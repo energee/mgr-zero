@@ -489,11 +489,14 @@ export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
 }
 
 export async function prepareSquarePublication(
-  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null, variationVersions: Record<string, number>,
+  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null,
+  variationVersions: Record<string, number> | { versions: Record<string, number>; changed: string[] },
 ) {
+  const fence = "versions" in variationVersions ? variationVersions
+    : { versions: variationVersions, changed: Object.keys(variationVersions) };
   const { data, error } = await createAdminClient().rpc("prepare_square_publication", {
     p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
-    p_request_body: requestBody, p_item_version: itemVersion, p_variation_versions: variationVersions,
+    p_request_body: requestBody, p_item_version: itemVersion, p_variation_versions: fence,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (data === false) throw new CommandError("Square publication was superseded", 409, "conflict");

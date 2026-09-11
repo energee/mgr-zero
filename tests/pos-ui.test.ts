@@ -7,11 +7,31 @@ import { describe, expect, it } from "vitest";
 import { PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
-import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, shouldStartNewCommandAttempt, syncFailureMessage } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage } from "@/lib/mgr/pos-view";
 import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 describe("POS UI truth", () => {
+  it("freezes corrected publication input for an exact retry after an unknown result", () => {
+    const corrected = selectExactCommandAttempt(null, { name: "publish_pos_item", input: {
+      posLocationId: "L1", brandId: "brand-1", retryConflict: true,
+    } }, true, () => "corrected-request");
+    const retry = selectExactCommandAttempt(corrected, { name: "publish_pos_item", input: {
+      posLocationId: "L1", brandId: "brand-1",
+    } }, false, () => "must-not-run");
+    expect(retry).toEqual(corrected);
+    expect(retry).toMatchObject({ requestId: "corrected-request", input: { retryConflict: true } });
+  });
+
+  it("renders superseded sync as incomplete while accepting a confirmed empty catalog", () => {
+    expect(syncResultMessage("Catalog", { locations: 1, variations: 0 }, "empty-ok")).toBe("Catalog sync complete · attempt empty-ok");
+    expect(syncResultMessage("Catalog", { synced: false }, "incomplete")).toBeNull();
+    const superseded = syncResultMessage("Catalog", { synced: false, superseded: true, errorCode: "connection_changed" }, "stale")!;
+    expect(superseded).toContain("Catalog sync superseded · attempt stale");
+    expect(superseded).toContain("not refreshed");
+    expect(superseded).not.toContain("sync complete");
+  });
+
   it("names uncertain publication by its exact retry identity", () => {
     expect(publicationNotice({ requestId: "request-17", status: "prepared" })).toEqual({
       label: "Outcome unknown",

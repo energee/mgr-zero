@@ -126,7 +126,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
           price_money: { amount: variation.priceCents, currency: "USD" },
         },
       })) },
-    }, itemVersion: null, variationVersions: {} as Record<string, number> };
+    }, itemVersion: null, variationVersions: { versions: {} as Record<string, number>, changed: [] as string[] } };
   }
   if (!current || current.type !== "ITEM" || current.id !== source.externalItemId || current.is_deleted === true
     || !Number.isSafeInteger(current.version)) throw new Error("Square catalog item changed or is unavailable");
@@ -139,6 +139,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
   if (!itemData || !Array.isArray(variations)) throw new Error("Square catalog item has no writable variations");
   const changed: Record<string, unknown>[] = [];
   const variationVersions: Record<string, number> = {};
+  const changedVariationIds: string[] = [];
   const ownedIds = new Set(source.variations.flatMap((variation) => variation.externalVariationId ? [variation.externalVariationId] : []));
   for (const sourceVariation of source.variations) {
     if (!sourceVariation.externalVariationId) {
@@ -156,6 +157,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
       && (entry as Record<string, unknown>).id === sourceVariation.externalVariationId) as Record<string, unknown> | undefined;
     if (!original || !variation || original.type !== "ITEM_VARIATION" || original.is_deleted === true
       || !Number.isSafeInteger(original.version)) throw new Error("Square catalog variation changed or is unavailable");
+    const before = JSON.stringify(writableCatalogValue(original));
     const variationData = variation.item_variation_data as Record<string, unknown> | undefined;
     if (!variationData || variationData.item_id !== source.externalItemId) throw new Error("Square catalog ownership changed");
     variationVersions[sourceVariation.externalVariationId] = original.version as number;
@@ -170,6 +172,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
       variationData.location_overrides = overrides;
     }
     setLocationPresence(variation, source.locationId, sourceVariation.present);
+    if (JSON.stringify(variation) !== before) changedVariationIds.push(sourceVariation.externalVariationId);
     changed.push(variation);
   }
   const anyPresent = source.variations.some((variation) => variation.present && variation.priceCents !== null);
@@ -186,7 +189,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     object: changed.length === 1 && !String(changed[0].id).startsWith("#")
       && !parentNeedsLocation && !parentNeedsRemoval && !parentNeedsName ? changed[0] : item,
     itemVersion: current.version as number,
-    variationVersions,
+    variationVersions: { versions: variationVersions, changed: changedVariationIds },
   };
 }
 
@@ -310,8 +313,8 @@ export class SquareClient {
     do {
       const body = { object_types: ["ITEM", "ITEM_VARIATION"], include_deleted_objects: true, ...(cursor ? { cursor } : {}) };
       const data = await this.api("/v2/catalog/search", accessToken, { method: "POST", body: JSON.stringify(body) });
-      if (!Array.isArray(data.objects)) throw unavailable();
-      objects.push(...data.objects.filter((value): value is Record<string, unknown> => !!value && typeof value === "object"));
+      if (data.objects !== undefined && !Array.isArray(data.objects)) throw unavailable();
+      objects.push(...(data.objects ?? []).filter((value): value is Record<string, unknown> => !!value && typeof value === "object"));
       cursor = data.cursor === undefined ? null : text(data.cursor);
       if (data.cursor !== undefined && !cursor) throw unavailable();
       if (cursor && cursors.has(cursor)) throw unavailable();

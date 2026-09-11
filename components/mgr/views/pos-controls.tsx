@@ -9,19 +9,20 @@ import {
 } from "@/components/mgr/views/pos";
 import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { isTerminalPublication, publicationNotice, readPublicationOutcome, shouldStartNewCommandAttempt, syncFailureMessage, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, type ExactCommandAttempt, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 function useExactCommand() {
   const action = useCommandAction();
-  const [requestId, setRequestId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState<ExactCommandAttempt | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  async function run(name: string, input: unknown, corrected = false) {
-    const id = !corrected && requestId ? requestId : crypto.randomUUID();
-    setRequestId(id); setResult(null);
-    const ok = await action.run(name, input, data => setResult(data as Record<string, unknown>), id);
-    return { ok, requestId: id };
+  async function run(name: string, input: unknown, newAttempt = false) {
+    const selected = selectExactCommandAttempt(attempt, { name, input }, newAttempt);
+    setAttempt(selected); setResult(null);
+    const ok = await action.run(selected.name, selected.input, data => setResult(data as Record<string, unknown>), selected.requestId);
+    return { ok, requestId: selected.requestId };
   }
-  return { ...action, requestId, result, run, clear: () => { setRequestId(null); setResult(null); action.setError(null); } };
+  return { ...action, requestId: attempt?.requestId ?? null, result, run,
+    clear: () => { setAttempt(null); setResult(null); action.setError(null); } };
 }
 
 export function PosRouteSheet({ title, backHref, children }: { title: string; backHref: string; children: ReactNode }) {
@@ -42,7 +43,8 @@ export function SquareDisconnectControl({ connectionId }: { connectionId: string
 export function SquareSyncControls() {
   const catalog = useExactCommand(), sales = useExactCommand();
   const summary = (kind: string, action: ReturnType<typeof useExactCommand>) => {
-    if (action.result) return E.info(`${kind} sync complete · attempt ${action.requestId}`);
+    const result = syncResultMessage(kind, action.result, action.requestId);
+    if (result) return action.result && (action.result as Record<string, unknown>).superseded === true ? E.note(result) : E.info(result);
     const message = syncFailureMessage(kind, action.failure, action.requestId);
     return message ? E.note(message) : null;
   };

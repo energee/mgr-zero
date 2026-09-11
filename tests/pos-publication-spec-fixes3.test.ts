@@ -1,9 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { Client } from "pg";
 import { runCommand } from "@/lib/commands/registry";
 import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { advanceSquareCatalogSync, beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
   compareAndSwapSquareTokens, readVersionedIntegrationTokens, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, DB, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
 import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
@@ -11,7 +12,7 @@ const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secre
 const nativeFetch = globalThis.fetch;
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 
-async function fixture(brands = 1) {
+async function fixture(brandCount = 1) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "admin");
   const location = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
@@ -25,7 +26,8 @@ async function fixture(brands = 1) {
     external_location_id: "L1", external_name: "Taproom", available: true, location_id: location.id })).error).toBeNull();
   const channel = await channelId(brewery.id, "Taproom");
   const brandIds: string[] = [];
-  for (let index = 0; index < brands; index += 1) {
+  const brands: Array<{ brandId: string; skuId: string; formatId: string }> = [];
+  for (let index = 0; index < brandCount; index += 1) {
     const keg = await seedCatalog(brewery.id, { product: `Brand ${index}`, sku: `Brand ${index} half`,
       packageType: "keg", bblPerUnit: 0.5 });
     const format = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: keg.brandId,
@@ -35,9 +37,10 @@ async function fixture(brands = 1) {
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId,
       qty: 1, type: "opening_balance" }, ctx, execution());
     brandIds.push(keg.brandId);
+    brands.push({ brandId: keg.brandId, skuId: keg.skuId, formatId: format.data!.id });
   }
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
-  return { brewery, ctx, connectionId: connection.data!.id as string, brandIds };
+  return { brewery, ctx, connectionId: connection.data!.id as string, brandIds, brands, location, channel };
 }
 
 function success(body: Record<string, any>, itemId = `ITEM-${crypto.randomUUID()}`) {
@@ -74,6 +77,77 @@ function commandSquare(fetcher: typeof globalThis.fetch) {
 }
 
 describe("Square publication final orchestration fences", () => {
+  it("refuses to coalesce an unresolved standalone publication across locations", async () => {
+    const f = await fixture();
+    const second = await seedLocation(f.brewery.id, { name: "Beer garden", kind: "taproom" });
+    expect((await admin.from("pos_locations").insert({ brewery_id: f.brewery.id, connection_id: f.connectionId,
+      external_location_id: "L2", external_name: "Beer garden", available: true, location_id: second.id })).error).toBeNull();
+    await runCommand("record_movement", { skuId: f.brands[0]!.skuId, locationId: second.id, binId: second.binId,
+      qty: 1, type: "opening_balance" }, f.ctx, execution());
+    await runCommand("configure_pos_menu", { posLocationId: "L2", binId: second.binId, saleChannelId: f.channel }, f.ctx, execution());
+
+    const firstRequest = crypto.randomUUID();
+    const first = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! }, firstRequest, "publish_pos_item");
+    const incompatibleRequest = crypto.randomUUID();
+    await expect(beginSquarePublication(f.ctx, { posLocationId: "L2", brandId: f.brandIds[0]! },
+      incompatibleRequest, "publish_pos_item")).rejects.toMatchObject({ status: 409 });
+    expect(sql(`select count(*) from private.command_requests where actor_id='${f.ctx.userId}' and request_id='${incompatibleRequest}'`))
+      .toEqual(["0"]);
+
+    await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! }, firstRequest,
+      new SquareClient(config, vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
+        success(JSON.parse(String(init?.body)), "LOCATION-ITEM"))), "publish_pos_item"))
+      .resolves.toMatchObject({ externalItemId: "LOCATION-ITEM" });
+    const secondStart = await beginSquarePublication(f.ctx, { posLocationId: "L2", brandId: f.brandIds[0]! },
+      crypto.randomUUID(), "publish_pos_item");
+    expect(secondStart.attemptId).not.toBe(first.attemptId);
+    expect(secondStart.source).toMatchObject({ locationId: "L2", externalItemId: "LOCATION-ITEM" });
+  });
+
+  it("serializes menu ownership capture with an in-flight standalone finish", async () => {
+    const f = await fixture();
+    let enteredProvider!: () => void, releaseProvider!: () => void;
+    const providerEntered = new Promise<void>((resolve) => { enteredProvider = resolve; });
+    const providerReleased = new Promise<void>((resolve) => { releaseProvider = resolve; });
+    const standalone = publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
+      crypto.randomUUID(), new SquareClient(config, vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
+        enteredProvider(); await providerReleased; return success(JSON.parse(String(init?.body)), "RACE-ITEM");
+      })), "publish_pos_item");
+    await providerEntered;
+
+    const blocker = new Client({ connectionString: DB });
+    await blocker.connect();
+    const lockName = `square-publish:${f.connectionId}:${f.brandIds[0]}:poured`;
+    let blocking = true;
+    try {
+      await blocker.query("begin");
+      await blocker.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [lockName]);
+      const menu = beginSquareMenuPublication(f.ctx, { posLocationId: "L1" }, crypto.randomUUID());
+      await vi.waitFor(() => expect(Number(sql(`select count(*) from pg_locks where locktype='advisory' and not granted
+        and classid=(((hashtextextended('${lockName}',0)>>32)&4294967295)::oid)
+        and objid=((hashtextextended('${lockName}',0)&4294967295)::oid)`)[0])).toBeGreaterThanOrEqual(1));
+      releaseProvider();
+      await vi.waitFor(() => {
+        const ownership = Number(sql(`select count(*) from public.pos_catalog_items where connection_id='${f.connectionId}'
+          and brand_id='${f.brandIds[0]}'`)[0]);
+        const waiters = Number(sql(`select count(*) from pg_locks where locktype='advisory' and not granted
+          and classid=(((hashtextextended('${lockName}',0)>>32)&4294967295)::oid)
+          and objid=((hashtextextended('${lockName}',0)&4294967295)::oid)`)[0]);
+        expect(ownership > 0 || waiters >= 2).toBe(true);
+      });
+      await blocker.query("commit"); blocking = false;
+      const results = await Promise.allSettled([menu, standalone]);
+      expect(results.map((result) => result.status)).toEqual(["rejected", "fulfilled"]);
+    } finally {
+      if (blocking) await blocker.query("rollback");
+      await blocker.end();
+      releaseProvider?.();
+    }
+    expect(sql(`select count(*) from private.square_menu_publications where brewery_id='${f.brewery.id}';
+      select external_item_id from public.pos_catalog_items where connection_id='${f.connectionId}' and brand_id='${f.brandIds[0]}'`))
+      .toEqual(["0", "RACE-ITEM"]);
+  }, 15_000);
+
   it("returns the durable terminal publication contract from the real command handlers", async () => {
     const succeeded = await fixture();
     const successFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {

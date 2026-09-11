@@ -91,12 +91,13 @@ type PosExpectation = { sale_id: string; expected_bbl: number | null; serving_ou
 type PosSaleLocation = { connection_id: string; external_location_id: string; external_name: string | null; locations: NamedRelation };
 type PosCatalogVariation = { connection_id: string; external_variation_id: string; external_item_name: string | null; external_variation_name: string | null };
 type PosMapping = { connection_id: string; external_variation_id: string; ignored: boolean };
+type PosOrderVersion = { connection_id: string; external_order_id: string; source_version: number };
 const relatedName = (relation: NamedRelation) => Array.isArray(relation) ? relation[0]?.name : relation?.name;
 
 async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
   if (!rows.length) return [];
   const connectionIds = [...new Set(rows.map((row) => row.connection_id))];
-  const [expectations, locations, catalog, mappings] = await Promise.all([
+  const [expectations, locations, catalog, mappings, orderVersions] = await Promise.all([
     completePosRows<PosExpectation>((start) => ctx.db.from("pos_sale_expectations")
       .select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).order("sale_id").range(start, start + 499)),
@@ -109,6 +110,9 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
     completePosRows<PosMapping>((start) => ctx.db.from("pos_item_mappings")
       .select("connection_id,external_item_id,external_variation_id,ignored", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + 499)),
+    completePosRows<PosOrderVersion>((start) => ctx.db.rpc("pos_order_versions", {}, { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds)
+      .order("connection_id").order("external_order_id").range(start, start + 499)),
   ]);
   const expectationBySale = new Map(expectations.map((row) => [row.sale_id, row]));
   const key = (connection: string, variation: string | null) => `${connection}\0${variation ?? ""}`;
@@ -121,6 +125,9 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
     const version = BigInt(row.source_version);
     if ((newestByOrder.get(order) ?? BigInt(-1)) < version) newestByOrder.set(order, version);
   }
+  const durableVersionByOrder = new Map(orderVersions.map((row) => [
+    `${row.connection_id}\0${row.external_order_id}`, BigInt(row.source_version),
+  ]));
   return rows.map((row) => {
     const catalogRow = catalogByVariation.get(key(row.connection_id, row.external_variation_id));
     const mapping = mappingByVariation.get(key(row.connection_id, row.external_variation_id));
@@ -129,7 +136,8 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
     return {
       id: row.id, externalOrderId: row.external_order_id, externalLineId: row.external_line_id,
       sourceVersion: String(row.source_version), factKind: row.fact_kind, factStatus: row.fact_status,
-      current: BigInt(row.source_version) === newestByOrder.get(`${row.connection_id}\0${row.external_order_id}`),
+      current: BigInt(row.source_version) === (durableVersionByOrder.get(`${row.connection_id}\0${row.external_order_id}`)
+        ?? newestByOrder.get(`${row.connection_id}\0${row.external_order_id}`)),
       itemName: catalogRow?.external_item_name ?? row.external_item_id ?? "Unknown Square item",
       variationName: catalogRow?.external_variation_name ?? row.external_variation_id ?? "No catalog variation",
       externalLocationId: row.external_location_id, locationName: relatedName(location?.locations ?? null) ?? location?.external_name ?? row.external_location_id ?? "Unknown location",

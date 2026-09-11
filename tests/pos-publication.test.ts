@@ -39,6 +39,74 @@ beforeAll(() => {
 });
 
 describe("Square durable catalog publication", () => {
+  it("accepts a parent rename when Square leaves the unchanged child version intact", async () => {
+    const f = await publicationFixture();
+    sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+      values('${f.brewery.id}','${f.connectionId}','${f.brandId}','poured','PARENT-ITEM','mgr');
+      insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,external_item_id,external_variation_id)
+      values('${f.brewery.id}','${f.connectionId}','${f.brandId}','poured','${f.formatId}','PARENT-ITEM','PARENT-VAR')`);
+    const current = { type: "ITEM", id: "PARENT-ITEM", version: 7, present_at_all_locations: false,
+      present_at_location_ids: ["L1"], item_data: { name: "Old parent name", variations: [{
+        type: "ITEM_VARIATION", id: "PARENT-VAR", version: 6, present_at_all_locations: false,
+        present_at_location_ids: ["L1"], item_variation_data: { item_id: "PARENT-ITEM", name: "Pint",
+          pricing_type: "FIXED_PRICING", price_money: { amount: 700, currency: "USD" },
+          location_overrides: [{ location_id: "L1", pricing_type: "FIXED_PRICING", price_money: { amount: 700, currency: "USD" } }] },
+      }] } };
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
+      if (!init?.method) return new Response(JSON.stringify({ object: current }), { status: 200 });
+      const body = JSON.parse(String(init.body));
+      expect(body.object).toMatchObject({ type: "ITEM", id: "PARENT-ITEM", version: 7,
+        item_data: { name: "Hazy", variations: [expect.objectContaining({ id: "PARENT-VAR", version: 6 })] } });
+      return new Response(JSON.stringify({ catalog_object: { ...body.object, version: 8 }, id_mappings: [] }), { status: 200 });
+    });
+    await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandId }, crypto.randomUUID(),
+      new SquareClient(config, fetch), "publish_pos_item")).resolves.toMatchObject({ published: true, externalItemId: "PARENT-ITEM" });
+  });
+
+  it("allows an unchanged sibling version in a mixed item update but rejects an unchanged changed-child version", async () => {
+    const run = async (changedVersion: number, forgeChangedContent = false) => {
+      const f = await publicationFixture();
+      const half = await admin.from("formats").insert({ brewery_id: f.brewery.id, brand_id: f.brandId,
+        name: "Half pint", basis: "poured", ounces: 8 }).select("id").single();
+      expect(half.error).toBeNull();
+      await priceSku(f.brewery.id, { saleChannelId: f.channel, brandId: f.brandId, formatId: half.data!.id, cents: 500 });
+      sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+        values('${f.brewery.id}','${f.connectionId}','${f.brandId}','poured','MIXED-ITEM','mgr');
+        insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,external_item_id,external_variation_id)
+        values('${f.brewery.id}','${f.connectionId}','${f.brandId}','poured','${f.formatId}','MIXED-ITEM','CHANGED-VAR'),
+          ('${f.brewery.id}','${f.connectionId}','${f.brandId}','poured','${half.data!.id}','MIXED-ITEM','UNCHANGED-VAR')`);
+      const current = { type: "ITEM", id: "MIXED-ITEM", version: 7, present_at_all_locations: false,
+        present_at_location_ids: ["L1"], item_data: { name: "Hazy", variations: [
+          { type: "ITEM_VARIATION", id: "CHANGED-VAR", version: 6, present_at_all_locations: false,
+            present_at_location_ids: ["L1"], item_variation_data: { item_id: "MIXED-ITEM", name: "Pint",
+              pricing_type: "FIXED_PRICING", price_money: { amount: 600, currency: "USD" },
+              location_overrides: [{ location_id: "L1", pricing_type: "FIXED_PRICING", price_money: { amount: 600, currency: "USD" } }] } },
+          { type: "ITEM_VARIATION", id: "UNCHANGED-VAR", version: 4, present_at_all_locations: false,
+            present_at_location_ids: ["L1"], item_variation_data: { item_id: "MIXED-ITEM", name: "Half pint",
+              pricing_type: "FIXED_PRICING", price_money: { amount: 500, currency: "USD" },
+              location_overrides: [{ location_id: "L1", pricing_type: "FIXED_PRICING", price_money: { amount: 500, currency: "USD" } }] } },
+        ] } };
+      const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
+        if (!init?.method) return new Response(JSON.stringify({ object: current }), { status: 200 });
+        const body = JSON.parse(String(init.body));
+        const variations = body.object.item_data.variations.map((variation: Record<string, any>) => ({
+          ...variation, version: variation.id === "CHANGED-VAR" ? changedVersion : 4,
+          ...(forgeChangedContent && variation.id === "CHANGED-VAR" ? { item_variation_data: {
+            ...variation.item_variation_data, location_overrides: [{ location_id: "L1", pricing_type: "FIXED_PRICING",
+              price_money: { amount: 1, currency: "USD" } }],
+          } } : {}),
+        }));
+        return new Response(JSON.stringify({ catalog_object: { ...body.object, version: 8,
+          item_data: { ...body.object.item_data, variations } }, id_mappings: [] }), { status: 200 });
+      });
+      return publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandId }, crypto.randomUUID(),
+        new SquareClient(config, fetch), "publish_pos_item");
+    };
+    await expect(run(7)).resolves.toMatchObject({ published: true, externalItemId: "MIXED-ITEM" });
+    await expect(run(6)).rejects.toThrow("Square publication result could not be recorded");
+    await expect(run(7, true)).rejects.toThrow("Square publication result could not be recorded");
+  });
+
   it("preserves seller fields and unrelated locations while changing one owned variation", () => {
     const current = {
       type: "ITEM", id: "ITEM-1", version: 7, updated_at: "readonly", is_deleted: false,
@@ -175,8 +243,8 @@ describe("Square durable catalog publication", () => {
       } }), { status: 200 });
       bodies.push(String(init.body));
       if (generation === 1) return new Response(JSON.stringify({ errors: [{ code: "VERSION_MISMATCH" }] }), { status: 409 });
-      return new Response(JSON.stringify({ catalog_object: { type: "ITEM_VARIATION", id: "SELLER-VAR", version: 8,
-        item_variation_data: { item_id: "SELLER-ITEM" } } }), { status: 200 });
+      const request = JSON.parse(String(init.body));
+      return new Response(JSON.stringify({ catalog_object: { ...request.object, version: 8 } }), { status: 200 });
     });
     const client = new SquareClient(config, fetch);
     const adoption = { posLocationId: "L1", brandId, adoptItemId: "SELLER-ITEM", adoptVariationId: "SELLER-VAR" };

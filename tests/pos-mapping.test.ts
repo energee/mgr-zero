@@ -19,6 +19,29 @@ async function connected(breweryId: string, merchantId = `merchant-${crypto.rand
 }
 
 describe("Square explicit mapping", () => {
+  it("marks a recent old fact historical when the durable newer revision is outside the recent page", async () => {
+    const brewery = await makeBrewery();
+    const connectionId = await connected(brewery.id);
+    const ctx = await makeStaffCtx(brewery.id, "warehouse");
+    const target = { brewery_id: brewery.id, connection_id: connectionId, external_order_id: "PAGE-CURRENT",
+      external_line_id: "line", source_version: 1, fact_kind: "sale", fact_status: "accepted",
+      sold_at: "2026-09-10T12:00:00Z", ingested_at: "2030-01-01T00:00:00Z", qty: 1, source_quantity: "1" };
+    const newer = { ...target, source_version: 2, ingested_at: "2000-01-01T00:00:00Z", qty: 2, source_quantity: "2" };
+    const fillers = Array.from({ length: 100 }, (_, index) => ({ ...target,
+      external_order_id: `FILLER-${index}`, external_line_id: `filler-${index}`,
+      ingested_at: `2029-01-${String((index % 28) + 1).padStart(2, "0")}T00:00:00Z`,
+    }));
+    expect((await admin.from("pos_sales").insert([target, newer, ...fillers])).error).toBeNull();
+    sql(`insert into private.square_order_snapshots(brewery_id,connection_id,merchant_id,external_order_id,source_version,snapshot_hash)
+      values('${brewery.id}','${connectionId}','merchant-page','PAGE-CURRENT',1,'v1'),
+        ('${brewery.id}','${connectionId}','merchant-page','PAGE-CURRENT',2,'v2')`);
+
+    const listing = await runCommand("list_pos_sales", {}, ctx) as { sales: Array<{ externalOrderId: string; sourceVersion: string; current: boolean }> };
+    expect(listing.sales).toHaveLength(100);
+    expect(listing.sales).toContainEqual(expect.objectContaining({ externalOrderId: "PAGE-CURRENT", sourceVersion: "1", current: false }));
+    expect(listing.sales).not.toContainEqual(expect.objectContaining({ externalOrderId: "PAGE-CURRENT", sourceVersion: "2" }));
+  });
+
   it("completes sale enrichment and retained revision reads beyond the Data API row cap", async () => {
     const brewery = await makeBrewery();
     const connectionId = await connected(brewery.id);

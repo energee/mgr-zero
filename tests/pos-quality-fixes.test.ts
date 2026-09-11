@@ -26,6 +26,15 @@ async function connected(breweryId: string) {
 }
 
 describe("Square quality-review lifecycle fences", () => {
+  it("accepts an omitted catalog objects field as empty but rejects a present malformed field", async () => {
+    const emptyClient = new SquareClient(config, vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("{}", { status: 200 })));
+    await expect(emptyClient.listCatalogVariations("access")).resolves.toEqual([]);
+    const malformedClient = new SquareClient(config, vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response('{"objects":null}', { status: 200 })));
+    await expect(malformedClient.listCatalogVariations("access")).rejects.toThrow("Square is unavailable");
+  });
+
   it.each([
     ["location verification", false, true, "confirmed"],
     ["durable adoption", true, true, "confirmed"],

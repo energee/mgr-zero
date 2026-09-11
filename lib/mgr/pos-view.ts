@@ -29,6 +29,29 @@ export function shouldStartNewCommandAttempt(result: unknown, failure: CommandFa
   return Boolean(result) || failure?.kind === "definitive";
 }
 
+export type ExactCommandAttempt = { requestId: string; name: string; input: unknown };
+
+export function selectExactCommandAttempt(
+  current: ExactCommandAttempt | null,
+  requested: Omit<ExactCommandAttempt, "requestId">,
+  newAttempt: boolean,
+  createId: () => string = () => crypto.randomUUID(),
+): ExactCommandAttempt {
+  return !newAttempt && current ? current : { requestId: createId(), ...requested };
+}
+
+export function syncResultMessage(kind: string, result: unknown, requestId: string | null) {
+  if (!result || !requestId || typeof result !== "object") return null;
+  const row = result as Record<string, unknown>;
+  if (row.superseded === true) {
+    return `${kind} sync superseded · attempt ${requestId}. The ${kind.toLowerCase()} was not refreshed. Start a new sync.`;
+  }
+  const complete = kind === "Catalog"
+    ? Number.isSafeInteger(row.locations) && Number.isSafeInteger(row.variations)
+    : kind === "Sales" && row.complete === true;
+  return complete ? `${kind} sync complete · attempt ${requestId}` : null;
+}
+
 export function syncFailureMessage(kind: string, failure: CommandFailureDetail | null, requestId: string | null) {
   if (failure?.kind === "unknown" && requestId) return `${kind} sync outcome is unknown · attempt ${requestId}. Retry the exact attempt before starting another.`;
   if (failure?.kind === "definitive") return `${kind} sync stopped · ${failure.message}. Resolve the permission or conflict, then start a new sync.`;
