@@ -2,19 +2,38 @@
 
 This is the durable evidence index for the 2026-09-11 F3 walkthrough. The
 walkthrough started from `5f8743915a44dd8e63039e99c3162befdd14a40d`.
-The initial browser/layout and audit commits were `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`
-and `02d6c40586547d3f694cb3894cabbd1b561dfd34`. The remediation code was proved
-at `662979b991d41d133a647bf6039e97ae8dd7894a` after the earlier
-`34af080bd65e147a607aba1e83d06f5361b8faca` product/test wave. Final customer-balance
-and dual-membership repairs were proved at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`. The final audit
-commit changes only this evidence file and the audit; its verification delta is
-stated in the audit and does not change runtime behavior.
+The latest product proof is exact code revision
+`a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006`. Its behavior was introduced at
+`924cf294f5084443bfa97d213c3642054d1bb166`: bounded, tenant/location scoped
+confirmation-stock reads and removal of an unsupported other-location stock
+assertion. The follow-up normalizes a nullable empty line response before the
+same exact-SKU read and changes no nonempty-order behavior. Earlier browser and regression evidence was created before the #318
+integration rebase. The map below records patch identity between those historical
+objects and the integrated ancestry; those old SHAs are evidence lineage, not
+exact-head labels.
 
 The run used the isolated local Supabase API/Postgres ports 54351/54352 and one
 reset/fixture owner. Browser work used Next port 3219 and the named
 `agent-browser` session `adversarial-completion`. No hosted system, real email,
 real Slack/Square/QBO provider, deployed credentials, legal review, printer, or
 assistive technology was used.
+
+## Historical-to-integrated commit map
+
+`git patch-id --stable` produced the same patch ID for every pair below. Tree
+hashes differ because the commits were replayed on the #318 integration ancestry.
+
+| Historical SHA | Integrated SHA | Stable patch ID |
+| --- | --- | --- |
+| `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec` | `579aad6186fb7575356e95a1133a11efe4963ea1` | `e704bc7af46caa209c179768c5ae1ddf6bf2f940` |
+| `02d6c40586547d3f694cb3894cabbd1b561dfd34` | `daec91899f231e26b0ce7ce47163c835da051a21` | `782edc379b5adde9ab8d02943c68f2a02c75286b` |
+| `34af080bd65e147a607aba1e83d06f5361b8faca` | `e62325f6a7c94b69d7badebb0fa300ff02c05746` | `d4334cdb4b6de9f7638baf729258a635ddbf43b6` |
+| `662979b991d41d133a647bf6039e97ae8dd7894a` | `47231aed2678610fb13931424d0cc9174eeec035` | `e3b38d1d2a66bec0fed952b22a354e7fb3cbade2` |
+| `dcefbfae15643866a15af152ef943ac9fa3bce52` | `f3607154e3519a1b3f07ee4fb5a549207cab1464` | `954caa0fb5817531c426566e27b61c7c51d7685d` |
+| `9f061b0394cb98eabd0c5690b3d16f72a6baea86` | `70bb725d8941979aa725305dfb890ae11e8f0fec` | `2d1de11bf98a9aa4b1d6e3029f9448b357458c12` |
+| `61df1d55e7b8060e2846b51d7650dbda2125404a` | `45fea192207b748d8c0c34dee83be3382cd4a73b` | `bc1a0132a3c9aa749cafac6a8e5846390fda90c5` |
+| `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` | `70c044f38377dfc3d198df7ec73cc19dd881380d` | `4843b976deb531fa7b954f58ad84b22616141d69` |
+| `881468a8029d9a015d7ee0f3abdfb611ee0153f4` | `c5e00d803152511732db5d105e5f81ef10176f6f` | `aef4cdedc75e2acfd722d781cd8e228ca9f0bba9` |
 
 ## Verification ledger
 
@@ -35,7 +54,20 @@ assistive technology was used.
 - At code commit `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`, `tests/portal-orders-view.test.ts`
   passed 13/13 and `tests/commands-portal.test.ts`, `tests/orders-lifecycle.test.ts`,
   and `tests/rls-command-boundary.test.ts` passed 92/92 after a fresh isolated reset.
-- With the final audit content present, the documentation/API suite passed 46/46,
+- At exact code commit `924cf294f5084443bfa97d213c3642054d1bb166`,
+  the focused RED first returned 1,000 source rows for an order whose SKU was
+  beyond the response cap and failed three false-other-location assertions.
+  After the fix, `tests/inventory-read-completeness.test.ts` and
+  `tests/orders-review-view.test.ts` passed 14/14: the target order receives
+  source quantity 508 and ATP 505, while two-location, single-location-short,
+  and never-stocked cases make no unsupported other-location claim.
+- At final code commit `a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006`,
+  the same focused stock/view batch passed 14/14 after nullable empty-line
+  normalization; `bunx tsc --noEmit` passed and `bun run lint` passed with the
+  one pre-existing `_request` warning in the public-menu route.
+- With the final audit content present at the documentation commit following
+  `a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006`, the seven-file pure
+  screen/documentation suite passed 121/121,
   `bunx tsc --noEmit` passed, and `bun run lint` passed with the pre-existing
   `_request` unused-parameter warning in the public-menu route. Raw command logs remain local
   under `.local/mgr-private`; they are intentionally not linked as durable proof.
@@ -49,6 +81,12 @@ The connected remediation fixture is
 is `/private/tmp/mgr-remainder-evidence/f3-review-browser`. These local artifacts
 were captured against the remediation source and are summarized here so the
 audit does not depend on a broken private-log link.
+
+The final connected portal fixture is
+`/private/tmp/mgr-remainder-evidence/f3-astra-fixture.json`; its browser/SQL
+bundle is `/private/tmp/mgr-remainder-evidence/f3-astra-browser`. It was created
+after one isolated reset against exact code revision
+`924cf294f5084443bfa97d213c3642054d1bb166`.
 
 - **A03:** one order, `8b6707a2-56c1-45f5-915a-04ac6735fca8`, was opened as
   Admin, Sales, Warehouse, Brewer, Taproom, and Customer. Admin/Sales/Warehouse
@@ -68,6 +106,26 @@ audit does not depend on a broken private-log link.
   showed ordered 10, shipped 4, “Two cases damaged during picking”, six cancelled
   with no units remaining to ship, and a separately unpaid $600 invoice. Files
   are prefixed `f3-quality-browser/p06-corrected-`.
+- **P01/B05:** customer `1c57e3fd-a645-48c2-ba8b-440e2bc1e7b9` saved draft
+  `bae43e13-73f3-41e5-bde7-83ccabdb32ec` with quantity 2 and note “Before
+  recovery”, signed out, signed back in, reopened the same ID through **Continue
+  / edit**, changed quantity to 4 and the note to “Edited after recovery”,
+  reviewed $168.00, and submitted that same ID. `p01-edit-submitted-sql.txt`
+  records the exact customer, ship-to, source, SKU, final fields, one target
+  order row, exact create/quote/submit request IDs, and created→updated→submitted
+  events. Files are prefixed `f3-astra-browser/p01-edit-`. Fresh final-head
+  375×812 and 1440×900 reloads at
+  `a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006` are recorded as
+  `p01-final-head-smoke-375.*` and `p01-final-head-smoke-1440.*`; both retain
+  the placed order's quantity 4, PO, edited note, and $168 total.
+- **P05:** at 1440×900 and 375×812, blank, decimal `1.5`, negative `-1`, huge
+  `9007199254740992`, and an `insertFromPaste` decimal `2.5` all disabled Save
+  draft/Review order; every nonblank invalid value stayed visible with “Enter
+  whole quantities of zero or more.” `p05-sql-counts.txt` records zero orders
+  after every pre-submit invalid case. A valid integer paste event set `3` and
+  enabled both actions. This completes the runnable input matrix, but the
+  message remains global rather than row-specific/announced, so P05 stays
+  Source only. Files are prefixed `f3-astra-browser/p05-`.
 - Browser page-error captures were empty. The final console contained only
   React DevTools development notices. The browser session and Next server were
   closed after capture.
@@ -104,13 +162,13 @@ was absent or the required capability does not exist.
 | <a id="i03"></a>I03 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/formats.test.ts` — “replace_format_bom writes the format's bill with on_break; sku_bom is gone” and `tests/packaging.test.ts` — “breaks one case into six four-packs, volume-neutral, and returns the tray to stock”. No single visible default/inheritance → mixed-pack → repack job was exercised. |
 | <a id="i04"></a>I04 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-inventory.test.ts` — “records every supported manual movement with exact signs, classification, and barrel volume”; its SQL readback covers all nine types and invalid sign/channel/state combinations. |
 | <a id="i05"></a>I05 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/inventory-reversal.test.ts` — “appends the exact frozen opposite and replays before lifecycle checks”, “restricts roles, foreign resources, unsupported types and compensation chains”, and “reads scoped inventory metadata, names, and linked history even at zero stock”. |
-| <a id="i06"></a>I06 | Proven | New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/i06-admin-confirm-1440.json`, `i06-admin-confirm-1440.png`, and `i06-admin-confirm.txt` on order `c285f69b-3895-41f4-9a03-fe9753270926`; new regression rerun at `662979b991d41d133a647bf6039e97ae8dd7894a` in `tests/order-sheets-view.test.ts` — “maps picked-below-ordered as a warning stepper”. |
+| <a id="i06"></a>I06 | Proven | New browser evidence at historical `34af080bd65e147a607aba1e83d06f5361b8faca` / patch-identical integrated `e62325f6a7c94b69d7badebb0fa300ff02c05746`: `f3-review-browser/i06-admin-confirm-1440.json`, `.png`, and `.txt` on order `c285f69b-3895-41f4-9a03-fe9753270926`. Fresh RED/GREEN at exact code revision `924cf294f5084443bfa97d213c3642054d1bb166`: `tests/inventory-read-completeness.test.ts` — “assembles every owned stock row beyond the PostgREST row cap” proves ordered SKU 1,001 receives source 508 and ATP 505; `tests/orders-review-view.test.ts` — “distinguishes source stock from brewery ATP without inventing another stocked location”, “does not claim other-location stock for a single-location shortage”, and “does not claim other-location stock for a never-stocked SKU”. |
 | <a id="i07"></a>I07 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/taproom-count.test.ts` — “persists a matching count and every explicit line without posting” and “waits for a real concurrent bin transfer, then refuses its stale observation”; the latter continues through refresh, one variance movement, and `get_taproom_count` reopen. |
 | <a id="i08"></a>I08 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/replenishment-form.test.ts` — “requires a SKU and a finite nonnegative quantity, allowing explicit zero to release” and `tests/purchasing.test.ts` — “one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped”. No connected existing-inbound-transfer effect on suggestions or duplicate-demand result was exercised. |
 | <a id="i09"></a>I09 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-inventory.test.ts` — “keeps a referenced SKU, location, and bin legible after edits and blocks new movement on the inactive SKU”. Product and location/bin retirement do not exist, so the complete three-entity archive scenario remains absent. |
 | <a id="o01"></a>O01 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/pricing.test.ts` — “create_order copies the customer's channel and prices lines from it; an unpriced sku is refused” and `tests/commands-portal.test.ts` — “rejects a ship-to that belongs to another customer”. No rendered adjacent remedy preserving the dirty order was exercised. |
 | <a id="o02"></a>O02 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “freezes the selected customer's price, deposit, addresses, and honest pending tax” and “rejects price, ship-to, source, or deposit drift without writing an order”. Changed facts were not visibly compared before commitment. |
-| <a id="o03"></a>O03 | Proven | New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/i06-admin-confirm-1440.json` shows source zero versus brewery ATP ten and the intentional-confirm consequence; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-lifecycle.test.ts` — “confirm warns (but does not block) when overselling”. |
+| <a id="o03"></a>O03 | Proven | Browser evidence at historical `34af080bd65e147a607aba1e83d06f5361b8faca` / patch-identical integrated `e62325f6a7c94b69d7badebb0fa300ff02c05746`: `f3-review-browser/i06-admin-confirm-1440.json` shows source zero versus brewery ATP ten and the intentional-confirm consequence. Fresh RED/GREEN at exact code revision `924cf294f5084443bfa97d213c3642054d1bb166`: `tests/inventory-read-completeness.test.ts` proves source 508/ATP 505 for ordered SKU 1,001; the three exact `tests/orders-review-view.test.ts` titles named in I06 prove truthful local-shortage text. Integrated `tests/orders-lifecycle.test.ts` at `47231aed2678610fb13931424d0cc9174eeec035` — “confirm warns (but does not block) when overselling” preserves the intentional choice. |
 | <a id="o04"></a>O04 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; corrected portal readback at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-375.json`. |
 | <a id="o05"></a>O05 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “ship with all lines qty_shipped 0 creates no invoice and releases allocations”. No rendered explanation of closed-versus-cancelled meaning was exercised. |
 | <a id="o06"></a>O06 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “adjust after pick sets needs_restock; re-pick clears it” and “clears needs_restock and writes an order event; no movement”. |
@@ -120,11 +178,11 @@ was absent or the required capability does not exist.
 | <a id="o10"></a>O10 | Source only | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/delivery.test.ts` — “keeps a failed stop open and blocks return without creating delivery money or stock effects”. Partial/refusal stock handling is unimplemented. |
 | <a id="o11"></a>O11 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/delivery.test.ts` — “walks a mixed route: the driver departs, Today names the next stop, a transfer stop confirms without an invoice, return waits for the last stop” The same test asserts another driver cannot depart/confirm and sees no Today stop. |
 | <a id="o12"></a>O12 | Not reviewed | Source inventory exists; multipage physical print inspection was not performed. |
-| <a id="p01"></a>P01 | Source only | Reused browser artifacts from `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`: `f3-browser/portal-draft-saved.json`, `portal-draft-relogin.json`, and `portal-draft-continued.txt`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/portal-continuity.test.ts` — “restores only a validated exact attempt in the same actor/customer/brewery scope”. That same recovered browser draft was not submitted. |
+| <a id="p01"></a>P01 | Proven | Newly observed at exact code revision `924cf294f5084443bfa97d213c3642054d1bb166`: `f3-astra-browser/p01-edit-draft-saved-375.json`, `p01-edit-relogin-orders-375.json`, `p01-edit-recovered-fields-375.json`, `p01-edit-recovered-review-375.json`, and `p01-edit-submitted-375.json` show draft `bae43e13-73f3-41e5-bde7-83ccabdb32ec` saved at quantity 2, recovered after sign-out/relogin, edited to quantity 4/note “Edited after recovery”, reviewed at $168, and submitted under the same ID. `p01-edit-submitted-sql.txt` records exact final IDs/fields, created→updated→submitted events, create/quote/submit request IDs, and exactly one target row. New final-head reload artifacts `p01-final-head-smoke-375.*` and `p01-final-head-smoke-1440.*` at `a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006` preserve quantity 4, PO, edited note, and $168 total. |
 | <a id="p02"></a>P02 | Proven | New fault-injection regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “injects committed response loss, reloads, and replays exact create/submit identities with one SQL effect”; it asserts exact request/order/event IDs and one order. |
 | <a id="p03"></a>P03 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “recovers a definitive submit failure by editing, reviewing, and retrying the exact saved draft”; exact ship-to, requested date, quantity, and submitted-state readback are asserted. |
 | <a id="p04"></a>P04 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “rejects price, ship-to, source, or deposit drift without writing an order” and “serializes a concurrent price change before drift validation and permits a safe retry”. No rendered cart-review comparison was exercised. |
-| <a id="p05"></a>P05 | Source only | New RED/GREEN regressions at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries” and “keeps staff fractional edits for a user who also belongs to the order customer”. They preserve customer-only direct-RPC enforcement, staff fractional edits, exact replay, one event, and the explicit portal invocation boundary. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. |
+| <a id="p05"></a>P05 | Source only | Newly rerun at exact code revision `924cf294f5084443bfa97d213c3642054d1bb166`: `f3-astra-browser/p05-blank-desktop.json`, `p05-decimal.json`, `p05-negative.json`, `p05-huge.json`, `p05-paste-decimal-375.json`, and `p05-sql-counts.txt` cover blank, typed decimal/negative/huge, and browser `insertFromPaste` decimal behavior at 1440×900/375×812. Invalid values stayed visible, showed the whole-quantity message, disabled Save/Review, and wrote no order; a valid integer paste enabled both actions. Patch-identical integrated `tests/commands-portal.test.ts` at `70c044f38377dfc3d198df7ec73cc19dd881380d` — “rejects fractional packaged quantities at the command and direct RPC boundaries” and “keeps staff fractional edits for a user who also belongs to the order customer” preserves database/command agreement. The message is global rather than row-specific/announced, so the complete accessible-error outcome remains absent. |
 | <a id="p06"></a>P06 | Proven | New browser evidence at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-1440.json`, `p06-corrected-1440.png`, `p06-corrected-375.json`, `p06-corrected-375.png`, and `p06-corrected-375.txt` show ordered 10, shipped 4, six cancelled with no units remaining to ship, and the separate `unpaid · $600.00` invoice. New regression at the same SHA: `tests/portal-orders-view.test.ts` — “separates cancelled fulfillment from the unpaid invoice balance”. |
 | <a id="p07"></a>P07 | Proven | Rerun with deterministic provider fixtures at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-state.test.ts` — “tracks partial, paid, reopened and voided states without mistaking credits for cash” and `tests/qbo-ui.test.ts` — “distinguishes a partial payment from a merely pushed invoice”. No live-provider claim. |
 | <a id="p08"></a>P08 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/invoice-questions.test.ts` — “a buyer raises one on their own invoice only, and a missing invoice reads the same as a foreign one” and `tests/portal-invoices-view.test.ts` — “the unavailable drawing has no Pay and still offers Question”. |
@@ -178,6 +236,14 @@ was absent or the required capability does not exist.
    customer during staff edits. Explicit portal scope now selects the portal contract;
    customer-only direct calls remain restricted, while staff fractional edits retain
    request identity, atomicity, and one effect.
+8. Confirmation loaded every brewery ATP row and every source-location balance
+   through uncapped requests. It now derives the exact order SKU set and loads
+   both projections in tenant/location-scoped batches of at most 100; the
+   >1,000-stocked-SKU regression returns source 508 and ATP 505 for SKU 1,001.
+9. Confirmation inferred stock at another location from nonnegative or absent
+   ATP. It now states only the observed source shortage and directs the operator
+   to replenish that source; two-location, single-location-short, and
+   never-stocked regressions reject the unsupported assertion.
 
 ## Evidence limits
 
