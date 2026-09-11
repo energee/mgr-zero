@@ -1,7 +1,7 @@
 # TODO — work still gated from `/docs/screens-explore`
 
-Refreshed 2026-09-11 against `main` at `848851e`. Counts are derived from
-`SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 169 MGR screens: 146 ungated and mapped, 23 gated, and 0 ungated without a live route.
+Refreshed 2026-09-11 against `main` at `9045bd4`. Counts are derived from
+`SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 169 MGR screens: 155 ungated and mapped, 14 gated, and 0 ungated without a live route.
 
 Audit sources: `components/mgr/screens.tsx`, `lib/mgr/screen-routes.ts`,
 `tests/app-screen-parity.test.ts`, and `tests/screen-command-gates.test.ts`.
@@ -19,16 +19,8 @@ drift do not remain here; merged work is recorded by the dreaming workflow in
   Keg report, Water profiles, Water profile, and Repack. This owner is blocked
   on the product/schema decisions named in the issue; do not start database or
   migration work while screens are the current focus.
-- [ ] Issue #276 — deferred Square/POS remainder (9 screens): POS mapping,
-  POS sale detail, Point of sale, Connect Square, Square locations,
-  Square → QuickBooks connector, Disconnect Square, Menu, and POS item. The
-  issue is intentionally labeled `wontfix`; reopen the Program 14 P5 decision
-  in `.agents/superpowers/plans/2026-09-07-backend-program-14-square-pos.md`
-  before implementing it.
-
-The remaining planned navigation entry is More → Menu and belongs to #276.
-Programs 10, 13, and 15 are complete on `main`; their screens are included in
-the 146 mapped records above.
+Programs 10, 13, 14, and 15 are complete on `main`; their screens are included
+in the 155 mapped records above.
 
 ## Release gate
 
