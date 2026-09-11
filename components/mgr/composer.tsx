@@ -73,6 +73,8 @@ export function Composer({ role }: { role: StaffRole }) {
   const [stock, setStock] = useState<Stock[]>([]);
   const [readSkuId, setReadSkuId] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [query, setQuery] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,13 +84,13 @@ export function Composer({ role }: { role: StaffRole }) {
   const conversationRef = useRef<string | null>(null);
   const requestGuardRef = useRef(createComposerRequestGuard());
   const movementLockRef = useRef(false);
-  const actionRef = useRef<HTMLSelectElement | null>(null);
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     const focusComposer = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        actionRef.current?.focus();
+        promptRef.current?.focus();
       }
     };
     addEventListener("keydown", focusComposer);
@@ -150,10 +152,11 @@ export function Composer({ role }: { role: StaffRole }) {
     await run("append_chat_message", { conversationId, role: messageRole, content }, crypto.randomUUID());
   }
 
-  async function chooseAction(id: string) {
+  async function chooseAction(id: string, message?: string) {
     const selected = actions.find((candidate) => candidate.id === id) ?? null;
     if (!retireMovement()) return;
     setAction(selected);
+    setQuery(message ?? selected?.label ?? null);
     setAnswer(null);
     if (!selected) return;
     setBusy(true);
@@ -173,6 +176,23 @@ export function Composer({ role }: { role: StaffRole }) {
       setError(messageText(cause));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function sendPrompt(message: string) {
+    setPrompt("");
+    const normalized = message.toLowerCase();
+    const selected = normalized.includes("available") || normalized.includes("atp") || normalized.startsWith("how much")
+      ? actions.find((candidate) => candidate.id === "read_atp")
+      : ["inventory", "movement", "stock", "blew", "deplet", "received"].some((word) => normalized.includes(word))
+        ? actions.find((candidate) => candidate.id === "record_movement")
+        : undefined;
+    if (selected) void chooseAction(selected.id, message);
+    else {
+      setQuery(message);
+      setAction(null);
+      setAnswer(null);
+      setError("I can help with the suggested tasks below. Broader natural-language inference is not connected yet.");
     }
   }
 
@@ -311,6 +331,21 @@ export function Composer({ role }: { role: StaffRole }) {
   const question = action?.id === "record_movement" ? movementQuestion(state.draft) : null;
   const movementLocked = movementIsLocked(state);
   const lotOptions = stock.filter((row) => row.kind === "sku" && row.stock_id === state.draft.skuId && row.bin_id === state.draft.binId && row.lot_id);
+  const movementPicker = action?.id === "record_movement" && <ComposerMovementPickerView
+    draft={state.draft}
+    skus={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))}
+    locations={locations.map((location) => ({ id: location.id, label: location.name }))}
+    bins={bins.filter((bin) => bin.location_id === state.draft.locationId).map((bin) => ({ id: bin.id, label: bin.name }))}
+    lots={lotOptions.map((row) => ({ id: row.lot_id!, label: `${row.lot_code} · ${row.qty} available` }))}
+    channels={channels.map((channel) => ({ id: channel.id, label: channel.name }))}
+    field={question?.field}
+    busy={busy}
+    disabled={movementLocked}
+    question={Boolean(question)}
+    proposal={Boolean(state.proposal)}
+    onChange={(patch) => void changeDraft(patch)}
+    onPreview={() => void previewMovement()}
+  />;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
@@ -344,22 +379,10 @@ export function Composer({ role }: { role: StaffRole }) {
         <Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button>
       </>}
 
-      {action?.id === "record_movement" && <ComposerMovementPickerView
-        draft={state.draft}
-        skus={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))}
-        locations={locations.map((location) => ({ id: location.id, label: location.name }))}
-        bins={bins.filter((bin) => bin.location_id === state.draft.locationId).map((bin) => ({ id: bin.id, label: bin.name }))}
-        lots={lotOptions.map((row) => ({ id: row.lot_id!, label: `${row.lot_code} · ${row.qty} available` }))}
-        channels={channels.map((channel) => ({ id: channel.id, label: channel.name }))}
-        busy={busy}
-        disabled={movementLocked}
-        question={Boolean(question)}
-        proposal={Boolean(state.proposal)}
-        onChange={(patch) => void changeDraft(patch)}
-        onPreview={() => void previewMovement()}
-      />}
+      {query && <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">{query}</div>}
 
-      {question && <ComposerQuestionView prompt={question.prompt} />}
+      {question ? <ComposerQuestionView prompt={question.prompt}>{movementPicker}</ComposerQuestionView> : movementPicker}
+
       {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input, state.commitRequestId ?? undefined)} onOpen={retireMovement} onDismiss={retireMovement} onCommit={() => void commitMovement()} committing={state.committing} locked={movementLocked} />}
 
       {action?.id === "read_atp" && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
@@ -371,8 +394,7 @@ export function Composer({ role }: { role: StaffRole }) {
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {action && <Button type="button" variant="ghost" className="self-start" disabled={movementLocked} onClick={() => { if (!retireMovement()) return; setAction(null); setAnswer(null); }}>Close composer</Button>}
-      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} actionRef={actionRef} disabled={movementLocked} />
-      <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Inventory movements require a live preview. Voice and a free-form model are not connected.</p>
+      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={sendPrompt} disabled={movementLocked} />
     </div>
   );
 }

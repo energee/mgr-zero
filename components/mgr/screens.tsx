@@ -853,22 +853,13 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer proposal",
     to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
-    job: "Exact structured fields become a canonical server preview; signed effect leads",
+    job: "A chat request becomes a canonical server preview; signed effect leads",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock · preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
     states: [["editing", "Any field edit removes the proposal and Commit", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1]],
-    spec: "The live no-model path requires exact fields before preview. The preview query is internal, never an AI tool; the proposal contains only its canonical effects and warnings.",
+    spec: "The user starts with a normal chat message. The current no-model fallback collects exact fields before preview. The preview query is internal, never an AI tool; the proposal contains only its canonical effects and warnings.",
     body: <>
-      <ComposerMovementPickerView
-        draft={{ skuId: "hazy-half", kind: "depletion", locationId: "taproom", binId: "walk-in", lotChoice: "untracked", qty: "1", saleChannelId: "taproom-channel" }}
-        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
-        locations={[{ id: "taproom", label: "Taproom" }]}
-        bins={[{ id: "walk-in", label: "Walk-in" }]}
-        lots={[]}
-        channels={[{ id: "taproom-channel", label: "Taproom" }]}
-        question={false}
-        proposal
-      />
+      <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">Record one half-barrel keg of Hazy IPA as taproom depletion.</div>
       <ComposerProposalView
         effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
         warnings={[]}
@@ -885,21 +876,24 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer question",
     to: { "Preview movement": "Composer question" },
-    job: "One exact missing-field question; no Commit until every required field is chosen",
+    job: "Ask one exact follow-up in the conversation; no Commit until every required field is known",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
     states: [["missing SKU", "structured picker · no Commit"], ["resolved", "Preview movement becomes available"]],
-    spec: "The no-model path asks for the first missing structured field. This initial state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
+    spec: "The user starts with a chat message and the no-model fallback asks for the first missing structured field. This state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
     body: <>
-      <ComposerMovementPickerView
-        draft={{}}
-        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
-        locations={[{ id: "taproom", label: "Taproom" }]}
-        bins={[]}
-        lots={[]}
-        channels={[{ id: "taproom-channel", label: "Taproom" }]}
-      />
-      <ComposerQuestionView prompt="Which SKU / package?" />
+      <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">We blew a half of Hazy.</div>
+      <ComposerQuestionView prompt="Which SKU / package?">
+        <ComposerMovementPickerView
+          draft={{}}
+          skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
+          locations={[{ id: "taproom", label: "Taproom" }]}
+          bins={[]}
+          lots={[]}
+          channels={[{ id: "taproom-channel", label: "Taproom" }]}
+          field="skuId"
+        />
+      </ComposerQuestionView>
     </>,
   },
   {

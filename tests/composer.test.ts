@@ -214,9 +214,18 @@ describe("structured composer state", () => {
     expect(resetComposerScope(populated, "actor-b:brewery-b:admin")).toEqual(composerInitialState("actor-b:brewery-b:admin"));
   });
 
-  it("shares structured composer views with the staff shell and filters shell actions by persona role", () => {
+  it("shares a chat composer with the staff shell and filters suggestions by persona role", () => {
     expect(E.comp().type).toBe(ComposerStripView);
+    const strip = renderToStaticMarkup(createElement(ComposerStripView, {
+      actions: [{ value: "record_movement", label: "Record inventory movement" }],
+    }));
+    expect(strip).toContain("Ask MGR");
+    expect(strip).toContain("textarea");
+    expect(strip).toContain("Send");
+    expect(strip).toContain("Record inventory movement");
+    expect(strip).not.toContain("Choose a supported action");
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toContain('"blew"');
     expect(live).toContain("<ComposerMovementPickerView");
     expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
     expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
@@ -225,17 +234,15 @@ describe("structured composer state", () => {
     expect(composerActions("brewer")).toEqual([]);
   });
 
-  it("renders reachable structured picker states and proposals only from canonical effect fields", () => {
+  it("renders one chat follow-up at a time and proposals only from canonical effect fields", () => {
     const question = renderToStaticMarkup(createElement(ComposerQuestionView, { prompt: "Which package?" }));
     expect(question).not.toContain("Commit movement");
     const questionScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer question")!.body));
     const proposalScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer proposal")!.body));
-    for (const label of ["SKU / package", "Type", "Location", "Bin", "Lot", "Positive quantity"]) {
-      expect(questionScreen, label).toContain(label);
-      expect(proposalScreen, label).toContain(label);
-    }
-    expect(questionScreen).not.toContain("Blew a half");
-    expect(proposalScreen).not.toContain("Blew a half");
+    expect(questionScreen).toContain("SKU / package");
+    for (const label of ["Type", "Location", "Bin", "Lot", "Positive quantity"]) expect(questionScreen, label).not.toContain(`>${label}<`);
+    expect(proposalScreen).not.toContain("SKU / package");
+    expect(questionScreen).toContain("We blew a half");
     const proposal = renderToStaticMarkup(createElement(ComposerProposalView, {
       effects: [{ label: "Canonical IPA · Taproom · Cold", qty: "-1", stockBeforeQty: "4", stockAfterQty: "3" }],
       warnings: ["Registration needs review"],
