@@ -28,8 +28,8 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerTrigger asChild>
-        <Button type="button" variant="outline" aria-label="Open Ask MGR" className="h-auto w-full justify-between rounded-xl px-4 py-3 text-left shadow-sm">
-          <span><span className="block font-semibold">Ask MGR</span><span className="block text-xs font-normal text-muted-foreground">Chat with your brewery data</span></span>
+        <Button type="button" variant="ghost" aria-label="Open Ask MGR" className="h-10 w-full justify-center gap-2 rounded-none">
+          <span className="font-heading font-semibold">Ask MGR</span>
           <span aria-hidden="true" className="text-muted-foreground">⌃</span>
         </Button>
       </DrawerTrigger>
@@ -38,7 +38,7 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
           <DrawerTitle>Ask MGR</DrawerTitle>
           <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
         </DrawerHeader>
-        <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto p-3 pt-2 sm:p-4">{children}</div>
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4 pt-2">{children}</div>
       </DrawerContent>
     </Drawer>
   );
@@ -72,7 +72,7 @@ export function ComposerStripView({
   onStop?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-2 shadow-lg">
+    <div className="shrink-0">
       <form onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
         <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
           <Textarea
@@ -122,13 +122,13 @@ export function ComposerConversationView({ messages, model, activity, error, onR
   onMinimize?: () => void;
 }) {
   return (
-    <section aria-label="MGR conversation" className="overflow-hidden rounded-2xl border bg-card shadow-xl">
-      <header className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col">
+      <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
         <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
       </header>
-      <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
-        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
+      <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
+        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
         {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
         {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
       </div>

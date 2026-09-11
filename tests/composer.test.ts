@@ -75,7 +75,7 @@ describe("AI composer", () => {
   it("shares the AI SDK composer between live and inventory surfaces", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
     const drawer = renderToStaticMarkup(E.comp());
-    expect(drawer).toContain("Chat with your brewery data");
+    expect(drawer).toContain("Open Ask MGR");
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
     expect(live).toContain("useChat");
     expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);
