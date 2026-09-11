@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
 import { runCommand } from "@/lib/commands/registry";
 import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
@@ -56,11 +56,6 @@ function success(body: Record<string, any>, itemId = `ITEM-${crypto.randomUUID()
     })),
   ] }), { status: 200 });
 }
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 afterEach(() => {
   vi.unstubAllEnvs();

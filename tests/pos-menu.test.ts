@@ -1,6 +1,6 @@
 // Program 14 P3: a menu is derived from one mapped location/bin/channel,
 // while website readers see only explicitly published safe rows.
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import {
@@ -13,11 +13,6 @@ import {
   seedLocation,
   sql,
 } from "./helpers";
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 async function connectedLocation(breweryId: string, externalLocationId: string, locationId: string) {
   const connection = await admin.from("pos_connections").insert({

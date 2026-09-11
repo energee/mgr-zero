@@ -4,6 +4,26 @@
 > replaced after this audit, and D1/D3 were resolved. Use `.agents/ARCHITECTURE.md`
 > for current invariants and `.agents/PROGRESS.md` for the re-triaged backlog.
 
+## Resolution update — 2026-09-10
+
+The remaining backlog was rechecked against `main` at `b602d8d`; all six
+findings are resolved:
+
+- **D2:** application roles cannot execute private-schema functions, enforced
+  by `tests/schema-rules.test.ts`.
+- **A1:** `/api/command` enforces an 8 MiB body cap and authenticated,
+  database-backed admission before dispatch.
+- **A2:** `unwrap` logs database detail server-side and returns stable generic
+  errors for permission, not-found, and unexpected SQLSTATEs.
+- **A3:** the movement and taproom-par definer RPCs derive actor and role access
+  inside their function bodies.
+- **A4:** global CSP, framing, MIME-sniffing, and referrer headers are tested.
+- **A5:** the development seed rejects non-loopback Supabase URLs before
+  constructing its privileged client.
+
+Application hardening for A1–A5 landed in PR #226. D2 is covered by the
+private-function ACL invariant introduced by the production-readiness work.
+
 Fresh database + application security/authorization audit of the current state.
 The original audit (snapshot `96ba05c`) was lost; its P1.1–P1.5 and P1.9 items
 were remediated on this branch (`docs/plans/audit-p1-authz.md`). Everything
@@ -174,10 +194,10 @@ explicit override flag.
 | Item | Sev | Summary |
 | --- | --- | --- |
 | ~~D1~~ | P1 | **Resolved** — customer-safe `portal_brewery` projection; base-table read is staff-only |
-| D2 | P2 | Gate/revoke `lock_order`, `order_line_price` |
-| A1 | P2 | Body-size cap + rate limit on `/api/command` |
-| A2 | P2 | Generic client message for 42501/23503/23505 in `unwrap` |
-| A3 | P3 | Explicit RPC guard in `record_movement`, `set_taproom_par` |
-| A4 | P3 | Security headers / CSP |
-| A5 | P3 | Local-only guard in `seed-dev.ts` |
+| ~~D2~~ | P2 | **Resolved** — application roles cannot execute private helpers |
+| ~~A1~~ | P2 | **Resolved** — 8 MiB body cap and authenticated command admission |
+| ~~A2~~ | P2 | **Resolved** — raw database detail is logged, not returned |
+| ~~A3~~ | P3 | **Resolved** — both definer RPCs enforce actor/role access |
+| ~~A4~~ | P3 | **Resolved** — global security headers are configured and tested |
+| ~~A5~~ | P3 | **Resolved** — seed refuses non-loopback Supabase URLs |
 | ~~D3~~ | P3 | **Resolved** — `breweries.settings` commented staff-only; customers cannot read it |
