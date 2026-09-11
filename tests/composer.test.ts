@@ -82,6 +82,8 @@ describe("AI composer", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
     const drawer = renderToStaticMarkup(E.comp());
     expect(drawer).toContain("Open Ask MGR");
+    expect(drawer).toContain("bg-muted-foreground/25");
+    expect(drawer).not.toContain("font-heading font-semibold");
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
     expect(live).toContain("useChat");
     expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);

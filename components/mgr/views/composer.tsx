@@ -28,9 +28,8 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerTrigger asChild>
-        <Button type="button" variant="ghost" aria-label="Open Ask MGR" className="h-10 w-full justify-center gap-2 rounded-none">
-          <span className="font-heading font-semibold">Ask MGR</span>
-          <span aria-hidden="true" className="text-muted-foreground">⌃</span>
+        <Button type="button" variant="ghost" aria-label="Open Ask MGR" className="group h-11 w-full rounded-none">
+          <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
         </Button>
       </DrawerTrigger>
       <DrawerContent className="max-h-[92vh] [&>div:first-child]:hidden">
