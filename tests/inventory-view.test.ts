@@ -89,6 +89,12 @@ describe("Finished goods view", () => {
     expect(form).toMatch(/<RecordMovementView\b/);
     expect(form).toMatch(/<MovementRecordedView\b/);
   });
+
+  it("opens the deep-linked movement form once instead of reopening after Close", () => {
+    const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
+    expect(form).toMatch(/const autoOpened = useRef\(false\)/);
+    expect(form).toMatch(/if \(autoOpen && !autoOpened\.current\)/);
+  });
 });
 
 describe("Record movement view", () => {
