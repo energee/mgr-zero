@@ -4038,6 +4038,7 @@ BEGIN
     SELECT brand_id FROM (
       SELECT DISTINCT (e->>'brandId')::uuid brand_id
       FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) e
+      WHERE coalesce((e->>'available')::boolean,false) AND e->>'priceCents' IS NOT NULL
       UNION
       SELECT i.brand_id FROM public.pos_catalog_items i
         WHERE i.connection_id=p_connection AND i.catalog_group='poured'
