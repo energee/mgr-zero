@@ -6,6 +6,7 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
+import { ThemeToggle } from "@/components/mgr/theme-toggle";
 
 export type { SettingsViewModel };
 
@@ -59,7 +60,14 @@ export function SettingsView({
           {E.nav("Import", "Upload, map and commit CSV rows", "", undefined, hrefs.import)}
         </section>
       </div>
-      <div className="mt-2 border-t pt-4 text-sm text-muted-foreground">{deployment ?? E.fld("Deployment", model.deployment)}</div>
+      <div className="mt-2 grid gap-6 border-t pt-6 @min-[48rem]:grid-cols-2">
+        <section aria-labelledby="settings-appearance">
+          <h2 id="settings-appearance" className="font-heading text-xl font-semibold">Appearance</h2>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">Choose how MGR looks on this device.</p>
+          <ThemeToggle />
+        </section>
+        <div className="text-sm text-muted-foreground">{deployment ?? E.fld("Deployment", model.deployment)}</div>
+      </div>
     </div>
   );
 }

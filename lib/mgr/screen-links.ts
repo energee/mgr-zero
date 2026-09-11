@@ -185,6 +185,7 @@ export const TAPS: [string | RegExp, string][] = [
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
   "Open Ask MGR",
+  /^Switch to (dark|light) mode$/,
   "Send",
   "Refresh expected",
   "Record 7 sales + 1 refund as expected",

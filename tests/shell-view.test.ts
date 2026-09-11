@@ -360,6 +360,8 @@ describe("Settings view", () => {
     expect(page).toMatch(/<PortalFulfillmentForm\b/);
     expect(settingsForm).toMatch(/<BrewerySettingsFormView\b/);
     expect(sharedView).toMatch(/<BrewerySettingsFormView\b/);
+    expect(sharedView).toMatch(/from "@\/components\/mgr\/theme-toggle"/);
+    expect(sharedView).toMatch(/<ThemeToggle\b/);
   });
 });
 
