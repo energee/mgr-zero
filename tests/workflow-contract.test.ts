@@ -65,6 +65,8 @@ const review = readWorkflow("claude-code-review.yml");
 const dreaming = readWorkflow("dreaming.yml");
 const supabaseEnvMapper = readFileSync(resolve(__dirname, "..", "scripts", "supabase-env.mjs"), "utf8");
 const vitestConfig = readFileSync(resolve(__dirname, "..", "vitest.config.mts"), "utf8");
+const prePush = readFileSync(resolve(__dirname, "..", "scripts", "pre-push.sh"), "utf8");
+const hook = readFileSync(resolve(__dirname, "..", ".githooks", "pre-push"), "utf8");
 
 describe("workflow action field reader", () => {
   it("requires a direct scalar child of the action's with mapping", () => {
@@ -114,6 +116,10 @@ describe("production-readiness workflow contract", () => {
     expect(ci).toContain('bunx vitest run --shard=${{ matrix.shard }}');
     expect(ci).toContain("--exclude tests/mgr-screens.test.ts");
     expect(ci).toMatch(/needs: \[quality, pure_tests, test_shard\]/);
+    expect(ci).toContain("supabase start --workdir tests/supabase");
+    expect(ci).toContain("supabase status --workdir tests/supabase -o env");
+    expect(ci).toContain("DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres");
+    expect(ci).toContain("MGR_TEST_STACK=1");
     expect(vitestConfig).toMatch(/include:\s*\[\s*"tests\/\*\*\/\*\.test\.ts"/);
     expect(matchesGlob(INVITE_TEST, "tests/**/*.test.ts")).toBe(true);
     expect(configDefaults.exclude.some((pattern) => matchesGlob(INVITE_TEST, pattern))).toBe(false);
@@ -137,6 +143,17 @@ describe("production-readiness workflow contract", () => {
     expect(ci).not.toMatch(/\bnpx /);
     expect(ci).not.toMatch(/\bpnpm\b/);
     expect(ci).not.toMatch(/cache: npm/);
+  });
+
+  it("keeps the tracked pre-push gate aligned with CI checks", () => {
+    expect(hook).toContain("scripts/pre-push.sh");
+    for (const command of ["bun run lint", "bunx tsc --noEmit", "bun run build", "scripts/test-db.sh"]) {
+      expect(prePush).toContain(command);
+    }
+    expect(prePush).toContain("tests/mgr-screens.test.ts");
+    expect(prePush).toContain("--exclude tests/mgr-screens.test.ts");
+    expect(prePush).toContain("for shard in 1/3 2/3 3/3");
+    expect(prePush).toContain("supabase db reset --workdir tests/supabase");
   });
 
   it("maps Supabase CLI keys into the modern application environment contract", () => {
