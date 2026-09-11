@@ -19,6 +19,7 @@ let locationId: string;
 let binId: string;
 let taproomId: string;
 let saleChannelId: string;
+let posConnectionId: string;
 let customerId: string;
 let shipToId: string;
 
@@ -35,6 +36,9 @@ beforeAll(async () => {
   ({ id: locationId, binId } = await seedLocation(brewery.id, { name: "Boundary warehouse" }));
   taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
   ({ customerId, shipToId, saleChannelId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
+  const { data: posConnection, error: posConnectionError } = await admin.from("pos_connections").insert({ brewery_id: brewery.id, merchant_id: `boundary-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
+  if (posConnectionError) throw posConnectionError;
+  posConnectionId = posConnection.id;
   await priceSku(brewery.id, { saleChannelId, brandId: cat.brandId, formatId, cents: 1200 });
 });
 
@@ -140,6 +144,20 @@ const nextPosition = async () => {
   return (data?.position ?? 0) + 1;
 };
 
+async function posMenuFixture(role: StaffRole, configured = false) {
+  const location = await seedLocation(brewery.id, { name: unique("matrix pos location", role), kind: "taproom" });
+  const catalog = await seedCatalog(brewery.id, { product: unique("matrix pos brand", role), sku: unique("matrix pos keg", role), packageType: "keg", bblPerUnit: 0.5, format: unique("Half bbl", role) });
+  const { data: poured, error: pouredError } = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: catalog.brandId, name: unique("Pint", role), basis: "poured", ounces: 16 }).select("id").single();
+  if (pouredError) throw pouredError;
+  const externalLocation = unique("L", role);
+  const { error: locationError } = await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: posConnectionId, external_location_id: externalLocation, location_id: location.id, available: true });
+  if (locationError) throw locationError;
+  await ins("inventory_movements", { brewery_id: brewery.id, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, qty: 1, bbl: 0.5, type: "opening_balance", created_by: adminCtx.userId });
+  await priceSku(brewery.id, { saleChannelId, brandId: catalog.brandId, formatId: poured.id, cents: 700 });
+  if (configured) await runCommand("configure_pos_menu", { posLocationId: externalLocation, binId: location.binId, saleChannelId }, adminCtx);
+  return { externalLocation, location, formatId: poured.id };
+}
+
 async function draftOrder() {
   const order = await runCommand("create_order", {
     kind: "wholesale", customerId, shipToId, fromLocationId: locationId, lines: [{ skuId, qty: 1 }],
@@ -214,6 +232,27 @@ describe("tenant-safe document counters", () => {
 
 describe("registered staff mutation role × RPC matrix", () => {
   const matrix: MatrixCase[] = [
+    {
+      command: "configure_pos_menu", rpc: "configure_pos_menu", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const fixture = await posMenuFixture(role);
+        return { command: { posLocationId: fixture.externalLocation, binId: fixture.location.binId, saleChannelId }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_bin: fixture.location.binId, p_sale_channel: saleChannelId } };
+      },
+    },
+    {
+      command: "set_pos_price_override", rpc: "set_pos_price_override", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const fixture = await posMenuFixture(role, true);
+        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, unitPriceCents: 725 }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_unit_price_cents: 725 } };
+      },
+    },
+    {
+      command: "set_pos_website_publication", rpc: "set_pos_website_publication", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const fixture = await posMenuFixture(role, true);
+        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, published: true }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_published: true } };
+      },
+    },
     {
       command: "upsert_brand", rpc: "upsert_brand", allowed: ["admin", "sales"],
       input: async role => {

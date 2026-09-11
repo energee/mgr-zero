@@ -21,4 +21,5 @@ import "./landings";
 import "./search";
 import "./compliance";
 import "./qbo";
+import "./pos";
 export {};

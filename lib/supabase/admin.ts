@@ -1,4 +1,4 @@
-// lib/supabase/admin.ts — service-role client; only tests, seeding, provisioning, invites, and the RLS-checking integration-token boundary may use it. Never in ordinary request paths.
+// lib/supabase/admin.ts — service-role client; imports are restricted to the narrow boundaries named in architecture rule 4.
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getServerEnv } from "@/lib/env/server";

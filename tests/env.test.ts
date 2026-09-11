@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readPublicEnv } from "@/lib/env/public";
-import { readQboEnv, readServerEnv } from "@/lib/env/server-parser";
+import { readQboEnv, readServerEnv, readSquareEnv } from "@/lib/env/server-parser";
 
 const validPublic = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54341",
@@ -48,6 +48,19 @@ describe("environment validation", () => {
       apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
     });
     expect(() => readQboEnv({ QBO_CLIENT_ID: "client" })).toThrow("QBO_CLIENT_SECRET");
+  });
+
+  it("parses only an explicit Square environment and server OAuth names", () => {
+    expect(readSquareEnv({
+      SQUARE_APPLICATION_ID: "application", SQUARE_APPLICATION_SECRET: "secret",
+      SQUARE_REDIRECT_URI: "https://mgr.test/api/integrations/square/oauth",
+      SQUARE_ENVIRONMENT: "sandbox",
+    })).toEqual({
+      applicationId: "application", applicationSecret: "secret",
+      redirectUri: "https://mgr.test/api/integrations/square/oauth",
+      environment: "sandbox",
+    });
+    expect(() => readSquareEnv({ SQUARE_ENVIRONMENT: "staging" })).toThrow("SQUARE_ENVIRONMENT");
   });
 
   it("needs only the Supabase secret key on the server; no rate-limit secret exists (audit 2026-09-05 A1)", () => {

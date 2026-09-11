@@ -24,6 +24,68 @@ export type VersionedIntegrationTokens = IntegrationTokens & {
   refreshHardExpiresAt: string | null;
 };
 
+export type SquareCatalogSyncStart = {
+  actorId: string;
+  connectionId: string;
+  merchantId: string;
+  credentialVersion: number;
+  catalogGeneration: number;
+  requestId: string;
+};
+
+export type SquareCatalogSyncResult = { locations: number; variations: number }
+  | { synced: false; superseded: true; errorCode: "connection_changed" };
+
+export type SquareSalesSyncStart = {
+  actorId: string;
+  requestId: string;
+  connectionId: string;
+  merchantId: string;
+  credentialVersion: number;
+  startsAt: string;
+  endsAt: string;
+  locationsCaptured: boolean;
+  locationIds: string[];
+  locationOffset: number;
+  cursor: string | null;
+  pages: number;
+};
+
+export type SquareSalesSyncResult = {
+  complete: true;
+  acceptedFacts: number;
+  unsupportedFacts: number;
+  pages: number;
+  locations: number;
+  startsAt: string;
+  endsAt: string;
+};
+
+export type SquarePublicationStart = {
+  attemptId: string;
+  connectionId: string;
+  credentialVersion: number;
+  catalogGeneration: number;
+  status: "needs_snapshot" | "prepared" | "succeeded" | "rejected" | "superseded";
+  providerKey: string;
+  source: import("@/lib/pos").SquarePublicationSource;
+  errorCode: string | null;
+  result: { published: boolean; retired?: boolean; superseded?: boolean; externalItemId?: string;
+    ownership?: "mgr" | "adopted"; variations?: Array<{ formatId: string; externalVariationId: string; retired: boolean }> } | null;
+};
+
+export type SquareMenuPublicationStart = {
+  menuAttemptId: string;
+  connectionId: string;
+  credentialVersion: number;
+  catalogGeneration: number;
+  status: "publishing" | "succeeded" | "rejected" | "superseded";
+  manifest: Array<{ brandId: string; requestId: string }>;
+  errorCode: string | null;
+  result: { published: boolean; items?: unknown[]; rejected?: boolean; partial?: boolean;
+    superseded?: boolean; errorCode?: string } | null;
+};
+
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
@@ -161,6 +223,326 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
 export async function failQboOAuth(intentId: string, actorId: string) {
   const { error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
+}
+
+export async function claimSquareOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {
+  const { data, error } = await createAdminClient().rpc("claim_square_oauth", {
+    p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId, p_redirect_uri: redirectUri,
+  }).maybeSingle();
+  if (error || !data) return null;
+  const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect"; requested_scopes: unknown };
+  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) return null;
+  return { intentId: row.intent_id, breweryId: row.brewery_id, providerIntent: row.provider_intent, requestedScopes: row.requested_scopes };
+}
+
+export async function completeSquareOAuthStore(
+  intentId: string,
+  actorId: string,
+  tokens: import("@/lib/pos").SquareTokens,
+  locations: import("@/lib/pos").SquareLocation[],
+) {
+  const { data, error } = await createAdminClient().rpc("complete_square_oauth", {
+    p_intent: intentId, p_actor: actorId, p_merchant_id: tokens.merchantId, p_merchant_label: tokens.merchantId,
+    p_access_token: tokens.accessToken, p_refresh_token: tokens.refreshToken, p_access_expires_at: tokens.accessExpiresAt,
+    p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: locations,
+  });
+  if (error || typeof data !== "string") throw new Error("Square connection storage failed");
+  return data;
+}
+
+export async function failSquareOAuth(
+  intentId: string,
+  actorId: string,
+  cleanupState: "not_required" | "pending" | "confirmed" | "unresolved",
+  merchantId: string | null,
+) {
+  const { data, error } = await createAdminClient().rpc("fail_square_oauth", {
+    p_intent: intentId, p_actor: actorId, p_cleanup_state: cleanupState, p_merchant_id: merchantId,
+  });
+  if (error || data !== true) throw new Error("Square recovery state could not be recorded");
+}
+
+export async function compareAndSwapSquareTokens(
+  ctx: Ctx,
+  expected: VersionedIntegrationTokens,
+  next: import("@/lib/pos").SquareTokens,
+  accessExpiresIn: number,
+) {
+  const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
+    p_brewery: ctx.breweryId, p_provider: "square", p_connection: expected.connectionId, p_actor: ctx.userId,
+    p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
+    p_received_at: next.receivedAt, p_access_seconds: accessExpiresIn, p_refresh_seconds: null, p_hard_seconds: null,
+  });
+  if (error) throw new Error("Square token refresh storage failed");
+  if (data !== true) throw new CommandError("Square connection changed; retry with the current connection", 409, "conflict");
+}
+
+export async function beginSquareCatalogSync(ctx: Ctx, requestId: string) {
+  const { data, error } = await ctx.db.rpc("begin_square_catalog_sync", {
+    p_brewery: ctx.breweryId, p_request_id: requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square catalog sync could not be started");
+  const row = data as Record<string, unknown> | null;
+  if (row?.replayResult && typeof row.replayResult === "object") {
+    return { replayResult: row.replayResult as SquareCatalogSyncResult } as const;
+  }
+  if (typeof row?.actorId !== "string" || typeof row.connectionId !== "string" || typeof row.merchantId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number" || typeof row.requestId !== "string") {
+    throw new Error("Square catalog sync start was invalid");
+  }
+  return row as SquareCatalogSyncStart;
+}
+
+export async function advanceSquareCatalogSync(
+  ctx: Ctx,
+  start: SquareCatalogSyncStart,
+  nextCredentialVersion: number,
+) {
+  const { data, error } = await createAdminClient().rpc("advance_square_catalog_sync", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
+  });
+  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  return { ...start, credentialVersion: nextCredentialVersion };
+}
+
+export async function markSquareAuthorizationFailed(ctx: Ctx, connectionId: string, expectedCredentialVersion: number) {
+  const { error } = await createAdminClient().rpc("mark_square_authorization_failed", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_expected_version: expectedCredentialVersion,
+  });
+  if (error) throw new Error("Square authorization health could not be updated");
+}
+
+export async function recordSquareCatalogSnapshot(
+  ctx: Ctx,
+  expected: SquareCatalogSyncStart,
+  facts: { locations: import("@/lib/pos").SquareLocation[]; variations: import("@/lib/pos").SquareVariation[] },
+) {
+  const { data, error } = await createAdminClient().rpc("record_square_catalog_snapshot", {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: expected.actorId,
+    p_expected_version: expected.credentialVersion, p_request_id: expected.requestId,
+    p_locations: facts.locations, p_variations: facts.variations,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square catalog snapshot storage failed");
+  return data as SquareCatalogSyncResult;
+}
+
+function squareSalesStart(data: unknown): SquareSalesSyncStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.actorId !== "string" || typeof row.requestId !== "string"
+    || typeof row.connectionId !== "string" || typeof row.merchantId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.startsAt !== "string" || typeof row.endsAt !== "string"
+    || typeof row.locationsCaptured !== "boolean" || !Array.isArray(row.locationIds)
+    || row.locationIds.some((id) => typeof id !== "string") || typeof row.locationOffset !== "number"
+    || (row.cursor !== null && typeof row.cursor !== "string") || typeof row.pages !== "number") {
+    throw new Error("Square sales sync start was invalid");
+  }
+  return row as SquareSalesSyncStart;
+}
+
+export async function beginSquareSalesSync(ctx: Ctx, requestId: string) {
+  const { data, error } = await ctx.db.rpc("begin_square_sales_sync", { p_brewery: ctx.breweryId, p_request_id: requestId });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.message === "Square connection required") throw new CommandError(error.message, 404, "not_found");
+  if (error) throw new Error("Square sales sync could not be started");
+  const row = data as Record<string, unknown> | null;
+  if (row?.replayResult && typeof row.replayResult === "object") return { replayResult: row.replayResult as SquareSalesSyncResult } as const;
+  return squareSalesStart(data);
+}
+
+export async function advanceSquareSalesSync(ctx: Ctx, start: SquareSalesSyncStart, nextCredentialVersion: number) {
+  const { data, error } = await createAdminClient().rpc("advance_square_sales_sync", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
+  });
+  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  return { ...start, credentialVersion: nextCredentialVersion };
+}
+
+export async function recordSquareSalesLocations(ctx: Ctx, start: SquareSalesSyncStart, locations: import("@/lib/pos").SquareLocation[]) {
+  const { data, error } = await createAdminClient().rpc("record_square_sales_locations", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_locations: locations,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square sales locations could not be stored");
+  const row = data as Record<string, unknown> | null;
+  if (!row || !Array.isArray(row.locationIds) || row.locationIds.some((id) => typeof id !== "string")
+    || typeof row.locationOffset !== "number" || (row.cursor !== null && typeof row.cursor !== "string")
+    || typeof row.pages !== "number") throw new Error("Square sales location snapshot was invalid");
+  return { ...start, locationsCaptured: true, locationIds: row.locationIds as string[],
+    locationOffset: row.locationOffset, cursor: row.cursor as string | null, pages: row.pages };
+}
+
+export async function recordSquareSalesPage(
+  ctx: Ctx,
+  start: SquareSalesSyncStart,
+  page: { locationIds: string[]; cursor: string | null; nextCursor: string | null;
+    orders: import("@/lib/pos").SquareOrderSnapshot[]; facts: import("@/lib/pos").SquareSalesFact[] },
+): Promise<SquareSalesSyncStart | SquareSalesSyncResult> {
+  const { data, error } = await createAdminClient().rpc("record_square_sales_page", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_location_ids: page.locationIds, p_cursor: page.cursor,
+    p_next_cursor: page.nextCursor, p_orders: page.orders, p_facts: page.facts,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square sales page could not be stored");
+  const row = data as Record<string, unknown> | null;
+  if (row?.complete === true) return row as SquareSalesSyncResult;
+  if (!row || row.complete !== false || !Array.isArray(row.locationIds) || typeof row.locationOffset !== "number"
+    || (row.cursor !== null && typeof row.cursor !== "string") || typeof row.pages !== "number") {
+    throw new Error("Square sales continuation was invalid");
+  }
+  return { ...start, locationIds: row.locationIds as string[], locationOffset: row.locationOffset,
+    cursor: row.cursor as string | null, pages: row.pages };
+}
+
+function squarePublicationStart(data: unknown): SquarePublicationStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.attemptId !== "string" || typeof row.connectionId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number" || typeof row.providerKey !== "string"
+    || !["needs_snapshot", "prepared", "succeeded", "rejected", "superseded"].includes(String(row.status))
+    || !row.source || typeof row.source !== "object"
+    || (row.errorCode !== null && typeof row.errorCode !== "string")
+    || (row.result !== null && typeof row.result !== "object")) {
+    throw new Error("Square publication start was invalid");
+  }
+  return row as SquarePublicationStart;
+}
+
+export async function beginSquarePublication(
+  ctx: Ctx,
+  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string;
+    retryConflict?: boolean; menuPublicationId?: string },
+  requestId: string,
+  commandName: "publish_pos_menu" | "publish_pos_item",
+) {
+  const { data, error } = await ctx.db.rpc("begin_square_publication", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_brand: input.brandId,
+    p_adopt_item: input.adoptItemId ?? null, p_adopt_variation: input.adoptVariationId ?? null,
+    p_retry_conflict: input.retryConflict ?? false, p_command: commandName, p_request_id: requestId,
+    p_menu_publication: input.menuPublicationId ?? null,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
+  if (error) throw new CommandError(error.message);
+  return squarePublicationStart(data);
+}
+
+function squareMenuPublicationStart(data: unknown): SquareMenuPublicationStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.menuAttemptId !== "string" || typeof row.connectionId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number"
+    || !["publishing", "succeeded", "rejected", "superseded"].includes(String(row.status)) || !Array.isArray(row.manifest)
+    || row.manifest.some((entry) => !entry || typeof entry !== "object"
+      || typeof (entry as Record<string, unknown>).brandId !== "string"
+      || typeof (entry as Record<string, unknown>).requestId !== "string")
+    || (row.errorCode !== null && typeof row.errorCode !== "string")
+    || (row.result !== null && typeof row.result !== "object")) {
+    throw new Error("Square menu publication start was invalid");
+  }
+  return row as SquareMenuPublicationStart;
+}
+
+export async function beginSquareMenuPublication(
+  ctx: Ctx, input: { posLocationId: string; retryConflict?: boolean }, requestId: string,
+) {
+  const { data, error } = await ctx.db.rpc("begin_square_menu_publication", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
+    p_retry_conflict: input.retryConflict ?? false, p_request_id: requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
+  if (error) throw new CommandError(error.message);
+  return squareMenuPublicationStart(data);
+}
+
+export async function finishSquareMenuPublication(ctx: Ctx, menuAttemptId: string) {
+  const { data, error } = await createAdminClient().rpc("finish_square_menu_publication", {
+    p_brewery: ctx.breweryId, p_publication: menuAttemptId, p_actor: ctx.userId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square menu publication result could not be recorded");
+  return data as NonNullable<SquareMenuPublicationStart["result"]>;
+}
+
+export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
+  const { data, error } = await createAdminClient().rpc("lease_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+  }).maybeSingle();
+  const row = data as Record<string, unknown> | null;
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (row?.superseded === true) throw new CommandError("Square publication was superseded", 409, "conflict");
+  if (error || !row || typeof row.access_token !== "string"
+    || (row.request_body !== null && typeof row.request_body !== "string")) {
+    throw new CommandError("Square publication access is no longer available", 403, "permission_denied");
+  }
+  return { accessToken: row.access_token, requestBody: row.request_body as string | null };
+}
+
+export async function prepareSquarePublication(
+  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null, variationVersions: Record<string, number>,
+) {
+  const { data, error } = await createAdminClient().rpc("prepare_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+    p_request_body: requestBody, p_item_version: itemVersion, p_variation_versions: variationVersions,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (data === false) throw new CommandError("Square publication was superseded", 409, "conflict");
+  if (error || data !== true) throw new Error("Square publication could not be prepared");
+}
+
+export async function finishSquarePublication(
+  ctx: Ctx, attemptId: string, errorCode: "version_mismatch" | "provider_rejected" | "provider_missing" | "provider_invalid" | null,
+  response: { catalogObject: Record<string, unknown>; idMappings: Record<string, unknown>[] } | null,
+) {
+  const { data, error } = await createAdminClient().rpc("finish_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+    p_error_code: errorCode, p_response: response,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square publication result could not be recorded");
+  return data as NonNullable<SquarePublicationStart["result"]>;
+}
+
+export async function getSquareHealth(ctx: Ctx) {
+  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  const { data, error } = await ctx.db.from("pos_connections")
+    .select("id,merchant_id,merchant_label,state,remote_revocation_state,last_error,access_expires_at")
+    .eq("brewery_id", ctx.breweryId).eq("provider", "square").maybeSingle();
+  if (error) throw new Error("Square health is unavailable");
+  if (!data) return { connected: false, state: "disconnected" as const, merchantId: null, merchantLabel: null, lastError: null };
+  return {
+    connected: data.state === "connected", connectionId: data.id as string,
+    state: data.state as "connected" | "disconnected" | "recovery_required",
+    merchantId: data.merchant_id as string | null, merchantLabel: data.merchant_label as string | null,
+    remoteRevocationState: data.remote_revocation_state as "not_requested" | "pending" | "confirmed" | "unresolved",
+    lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
+  };
+}
+
+export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (token: string) => Promise<void>, requestId: string) {
+  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("begin_square_disconnect", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId,
+  }).maybeSingle();
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square disconnect failed");
+  const row = data as { access_token?: unknown; replay_result?: unknown } | null;
+  if (row?.replay_result && typeof row.replay_result === "object") {
+    return row.replay_result as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
+  }
+  const token = typeof row?.access_token === "string" ? row.access_token : null;
+  let revoked = false;
+  if (token) revoked = await revoke(token).then(() => true, () => false);
+  const { data: finished, error: finishError } = await admin.rpc("finish_square_disconnect", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
+  });
+  if (finishError || !finished || typeof finished !== "object") throw new Error("Square disconnect reconciliation failed");
+  return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
 }
 
 export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedIntegrationTokens, next: import("@/lib/qbo").QboTokens) {
