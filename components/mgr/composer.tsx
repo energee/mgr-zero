@@ -35,7 +35,7 @@ export function Composer({ role }: { role: StaffRole }) {
       id, breweryId, expectedContext: { actorId: expectedContext.actorId, breweryId }, message: messages.findLast((message) => message.role === "user"),
     } }),
   }), [breweryId, expectedContext.actorId]);
-  const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: crypto.randomUUID, transport });
+  const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
   async function newChat() {
     clearError(); setSetupError(undefined); setReceipt(undefined);
