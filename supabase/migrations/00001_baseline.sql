@@ -4274,9 +4274,16 @@ end $$;
 create function update_draft_order(
   p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid, p_clear_requested boolean default false, p_expected_brewery uuid default null, p_expected_customer uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_brewery uuid; v_customer uuid; v_replay jsonb; v_result jsonb;
+declare v_brewery uuid; v_customer uuid; v_replay jsonb; v_result jsonb; v_is_staff boolean;
 begin
-  select o.brewery_id, o.customer_id into v_brewery, v_customer
+  select o.brewery_id, o.customer_id,
+    exists (
+      select 1 from public.brewery_users bu
+      where bu.brewery_id = o.brewery_id
+        and bu.user_id = auth.uid()
+        and bu.role = any(array['admin','sales']::public.staff_role[])
+    )
+    into v_brewery, v_customer, v_is_staff
   from public.orders o
   where o.id = p_order
     and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
@@ -4294,10 +4301,11 @@ begin
       )
     );
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  if exists (
-    select 1 from public.customer_users cu
-    where cu.customer_id = v_customer and cu.user_id = auth.uid()
-  ) then
+  -- The portal adapter supplies p_expected_customer. A customer calling this
+  -- RPC directly cannot omit that argument to bypass whole-unit validation;
+  -- an authorized staff call keeps its fractional-quantity contract even when
+  -- the same user also belongs to the order's customer account.
+  if p_expected_customer is not null or not v_is_staff then
     perform private.assert_portal_order_lines(p_lines);
   end if;
   v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines,'clear_requested',p_clear_requested,'expected_brewery',p_expected_brewery,'expected_customer',p_expected_customer));

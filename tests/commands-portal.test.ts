@@ -67,8 +67,55 @@ describe("portal commands", () => {
       p_expected_customer: customerId,
     });
     expect(update.error?.message).toMatch(/whole packaged units/);
+    const omittedScope = await custCtx.db.rpc("update_draft_order", {
+      p_order: made.order_id,
+      p_ship_to: null,
+      p_requested: null,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1.5 }],
+      p_request_id: crypto.randomUUID(),
+      p_clear_requested: false,
+    });
+    expect(omittedScope.error?.message).toMatch(/whole packaged units/);
     const persisted = await admin.from("order_lines").select("qty_ordered").eq("order_id", made.order_id);
     expect(persisted.data).toEqual([{ qty_ordered: 1 }]);
+  });
+
+  it("keeps staff fractional edits for a user who also belongs to the order customer", async () => {
+    const dualCtx = await makeStaffCtx(b.id, "sales");
+    await admin.from("customer_users").insert({ customer_id: customerId, user_id: dualCtx.userId });
+    const made = await runCommand("create_order", {
+      kind: "wholesale",
+      customerId,
+      shipToId,
+      fromLocationId: warehouseId,
+      lines: [{ skuId, qty: 1.25 }],
+    }, dualCtx) as { order_id: string };
+
+    const requestId = crypto.randomUUID();
+    const portalAttempt = await dualCtx.db.rpc("update_draft_order", {
+      p_order: made.order_id,
+      p_ship_to: shipToId,
+      p_requested: null,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1.5 }],
+      p_request_id: requestId,
+      p_clear_requested: false,
+      p_expected_brewery: b.id,
+      p_expected_customer: customerId,
+    });
+    expect(portalAttempt.error?.message).toMatch(/whole packaged units/);
+
+    const execution = { requestId, correlationId: crypto.randomUUID() };
+    const input = { orderId: made.order_id, shipToId, lines: [{ skuId, qty: 2.5 }] };
+    const changed = await runCommand("update_draft_order", input, dualCtx, execution);
+    expect(await runCommand("update_draft_order", input, dualCtx, execution)).toEqual(changed);
+    const persisted = await admin.from("order_lines").select("qty_ordered").eq("order_id", made.order_id);
+    expect(persisted.data).toEqual([{ qty_ordered: 2.5 }]);
+    const events = await admin.from("order_events").select("event").eq("order_id", made.order_id).eq("event", "updated");
+    expect(events.data).toHaveLength(1);
   });
 
   it("derives trusted order fields from the configured fulfillment source and the authenticated customer", async () => {

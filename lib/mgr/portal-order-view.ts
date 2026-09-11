@@ -111,7 +111,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
       ? "The brewery adjusted this order. Quantities above are what ships."
       : undefined,
     shortageExplanation: shortLines.length
-      ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${unshipped} ${unshipped === 1 ? "unit was" : "units were"} cancelled when this order closed; nothing remains due on this order.`
+      ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${unshipped} ${unshipped === 1 ? "unit was" : "units were"} cancelled when this order closed; no units remain to ship.`
       : undefined,
     invoice: invoice
       ? {
