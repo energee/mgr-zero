@@ -33,6 +33,9 @@ export type SquareCatalogSyncStart = {
   requestId: string;
 };
 
+export type SquareCatalogSyncResult = { locations: number; variations: number }
+  | { synced: false; superseded: true; errorCode: "connection_changed" };
+
 export type SquareSalesSyncStart = {
   actorId: string;
   requestId: string;
@@ -282,7 +285,7 @@ export async function beginSquareCatalogSync(ctx: Ctx, requestId: string) {
   if (error) throw new Error("Square catalog sync could not be started");
   const row = data as Record<string, unknown> | null;
   if (row?.replayResult && typeof row.replayResult === "object") {
-    return { replayResult: row.replayResult as { locations: number; variations: number } } as const;
+    return { replayResult: row.replayResult as SquareCatalogSyncResult } as const;
   }
   if (typeof row?.actorId !== "string" || typeof row.connectionId !== "string" || typeof row.merchantId !== "string"
     || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number" || typeof row.requestId !== "string") {
@@ -323,7 +326,7 @@ export async function recordSquareCatalogSnapshot(
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square catalog snapshot storage failed");
-  return data as { locations: number; variations: number };
+  return data as SquareCatalogSyncResult;
 }
 
 function squareSalesStart(data: unknown): SquareSalesSyncStart {

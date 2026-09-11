@@ -2153,6 +2153,7 @@ CREATE FUNCTION public.complete_square_oauth(p_intent uuid,p_actor uuid,p_mercha
   p_access_token text,p_refresh_token text,p_access_expires_at timestamptz,p_granted_scopes text[],p_locations jsonb) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE i private.square_oauth_intents; c public.pos_connections; v_id uuid:=private.new_uuid(); v_version bigint;
+  v_sync_result jsonb:=jsonb_build_object('synced',false,'superseded',true,'errorCode','connection_changed');
 BEGIN
   SELECT brewery_id INTO i.brewery_id FROM private.square_oauth_intents WHERE id=p_intent AND actor_id=p_actor;
   IF NOT FOUND THEN RAISE EXCEPTION 'oauth state invalid'; END IF;
@@ -2176,6 +2177,15 @@ BEGIN
   IF EXISTS(SELECT 1 FROM public.pos_connections x WHERE x.merchant_id=p_merchant_id AND x.brewery_id<>i.brewery_id AND x.state='connected') THEN
     RAISE EXCEPTION 'Square seller is already connected to another brewery' USING errcode='MG409';
   END IF;
+  SELECT current_connection.id,current_connection.merchant_id INTO c.id,c.merchant_id
+    FROM public.pos_connections current_connection WHERE current_connection.brewery_id=i.brewery_id
+      AND current_connection.provider='square';
+  IF c.id IS NOT NULL AND c.merchant_id IS DISTINCT FROM p_merchant_id THEN
+    PERFORM 1 FROM private.command_requests request
+      JOIN private.square_catalog_syncs sync ON sync.actor_id=request.actor_id AND sync.request_id=request.request_id
+      WHERE sync.connection_id=c.id AND request.result IS NULL
+      ORDER BY request.actor_id,request.request_id FOR UPDATE OF request;
+  END IF;
   SELECT * INTO c FROM public.pos_connections WHERE brewery_id=i.brewery_id AND provider='square' FOR UPDATE;
   IF c.id IS NOT NULL AND c.merchant_id IS DISTINCT FROM p_merchant_id THEN
     IF EXISTS(SELECT 1 FROM public.pos_sales WHERE connection_id=c.id)
@@ -2188,6 +2198,10 @@ BEGIN
     EXECUTE $cleanup$UPDATE private.square_menu_publications SET status='superseded',
       result=jsonb_build_object('published',false,'superseded',true,'errorCode','connection_changed'),finished_at=now()
       WHERE connection_id=$1 AND status='publishing'$cleanup$ USING c.id;
+    UPDATE private.command_requests request SET result=v_sync_result
+      FROM private.square_catalog_syncs sync
+      WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
+        AND sync.connection_id=c.id AND request.result IS NULL;
     EXECUTE 'DELETE FROM public.pos_catalog_ownership WHERE connection_id=$1' USING c.id;
     EXECUTE 'DELETE FROM public.pos_catalog_items WHERE connection_id=$1' USING c.id;
     DELETE FROM public.pos_menus WHERE connection_id=c.id;
@@ -4143,7 +4157,9 @@ BEGIN
   PERFORM private.supersede_square_publications(v_connection.id);
   IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
     ON r.actor_id=s.actor_id AND r.request_id=s.request_id
-    WHERE s.connection_id=v_connection.id AND s.catalog_generation>v_connection.catalog_sync_generation
+    WHERE s.connection_id=v_connection.id AND s.merchant_id=v_connection.merchant_id
+      AND s.credential_version=v_connection.credential_version
+      AND s.catalog_generation>v_connection.catalog_sync_generation
       AND r.result IS NULL) THEN
     RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
   IF EXISTS(SELECT 1 FROM private.square_menu_publications p WHERE p.connection_id=v_connection.id
@@ -4257,7 +4273,9 @@ BEGIN
   PERFORM private.supersede_square_publications(v_connection.id);
   IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
     ON r.actor_id=s.actor_id AND r.request_id=s.request_id
-    WHERE s.connection_id=v_connection.id AND s.catalog_generation>v_connection.catalog_sync_generation
+    WHERE s.connection_id=v_connection.id AND s.merchant_id=v_connection.merchant_id
+      AND s.credential_version=v_connection.credential_version
+      AND s.catalog_generation>v_connection.catalog_sync_generation
       AND r.result IS NULL) THEN
     RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
   IF p_menu_publication IS NOT NULL THEN
