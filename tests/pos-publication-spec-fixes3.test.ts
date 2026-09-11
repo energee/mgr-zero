@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
-import { publishSquareMenu, SquareClient } from "@/lib/pos";
-import { beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
-  recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
+import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
+import { advanceSquareCatalogSync, beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
+  compareAndSwapSquareTokens, readVersionedIntegrationTokens, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
 import "@/lib/commands/all";
 
@@ -137,6 +137,34 @@ describe("Square publication final orchestration fences", () => {
       crypto.randomUUID(), "publish_pos_item")).rejects.toMatchObject({ status: 409 });
     expect(sql(`select count(*) from private.square_publications where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
     await recordSquareCatalogSnapshot(f.ctx, sync, { locations: [{ id: "L1", name: "Taproom", status: "ACTIVE" }], variations: [] });
+    const publication = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
+      crypto.randomUUID(), "publish_pos_item");
+    expect(publication.catalogGeneration).toBe(1);
+  });
+
+  it("keeps publication fenced between credential CAS and catalog-attempt advancement", async () => {
+    const f = await fixture();
+    expect((await admin.from("pos_connections").update({ access_expires_at: "2020-01-01T00:00:00Z" })
+      .eq("id", f.connectionId)).error).toBeNull();
+    const sync = await beginSquareCatalogSync(f.ctx, crypto.randomUUID());
+    if ("replayResult" in sync) throw new Error("unexpected replay");
+    const tokens = await readVersionedIntegrationTokens(f.ctx, "square");
+    await compareAndSwapSquareTokens(f.ctx, tokens, {
+      accessToken: "refreshed-access", refreshToken: "refreshed-secret",
+      accessExpiresAt: "2026-10-10T00:00:00Z", merchantId: sync.merchantId, receivedAt: "2026-09-10T00:00:00Z",
+    }, 2_592_000);
+    expect(sql(`select credential_version from public.pos_connections where id='${f.connectionId}';
+      select credential_version from private.square_catalog_syncs where actor_id='${sync.actorId}' and request_id='${sync.requestId}'`))
+      .toEqual(["2", "1"]);
+
+    const provider = vi.fn<typeof globalThis.fetch>();
+    await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! }, crypto.randomUUID(),
+      new SquareClient(config, provider), "publish_pos_item")).rejects.toMatchObject({ status: 409 });
+    expect(provider).not.toHaveBeenCalled();
+    expect(sql(`select count(*) from private.square_publications where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+
+    const advanced = await advanceSquareCatalogSync(f.ctx, sync, 2);
+    await recordSquareCatalogSnapshot(f.ctx, advanced, { locations: [{ id: "L1", name: "Taproom", status: "ACTIVE" }], variations: [] });
     const publication = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
       crypto.randomUUID(), "publish_pos_item");
     expect(publication.catalogGeneration).toBe(1);
