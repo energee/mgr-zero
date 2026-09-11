@@ -20,6 +20,7 @@ export type OfflineOutboxRow = {
   fixHref?: string;
   fixTo?: string;
 };
+export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
 
 const MOVEMENT_TYPES: { value: MovementKind; label: string }[] = [
   { value: "opening_balance", label: "Opening balance" },
@@ -75,6 +76,8 @@ export function ComposerStripView({
   value,
   onChange,
   onSubmit,
+  streaming = false,
+  onStop,
 }: {
   actions?: ComposerStripAction[];
   onAction?: (value: string) => void;
@@ -86,6 +89,8 @@ export function ComposerStripView({
   value?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
+  streaming?: boolean;
+  onStop?: () => void;
 }) {
   return (
     <div className="rounded-2xl border bg-card p-2 shadow-lg">
@@ -99,6 +104,7 @@ export function ComposerStripView({
             value={value}
             onChange={onChange ? (event) => onChange(event.target.value) : undefined}
             rows={2}
+            maxLength={4000}
             className="min-h-14 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
             onKeyDown={onSubmit ? (event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -115,12 +121,38 @@ export function ComposerStripView({
             <span className="flex flex-wrap items-center justify-end gap-1">
               <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
               <Button type="button" variant="ghost" size="sm" onClick={onHistory}>History</Button>
-              <Button type="submit" size="sm" disabled={disabled || !value?.trim()}>Send</Button>
+              <span className="text-xs text-muted-foreground">Enter to send · Shift + Enter for a new line</span>
+              {streaming
+                ? <Button type="button" size="sm" variant="outline" onClick={onStop}>Stop response</Button>
+                : <Button type="submit" size="sm" disabled={disabled || !value?.trim()}>Send</Button>}
             </span>
           </InputGroupAddon>
         </InputGroup>
       </form>
     </div>
+  );
+}
+
+export function ComposerConversationView({ messages, activity, error, onRetry, onNewChat, onMinimize }: {
+  messages: ComposerConversationMessage[];
+  activity?: string;
+  error?: string;
+  onRetry?: () => void;
+  onNewChat?: () => void;
+  onMinimize?: () => void;
+}) {
+  return (
+    <section aria-label="MGR conversation" className="overflow-hidden rounded-2xl border bg-card shadow-xl">
+      <header className="flex items-center justify-between border-b px-4 py-3">
+        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p></div>
+        <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
+      </header>
+      <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
+        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] whitespace-pre-wrap text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.content}</div>)}
+        {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
+        {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
+      </div>
+    </section>
   );
 }
 
