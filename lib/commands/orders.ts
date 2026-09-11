@@ -261,7 +261,8 @@ defineQuery({
     // Both aggregate views have one row per selected key. Restrict each request
     // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
     // an omitted balance into a false zero on the confirmation screen.
-    const skuIds = [...new Set(ln.map((line: { sku_id: string }) => line.sku_id))];
+    const lines = ln ?? [];
+    const skuIds = [...new Set(lines.map((line: { sku_id: string }) => line.sku_id))];
     const atp: { brewery_id: string; sku_id: string; qty: number }[] = [];
     const sourceOnHand: { sku_id: string; qty: number }[] = [];
     for (let start = 0; start < skuIds.length; start += 100) {
@@ -274,7 +275,7 @@ defineQuery({
       atp.push(...(batchAtp ?? []));
       sourceOnHand.push(...(batchSource ?? []));
     }
-    return { order, lines: ln, events, shipment, atp, sourceOnHand };
+    return { order, lines, events, shipment, atp, sourceOnHand };
   },
 });
 
