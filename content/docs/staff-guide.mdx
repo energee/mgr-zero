@@ -193,7 +193,7 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is **Opening balance** (`opening_balance` in the API).
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
-5. Enter a positive **Qty** in SKU units, to two decimal places if needed. The type decides whether stock is added or removed; for `adjustment`, choose **Add stock** or **Remove stock**. Zero is rejected. Samples and festival removals require a two-letter **Destination state**. Check the signed quantity and estimated volume in the preview.
+5. Enter a positive **Qty** in SKU units, to two decimal places if needed. The type decides whether stock is added or removed; for `adjustment`, choose **Add stock** or **Remove stock**. Zero is rejected. Samples and festival removals require a two-letter uppercase **Destination state**. An inactive SKU remains available in history but cannot receive a new movement. Check the signed quantity and estimated volume in the preview.
 6. Add an optional **Note**, then select **Record movement**.
 
 | Type | Use | Normal sign |
@@ -300,7 +300,7 @@ A wholesale order fails if an ordered SKU has no price: its brand is on no price
 
 <Screen name="Confirm order" />
 
-A submitted order's **Confirm** on Today, Work, or the Orders list opens a review two taps from Today: the customer, the fulfillment source, each line with its ATP, and a note when confirming would oversell (that stays your call). **Confirm order** confirms it and returns to Orders; **Cancel order** asks for a reason first.
+A submitted order's **Confirm** on Today, Work, or the Orders list opens a review two taps from Today: the customer, the fulfillment source, each line's stock at that source and brewery-wide ATP, and a note when confirming would oversell or leave the source short. Replenish the named source before picking, or confirm intentionally knowing Warehouse cannot pick the full quantity. **Confirm order** confirms it and returns to Orders; **Cancel order** asks for a reason first.
 
 <Screen name="Complete transfer" />
 
@@ -312,7 +312,7 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 | --- | --- | --- |
 | **Submit** | Draft | Status becomes submitted and the event timeline records it. |
 | **Confirm** | Submitted | Status becomes confirmed and stock is reserved. Negative ATP shows as a warning (**ATP negative for …**) but does not block confirmation. |
-| **Adjust lines** | Confirmed or picked | Replace the full line set and give a required **Reason**. Reservations update. Changing a picked order adds a **staged — needs restocking** badge until it is picked again. |
+| **Adjust lines** | Confirmed or picked | Replace the full line set and give a required **Reason**. Reservations update. Changing a picked order adds a **staged — needs restocking** badge until it is picked again. Shipping is refused without creating a shipment, invoice, or stock movement while that badge remains. |
 | **Record pick** | Confirmed or picked | Enter a nonnegative picked amount per line. Values default to the current picked amount, or the ordered amount if nothing has been picked yet. Short picks and zero are allowed. Status becomes picked and the restocking badge clears. A count below ordered shows **Short** beside the line, which opens the short-line sheet instead of saving silently. |
 | **Short line** | Confirmed or picked | From **Short** on a pick line (Warehouse or Admin). Enter the count and a required reason, then choose one resolution: **Adjust order to N** makes the count the order, shrinks the reservation so ATP recovers, and the customer sees the line as adjusted; **Keep N owed** records the count and leaves the remainder owed, so the order stays picked but keeps its Pick row on Today until every line reaches its ordered quantity. Either way a *short pick* event is recorded with the reason. A count at or above ordered is refused as not short. |
 | **Ship** | Picked | Enter a shipped amount per line (defaults to picked; every line must be listed, held-back lines at 0). **Carrier** and **tracking** are optional. A transfer adds the same stock to its destination. One transaction writes the shipment, the stock movements, fulfills reservations, and, for a wholesale order, the invoice. Tick **Invoice on delivery** to ship without an invoice; the shipment remembers that choice and the invoice is raised when the delivery is confirmed. Shipping less than was picked flags the order for restocking, so the held-back beer shows on Today as **Put back**. |

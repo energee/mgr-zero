@@ -13,8 +13,8 @@ function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdent
   }
 }
 
-const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
-const quoteLines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() })).min(1);
+const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() })).min(1);
+const quoteLines = lines;
 const quoteInput = z.object({
   shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
   requestedShipDate: z.string().date().nullable().optional(), lines: quoteLines,

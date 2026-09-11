@@ -31,6 +31,26 @@ describe("search_entities", () => {
     const hits = await search("ORD-0001");
     expect(hits[0]).toMatchObject({ kind: "order", id: orderId, href: `/orders/${orderId}` });
   });
+  it("reaches an old open order after it falls beyond the newest fifty", async () => {
+    const original = await adminCtx.db.from("orders").select("order_no,status").eq("id", orderId).single();
+    expect(original.error).toBeNull();
+    expect(original.data!.status).toBe("draft");
+    const base = await adminCtx.db.from("orders").select("customer_id,ship_to_id,from_location_id").eq("id", orderId).single();
+    expect(base.error).toBeNull();
+    for (let index = 0; index < 55; index += 1) {
+      await runCommand("create_order", {
+        kind: "wholesale", customerId: base.data!.customer_id!, shipToId: base.data!.ship_to_id!,
+        fromLocationId: base.data!.from_location_id!, lines: [{ skuId, qty: 1 }],
+      }, adminCtx);
+    }
+    const newest = await runCommand("list_orders", {}, adminCtx) as { id: string }[];
+    expect(newest).toHaveLength(50);
+    expect(newest.map((row) => row.id)).not.toContain(orderId);
+
+    const hits = await search(`ORD-${original.data!.order_no}`);
+    expect(hits).toContainEqual(expect.objectContaining({ kind: "order", id: orderId, href: `/orders/${orderId}` }));
+    expect((await runCommand("get_order", { orderId }, adminCtx) as { order: { status: string } }).order.status).toBe("draft");
+  });
   it("a name matches on prefix across kinds", async () => {
     const hits = await search("Haz");
     expect(hits.map((h) => `${h.kind}:${h.id}`)).toContain(`sku:${skuId}`);

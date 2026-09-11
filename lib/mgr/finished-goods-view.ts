@@ -29,6 +29,28 @@ export type FinishedGoodsSnapshot = {
   backHref?: string;
 };
 
+type StockRow = { sku_id: string; qty: string | number };
+
+export function assembleFinishedGoods(
+  skus: Omit<FinishedGoodsSku, "on_hand" | "atp">[],
+  onHandRows: StockRow[],
+  atpRows: StockRow[],
+): FinishedGoodsSnapshot {
+  const sum = (rows: StockRow[]) => rows.reduce(
+    (totals, row) => totals.set(row.sku_id, (totals.get(row.sku_id) ?? 0) + Number(row.qty)),
+    new Map<string, number>(),
+  );
+  const onHand = sum(onHandRows);
+  const atp = new Map(atpRows.map((row) => [row.sku_id, Number(row.qty)]));
+  return {
+    skus: skus.filter((sku) => onHand.has(sku.id) || atp.has(sku.id)).map((sku) => ({
+      ...sku,
+      on_hand: onHand.get(sku.id) ?? 0,
+      atp: atp.get(sku.id) ?? onHand.get(sku.id) ?? 0,
+    })),
+  };
+}
+
 export const skuLabel = (sku: { name: string; brands?: { name: string } | null }) =>
   sku.brands?.name ? `${sku.brands.name} · ${sku.name}` : sku.name;
 

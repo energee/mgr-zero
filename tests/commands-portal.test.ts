@@ -2,12 +2,13 @@
 // scoping to the caller's own customer, availability badges never leak raw ATP,
 // and staff-only commands reject a customer ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku, sql } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 let b: { id: string }, adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let customerId: string, shipToId: string, saleChannelId: string, skuId: string, warehouseId: string, warehouseBinId: string;
+let customerEmail: string;
 let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
@@ -25,11 +26,98 @@ beforeAll(async () => {
     type: "production_in", created_by: adminCtx.userId,
   });
   const custUser = await makeCustomerUser(customerId);
+  customerEmail = custUser.email;
   const db = await asUser(custUser.email);
   custCtx = { db, userId: custUser.id, breweryId: b.id, role: "customer", customerId };
 });
 
 describe("portal commands", () => {
+  it("rejects fractional packaged quantities at the command and direct RPC boundaries", async () => {
+    const configured = await seedLocation(b.id, { name: "Whole units WH" });
+    await runCommand("set_portal_fulfillment_source", { locationId: configured.id }, adminCtx);
+    await expect(runCommand("portal_create_order", {
+      shipToId, lines: [{ skuId, qty: 0.5 }],
+    }, custCtx)).rejects.toThrow();
+
+    const direct = await custCtx.db.rpc("portal_create_order", {
+      p_brewery: b.id,
+      p_customer: customerId,
+      p_ship_to: shipToId,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 0.5 }],
+      p_request_id: crypto.randomUUID(),
+      p_requested: null,
+    });
+    expect(direct.error?.message).toMatch(/whole packaged units/);
+
+    const made = await runCommand("portal_create_order", {
+      shipToId, lines: [{ skuId, qty: 1 }],
+    }, custCtx) as { order_id: string };
+    const update = await custCtx.db.rpc("update_draft_order", {
+      p_order: made.order_id,
+      p_ship_to: null,
+      p_requested: null,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1.5 }],
+      p_request_id: crypto.randomUUID(),
+      p_clear_requested: false,
+      p_expected_brewery: b.id,
+      p_expected_customer: customerId,
+    });
+    expect(update.error?.message).toMatch(/whole packaged units/);
+    const omittedScope = await custCtx.db.rpc("update_draft_order", {
+      p_order: made.order_id,
+      p_ship_to: null,
+      p_requested: null,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1.5 }],
+      p_request_id: crypto.randomUUID(),
+      p_clear_requested: false,
+    });
+    expect(omittedScope.error?.message).toMatch(/whole packaged units/);
+    const persisted = await admin.from("order_lines").select("qty_ordered").eq("order_id", made.order_id);
+    expect(persisted.data).toEqual([{ qty_ordered: 1 }]);
+  });
+
+  it("keeps staff fractional edits for a user who also belongs to the order customer", async () => {
+    const dualCtx = await makeStaffCtx(b.id, "sales");
+    await admin.from("customer_users").insert({ customer_id: customerId, user_id: dualCtx.userId });
+    const made = await runCommand("create_order", {
+      kind: "wholesale",
+      customerId,
+      shipToId,
+      fromLocationId: warehouseId,
+      lines: [{ skuId, qty: 1.25 }],
+    }, dualCtx) as { order_id: string };
+
+    const requestId = crypto.randomUUID();
+    const portalAttempt = await dualCtx.db.rpc("update_draft_order", {
+      p_order: made.order_id,
+      p_ship_to: shipToId,
+      p_requested: null,
+      p_po: null,
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1.5 }],
+      p_request_id: requestId,
+      p_clear_requested: false,
+      p_expected_brewery: b.id,
+      p_expected_customer: customerId,
+    });
+    expect(portalAttempt.error?.message).toMatch(/whole packaged units/);
+
+    const execution = { requestId, correlationId: crypto.randomUUID() };
+    const input = { orderId: made.order_id, shipToId, lines: [{ skuId, qty: 2.5 }] };
+    const changed = await runCommand("update_draft_order", input, dualCtx, execution);
+    expect(await runCommand("update_draft_order", input, dualCtx, execution)).toEqual(changed);
+    const persisted = await admin.from("order_lines").select("qty_ordered").eq("order_id", made.order_id);
+    expect(persisted.data).toEqual([{ qty_ordered: 2.5 }]);
+    const events = await admin.from("order_events").select("event").eq("order_id", made.order_id).eq("event", "updated");
+    expect(events.data).toHaveLength(1);
+  });
+
   it("derives trusted order fields from the configured fulfillment source and the authenticated customer", async () => {
     const configured = await seedLocation(b.id, { name: "Configured WH" });
     await runCommand("set_portal_fulfillment_source", { locationId: configured.id }, adminCtx);
@@ -89,16 +177,79 @@ describe("portal commands", () => {
     expect(await read()).toBeNull();
   });
 
-  it("recovers lost create and submit responses with exact request replay, without another update", async () => {
-    const input = { shipToId, lines: [{ skuId, qty: 2 }] };
+  it("injects committed response loss, reloads, and replays exact create/submit identities with one SQL effect", async () => {
+    const marker = `LOSS-${crypto.randomUUID().slice(0, 8)}`;
+    const input = { shipToId, poNumber: marker, lines: [{ skuId, qty: 2 }] };
     const create = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-    await runCommand("portal_create_order", input, custCtx, create); // committed response lost
-    const recovered = await runCommand("portal_create_order", input, custCtx, create) as { order_id: string };
+    const loseResponseAfterCommit = async (name: string, value: Record<string, unknown>, execution: typeof create) => {
+      await runCommand(name, value, custCtx, execution);
+      throw new Error("injected transport loss after commit");
+    };
+    await expect(loseResponseAfterCommit("portal_create_order", input, create))
+      .rejects.toThrow("injected transport loss after commit");
+
+    const reloadedCtx = { ...custCtx, db: await asUser(customerEmail) };
+    const recovered = await runCommand("portal_create_order", input, reloadedCtx, create) as { order_id: string };
     const submit = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit); // response lost
-    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit);
+    await expect(loseResponseAfterCommit("portal_submit_order", { orderId: recovered.order_id }, submit))
+      .rejects.toThrow("injected transport loss after commit");
+    expect(await runCommand("portal_submit_order", { orderId: recovered.order_id }, reloadedCtx, submit))
+      .toEqual({ order_id: recovered.order_id });
+
+    expect(sql(`select id::text from public.orders where po_number='${marker}'`)).toEqual([recovered.order_id]);
+    expect(sql(`select request_id::text from private.command_requests
+      where request_id in ('${create.requestId}','${submit.requestId}') order by request_id`))
+      .toEqual([create.requestId, submit.requestId].sort());
     const events = await admin.from("order_events").select("event").eq("order_id", recovered.order_id);
     expect(events.data?.map(e => e.event).sort()).toEqual(["created", "submitted"]);
+  });
+
+  it("recovers a definitive submit failure by editing, reviewing, and retrying the exact saved draft", async () => {
+    const alternate = await ins("ship_tos", {
+      brewery_id: b.id,
+      customer_id: customerId,
+      label: "alternate",
+      address1: "2 Main St",
+      city: "Town",
+      state: "PA",
+      zip: "19101",
+    });
+    const made = await runCommand("portal_create_order", {
+      shipToId,
+      poNumber: "BEFORE",
+      note: "before",
+      lines: [{ skuId, qty: 1 }],
+    }, custCtx) as { order_id: string };
+
+    await expect(runCommand("portal_submit_order", {
+      orderId: made.order_id,
+      expectedIdentity: { actorId: crypto.randomUUID(), customerId },
+    }, custCtx)).rejects.toThrow(/account changed/);
+    expect((await admin.from("orders").select("status").eq("id", made.order_id).single()).data?.status).toBe("draft");
+
+    const reviewed = {
+      shipToId: alternate.id,
+      poNumber: "AFTER",
+      note: "edited after definitive failure",
+      requestedShipDate: "2026-10-03",
+      lines: [{ skuId, qty: 4 }],
+    };
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, ...reviewed }, custCtx);
+    const quote = await runCommand("portal_quote_order", reviewed, custCtx) as { quoteId: string; lines: { skuId: string; qty: number }[] };
+    expect(quote.lines).toMatchObject([{ skuId, qty: 4 }]);
+    await runCommand("portal_submit_quote", { quoteId: quote.quoteId, orderId: made.order_id }, custCtx);
+
+    expect((await admin.from("orders")
+      .select("status,ship_to_id,po_number,note,requested_ship_date")
+      .eq("id", made.order_id).single()).data).toEqual({
+        status: "submitted",
+        ship_to_id: alternate.id,
+        po_number: "AFTER",
+        note: "edited after definitive failure",
+        requested_ship_date: "2026-10-03",
+      });
+    expect((await admin.from("order_lines").select("sku_id,qty_ordered").eq("order_id", made.order_id)).data)
+      .toEqual([{ sku_id: skuId, qty_ordered: 4 }]);
   });
 
   it("refuses other-customer and cross-tenant draft reads and writes", async () => {

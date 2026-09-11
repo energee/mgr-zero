@@ -247,18 +247,35 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines, events, shipment, and per-SKU ATP",
+  name: "get_order", description: "One order with lines, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, city, state)").eq("id", i.orderId).single());
-    const [ln, events, shipment, atp] = await Promise.all([
-      unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
+    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, city, state)")
+      .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
+    const [ln, events, shipment] = await Promise.all([
+      unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("shipments").select().eq("order_id", i.orderId).maybeSingle()),
-      unwrap(ctx.db.from("atp").select().eq("brewery_id", ctx.breweryId)),
     ]);
-    return { order, lines: ln, events, shipment, atp };
+    // Both aggregate views have one row per selected key. Restrict each request
+    // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
+    // an omitted balance into a false zero on the confirmation screen.
+    const lines = ln ?? [];
+    const skuIds = [...new Set(lines.map((line: { sku_id: string }) => line.sku_id))];
+    const atp: { brewery_id: string; sku_id: string; qty: number }[] = [];
+    const sourceOnHand: { sku_id: string; qty: number }[] = [];
+    for (let start = 0; start < skuIds.length; start += 100) {
+      const batch = skuIds.slice(start, start + 100);
+      const [batchAtp, batchSource] = await Promise.all([
+        unwrap(ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId).in("sku_id", batch)),
+        unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)
+          .eq("location_id", order.from_location_id).in("sku_id", batch)),
+      ]);
+      atp.push(...(batchAtp ?? []));
+      sourceOnHand.push(...(batchSource ?? []));
+    }
+    return { order, lines, events, shipment, atp, sourceOnHand };
   },
 });
 

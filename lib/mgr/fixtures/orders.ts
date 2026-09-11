@@ -98,6 +98,10 @@ export const orderSubmittedRidgeline: ConfirmOrderSnapshot = {
     { sku_id: SKU_HAZY.sku_id, qty: 11 },
     { sku_id: SKU_PILS.sku_id, qty: -6 },
   ],
+  sourceOnHand: [
+    { sku_id: SKU_HAZY.sku_id, qty: 8 },
+    { sku_id: SKU_PILS.sku_id, qty: 0 },
+  ],
   locations: LOCATIONS,
 };
 
