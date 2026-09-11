@@ -87,7 +87,10 @@ describe("AI composer", () => {
     expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);
     expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
     expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
-    expect(readFileSync("components/mgr/views/composer.tsx", "utf8")).toContain("DrawerContent");
+    const shared = readFileSync("components/mgr/views/composer.tsx", "utf8");
+    expect(shared).toContain("DrawerContent");
+    expect(shared).toMatch(/<DrawerClose asChild>[\s\S]*aria-label="Minimize Ask MGR"/);
+    expect(shared).not.toContain(">Minimize</Button>");
   });
 
   it("renders only canonical proposal effects", () => {

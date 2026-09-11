@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
 
@@ -33,11 +33,16 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
           <span aria-hidden="true" className="text-muted-foreground">⌃</span>
         </Button>
       </DrawerTrigger>
-      <DrawerContent className="max-h-[92vh]">
+      <DrawerContent className="max-h-[92vh] [&>div:first-child]:hidden">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Ask MGR</DrawerTitle>
           <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
         </DrawerHeader>
+        <DrawerClose asChild>
+          <Button type="button" variant="ghost" aria-label="Minimize Ask MGR" className="group h-11 w-full shrink-0 rounded-none">
+            <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
+          </Button>
+        </DrawerClose>
         <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4 pt-2">{children}</div>
       </DrawerContent>
     </Drawer>
@@ -110,20 +115,19 @@ export function ComposerStripView({
   );
 }
 
-export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat, onMinimize }: {
+export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat }: {
   messages: ComposerConversationMessage[];
   model?: string;
   activity?: string;
   error?: string;
   onRetry?: () => void;
   onNewChat?: () => void;
-  onMinimize?: () => void;
 }) {
   return (
     <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col">
       <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
-        <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
+        <Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button>
       </header>
       <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
         {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
