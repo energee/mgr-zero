@@ -7,7 +7,7 @@ import { useBrewery } from "../brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { movementFields, movementTypeLabel } from "@/lib/movement-form";
 import { formatVolume } from "@/lib/volume";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
@@ -69,8 +69,14 @@ export function MovementForm({
     reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
   const { setOpen } = form;
+  const autoOpened = useRef(false);
 
-  useEffect(() => { if (autoOpen) setOpen(true); }, [autoOpen, setOpen]);
+  useEffect(() => {
+    if (autoOpen && !autoOpened.current) {
+      autoOpened.current = true;
+      setOpen(true);
+    }
+  }, [autoOpen, setOpen]);
 
   useEffect(() => {
     if (!locationId || !form.open) return;
