@@ -4158,7 +4158,6 @@ BEGIN
   IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
     ON r.actor_id=s.actor_id AND r.request_id=s.request_id
     WHERE s.connection_id=v_connection.id AND s.merchant_id=v_connection.merchant_id
-      AND s.credential_version=v_connection.credential_version
       AND s.catalog_generation>v_connection.catalog_sync_generation
       AND r.result IS NULL) THEN
     RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
@@ -4274,7 +4273,6 @@ BEGIN
   IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
     ON r.actor_id=s.actor_id AND r.request_id=s.request_id
     WHERE s.connection_id=v_connection.id AND s.merchant_id=v_connection.merchant_id
-      AND s.credential_version=v_connection.credential_version
       AND s.catalog_generation>v_connection.catalog_sync_generation
       AND r.result IS NULL) THEN
     RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
