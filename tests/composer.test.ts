@@ -87,6 +87,8 @@ describe("AI composer", () => {
     expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
     const shared = readFileSync("components/mgr/views/composer.tsx", "utf8");
     const drawer = readFileSync("components/mgr/views/composer-drawer.tsx", "utf8");
+    const drawerPrimitive = readFileSync("components/ui/drawer.tsx", "utf8");
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { dependencies: Record<string, string> };
     expect(shared).toMatch(/export \{ ComposerDrawerView \} from/);
     expect(drawer).toContain('const MINIMIZED = "44px"');
     expect(drawer).toContain('const COMPACT = "480px"');
@@ -94,6 +96,11 @@ describe("AI composer", () => {
     expect(drawer).toContain('const minimized = isMobile ? "92px" : MINIMIZED');
     expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[minimized, COMPACT, EXPANDED\]\}/);
     expect(drawer).toContain("modal={false}");
+    expect(drawer).toContain("disablePointerDismissal");
+    expect(drawer).toContain("snapToSequentialPoints");
+    expect(drawer).toContain("snapPoint={snapPoint}");
+    expect(drawer).toContain("onSnapPointChange={setSnapPoint}");
+    expect(drawer).not.toContain("handleOnly");
     expect(drawer).not.toContain("DrawerTrigger");
     expect(drawer).toContain('"Expand Ask MGR"');
     expect(drawer).toContain('"Minimize Ask MGR"');
@@ -101,6 +108,10 @@ describe("AI composer", () => {
     expect(shared).toContain('className="flex min-h-0 flex-1 flex-col overflow-hidden"');
     expect(shared).not.toContain(">Minimize</Button>");
     expect(readFileSync("components/mgr/app-shell.tsx", "utf8")).toContain('className="h-11 shrink-0"');
+    expect(drawerPrimitive).toContain('from "@base-ui/react/drawer"');
+    expect(drawerPrimitive).not.toContain('from "vaul"');
+    expect(packageJson.dependencies).toHaveProperty("@base-ui/react");
+    expect(packageJson.dependencies).not.toHaveProperty("vaul");
   });
 
   it("renders only canonical proposal effects", () => {

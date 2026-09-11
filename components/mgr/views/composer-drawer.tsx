@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHandle, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const MINIMIZED = "44px";
@@ -33,24 +33,20 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
     <Drawer
       open
       modal={false}
-      dismissible={false}
-      handleOnly
+      disablePointerDismissal
+      snapToSequentialPoints
       snapPoints={[minimized, COMPACT, EXPANDED]}
-      activeSnapPoint={snapPoint}
-      setActiveSnapPoint={setSnapPoint}
-      fadeFromIndex={2}
-      noBodyStyles
+      snapPoint={snapPoint}
+      onSnapPointChange={setSnapPoint}
     >
-      <DrawerContent className="h-dvh! max-h-none! [&>div:first-child]:hidden">
+      <DrawerContent className="h-dvh! max-h-none! border-t">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Ask MGR</DrawerTitle>
           <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
         </DrawerHeader>
-        <DrawerHandle preventCycle className="h-11! w-full! bg-transparent! opacity-100!">
-          <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="group h-11 w-full shrink-0 rounded-none" onClick={() => setSnapPoint(nextSnapPoint)}>
-            <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
-          </Button>
-        </DrawerHandle>
+        <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="group h-11 w-full shrink-0 rounded-none" onClick={() => setSnapPoint(nextSnapPoint)}>
+          <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
+        </Button>
         <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${snapPoint === minimized ? "h-0 overflow-hidden p-0" : snapPoint === EXPANDED ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>{children}</div>
       </DrawerContent>
     </Drawer>
