@@ -62,11 +62,13 @@ export type SquarePublicationStart = {
   attemptId: string;
   connectionId: string;
   credentialVersion: number;
-  status: "needs_snapshot" | "prepared" | "succeeded" | "rejected";
+  catalogGeneration: number;
+  status: "needs_snapshot" | "prepared" | "succeeded" | "rejected" | "superseded";
   providerKey: string;
   source: import("@/lib/pos").SquarePublicationSource;
   errorCode: string | null;
-  result: { published: boolean; retired: boolean; externalItemId: string; externalVariationId: string; ownership: "mgr" | "adopted" } | null;
+  result: { published: boolean; retired?: boolean; superseded?: boolean; externalItemId?: string;
+    ownership?: "mgr" | "adopted"; variations?: Array<{ formatId: string; externalVariationId: string; retired: boolean }> } | null;
 };
 
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
@@ -385,8 +387,8 @@ export async function recordSquareSalesPage(
 function squarePublicationStart(data: unknown): SquarePublicationStart {
   const row = data as Record<string, unknown> | null;
   if (!row || typeof row.attemptId !== "string" || typeof row.connectionId !== "string"
-    || typeof row.credentialVersion !== "number" || typeof row.providerKey !== "string"
-    || !["needs_snapshot", "prepared", "succeeded", "rejected"].includes(String(row.status))
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number" || typeof row.providerKey !== "string"
+    || !["needs_snapshot", "prepared", "succeeded", "rejected", "superseded"].includes(String(row.status))
     || !row.source || typeof row.source !== "object"
     || (row.errorCode !== null && typeof row.errorCode !== "string")
     || (row.result !== null && typeof row.result !== "object")) {
@@ -397,12 +399,12 @@ function squarePublicationStart(data: unknown): SquarePublicationStart {
 
 export async function beginSquarePublication(
   ctx: Ctx,
-  input: { posLocationId: string; formatId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
+  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
   requestId: string,
   commandName: "publish_pos_menu" | "publish_pos_item",
 ) {
   const { data, error } = await ctx.db.rpc("begin_square_publication", {
-    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_brand: input.brandId,
     p_adopt_item: input.adoptItemId ?? null, p_adopt_variation: input.adoptVariationId ?? null,
     p_retry_conflict: input.retryConflict ?? false, p_command: commandName, p_request_id: requestId,
   });
@@ -418,6 +420,7 @@ export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
   }).maybeSingle();
   const row = data as Record<string, unknown> | null;
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (row?.superseded === true) throw new CommandError("Square publication was superseded", 409, "conflict");
   if (error || !row || typeof row.access_token !== "string"
     || (row.request_body !== null && typeof row.request_body !== "string")) {
     throw new CommandError("Square publication access is no longer available", 403, "permission_denied");
@@ -426,18 +429,19 @@ export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
 }
 
 export async function prepareSquarePublication(
-  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null, variationVersion: number | null,
+  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null, variationVersions: Record<string, number>,
 ) {
   const { data, error } = await createAdminClient().rpc("prepare_square_publication", {
     p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
-    p_request_body: requestBody, p_item_version: itemVersion, p_variation_version: variationVersion,
+    p_request_body: requestBody, p_item_version: itemVersion, p_variation_versions: variationVersions,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (data === false) throw new CommandError("Square publication was superseded", 409, "conflict");
   if (error || data !== true) throw new Error("Square publication could not be prepared");
 }
 
 export async function finishSquarePublication(
-  ctx: Ctx, attemptId: string, errorCode: "version_mismatch" | "provider_rejected" | null,
+  ctx: Ctx, attemptId: string, errorCode: "version_mismatch" | "provider_rejected" | "provider_missing" | "provider_invalid" | null,
   response: { catalogObject: Record<string, unknown>; idMappings: Record<string, unknown>[] } | null,
 ) {
   const { data, error } = await createAdminClient().rpc("finish_square_publication", {
@@ -446,7 +450,7 @@ export async function finishSquarePublication(
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square publication result could not be recorded");
-  return data as { published: boolean; retired: boolean; externalItemId: string; externalVariationId: string; ownership: "mgr" | "adopted" };
+  return data as NonNullable<SquarePublicationStart["result"]>;
 }
 
 export async function getSquareHealth(ctx: Ctx) {

@@ -104,6 +104,7 @@ describe("derived POS menus", () => {
     const inactive = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any;
     expect(inactive.items).toEqual([]);
     expect(inactive.excluded).toContainEqual({
+      brandId: keg.brandId,
       formatId: pintId,
       brand: "Hazy",
       format: "Pint",

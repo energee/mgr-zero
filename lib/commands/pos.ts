@@ -174,26 +174,33 @@ defineCommand({
   })),
 });
 
-const squarePublicationInput = z.object({
+const squarePublicationOptions = {
   posLocationId,
-  formatId: z.string().uuid(),
   adoptItemId: z.string().trim().min(1).max(200).optional(),
   adoptVariationId: z.string().trim().min(1).max(200).optional(),
   retryConflict: z.boolean().optional(),
-}).refine((value) => Boolean(value.adoptItemId) === Boolean(value.adoptVariationId), {
+};
+const squareItemPublicationInput = z.object({ ...squarePublicationOptions, brandId: z.string().uuid() }).strict()
+  .refine((value) => Boolean(value.adoptItemId) === Boolean(value.adoptVariationId), {
   message: "choose both Square item and variation when adopting",
 });
 
-for (const command of ["publish_pos_menu", "publish_pos_item"] as const) defineCommand({
-  name: command,
-  description: command === "publish_pos_menu"
-    ? "Publish one derived menu row to Square with durable recovery and provider ownership"
-    : "Create, update, retire, or explicitly adopt one Square item variation",
-  input: squarePublicationInput,
+defineCommand({
+  name: "publish_pos_menu", description: "Publish every derived brand and format change for one Square location",
+  input: z.object({ posLocationId, retryConflict: z.boolean().optional() }).strict(),
   roles: [...menuRoles],
   handler: async (ctx, input, execution) => {
+    const { publishSquareMenu, squareConfig, SquareClient } = await import("@/lib/pos");
+    return publishSquareMenu(ctx, input, execution.requestId, new SquareClient(squareConfig()));
+  },
+});
+
+defineCommand({
+  name: "publish_pos_item", description: "Create, update, retire, or explicitly adopt one brand's Square item and format variations",
+  input: squareItemPublicationInput, roles: [...menuRoles],
+  handler: async (ctx, input, execution) => {
     const { publishSquareCatalogItem, squareConfig, SquareClient } = await import("@/lib/pos");
-    return publishSquareCatalogItem(ctx, input, execution.requestId, new SquareClient(squareConfig()), command);
+    return publishSquareCatalogItem(ctx, input, execution.requestId, new SquareClient(squareConfig()), "publish_pos_item");
   },
 });
 

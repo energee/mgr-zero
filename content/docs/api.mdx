@@ -4582,12 +4582,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Create, update, retire, or explicitly adopt one Square item variation
+Create, update, retire, or explicitly adopt one brand's Square item and format variations
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `posLocationId` | string | yes |
-| `formatId` | uuid | yes |
+| `brandId` | uuid | yes |
 | `adoptItemId` | string | no |
 | `adoptVariationId` | string | no |
 | `retryConflict` | boolean | no |
@@ -4596,28 +4596,25 @@ Create, update, retire, or explicitly adopt one Square item variation
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "brandId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### publish_pos_menu [#publish_pos_menu]
 
 `command` · admin, warehouse
 
-Publish one derived menu row to Square with durable recovery and provider ownership
+Publish every derived brand and format change for one Square location
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `posLocationId` | string | yes |
-| `formatId` | uuid | yes |
-| `adoptItemId` | string | no |
-| `adoptVariationId` | string | no |
 | `retryConflict` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string" } }'
 ```
 
 #### revoke_staff [#revoke_staff]
