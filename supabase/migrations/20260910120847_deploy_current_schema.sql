@@ -2180,7 +2180,7 @@ BEGIN
   SELECT current_connection.id,current_connection.merchant_id INTO c.id,c.merchant_id
     FROM public.pos_connections current_connection WHERE current_connection.brewery_id=i.brewery_id
       AND current_connection.provider='square';
-  IF c.id IS NOT NULL AND c.merchant_id IS DISTINCT FROM p_merchant_id THEN
+  IF c.id IS NOT NULL THEN
     PERFORM 1 FROM private.command_requests request
       JOIN private.square_catalog_syncs sync ON sync.actor_id=request.actor_id AND sync.request_id=request.request_id
       WHERE sync.connection_id=c.id AND request.result IS NULL
@@ -2198,10 +2198,6 @@ BEGIN
     EXECUTE $cleanup$UPDATE private.square_menu_publications SET status='superseded',
       result=jsonb_build_object('published',false,'superseded',true,'errorCode','connection_changed'),finished_at=now()
       WHERE connection_id=$1 AND status='publishing'$cleanup$ USING c.id;
-    UPDATE private.command_requests request SET result=v_sync_result
-      FROM private.square_catalog_syncs sync
-      WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
-        AND sync.connection_id=c.id AND request.result IS NULL;
     EXECUTE 'DELETE FROM public.pos_catalog_ownership WHERE connection_id=$1' USING c.id;
     EXECUTE 'DELETE FROM public.pos_catalog_items WHERE connection_id=$1' USING c.id;
     DELETE FROM public.pos_menus WHERE connection_id=c.id;
@@ -2209,6 +2205,10 @@ BEGIN
     DELETE FROM public.pos_catalog_variations WHERE connection_id=c.id;
     DELETE FROM public.pos_locations WHERE connection_id=c.id;
   END IF;
+  UPDATE private.command_requests request SET result=v_sync_result
+    FROM private.square_catalog_syncs sync
+    WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
+      AND sync.connection_id=c.id AND request.result IS NULL;
   INSERT INTO public.pos_connections(id,brewery_id,provider,merchant_id,merchant_label,state,access_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at,granted_scopes)
     VALUES(v_id,i.brewery_id,'square',p_merchant_id,p_merchant_label,'connected',p_access_expires_at,'not_requested',null,1,p_actor,now(),p_granted_scopes)
   ON CONFLICT(brewery_id,provider) DO UPDATE SET merchant_id=excluded.merchant_id,merchant_label=excluded.merchant_label,state='connected',
