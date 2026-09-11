@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { advanceSquareCatalogSync, beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
@@ -8,6 +8,7 @@ import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
+const nativeFetch = globalThis.fetch;
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 
 async function fixture(brands = 1) {
@@ -58,7 +59,79 @@ beforeAll(() => {
   expect(process.env.DATABASE_URL).toContain(":54352/");
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+function commandSquare(fetcher: typeof globalThis.fetch) {
+  vi.stubEnv("SQUARE_APPLICATION_ID", config.applicationId);
+  vi.stubEnv("SQUARE_APPLICATION_SECRET", config.applicationSecret);
+  vi.stubEnv("SQUARE_REDIRECT_URI", config.redirectUri);
+  vi.stubEnv("SQUARE_ENVIRONMENT", config.environment);
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).startsWith("http://127.0.0.1:54351") ? nativeFetch(input, init) : fetcher(input, init));
+}
+
 describe("Square publication final orchestration fences", () => {
+  it("returns the durable terminal publication contract from the real command handlers", async () => {
+    const succeeded = await fixture();
+    const successFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      expect(String(input)).toBe("https://connect.squareupsandbox.com/v2/catalog/object");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual({
+        "Square-Version": "2026-08-19", Authorization: "Bearer publication-access",
+        "Content-Type": "application/json", Accept: "application/json",
+      });
+      const body = JSON.parse(String(init?.body));
+      expect(Object.keys(body).sort()).toEqual(["idempotency_key", "object"]);
+      return success(body, "COMMAND-SUCCESS");
+    });
+    commandSquare(successFetch);
+    const successRequest = crypto.randomUUID();
+    await expect(runCommand("publish_pos_item", { posLocationId: "L1", brandId: succeeded.brandIds[0] }, succeeded.ctx,
+      { requestId: successRequest, correlationId: crypto.randomUUID() })).resolves.toEqual({
+      publication: { attemptId: expect.any(String), status: "succeeded", errorCode: null },
+      result: expect.objectContaining({ published: true, externalItemId: "COMMAND-SUCCESS" }),
+    });
+    expect(successFetch).toHaveBeenCalledTimes(1);
+
+    const rejected = await fixture();
+    const rejectedFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ errors: [{ code: "VERSION_MISMATCH" }] }), { status: 409 }));
+    commandSquare(rejectedFetch);
+    const rejectedRequest = crypto.randomUUID();
+    const rejectedResult = await runCommand("publish_pos_item", { posLocationId: "L1", brandId: rejected.brandIds[0] }, rejected.ctx,
+      { requestId: rejectedRequest, correlationId: crypto.randomUUID() }) as { publication: { attemptId: string; status: string; errorCode: string | null } };
+    expect(rejectedResult.publication).toEqual({ attemptId: expect.any(String), status: "rejected", errorCode: "version_mismatch" });
+    expect(rejectedResult.publication.attemptId).not.toBe(rejectedRequest);
+
+    const superseded = await fixture();
+    const supersededRequest = crypto.randomUUID();
+    const started = await beginSquarePublication(superseded.ctx, { posLocationId: "L1", brandId: superseded.brandIds[0]! }, supersededRequest, "publish_pos_item");
+    sql(`update private.square_publications set status='superseded',error_code='connection_changed',
+      result='{"published":false,"superseded":true}'::jsonb,finished_at=now() where id='${started.attemptId}'`);
+    commandSquare(vi.fn());
+    await expect(runCommand("publish_pos_item", { posLocationId: "L1", brandId: superseded.brandIds[0] }, superseded.ctx,
+      { requestId: supersededRequest, correlationId: crypto.randomUUID() })).resolves.toMatchObject({
+      publication: { attemptId: started.attemptId, status: "superseded", errorCode: "connection_changed" },
+    });
+
+    const transient = await fixture();
+    commandSquare(vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("temporary", { status: 503 })));
+    await expect(runCommand("publish_pos_item", { posLocationId: "L1", brandId: transient.brandIds[0] }, transient.ctx,
+      { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() })).rejects.toThrow("Square is unavailable");
+  });
+
+  it("returns a confirmed durable menu publication envelope", async () => {
+    const f = await fixture();
+    commandSquare(vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => success(JSON.parse(String(init?.body)), "MENU-SUCCESS")));
+    await expect(runCommand("publish_pos_menu", { posLocationId: "L1" }, f.ctx,
+      { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() })).resolves.toEqual({
+      publication: { attemptId: expect.any(String), status: "succeeded", errorCode: null },
+      result: expect.objectContaining({ published: true, items: [expect.any(Object)] }),
+    });
+  });
+
   it("terminally rejects a partial menu after a definitive child failure and permits a corrected request", async () => {
     const f = await fixture(2);
     const requestId = crypto.randomUUID();

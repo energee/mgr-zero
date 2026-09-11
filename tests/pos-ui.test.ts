@@ -1,8 +1,14 @@
 // Program 14 P5: POS screens share their inventory/live presentation, and an
 // uncertain provider response keeps one retryable identity without claiming success.
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { isTerminalPublication, publicationNotice } from "@/lib/mgr/pos-view";
+import { PosItemView, PosMenuView } from "@/components/mgr/views/pos";
+import { SCREENS } from "@/components/mgr/screens";
+import { classifyCommandFailure } from "@/lib/commands/client";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, shouldStartNewCommandAttempt, syncFailureMessage } from "@/lib/mgr/pos-view";
+import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 describe("POS UI truth", () => {
@@ -19,6 +25,67 @@ describe("POS UI truth", () => {
     expect(isTerminalPublication("rejected")).toBe(true);
     expect(isTerminalPublication("superseded")).toBe(true);
     expect(isTerminalPublication("prepared")).toBe(false);
+  });
+
+  it("consumes the durable publication command envelope instead of inventing status", () => {
+    expect(readPublicationOutcome({ publication: { attemptId: "attempt-ok", status: "succeeded", errorCode: null } }))
+      .toEqual({ attemptId: "attempt-ok", status: "succeeded", errorCode: null });
+    expect(readPublicationOutcome({ publication: { attemptId: "attempt-bad", status: "rejected", errorCode: "version_mismatch" } }))
+      .toEqual({ attemptId: "attempt-bad", status: "rejected", errorCode: "version_mismatch" });
+    expect(readPublicationOutcome({ publication: { attemptId: "attempt-old", status: "superseded", errorCode: "connection_changed" } }))
+      .toEqual({ attemptId: "attempt-old", status: "superseded", errorCode: "connection_changed" });
+    expect(readPublicationOutcome({ published: true })).toBeNull();
+  });
+
+  it("separates definitive command refusal from uncertain transport failure", () => {
+    const permission = classifyCommandFailure(Object.assign(new Error("permission denied"), { status: 403, code: "permission_denied" }));
+    const conflict = classifyCommandFailure(Object.assign(new Error("conflict"), { status: 409, code: "conflict" }));
+    const unknown = classifyCommandFailure(new TypeError("fetch failed"));
+    expect(permission).toMatchObject({ kind: "definitive", status: 403, code: "permission_denied" });
+    expect(conflict).toMatchObject({ kind: "definitive", status: 409, code: "conflict" });
+    expect(unknown).toMatchObject({ kind: "unknown" });
+    expect(syncFailureMessage("Sales", permission, "request-known")).toBe("Sales sync stopped · permission denied. Resolve the permission or conflict, then start a new sync.");
+    expect(syncFailureMessage("Sales", unknown, "request-unknown")).toContain("attempt request-unknown. Retry the exact attempt");
+    expect(shouldStartNewCommandAttempt(null, permission)).toBe(true);
+    expect(shouldStartNewCommandAttempt(null, unknown)).toBe(false);
+  });
+
+  it("rolls an optimistic boolean back when persistence fails", async () => {
+    const states: boolean[] = [];
+    await reconcileBooleanChange(false, true, async () => false, value => states.push(value));
+    expect(states).toEqual([true, false]);
+    states.length = 0;
+    await reconcileBooleanChange(false, true, async () => true, value => states.push(value));
+    expect(states).toEqual([true]);
+  });
+
+  it("keeps an all-out-of-stock owned menu publishable and its item reachable", () => {
+    const model = { locations: [{ id: "taproom", label: "Taproom" }], selectedLocationId: "taproom", locationName: "Taproom",
+      binName: "Cold", channelName: "Taproom", items: [], externalItems: [],
+      excluded: [{ brandId: "hazy", formatId: "pint", label: "Hazy · Pint", retail: "$7.00", source: "format", destinations: "Square", available: false, reason: "out of stock", href: "#" }] };
+    const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
+    expect(menu).toContain("Publish changes");
+    expect(menu).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish changes/);
+    expect(menu).toContain("Open");
+    const item = renderToStaticMarkup(createElement(PosItemView, { item: { brand: "Hazy", format: "Pint", sources: "", serving: "16 oz", price: "$7.00", override: "", websitePublished: false, available: false } }));
+    expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish item to Square/);
+  });
+
+  it("renders the inventory sync and sale-opening action contract", () => {
+    const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
+    expect(html("Point of sale")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
+    expect(html("POS mapping")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
+    expect(html("POS mapping")).toContain("Open");
+  });
+
+  it("keeps live POS route sheets on the inventory body layout", () => {
+    expect(readFileSync("components/mgr/views/pos-controls.tsx", "utf8"))
+      .toContain('<div className="flex flex-col gap-2">{children}</div>');
+  });
+
+  it("gives Warehouse a direct route to POS mapping and retained sales", () => {
+    expect(navFor(shippedNav(STAFF_NAV), "warehouse").find(item => item.label === "More")?.children)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ label: "POS mapping", href: "/settings/pos/mapping" })]));
   });
 
   it("mounts one shared view from every POS inventory record", () => {

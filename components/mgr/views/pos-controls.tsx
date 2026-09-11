@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import {
-  ConnectSquareView, DisconnectSquareView, PosItemView, PosMappingView, PosMenuView, SquareLocationsView,
+  ConnectSquareView, DisconnectSquareView, PosItemView, PosMappingView, PosMenuView, PosSyncActions, SquareLocationsView,
 } from "@/components/mgr/views/pos";
 import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { isTerminalPublication, publicationNotice, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, shouldStartNewCommandAttempt, syncFailureMessage, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 function useExactCommand() {
   const action = useCommandAction();
@@ -26,7 +26,7 @@ function useExactCommand() {
 
 export function PosRouteSheet({ title, backHref, children }: { title: string; backHref: string; children: ReactNode }) {
   const router = useRouter();
-  return <CommandForm open onOpenChange={open => { if (!open) router.push(backHref); }} title={title}>{children}</CommandForm>;
+  return <CommandForm open onOpenChange={open => { if (!open) router.push(backHref); }} title={title}><div className="flex flex-col gap-2">{children}</div></CommandForm>;
 }
 
 export function SquareConnectControl({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
@@ -43,16 +43,15 @@ export function SquareSyncControls() {
   const catalog = useExactCommand(), sales = useExactCommand();
   const summary = (kind: string, action: ReturnType<typeof useExactCommand>) => {
     if (action.result) return E.info(`${kind} sync complete · attempt ${action.requestId}`);
-    if (action.error && action.requestId) return E.note(`${kind} sync outcome is unknown · attempt ${action.requestId}. Retry the exact attempt before starting another.`);
-    return null;
+    const message = syncFailureMessage(kind, action.failure, action.requestId);
+    return message ? E.note(message) : null;
   };
-  return <div className="flex flex-col gap-2">
-    <div className="flex flex-wrap justify-end gap-2">
-      <Button variant="outline" disabled={catalog.busy} onClick={() => void catalog.run("sync_square_catalog", {}, Boolean(catalog.result))}>{catalog.busy ? "Syncing catalog…" : catalog.error ? "Retry exact catalog sync" : "Sync Square catalog"}</Button>
-      <Button variant="outline" disabled={sales.busy} onClick={() => void sales.run("sync_square_sales", {}, Boolean(sales.result))}>{sales.busy ? "Syncing sales…" : sales.error ? "Retry exact sales sync" : "Sync Square sales"}</Button>
-    </div>
-    {summary("Catalog", catalog)}{summary("Sales", sales)}
-  </div>;
+  return <PosSyncActions catalogBusy={catalog.busy} salesBusy={sales.busy}
+    catalogLabel={catalog.failure?.kind === "unknown" ? "Retry exact catalog sync" : "Sync Square catalog"}
+    salesLabel={sales.failure?.kind === "unknown" ? "Retry exact sales sync" : "Sync Square sales"}
+    onCatalog={() => void catalog.run("sync_square_catalog", {}, shouldStartNewCommandAttempt(catalog.result, catalog.failure))}
+    onSales={() => void sales.run("sync_square_sales", {}, shouldStartNewCommandAttempt(sales.result, sales.failure))}
+    feedback={<>{summary("Catalog", catalog)}{summary("Sales", sales)}</>} />;
 }
 
 export function SquareLocationsControl({ rows, locations }: { rows: PosLocationRow[]; locations: { id: string; name: string }[] }) {
@@ -79,10 +78,10 @@ export function PosMappingControl({ variations, targets, sales, coverage, canSyn
 
 function PublicationResult({ action, onRetry, onCorrected }: { action: ReturnType<typeof useExactCommand>; onRetry: () => void; onCorrected: () => void }) {
   if (!action.requestId) return null;
-  const status = typeof action.result?.status === "string" ? action.result.status : action.error ? "prepared" : "requested";
-  const identity = typeof action.result?.menuAttemptId === "string" ? action.result.menuAttemptId
-    : typeof action.result?.attemptId === "string" ? action.result.attemptId : action.requestId;
-  const notice = publicationNotice({ requestId: identity, status: status as Parameters<typeof publicationNotice>[0]["status"], errorCode: typeof action.result?.errorCode === "string" ? action.result.errorCode : null });
+  const outcome = readPublicationOutcome(action.result);
+  if (!outcome && action.failure?.kind !== "unknown") return null;
+  const status = outcome?.status ?? "prepared";
+  const notice = publicationNotice({ requestId: outcome?.attemptId ?? action.requestId, status, errorCode: outcome?.errorCode });
   return <div className="flex flex-col gap-2">
     {notice.tone === "success" ? E.info(`${notice.label} · ${notice.detail}`) : E.note(`${notice.label} · ${notice.detail}`)}
     {notice.retry && <Button variant="outline" disabled={action.busy} onClick={onRetry}>Retry exact attempt</Button>}
@@ -94,13 +93,13 @@ export function PosMenuControl({ model, bins, channels }: {
   model: PosMenuModel; bins: { id: string; name: string }[]; channels: { id: string; name: string }[];
 }) {
   const command = useCommandAction(), publication = useExactCommand();
-  const status = publication.result?.status;
-  const terminal = isTerminalPublication(status);
-  const publish = (corrected = false) => publication.run("publish_pos_menu", { posLocationId: model.selectedLocationId, ...(corrected && status === "rejected" ? { retryConflict: true } : {}) }, corrected);
+  const outcome = readPublicationOutcome(publication.result);
+  const terminal = isTerminalPublication(outcome?.status);
+  const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_menu", { posLocationId: model.selectedLocationId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt);
   return <PosMenuView model={model} bins={bins} channels={channels} busy={command.busy || publication.busy} error={command.error ?? publication.error} live
-    notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true)} />}
+    notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
     onConfigure={(binId, saleChannelId) => void command.run("configure_pos_menu", { posLocationId: model.selectedLocationId, binId, saleChannelId })}
-    onPublish={() => void publish(terminal)} />;
+    onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
 }
 
 export function PosItemControl({ posLocationId, brandId, formatId, item }: {
@@ -108,12 +107,12 @@ export function PosItemControl({ posLocationId, brandId, formatId, item }: {
   item: Parameters<typeof PosItemView>[0]["item"];
 }) {
   const command = useCommandAction(), publication = useExactCommand();
-  const status = publication.result?.status;
-  const terminal = isTerminalPublication(status);
-  const publish = (corrected = false) => publication.run("publish_pos_item", { posLocationId, brandId, ...(corrected && status === "rejected" ? { retryConflict: true } : {}) }, corrected);
+  const outcome = readPublicationOutcome(publication.result);
+  const terminal = isTerminalPublication(outcome?.status);
+  const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_item", { posLocationId, brandId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt);
   return <PosItemView item={item} busy={command.busy || publication.busy} error={command.error ?? publication.error}
-    notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true)} />}
+    notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
     onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, unitPriceCents: value === "" ? null : Math.round(Number(value) * 100) })}
-    onWebsite={published => void command.run("set_pos_website_publication", { posLocationId, formatId, published })}
-    onPublish={() => void publish(terminal)} />;
+    onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, published })}
+    onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
 }

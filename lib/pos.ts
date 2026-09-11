@@ -536,6 +536,63 @@ export async function publishSquareMenu(
   return finishSquareMenuPublication(ctx, start.menuAttemptId);
 }
 
+type PublicationCommandResult = {
+  publication: { attemptId: string; status: "succeeded" | "rejected" | "superseded"; errorCode: string | null };
+  result: Record<string, unknown> | null;
+};
+
+function itemCommandResult(start: Awaited<ReturnType<typeof beginSquarePublication>>): PublicationCommandResult | null {
+  if (start.status !== "succeeded" && start.status !== "rejected" && start.status !== "superseded") return null;
+  return { publication: { attemptId: start.attemptId, status: start.status, errorCode: start.errorCode }, result: start.result };
+}
+
+function menuCommandResult(start: Awaited<ReturnType<typeof beginSquareMenuPublication>>): PublicationCommandResult | null {
+  if (start.status !== "succeeded" && start.status !== "rejected" && start.status !== "superseded") return null;
+  return { publication: { attemptId: start.menuAttemptId, status: start.status, errorCode: start.errorCode }, result: start.result };
+}
+
+/** The HTTP command contract includes durable terminal state; transient throws remain retryable under the same request ID. */
+export async function publishSquareCatalogItemCommand(
+  ctx: Ctx,
+  input: Parameters<typeof publishSquareCatalogItem>[1],
+  requestId: string,
+  client: SquareClient,
+) {
+  try {
+    await publishSquareCatalogItem(ctx, input, requestId, client, "publish_pos_item");
+  } catch (error) {
+    try {
+      const terminal = itemCommandResult(await beginSquarePublication(ctx, input, requestId, "publish_pos_item"));
+      if (terminal) return terminal;
+    } catch { /* No durable attempt means the original command failure remains authoritative. */ }
+    throw error;
+  }
+  const terminal = itemCommandResult(await beginSquarePublication(ctx, input, requestId, "publish_pos_item"));
+  if (!terminal) throw new Error("Square publication terminal state was unavailable");
+  return terminal;
+}
+
+/** Menu publication has the same terminal envelope as item publication. */
+export async function publishSquareMenuCommand(
+  ctx: Ctx,
+  input: Parameters<typeof publishSquareMenu>[1],
+  requestId: string,
+  client: SquareClient,
+) {
+  try {
+    await publishSquareMenu(ctx, input, requestId, client);
+  } catch (error) {
+    try {
+      const terminal = menuCommandResult(await beginSquareMenuPublication(ctx, input, requestId));
+      if (terminal) return terminal;
+    } catch { /* No durable attempt means the original command failure remains authoritative. */ }
+    throw error;
+  }
+  const terminal = menuCommandResult(await beginSquareMenuPublication(ctx, input, requestId));
+  if (!terminal) throw new Error("Square menu publication terminal state was unavailable");
+  return terminal;
+}
+
 export async function syncSquareCatalogFacts(client: SquareClient, accessToken: string, merchantId: string) {
   const locations = await client.listLocations(accessToken, merchantId);
   const variations = await client.listCatalogVariations(accessToken);

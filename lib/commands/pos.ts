@@ -11,7 +11,7 @@ async function completePosRows<T>(page: (start: number) => PromiseLike<{
     const next = await unwrap(Promise.resolve(result));
     if (result.count === null || !next || (total !== undefined && result.count !== total)
       || (next.length === 0 && all.length < result.count)) {
-      throw new CommandError("The complete Square mapping list could not be loaded. Retry the read.", 409, "conflict");
+      throw new CommandError("The complete Square data could not be loaded. Retry the read.", 409, "conflict");
     }
     total = result.count;
     all.push(...next as T[]);
@@ -95,18 +95,21 @@ const relatedName = (relation: NamedRelation) => Array.isArray(relation) ? relat
 
 async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
   if (!rows.length) return [];
-  const saleIds = rows.map((row) => row.id);
   const connectionIds = [...new Set(rows.map((row) => row.connection_id))];
   const [expectations, locations, catalog, mappings] = await Promise.all([
-    unwrap(ctx.db.from("pos_sale_expectations").select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name)")
-      .eq("brewery_id", ctx.breweryId).in("sale_id", saleIds)),
-    unwrap(ctx.db.from("pos_locations").select("connection_id,external_location_id,external_name,locations(name)")
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds)),
-    unwrap(ctx.db.from("pos_catalog_variations").select("connection_id,external_item_id,external_variation_id,external_item_name,external_variation_name")
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds)),
-    unwrap(ctx.db.from("pos_item_mappings").select("connection_id,external_item_id,external_variation_id,ignored")
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds)),
-  ]) as [PosExpectation[], PosSaleLocation[], PosCatalogVariation[], PosMapping[]];
+    completePosRows<PosExpectation>((start) => ctx.db.from("pos_sale_expectations")
+      .select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).order("sale_id").range(start, start + 499)),
+    completePosRows<PosSaleLocation>((start) => ctx.db.from("pos_locations")
+      .select("connection_id,external_location_id,external_name,locations(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_location_id").range(start, start + 499)),
+    completePosRows<PosCatalogVariation>((start) => ctx.db.from("pos_catalog_variations")
+      .select("connection_id,external_item_id,external_variation_id,external_item_name,external_variation_name", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + 499)),
+    completePosRows<PosMapping>((start) => ctx.db.from("pos_item_mappings")
+      .select("connection_id,external_item_id,external_variation_id,ignored", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + 499)),
+  ]);
   const expectationBySale = new Map(expectations.map((row) => [row.sale_id, row]));
   const key = (connection: string, variation: string | null) => `${connection}\0${variation ?? ""}`;
   const catalogByVariation = new Map(catalog.map((row) => [key(row.connection_id, row.external_variation_id), row]));
@@ -163,9 +166,9 @@ defineQuery({
     const selected = await unwrap(ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id")
       .eq("brewery_id", ctx.breweryId).eq("id", input.saleId).maybeSingle()) as PosSale | null;
     if (!selected) throw new CommandError("Square sale fact not found", 404, "not_found");
-    const revisions = await unwrap(ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id")
+    const revisions = await completePosRows<PosSale>((start) => ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("connection_id", selected.connection_id).eq("external_order_id", selected.external_order_id)
-      .order("source_version", { ascending: false }).order("external_line_id")) as PosSale[];
+      .order("source_version", { ascending: false }).order("external_line_id").order("id").range(start, start + 499));
     const enriched = await posSaleRows(ctx, revisions);
     return { sale: enriched.find((row) => row.id === selected.id), revisions: enriched };
   },
@@ -282,8 +285,8 @@ defineCommand({
   input: z.object({ posLocationId, retryConflict: z.boolean().optional() }).strict(),
   roles: [...menuRoles],
   handler: async (ctx, input, execution) => {
-    const { publishSquareMenu, squareConfig, SquareClient } = await import("@/lib/pos");
-    return publishSquareMenu(ctx, input, execution.requestId, new SquareClient(squareConfig()));
+    const { publishSquareMenuCommand, squareConfig, SquareClient } = await import("@/lib/pos");
+    return publishSquareMenuCommand(ctx, input, execution.requestId, new SquareClient(squareConfig()));
   },
 });
 
@@ -291,8 +294,8 @@ defineCommand({
   name: "publish_pos_item", description: "Create, update, retire, or explicitly adopt one brand's Square item and format variations",
   input: squareItemPublicationInput, roles: [...menuRoles],
   handler: async (ctx, input, execution) => {
-    const { publishSquareCatalogItem, squareConfig, SquareClient } = await import("@/lib/pos");
-    return publishSquareCatalogItem(ctx, input, execution.requestId, new SquareClient(squareConfig()), "publish_pos_item");
+    const { publishSquareCatalogItemCommand, squareConfig, SquareClient } = await import("@/lib/pos");
+    return publishSquareCatalogItemCommand(ctx, input, execution.requestId, new SquareClient(squareConfig()));
   },
 });
 

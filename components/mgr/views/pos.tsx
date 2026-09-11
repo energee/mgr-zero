@@ -7,13 +7,26 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { PosLocationRow, PosMenuModel, PosSaleRow, PosVariationRow } from "@/lib/mgr/pos-view";
+import { reconcileBooleanChange, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 const SelectField = ({ id, label, value, options, onChange }: {
   id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void;
 }) => <div className="flex flex-col gap-2"><Label htmlFor={id}>{label}</Label><select role="combobox" id={id} value={value} onChange={event => onChange(event.target.value)} className="h-9 rounded-md border bg-transparent px-3 text-sm">
   <option value="">Select {label.toLowerCase()}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
 </select></div>;
+
+export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalogLabel = "Sync Square catalog", salesLabel = "Sync Square sales", feedback, onCatalog, onSales }: {
+  catalogBusy?: boolean; salesBusy?: boolean; catalogLabel?: string; salesLabel?: string; feedback?: ReactNode;
+  onCatalog?: () => void; onSales?: () => void;
+}) {
+  return <div className="flex flex-col gap-2">
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button variant="outline" disabled={catalogBusy} onClick={onCatalog}>{catalogBusy ? "Syncing catalog…" : catalogLabel}</Button>
+      <Button variant="outline" disabled={salesBusy} onClick={onSales}>{salesBusy ? "Syncing sales…" : salesLabel}</Button>
+    </div>
+    {feedback}
+  </div>;
+}
 
 export function PointOfSaleView({ model, syncAction, live = false }: {
   model: { connected: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null };
@@ -121,7 +134,7 @@ export function PosMappingView({ variations, targets, sales, coverage, busy, err
     {E.ttl("Sales coverage")}
     {coverage.length ? coverage.map((line, index) => <div key={`${line}-${index}`}>{E.row(line, "Completed observation window", E.status("Complete", "ok"), "ok")}</div>) : E.note("No complete Square sales coverage yet. A failed or partial sync is not counted as coverage.")}
     {E.ttl("Recent Square facts")}
-    {sales.length ? sales.map(sale => <div key={sale.id}>{E.row(sale.label, sale.detail, sale.href ? E.act("Open", "primary", sale.href) : sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
+    {sales.length ? sales.map(sale => <div key={sale.id}>{E.row(sale.label, sale.detail, sale.href || sale.openable ? E.act("Open", "primary", sale.href) : sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     {E.note("The physical count posts depletion. Square sales and returns supply the expected amount used for variance.")}
   </>;
 }
@@ -162,8 +175,8 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
     {model.items.map(item => <div key={item.formatId}>{E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, item.href ? E.act("Open", "primary", item.href) : "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={item.formatId}>{E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}
-    {model.binName && <Button disabled={busy || !model.items.length} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
+    {model.excluded.map(item => <div key={item.formatId}>{E.row(item.label, item.reason ?? "Unavailable", item.href ? E.act("Open", "primary", item.href) : E.status("Off register", "w"), "w")}</div>)}
+    {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />
     {E.ttl("Also in Square")}
@@ -175,7 +188,7 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
 export function PosItemView({ item, price, busy, error, notice, onSave, onWebsite, onPublish }: {
   item: { brand: string; format: string; sources: string; serving: string; price: string; override: string; websitePublished: boolean; available: boolean };
   price?: string; busy?: boolean; error?: string | null; notice?: ReactNode;
-  onSave?: (value: string) => void; onWebsite?: (published: boolean) => void; onPublish?: () => void;
+  onSave?: (value: string) => void; onWebsite?: (published: boolean) => Promise<boolean>; onPublish?: () => void;
 }) {
   const [value, setValue] = useState(price ?? item.override), [website, setWebsite] = useState(item.websitePublished);
   return <>
@@ -185,9 +198,9 @@ export function PosItemView({ item, price, busy, error, notice, onSave, onWebsit
       <Label htmlFor="pos-price-override">Price override</Label><Input id="pos-price-override" type="number" min="0" step="0.01" value={value} onChange={event => setValue(event.target.value)} placeholder="Follow format price" />
       <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setValue("")}>Reset to format price</Button><Button disabled={busy}>{busy ? "Saving…" : "Save override"}</Button></div>
     </form>
-    <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Publish on website<input type="checkbox" className="size-5" checked={website} onChange={event => { setWebsite(event.target.checked); onWebsite?.(event.target.checked); }} disabled={!onWebsite || busy || !item.available} /></label>
+    <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Publish on website<input type="checkbox" className="size-5" checked={website} onChange={event => { if (onWebsite) void reconcileBooleanChange(website, event.target.checked, onWebsite, setWebsite); }} disabled={!onWebsite || busy || !item.available} /></label>
     {E.info("An empty override follows the format price. Availability remains derived from stock in this location's configured bin.")}
-    <Button disabled={busy || !item.available} onClick={onPublish}>{busy ? "Publishing…" : "Publish item to Square"}</Button>
+    <Button disabled={busy} onClick={onPublish}>{busy ? "Publishing…" : "Publish item to Square"}</Button>
     {notice}<CommandFormMessage error={error ?? null} />
   </>;
 }

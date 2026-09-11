@@ -1,6 +1,39 @@
+import type { CommandFailureDetail } from "@/lib/commands/client";
+
 export type PublicationStatus = "requested" | "needs_snapshot" | "prepared" | "publishing" | "succeeded" | "rejected" | "superseded";
 
 export const isTerminalPublication = (status: unknown) => status === "succeeded" || status === "rejected" || status === "superseded";
+
+export type PublicationOutcome = { attemptId: string; status: PublicationStatus; errorCode: string | null };
+
+export function readPublicationOutcome(payload: unknown): PublicationOutcome | null {
+  const publication = payload && typeof payload === "object" ? (payload as { publication?: unknown }).publication : null;
+  if (!publication || typeof publication !== "object") return null;
+  const row = publication as Record<string, unknown>;
+  if (typeof row.attemptId !== "string" || !isTerminalPublication(row.status)
+    || (row.errorCode !== null && typeof row.errorCode !== "string")) return null;
+  return { attemptId: row.attemptId, status: row.status as PublicationStatus, errorCode: row.errorCode as string | null };
+}
+
+export async function reconcileBooleanChange(
+  previous: boolean,
+  next: boolean,
+  save: (next: boolean) => Promise<boolean>,
+  setValue: (next: boolean) => void,
+) {
+  setValue(next);
+  if (!await save(next)) setValue(previous);
+}
+
+export function shouldStartNewCommandAttempt(result: unknown, failure: CommandFailureDetail | null) {
+  return Boolean(result) || failure?.kind === "definitive";
+}
+
+export function syncFailureMessage(kind: string, failure: CommandFailureDetail | null, requestId: string | null) {
+  if (failure?.kind === "unknown" && requestId) return `${kind} sync outcome is unknown · attempt ${requestId}. Retry the exact attempt before starting another.`;
+  if (failure?.kind === "definitive") return `${kind} sync stopped · ${failure.message}. Resolve the permission or conflict, then start a new sync.`;
+  return null;
+}
 
 export function publicationNotice({ requestId, status, errorCode }: {
   requestId: string;
@@ -46,6 +79,7 @@ export type PosSaleRow = {
   amount: string;
   status: "mapped" | "queued" | "ignored" | "unsupported" | "removed";
   href?: string;
+  openable?: boolean;
 };
 
 export type PosMenuItem = {
