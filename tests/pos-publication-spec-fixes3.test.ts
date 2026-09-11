@@ -9,6 +9,7 @@ import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
+const squareApiOrigin = "https://connect.squareupsandbox.com";
 const nativeFetch = globalThis.fetch;
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 
@@ -68,7 +69,7 @@ function commandSquare(fetcher: typeof globalThis.fetch) {
   vi.stubEnv("SQUARE_REDIRECT_URI", config.redirectUri);
   vi.stubEnv("SQUARE_ENVIRONMENT", config.environment);
   vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
-    String(input).startsWith("http://127.0.0.1:54351") ? nativeFetch(input, init) : fetcher(input, init));
+    String(input).startsWith(`${squareApiOrigin}/`) ? fetcher(input, init) : nativeFetch(input, init));
 }
 
 describe("Square publication final orchestration fences", () => {
