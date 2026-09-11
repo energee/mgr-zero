@@ -5,7 +5,8 @@ walkthrough started from `5f8743915a44dd8e63039e99c3162befdd14a40d`.
 The initial browser/layout and audit commits were `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`
 and `02d6c40586547d3f694cb3894cabbd1b561dfd34`. The remediation code was proved
 at `662979b991d41d133a647bf6039e97ae8dd7894a` after the earlier
-`34af080bd65e147a607aba1e83d06f5361b8faca` product/test wave. The final audit
+`34af080bd65e147a607aba1e83d06f5361b8faca` product/test wave. Final customer-balance
+and dual-membership repairs were proved at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`. The final audit
 commit changes only this evidence file and the audit; its verification delta is
 stated in the audit and does not change runtime behavior.
 
@@ -31,6 +32,9 @@ assistive technology was used.
 - At code commit `662979b991d41d133a647bf6039e97ae8dd7894a`, after the second fresh reset, `bun run test` passed
   203 files and 1,932 tests in 250.64 seconds. The local raw log is
   `.local/mgr-private/f3-review-final-code-full.log`.
+- At code commit `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`, `tests/portal-orders-view.test.ts`
+  passed 13/13 and `tests/commands-portal.test.ts`, `tests/orders-lifecycle.test.ts`,
+  and `tests/rls-command-boundary.test.ts` passed 92/92 after a fresh isolated reset.
 - With the final audit content present, the documentation/API suite passed 46/46,
   `bunx tsc --noEmit` passed, and `bun run lint` passed with the pre-existing
   `_request` unused-parameter warning in the public-menu route. Raw command logs remain local
@@ -58,13 +62,15 @@ audit does not depend on a broken private-log link.
 - **U04/B14:** exact search found old open draft ORD-0005,
   `f492c88d-eac6-497c-b727-c21031b6218e`, after 55 newer orders and opened its
   detail. Files are prefixed `u04-`.
-- **P06/O04/J02:** portal order ORD-0061,
-  `46e85c1a-a859-48e7-b687-2503c7602b00`, showed ordered 10, shipped 4,
-  “Two cases damaged during picking”, six cancelled/nothing due, and invoice
-  `814977bb-2d54-4bd8-b0ea-a65764bcbe9b` for $600. Files are prefixed
-  `p06-short-shipment`.
-- Browser console and page-error captures were empty. The browser session and
-  Next server were closed after capture.
+- **P06/O04/J02:** new evidence at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`
+  used order `8f9f4d5e-1cc7-47e1-a4c6-eb88e5070856` and invoice
+  `04527971-6f4f-49a6-a339-1ad52855b3e4`. At 1440×900 and 375×812, the order
+  showed ordered 10, shipped 4, “Two cases damaged during picking”, six cancelled
+  with no units remaining to ship, and a separately unpaid $600 invoice. Files
+  are prefixed `f3-quality-browser/p06-corrected-`.
+- Browser page-error captures were empty. The final console contained only
+  React DevTools development notices. The browser session and Next server were
+  closed after capture.
 
 The first F3 browser bundle at `/private/tmp/mgr-remainder-evidence/f3-browser`
 is reused only for the exact paths named below: expired invite/reset/no-membership,
@@ -74,8 +80,9 @@ receipt, history paging, and disconnected integration screens. Its source
 lineage was `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec` on base
 `5f8743915a44dd8e63039e99c3162befdd14a40d`; the later source delta changes portal
 quantity enforcement, fulfillment explanations, local-stock warning text, and
-inactive-movement guards. Rows affected by that delta use the fresh remediation
-bundle or fresh backend tests instead.
+inactive-movement guards. The final delta further separates fulfillment completion
+from invoice balance and preserves staff fractional edits for dual-membership users.
+Rows affected by those deltas use the fresh remediation/final bundles or focused tests.
 
 ## Scenario evidence index
 
@@ -104,7 +111,7 @@ was absent or the required capability does not exist.
 | <a id="o01"></a>O01 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/pricing.test.ts` — “create_order copies the customer's channel and prices lines from it; an unpriced sku is refused” and `tests/commands-portal.test.ts` — “rejects a ship-to that belongs to another customer”. No rendered adjacent remedy preserving the dirty order was exercised. |
 | <a id="o02"></a>O02 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “freezes the selected customer's price, deposit, addresses, and honest pending tax” and “rejects price, ship-to, source, or deposit drift without writing an order”. Changed facts were not visibly compared before commitment. |
 | <a id="o03"></a>O03 | Proven | New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/i06-admin-confirm-1440.json` shows source zero versus brewery ATP ten and the intentional-confirm consequence; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-lifecycle.test.ts` — “confirm warns (but does not block) when overselling”. |
-| <a id="o04"></a>O04 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; new portal readback at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/p06-short-shipment-375.json`. |
+| <a id="o04"></a>O04 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; corrected portal readback at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-375.json`. |
 | <a id="o05"></a>O05 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “ship with all lines qty_shipped 0 creates no invoice and releases allocations”. No rendered explanation of closed-versus-cancelled meaning was exercised. |
 | <a id="o06"></a>O06 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “adjust after pick sets needs_restock; re-pick clears it” and “clears needs_restock and writes an order event; no movement”. |
 | <a id="o07"></a>O07 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “serializes distinct workers racing shipment and adjustment so only one transition wins”; assertions require one successful transition, one stale conflict, and one shipment/invoice effect. |
@@ -117,8 +124,8 @@ was absent or the required capability does not exist.
 | <a id="p02"></a>P02 | Proven | New fault-injection regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “injects committed response loss, reloads, and replays exact create/submit identities with one SQL effect”; it asserts exact request/order/event IDs and one order. |
 | <a id="p03"></a>P03 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “recovers a definitive submit failure by editing, reviewing, and retrying the exact saved draft”; exact ship-to, requested date, quantity, and submitted-state readback are asserted. |
 | <a id="p04"></a>P04 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “rejects price, ship-to, source, or deposit drift without writing an order” and “serializes a concurrent price change before drift validation and permits a safe retry”. No rendered cart-review comparison was exercised. |
-| <a id="p05"></a>P05 | Source only | New RED/GREEN regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries”; `tests/mgr-screens.test.ts` — “edits a whole number with the same stepper Weekly count uses”. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. |
-| <a id="p06"></a>P06 | Proven | New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/p06-short-shipment-375.json`, `p06-short-shipment-375.png`, and `p06-short-shipment.txt` on ORD-0061/invoice `814977bb-2d54-4bd8-b0ea-a65764bcbe9b`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/portal-orders-view.test.ts` — “explains a short shipment, its recorded reason, and that no remainder stays due”. |
+| <a id="p05"></a>P05 | Source only | New RED/GREEN regressions at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries” and “keeps staff fractional edits for a user who also belongs to the order customer”. They preserve customer-only direct-RPC enforcement, staff fractional edits, exact replay, one event, and the explicit portal invocation boundary. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. |
+| <a id="p06"></a>P06 | Proven | New browser evidence at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-1440.json`, `p06-corrected-1440.png`, `p06-corrected-375.json`, `p06-corrected-375.png`, and `p06-corrected-375.txt` show ordered 10, shipped 4, six cancelled with no units remaining to ship, and the separate `unpaid · $600.00` invoice. New regression at the same SHA: `tests/portal-orders-view.test.ts` — “separates cancelled fulfillment from the unpaid invoice balance”. |
 | <a id="p07"></a>P07 | Proven | Rerun with deterministic provider fixtures at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-state.test.ts` — “tracks partial, paid, reopened and voided states without mistaking credits for cash” and `tests/qbo-ui.test.ts` — “distinguishes a partial payment from a merely pushed invoice”. No live-provider claim. |
 | <a id="p08"></a>P08 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/invoice-questions.test.ts` — “a buyer raises one on their own invoice only, and a missing invoice reads the same as a foreign one” and `tests/portal-invoices-view.test.ts` — “the unavailable drawing has no Pay and still offers Question”. |
 | <a id="r01"></a>R01 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/production.test.ts` — “creates a recipe, then two versions whose ingredients snapshot extract potential” and “schedules a batch with no brand, brews it into the fermenter, and refuses a second brew there”. No connected substitution/recalculation production walkthrough was exercised. |
@@ -155,17 +162,22 @@ was absent or the required capability does not exist.
    `min-w-0` at the shared composer owner fixed it; focused rendering measured a
    375 px body afterward.
 2. Portal create/update accepted fractional quantities while cart/quote required
-   whole units. Command and database validation now agree; staff-created
-   fractional order lines remain supported by their separate contract.
+   whole units. Command and database validation now agree.
 3. Order confirmation showed only brewery-wide availability. It now presents
    source-location on-hand next to brewery ATP and gives the operator an
    actionable shortage decision.
 4. The portal short-shipment result omitted the recorded reason and cancellation
-   consequence. It now says why the quantity changed, what was cancelled, the
-   final amount, and that nothing remains due.
+  consequence. It now says why the quantity changed, what was cancelled, the
+   final amount, and that no units remain to ship.
 5. A direct staff movement could append to an inactive SKU and accept lower-case
    sample/festival state. Both baseline and deploy migration definitions now
    reject those inputs after idempotent replay recovery.
+6. Short-shipment copy conflated fulfillment completion with invoice balance.
+   It now describes cancelled units separately from the linked invoice's payment state.
+7. The portal whole-unit guard treated a dual-membership Admin/Sales user as a
+   customer during staff edits. Explicit portal scope now selects the portal contract;
+   customer-only direct calls remain restricted, while staff fractional edits retain
+   request identity, atomicity, and one effect.
 
 ## Evidence limits
 

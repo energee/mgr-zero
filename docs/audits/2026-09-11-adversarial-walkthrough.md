@@ -1,6 +1,6 @@
 # Adversarial walkthrough execution — 2026-09-11
 
-Walkthrough code revision: `662979b991d41d133a647bf6039e97ae8dd7894a` on `adversarial-completion`.
+Walkthrough code revision: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` on `adversarial-completion`.
 Starting baseline: `5f8743915a44dd8e63039e99c3162befdd14a40d`.
 Authority: `.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`.
 
@@ -12,19 +12,19 @@ No real email, Slack, Square, QuickBooks, payment, deployment, credentials, phys
 
 - Runtime: one isolated reset/fixture owner, API `54351`, Postgres `54352`; Next `:3219`; named browser session `adversarial-completion`.
 - Browser coverage: desktop 1440×900 and phone 375×812, pointer and keyboard, six-role same-record deep links, local/global stock, old-record search, and customer short shipment.
-- Code proof revision `662979b991d41d133a647bf6039e97ae8dd7894a` follows remediation commits `34af080bd65e147a607aba1e83d06f5361b8faca`, `02d6c40586547d3f694cb3894cabbd1b561dfd34`, and `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`; the final audit-only commit changes no runtime source.
-- Exact-code full suite: **203 files / 1,932 tests passed** at `662979b991d41d133a647bf6039e97ae8dd7894a`; final audit-only documentation checks passed 46/46.
+- Code proof revision `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` includes the final customer-balance and dual-membership repairs after the fully tested remediation revision `662979b991d41d133a647bf6039e97ae8dd7894a`; the final audit-only commit changes no runtime source.
+- Exact-code full suite: **203 files / 1,932 tests passed** at `662979b991d41d133a647bf6039e97ae8dd7894a`. At `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`, focused portal/order/RLS tests passed 105/105; final audit-only documentation checks passed 46/46.
 
 ## Failures repaired
 
-The walkthrough found and fixed five shared-owner defects: a 375 px composer overflow; fractional portal quantities accepted below an integer-only cart; confirmation that hid source-location stock; a portal short shipment that hid reason/cancellation; and direct movements that accepted inactive SKUs or lower-case sample/festival state. Each behavior has focused regression proof in the [execution ledger](evidence/2026-09-11-f3-execution.md#fixes-found-by-the-walkthrough). No demonstrated failure remains open, so the Failure count is zero.
+The walkthrough found and fixed seven shared-owner defects: a 375 px composer overflow; fractional portal quantities accepted below an integer-only cart; confirmation that hid source-location stock; a portal short shipment that hid reason/cancellation; direct movements that accepted inactive SKUs or lower-case sample/festival state; shortage copy that contradicted an unpaid invoice; and a whole-unit SQL guard that misclassified dual-membership staff. Each behavior has focused regression proof in the [execution ledger](evidence/2026-09-11-f3-execution.md#fixes-found-by-the-walkthrough). No demonstrated failure remains open, so the Failure count is zero.
 
 ## Scenario ledger
 
 ## A01
 Scenario ID(s): A01
 Screen name(s) / walkthrough URL: Create brewery; First-run checklist; Import; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: New admin, no setup data.
 Expected outcome: Checklist follows actual dependencies; create first usable order without hidden database work.
@@ -38,7 +38,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## A02
 Scenario ID(s): A02
 Screen name(s) / walkthrough URL: Expired invite; Expired reset; No membership; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Expired/used invitation, password reset, user without membership.
 Expected outcome: Clear destination, retry path, and responsible contact; no login loop.
@@ -52,7 +52,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## A03
 Scenario ID(s): A03
 Screen name(s) / walkthrough URL: Permission denied; Order; Finished goods; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Admin, Sales, Warehouse, Brewer, Customer open the same deep link.
 Expected outcome: Correct content and permitted actions; denial gives a useful exit without leaking records.
@@ -66,7 +66,7 @@ Owner / follow-up: No follow-up from this audit.
 ## A04
 Scenario ID(s): A04
 Screen name(s) / walkthrough URL: Me; Portal Me; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Switch brewery/account while a form is dirty.
 Expected outcome: Explicit discard/preserve decision; no draft crosses tenant boundaries.
@@ -80,7 +80,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## A05
 Scenario ID(s): A05
 Screen name(s) / walkthrough URL: Session expired; Team member; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Access revoked while a page remains open.
 Expected outcome: Failed save preserves understandable context; no success fiction or sensitive cached account bleed.
@@ -94,7 +94,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## A06
 Scenario ID(s): A06
 Screen name(s) / walkthrough URL: Today; Beer; Work; More; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Phone tabs, desktop rail, browser Back, direct URL.
 Expected outcome: Same jobs remain reachable; active navigation and page title agree.
@@ -108,7 +108,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I01
 Scenario ID(s): I01
 Screen name(s) / walkthrough URL: Entity picker; New order; SKU detail; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Similar product names with several keg/case formats.
 Expected outcome: Every picker, confirmation, movement, and invoice identifies brand plus format and unit.
@@ -122,7 +122,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I02
 Scenario ID(s): I02
 Screen name(s) / walkthrough URL: Format; Record movement; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Wrong BBL-per-unit discovered after movements exist.
 Expected outcome: Explicit historical policy; correcting configuration cannot silently rewrite past volume.
@@ -136,7 +136,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I03
 Scenario ID(s): I03
 Screen name(s) / walkthrough URL: Format; Package BOM; Repack; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Format defaults, SKU overrides, mixed packs, repack.
 Expected outcome: Inheritance is visible; changing a default has clear scope; repack accounts for source, destination, and volume.
@@ -150,7 +150,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## I04
 Scenario ID(s): I04
 Screen name(s) / walkthrough URL: Record movement; Movement recorded; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Sample, festival, loss, destruction, depletion, opening stock.
 Expected outcome: Correct sign, unit, location, classification, and required destination fields; no invalid offered combinations.
@@ -164,7 +164,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I05
 Scenario ID(s): I05
 Screen name(s) / walkthrough URL: Finished goods; Record movement; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Wrong movement posted yesterday.
 Expected outcome: Find original, inspect effects, choose supported correction, retain actor/reason/link; blocked corrections are honest.
@@ -178,7 +178,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I06
 Scenario ID(s): I06
 Screen name(s) / walkthrough URL: Finished goods; Confirm order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Two warehouses; stock exists only at the other source.
 Expected outcome: Local stock and global ATP are distinct; intentional oversell warning has an actionable consequence.
@@ -192,7 +192,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I07
 Scenario ID(s): I07
 Screen name(s) / walkthrough URL: Weekly count; Variance by brand; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Exact-match count, variance count, recount after another worker moves stock.
 Expected outcome: Count remains durable with zero variance; stale snapshot is handled; no duplicate depletion.
@@ -206,7 +206,7 @@ Owner / follow-up: No follow-up from this audit.
 ## I08
 Scenario ID(s): I08
 Screen name(s) / walkthrough URL: Pars and allocation; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Existing inbound transfer when opening replenishment again.
 Expected outcome: Explain whether suggestions include in-flight supply; prevent accidental duplicate demand or clearly warn.
@@ -220,7 +220,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## I09
 Scenario ID(s): I09
 Screen name(s) / walkthrough URL: SKU; Location detail; Bin; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Archive product/location/bin still referenced by history.
 Expected outcome: Historical records remain intelligible; new use is constrained without destroying references.
@@ -234,7 +234,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## O01
 Scenario ID(s): O01
 Screen name(s) / walkthrough URL: New order; Customer detail; Ship-to form; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Customer lacks price list, SKU price, or ship-to.
 Expected outcome: Block near the missing input and link the authorized person to the remedy; preserve order work.
@@ -248,7 +248,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## O02
 Scenario ID(s): O02
 Screen name(s) / walkthrough URL: New order; Review order; Order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Price/address changes while an order is drafted or open.
 Expected outcome: Explicit price and address snapshot policy; review shows any changes before commitment.
@@ -262,7 +262,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## O03
 Scenario ID(s): O03
 Screen name(s) / walkthrough URL: Confirm order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Confirm causes negative ATP.
 Expected outcome: Quantified warning identifies affected product, location scope, and competing demand; intentional oversell remains possible.
@@ -276,11 +276,11 @@ Owner / follow-up: No follow-up from this audit.
 ## O04
 Scenario ID(s): O04
 Screen name(s) / walkthrough URL: Ship and invoice; Put back; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Ordered 10, picked 6, shipped 4.
 Expected outcome: Show 6 unshipped units cancelled under current policy, 2 staged units to put back, 4 billed, and released demand. Do not invent a backorder.
-Observed outcome and evidence: Historical evidence label: **Review question**. New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; new portal readback at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/p06-short-shipment-375.json`. See [exact O04 execution and boundary](evidence/2026-09-11-f3-execution.md#o04).
+Observed outcome and evidence: Historical evidence label: **Review question**. New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; corrected portal readback at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-375.json`. See [exact O04 execution and boundary](evidence/2026-09-11-f3-execution.md#o04).
 Design status: Pass — the complete stated outcome was exercised.
 Implementation status / proof link: **Proven** — [durable proof index](evidence/2026-09-11-f3-execution.md#o04).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -290,7 +290,7 @@ Owner / follow-up: No follow-up from this audit.
 ## O05
 Scenario ID(s): O05
 Screen name(s) / walkthrough URL: Pick; Ship and invoice; Shipment done; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Pick all zero; then attempt shipment.
 Expected outcome: Deliberate explanation of whether this closes the order or should be cancellation; no misleading “delivered” implication.
@@ -304,7 +304,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## O06
 Scenario ID(s): O06
 Screen name(s) / walkthrough URL: Adjust lines; Put back; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Sales adjusts or cancels an order already staged by Warehouse.
 Expected outcome: Before/after quantities, reason, warehouse acknowledgment, and durable end to restock work.
@@ -318,7 +318,7 @@ Owner / follow-up: No follow-up from this audit.
 ## O07
 Scenario ID(s): O07
 Screen name(s) / walkthrough URL: Pick; Ship and invoice; Adjust lines; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Two workers pick/ship/adjust the same order.
 Expected outcome: Stale state is rejected or explicitly reconciled; neither overwrites silently. Backend proof required.
@@ -332,7 +332,7 @@ Owner / follow-up: No follow-up from this audit.
 ## O08
 Scenario ID(s): O08
 Screen name(s) / walkthrough URL: Return and credit; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Full return, partial sellable return, damaged return, price-only credit.
 Expected outcome: Each supported case separates money from stock; credits cannot exceed remaining eligible amounts/quantities.
@@ -346,7 +346,7 @@ Owner / follow-up: Product and Finance.
 ## O09
 Scenario ID(s): O09
 Screen name(s) / walkthrough URL: Transfer detail; Complete transfer; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Transfer entered to wrong taproom, discovered after completion.
 Expected outcome: Named correction path moves the physical stock and preserves the original event.
@@ -360,7 +360,7 @@ Owner / follow-up: No follow-up from this audit.
 ## O10
 Scenario ID(s): O10
 Screen name(s) / walkthrough URL: Ship on delivery; Driver; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Self-delivery with failed stop, partial delivery, route return.
 Expected outcome: Distinguish loaded/shipped/delivered; explicit invoice timing; returned goods and outstanding work remain accounted for.
@@ -374,7 +374,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## O11
 Scenario ID(s): O11
 Screen name(s) / walkthrough URL: Driver; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Unassigned driver or another driver's route.
 Expected outcome: Appropriate access restrictions; route assignment changes have visible consequences. Backend proof required.
@@ -388,7 +388,7 @@ Owner / follow-up: No follow-up from this audit.
 ## O12
 Scenario ID(s): O12
 Screen name(s) / walkthrough URL: Pick sheet; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Print pick sheet with long names and multiple pages.
 Expected outcome: Source/destination, order identity, quantities/units, grouping, and headers survive printing.
@@ -402,7 +402,7 @@ Owner / follow-up: Human QA with a physical print path.
 ## P01
 Scenario ID(s): P01
 Screen name(s) / walkthrough URL: Shop; Order detail; Review order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Save draft, sign out, return next day.
 Expected outcome: Resume, edit, review, and submit the same draft.
@@ -416,7 +416,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## P02
 Scenario ID(s): P02
 Screen name(s) / walkthrough URL: Shop; Review order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Order creation commits but response is lost.
 Expected outcome: Recover that action without producing a second order. Backend fault injection required.
@@ -430,7 +430,7 @@ Owner / follow-up: No follow-up from this audit.
 ## P03
 Scenario ID(s): P03
 Screen name(s) / walkthrough URL: Shop; Review order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Submission fails after draft exists; change cart and retry.
 Expected outcome: Persisted order matches reviewed values, or edits are explicitly prevented.
@@ -444,7 +444,7 @@ Owner / follow-up: No follow-up from this audit.
 ## P04
 Scenario ID(s): P04
 Screen name(s) / walkthrough URL: Review order; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Availability or price changes after cart review.
 Expected outcome: Refresh/revalidation policy is visible; no silent substitution or surprise total.
@@ -458,11 +458,11 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## P05
 Scenario ID(s): P05
 Screen name(s) / walkthrough URL: Shop; Pick; Ship and invoice; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Decimal, negative, huge, blank, and pasted quantity.
 Expected outcome: Consistent whole/fractional-unit rules across UI, command, and database; row-specific accessible errors.
-Observed outcome and evidence: Historical evidence label: **Review question**. New RED/GREEN regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries”; `tests/mgr-screens.test.ts` — “edits a whole number with the same stepper Weekly count uses”. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. See [exact P05 execution and boundary](evidence/2026-09-11-f3-execution.md#p05).
+Observed outcome and evidence: Historical evidence label: **Review question**. New RED/GREEN regressions at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries” and “keeps staff fractional edits for a user who also belongs to the order customer”. They preserve customer-only direct-RPC enforcement, staff fractional edits, exact replay, one event, and the explicit portal invocation boundary. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. See [exact P05 execution and boundary](evidence/2026-09-11-f3-execution.md#p05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#p05).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -472,11 +472,11 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## P06
 Scenario ID(s): P06
 Screen name(s) / walkthrough URL: Order detail; Invoice history; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Brewery short ships or changes order.
 Expected outcome: Customer sees what changed, why, final amount, and whether anything remains due.
-Observed outcome and evidence: Historical evidence label: **Review question**. New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/p06-short-shipment-375.json`, `p06-short-shipment-375.png`, and `p06-short-shipment.txt` on ORD-0061/invoice `814977bb-2d54-4bd8-b0ea-a65764bcbe9b`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/portal-orders-view.test.ts` — “explains a short shipment, its recorded reason, and that no remainder stays due”. See [exact P06 execution and boundary](evidence/2026-09-11-f3-execution.md#p06).
+Observed outcome and evidence: Historical evidence label: **Review question**. New 1440×900 and 375×812 browser evidence at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-1440.json`, `p06-corrected-1440.png`, `p06-corrected-375.json`, `p06-corrected-375.png`, and `p06-corrected-375.txt` show ordered 10, shipped 4, six cancelled with no units left to ship, and the separate `unpaid · $600.00` invoice. New regression at the same SHA: `tests/portal-orders-view.test.ts` — “separates cancelled fulfillment from the unpaid invoice balance”. See [exact P06 execution and boundary](evidence/2026-09-11-f3-execution.md#p06).
 Design status: Pass — the complete stated outcome was exercised.
 Implementation status / proof link: **Proven** — [durable proof index](evidence/2026-09-11-f3-execution.md#p06).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -486,7 +486,7 @@ Owner / follow-up: No follow-up from this audit.
 ## P07
 Scenario ID(s): P07
 Screen name(s) / walkthrough URL: Pay invoice; Paid invoice; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Payment pending, failed, already paid elsewhere, or partially paid.
 Expected outcome: Payment source and last update visible; avoid duplicate payment requests and premature “paid”.
@@ -500,7 +500,7 @@ Owner / follow-up: No follow-up from this audit.
 ## P08
 Scenario ID(s): P08
 Screen name(s) / walkthrough URL: Question invoice; Payment unavailable; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Customer disputes one line or cannot pay online.
 Expected outcome: Useful next action with invoice context; no unsupported button or dead-end explanation.
@@ -514,7 +514,7 @@ Owner / follow-up: No follow-up from this audit.
 ## R01
 Scenario ID(s): R01
 Screen name(s) / walkthrough URL: Schedule batch; Brew day; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Recipe changes after a batch is scheduled.
 Expected outcome: Batch retains the intended version; substitutions and recalculations are explicit.
@@ -528,7 +528,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R02
 Scenario ID(s): R02
 Screen name(s) / walkthrough URL: Cellar transfer; Fermentation reading; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Vessel conflict, split/merge transfer, late fermentation reading.
 Expected outcome: Capacity, occupancy, chronology, and source/destination are reconciled; invalid transitions explain the remedy.
@@ -542,7 +542,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R03
 Scenario ID(s): R03
 Screen name(s) / walkthrough URL: Close packaging run; Run closed; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Packaging closes with less beer or more material consumption than planned.
 Expected outcome: Actual output, materials, lot identity, remaining beer, and loss reconcile in one reviewed outcome.
@@ -556,7 +556,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R04
 Scenario ID(s): R04
 Screen name(s) / walkthrough URL: Run closed; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Batch completion loss later reclassified as samples/destruction.
 Expected outcome: Original loss identity survives; exact compensation and classification are visible; named schema gate remains until supported.
@@ -570,7 +570,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R05
 Scenario ID(s): R05
 Screen name(s) / walkthrough URL: Import; Purchase orders; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Partial PO receipt, damaged material, over-receipt, duplicate receipt.
 Expected outcome: Remaining order quantity, actual usable stock, supplier disposition, and retry outcome are clear.
@@ -584,7 +584,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R06
 Scenario ID(s): R06
 Screen name(s) / walkthrough URL: Run closed; SKU detail; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Material substitution, lot recall, count correction.
 Expected outcome: Trace source lots through batches and packages to affected recipients; demonstrate both forward and backward trace.
@@ -598,7 +598,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## R07
 Scenario ID(s): R07
 Screen name(s) / walkthrough URL: Schedule batch; Schedule packaging run; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Plan changes after production or purchasing starts.
 Expected outcome: Separate suggestion from commitment; show dependencies and what cannot be undone.
@@ -612,7 +612,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## X01
 Scenario ID(s): X01
 Screen name(s) / walkthrough URL: Weekly count; Variance by brand; Taproom sale; Refund; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: POS sale, refund, physical count, and delayed sync overlap.
 Expected outcome: One coherent inventory model; no double depletion; expected consumption and physical observation stay distinguishable.
@@ -626,7 +626,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X02
 Scenario ID(s): X02
 Screen name(s) / walkthrough URL: Square locations; POS item; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: New/unmapped external location or product, later mapped.
 Expected outcome: Held records remain visible and retryable; original event date retained; no silent default mapping.
@@ -640,7 +640,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X03
 Scenario ID(s): X03
 Screen name(s) / walkthrough URL: Taproom; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Keg kick/swap, same beer replacement, guest keg, partial keg.
 Expected outcome: Correct interval/custody and nominal size; duplicate swap conflict is understandable; guest stock excluded from owned inventory.
@@ -654,7 +654,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X04
 Scenario ID(s): X04
 Screen name(s) / walkthrough URL: Return and credit; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Keg return, deposit refund, ownership discrepancy.
 Expected outcome: Physical return and financial credit reconcile without assuming they always occur together.
@@ -668,7 +668,7 @@ Owner / follow-up: Product, Finance, and Operations.
 ## X05
 Scenario ID(s): X05
 Screen name(s) / walkthrough URL: Pushed invoice; Push rejected; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: QBO POST succeeds, local acknowledgment fails.
 Expected outcome: Retry reuses durable outbound identity/payload; no duplicate invoice. Backend/external-boundary proof required.
@@ -682,7 +682,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X06
 Scenario ID(s): X06
 Screen name(s) / walkthrough URL: Mapping conflict; Fix mapping; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Accounting mapping conflict or edited external invoice.
 Expected outcome: Show authority, drift, and explicit resolution; never silently overwrite the accounting book.
@@ -696,7 +696,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X07
 Scenario ID(s): X07
 Screen name(s) / walkthrough URL: Disconnect Slack; Disconnect Square; Disconnect QuickBooks; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Disconnect/reconnect Slack, Square, or QBO with pending work.
 Expected outcome: Explain what stops, what is retained, who can reconnect, and how backlog resumes.
@@ -710,7 +710,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X08
 Scenario ID(s): X08
 Screen name(s) / walkthrough URL: Personal DM; Team digest; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Slack alert becomes resolved or user loses access before opening it.
 Expected outcome: Current status and permissions govern the destination; private details are not exposed in notifications.
@@ -724,7 +724,7 @@ Owner / follow-up: No follow-up from this audit.
 ## X09
 Scenario ID(s): X09
 Screen name(s) / walkthrough URL: Compliance months; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Compliance month crosses timezone boundary; late correction after filing.
 Expected outcome: Define effective date and immutable filed snapshot/amendment policy. This is a product/data review, not verification of current legal requirements.
@@ -738,7 +738,7 @@ Owner / follow-up: Compliance and Product.
 ## X10
 Scenario ID(s): X10
 Screen name(s) / walkthrough URL: Sale channels; Channel; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: New sale channel or destination lacks reporting setup.
 Expected outcome: Missing configuration is discoverable before reporting; no “compliant” claim inferred from collecting a state code.
@@ -752,7 +752,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U01
 Scenario ID(s): U01
 Screen name(s) / walkthrough URL: Permission denied; Session expired; Today empty; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Empty, loading, unavailable, forbidden, not found, and server error.
 Expected outcome: Distinct meaning and next action; not every failure is an empty list or generic Retry.
@@ -766,7 +766,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U02
 Scenario ID(s): U02
 Screen name(s) / walkthrough URL: Record movement; Shop; Offline outbox; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Double click, slow request, offline, reload during save.
 Expected outcome: Clear saving/unknown/confirmed states; no duplicate effects; inputs survive recoverable failures.
@@ -780,7 +780,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U03
 Scenario ID(s): U03
 Screen name(s) / walkthrough URL: Composer proposal; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: AI proposal becomes stale before confirmation.
 Expected outcome: Canonical effects and warnings shown; revalidation blocks stale execution; proposal never auto-commits.
@@ -794,7 +794,7 @@ Owner / follow-up: No follow-up from this audit.
 ## U04
 Scenario ID(s): U04
 Screen name(s) / walkthrough URL: Search; Orders; Finished goods; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Old open record beyond first 50; large catalog/history.
 Expected outcome: Paging/search reaches the record; counts indicate scope; latency remains usable with realistic data.
@@ -808,7 +808,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U05
 Scenario ID(s): U05
 Screen name(s) / walkthrough URL: Format; Package BOM; Pars and allocation; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Keyboard-only, 200% zoom, narrow phone, long names.
 Expected outcome: Reachable actions, visible focus, correct dialog focus return, no trapped or clipped critical controls.
@@ -822,7 +822,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U06
 Scenario ID(s): U06
 Screen name(s) / walkthrough URL: Shop; Ship and invoice; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Screen reader on repeated quantities and inline errors.
 Expected outcome: Unique accessible names, units, error association, and announced progress/result.
@@ -836,7 +836,7 @@ Owner / follow-up: Accessibility QA with assistive technology.
 ## U07
 Scenario ID(s): U07
 Screen name(s) / walkthrough URL: Today; Order; Compliance months; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Browser/device timezone differs from brewery.
 Expected outcome: Dates, due work, timeline, and reporting periods use an explicit coherent policy.
@@ -850,7 +850,7 @@ Owner / follow-up: Owning product/domain team; retain as release evidence debt.
 ## U08
 Scenario ID(s): U08
 Screen name(s) / walkthrough URL: Record movement; Composer proposal; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Same write from form, API, and future AI.
 Expected outcome: Same command-owned validation, authorization, transaction, and error meaning.
@@ -864,7 +864,7 @@ Owner / follow-up: No follow-up from this audit.
 ## U09
 Scenario ID(s): U09
 Screen name(s) / walkthrough URL: Permission denied; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Tampered tenant/customer ID or direct RPC invocation.
 Expected outcome: Database independently rejects unauthorized access. No walkthrough can prove this; link real backend tests.
@@ -878,7 +878,7 @@ Owner / follow-up: No follow-up from this audit.
 ## U10
 Scenario ID(s): U10
 Screen name(s) / walkthrough URL: Session expired; Movement recorded; inventory `/docs/screens-explore` (no recorded scenario URL).
-Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; final audit-only delta disclosed above).
+Walkthrough commit: `2a6bdd019f884156d9d782a49c0f989dfa5db1ce` (base `5f8743915a44dd8e63039e99c3162befdd14a40d`; exact scenario evidence cites its observed source revision).
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Support needs to investigate uncertain save.
 Expected outcome: User can supply an action/record reference and correlation information without exposing credentials.
@@ -966,5 +966,6 @@ Historical wording remains separate from design disposition and implementation e
 - At `34af080bd65e147a607aba1e83d06f5361b8faca`, `bun run test` passed 203 files / 1,930 tests after generated API docs were refreshed.
 - At `662979b991d41d133a647bf6039e97ae8dd7894a`, focused inventory/bin tests passed 16/16 and taproom-count tests passed 29/29 after the final fixes.
 - At exact code revision `662979b991d41d133a647bf6039e97ae8dd7894a`, `bun run test` passed 203 files / 1,932 tests in 250.64 seconds.
+- At `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`, `tests/portal-orders-view.test.ts` passed 13/13 and the portal command, order lifecycle, and RLS boundary batch passed 92/92 after a fresh isolated reset.
 - With the final audit content present, the documentation/API suite passed 46/46, `bunx tsc --noEmit` passed, and `bun run lint` passed with one pre-existing `_request` unused-parameter warning.
 - Browser: 1440×900 and 375×812, pointer, keyboard, six roles, source/global stock, old-record search, short-shipment portal result; session/server closed. True 200% zoom, print, and assistive technology remain unclaimed.
