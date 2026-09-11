@@ -17,7 +17,7 @@ import {
 
 const sdkRole = "chat_oauth_test";
 beforeAll(() => {
-  expect(new URL(DB).port).toBe(process.env.CI === "true" ? "54342" : "54352");
+  expect(new URL(DB).port).toBe("54352");
   sql(`set client_min_messages=warning; drop role if exists ${sdkRole}; create role ${sdkRole} login password 'oauth-test-password'; grant mgr_chat_sdk to ${sdkRole}`);
   const url = new URL(DB); url.username = sdkRole; url.password = "oauth-test-password";
   process.env.CHAT_STATE_DATABASE_URL = url.toString();
