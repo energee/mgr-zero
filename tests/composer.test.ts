@@ -54,7 +54,7 @@ describe("AI composer", () => {
       messages: [{ id: "answer", role: "assistant", content: "1. **First**\n2. Second" }],
     }));
     expect(html).toContain("<ol");
-    expect(html).toContain("<strong>First</strong>");
+    expect(html).toContain('data-streamdown="strong">First</span>');
   });
 
   it("preserves known fields when opening the ordinary movement form", () => {

@@ -1,5 +1,6 @@
 import type { Ref } from "react";
 import Link from "next/link";
+import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -102,7 +103,7 @@ export function ComposerConversationView({ messages, model, activity, error, onR
         <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
       </header>
       <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
-        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] whitespace-pre-wrap text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.content}</div>)}
+        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
         {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
         {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
       </div>
