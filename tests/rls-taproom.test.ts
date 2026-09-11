@@ -23,7 +23,7 @@ const matrix = {
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", pos_connections: "deny",
-  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
+  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
   notification_preferences: "self", notification_occurrences: "deny", notification_deliveries: "deny",
@@ -38,6 +38,7 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   taproom_pars: ["location_id", "sku_id"], pos_locations: ["connection_id", "external_location_id"],
   pos_item_mappings: ["connection_id", "external_item_id", "external_variation_id"],
   pos_catalog_variations: ["connection_id", "external_item_id", "external_variation_id"], pos_sale_expectations: ["sale_id"],
+  pos_catalog_ownership: ["connection_id", "format_id"],
 };
 const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
 // These tables intentionally have no authenticated SELECT privilege, in addition to RLS.
@@ -124,6 +125,7 @@ async function fixtures() {
   const menu = await put("pos_menus", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, bin_id: taps[0].binId, sale_channel_id: customer.saleChannelId });
   await put("pos_menu_lines", { menu_id: menu.id, format_id: poured.id, price_override_cents: 700 });
   await put("pos_catalog_variations", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", external_item_name: "IPA", external_variation_name: "Can", source_version: 1 });
+  await put("pos_catalog_ownership", { connection_id: pos.id, format_id: poured.id, external_item_id: "I1", external_variation_id: "V1", ownership: "adopted" });
   await put("pos_item_mappings", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", sku_id: cat.skuId });
   const sale = await put("pos_sales", { connection_id: pos.id, external_order_id: "O1", external_line_id: "S1", external_item_id: "I1", external_variation_id: "V1", external_location_id: "L1", sold_at: now, qty: 1 });
   sql(`select private.reconcile_pos_sale('${brewery.id}','${sale.id}')`);
@@ -151,7 +153,7 @@ async function fixtures() {
   const ownerCtx = { breweryId: brewery.id, userId: owner.id, role: "admin" as const, db: await asUser(owner.email) };
   const completed = await runCommand("complete_batch", { batchId: batch.id }, ownerCtx) as { adjustmentId: string };
   await runCommand("reattribute_loss", { adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction" }, ownerCtx);
-  return { brewery, owner, taproom, taps, wh, storage, pool, customer, cat, vendor, material, recipe, version, batch, vessel, occupancy, run, po, poLine, order, line, invoice, transfer, installation, occurrence, composed };
+  return { brewery, owner, taproom, taps, wh, storage, pool, customer, cat, vendor, material, recipe, version, batch, vessel, occupancy, run, po, poLine, order, line, invoice, transfer, installation, occurrence, composed, poured };
 }
 
 type Fixture = Awaited<ReturnType<typeof fixtures>>;
@@ -296,6 +298,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()],
     begin_square_oauth: [B,"https://example.test/square/callback","state","connect",R(),["ITEMS_READ","ITEMS_WRITE","MERCHANT_PROFILE_READ","ORDERS_READ"]],
     begin_square_catalog_sync: [B,R()],
+    begin_square_publication: [B,"L1",f.poured.id,null,null,false,"publish_pos_item",R()],
     begin_square_sales_sync: [B,R()],
     close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R()],
     complete_batch: [B,f.batch.id,R()],
@@ -383,6 +386,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     record_square_sales_locations: [B,pos,f.taproom.id,R(),1,[]],
     record_square_sales_page: [B,pos,f.taproom.id,R(),1,[],null,null,[],[]],
     begin_square_disconnect: [B,pos,f.taproom.id,R()], finish_square_disconnect: [B,pos,f.taproom.id,R(),true],
+    lease_square_publication: [B,R(),f.taproom.id],
+    prepare_square_publication: [B,R(),f.taproom.id,"{}",null,null],
+    finish_square_publication: [B,R(),f.taproom.id,null,{}],
     assert_chat_admin: [B], issue_chat_link_proof: [I,"U-PENDING","fixture-proof"], resolve_chat_actor: ["slack",B,f.taproom.id],
     scan_chat_today_candidates: [B,now], chat_quiet_release: [now,"22:00","07:00","America/New_York"], chat_upsert_occurrences: [B,now,f.order.id],
     chat_fanout_deliveries: [B,now,f.occurrence.id], scan_chat_notification_occurrences: [B,now], lease_chat_deliveries: [1,60,now], chat_take_lease: [delivery,now],

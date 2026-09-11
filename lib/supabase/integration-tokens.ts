@@ -58,6 +58,17 @@ export type SquareSalesSyncResult = {
   endsAt: string;
 };
 
+export type SquarePublicationStart = {
+  attemptId: string;
+  connectionId: string;
+  credentialVersion: number;
+  status: "needs_snapshot" | "prepared" | "succeeded" | "rejected";
+  providerKey: string;
+  source: import("@/lib/pos").SquarePublicationSource;
+  errorCode: string | null;
+  result: { published: boolean; retired: boolean; externalItemId: string; externalVariationId: string; ownership: "mgr" | "adopted" } | null;
+};
+
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
@@ -369,6 +380,73 @@ export async function recordSquareSalesPage(
   }
   return { ...start, locationIds: row.locationIds as string[], locationOffset: row.locationOffset,
     cursor: row.cursor as string | null, pages: row.pages };
+}
+
+function squarePublicationStart(data: unknown): SquarePublicationStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.attemptId !== "string" || typeof row.connectionId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.providerKey !== "string"
+    || !["needs_snapshot", "prepared", "succeeded", "rejected"].includes(String(row.status))
+    || !row.source || typeof row.source !== "object"
+    || (row.errorCode !== null && typeof row.errorCode !== "string")
+    || (row.result !== null && typeof row.result !== "object")) {
+    throw new Error("Square publication start was invalid");
+  }
+  return row as SquarePublicationStart;
+}
+
+export async function beginSquarePublication(
+  ctx: Ctx,
+  input: { posLocationId: string; formatId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
+  requestId: string,
+  commandName: "publish_pos_menu" | "publish_pos_item",
+) {
+  const { data, error } = await ctx.db.rpc("begin_square_publication", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_adopt_item: input.adoptItemId ?? null, p_adopt_variation: input.adoptVariationId ?? null,
+    p_retry_conflict: input.retryConflict ?? false, p_command: commandName, p_request_id: requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
+  if (error) throw new CommandError(error.message);
+  return squarePublicationStart(data);
+}
+
+export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
+  const { data, error } = await createAdminClient().rpc("lease_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+  }).maybeSingle();
+  const row = data as Record<string, unknown> | null;
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error || !row || typeof row.access_token !== "string"
+    || (row.request_body !== null && typeof row.request_body !== "string")) {
+    throw new CommandError("Square publication access is no longer available", 403, "permission_denied");
+  }
+  return { accessToken: row.access_token, requestBody: row.request_body as string | null };
+}
+
+export async function prepareSquarePublication(
+  ctx: Ctx, attemptId: string, requestBody: string, itemVersion: number | null, variationVersion: number | null,
+) {
+  const { data, error } = await createAdminClient().rpc("prepare_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+    p_request_body: requestBody, p_item_version: itemVersion, p_variation_version: variationVersion,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error || data !== true) throw new Error("Square publication could not be prepared");
+}
+
+export async function finishSquarePublication(
+  ctx: Ctx, attemptId: string, errorCode: "version_mismatch" | "provider_rejected" | null,
+  response: { catalogObject: Record<string, unknown>; idMappings: Record<string, unknown>[] } | null,
+) {
+  const { data, error } = await createAdminClient().rpc("finish_square_publication", {
+    p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
+    p_error_code: errorCode, p_response: response,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square publication result could not be recorded");
+  return data as { published: boolean; retired: boolean; externalItemId: string; externalVariationId: string; ownership: "mgr" | "adopted" };
 }
 
 export async function getSquareHealth(ctx: Ctx) {

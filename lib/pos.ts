@@ -6,9 +6,13 @@ import {
   advanceSquareCatalogSync,
   advanceSquareSalesSync,
   beginSquareCatalogSync,
+  beginSquarePublication,
   beginSquareSalesSync,
   compareAndSwapSquareTokens,
+  finishSquarePublication,
+  leaseSquarePublication,
   markSquareAuthorizationFailed,
+  prepareSquarePublication,
   readVersionedIntegrationTokens,
   recordSquareCatalogSnapshot,
   recordSquareSalesLocations,
@@ -64,6 +68,103 @@ export type SquareSalesFact = SquareOrderSnapshot & {
   unsupportedReason: string | null;
   sourceHash: string;
 };
+
+export type SquarePublicationSource = {
+  brandId: string;
+  formatId: string;
+  brand: string;
+  format: string;
+  locationId: string;
+  priceCents: number | null;
+  present: boolean;
+  ownership: "mgr" | "adopted";
+  externalItemId: string | null;
+  externalVariationId: string | null;
+};
+
+const READ_ONLY_CATALOG_FIELDS = new Set(["updated_at", "is_deleted", "sold_out", "sold_out_valid_until"]);
+
+function writableCatalogValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(writableCatalogValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !READ_ONLY_CATALOG_FIELDS.has(key))
+    .map(([key, child]) => [key, writableCatalogValue(child)]));
+}
+
+function locationPresent(object: Record<string, unknown>, locationId: string) {
+  const ids = (object.present_at_all_locations === false ? object.present_at_location_ids : object.absent_at_location_ids) as unknown;
+  return object.present_at_all_locations === false
+    ? Array.isArray(ids) && ids.includes(locationId)
+    : !(Array.isArray(ids) && ids.includes(locationId));
+}
+
+function setLocationPresence(object: Record<string, unknown>, locationId: string, present: boolean) {
+  const all = object.present_at_all_locations !== false;
+  const key = all ? "absent_at_location_ids" : "present_at_location_ids";
+  const current = Array.isArray(object[key]) ? object[key].filter((id): id is string => typeof id === "string") : [];
+  const shouldContain = all ? !present : present;
+  object[key] = shouldContain ? [...new Set([...current, locationId])] : current.filter((id) => id !== locationId);
+}
+
+export function prepareSquareCatalogPublication(source: SquarePublicationSource, current?: Record<string, unknown> | null) {
+  if (!source.externalItemId || !source.externalVariationId) {
+    if (!source.present || source.priceCents === null) throw new Error("A new Square item must be available and priced");
+    const itemId = `#mgr-item-${source.brandId}`;
+    const variationId = `#mgr-variation-${source.formatId}`;
+    return { object: {
+      type: "ITEM", id: itemId, present_at_all_locations: false, present_at_location_ids: [source.locationId],
+      item_data: { name: source.brand, product_type: "REGULAR", variations: [{
+        type: "ITEM_VARIATION", id: variationId, present_at_all_locations: false,
+        present_at_location_ids: [source.locationId], item_variation_data: {
+          item_id: itemId, name: source.format, pricing_type: "FIXED_PRICING",
+          price_money: { amount: source.priceCents, currency: "USD" },
+        },
+      }] },
+    }, itemVersion: null, variationVersion: null };
+  }
+  if (!current || current.type !== "ITEM" || current.id !== source.externalItemId || current.is_deleted === true
+    || !Number.isSafeInteger(current.version)) throw new Error("Square catalog item changed or is unavailable");
+  const currentItemData = current.item_data as Record<string, unknown> | undefined;
+  const currentVariations = currentItemData?.variations;
+  const currentVariation = Array.isArray(currentVariations) ? currentVariations.find((entry) => !!entry
+    && typeof entry === "object" && (entry as Record<string, unknown>).id === source.externalVariationId) as Record<string, unknown> | undefined : undefined;
+  if (!currentVariation || currentVariation.type !== "ITEM_VARIATION" || currentVariation.is_deleted === true
+    || !Number.isSafeInteger(currentVariation.version)) throw new Error("Square catalog variation changed or is unavailable");
+  const item = writableCatalogValue(current) as Record<string, unknown>;
+  const itemData = item.item_data as Record<string, unknown> | undefined;
+  const variations = itemData?.variations;
+  if (!itemData || !Array.isArray(variations)) throw new Error("Square catalog item has no writable variations");
+  const index = variations.findIndex((entry) => !!entry && typeof entry === "object"
+    && (entry as Record<string, unknown>).id === source.externalVariationId);
+  if (index < 0) throw new Error("Square catalog variation changed or is unavailable");
+  const variation = variations[index] as Record<string, unknown>;
+  if (variation.type !== "ITEM_VARIATION" || !Number.isSafeInteger(variation.version)) {
+    throw new Error("Square catalog variation changed or is unavailable");
+  }
+  const variationData = variation.item_variation_data as Record<string, unknown> | undefined;
+  if (!variationData || variationData.item_id !== source.externalItemId) throw new Error("Square catalog ownership changed");
+  variationData.name = source.format;
+  if (source.present && source.priceCents !== null) {
+    const overrides = Array.isArray(variationData.location_overrides)
+      ? variationData.location_overrides.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object") : [];
+    const at = overrides.findIndex((entry) => entry.location_id === source.locationId);
+    const next = { ...(at < 0 ? { location_id: source.locationId } : overrides[at]),
+      pricing_type: "FIXED_PRICING", price_money: { amount: source.priceCents, currency: "USD" } };
+    if (at < 0) overrides.push(next); else overrides[at] = next;
+    variationData.location_overrides = overrides;
+  }
+  setLocationPresence(variation, source.locationId, source.present);
+  const parentNeedsLocation = source.present && !locationPresent(item, source.locationId);
+  const parentNeedsName = source.present && source.ownership === "mgr" && itemData.name !== source.brand;
+  if (parentNeedsLocation) setLocationPresence(item, source.locationId, true);
+  if (parentNeedsName) itemData.name = source.brand;
+  return {
+    object: parentNeedsLocation || parentNeedsName ? item : variation,
+    itemVersion: current.version as number,
+    variationVersion: variation.version as number,
+  };
+}
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const unavailable = () => new Error("Square is unavailable");
@@ -235,6 +336,86 @@ export class SquareClient {
     if (data.cursor !== undefined && !nextCursor) throw unavailable();
     return { orders: data.orders ?? [], nextCursor };
   }
+
+  async retrieveCatalogObject(accessToken: string, objectId: string) {
+    const data = await this.api(`/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, accessToken);
+    if (!data.object || typeof data.object !== "object") throw unavailable();
+    return data.object as Record<string, unknown>;
+  }
+
+  async upsertCatalogObject(accessToken: string, requestBody: string) {
+    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object`, {
+      method: "POST",
+      headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: requestBody,
+    });
+    const data = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok) {
+      if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true);
+      const versionConflict = Array.isArray(data?.errors) && data.errors.some((entry) =>
+        !!entry && typeof entry === "object" && (entry as Record<string, unknown>).code === "VERSION_MISMATCH");
+      return { ok: false as const, versionConflict, definitive: versionConflict || (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) };
+    }
+    if (!data?.catalog_object || typeof data.catalog_object !== "object" || !Array.isArray(data.id_mappings ?? [])) throw unavailable();
+    return { ok: true as const, catalogObject: data.catalog_object as Record<string, unknown>,
+      idMappings: (data.id_mappings ?? []) as Record<string, unknown>[] };
+  }
+}
+
+export async function publishSquareCatalogItem(
+  ctx: Ctx,
+  input: { posLocationId: string; formatId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
+  requestId: string,
+  client: SquareClient,
+  commandName: "publish_pos_menu" | "publish_pos_item",
+) {
+  const start = await beginSquarePublication(ctx, input, requestId, commandName);
+  if (start.status === "succeeded") return start.result!;
+  if (start.status === "rejected") {
+    throw new CommandError(start.errorCode === "version_mismatch"
+      ? "Square changed this item; retry after loading its current version" : "Square rejected this publication", 409, "conflict");
+  }
+  const leaseOrFinished = async () => {
+    try { return { lease: await leaseSquarePublication(ctx, start.attemptId) }; }
+    catch (error) {
+      const replay = await beginSquarePublication(ctx, input, requestId, commandName);
+      if (replay.status === "succeeded") return { result: replay.result! };
+      if (replay.status === "rejected") throw new CommandError(replay.errorCode === "version_mismatch"
+        ? "Square changed this item; retry after loading its current version" : "Square rejected this publication", 409, "conflict");
+      throw error;
+    }
+  };
+  let acquired = await leaseOrFinished();
+  if ("result" in acquired) return acquired.result;
+  let lease = acquired.lease;
+  if (!lease.requestBody) {
+    let current: Record<string, unknown> | null = null;
+    try {
+      current = start.source.externalItemId
+        ? await client.retrieveCatalogObject(lease.accessToken, start.source.externalItemId) : null;
+    } catch { throw unavailable(); }
+    const prepared = prepareSquareCatalogPublication(start.source, current);
+    await prepareSquarePublication(ctx, start.attemptId, JSON.stringify({
+      idempotency_key: start.providerKey,
+      object: prepared.object,
+    }), prepared.itemVersion, prepared.variationVersion);
+    acquired = await leaseOrFinished();
+    if ("result" in acquired) return acquired.result;
+    lease = acquired.lease;
+  }
+  let result: Awaited<ReturnType<SquareClient["upsertCatalogObject"]>>;
+  try { result = await client.upsertCatalogObject(lease.accessToken, lease.requestBody!); }
+  catch { throw unavailable(); }
+  if (!result.ok) {
+    if (result.definitive) await finishSquarePublication(ctx, start.attemptId,
+      result.versionConflict ? "version_mismatch" : "provider_rejected", null);
+    if (result.versionConflict) throw new CommandError("Square changed this item; retry after loading its current version", 409, "conflict");
+    throw result.definitive ? new CommandError("Square rejected this publication", 400) : unavailable();
+  }
+  return finishSquarePublication(ctx, start.attemptId, null, {
+    catalogObject: result.catalogObject,
+    idMappings: result.idMappings,
+  });
 }
 
 export async function syncSquareCatalogFacts(client: SquareClient, accessToken: string, merchantId: string) {

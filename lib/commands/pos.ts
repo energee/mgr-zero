@@ -174,6 +174,29 @@ defineCommand({
   })),
 });
 
+const squarePublicationInput = z.object({
+  posLocationId,
+  formatId: z.string().uuid(),
+  adoptItemId: z.string().trim().min(1).max(200).optional(),
+  adoptVariationId: z.string().trim().min(1).max(200).optional(),
+  retryConflict: z.boolean().optional(),
+}).refine((value) => Boolean(value.adoptItemId) === Boolean(value.adoptVariationId), {
+  message: "choose both Square item and variation when adopting",
+});
+
+for (const command of ["publish_pos_menu", "publish_pos_item"] as const) defineCommand({
+  name: command,
+  description: command === "publish_pos_menu"
+    ? "Publish one derived menu row to Square with durable recovery and provider ownership"
+    : "Create, update, retire, or explicitly adopt one Square item variation",
+  input: squarePublicationInput,
+  roles: [...menuRoles],
+  handler: async (ctx, input, execution) => {
+    const { publishSquareCatalogItem, squareConfig, SquareClient } = await import("@/lib/pos");
+    return publishSquareCatalogItem(ctx, input, execution.requestId, new SquareClient(squareConfig()), command);
+  },
+});
+
 defineCommand({
   name: "set_pos_website_publication", description: "Publish or unpublish one currently priced, stocked menu row on the brewery website feed",
   input: z.object({ posLocationId, formatId: z.string().uuid(), published: z.boolean() }),
