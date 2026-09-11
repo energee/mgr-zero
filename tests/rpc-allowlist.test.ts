@@ -24,6 +24,7 @@ const AUTHENTICATED_RPCS = [
   "get_pos_menu_item(uuid,text,uuid)",
   "list_chat_user_links(uuid)",
   "set_brewery_operating_defaults(uuid,integer,uuid)",
+  "set_brewery_ai_model(uuid,text,uuid)",
 
   "begin_csv_import(uuid,text,jsonb,uuid)",
   "import_csv_row(uuid,uuid,integer)",
