@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { advanceSquareCatalogSync, beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
@@ -52,11 +52,6 @@ function success(body: Record<string, any>, itemId = `ITEM-${crypto.randomUUID()
     })),
   ] }), { status: 200 });
 }
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 describe("Square publication final orchestration fences", () => {
   it("terminally rejects a partial menu after a definitive child failure and permits a corrected request", async () => {

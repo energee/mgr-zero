@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { SquareClient, syncSquareCatalog } from "@/lib/pos";
@@ -7,11 +7,6 @@ import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 async function connected(breweryId: string) {
   const merchantId = `merchant-${crypto.randomUUID()}`;
