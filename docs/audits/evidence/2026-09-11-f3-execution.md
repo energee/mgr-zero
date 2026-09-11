@@ -3,11 +3,13 @@
 This is the durable evidence index for the 2026-09-11 F3 walkthrough. The
 walkthrough started from `5f8743915a44dd8e63039e99c3162befdd14a40d`.
 The latest product proof is exact code revision
-`a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006`. Its behavior was introduced at
-`924cf294f5084443bfa97d213c3642054d1bb166`: bounded, tenant/location scoped
-confirmation-stock reads and removal of an unsupported other-location stock
-assertion. The follow-up normalizes a nullable empty line response before the
-same exact-SKU read and changes no nonempty-order behavior. Earlier browser and regression evidence was created before the #318
+`d6eeed7a5e5b66a827ad6ae19272fc3f45539b34`. The preceding
+`924cf294f5084443bfa97d213c3642054d1bb166` and
+`a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006` revisions introduced bounded,
+tenant/location-scoped confirmation-stock reads, removed an unsupported
+other-location stock assertion, and normalized an empty line response. The
+latest revision blocks shipment after a picked-order adjustment until a new
+pick clears the physical-restock state. Earlier browser and regression evidence was created before the #318
 integration rebase. The map below records patch identity between those historical
 objects and the integrated ancestry; those old SHAs are evidence lineage, not
 exact-head labels.
@@ -65,8 +67,20 @@ hashes differ because the commits were replayed on the #318 integration ancestry
   the same focused stock/view batch passed 14/14 after nullable empty-line
   normalization; `bunx tsc --noEmit` passed and `bun run lint` passed with the
   one pre-existing `_request` warning in the public-menu route.
+- [CI run 34592472757](https://github.com/energee/mgr-zero/actions/runs/34592472757)
+  exposed two successful transitions in the shipment/adjustment race at
+  pre-fix head `bcd324f5174edf4ef5c2dbbe87bc6774d3e0eddb`. Local REDs reproduced both
+  that race and a deterministic adjustment-first shipment that wrote effects
+  while `needs_restock` was true.
+- At exact product commit `d6eeed7a5e5b66a827ad6ae19272fc3f45539b34`,
+  a fresh reset applied the guard from both the baseline and deploy overlay.
+  `tests/orders-fulfillment.test.ts` passed 21/21, including eight races through
+  two authenticated clients and a same-request retry after re-pick. The related
+  fulfillment, lifecycle, lot, delivery, portal, QBO, RLS, and RPC-contract
+  batch passed 9 files / 139 tests; documentation passed 15/15, TypeScript
+  passed, and lint retained only the pre-existing `_request` warning.
 - With the final audit content present at the documentation commit following
-  `a5c2b30e6aa06e88a2aac5e07e0ee17a50cd0006`, the seven-file pure
+  `d6eeed7a5e5b66a827ad6ae19272fc3f45539b34`, the seven-file pure
   screen/documentation suite passed 121/121,
   `bunx tsc --noEmit` passed, and `bun run lint` passed with the pre-existing
   `_request` unused-parameter warning in the public-menu route. Raw command logs remain local
@@ -171,8 +185,8 @@ was absent or the required capability does not exist.
 | <a id="o03"></a>O03 | Proven | Browser evidence at historical `34af080bd65e147a607aba1e83d06f5361b8faca` / patch-identical integrated `e62325f6a7c94b69d7badebb0fa300ff02c05746`: `f3-review-browser/i06-admin-confirm-1440.json` shows source zero versus brewery ATP ten and the intentional-confirm consequence. Fresh RED/GREEN at exact code revision `924cf294f5084443bfa97d213c3642054d1bb166`: `tests/inventory-read-completeness.test.ts` proves source 508/ATP 505 for ordered SKU 1,001; the three exact `tests/orders-review-view.test.ts` titles named in I06 prove truthful local-shortage text. Integrated `tests/orders-lifecycle.test.ts` at `47231aed2678610fb13931424d0cc9174eeec035` — “confirm warns (but does not block) when overselling” preserves the intentional choice. |
 | <a id="o04"></a>O04 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released”; corrected portal readback at `2a6bdd019f884156d9d782a49c0f989dfa5db1ce`: `f3-quality-browser/p06-corrected-375.json`. |
 | <a id="o05"></a>O05 | Source only | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “ship with all lines qty_shipped 0 creates no invoice and releases allocations”. No rendered explanation of closed-versus-cancelled meaning was exercised. |
-| <a id="o06"></a>O06 | Proven | Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “adjust after pick sets needs_restock; re-pick clears it” and “clears needs_restock and writes an order event; no movement”. |
-| <a id="o07"></a>O07 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “serializes distinct workers racing shipment and adjustment so only one transition wins”; assertions require one successful transition, one stale conflict, and one shipment/invoice effect. |
+| <a id="o06"></a>O06 | Proven | Rerun at exact product revision `d6eeed7a5e5b66a827ad6ae19272fc3f45539b34`: `tests/orders-fulfillment.test.ts` — “adjust after pick sets needs_restock; re-pick clears it” refuses shipment before re-pick with no shipment or movement, then succeeds after re-pick with the same request ID; “clears needs_restock and writes an order event; no movement” retains the explicit put-back path. |
+| <a id="o07"></a>O07 | Proven | CI run 34592472757 and local RED both produced two winners at `bcd324f5174edf4ef5c2dbbe87bc6774d3e0eddb`. Rerun at exact product revision `d6eeed7a5e5b66a827ad6ae19272fc3f45539b34`: `tests/orders-fulfillment.test.ts` — “serializes distinct workers racing shipment and adjustment so only one transition wins” executes eight races through two authenticated clients and asserts one winner, one terminal event, and the matching zero-or-one shipment in every round. |
 | <a id="o08"></a>O08 | Gated | Return tests cover currently coupled physical/financial returns; price-only and independent disposition policy remains Product/Finance-owned. |
 | <a id="o09"></a>O09 | Proven | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/stock-transfers.test.ts` — “corrects a completed wrong-destination transfer with a linked compensating transfer”; exact SQL assertions retain both documents and produce 5/0/3 balances. |
 | <a id="o10"></a>O10 | Source only | New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/delivery.test.ts` — “keeps a failed stop open and blocks return without creating delivery money or stock effects”. Partial/refusal stock handling is unimplemented. |
@@ -244,6 +258,11 @@ was absent or the required capability does not exist.
    ATP. It now states only the observed source shortage and directs the operator
    to replenish that source; two-location, single-location-short, and
    never-stocked regressions reject the unsupported assertion.
+10. Shipment and picked-order adjustment locked the same order row, but a
+    winning adjustment left status `picked`, so the waiting shipment passed the
+    status-only check while `needs_restock` was true. Shipment now checks the
+    post-lock restock state before writing a shipment, invoice, or movement;
+    re-pick clears the state and permits the same request to commit once.
 
 ## Evidence limits
 
