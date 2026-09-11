@@ -179,6 +179,15 @@ for approvals, environment separation, hosted advisors, smoke tests, and rollbac
 
 ## CI
 
+Enable the tracked pre-push check once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+For code changes, it runs the same lint, typecheck, build, pure-screen, and
+isolated-database test commands as CI. Documentation-only pushes skip the gate.
+
 `.github/workflows/ci.yml` runs on every push and pull request: installs
 deps, starts a local Supabase stack with only the services the tests use
 (Postgres, Auth, PostgREST, Kong, and the mailpit SMTP sink Auth sends

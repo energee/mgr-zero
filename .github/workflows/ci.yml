@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml — RLS + command tests gate every merge.
 #
-# Runs against a local Supabase stack. Ports are set in the committed
-# supabase/config.toml (54341/54342/54343), same as every local dev machine.
+# Runs against the isolated test Supabase stack. Ports are set in the committed
+# tests/supabase/supabase/config.toml (54351/54352/54354).
 # Env vars for the test suite are derived from `supabase status -o env`
 # rather than hardcoded, so this keeps working if the config ever changes.
 name: ci
@@ -94,11 +94,14 @@ jobs:
       # inviteUserByEmail fail with "Error sending invite email").
       # `start` on a fresh stack already applies supabase/migrations/*, so
       # there is no separate `db reset` step here.
-      - run: supabase start -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
+      - run: supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
       - name: Env from local stack
         # The app accepts modern Supabase names only. The mapping script keeps
         # local CLI output compatible without reintroducing runtime fallbacks.
-        run: supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
+        run: |
+          supabase status --workdir tests/supabase -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres" >> "$GITHUB_ENV"
+          echo "MGR_TEST_STACK=1" >> "$GITHUB_ENV"
       - run: >
           bunx vitest run --shard=${{ matrix.shard }}
           --exclude tests/mgr-screens.test.ts --exclude tests/tap-coverage.test.ts

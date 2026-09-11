@@ -116,6 +116,7 @@ type AtpRow = { brewery_id: string; sku_id: string; qty: number };
 defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
+  aiExposed: true,
   handler: async (ctx, i) => {
     const rows = await completeKeyedRows<OnHandRow>("On-hand stock", async after => {
       let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty").eq("brewery_id", ctx.breweryId);
@@ -171,6 +172,7 @@ defineQuery({
 defineQuery({
   name: "get_atp", description: "Available-to-promise (on-hand minus open allocations) per SKU",
   input: bySku, roles: [...readRoles],
+  aiExposed: true,
   handler: (ctx, i) => completeKeyedRows<AtpRow>("Available stock", async after => {
     let q = ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId);
     let counted = ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
@@ -214,6 +216,7 @@ defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
+  aiExposed: true,
   handler: async (ctx) => {
     const rows = await completeRows("SKU list", async afterId => {
       let query = ctx.db.from("skus")
@@ -234,6 +237,7 @@ defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
+  aiExposed: true,
   handler: async (ctx) => {
     const rows = await completeRows("Location list", async afterId => {
       let query = ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("id").limit(500);
@@ -266,6 +270,7 @@ export type BinMoveStock = {
 defineQuery({
   name: "get_bin_move_stock", description: "Stock by bin and explicit lot identity at one location, including untracked stock and empty keg sizes",
   input: z.object({ locationId: z.string().uuid() }), roles: ["admin", "warehouse"],
+  aiExposed: true,
   handler: async (ctx, i) => {
     const rows: BinMoveStock[] = [];
     // Read all grouped sources, not just PostgREST's first 1,000 rows.

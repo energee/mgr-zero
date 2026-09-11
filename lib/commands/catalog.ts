@@ -114,6 +114,7 @@ defineQuery({
   // Brewers read bins too: packaging output lands in one.
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
   input: z.object({ locationId: z.string().uuid().optional() }), roles: STAFF_ROLES,
+  aiExposed: true,
   handler: (ctx, i) => {
     let q = ctx.db.from("bins").select("id, location_id, name").eq("brewery_id", ctx.breweryId).order("name");
     if (i.locationId) q = q.eq("location_id", i.locationId);
@@ -159,6 +160,7 @@ const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "tra
 defineQuery({
   name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
+  aiExposed: true,
   handler: (ctx) => unwrap(ctx.db.from("sale_channels").select("id, name, tax_treatment").eq("brewery_id", ctx.breweryId).order("name")),
 });
 

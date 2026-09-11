@@ -211,7 +211,7 @@ import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
-import { ComposerAnswerView, ComposerMovementPickerView, ComposerProposalView, ComposerQuestionView, OfflineOutboxView } from "@/components/mgr/views/composer";
+import { ComposerConversationView, ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { toMeViewProps } from "@/lib/mgr/me-view";
 import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -851,22 +851,13 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer proposal",
     to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
-    job: "Exact structured fields become a canonical server preview; signed effect leads",
+    job: "A chat request becomes a canonical server preview; signed effect leads",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock · preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
     states: [["editing", "Any field edit removes the proposal and Commit", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1]],
-    spec: "The live no-model path requires exact fields before preview. The preview query is internal, never an AI tool; the proposal contains only its canonical effects and warnings.",
+    spec: "The user starts with a normal chat message. The Gateway conversation collects exact fields before preview. The preview query is internal, never a model-executed write; the proposal contains only its canonical effects and warnings.",
     body: <>
-      <ComposerMovementPickerView
-        draft={{ skuId: "hazy-half", kind: "depletion", locationId: "taproom", binId: "walk-in", lotChoice: "untracked", qty: "1", saleChannelId: "taproom-channel" }}
-        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
-        locations={[{ id: "taproom", label: "Taproom" }]}
-        bins={[{ id: "walk-in", label: "Walk-in" }]}
-        lots={[]}
-        channels={[{ id: "taproom-channel", label: "Taproom" }]}
-        question={false}
-        proposal
-      />
+      <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">Record one half-barrel keg of Hazy IPA as taproom depletion.</div>
       <ComposerProposalView
         effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
         warnings={[]}
@@ -882,23 +873,16 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer question",
-    to: { "Preview movement": "Composer question" },
-    job: "One exact missing-field question; no Commit until every required field is chosen",
+    to: { "New chat": "Composer question", Minimize: "Today" },
+    job: "Ask one exact follow-up in the conversation; no Commit until every required field is known",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
     states: [["missing SKU", "structured picker · no Commit"], ["resolved", "Preview movement becomes available"]],
-    spec: "The no-model path asks for the first missing structured field. This initial state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
-    body: <>
-      <ComposerMovementPickerView
-        draft={{}}
-        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
-        locations={[{ id: "taproom", label: "Taproom" }]}
-        bins={[]}
-        lots={[]}
-        channels={[{ id: "taproom-channel", label: "Taproom" }]}
-      />
-      <ComposerQuestionView prompt="Which SKU / package?" />
-    </>,
+    spec: "The Gateway conversation asks for the first missing exact field. This state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
+    body: <ComposerConversationView messages={[
+      { id: "question-user", role: "user", content: "We blew a half of Hazy." },
+      { id: "question-assistant", role: "assistant", content: "Which SKU / package: Hazy IPA · ½ bbl keg or Hazy IPA · case?" },
+    ]} />,
   },
   {
     step: 4,
@@ -906,18 +890,16 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer answer",
-    to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation" },
+    to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation", "New chat": "Composer answer", Minimize: "Today" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
     spec: "History is a visible control in the composer strip; no swipe-only interaction.",
-    body: <ComposerAnswerView
-      query="How much Hazy is available to promise?"
-      answer="11 × ½ bbl"
-      detail="plus 40 cases · current brewery ATP"
-      observedAt="Sep 10, 2026, 10:00 AM"
-    />,
+    body: <ComposerConversationView messages={[
+      { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
+      { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
+    ]} />,
   },
   {
     step: 4,

@@ -25,7 +25,7 @@ export type AppShellProps = {
   items: readonly NavItem[];
   /** Header controls (Search, Me, Sign out). Owned by the layout, not the shell. */
   headerRight?: React.ReactNode;
-  /** Composer strip above the tab bar; omitted until the composer ships. */
+  /** Chat composer above the tab bar. */
   composer?: React.ReactNode;
   /** Force the active tab (the inventory renders screens off their real route). */
   active?: string;

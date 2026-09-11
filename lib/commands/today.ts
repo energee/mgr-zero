@@ -29,6 +29,7 @@ defineQuery({
   description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue, buyer questions about invoices)",
   input: z.object({ now: z.string().datetime({ offset: true }).optional() }),
   roles: STAFF_ROLES,
+  aiExposed: true,
   handler: async (ctx, i): Promise<TodayItem[]> => {
     const rows = await unwrap(ctx.db.rpc("get_today_items", { p_brewery: ctx.breweryId, p_now: i.now ?? new Date().toISOString() })) as Row[];
     return rows

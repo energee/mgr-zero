@@ -1,16 +1,13 @@
-import type { ReactNode, Ref } from "react";
+import type { Ref } from "react";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DirectionIcon } from "@/components/mgr/icon";
-import type { ComposerEffect, ComposerHistoryMessage, MovementDraft, MovementKind } from "@/lib/composer/state";
+import type { ComposerEffect } from "@/lib/composer/state";
 
-export type ComposerChoice = { value: string; label: string };
 export type ComposerStripAction = { value: string; label: string };
-export type ComposerPickerOption = { id: string; label: string };
 export type OfflineOutboxRow = {
   id: string;
   label: string;
@@ -19,58 +16,21 @@ export type OfflineOutboxRow = {
   fixHref?: string;
   fixTo?: string;
 };
-
-const MOVEMENT_TYPES: { value: MovementKind; label: string }[] = [
-  { value: "opening_balance", label: "Opening balance" },
-  { value: "production_in", label: "Production in" },
-  { value: "adjustment", label: "Adjustment" },
-  { value: "depletion", label: "Depletion" },
-  { value: "return_in", label: "Return in" },
-  { value: "destruction", label: "Destruction" },
-  { value: "loss", label: "Loss" },
-  { value: "sample", label: "Sample" },
-  { value: "festival_removal", label: "Festival removal" },
-];
-
-export function ComposerMovementPickerView({ draft, skus, locations, bins, lots, channels, busy = false, disabled = false, question = true, proposal = false, onChange, onPreview }: {
-  draft: MovementDraft;
-  skus: ComposerPickerOption[];
-  locations: ComposerPickerOption[];
-  bins: ComposerPickerOption[];
-  lots: ComposerPickerOption[];
-  channels: ComposerPickerOption[];
-  busy?: boolean;
-  disabled?: boolean;
-  question?: boolean;
-  proposal?: boolean;
-  onChange?: (patch: Partial<MovementDraft>) => void;
-  onPreview?: () => void;
-}) {
-  return (
-    <section className="grid gap-2 rounded-md border bg-card p-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Label>SKU / package<select disabled={disabled} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.skuId ?? ""} onChange={(event) => onChange?.({ skuId: event.target.value || undefined, lotChoice: undefined })}><option value="">Choose…</option>{skus.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Label>
-      <Label>Type<select disabled={disabled} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.kind ?? ""} onChange={(event) => onChange?.({ kind: (event.target.value || undefined) as MovementKind | undefined, direction: undefined, saleChannelId: undefined, destState: undefined })}><option value="">Choose…</option>{MOVEMENT_TYPES.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select></Label>
-      {draft.kind === "adjustment" && <Label>Direction<select disabled={disabled} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.direction ?? ""} onChange={(event) => onChange?.({ direction: (event.target.value || undefined) as "add" | "remove" | undefined })}><option value="">Choose…</option><option value="add">Add stock</option><option value="remove">Remove stock</option></select></Label>}
-      <Label>Location<select disabled={disabled} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.locationId ?? ""} onChange={(event) => onChange?.({ locationId: event.target.value || undefined, binId: undefined, lotChoice: undefined })}><option value="">Choose…</option>{locations.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Label>
-      <Label>Bin<select className="mt-1 w-full rounded-md border bg-background p-2" value={draft.binId ?? ""} disabled={disabled || !draft.locationId} onChange={(event) => onChange?.({ binId: event.target.value || undefined, lotChoice: undefined })}><option value="">Choose…</option>{bins.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Label>
-      <Label>Lot<select className="mt-1 w-full rounded-md border bg-background p-2" value={draft.lotChoice ?? ""} disabled={disabled || !draft.binId || !draft.skuId} onChange={(event) => onChange?.({ lotChoice: event.target.value || undefined })}><option value="">Choose…</option><option value="untracked">Untracked / legacy stock</option>{lots.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Label>
-      <Label>Positive quantity<Input disabled={disabled} className="mt-1" type="number" min="0.01" step="0.01" value={draft.qty ?? ""} onChange={(event) => onChange?.({ qty: event.target.value })} /></Label>
-      {draft.kind === "depletion" && <Label>Sale channel<select disabled={disabled} className="mt-1 w-full rounded-md border bg-background p-2" value={draft.saleChannelId ?? ""} onChange={(event) => onChange?.({ saleChannelId: event.target.value || undefined })}><option value="">Choose…</option>{channels.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Label>}
-      {(draft.kind === "sample" || draft.kind === "festival_removal") && <Label>Destination state<Input disabled={disabled} className="mt-1" maxLength={2} pattern="[A-Za-z]{2}" value={draft.destState ?? ""} onChange={(event) => onChange?.({ destState: event.target.value.toUpperCase() })} /></Label>}
-      <Label className="sm:col-span-2">Note<Input disabled={disabled} className="mt-1" value={draft.note ?? ""} onChange={(event) => onChange?.({ note: event.target.value })} /></Label>
-      <div className="flex items-end"><Button type="button" disabled={disabled || busy || question} onClick={onPreview}>{busy ? "Loading…" : proposal ? "Preview current data" : "Preview movement"}</Button></div>
-    </section>
-  );
-}
+export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
 
 export function ComposerStripView({
-  actions = [{ value: "record_movement", label: "Record inventory movement" }, { value: "read_atp", label: "Check available to promise" }],
+  actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],
   onAction,
   onHistory,
   onOutbox,
   outboxCount = 0,
   disabled = false,
-  actionRef,
+  promptRef,
+  value,
+  onChange,
+  onSubmit,
+  streaming = false,
+  onStop,
 }: {
   actions?: ComposerStripAction[];
   onAction?: (value: string) => void;
@@ -78,26 +38,74 @@ export function ComposerStripView({
   onOutbox?: () => void;
   outboxCount?: number;
   disabled?: boolean;
-  actionRef?: Ref<HTMLSelectElement>;
+  promptRef?: Ref<HTMLTextAreaElement>;
+  value?: string;
+  onChange?: (value: string) => void;
+  onSubmit?: (value: string) => void;
+  streaming?: boolean;
+  onStop?: () => void;
 }) {
   return (
-    <InputGroup>
-      <select
-        ref={actionRef}
-        aria-label="Composer action"
-        disabled={disabled}
-        defaultValue=""
-        onChange={(event) => { if (event.target.value) onAction?.(event.target.value); event.target.value = ""; }}
-        className="min-h-9 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
-      >
-        <option value="">Choose a supported action…</option>
-        {actions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
-      </select>
-      <InputGroupAddon align="inline-end">
-        <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onHistory}>History</Button>
-      </InputGroupAddon>
-    </InputGroup>
+    <div className="rounded-2xl border bg-card p-2 shadow-lg">
+      <form onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
+        <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
+          <Textarea
+            ref={promptRef}
+            aria-label="Ask MGR"
+            placeholder="Ask MGR about inventory, orders, production…"
+            disabled={disabled}
+            value={value}
+            onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+            rows={2}
+            maxLength={4000}
+            className="min-h-14 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
+            onKeyDown={onSubmit ? (event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                const message = value?.trim();
+                if (message) onSubmit(message);
+              }
+            } : undefined}
+          />
+          <InputGroupAddon align="block-end" className="flex-col items-stretch gap-1 px-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex flex-wrap gap-1">
+              {actions.map((action) => <Button key={action.value} type="button" variant="ghost" size="sm" disabled={disabled} onClick={onAction ? () => onAction(action.value) : undefined}>{action.label}</Button>)}
+            </span>
+            <span className="flex flex-wrap items-center justify-end gap-1">
+              <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={onHistory}>History</Button>
+              <span className="text-xs text-muted-foreground">Enter to send · Shift + Enter for a new line</span>
+              {streaming
+                ? <Button type="button" size="sm" variant="outline" onClick={onStop}>Stop response</Button>
+                : <Button type="submit" size="sm" disabled={disabled || !value?.trim()}>Send</Button>}
+            </span>
+          </InputGroupAddon>
+        </InputGroup>
+      </form>
+    </div>
+  );
+}
+
+export function ComposerConversationView({ messages, activity, error, onRetry, onNewChat, onMinimize }: {
+  messages: ComposerConversationMessage[];
+  activity?: string;
+  error?: string;
+  onRetry?: () => void;
+  onNewChat?: () => void;
+  onMinimize?: () => void;
+}) {
+  return (
+    <section aria-label="MGR conversation" className="overflow-hidden rounded-2xl border bg-card shadow-xl">
+      <header className="flex items-center justify-between border-b px-4 py-3">
+        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p></div>
+        <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
+      </header>
+      <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
+        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] whitespace-pre-wrap text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.content}</div>)}
+        {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
+        {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
+      </div>
+    </section>
   );
 }
 
@@ -130,26 +138,6 @@ export function OfflineOutboxView({ rows, busy = false, onRetry, onDiscard, onRe
         {retryable.length > 0 && <Button type="button" variant="outline" disabled={busy} onClick={onRetryAll}>Retry {retryable.length} waiting</Button>}
         <Button type="button" variant="destructive" disabled={busy} onClick={onDiscardAll}>Discard {rows.length} queued reading{rows.length === 1 ? "" : "s"}</Button>
       </div>}
-    </section>
-  );
-}
-
-export function ComposerQuestionView({ query, prompt, choices = [], children }: {
-  query?: string;
-  prompt: string;
-  choices?: ComposerChoice[];
-  children?: ReactNode;
-}) {
-  return (
-    <section aria-live="polite" aria-label="Composer question" className="rounded-md border bg-card p-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Composer · question</p>
-      {query && <p className="mt-2 text-sm">“{query}”</p>}
-      <h2 className="mt-2 font-medium">{prompt}</h2>
-      {choices.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{choices.map((choice) => (
-        <Button key={choice.value} type="button" variant="outline" size="sm">{choice.label}</Button>
-      ))}</div>}
-      {children}
-      <p className="mt-2 text-xs text-muted-foreground">Nothing is recorded until a canonical proposal is previewed and its verb is selected.</p>
     </section>
   );
 }
@@ -193,40 +181,6 @@ export function ComposerProposalView({ query, effects, warnings, openHref, openT
         <Button type="button" variant="ghost" onClick={onDismiss} disabled={locked}>Dismiss</Button>
         <Button type="button" onClick={onCommit} disabled={!onCommit || committing}>{committing ? "Recording…" : "Commit movement"}</Button>
       </div>
-    </section>
-  );
-}
-
-export function ComposerAnswerView({ query, answer, detail, observedAt }: {
-  query: string;
-  answer: string;
-  detail?: string;
-  observedAt: string;
-}) {
-  return (
-    <section aria-live="polite" aria-label="Composer answer" className="rounded-md border bg-card p-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Composer · answer</p>
-      <p className="mt-2 text-sm">“{query}”</p>
-      <p className="mt-2 text-lg font-semibold">{answer}</p>
-      {detail && <p className="text-sm text-muted-foreground">{detail}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">Observed {observedAt}</p>
-    </section>
-  );
-}
-
-export function ComposerHistoryView({ messages, onClose }: { messages: ComposerHistoryMessage[]; onClose?: () => void }) {
-  return (
-    <section aria-label="Composer history" className="max-h-64 overflow-y-auto rounded-md border bg-card p-3 shadow-sm">
-      <div className="flex items-center justify-between"><h2 className="font-medium">History</h2><Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button></div>
-      {messages.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No conversation history yet.</p> : (
-        <ol className="mt-2 space-y-2">{messages.map((message) => (
-          <li key={message.id} className="text-sm">
-            <span className="font-medium">{message.role === "result" ? "Recorded" : message.role === "user" ? "You" : "MGR"}</span>
-            {message.content && <span> · {message.content}</span>}
-            <span className="block text-xs text-muted-foreground">{new Date(message.created_at).toLocaleString()}</span>
-          </li>
-        ))}</ol>
-      )}
     </section>
   );
 }

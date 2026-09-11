@@ -2186,6 +2186,10 @@ BEGIN
       JOIN private.square_catalog_syncs sync ON sync.actor_id=request.actor_id AND sync.request_id=request.request_id
       WHERE sync.connection_id=c.id AND request.result IS NULL
       ORDER BY request.actor_id,request.request_id FOR UPDATE OF request;
+    UPDATE private.command_requests request SET result=v_sync_result
+      FROM private.square_catalog_syncs sync
+      WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
+        AND sync.connection_id=c.id AND request.result IS NULL;
   END IF;
   SELECT * INTO c FROM public.pos_connections WHERE brewery_id=i.brewery_id AND provider='square' FOR UPDATE;
   IF c.id IS NOT NULL AND c.merchant_id IS DISTINCT FROM p_merchant_id THEN
