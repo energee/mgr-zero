@@ -49,6 +49,14 @@ describe("AI composer", () => {
     expect(html).toContain("openai/gpt-5.4");
   });
 
+  it("renders assistant markdown", () => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, {
+      messages: [{ id: "answer", role: "assistant", content: "1. **First**\n2. Second" }],
+    }));
+    expect(html).toContain("<ol");
+    expect(html).toContain("<strong>First</strong>");
+  });
+
   it("preserves known fields when opening the ordinary movement form", () => {
     const handoffId = "88888888-8888-4888-8888-888888888888";
     const href = movementFormHref({ ...ids, qty: -0.5, type: "depletion", note: "Festival tent" }, handoffId);
