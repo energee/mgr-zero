@@ -133,6 +133,7 @@ export function ScreenExplorer() {
     // happens to put its rows above the field; this keeps it that way.
     if (el.closest("[data-slot=input-group-addon]")) return;
     if (el.closest("[data-gated]")) return e.preventDefault();
+    if (el.matches("[data-slot=drawer-trigger]")) return;
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
     const to = el.getAttribute("data-to");

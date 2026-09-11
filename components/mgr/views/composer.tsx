@@ -1,10 +1,11 @@
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
 
@@ -18,6 +19,30 @@ export type OfflineOutboxRow = {
   fixTo?: string;
 };
 export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
+
+export function ComposerDrawerView({ children, open, onOpenChange }: {
+  children: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerTrigger asChild>
+        <Button type="button" variant="outline" aria-label="Open Ask MGR" className="h-auto w-full justify-between rounded-xl px-4 py-3 text-left shadow-sm">
+          <span><span className="block font-semibold">Ask MGR</span><span className="block text-xs font-normal text-muted-foreground">Chat with your brewery data</span></span>
+          <span aria-hidden="true" className="text-muted-foreground">⌃</span>
+        </Button>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[92vh]">
+        <DrawerHeader className="sr-only">
+          <DrawerTitle>Ask MGR</DrawerTitle>
+          <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
+        </DrawerHeader>
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto p-3 pt-2 sm:p-4">{children}</div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
 
 export function ComposerStripView({
   actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],

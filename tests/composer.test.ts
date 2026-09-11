@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
-import { ComposerConversationView, ComposerProposalView, ComposerStripView } from "@/components/mgr/views/composer";
+import { ComposerConversationView, ComposerDrawerView, ComposerProposalView } from "@/components/mgr/views/composer";
 import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -73,9 +73,9 @@ describe("AI composer", () => {
   });
 
   it("shares the AI SDK composer between live and inventory surfaces", () => {
-    expect(E.comp().type).toBe(ComposerStripView);
-    const strip = renderToStaticMarkup(createElement(ComposerStripView));
-    for (const text of ["Ask MGR", "Send", "Record a movement"]) expect(strip).toContain(text);
+    expect(E.comp().type).toBe(ComposerDrawerView);
+    const drawer = renderToStaticMarkup(E.comp());
+    expect(drawer).toContain("Chat with your brewery data");
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
     expect(live).toContain("useChat");
     expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);
