@@ -110,6 +110,8 @@ describe("Square publication residual specification fences", () => {
       format_id,external_item_id,external_variation_id,ownership,present)
       values('${eventPublication}','${f.brewery.id}','${f.connectionId}','${owned.brandId}','poured','${owned.formatId}',
         'SELLER-A-ITEM','SELLER-A-VAR','mgr',true)`);
+    const staleSync = await beginSquareCatalogSync(f.ctx, crypto.randomUUID());
+    if ("replayResult" in staleSync) throw new Error("unexpected replay");
 
     const oauth = new URL((await beginSquareOAuth(f.ctx, new SquareClient(config, vi.fn()), "reconnect", crypto.randomUUID())).authorizeUrl);
     const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
@@ -137,6 +139,16 @@ describe("Square publication residual specification fences", () => {
     await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: owned.brandId }, requestId,
       new SquareClient(config, fetch), "publish_pos_item")).resolves.toMatchObject({ externalItemId: "SELLER-B-ITEM" });
     expect(fetch).toHaveBeenCalledTimes(1);
+    await expect(recordSquareCatalogSnapshot(f.ctx, staleSync, {
+      locations: [{ id: "SELLER-A-LATE", name: "Seller A late location", status: "ACTIVE" }],
+      variations: [{ itemId: "SELLER-A-LATE-ITEM", itemName: "Seller A late item",
+        variationId: "SELLER-A-LATE-VAR", variationName: "Seller A late variation", version: 9, available: true }],
+    })).resolves.toEqual({ synced: false, superseded: true, errorCode: "connection_changed" });
+    expect(sql(`select result->>'errorCode' from private.command_requests
+        where actor_id='${f.ctx.userId}' and request_id='${staleSync.requestId}';
+      select count(*) from public.pos_locations where connection_id='${f.connectionId}' and external_location_id='SELLER-A-LATE';
+      select count(*) from public.pos_catalog_variations where connection_id='${f.connectionId}' and external_item_id='SELLER-A-LATE-ITEM'`))
+      .toEqual(["connection_changed", "0", "0"]);
   });
 
   it("advances only the committed catalog generation and supersedes publication when a delayed snapshot lands", async () => {
