@@ -4,7 +4,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { beginSquareOAuth, completeSquareOAuth, SquareClient } from "@/lib/pos";
 import { disconnectSquare, failSquareOAuth } from "@/lib/supabase/integration-tokens";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
@@ -174,6 +174,37 @@ describe("Square quality-review lifecycle fences", () => {
     await failSquareOAuth(fallbackIntent, ctx.userId, "unresolved", ownerConnection.merchantId);
     expect(sql(`select exchange_state,cleanup_state from private.square_oauth_intents where id='${fallbackIntent}'`))
       .toEqual(["recovery_required|unresolved"]);
+  });
+
+  it("replaces a seller without inheriting its unobserved menu configuration", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connection = await connected(brewery.id);
+    const location = await seedLocation(brewery.id, { name: "Old seller taproom", kind: "taproom" });
+    expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connection.connectionId,
+      external_location_id: "REUSED-L", external_name: "Old seller location", location_id: location.id })).error).toBeNull();
+    const saleChannelId = await channelId(brewery.id, "Taproom");
+    const configured = await runCommand("configure_pos_menu", {
+      posLocationId: "REUSED-L", binId: location.binId, saleChannelId,
+    }, ctx) as { publicId: string };
+
+    const oauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "reconnect", crypto.randomUUID())).authorizeUrl);
+    const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
+      p_actor: ctx.userId, p_brewery: brewery.id, p_redirect_uri: config.redirectUri });
+    const intentId = (claim.data as Array<{ intent_id: string }>)[0].intent_id;
+    const replacementMerchant = `replacement-${crypto.randomUUID()}`;
+    const completed = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
+      p_merchant_id: replacementMerchant, p_merchant_label: "Replacement", p_access_token: "replacement-access",
+      p_refresh_token: "replacement-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"],
+      p_locations: [{ id: "REUSED-L", name: "New seller location", status: "ACTIVE" }],
+    });
+
+    expect(completed.error).toBeNull();
+    expect(completed.data).toBe(connection.connectionId);
+    expect((await admin.from("pos_menus").select("id").eq("public_id", configured.publicId)).data).toEqual([]);
+    expect((await admin.from("pos_locations").select("external_name,location_id").eq("connection_id", connection.connectionId)).data)
+      .toEqual([{ external_name: "New seller location", location_id: null }]);
   });
 
   it("serializes concurrent location and variation mappings and reconciles the sale exactly once", async () => {

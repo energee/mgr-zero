@@ -3,7 +3,7 @@
 // .agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md, Decision 1.
 import { describe, it, expect, beforeAll } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
+import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -68,6 +68,29 @@ describe("bins", () => {
     expect(left).toHaveLength(1);
     const renamed = (await runCommand("update_bin", { binId: left[0].id, name: "Only" }, ctx)) as Row;
     expect(renamed.name).toBe("Only");
+  });
+
+  it("delete_bin clears a menu configured against that empty bin", async () => {
+    const loc = (await runCommand("create_location", { name: "Menu bin", kind: "taproom" }, ctx)) as Row;
+    const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    const connection = await admin.from("pos_connections").insert({ brewery_id: ctx.breweryId,
+      merchant_id: `bin-menu-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
+    expect(connection.error).toBeNull();
+    expect((await admin.from("pos_locations").insert({ brewery_id: ctx.breweryId, connection_id: connection.data!.id,
+      external_location_id: "BIN-MENU", location_id: loc.id })).error).toBeNull();
+    const saleChannelId = await channelId(ctx.breweryId, "Taproom");
+    const menu = await runCommand("configure_pos_menu", {
+      posLocationId: "BIN-MENU", binId: bins[0].id, saleChannelId,
+    }, ctx) as { menuId: string };
+    const catalog = await seedCatalog(ctx.breweryId, { product: "Menu bin beer", sku: "Menu bin keg", packageType: "keg" });
+    const poured = await admin.from("formats").insert({ brewery_id: ctx.breweryId, brand_id: catalog.brandId,
+      name: "Menu bin pint", basis: "poured", ounces: 16 }).select("id").single();
+    insertFixture("pos_menu_lines", { menu_id: menu.menuId, brewery_id: ctx.breweryId, format_id: poured.data!.id,
+      price_override_cents: 700 });
+
+    await expect(runCommand("delete_bin", { binId: bins[0].id }, ctx)).resolves.toMatchObject({ id: bins[0].id });
+    expect((await admin.from("pos_menus").select("id").eq("id", menu.menuId)).data).toEqual([]);
+    expect((await admin.from("pos_menu_lines").select("menu_id").eq("menu_id", menu.menuId)).data).toEqual([]);
   });
 
   it("a bin belongs to the caller's brewery or the RPC refuses it", async () => {

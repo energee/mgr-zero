@@ -2,7 +2,7 @@
 // and a documented short shared-cache window.
 import { createClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { GET } from "@/app/api/public/menus/[publicId]/route";
+import { GET, OPTIONS } from "@/app/api/public/menus/[publicId]/route";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation } from "./helpers";
@@ -54,6 +54,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("public, max-age=0, s-maxage=60, stale-while-revalidate=300");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Expose-Headers")).toBe("ETag");
     const body = await response.json();
     expect(body).toMatchObject({
       location: "Public Taproom",
@@ -82,6 +83,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     expect(unchanged.headers.get("ETag")).toBe(etag);
     expect(unchanged.headers.get("Cache-Control")).toBe("public, max-age=0, s-maxage=60, stale-while-revalidate=300");
     expect(unchanged.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(unchanged.headers.get("Access-Control-Expose-Headers")).toBe("ETag");
 
     await runCommand("set_pos_price_override", {
       posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, unitPriceCents: 650,
@@ -114,6 +116,17 @@ describe("GET /api/public/menus/[publicId]", () => {
       params: Promise.resolve({ publicId: "not-a-uuid" }),
     });
     expect(missing.status).toBe(404);
+    expect(missing.headers.get("Cache-Control")).toBe("no-store");
+    expect(missing.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(await missing.json()).toEqual({ error: "menu not found" });
+
+    const preflight = await OPTIONS(new Request(`http://localhost/api/public/menus/${configured.publicId}`, {
+      method: "OPTIONS",
+      headers: { Origin: "https://brewery.example", "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "If-None-Match" },
+    }));
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(preflight.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+    expect(preflight.headers.get("Access-Control-Allow-Headers")).toBe("If-None-Match");
   });
 });

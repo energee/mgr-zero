@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -71,6 +71,30 @@ describe("Square explicit mapping", () => {
     expect((await admin.from("pos_sales_coverage").insert({ brewery_id: brewery.id, connection_id: connectionId,
       external_location_id: "L1", location_id: one.id, starts_at: "2026-09-01T00:00:00Z", ends_at: "2026-09-02T00:00:00Z", complete: true })).error).toBeNull();
     await expect(call("L1", two.id)).rejects.toMatchObject({ status: 409, message: expect.stringContaining("history") });
+  });
+
+  it("explicitly clears an unobserved menu when its Square location is remapped", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connectionId = await connected(brewery.id);
+    const first = await seedLocation(brewery.id, { name: "First taproom", kind: "taproom" });
+    const second = await seedLocation(brewery.id, { name: "Second taproom", kind: "taproom" });
+    expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connectionId,
+      external_location_id: "L-MOVE", external_name: "Movable", location_id: first.id })).error).toBeNull();
+    const saleChannelId = await channelId(brewery.id, "Taproom");
+    const configured = await runCommand("configure_pos_menu", {
+      posLocationId: "L-MOVE", binId: first.binId, saleChannelId,
+    }, ctx) as { publicId: string };
+
+    await expect(runCommand("set_pos_location_mapping", {
+      posLocationId: "L-MOVE", mgrLocationId: second.id,
+    }, ctx)).resolves.toEqual({ mapped: true, menuCleared: true });
+    expect((await admin.from("pos_menus").select("id").eq("public_id", configured.publicId)).data).toEqual([]);
+    await expect(runCommand("get_pos_menu", { posLocationId: "L-MOVE" }, ctx))
+      .rejects.toMatchObject({ message: "Menu is not configured" });
+    await expect(runCommand("configure_pos_menu", {
+      posLocationId: "L-MOVE", binId: second.binId, saleChannelId,
+    }, ctx)).resolves.toMatchObject({ configured: true });
   });
 
   it("keeps ignored and unavailable variations visible with their mapping history", async () => {
