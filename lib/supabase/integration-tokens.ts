@@ -308,10 +308,11 @@ export async function advanceSquareCatalogSync(
 }
 
 export async function markSquareAuthorizationFailed(ctx: Ctx, connectionId: string, expectedCredentialVersion: number) {
-  const { error } = await createAdminClient().rpc("mark_square_authorization_failed", {
+  const { data, error } = await createAdminClient().rpc("mark_square_authorization_failed", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_expected_version: expectedCredentialVersion,
   });
   if (error) throw new Error("Square authorization health could not be updated");
+  return data === true;
 }
 
 export async function recordSquareCatalogSnapshot(
@@ -476,10 +477,15 @@ export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (row?.superseded === true) throw new CommandError("Square publication was superseded", 409, "conflict");
   if (error || !row || typeof row.access_token !== "string"
+    || typeof row.refresh_token !== "string" || typeof row.merchant_id !== "string"
+    || typeof row.credential_version !== "number"
+    || (row.access_expires_at !== null && typeof row.access_expires_at !== "string")
     || (row.request_body !== null && typeof row.request_body !== "string")) {
     throw new CommandError("Square publication access is no longer available", 403, "permission_denied");
   }
-  return { accessToken: row.access_token, requestBody: row.request_body as string | null };
+  return { accessToken: row.access_token, refreshToken: row.refresh_token, merchantId: row.merchant_id,
+    credentialVersion: row.credential_version, accessExpiresAt: row.access_expires_at as string | null,
+    requestBody: row.request_body as string | null };
 }
 
 export async function prepareSquarePublication(

@@ -433,12 +433,33 @@ export async function publishSquareCatalogItem(
   let acquired = await leaseOrFinished();
   if ("result" in acquired) return acquired.result;
   let lease = acquired.lease;
+  if (lease.accessExpiresAt && Date.parse(lease.accessExpiresAt) <= Date.now()) {
+    let next: SquareTokens;
+    try { next = await client.refresh(lease.refreshToken); }
+    catch (error) {
+      if (isTerminalAuthorization(error)) {
+        await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+      }
+      throw unavailable();
+    }
+    if (next.merchantId !== lease.merchantId) throw unavailable();
+    await compareAndSwapSquareTokens(ctx, {
+      accessToken: lease.accessToken, refreshToken: lease.refreshToken, connectionId: start.connectionId,
+      credentialVersion: lease.credentialVersion, accessExpiresAt: lease.accessExpiresAt,
+      refreshExpiresAt: null, refreshHardExpiresAt: null,
+    }, next, secondsUntil(next.receivedAt, next.accessExpiresAt));
+    throw new CommandError("Square publication was superseded by refreshed credentials", 409, "conflict");
+  }
   if (!lease.requestBody) {
     let current: Record<string, unknown> | null = null;
     try {
       current = start.source.externalItemId
         ? await client.retrieveCatalogObject(lease.accessToken, start.source.externalItemId) : null;
     } catch (error) {
+      if (isTerminalAuthorization(error)) {
+        await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+        throw unavailable();
+      }
       if (error instanceof SquareCatalogReadError) {
         await finishSquarePublication(ctx, start.attemptId, error.code, null);
         throw new CommandError("Square no longer has the selected catalog item", 409, "conflict");
@@ -462,7 +483,12 @@ export async function publishSquareCatalogItem(
   }
   let result: Awaited<ReturnType<SquareClient["upsertCatalogObject"]>>;
   try { result = await client.upsertCatalogObject(lease.accessToken, lease.requestBody!); }
-  catch { throw unavailable(); }
+  catch (error) {
+    if (isTerminalAuthorization(error)) {
+      await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+    }
+    throw unavailable();
+  }
   if (!result.ok) {
     if (result.definitive) await finishSquarePublication(ctx, start.attemptId,
       result.versionConflict ? "version_mismatch" : "provider_rejected", null);
