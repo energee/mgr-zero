@@ -87,42 +87,23 @@ function closeSession(session: string) {
 
 /** Seeds a brewery/warehouse/product/sku/price-list/customer/ship-to/inventory + a customer-portal login, mirroring the old Playwright spec's beforeAll. */
 async function seed() {
-  const { admin, makeBrewery, makeStaffCtx, makeCustomerUser } = await import("../tests/helpers");
+  const { admin, makeBrewery, makeStaffCtx, makeCustomerUser, priceSku, seedCatalog, seedCustomer, seedLocation } = await import("../tests/helpers");
+  const { runCommand } = await import("../lib/commands/registry");
+  await import("../lib/commands/all");
 
   const b = await makeBrewery();
   const staff = await makeStaffCtx(b.id, "admin");
-  await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" });
-  const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  const { data: s } = await admin
-    .from("skus")
-    .insert({ brewery_id: b.id, product_id: p!.id, name: "IPA case", package_type: "can", bbl_per_unit: 0.0645 })
-    .select()
-    .single();
-  const { data: pl } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
-  await admin
-    .from("price_list_items")
-    .insert({ brewery_id: b.id, price_list_id: pl!.id, sku_id: s!.id, unit_price_cents: 3600 });
-  const { data: c } = await admin
-    .from("customers")
-    .insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id })
-    .select()
-    .single();
-  await admin
-    .from("ship_tos")
-    .insert({ brewery_id: b.id, customer_id: c!.id, label: "Main", address1: "1 Main St", city: "Philadelphia", state: "PA", zip: "19100" });
-  const { data: loc } = await admin.from("locations").select("id").eq("brewery_id", b.id).eq("kind", "warehouse").single();
-  await admin.from("breweries").update({ portal_fulfillment_location_id: loc!.id }).eq("id", b.id);
-  await admin.from("inventory_movements").insert({
-    brewery_id: b.id,
-    sku_id: s!.id,
-    location_id: loc!.id,
-    qty: 100,
-    bbl: 100 * 0.0645,
-    type: "production_in",
-    created_by: staff.userId,
-  });
-  const custUser = await makeCustomerUser(c!.id);
-  return { customerEmail: custUser.email, skuName: s!.name as string };
+  const catalog = await seedCatalog(b.id, { sku: "IPA case" });
+  const location = await seedLocation(b.id);
+  const customer = await seedCustomer(b.id);
+  await priceSku(b.id, { saleChannelId: customer.saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 3600 });
+  await admin.from("breweries").update({ portal_fulfillment_location_id: location.id }).eq("id", b.id);
+  await runCommand("record_movement", {
+    skuId: catalog.skuId, locationId: location.id, binId: location.binId,
+    qty: 100, type: "opening_balance",
+  }, staff);
+  const custUser = await makeCustomerUser(customer.customerId);
+  return { customerEmail: custUser.email, skuName: "IPA case" };
 }
 
 /** Drives the full login → shop → submit → orders flow on `session`/`engine`, throwing on the first failed step or failed assertion. */
@@ -132,30 +113,30 @@ function runFlow(session: string, engine: Engine, customerEmail: string, skuName
   ab(session, ["find", "label", "Password", "fill", "test-password-1"]);
   ab(session, ["find", "role", "button", "click", "--name", "Sign in"]);
   ab(session, ["wait", "--url", "**/portal"]);
-  ab(session, ["wait", "--text", "Shop"]);
+  ab(session, ["wait", "--text", "Order"]);
 
-  const catalogRow = ab(session, ["get", "text", "table tbody tr"]) as { text: string };
+  const catalogRow = ab(session, ["get", "text", "body"]) as { text: string };
   if (!catalogRow.text.includes(skuName)) {
     throw new Error(`catalog row missing seeded sku "${skuName}": ${JSON.stringify(catalogRow)}`);
   }
 
-  ab(session, ["fill", "table tbody tr input[type=number]", "2"]);
-  ab(session, ["find", "label", "Ship to", "click"]);
-  ab(session, ["find", "role", "option", "click", "--name", "Main"]);
+  ab(session, ["find", "label", `Quantity — IPA · ${skuName}`, "fill", "2"]);
 
   // Real assertion, not just "the click didn't error": confirm the cart's
   // React state actually picked up the qty fill and ship-to selection
-  // (Submit order is disabled until both are set) before clicking it — this
+  // (Review order is disabled until both are set) before clicking it — this
   // is what catches Lightpanda's fill not propagating to React, instead of
   // discovering it 25s later via a `wait --url` timeout.
   const submitState = ab(session, [
     "eval",
-    "(() => { const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Submit order'); return b ? !b.disabled : null; })()",
+    "(() => { const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Review order'); return b ? !b.disabled : null; })()",
   ]) as { result: boolean | null };
   if (submitState.result !== true) {
-    throw new Error(`Submit order button still disabled after filling qty + ship-to (cart state didn't update): ${JSON.stringify(submitState)}`);
+    throw new Error(`Review order button still disabled after filling qty + ship-to (cart state didn't update): ${JSON.stringify(submitState)}`);
   }
 
+  ab(session, ["find", "role", "button", "click", "--name", "Review order"]);
+  ab(session, ["wait", "--text", "Submit order"]);
   ab(session, ["find", "role", "button", "click", "--name", "Submit order"]);
   try {
     ab(session, ["wait", "--url", "**/portal/orders/*"]);
@@ -167,9 +148,9 @@ function runFlow(session: string, engine: Engine, customerEmail: string, skuName
   ab(session, ["find", "role", "link", "click", "--name", "Orders"]);
   ab(session, ["wait", "--url", "**/portal/orders"]);
 
-  const orderRow = ab(session, ["get", "text", "tbody tr"]) as { text: string };
-  if (!orderRow.text.includes("submitted")) {
-    throw new Error(`orders list did not show "submitted": ${JSON.stringify(orderRow)}`);
+  const orderRow = ab(session, ["get", "text", "body"]) as { text: string };
+  if (!orderRow.text.includes("Placed")) {
+    throw new Error(`orders list did not show "Placed": ${JSON.stringify(orderRow)}`);
   }
 }
 
