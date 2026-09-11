@@ -80,13 +80,14 @@ defineCommand({
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
-async function completeRows<T>(name: string, page: (start: number) => PromiseLike<{
+async function completeKeyedRows<T>(name: string, page: (after: T | null) => PromiseLike<{
   data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
 }>, key: (row: T) => string): Promise<T[]> {
   const rows: T[] = [];
   let total: number | undefined;
   do {
-    const result = await page(rows.length);
+    const after = rows.at(-1) ?? null;
+    const result = await page(after);
     const next = await unwrap(Promise.resolve(result));
     const invalidPage = next?.some((row, index) => {
       const previous = index === 0 ? rows.at(-1) : next[index - 1];
@@ -102,15 +103,28 @@ async function completeRows<T>(name: string, page: (start: number) => PromiseLik
   return rows;
 }
 
+function completeRows<T extends { id: string }>(name: string, page: (afterId: string | null) => PromiseLike<{
+  data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
+}>): Promise<T[]> {
+  return completeKeyedRows(name, after => page(after?.id ?? null), row => row.id);
+}
+
+type OnHandRow = { brewery_id: string; sku_id: string; location_id: string; qty: number };
+type BinOnHandRow = OnHandRow & { bin_id: string };
+type AtpRow = { brewery_id: string; sku_id: string; qty: number };
+
 defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
   handler: async (ctx, i) => {
-    const rows = await completeRows("On-hand stock", start => {
-      let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId)
-        .order("sku_id").order("location_id").range(start, start + 499);
+    const rows = await completeKeyedRows<OnHandRow>("On-hand stock", async after => {
+      let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty").eq("brewery_id", ctx.breweryId);
+      let counted = ctx.db.from("on_hand").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
       if (i.skuId) q = q.eq("sku_id", i.skuId);
-      return q;
+      if (i.skuId) counted = counted.eq("sku_id", i.skuId);
+      if (after) q = q.or(`sku_id.gt.${after.sku_id},and(sku_id.eq.${after.sku_id},location_id.gt.${after.location_id})`);
+      const [result, count] = await Promise.all([q.order("sku_id").order("location_id").limit(500), counted]);
+      return { ...result, count: count.count, error: result.error ?? count.error };
     }, row => `${row.sku_id}\0${row.location_id}`);
     const names = new Map<string, string>();
     const locationIds = [...new Set(rows.map(row => row.location_id))];
@@ -141,22 +155,30 @@ defineCommand({
 defineQuery({
   name: "get_bin_on_hand", description: "On-hand quantity per SKU/location/bin",
   input: z.object({ skuId: z.string().uuid().optional(), locationId: z.string().uuid().optional() }), roles: [...readRoles],
-  handler: (ctx, i) => completeRows("Bin stock", start => {
-    let q = ctx.db.from("bin_on_hand").select("brewery_id, sku_id, location_id, bin_id, qty", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId);
+  handler: (ctx, i) => completeKeyedRows<BinOnHandRow>("Bin stock", async after => {
+    let q = ctx.db.from("bin_on_hand").select("brewery_id, sku_id, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId);
+    let counted = ctx.db.from("bin_on_hand").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.skuId) counted = counted.eq("sku_id", i.skuId);
     if (i.locationId) q = q.eq("location_id", i.locationId);
-    return q.order("sku_id").order("location_id").order("bin_id").range(start, start + 499);
+    if (i.locationId) counted = counted.eq("location_id", i.locationId);
+    if (after) q = q.or(`sku_id.gt.${after.sku_id},and(sku_id.eq.${after.sku_id},location_id.gt.${after.location_id}),and(sku_id.eq.${after.sku_id},location_id.eq.${after.location_id},bin_id.gt.${after.bin_id})`);
+    const [result, count] = await Promise.all([q.order("sku_id").order("location_id").order("bin_id").limit(500), counted]);
+    return { ...result, count: count.count, error: result.error ?? count.error };
   }, row => `${row.sku_id}\0${row.location_id}\0${row.bin_id}`),
 });
 
 defineQuery({
   name: "get_atp", description: "Available-to-promise (on-hand minus open allocations) per SKU",
   input: bySku, roles: [...readRoles],
-  handler: (ctx, i) => completeRows("Available stock", start => {
-    let q = ctx.db.from("atp").select("brewery_id, sku_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+  handler: (ctx, i) => completeKeyedRows<AtpRow>("Available stock", async after => {
+    let q = ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId);
+    let counted = ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
-    return q.order("sku_id").range(start, start + 499);
+    if (i.skuId) counted = counted.eq("sku_id", i.skuId);
+    if (after) q = q.gt("sku_id", after.sku_id);
+    const [result, count] = await Promise.all([q.order("sku_id").limit(500), counted]);
+    return { ...result, count: count.count, error: result.error ?? count.error };
   }, row => row.sku_id),
 });
 
@@ -193,9 +215,17 @@ defineQuery({
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
-    const rows = await completeRows("SKU list", start => ctx.db.from("skus")
-      .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).order("id").range(start, start + 499), row => row.id);
+    const rows = await completeRows("SKU list", async afterId => {
+      let query = ctx.db.from("skus")
+        .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
+        .eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   },
 });
@@ -205,8 +235,15 @@ defineQuery({
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
-    const rows = await completeRows("Location list", start => ctx.db.from("locations")
-      .select("id, name, kind", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id").range(start, start + 499), row => row.id);
+    const rows = await completeRows("Location list", async afterId => {
+      let query = ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   },
 });

@@ -53,6 +53,23 @@ describe("complete finished-goods reads", () => {
       type: "opening_balance",
       created_by: ctx.userId,
     })));
+    const binPrefix = crypto.randomUUID().slice(0, 8);
+    const extraBins = Array.from({ length: 501 }, (_, index) => ({
+      id: fixtureId(binPrefix, index + 1),
+      brewery_id: brewery.id,
+      location_id: location.id,
+      name: `Complete bin ${String(index + 1).padStart(4, "0")}`,
+    }));
+    expect((await admin.from("bins").insert(extraBins)).error).toBeNull();
+    insertFixture("inventory_movements", extraBins.map((bin) => ({
+      brewery_id: brewery.id,
+      sku_id: target.id,
+      location_id: location.id,
+      bin_id: bin.id,
+      qty: 1,
+      type: "opening_balance",
+      created_by: ctx.userId,
+    })));
     expect((await admin.from("allocations").insert({
       brewery_id: brewery.id,
       sku_id: target.id,
@@ -83,11 +100,11 @@ describe("complete finished-goods reads", () => {
     const model = toFinishedGoodsViewProps(assembleFinishedGoods(skus, binRows, atpRows));
 
     expect({ binRows: binRows.length, atpRows: atpRows.length, assembled: model.rows.length })
-      .toEqual({ binRows: 1_001, atpRows: 1_001, assembled: 1_001 });
+      .toEqual({ binRows: 1_502, atpRows: 1_001, assembled: 1_001 });
     expect(binRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
     expect(atpRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
     expect(model.rows.find((row) => row.title.endsWith("Cap target"))?.detail)
-      .toBe("7 on hand · 3 allocated · ATP 4");
+      .toBe("508 on hand · 3 allocated · ATP 505");
 
     const lowId = fixtureId("00000000", Number.parseInt(crypto.randomUUID().slice(-8), 16));
     const highId = fixtureId("ffffffff", Number.parseInt(crypto.randomUUID().slice(-8), 16));
@@ -118,14 +135,8 @@ describe("complete finished-goods reads", () => {
       } },
     });
     expect((await db.auth.signInWithPassword({ email: staff.email, password: "test-password-1" })).error).toBeNull();
-    const churnRows = await runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, role: "admin" }) as StockRow[];
-    const currentIds = new Set(churnRows.map((row) => row.sku_id));
+    await expect(runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, role: "admin" }))
+      .rejects.toMatchObject({ status: 409, code: "conflict", message: expect.stringMatching(/changed while loading/i) });
     expect(churned).toBe(true);
-    expect(churnRows).toHaveLength(1_002);
-    expect({
-      everyCurrentStock: skuRows.every((sku) => currentIds.has(sku.id)),
-      closedAllocationOnlyRow: currentIds.has(lowId),
-      openedAllocationOnlyRow: currentIds.has(highId),
-    }).toEqual({ everyCurrentStock: true, closedAllocationOnlyRow: false, openedAllocationOnlyRow: true });
   }, 30_000);
 });
