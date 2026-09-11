@@ -58,8 +58,7 @@ export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locat
     oversellNotes: lines.flatMap((l) => {
       const sourceQty = sourceOnHand === undefined ? undefined : sourceMap.get(l.sku_id) ?? 0;
       if (sourceQty !== undefined && sourceQty < l.qty_ordered) {
-        const elsewhere = (atpMap.get(l.sku_id) ?? 0) >= 0 ? " Stock exists at another location;" : "";
-        return [`Only ${sourceQty} of ${l.skus?.name ?? "this line"} is at ${sourceName}.${elsewhere} move stock here before picking, or confirm intentionally knowing Warehouse cannot pick the full quantity.`];
+        return [`Only ${sourceQty} of ${l.skus?.name ?? "this line"} is at ${sourceName}. Replenish ${sourceName} before picking, or confirm intentionally knowing Warehouse cannot pick the full quantity.`];
       }
       if ((atpMap.get(l.sku_id) ?? 0) < 0) return [`ATP for ${l.skus?.name ?? "a line"} is ${atpMap.get(l.sku_id)}. Confirming oversells; that stays your call.`];
       return [];

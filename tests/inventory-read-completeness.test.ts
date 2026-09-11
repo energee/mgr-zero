@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import { publicEnv } from "@/lib/env/public";
 import { assembleFinishedGoods, toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
-import { admin, insertFixture, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaff, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
 import "@/lib/commands/all";
 
 type StockRow = { brewery_id: string; sku_id: string; qty: string };
@@ -105,6 +105,28 @@ describe("complete finished-goods reads", () => {
     expect(atpRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
     expect(model.rows.find((row) => row.title.endsWith("Cap target"))?.detail)
       .toBe("508 on hand · 3 allocated · ATP 505");
+
+    const customer = await seedCustomer(brewery.id);
+    await priceSku(brewery.id, {
+      saleChannelId: customer.saleChannelId,
+      brandId: target.brand_id,
+      formatId: format.data!.id,
+      cents: 3600,
+    });
+    const created = await runCommand("create_order", {
+      kind: "wholesale",
+      customerId: customer.customerId,
+      shipToId: customer.shipToId,
+      fromLocationId: location.id,
+      lines: [{ skuId: target.id, qty: 4 }],
+    }, ctx) as { order_id: string };
+    await runCommand("submit_order", { orderId: created.order_id }, ctx);
+    const order = await runCommand("get_order", { orderId: created.order_id }, ctx) as {
+      atp: { sku_id: string; qty: number }[];
+      sourceOnHand: { sku_id: string; qty: number }[];
+    };
+    expect(order.sourceOnHand).toEqual([{ sku_id: target.id, qty: 508 }]);
+    expect(order.atp).toEqual([{ brewery_id: brewery.id, sku_id: target.id, qty: 505 }]);
 
     const lowId = fixtureId("00000000", Number.parseInt(crypto.randomUUID().slice(-8), 16));
     const highId = fixtureId("ffffffff", Number.parseInt(crypto.randomUUID().slice(-8), 16));

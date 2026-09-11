@@ -34,7 +34,7 @@ describe("Confirm order view loop", () => {
     expect(model.oversellNotes[0]).toMatch(/Pils · 16 oz case/);
   });
 
-  it("distinguishes source stock from brewery ATP when another warehouse holds the beer", () => {
+  it("distinguishes source stock from brewery ATP without inventing another stocked location", () => {
     const model = toConfirmOrderViewProps({
       ...orderSubmittedRidgeline,
       lines: [orderSubmittedRidgeline.lines[0]],
@@ -43,7 +43,32 @@ describe("Confirm order view loop", () => {
     });
     expect(model.lines[0].trailing).toBe("4 · 0 at Warehouse · brewery ATP 5");
     expect(model.lines[0].tone).toBe("w");
-    expect(model.oversellNotes).toEqual([expect.stringMatching(/another location.*move stock.*Warehouse cannot pick/i)]);
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/Replenish Warehouse.*Warehouse cannot pick/i)]);
+    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
+  });
+
+  it("does not claim other-location stock for a single-location shortage", () => {
+    const sku = orderSubmittedRidgeline.lines[0];
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [{ sku_id: sku.sku_id, qty: 3 }],
+      sourceOnHand: [{ sku_id: sku.sku_id, qty: 3 }],
+    });
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/Only 3 .* at Warehouse.*Replenish Warehouse.*Warehouse cannot pick/i)]);
+    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
+  });
+
+  it("does not claim other-location stock for a never-stocked SKU", () => {
+    const sku = orderSubmittedRidgeline.lines[0];
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [],
+      sourceOnHand: [],
+    });
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/Only 0 .* at Warehouse.*Replenish Warehouse.*Warehouse cannot pick/i)]);
+    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
   });
 
   it("the inventory record is ConfirmOrderView painted from that fixture", () => {
