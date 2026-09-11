@@ -148,6 +148,40 @@ describe("Square publication final orchestration fences", () => {
       .toEqual(["0", "RACE-ITEM"]);
   }, 15_000);
 
+  it("uses one frozen candidate set for menu brand locks and manifest children", async () => {
+    const f = await fixture();
+    const blocker = new Client({ connectionString: DB });
+    await blocker.connect();
+    const lockName = `square-publish:${f.connectionId}:${f.brandIds[0]}:poured`;
+    let blocking = true;
+    try {
+      await blocker.query("begin");
+      await blocker.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [lockName]);
+      const menu = beginSquareMenuPublication(f.ctx, { posLocationId: "L1" }, crypto.randomUUID());
+      await vi.waitFor(() => expect(Number(sql(`select count(*) from pg_locks where locktype='advisory' and not granted
+        and classid=(((hashtextextended('${lockName}',0)>>32)&4294967295)::oid)
+        and objid=((hashtextextended('${lockName}',0)&4294967295)::oid)`)[0])).toBeGreaterThanOrEqual(1));
+
+      const late = await seedCatalog(f.brewery.id, { product: "Late brand", sku: "Late brand half",
+        packageType: "keg", bblPerUnit: 0.5 });
+      const format = await admin.from("formats").insert({ brewery_id: f.brewery.id, brand_id: late.brandId,
+        name: "Late brand Pint", basis: "poured", ounces: 16 }).select("id").single();
+      expect(format.error).toBeNull();
+      await priceSku(f.brewery.id, { saleChannelId: f.channel, brandId: late.brandId, formatId: format.data!.id, cents: 800 });
+      await runCommand("record_movement", { skuId: late.skuId, locationId: f.location.id, binId: f.location.binId,
+        qty: 1, type: "opening_balance" }, f.ctx, execution());
+
+      await blocker.query("commit"); blocking = false;
+      const result = await menu;
+      expect(result.manifest.map((entry) => entry.brandId)).toEqual([f.brandIds[0]]);
+      expect(sql(`select count(*) from private.square_publications where menu_publication_id='${result.menuAttemptId}'`))
+        .toEqual(["1"]);
+    } finally {
+      if (blocking) await blocker.query("rollback");
+      await blocker.end();
+    }
+  }, 15_000);
+
   it("returns the durable terminal publication contract from the real command handlers", async () => {
     const succeeded = await fixture();
     const successFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {

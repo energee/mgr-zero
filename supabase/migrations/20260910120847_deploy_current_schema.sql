@@ -4039,21 +4039,13 @@ CREATE INDEX square_publication_events_brewery_idx ON private.square_publication
 ALTER TABLE private.square_publication_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.square_publication_events FROM public,anon,authenticated,service_role;
 
-CREATE FUNCTION private.square_menu_publication_manifest(p_menu uuid,p_connection uuid) RETURNS jsonb
+CREATE FUNCTION private.square_menu_publication_manifest(p_snapshot jsonb,p_connection uuid,p_candidates jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE v_snapshot jsonb; v_manifest jsonb:='[]'::jsonb; v_brand uuid; v_brand_name text;
+DECLARE v_snapshot jsonb:=p_snapshot; v_manifest jsonb:='[]'::jsonb; v_brand uuid; v_brand_name text;
   v_external_item text; v_ownership text; v_variations jsonb;
 BEGIN
-  v_snapshot:=private.pos_menu_snapshot(p_menu);
   FOR v_brand IN
-    SELECT brand_id FROM (
-      SELECT DISTINCT (e->>'brandId')::uuid brand_id
-      FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) e
-      WHERE coalesce((e->>'available')::boolean,false) AND e->>'priceCents' IS NOT NULL
-      UNION
-      SELECT i.brand_id FROM public.pos_catalog_items i
-        WHERE i.connection_id=p_connection AND i.catalog_group='poured'
-    ) brands ORDER BY brand_id
+    SELECT value::uuid FROM jsonb_array_elements_text(p_candidates) x(value) ORDER BY value::uuid
   LOOP
     v_external_item:=null; v_ownership:='mgr';
     SELECT i.external_item_id,i.ownership INTO v_external_item,v_ownership
@@ -4087,7 +4079,7 @@ BEGIN
   END LOOP;
   RETURN v_manifest;
 END $$;
-REVOKE ALL ON FUNCTION private.square_menu_publication_manifest(uuid,uuid) FROM public,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION private.square_menu_publication_manifest(jsonb,uuid,jsonb) FROM public,anon,authenticated,service_role;
 
 CREATE FUNCTION private.square_menu_publication_state(p_publication uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
@@ -4159,7 +4151,8 @@ CREATE FUNCTION public.begin_square_menu_publication(
   p_brewery uuid,p_external_location text,p_retry_conflict boolean,p_request_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_actor uuid; v_replay jsonb; v_connection public.pos_connections; v_menu public.pos_menus;
-  v_attempt private.square_menu_publications; v_manifest jsonb; v_snapshot jsonb; v_result jsonb; v_entry jsonb;
+  v_attempt private.square_menu_publications; v_manifest jsonb; v_snapshot jsonb; v_candidates jsonb;
+  v_result jsonb; v_entry jsonb; v_brand uuid;
 BEGIN
   v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
   IF nullif(btrim(p_external_location),'') IS NULL OR p_retry_conflict IS NULL THEN
@@ -4191,20 +4184,20 @@ BEGIN
     AND p.external_location_id=p_external_location AND p.status='publishing') THEN
     RAISE EXCEPTION 'Another Square menu publication is still unresolved' USING errcode='MG409'; END IF;
   v_snapshot:=private.pos_menu_snapshot(v_menu.id);
-  FOR v_entry IN
-    SELECT jsonb_build_object('brandId',brand_id) FROM (
+  SELECT coalesce(jsonb_agg(brand_id ORDER BY brand_id),'[]'::jsonb) INTO v_candidates FROM (
       SELECT DISTINCT (e->>'brandId')::uuid brand_id
       FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) e
       WHERE coalesce((e->>'available')::boolean,false) AND e->>'priceCents' IS NOT NULL
       UNION
       SELECT i.brand_id FROM public.pos_catalog_items i
       WHERE i.connection_id=v_connection.id AND i.catalog_group='poured'
-    ) brands ORDER BY brand_id
+    ) brands;
+  FOR v_brand IN SELECT value::uuid FROM jsonb_array_elements_text(v_candidates) x(value) ORDER BY value::uuid
   LOOP
     PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
-      'square-publish:'||v_connection.id::text||':'||(v_entry->>'brandId')||':poured',0));
+      'square-publish:'||v_connection.id::text||':'||v_brand::text||':poured',0));
   END LOOP;
-  v_manifest:=private.square_menu_publication_manifest(v_menu.id,v_connection.id);
+  v_manifest:=private.square_menu_publication_manifest(v_snapshot,v_connection.id,v_candidates);
   INSERT INTO private.square_menu_publications(brewery_id,connection_id,actor_id,request_id,
     credential_version,catalog_generation,external_location_id,retry_conflict,manifest)
   VALUES(p_brewery,v_connection.id,v_actor,p_request_id,v_connection.credential_version,
