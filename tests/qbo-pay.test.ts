@@ -110,11 +110,11 @@ describe("QuickBooks portal payment link", () => {
     }).eq("id", invoice.data.id)).error).toBeNull();
     await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toMatchObject({ remoteInvoiceId: "remote-pay-1" });
     const reopenedFetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({
-      Invoice: { Id: "remote-pay-1", InvoiceLink: "https://pay.example.test/session/reopened" },
+      Invoice: { Id: "remote-pay-1", InvoiceLink: "https://connect.intuit.com/pay/reopened" },
     }));
     await expect(resolvePortalInvoicePayment(
-      ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch), new Set(["pay.example.test"]),
-    )).resolves.toEqual({ kind: "redirect", url: "https://pay.example.test/session/reopened" });
+      ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch),
+    )).resolves.toEqual({ kind: "redirect", url: "https://connect.intuit.com/pay/reopened" });
     expect(reopenedFetch).toHaveBeenCalledOnce();
     expect((await admin.from("invoices").update({
       paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
