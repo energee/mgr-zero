@@ -76,9 +76,11 @@ export type SquareMenuPublicationStart = {
   connectionId: string;
   credentialVersion: number;
   catalogGeneration: number;
-  status: "publishing" | "succeeded" | "superseded";
+  status: "publishing" | "succeeded" | "rejected" | "superseded";
   manifest: Array<{ brandId: string; requestId: string }>;
-  result: { published: boolean; items?: unknown[]; superseded?: boolean; errorCode?: string } | null;
+  errorCode: string | null;
+  result: { published: boolean; items?: unknown[]; rejected?: boolean; partial?: boolean;
+    superseded?: boolean; errorCode?: string } | null;
 };
 
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
@@ -430,10 +432,11 @@ function squareMenuPublicationStart(data: unknown): SquareMenuPublicationStart {
   const row = data as Record<string, unknown> | null;
   if (!row || typeof row.menuAttemptId !== "string" || typeof row.connectionId !== "string"
     || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number"
-    || !["publishing", "succeeded", "superseded"].includes(String(row.status)) || !Array.isArray(row.manifest)
+    || !["publishing", "succeeded", "rejected", "superseded"].includes(String(row.status)) || !Array.isArray(row.manifest)
     || row.manifest.some((entry) => !entry || typeof entry !== "object"
       || typeof (entry as Record<string, unknown>).brandId !== "string"
       || typeof (entry as Record<string, unknown>).requestId !== "string")
+    || (row.errorCode !== null && typeof row.errorCode !== "string")
     || (row.result !== null && typeof row.result !== "object")) {
     throw new Error("Square menu publication start was invalid");
   }

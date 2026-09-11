@@ -142,12 +142,12 @@ describe("Square publication residual specification fences", () => {
   it("advances only the committed catalog generation and supersedes publication when a delayed snapshot lands", async () => {
     const f = await fixture();
     const brand = await f.addBrand("Concurrent");
-    const sync = await beginSquareCatalogSync(f.ctx, crypto.randomUUID());
-    if ("replayResult" in sync) throw new Error("unexpected replay");
-    expect(sql(`select catalog_sync_generation from public.pos_connections where id='${f.connectionId}'`)).toEqual(["0"]);
     const publication = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: brand.brandId },
       crypto.randomUUID(), "publish_pos_item");
     expect(publication.catalogGeneration).toBe(0);
+    const sync = await beginSquareCatalogSync(f.ctx, crypto.randomUUID());
+    if ("replayResult" in sync) throw new Error("unexpected replay");
+    expect(sql(`select catalog_sync_generation from public.pos_connections where id='${f.connectionId}'`)).toEqual(["0"]);
 
     sql(`insert into public.pos_catalog_variations(brewery_id,connection_id,external_item_id,external_variation_id,
       external_item_name,external_variation_name,source_version,available,last_seen_at)
@@ -161,5 +161,7 @@ describe("Square publication residual specification fences", () => {
       select external_variation_id||':'||source_version||':'||available from public.pos_catalog_variations
         where connection_id='${f.connectionId}' order by external_variation_id`))
       .toEqual(["1", "superseded:catalog_changed", "V-NEW:9:true", "V-OLD:7:true"]);
+    await expect(beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: brand.brandId },
+      crypto.randomUUID(), "publish_pos_item")).resolves.toMatchObject({ catalogGeneration: 1 });
   });
 });

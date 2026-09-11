@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
-import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
+import { publishSquareMenu, SquareClient } from "@/lib/pos";
 import { beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
   recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
@@ -69,7 +69,7 @@ describe("Square publication final orchestration fences", () => {
       new SquareClient(config, rejectedFetch))).rejects.toMatchObject({ status: 409 });
     expect(sql(`select status from private.square_menu_publications where brewery_id='${f.brewery.id}';
       select status from private.square_publications where brewery_id='${f.brewery.id}' order by status`))
-      .toEqual(["rejected", "needs_snapshot", "rejected"]);
+      .toEqual(["rejected", "rejected", "superseded"]);
 
     const exactReplayFetch = vi.fn<typeof globalThis.fetch>();
     await expect(publishSquareMenu(f.ctx, { posLocationId: "L1" }, requestId,
@@ -101,14 +101,33 @@ describe("Square publication final orchestration fences", () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
-  it("claims frozen menu children before a standalone item can take the same parent identity", async () => {
+  it("holds the shared brand lock while creating the manifest so a concurrent standalone item cannot take it", async () => {
     const f = await fixture();
-    const menu = await beginSquareMenuPublication(f.ctx, { posLocationId: "L1" }, crypto.randomUUID());
-    expect(sql(`select count(*) from private.square_publications where menu_publication_id='${menu.menuAttemptId}'`)).toEqual(["1"]);
-    await expect(beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
-      crypto.randomUUID(), "publish_pos_item")).rejects.toMatchObject({ status: 409 });
+    sql(`create function private.test_square_menu_manifest_delay() returns trigger language plpgsql set search_path='' as $$
+      begin perform pg_sleep(1.5); return new; end $$;
+      create trigger test_square_menu_manifest_delay after insert on private.square_menu_publications
+        for each row execute function private.test_square_menu_manifest_delay()`);
+    let results: PromiseSettledResult<unknown>[];
+    try {
+      const menu = beginSquareMenuPublication(f.ctx, { posLocationId: "L1" }, crypto.randomUUID());
+      let brandLockHeld = false;
+      for (let attempt = 0; attempt < 20 && !brandLockHeld; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        brandLockHeld = sql(`select count(*) from pg_locks where locktype='advisory' and granted
+          and classid=(((hashtextextended('square-publish:${f.connectionId}:${f.brandIds[0]}:poured',0)>>32)&4294967295)::oid)
+          and objid=((hashtextextended('square-publish:${f.connectionId}:${f.brandIds[0]}:poured',0)&4294967295)::oid)`)[0] === "1";
+      }
+      expect(brandLockHeld).toBe(true);
+      const item = beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
+        crypto.randomUUID(), "publish_pos_item");
+      results = await Promise.allSettled([menu, item]);
+    } finally {
+      sql(`drop trigger if exists test_square_menu_manifest_delay on private.square_menu_publications;
+        drop function if exists private.test_square_menu_manifest_delay()`);
+    }
+    expect(results!.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
     expect(sql(`select count(*) from private.square_publications where brewery_id='${f.brewery.id}'`)).toEqual(["1"]);
-  });
+  }, 15_000);
 
   it("blocks publication behind an unfinished newer catalog snapshot, then captures its committed generation", async () => {
     const f = await fixture();

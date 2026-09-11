@@ -478,15 +478,31 @@ export async function publishSquareCatalogItem(
 export async function publishSquareMenu(
   ctx: Ctx, input: { posLocationId: string; retryConflict?: boolean }, requestId: string, client: SquareClient,
 ) {
+  const reject = (result: { errorCode?: string }) => {
+    if (result.errorCode === "version_mismatch") {
+      throw new CommandError("Square changed a menu item; retry after loading its current version", 409, "conflict");
+    }
+    throw new CommandError("Square rejected this menu publication",
+      result.errorCode === "provider_rejected" ? 400 : 409, "conflict");
+  };
   const start = await beginSquareMenuPublication(ctx, input, requestId);
   if (start.status === "succeeded") return start.result!;
+  if (start.status === "rejected") return reject(start.result!);
   if (start.status === "superseded") {
     throw new CommandError("Square menu publication was superseded by newer connection data", 409, "conflict");
   }
-  for (const item of start.manifest) await publishSquareCatalogItem(ctx, {
-    posLocationId: input.posLocationId, brandId: item.brandId, retryConflict: input.retryConflict,
-    menuPublicationId: start.menuAttemptId,
-  }, item.requestId, client, "publish_pos_menu");
+  try {
+    for (const item of start.manifest) await publishSquareCatalogItem(ctx, {
+      posLocationId: input.posLocationId, brandId: item.brandId, retryConflict: input.retryConflict,
+      menuPublicationId: start.menuAttemptId,
+    }, item.requestId, client, "publish_pos_menu");
+  } catch (error) {
+    if (error instanceof CommandError) {
+      const settled = await finishSquareMenuPublication(ctx, start.menuAttemptId);
+      if (settled.rejected) return reject(settled);
+    }
+    throw error;
+  }
   return finishSquareMenuPublication(ctx, start.menuAttemptId);
 }
 

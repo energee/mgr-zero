@@ -3937,7 +3937,8 @@ CREATE TABLE private.square_menu_publications (
   external_location_id text NOT NULL,
   retry_conflict boolean NOT NULL,
   manifest jsonb NOT NULL,
-  status text NOT NULL DEFAULT 'publishing' CHECK(status IN ('publishing','succeeded','superseded')),
+  status text NOT NULL DEFAULT 'publishing' CHECK(status IN ('publishing','succeeded','rejected','superseded')),
+  error_code text CHECK(error_code IN ('version_mismatch','provider_rejected','provider_missing','provider_invalid')),
   result jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz,
@@ -3972,7 +3973,7 @@ CREATE TABLE private.square_publications (
   expected_item_version bigint,
   expected_variation_versions jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'needs_snapshot' CHECK(status IN ('needs_snapshot','prepared','succeeded','rejected','superseded')),
-  error_code text CHECK(error_code IN ('version_mismatch','provider_rejected','provider_missing','provider_invalid','credential_changed','catalog_changed','connection_changed')),
+  error_code text CHECK(error_code IN ('version_mismatch','provider_rejected','provider_missing','provider_invalid','credential_changed','catalog_changed','connection_changed','menu_rejected')),
   result jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz,
@@ -4061,7 +4062,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
   SELECT jsonb_build_object('menuAttemptId',p.id,'connectionId',p.connection_id,
     'credentialVersion',p.credential_version,'catalogGeneration',p.catalog_generation,'status',p.status,
     'manifest',coalesce((SELECT jsonb_agg(jsonb_build_object('brandId',e->>'brandId','requestId',e->>'requestId') ORDER BY ord)
-      FROM jsonb_array_elements(p.manifest) WITH ORDINALITY x(e,ord)),'[]'::jsonb),'result',p.result)
+      FROM jsonb_array_elements(p.manifest) WITH ORDINALITY x(e,ord)),'[]'::jsonb),
+    'errorCode',p.error_code,'result',p.result)
   FROM private.square_menu_publications p WHERE p.id=p_publication;
 $$;
 REVOKE ALL ON FUNCTION private.square_menu_publication_state(uuid) FROM public,anon,authenticated,service_role;
@@ -4117,7 +4119,7 @@ CREATE FUNCTION public.begin_square_menu_publication(
   p_brewery uuid,p_external_location text,p_retry_conflict boolean,p_request_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_actor uuid; v_replay jsonb; v_connection public.pos_connections; v_menu public.pos_menus;
-  v_attempt private.square_menu_publications; v_manifest jsonb; v_result jsonb;
+  v_attempt private.square_menu_publications; v_manifest jsonb; v_result jsonb; v_entry jsonb;
 BEGIN
   v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
   IF nullif(btrim(p_external_location),'') IS NULL OR p_retry_conflict IS NULL THEN
@@ -4139,14 +4141,29 @@ BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
     'square-menu-publish:'||v_connection.id::text||':'||p_external_location,0));
   PERFORM private.supersede_square_publications(v_connection.id);
+  IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
+    ON r.actor_id=s.actor_id AND r.request_id=s.request_id
+    WHERE s.connection_id=v_connection.id AND s.catalog_generation>v_connection.catalog_sync_generation
+      AND r.result IS NULL) THEN
+    RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
   IF EXISTS(SELECT 1 FROM private.square_menu_publications p WHERE p.connection_id=v_connection.id
     AND p.external_location_id=p_external_location AND p.status='publishing') THEN
     RAISE EXCEPTION 'Another Square menu publication is still unresolved' USING errcode='MG409'; END IF;
   v_manifest:=private.square_menu_publication_manifest(v_menu.id,v_connection.id);
+  FOR v_entry IN SELECT value FROM jsonb_array_elements(v_manifest)
+  LOOP
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+      'square-publish:'||v_connection.id::text||':'||(v_entry->>'brandId')||':poured',0));
+  END LOOP;
   INSERT INTO private.square_menu_publications(brewery_id,connection_id,actor_id,request_id,
     credential_version,catalog_generation,external_location_id,retry_conflict,manifest)
   VALUES(p_brewery,v_connection.id,v_actor,p_request_id,v_connection.credential_version,
     v_connection.catalog_sync_generation,p_external_location,p_retry_conflict,v_manifest) RETURNING * INTO v_attempt;
+  FOR v_entry IN SELECT value FROM jsonb_array_elements(v_manifest)
+  LOOP
+    PERFORM public.begin_square_publication(p_brewery,p_external_location,(v_entry->>'brandId')::uuid,
+      null,null,p_retry_conflict,'publish_pos_menu',(v_entry->>'requestId')::uuid,v_attempt.id);
+  END LOOP;
   v_result:=private.square_menu_publication_state(v_attempt.id);
   PERFORM private.complete_command_request_for(v_actor,p_request_id,v_result);
   RETURN v_result;
@@ -4154,7 +4171,8 @@ END $$;
 
 CREATE FUNCTION public.finish_square_menu_publication(p_brewery uuid,p_publication uuid,p_actor uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE v_attempt private.square_menu_publications; v_result jsonb; v_items jsonb;
+DECLARE v_attempt private.square_menu_publications; v_child private.square_publications;
+  v_result jsonb; v_items jsonb; v_error text; v_partial boolean;
 BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor
     AND u.role IN ('admin','warehouse')) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
@@ -4163,7 +4181,36 @@ BEGIN
   IF NOT FOUND THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
   PERFORM private.supersede_square_publications(v_attempt.connection_id);
   SELECT * INTO v_attempt FROM private.square_menu_publications WHERE id=p_publication FOR UPDATE;
-  IF v_attempt.status IN ('succeeded','superseded') THEN RETURN v_attempt.result; END IF;
+  IF v_attempt.status IN ('succeeded','rejected','superseded') THEN RETURN v_attempt.result; END IF;
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements(v_attempt.manifest) e JOIN private.square_publications p
+    ON p.actor_id=v_attempt.actor_id AND p.request_id=(e->>'requestId')::uuid
+      AND p.menu_publication_id=v_attempt.id WHERE p.status='rejected') THEN
+    SELECT p.error_code INTO v_error FROM jsonb_array_elements(v_attempt.manifest) WITH ORDINALITY x(e,ord)
+      JOIN private.square_publications p ON p.actor_id=v_attempt.actor_id
+        AND p.request_id=(x.e->>'requestId')::uuid AND p.menu_publication_id=v_attempt.id
+      WHERE p.status='rejected' ORDER BY x.ord LIMIT 1;
+    FOR v_child IN
+      UPDATE private.square_publications SET status='superseded',error_code='menu_rejected',
+        result=jsonb_build_object('published',false,'superseded',true,'errorCode','menu_rejected'),finished_at=now()
+      WHERE menu_publication_id=v_attempt.id AND status IN ('needs_snapshot','prepared') RETURNING *
+    LOOP
+      PERFORM private.complete_command_request_for(v_child.actor_id,v_child.request_id,
+        private.square_publication_state(v_child.id));
+    END LOOP;
+    SELECT coalesce(jsonb_agg(jsonb_build_object('brandId',x.e->>'brandId','requestId',x.e->>'requestId',
+      'status',coalesce(p.status,'not_attempted'),'result',p.result) ORDER BY x.ord),'[]'::jsonb),
+      coalesce(bool_or(p.status='succeeded'),false) INTO v_items,v_partial
+    FROM jsonb_array_elements(v_attempt.manifest) WITH ORDINALITY x(e,ord)
+    LEFT JOIN private.square_publications p ON p.actor_id=v_attempt.actor_id
+      AND p.request_id=(x.e->>'requestId')::uuid AND p.menu_publication_id=v_attempt.id;
+    v_result:=jsonb_build_object('published',false,'rejected',true,'partial',v_partial,
+      'errorCode',v_error,'items',v_items);
+    UPDATE private.square_menu_publications SET status='rejected',error_code=v_error,result=v_result,finished_at=now()
+      WHERE id=v_attempt.id;
+    PERFORM private.complete_command_request_for(v_attempt.actor_id,v_attempt.request_id,
+      private.square_menu_publication_state(v_attempt.id));
+    RETURN v_result;
+  END IF;
   IF EXISTS(SELECT 1 FROM jsonb_array_elements(v_attempt.manifest) e WHERE NOT EXISTS(
     SELECT 1 FROM private.square_publications p WHERE p.actor_id=v_attempt.actor_id
       AND p.request_id=(e->>'requestId')::uuid AND p.menu_publication_id=v_attempt.id AND p.status='succeeded'))
@@ -4208,6 +4255,11 @@ BEGIN
   IF v_connection.id IS NULL OR v_menu.id IS NULL THEN RAISE EXCEPTION 'Square menu is unavailable'; END IF;
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('square-publish:'||v_connection.id::text||':'||p_brand::text||':poured',0));
   PERFORM private.supersede_square_publications(v_connection.id);
+  IF EXISTS(SELECT 1 FROM private.square_catalog_syncs s JOIN private.command_requests r
+    ON r.actor_id=s.actor_id AND r.request_id=s.request_id
+    WHERE s.connection_id=v_connection.id AND s.catalog_generation>v_connection.catalog_sync_generation
+      AND r.result IS NULL) THEN
+    RAISE EXCEPTION 'Square catalog sync is still in progress' USING errcode='MG409'; END IF;
   IF p_menu_publication IS NOT NULL THEN
     SELECT * INTO v_menu_attempt FROM private.square_menu_publications p
       WHERE p.id=p_menu_publication AND p.brewery_id=p_brewery AND p.connection_id=v_connection.id
