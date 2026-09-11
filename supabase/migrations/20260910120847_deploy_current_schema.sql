@@ -4330,6 +4330,13 @@ BEGIN
       IF v_parent.connection_id IS NOT NULL THEN
         IF v_parent.external_item_id<>p_adopt_item THEN
           RAISE EXCEPTION 'MGR already owns a different Square item for this brand' USING errcode='MG409'; END IF;
+        IF EXISTS(SELECT 1 FROM public.pos_item_mappings m
+          JOIN public.pos_catalog_ownership o ON o.connection_id=m.connection_id AND o.format_id=m.format_id
+            AND o.brand_id=p_brand AND o.catalog_group='poured' AND o.external_item_id=p_adopt_item
+          WHERE m.connection_id=v_connection.id AND m.external_item_id=p_adopt_item
+            AND m.external_variation_id=p_adopt_variation AND NOT m.ignored
+            AND o.external_variation_id<>p_adopt_variation)
+        THEN RAISE EXCEPTION 'MGR already owns a different Square variation for this format' USING errcode='MG409'; END IF;
         v_ownership:=v_parent.ownership; v_external_item:=v_parent.external_item_id;
       ELSE
         IF EXISTS(SELECT 1 FROM public.pos_catalog_items i WHERE i.connection_id=v_connection.id AND i.external_item_id=p_adopt_item)
