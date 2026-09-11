@@ -26,37 +26,41 @@ export function SettingsView({
   return (
     <>
       {E.back("More", "Settings", undefined, model.backHref)}
-      {breweryForm ?? (
-        <>
-          {E.edit("Brewery name", model.name)}
-          {E.pick("Timezone", model.timezone, model.timezoneOptions)}
-          {E.edit("TTB registry number", model.ttb)}
-          {E.edit("PA license", model.paLicense)}
-          {E.edit("Customer-facing phone", model.phone, "tel")}
-          {E.edit("Reading overdue after (hours)", model.overdueHours, "number")}
-          {E.fld("Deployment", model.deployment)}
-          {E.btn("Save brewery")}
-        </>
-      )}
-      {fulfillmentForm ?? (
-        <>
-          {E.pick("Portal fulfillment warehouse", model.warehouse, model.warehouseOptions)}
-          {E.btn("Save warehouse", "g")}
-        </>
-      )}
-      {aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}
-      {deployment}
-      {links ?? (
-        <>
-          {E.nav("Source water · Municipal · Denver", model.sourceWater)}
-          {E.nav("Locations", model.locations)}
-          {E.nav("Team", model.team)}
-          {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
-          {E.nav("Point of sale", "Square · catalog and sales", "", SquareMark)}
-          {E.nav("Chat", "Slack and notifications", "", SlackMark)}
-          {E.nav("Import", "CSV wizard")}
-        </>
-      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(20rem,2fr)] lg:items-start">
+        <div className="min-w-0">{breweryForm ?? (
+          <div className="flex flex-col gap-4">
+            {E.edit("Brewery name", model.name)}
+            {E.pick("Timezone", model.timezone, model.timezoneOptions)}
+            {E.edit("TTB registry number", model.ttb)}
+            {E.edit("PA license", model.paLicense)}
+            {E.edit("Customer-facing phone", model.phone, "tel")}
+            {E.edit("Reading overdue after (hours)", model.overdueHours, "number")}
+            {E.fld("Deployment", model.deployment)}
+            {E.btn("Save brewery")}
+          </div>
+        )}</div>
+        <div className="flex min-w-0 flex-col gap-6">
+          <div className="order-2 lg:order-1">{aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}</div>
+          <div className="order-1 lg:order-2">{fulfillmentForm ?? (
+            <div className="flex flex-col gap-4">
+              {E.pick("Portal fulfillment warehouse", model.warehouse, model.warehouseOptions)}
+              {E.btn("Save warehouse", "g")}
+            </div>
+          )}</div>
+          <div className="order-3">{deployment}</div>
+          <div className="order-4 flex flex-col gap-2">{links ?? (
+            <>
+              {E.nav("Source water · Municipal · Denver", model.sourceWater)}
+              {E.nav("Locations", model.locations)}
+              {E.nav("Team", model.team)}
+              {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
+              {E.nav("Point of sale", "Square · catalog and sales", "", SquareMark)}
+              {E.nav("Chat", "Slack and notifications", "", SlackMark)}
+              {E.nav("Import", "CSV wizard")}
+            </>
+          )}</div>
+        </div>
+      </div>
     </>
   );
 }
