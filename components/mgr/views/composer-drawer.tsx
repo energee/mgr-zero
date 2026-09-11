@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -18,10 +18,19 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
   const [internalOpen, setInternalOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [positioned, setPositioned] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    let reveal = 0;
-    const measure = requestAnimationFrame(() => { reveal = requestAnimationFrame(() => setPositioned(true)); });
-    return () => { cancelAnimationFrame(measure); cancelAnimationFrame(reveal); };
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const reveal = () => {
+      if (!drawer.style.getPropertyValue("--drawer-frontmost-height")) return false;
+      setPositioned(true);
+      return true;
+    };
+    if (reveal()) return;
+    const observer = new MutationObserver(() => { if (reveal()) observer.disconnect(); });
+    observer.observe(drawer, { attributes: true, attributeFilter: ["style"] });
+    return () => observer.disconnect();
   }, []);
   const chatOpen = open ?? internalOpen;
   const minimized = isMobile ? "92px" : MINIMIZED;
@@ -47,6 +56,7 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
     >
       <DrawerContent
         className={`h-dvh! max-h-none! border-t ${positioned ? "visible" : "invisible"}`}
+        ref={drawerRef}
         handle={<div
           className="group h-11 w-full shrink-0 cursor-grab touch-pan-x active:cursor-grabbing"
           onPointerDown={(event) => {

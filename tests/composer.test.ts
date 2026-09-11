@@ -94,7 +94,8 @@ describe("AI composer", () => {
     expect(drawer).toContain('const COMPACT = "480px"');
     expect(drawer).toContain("const EXPANDED = 1");
     expect(drawer).toContain('const minimized = isMobile ? "92px" : MINIMIZED');
-    expect(drawer).toContain("requestAnimationFrame");
+    expect(drawer).toContain("MutationObserver");
+    expect(drawer).toContain("--drawer-frontmost-height");
     expect(drawer).toContain('positioned ? "visible" : "invisible"');
     expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[minimized, COMPACT, EXPANDED\]\}/);
     expect(drawer).toContain("modal={false}");
