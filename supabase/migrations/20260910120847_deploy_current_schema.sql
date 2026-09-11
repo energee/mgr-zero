@@ -2182,6 +2182,7 @@ BEGIN
       OR EXISTS(SELECT 1 FROM public.pos_sales_coverage WHERE connection_id=c.id) THEN
       RAISE EXCEPTION 'Square seller cannot be replaced while retained sales history exists' USING errcode='MG409';
     END IF;
+    DELETE FROM public.pos_menus WHERE connection_id=c.id;
     DELETE FROM public.pos_item_mappings WHERE connection_id=c.id;
     DELETE FROM public.pos_catalog_variations WHERE connection_id=c.id;
     DELETE FROM public.pos_locations WHERE connection_id=c.id;
@@ -2390,7 +2391,7 @@ END $$;
 
 CREATE FUNCTION public.set_pos_location_mapping(p_brewery uuid,p_external_location text,p_location uuid,p_request_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE c uuid; old_location uuid; replay jsonb; result jsonb;
+DECLARE c uuid; old_location uuid; replay jsonb; result jsonb; menu_cleared boolean:=false;
 BEGIN
   PERFORM private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
   replay:=private.claim_command_request(p_brewery,'set_pos_location_mapping',p_request_id,jsonb_build_object('posLocationId',p_external_location,'mgrLocationId',p_location));
@@ -2403,6 +2404,10 @@ BEGIN
     SELECT 1 FROM public.pos_sales_coverage WHERE connection_id=c AND external_location_id=p_external_location AND location_id=old_location) THEN
     RAISE EXCEPTION 'Square location mapping has observed history and cannot be changed in place' USING errcode='MG409';
   END IF;
+  IF old_location IS DISTINCT FROM p_location THEN
+    DELETE FROM public.pos_menus WHERE connection_id=c AND external_location_id=p_external_location;
+    menu_cleared:=FOUND;
+  END IF;
   BEGIN
     UPDATE public.pos_locations SET location_id=p_location WHERE connection_id=c AND external_location_id=p_external_location;
   EXCEPTION WHEN unique_violation THEN RAISE EXCEPTION 'MGR location is already claimed by another Square location' USING errcode='MG409'; END;
@@ -2410,7 +2415,7 @@ BEGIN
     WHERE connection_id=c AND external_location_id=p_external_location AND location_id IS NULL;
   PERFORM private.reconcile_pos_sale(p_brewery,s.id) FROM public.pos_sales s LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id
     WHERE s.connection_id=c AND s.external_location_id=p_external_location AND e.sale_id IS NULL;
-  result:=jsonb_build_object('mapped',true);
+  result:=jsonb_build_object('mapped',true,'menuCleared',menu_cleared);
   RETURN private.complete_command_request(p_request_id,result);
 END $$;
 
@@ -3594,7 +3599,7 @@ CREATE TABLE public.pos_menus (
   UNIQUE(connection_id,external_location_id),
   FOREIGN KEY(connection_id,external_location_id) REFERENCES public.pos_locations(connection_id,external_location_id),
   FOREIGN KEY(location_id,brewery_id) REFERENCES public.locations(id,brewery_id),
-  FOREIGN KEY(bin_id,location_id,brewery_id) REFERENCES public.bins(id,location_id,brewery_id),
+  FOREIGN KEY(bin_id,location_id,brewery_id) REFERENCES public.bins(id,location_id,brewery_id) ON DELETE CASCADE,
   FOREIGN KEY(sale_channel_id,brewery_id) REFERENCES public.sale_channels(id,brewery_id)
 );
 CREATE INDEX pos_menus_brewery_idx ON public.pos_menus(brewery_id,location_id);

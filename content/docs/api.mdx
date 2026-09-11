@@ -157,7 +157,9 @@ bin, channel, connection, or provider identifiers. Successful responses set
 `Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`;
 the quoted version is also its `ETag`, and a matching `If-None-Match` receives
 `304` with the same cache headers. Missing ids and failures are not cached. The
-endpoint does not accept writes.
+endpoint allows cross-origin `GET` and `OPTIONS`, exposes `ETag`, and accepts
+`If-None-Match`; its 200, 304, 404, and 503 responses all carry the same safe
+wildcard origin policy. It does not accept writes.
 
 Outside the app, the equivalent is a POST with your own `requestId`:
 
@@ -2016,7 +2018,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Map one observed Square location to one unclaimed MGR location; observed history cannot be remapped in place
+Map one observed Square location to one unclaimed MGR location; a pre-history remap clears its menu, and observed history prevents remapping
 
 | Field | Type | Required |
 | --- | --- | --- |

@@ -19,7 +19,7 @@ never copy it into a second place.
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/invites.ts` | Durable staff/customer invitations: RLS-bound claim and membership RPCs surround the sole Auth admin invite call. `private.invite_requests` and an Auth-transaction trigger preserve identity across lost responses; replay never regrants revoked membership. |
-| `lib/supabase/public-menu.ts` | Server-only website menu reader. It may call only the service-only `get_published_pos_menu` RPC, whose opaque public id and fixed safe projection expose explicitly published current rows without granting anonymous access to tenant tables. The route hashes that stable projection into its public content version and ETag. |
+| `lib/supabase/public-menu.ts` | Server-only website menu reader. It may call only the service-only `get_published_pos_menu` RPC, whose opaque public id and fixed safe projection expose explicitly published current rows without granting anonymous access to tenant tables. The route hashes that stable projection into its public content version and ETag and applies one CORS policy to success, conditional, missing, and failure responses. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
 | `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching across the signed-in user's memberships. |
 | `lib/portal.ts` | `getActiveCustomer()`: resolves which customer account the session operates as from `customer_users`, mirroring `lib/brewery.ts`. Redirects to `/login` with no membership. |

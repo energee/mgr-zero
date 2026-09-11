@@ -108,7 +108,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "set_pos_location_mapping", description: "Map one observed Square location to one unclaimed MGR location; observed history cannot be remapped in place",
+  name: "set_pos_location_mapping", description: "Map one observed Square location to one unclaimed MGR location; a pre-history remap clears its menu, and observed history prevents remapping",
   input: z.object({ posLocationId: z.string().trim().min(1), mgrLocationId: z.string().uuid() }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_location_mapping", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
