@@ -4,9 +4,22 @@
 // adds their rows to lib/mgr/screen-routes.ts.
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES, ungatedMgrScreens } from "@/lib/mgr/screen-routes";
 
 describe("explorer parity", () => {
+  it("keeps TODO's screen totals aligned with the executable parity inventory", () => {
+    const todo = readFileSync("TODO.md", "utf8");
+    const mgr = SCREENS.filter((screen) => !screen.venue);
+    const ungated = ungatedMgrScreens();
+    const mapped = new Set(SCREEN_ROUTES.map((route) => route.name));
+    const unmapped = ungated.filter((screen) => !mapped.has(screen.name));
+
+    expect(todo).toContain(
+      `${mgr.length} MGR screens: ${ungated.length} ungated and mapped, ${mgr.length - ungated.length} gated, and ${unmapped.length} ungated without a live route`,
+    );
+  });
+
   it("every ungated MGR screen names a live page that exists", () => {
     const file = new Map(SCREEN_ROUTES.map((r) => [r.name, r.file]));
     const missing = ungatedMgrScreens()
