@@ -25,18 +25,19 @@ function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) 
   return <DrawerPrimitive.Backdrop data-slot="drawer-overlay" className={cn("fixed inset-0 z-50 bg-black/10 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0", className)} {...props} />
 }
 
-function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.Props) {
+function DrawerContent({ className, children, handle, ...props }: DrawerPrimitive.Popup.Props & { handle?: React.ReactNode }) {
   return (
     <DrawerPortal>
       <DrawerPrimitive.Viewport className="pointer-events-none fixed inset-0 z-50 select-none">
         <DrawerPrimitive.Popup
           data-slot="drawer-popup"
           className={cn(
-            "group/drawer-popup pointer-events-auto fixed inset-x-0 bottom-0 flex h-(--drawer-content-height) max-h-dvh min-h-0 w-full translate-y-[var(--drawer-snap-point-offset,0px)] flex-col bg-popover text-sm text-popover-foreground outline-none transition-transform duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:translate-y-[calc(100%+2px)] data-starting-style:translate-y-[calc(100%+2px)] data-swiping:translate-y-[calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y))] data-swiping:duration-0",
+            "group/drawer-popup pointer-events-auto fixed inset-x-0 bottom-0 flex h-(--drawer-content-height) max-h-dvh min-h-0 w-full transform-[translate3d(0,var(--drawer-snap-point-offset,0px),0)] flex-col bg-popover text-sm text-popover-foreground outline-none transition-transform duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform data-ending-style:transform-[translate3d(0,calc(100%+2px),0)] data-starting-style:transform-[translate3d(0,calc(100%+2px),0)] data-swiping:transform-[translate3d(0,calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y)),0)] data-swiping:duration-0",
             className
           )}
           {...props}
         >
+          {handle}
           <DrawerPrimitive.Content className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain">
             {children}
           </DrawerPrimitive.Content>
