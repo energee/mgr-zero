@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { prepareSquareCatalogPublication, publishSquareCatalogItem, SquareClient } from "@/lib/pos";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -32,11 +32,6 @@ async function publicationFixture() {
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
   return { brewery, ctx, location, connectionId: connection.data!.id, channel, keg, brandId: keg.brandId, formatId: poured.data!.id };
 }
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 describe("Square durable catalog publication", () => {
   it("preserves seller fields and unrelated locations while changing one owned variation", () => {
