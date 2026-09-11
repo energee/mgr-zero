@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { prepareSquareCatalogPublication, publishSquareCatalogItem, SquareClient } from "@/lib/pos";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
-import { beginSquarePublication, leaseSquarePublication } from "@/lib/supabase/integration-tokens";
+import { beginSquareMenuPublication, beginSquarePublication, leaseSquarePublication } from "@/lib/supabase/integration-tokens";
 import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
@@ -196,6 +196,71 @@ describe("Square durable catalog publication", () => {
     expect(JSON.parse(bodies[0]).idempotency_key).not.toBe(JSON.parse(bodies[1]).idempotency_key);
     expect(sql(`select status||':'||coalesce(error_code,'') from private.square_publications where brewery_id='${brewery.id}' order by created_at,id`))
       .toEqual(["rejected:version_mismatch", "succeeded:"]);
+  });
+
+  it("never treats sales mappings as write ownership for an existing parent", async () => {
+    const { brewery, ctx, connectionId, brandId, formatId } = await publicationFixture();
+    sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+      values('${brewery.id}','${connectionId}','${brandId}','poured','OWNED-PARENT','mgr');
+      insert into public.pos_catalog_variations(brewery_id,connection_id,external_item_id,external_variation_id,
+        external_item_name,external_variation_name,source_version,available)
+      values('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V1','Hazy','Seller pint',1,true),
+        ('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V2','Hazy','Other seller pint',2,true);
+      insert into public.pos_item_mappings(brewery_id,connection_id,external_item_id,external_variation_id,format_id,ignored)
+      values('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V1','${formatId}',false),
+        ('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V2','${formatId}',false)`);
+    const start = await beginSquarePublication(ctx, { posLocationId: "L1", brandId }, crypto.randomUUID(), "publish_pos_item");
+    expect(start.source.variations).toEqual([expect.objectContaining({ formatId, externalVariationId: null })]);
+  });
+
+  it("refreshes an expired publication credential without sending the expired access token", async () => {
+    const { brewery, ctx, connectionId, brandId } = await publicationFixture();
+    expect((await admin.from("pos_connections").update({ access_expires_at: "2020-01-01T00:00:00Z" })
+      .eq("id", connectionId)).error).toBeNull();
+    const merchantId = sql(`select merchant_id from public.pos_connections where id='${connectionId}'`)[0]!;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      access_token: "publication-access-2", refresh_token: "publication-refresh-2",
+      expires_at: "2026-10-10T00:00:00Z", merchant_id: merchantId,
+    }), { status: 200 }));
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, crypto.randomUUID(),
+      new SquareClient(config, fetch), "publish_pos_item")).rejects.toMatchObject({ status: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(fetch.mock.calls[0]![0])).toContain("/oauth2/token");
+    expect(sql(`select credential_version from public.pos_connections where id='${connectionId}';
+      select status||':'||error_code from private.square_publications where brewery_id='${brewery.id}'`))
+      .toEqual(["2", "superseded:credential_changed"]);
+  });
+
+  it("marks terminal publication authorization failures and prevents expired-token replay", async () => {
+    const { brewery, ctx, connectionId, brandId } = await publicationFixture();
+    const requestId = crypto.randomUUID();
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      errors: [{ category: "AUTHENTICATION_ERROR", code: "ACCESS_TOKEN_EXPIRED" }],
+    }), { status: 401 }));
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId,
+      new SquareClient(config, fetch), "publish_pos_item")).rejects.toThrow("Square is unavailable");
+    expect(sql(`select state from public.pos_connections where id='${connectionId}';
+      select status||':'||error_code from private.square_publications where brewery_id='${brewery.id}'`))
+      .toEqual(["recovery_required", "superseded:connection_changed"]);
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId,
+      new SquareClient(config, fetch), "publish_pos_item")).rejects.toMatchObject({ status: 409 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles role-invalid menu work so another current operator can take over", async () => {
+    const { brewery, ctx, connectionId } = await publicationFixture();
+    const next = await makeStaffCtx(brewery.id, "admin");
+    const old = await beginSquareMenuPublication(ctx, { posLocationId: "L1" }, crypto.randomUUID());
+    expect((await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", brewery.id)
+      .eq("user_id", ctx.userId)).error).toBeNull();
+    const current = await beginSquareMenuPublication(next, { posLocationId: "L1" }, crypto.randomUUID());
+    expect(current.status).toBe("publishing");
+    expect(sql(`select status||':'||(result->>'errorCode') from private.square_menu_publications
+        where id='${old.menuAttemptId}';
+      select status||':'||error_code from private.square_publications
+        where menu_publication_id='${old.menuAttemptId}';
+      select count(*) from private.square_menu_publications where connection_id='${connectionId}' and status='publishing'`))
+      .toEqual(["superseded:role_changed", "superseded:role_changed", "1"]);
   });
 
   it("serializes concurrent publication to one frozen provider identity", async () => {
