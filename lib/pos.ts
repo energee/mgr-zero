@@ -6,9 +6,11 @@ import {
   advanceSquareCatalogSync,
   advanceSquareSalesSync,
   beginSquareCatalogSync,
+  beginSquareMenuPublication,
   beginSquarePublication,
   beginSquareSalesSync,
   compareAndSwapSquareTokens,
+  finishSquareMenuPublication,
   finishSquarePublication,
   leaseSquarePublication,
   markSquareAuthorizationFailed,
@@ -404,7 +406,8 @@ export class SquareClient {
 
 export async function publishSquareCatalogItem(
   ctx: Ctx,
-  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
+  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string;
+    retryConflict?: boolean; menuPublicationId?: string },
   requestId: string,
   client: SquareClient,
   commandName: "publish_pos_menu" | "publish_pos_item",
@@ -472,26 +475,19 @@ export async function publishSquareCatalogItem(
   });
 }
 
-const childPublicationRequestId = (requestId: string, brandId: string) => {
-  const value = sha256(`${requestId}:${brandId}:poured`).slice(0, 32).split("");
-  value[12] = "4"; value[16] = "8";
-  const hex = value.join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-};
-
 export async function publishSquareMenu(
   ctx: Ctx, input: { posLocationId: string; retryConflict?: boolean }, requestId: string, client: SquareClient,
 ) {
-  const snapshot = await unwrap(ctx.db.rpc("get_pos_menu", { p_brewery: ctx.breweryId, p_external_location: input.posLocationId })) as {
-    items?: Array<{ brandId?: unknown }>; excluded?: Array<{ brandId?: unknown }>;
-  };
-  const brandIds = [...new Set([...(snapshot.items ?? []), ...(snapshot.excluded ?? [])]
-    .map((row) => typeof row.brandId === "string" ? row.brandId : null).filter((value): value is string => !!value))].sort();
-  const items: unknown[] = [];
-  for (const brandId of brandIds) items.push(await publishSquareCatalogItem(ctx, {
-    posLocationId: input.posLocationId, brandId, retryConflict: input.retryConflict,
-  }, childPublicationRequestId(requestId, brandId), client, "publish_pos_menu"));
-  return { published: true, items };
+  const start = await beginSquareMenuPublication(ctx, input, requestId);
+  if (start.status === "succeeded") return start.result!;
+  if (start.status === "superseded") {
+    throw new CommandError("Square menu publication was superseded by newer connection data", 409, "conflict");
+  }
+  for (const item of start.manifest) await publishSquareCatalogItem(ctx, {
+    posLocationId: input.posLocationId, brandId: item.brandId, retryConflict: input.retryConflict,
+    menuPublicationId: start.menuAttemptId,
+  }, item.requestId, client, "publish_pos_menu");
+  return finishSquareMenuPublication(ctx, start.menuAttemptId);
 }
 
 export async function syncSquareCatalogFacts(client: SquareClient, accessToken: string, merchantId: string) {

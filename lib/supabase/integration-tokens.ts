@@ -71,6 +71,16 @@ export type SquarePublicationStart = {
     ownership?: "mgr" | "adopted"; variations?: Array<{ formatId: string; externalVariationId: string; retired: boolean }> } | null;
 };
 
+export type SquareMenuPublicationStart = {
+  menuAttemptId: string;
+  connectionId: string;
+  credentialVersion: number;
+  catalogGeneration: number;
+  status: "publishing" | "succeeded" | "superseded";
+  manifest: Array<{ brandId: string; requestId: string }>;
+  result: { published: boolean; items?: unknown[]; superseded?: boolean; errorCode?: string } | null;
+};
+
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
@@ -399,7 +409,8 @@ function squarePublicationStart(data: unknown): SquarePublicationStart {
 
 export async function beginSquarePublication(
   ctx: Ctx,
-  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string; retryConflict?: boolean },
+  input: { posLocationId: string; brandId: string; adoptItemId?: string; adoptVariationId?: string;
+    retryConflict?: boolean; menuPublicationId?: string },
   requestId: string,
   commandName: "publish_pos_menu" | "publish_pos_item",
 ) {
@@ -407,11 +418,48 @@ export async function beginSquarePublication(
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_brand: input.brandId,
     p_adopt_item: input.adoptItemId ?? null, p_adopt_variation: input.adoptVariationId ?? null,
     p_retry_conflict: input.retryConflict ?? false, p_command: commandName, p_request_id: requestId,
+    p_menu_publication: input.menuPublicationId ?? null,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
   if (error) throw new CommandError(error.message);
   return squarePublicationStart(data);
+}
+
+function squareMenuPublicationStart(data: unknown): SquareMenuPublicationStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.menuAttemptId !== "string" || typeof row.connectionId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number"
+    || !["publishing", "succeeded", "superseded"].includes(String(row.status)) || !Array.isArray(row.manifest)
+    || row.manifest.some((entry) => !entry || typeof entry !== "object"
+      || typeof (entry as Record<string, unknown>).brandId !== "string"
+      || typeof (entry as Record<string, unknown>).requestId !== "string")
+    || (row.result !== null && typeof row.result !== "object")) {
+    throw new Error("Square menu publication start was invalid");
+  }
+  return row as SquareMenuPublicationStart;
+}
+
+export async function beginSquareMenuPublication(
+  ctx: Ctx, input: { posLocationId: string; retryConflict?: boolean }, requestId: string,
+) {
+  const { data, error } = await ctx.db.rpc("begin_square_menu_publication", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
+    p_retry_conflict: input.retryConflict ?? false, p_request_id: requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
+  if (error) throw new CommandError(error.message);
+  return squareMenuPublicationStart(data);
+}
+
+export async function finishSquareMenuPublication(ctx: Ctx, menuAttemptId: string) {
+  const { data, error } = await createAdminClient().rpc("finish_square_menu_publication", {
+    p_brewery: ctx.breweryId, p_publication: menuAttemptId, p_actor: ctx.userId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square menu publication result could not be recorded");
+  return data as NonNullable<SquareMenuPublicationStart["result"]>;
 }
 
 export async function leaseSquarePublication(ctx: Ctx, attemptId: string) {

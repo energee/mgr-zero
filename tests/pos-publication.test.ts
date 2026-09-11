@@ -126,11 +126,11 @@ describe("Square durable catalog publication", () => {
     const client = new SquareClient(config, fetch);
     const requestId = crypto.randomUUID();
 
-    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId, client, "publish_pos_menu"))
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId, client, "publish_pos_item"))
       .rejects.toThrow("Square is unavailable");
     expect(sql(`select status from private.square_publications where brewery_id='${brewery.id}'`)).toEqual(["prepared"]);
     expect((await admin.from("channel_prices").update({ unit_price_cents: 999 }).eq("brewery_id", brewery.id)).error).toBeNull();
-    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId, client, "publish_pos_menu"))
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, requestId, client, "publish_pos_item"))
       .resolves.toMatchObject({ published: true, externalItemId: "ITEM-REMOTE",
         variations: [expect.objectContaining({ formatId, externalVariationId: "VAR-REMOTE" })] });
 
@@ -203,7 +203,7 @@ describe("Square durable catalog publication", () => {
     const bodies: string[] = [];
     const client = new SquareClient(config, vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
       const body = String(init?.body); bodies.push(body); const parsed = JSON.parse(body);
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 25));
       return new Response(JSON.stringify({ catalog_object: { ...parsed.object, id: "ONE-ITEM", version: 2,
         item_data: { ...parsed.object.item_data, variations: [{ ...parsed.object.item_data.variations[0], id: "ONE-VAR", version: 2,
           item_variation_data: { ...parsed.object.item_data.variations[0].item_variation_data, item_id: "ONE-ITEM" } }] } },
@@ -211,7 +211,7 @@ describe("Square durable catalog publication", () => {
           { client_object_id: parsed.object.item_data.variations[0].id, object_id: "ONE-VAR" }] }), { status: 200 });
     }));
     const results = await Promise.all([1, 2].map(() => publishSquareCatalogItem(ctx,
-      { posLocationId: "L1", brandId }, crypto.randomUUID(), client, "publish_pos_menu")));
+      { posLocationId: "L1", brandId }, crypto.randomUUID(), client, "publish_pos_item")));
     expect(results).toEqual([results[0], results[0]]);
     expect(bodies.length).toBeGreaterThan(0);
     expect([...new Set(bodies)]).toHaveLength(1);

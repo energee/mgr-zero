@@ -33,7 +33,7 @@ async function fixture(role: "admin" | "warehouse" = "admin") {
         name: `${name} Pint`, basis: "poured", ounces: 16 }).select("id").single();
       expect(format.error).toBeNull();
       formatId = format.data!.id;
-      await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId, cents: 700 });
+      await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: format.data!.id, cents: 700 });
     }
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId,
       qty: 1, type: "opening_balance" }, ctx, execution());
@@ -81,7 +81,10 @@ describe("Square publication residual specification fences", () => {
     const requestId = crypto.randomUUID();
     const first = await publishSquareMenu(f.ctx, { posLocationId: "L1" }, requestId, new SquareClient(config, fetch));
     expect(fetch).toHaveBeenCalledTimes(3);
-    expect(sql(`select retired_at is not null from public.pos_catalog_items where external_item_id='OLD-DISAPPEARED'`)).toEqual(["t"]);
+    expect(sql(`select jsonb_array_length(manifest) from private.square_menu_publications
+      where brewery_id='${f.brewery.id}'`)).toEqual(["2"]);
+    expect(sql(`select retired_at is not null from public.pos_catalog_items where brewery_id='${f.brewery.id}'
+      and external_item_id='OLD-DISAPPEARED'`)).toEqual(["t"]);
 
     await f.addBrand("Added later");
     await expect(publishSquareMenu(f.ctx, { posLocationId: "L1" }, requestId, new SquareClient(config, fetch))).resolves.toEqual(first);
