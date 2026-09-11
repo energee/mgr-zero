@@ -3002,6 +3002,15 @@ begin
     p_origin,p_conversation,p_preview_token);
   if v_replay is not null then return v_replay; end if;
 
+  if not exists (select 1 from public.skus where id = p_sku and brewery_id = p_brewery and active) then
+    raise exception 'inactive SKU cannot receive a new movement';
+  end if;
+  if (p_type in ('sample','festival_removal','sale_removal')
+      and (p_dest_state is null or p_dest_state !~ '^[A-Z]{2}$'))
+     or (p_type not in ('sample','festival_removal','sale_removal') and p_dest_state is not null) then
+    raise exception 'classified removals require a two-letter uppercase destination state';
+  end if;
+
   if p_origin='chat' then
     select * into v_preview from private.command_previews
       where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery

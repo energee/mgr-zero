@@ -3979,6 +3979,14 @@ begin
     jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot));
   if v_replay is not null then return v_replay; end if;
   if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
+  if not exists (select 1 from public.skus where id = p_sku and brewery_id = p_brewery and active) then
+    raise exception 'inactive SKU cannot receive a new movement';
+  end if;
+  if (p_type in ('sample','festival_removal','sale_removal')
+      and (p_dest_state is null or p_dest_state !~ '^[A-Z]{2}$'))
+     or (p_type not in ('sample','festival_removal','sale_removal') and p_dest_state is not null) then
+    raise exception 'classified removals require a two-letter uppercase destination state';
+  end if;
   if p_qty < 0 then
     -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
     lock table public.inventory_movements in share row exclusive mode;
