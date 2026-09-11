@@ -213,6 +213,31 @@ describe("Square durable catalog publication", () => {
     expect(start.source.variations).toEqual([expect.objectContaining({ formatId, externalVariationId: null })]);
   });
 
+  it("rejects adoption of a different variation when the format already has durable ownership", async () => {
+    const { brewery, ctx, connectionId, brandId, formatId } = await publicationFixture();
+    sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+      values('${brewery.id}','${connectionId}','${brandId}','poured','OWNED-PARENT','adopted');
+      insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,
+        external_item_id,external_variation_id)
+      values('${brewery.id}','${connectionId}','${brandId}','poured','${formatId}','OWNED-PARENT','OWNED-V1');
+      insert into public.pos_catalog_variations(brewery_id,connection_id,external_item_id,external_variation_id,
+        external_item_name,external_variation_name,source_version,available)
+      values('${brewery.id}','${connectionId}','OWNED-PARENT','OWNED-V1','Hazy','Owned pint',1,true),
+        ('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V2','Hazy','Seller pint',2,true);
+      insert into public.pos_item_mappings(brewery_id,connection_id,external_item_id,external_variation_id,format_id,ignored)
+      values('${brewery.id}','${connectionId}','OWNED-PARENT','OWNED-V1','${formatId}',false),
+        ('${brewery.id}','${connectionId}','OWNED-PARENT','SELLER-V2','${formatId}',false)`);
+
+    await expect(beginSquarePublication(ctx, { posLocationId: "L1", brandId,
+      adoptItemId: "OWNED-PARENT", adoptVariationId: "SELLER-V2" }, crypto.randomUUID(), "publish_pos_item"))
+      .rejects.toMatchObject({ status: 409 });
+    expect(sql(`select count(*) from private.square_publications where brewery_id='${brewery.id}'`)).toEqual(["0"]);
+
+    const same = await beginSquarePublication(ctx, { posLocationId: "L1", brandId,
+      adoptItemId: "OWNED-PARENT", adoptVariationId: "OWNED-V1" }, crypto.randomUUID(), "publish_pos_item");
+    expect(same.source.variations).toEqual([expect.objectContaining({ formatId, externalVariationId: "OWNED-V1" })]);
+  });
+
   it("refreshes an expired publication credential without sending the expired access token", async () => {
     const { brewery, ctx, connectionId, brandId } = await publicationFixture();
     expect((await admin.from("pos_connections").update({ access_expires_at: "2020-01-01T00:00:00Z" })
