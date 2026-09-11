@@ -151,6 +151,41 @@ describe("Square publication residual specification fences", () => {
       .toEqual(["connection_changed", "0", "0"]);
   });
 
+  it("terminally settles an unfinished catalog sync when OAuth reconnects the same seller", async () => {
+    const f = await fixture();
+    const brand = await f.addBrand("Same seller reconnect");
+    const staleSync = await beginSquareCatalogSync(f.ctx, crypto.randomUUID());
+    if ("replayResult" in staleSync) throw new Error("unexpected replay");
+
+    const oauth = new URL((await beginSquareOAuth(f.ctx, new SquareClient(config, vi.fn()), "reconnect", crypto.randomUUID())).authorizeUrl);
+    const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
+      p_actor: f.ctx.userId, p_brewery: f.brewery.id, p_redirect_uri: config.redirectUri });
+    const intentId = (claim.data as Array<{ intent_id: string }>)[0]!.intent_id;
+    const reconnect = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: f.ctx.userId,
+      p_merchant_id: f.merchantId, p_merchant_label: "Same seller", p_access_token: "same-seller-access-2",
+      p_refresh_token: "same-seller-refresh-2", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"],
+      p_locations: [{ id: "L1", name: "Taproom", status: "ACTIVE" }] });
+    expect(reconnect.error).toBeNull();
+    expect(sql(`select credential_version from public.pos_connections where id='${f.connectionId}';
+      select result->>'errorCode' from private.command_requests
+        where actor_id='${f.ctx.userId}' and request_id='${staleSync.requestId}'`)).toEqual(["2", "connection_changed"]);
+
+    const provider = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
+      createResponse(JSON.parse(String(init?.body)), "SAME-SELLER-ITEM-2"));
+    await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: brand.brandId }, crypto.randomUUID(),
+      new SquareClient(config, provider), "publish_pos_item")).resolves.toMatchObject({ externalItemId: "SAME-SELLER-ITEM-2" });
+    expect(provider).toHaveBeenCalledTimes(1);
+    await expect(recordSquareCatalogSnapshot(f.ctx, staleSync, {
+      locations: [{ id: "STALE-CREDENTIAL-L", name: "Stale credential location", status: "ACTIVE" }],
+      variations: [{ itemId: "STALE-CREDENTIAL-I", itemName: "Stale credential item",
+        variationId: "STALE-CREDENTIAL-V", variationName: "Stale credential variation", version: 3, available: true }],
+    })).resolves.toEqual({ synced: false, superseded: true, errorCode: "connection_changed" });
+    expect(sql(`select count(*) from public.pos_locations where connection_id='${f.connectionId}' and external_location_id='STALE-CREDENTIAL-L';
+      select count(*) from public.pos_catalog_variations where connection_id='${f.connectionId}' and external_item_id='STALE-CREDENTIAL-I'`))
+      .toEqual(["0", "0"]);
+  });
+
   it("advances only the committed catalog generation and supersedes publication when a delayed snapshot lands", async () => {
     const f = await fixture();
     const brand = await f.addBrand("Concurrent");
