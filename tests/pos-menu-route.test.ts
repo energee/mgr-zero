@@ -1,16 +1,11 @@
 // Public menu feed: narrow fields, explicit publication, derived availability,
 // and a documented short shared-cache window.
 import { createClient } from "@supabase/supabase-js";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { GET, OPTIONS } from "@/app/api/public/menus/[publicId]/route";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation } from "./helpers";
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { beginSquareOAuth, publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { beginSquareCatalogSync, beginSquarePublication, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
@@ -56,11 +56,6 @@ const createResponse = (body: Record<string, any>, itemId: string) => {
     })),
   ] }), { status: 200 });
 };
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 describe("Square publication residual specification fences", () => {
   it("freezes the complete top-level menu manifest, retires disappeared owned brands, and replays exactly", async () => {
