@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
-import { ComposerProposalView, ComposerStripView } from "@/components/mgr/views/composer";
+import { ComposerConversationView, ComposerProposalView, ComposerStripView } from "@/components/mgr/views/composer";
 import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -42,6 +42,11 @@ describe("AI composer", () => {
     expect(html).toContain("AI model");
     expect(html).toContain("GPT-5.4");
     expect(html).toContain("Save AI model");
+  });
+
+  it("shows the brewery model in the conversation header", () => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [], model: "openai/gpt-5.4" }));
+    expect(html).toContain("openai/gpt-5.4");
   });
 
   it("preserves known fields when opening the ordinary movement form", () => {
