@@ -80,19 +80,21 @@ describe("AI composer", () => {
 
   it("shares the AI SDK composer between live and inventory surfaces", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
-    const drawer = renderToStaticMarkup(E.comp());
-    expect(drawer).toContain("Open Ask MGR");
-    expect(drawer).toContain("bg-muted-foreground/25");
-    expect(drawer).not.toContain("font-heading font-semibold");
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
     expect(live).toContain("useChat");
     expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);
     expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
     expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
     const shared = readFileSync("components/mgr/views/composer.tsx", "utf8");
-    expect(shared).toContain("DrawerContent");
-    expect(shared).toMatch(/<DrawerClose asChild>[\s\S]*aria-label="Minimize Ask MGR"/);
+    const drawer = readFileSync("components/mgr/views/composer-drawer.tsx", "utf8");
+    expect(shared).toMatch(/export \{ ComposerDrawerView \} from/);
+    expect(drawer).toContain('const PEEK = "44px"');
+    expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[PEEK, EXPANDED\]\}/);
+    expect(drawer).toContain("modal={false}");
+    expect(drawer).not.toContain("DrawerTrigger");
+    expect(drawer).toContain('aria-label={expanded ? "Minimize Ask MGR" : "Open Ask MGR"}');
     expect(shared).not.toContain(">Minimize</Button>");
+    expect(readFileSync("components/mgr/app-shell.tsx", "utf8")).toContain('className="h-11 shrink-0"');
   });
 
   it("renders only canonical proposal effects", () => {

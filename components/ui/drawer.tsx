@@ -28,6 +28,12 @@ function DrawerClose({
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
 }
 
+function DrawerHandle({
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Handle>) {
+  return <DrawerPrimitive.Handle data-slot="drawer-handle" {...props} />
+}
+
 function DrawerOverlay({
   className,
   ...props
@@ -125,6 +131,7 @@ export {
   DrawerOverlay,
   DrawerTrigger,
   DrawerClose,
+  DrawerHandle,
   DrawerContent,
   DrawerHeader,
   DrawerFooter,

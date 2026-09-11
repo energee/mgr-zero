@@ -1,13 +1,14 @@
-import type { ReactNode, Ref } from "react";
+import type { Ref } from "react";
 import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
-import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
+
+export { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
 
 export type ComposerStripAction = { value: string; label: string };
 export type OfflineOutboxRow = {
@@ -19,34 +20,6 @@ export type OfflineOutboxRow = {
   fixTo?: string;
 };
 export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
-
-export function ComposerDrawerView({ children, open, onOpenChange }: {
-  children: ReactNode;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerTrigger asChild>
-        <Button type="button" variant="ghost" aria-label="Open Ask MGR" className="group h-11 w-full rounded-none">
-          <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent className="max-h-[92vh] [&>div:first-child]:hidden">
-        <DrawerHeader className="sr-only">
-          <DrawerTitle>Ask MGR</DrawerTitle>
-          <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
-        </DrawerHeader>
-        <DrawerClose asChild>
-          <Button type="button" variant="ghost" aria-label="Minimize Ask MGR" className="group h-11 w-full shrink-0 rounded-none">
-            <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
-          </Button>
-        </DrawerClose>
-        <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4 pt-2">{children}</div>
-      </DrawerContent>
-    </Drawer>
-  );
-}
 
 export function ComposerStripView({
   actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],

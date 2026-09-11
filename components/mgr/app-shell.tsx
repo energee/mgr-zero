@@ -89,7 +89,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         </header>
         {/* SidebarInset is already the <main> landmark; this is the content column. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:px-8 md:py-6">{children}</div>
-        {composer && <div className="border-t px-3 py-2">{composer}</div>}
+        {composer && <div className="h-11 shrink-0">{composer}</div>}
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>
@@ -101,7 +101,7 @@ export function TabBar({ items, active, className }: { items: readonly NavItem[]
   return (
     <nav
       aria-label="Tabs"
-      className={cn("grid border-t pb-[env(safe-area-inset-bottom)] text-xs", className)}
+      className={cn("relative z-[60] grid border-t bg-background pb-[env(safe-area-inset-bottom)] text-xs", className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((t) => (
