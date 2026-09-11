@@ -34,6 +34,18 @@ describe("Confirm order view loop", () => {
     expect(model.oversellNotes[0]).toMatch(/Pils · 16 oz case/);
   });
 
+  it("distinguishes source stock from brewery ATP when another warehouse holds the beer", () => {
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [orderSubmittedRidgeline.lines[0]],
+      atp: [{ sku_id: orderSubmittedRidgeline.lines[0].sku_id, qty: 5 }],
+      sourceOnHand: [{ sku_id: orderSubmittedRidgeline.lines[0].sku_id, qty: 0 }],
+    });
+    expect(model.lines[0].trailing).toBe("4 · 0 at Warehouse · brewery ATP 5");
+    expect(model.lines[0].tone).toBe("w");
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/another location.*move stock.*Warehouse cannot pick/i)]);
+  });
+
   it("the inventory record is ConfirmOrderView painted from that fixture", () => {
     const body = screen("Confirm order").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Confirm order").body)).toBe(true);

@@ -65,6 +65,52 @@ describe("stock transfer lifecycle", () => {
 });
 
 describe("receive_stock_transfer", () => {
+  it("corrects a completed wrong-destination transfer with a linked compensating transfer", async () => {
+    const b = await makeBrewery();
+    const ctx = await makeStaffCtx(b.id, "warehouse");
+    const warehouse = await seedLocation(b.id, { name: "Warehouse", kind: "warehouse" });
+    const wrong = await seedLocation(b.id, { name: "Wrong taproom", kind: "taproom" });
+    const intended = await seedLocation(b.id, { name: "Intended taproom", kind: "taproom" });
+    const { skuId } = await seedCatalog(b.id);
+    await runCommand("record_movement", {
+      skuId, locationId: warehouse.id, binId: warehouse.binId, qty: 8, type: "opening_balance",
+    }, ctx);
+
+    const complete = async (from: typeof warehouse, to: typeof warehouse, note: string) => {
+      const { transferId } = await runCommand("create_stock_transfer", {
+        fromLocationId: from.id,
+        toLocationId: to.id,
+        note,
+        lines: [{ skuId, qty: 3, fromBinId: from.binId, toBinId: to.binId }],
+      }, ctx) as { transferId: string };
+      await runCommand("submit_stock_transfer", { transferId }, ctx);
+      const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single()).data!;
+      await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: line.id, qty: 3 }] }, ctx);
+      await runCommand("receive_stock_transfer", { transferId, lines: [{ lineId: line.id, qty: 3 }] }, ctx);
+      return transferId;
+    };
+
+    const original = await complete(warehouse, wrong, "Entered for the wrong taproom");
+    const correction = await complete(wrong, intended, `Correction of transfer ${original}`);
+
+    expect((await admin.from("stock_transfers")
+      .select("id,status,from_location_id,to_location_id,note")
+      .in("id", [original, correction]).order("created_at")).data).toEqual([
+        { id: original, status: "received", from_location_id: warehouse.id, to_location_id: wrong.id, note: "Entered for the wrong taproom" },
+        { id: correction, status: "received", from_location_id: wrong.id, to_location_id: intended.id, note: `Correction of transfer ${original}` },
+      ]);
+    const balances = (await admin.from("bin_on_hand").select("location_id,qty").eq("sku_id", skuId)).data!
+      .map((row) => [row.location_id, Number(row.qty)]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    expect(balances).toEqual([
+      [warehouse.id, 5],
+      [wrong.id, 0],
+      [intended.id, 3],
+    ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+    const movements = (await admin.from("inventory_movements").select("ref,qty").in("ref", [original, correction])).data!;
+    expect(movements.filter((row) => row.ref === original).reduce((sum, row) => sum + Number(row.qty), 0)).toBe(0);
+    expect(movements.filter((row) => row.ref === correction).reduce((sum, row) => sum + Number(row.qty), 0)).toBe(0);
+  });
+
   it("posts paired FG rows whose bbl sums to 0 and paired keg events, then marks the transfer received", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "warehouse");

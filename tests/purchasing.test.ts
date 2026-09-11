@@ -68,6 +68,37 @@ describe("vendors, materials, contracts", () => {
 });
 
 describe("purchase orders: draft, mark sent, receive", () => {
+  it("records an overreceipt once and makes the missing damage/disposition contract explicit", async () => {
+    const wh = await seedLocation(b.id, { name: "Overreceipt dock" });
+    const vendor = await runCommand("upsert_vendor", { name: "Variance supplier" }, ctx) as { id: string };
+    const material = await runCommand("upsert_material", {
+      name: "Overage cans", category: "packaging", baseUom: "each", purchaseUom: "each",
+    }, ctx) as { id: string };
+    const po = await runCommand("create_purchase_order", {
+      vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 10, unitCostCents: 25 }],
+    }, ctx) as { id: string };
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, ctx);
+    const detail = await runCommand("get_purchase_order", { poId: po.id }, ctx) as { lines: { id: string }[] };
+    const requestId = crypto.randomUUID();
+    const input = { poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-19", lines: [{ poLineId: detail.lines[0].id, qtyCounted: 12 }] };
+    const first = await runCommand("receive_purchase_order", input, ctx, { requestId, correlationId: requestId }) as { receipt_id: string; status: string };
+    const replay = await runCommand("receive_purchase_order", input, ctx, { requestId, correlationId: requestId });
+
+    expect(replay).toEqual(first);
+    expect(first.status).toBe("received");
+    expect((await admin.from("receipt_lines").select("qty_expected, qty_counted, variance").eq("receipt_id", first.receipt_id)).data)
+      .toEqual([{ qty_expected: 10, qty_counted: 12, variance: 2 }]);
+    expect((await admin.from("material_movements").select("qty, type").eq("material_id", material.id)).data)
+      .toEqual([{ qty: 12, type: "receipt" }]);
+    expect((await admin.from("receipts").select("id").eq("po_id", po.id)).data).toHaveLength(1);
+
+    // R05's damaged quantity and supplier disposition are not representable in
+    // the current receipt schema. Keep that boundary executable until designed.
+    expect(sql(`select column_name from information_schema.columns
+      where table_schema='public' and table_name in ('receipts','receipt_lines')
+        and column_name in ('damaged_qty','supplier_disposition','disposition')`)).toEqual([]);
+  });
+
   it("draft → sent (mailto) → partial receipt → received; open balance and status derive from counts", async () => {
     const wh = await seedLocation(b.id);
     const vendor = (await runCommand("upsert_vendor", { name: "Country Malt", leadTimeDays: 7 }, ctx)) as { id: string };
@@ -113,7 +144,7 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(after.lines.find((l) => l.material_id === hulls.id)).toMatchObject({ qty_received: 6, qty_open: 0 });
 
     // Ledger: base units (3 bags × 55 lb), the lot read off the package, the hulls untracked.
-    const moves = await admin.from("material_movements").select("material_id, qty, type, lot_id, bin_id").eq("brewery_id", b.id).order("qty");
+    const moves = await admin.from("material_movements").select("material_id, qty, type, lot_id, bin_id").eq("brewery_id", b.id).in("material_id", [malt.id, hulls.id]).order("qty");
     expect(moves.data).toHaveLength(2);
     expect(moves.data!.find((m) => m.material_id === malt.id)).toMatchObject({ qty: 165, type: "receipt", bin_id: wh.binId });
     expect(moves.data!.find((m) => m.material_id === hulls.id)).toMatchObject({ qty: 300, lot_id: null });

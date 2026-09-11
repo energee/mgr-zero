@@ -41,6 +41,71 @@ async function lineOf(orderId: string) {
 }
 
 describe("pick and ship", () => {
+  it("connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", {
+      p_order: id,
+      p_picks: [{ line_id: line.id, qty_picked: 6 }],
+      p_request_id: crypto.randomUUID(),
+    });
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id,
+      p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+      p_carrier: "self",
+      p_tracking: null,
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(shipped.error).toBeNull();
+
+    const invoiceId = (shipped.data as { invoice_id: string }).invoice_id;
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 6, qty_shipped: 4 });
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data)
+      .toEqual({ status: "shipped", needs_restock: true });
+    expect((await admin.from("invoice_lines").select("qty,amount_cents").eq("invoice_id", invoiceId)).data)
+      .toEqual([{ qty: 4, amount_cents: 48000 }]);
+    expect((await admin.from("inventory_movements").select("qty").eq("ref", id)).data)
+      .toEqual([{ qty: -4 }]);
+    expect((await admin.from("allocations").select("qty,status").eq("ref", line.id).single()).data)
+      .toEqual({ qty: 10, status: "fulfilled" });
+
+    await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect((await admin.from("orders").select("needs_restock").eq("id", id).single()).data)
+      .toEqual({ needs_restock: false });
+    expect((await admin.from("order_events").select("event").eq("order_id", id).order("created_at")).data?.map((event) => event.event))
+      .toEqual(["created", "submitted", "confirmed", "picked", "shipped", "restocked"]);
+  });
+
+  it("serializes distinct workers racing shipment and adjustment so only one transition wins", async () => {
+    const id = await confirmedOrder(6);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", {
+      p_order: id,
+      p_picks: [{ line_id: line.id, qty_picked: 6 }],
+      p_request_id: crypto.randomUUID(),
+    });
+    const [ship, adjust] = await Promise.all([
+      staffDb.rpc("ship_order", {
+        p_order: id,
+        p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+        p_carrier: null,
+        p_tracking: null,
+        p_request_id: crypto.randomUUID(),
+      }),
+      staffDb.rpc("adjust_order_lines", {
+        p_order: id,
+        p_lines: [{ sku_id: skuId, qty: 4 }],
+        p_reason: "concurrent customer change",
+        p_request_id: crypto.randomUUID(),
+      }),
+    ]);
+    expect([ship, adjust].filter((result) => result.error === null)).toHaveLength(1);
+    const persisted = await admin.from("orders").select("status").eq("id", id).single();
+    expect(["picked", "shipped"]).toContain(persisted.data?.status);
+    expect((await admin.from("order_events").select("event").eq("order_id", id).in("event", ["updated", "shipped"])).data)
+      .toHaveLength(1);
+  });
+
   it("short ship writes movement + invoice for shipped qty and fulfills allocations", async () => {
     const id = await confirmedOrder(10);
     const line = await lineOf(id);

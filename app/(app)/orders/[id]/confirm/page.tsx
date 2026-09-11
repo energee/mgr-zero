@@ -21,14 +21,14 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "confirm_order");
-  const [{ order, lines, atp }, locations] = await Promise.all([
-    orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[]; atp: { sku_id: string; qty: number }[] }>),
+  const [{ order, lines, atp, sourceOnHand }, locations] = await Promise.all([
+    orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[]; atp: { sku_id: string; qty: number }[]; sourceOnHand: { sku_id: string; qty: number }[] }>),
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
   ]);
   if (order.status !== "submitted") redirect(`/orders/${order.id}`);
   return (
     <ConfirmOrderView
-      model={toConfirmOrderViewProps({ order, lines, atp, locations, backHref: "/orders" })}
+      model={toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locations, backHref: "/orders" })}
       footer={<ConfirmButtons orderId={order.id} />}
     />
   );

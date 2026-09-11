@@ -121,6 +121,22 @@ describe("Order detail view", () => {
     expect(model.reorder).toBe(false);
   });
 
+  it("explains a short shipment, its recorded reason, and that no remainder stays due", () => {
+    const model = toPortalOrderViewProps({
+      ...portalOrderShipped,
+      lines: [{ ...portalOrderShipped.lines[0], qty_ordered: 10, qty_shipped: 4, short_reason: "Two cases damaged during picking" }],
+      shipment: {
+        ...portalOrderShipped.shipment!,
+        invoices: portalOrderShipped.shipment!.invoices.map((invoice) => ({
+          ...invoice, qbo_total_cents: null, invoice_lines: [{ amount_cents: 4 * SKU_HAZY.unit_price_cents }],
+        })),
+      },
+    });
+    expect(model.lines[0]).toMatchObject({ detail: "ordered 10 · shipped 4", warning: true });
+    expect(model.shortageExplanation).toMatch(/Two cases damaged during picking.*unshipped 6.*nothing remains due/i);
+    expect(model.invoice?.amount).toBe(money(4 * SKU_HAZY.unit_price_cents));
+  });
+
   it("renders Reorder, ORD-0225, and buyer status from the view", () => {
     const html = htmlOf(createElement(PortalOrderView, { model: toPortalOrderViewProps(portalOrderShipped) }));
     expect(html).toMatch(/>Reorder</);

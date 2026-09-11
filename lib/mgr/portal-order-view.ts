@@ -32,6 +32,7 @@ export type PortalOrderViewModel = {
   note?: string;
   lines: PortalOrderLineView[];
   adjusted?: string;
+  shortageExplanation?: string;
   invoice?: PortalOrderInvoiceView;
   reorder: boolean;
 };
@@ -52,6 +53,7 @@ export type PortalOrderSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_shipped: number | null;
+    short_reason?: string | null;
     unit_price_cents: number;
     skus: { name: string } | null;
   }[];
@@ -82,6 +84,9 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
   const invoice = shipment?.invoices.find((v) => v.kind === "invoice");
   const invoiceState = invoice ? invoiceCurrentState(invoice) : null;
   const ship = order.ship_tos;
+  const shortLines = lines.filter((line) => line.qty_shipped !== null && Number(line.qty_shipped) < Number(line.qty_ordered));
+  const unshipped = shortLines.reduce((sum, line) => sum + Number(line.qty_ordered) - Number(line.qty_shipped), 0);
+  const shortReasons = [...new Set(shortLines.map((line) => line.short_reason?.trim()).filter(Boolean))] as string[];
   return {
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
@@ -104,6 +109,9 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     }),
     adjusted: events.some((e) => e.event === "lines_adjusted")
       ? "The brewery adjusted this order. Quantities above are what ships."
+      : undefined,
+    shortageExplanation: shortLines.length
+      ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${unshipped} ${unshipped === 1 ? "unit was" : "units were"} cancelled when this order closed; nothing remains due on this order.`
       : undefined,
     invoice: invoice
       ? {
