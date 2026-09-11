@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 const MINIMIZED = "44px";
 const COMPACT = "480px";
@@ -17,25 +18,12 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
   const isMobile = useIsMobile();
   const [internalOpen, setInternalOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [positioned, setPositioned] = useState(false);
-  const drawerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const drawer = drawerRef.current;
-    if (!drawer) return;
-    const reveal = () => {
-      if (!drawer.style.getPropertyValue("--drawer-frontmost-height")) return false;
-      setPositioned(true);
-      return true;
-    };
-    if (reveal()) return;
-    const observer = new MutationObserver(() => { if (reveal()) observer.disconnect(); });
-    observer.observe(drawer, { attributes: true, attributeFilter: ["style"] });
-    return () => observer.disconnect();
-  }, []);
+  const [interacted, setInteracted] = useState(false);
   const chatOpen = open ?? internalOpen;
   const minimized = isMobile ? "92px" : MINIMIZED;
   const snapPoint = !chatOpen ? minimized : expanded ? EXPANDED : COMPACT;
   const setSnapPoint = (point: string | number | null) => {
+    setInteracted(true);
     const nextOpen = point !== minimized;
     setExpanded(point === EXPANDED);
     if (open === undefined) setInternalOpen(nextOpen);
@@ -55,11 +43,13 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
       onSnapPointChange={setSnapPoint}
     >
       <DrawerContent
-        className={`h-dvh! max-h-none! border-t ${positioned ? "visible" : "invisible"}`}
-        ref={drawerRef}
+        // Keep the initial peek stationary while Base UI measures its portal.
+        className={cn("h-dvh! max-h-none! border-t [--composer-peek:44px] max-md:[--composer-peek:92px]", !interacted && !chatOpen && "transform-[translate3d(0,calc(100%-var(--composer-peek)),0)]! transition-none!")}
+        initialFocus={false}
         handle={<div
           className="group h-11 w-full shrink-0 cursor-grab touch-pan-x active:cursor-grabbing"
           onPointerDown={(event) => {
+            setInteracted(true);
             const start = { x: event.clientX, y: event.clientY };
             const release = (end: PointerEvent) => {
               if (Math.hypot(end.clientX - start.x, end.clientY - start.y) < 8) setSnapPoint(nextSnapPoint);
