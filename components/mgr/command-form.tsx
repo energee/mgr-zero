@@ -20,16 +20,14 @@ import { cn } from "@/lib/utils";
 // Every CommandForm holds unsubmitted edits, so its close is a discard: styled
 // destructive like the offline queue's Discard rather than the shadcn default
 // ghost X, and overridden here (not in components/ui) so a harmless Sheet like
-// MeSheet keeps its neutral close. Sheet is Radix Dialog under an alias, so one
-// primitive closes both branches; only the corner inset differs.
-function FormClose({ className }: { className: string }) {
+// MeSheet keeps its neutral close. Route it through the controlled boundary
+// directly so both the Dialog and aliased Sheet branches reset their form state.
+function FormClose({ className, onClose }: { className: string; onClose?: (open: boolean) => void }) {
   return (
-    <DialogPrimitive.Close asChild>
-      <Button variant="destructive" size="icon-sm" className={className}>
-        <XIcon />
-        <span className="sr-only">Close</span>
-      </Button>
-    </DialogPrimitive.Close>
+    <Button type="button" variant="destructive" size="icon-sm" className={className} onClick={() => onClose?.(false)}>
+      <XIcon />
+      <span className="sr-only">Close</span>
+    </Button>
   );
 }
 
@@ -72,7 +70,7 @@ export function CommandForm({
           <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
           {body("-mx-4")}
           {foot("-mx-4")}
-          <FormClose className="absolute top-3 right-3" />
+          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </Dialog>
@@ -87,7 +85,7 @@ export function CommandForm({
           </SheetHeader>
           {body("")}
           {foot("")}
-          <FormClose className="absolute top-3 right-3" />
+          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} />
         </SheetContent>
       </Sheet>
     );
@@ -101,7 +99,7 @@ export function CommandForm({
         </DialogHeader>
         {body("-mx-4")}
         {foot("-mx-4")}
-        <FormClose className="absolute top-2 right-2" />
+        <FormClose className="absolute top-2 right-2" onClose={onOpenChange} />
       </DialogContent>
     </Dialog>
   );
