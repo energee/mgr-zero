@@ -17,6 +17,13 @@ describe("command registry", () => {
     await expect(runCommand("hmr_read", {}, ctx)).resolves.toBe("new");
   });
 
+  it("still rejects duplicate definitions outside development", () => {
+    _clearRegistry();
+    defineQuery({ name: "duplicate_read", input: z.object({}), roles: ["admin"], handler: async () => null });
+    expect(() => defineQuery({ name: "duplicate_read", input: z.object({}), roles: ["admin"], handler: async () => null }))
+      .toThrow("duplicate command: duplicate_read");
+  });
+
   it("validates input and runs handler", async () => {
     _clearRegistry();
     defineCommand({
