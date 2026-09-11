@@ -16,6 +16,7 @@ const AUTHENTICATED_RPCS = [
   "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_print_labels(uuid,uuid,text)", "get_taproom_count(uuid,uuid)", "list_taproom_counts(uuid,uuid)",
   "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)", "correct_taproom_count(uuid,uuid,jsonb,text,uuid)",
   "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "on_hand_rows()",
+  "pos_order_versions()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",
   "configure_pos_menu(uuid,text,uuid,uuid,uuid)",

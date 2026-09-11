@@ -26,7 +26,7 @@ describe("navFor", () => {
     // unit is a personal preference rather than a permission
     // (set_my_gravity_unit admits all four roles).
     expect(warehouse.find((t) => t.label === "Beer")!.children!.map((c) => c.label)).toContain("Taproom");
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "POS mapping", "Vendors", "Planning", "Chat", "Units"]);
   });
 });
 

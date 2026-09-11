@@ -49,8 +49,8 @@ describe("shippedNav", () => {
     // the phone tab still lands somewhere real.
     expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     expect(navFor(shippedNav(STAFF_NAV), "warehouse").find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Vendors", "Planning", "Chat", "Units"]);
+      .toEqual(["Menu", "POS mapping", "Vendors", "Planning", "Chat", "Units"]);
     expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Import", "Settings", "Chat", "Sale channels", "Locations", "Units"]);
+      .toEqual(["Invoices", "Catalog", "Menu", "POS mapping", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Import", "Settings", "Chat", "Sale channels", "Locations", "Units"]);
   });
 });

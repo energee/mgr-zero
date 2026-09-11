@@ -50,7 +50,7 @@ export default async function SettingsPage() {
           {E.nav("Locations", locations.map((l) => l.name).join(" · ") || "none yet", "", undefined, "/locations")}
           {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
           {E.nav("Accounting", "QuickBooks connection, mappings and payment defaults", "", undefined, "/settings/accounting")}
-          {E.gated("Point of sale", "Square isn’t connected yet")}
+          {E.nav("Point of sale", "Square connection, location mappings, sync and menu", "", undefined, "/settings/pos")}
           {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
           {E.nav("Import", "upload, map and commit CSV rows", "", undefined, "/settings/import")}
         </>

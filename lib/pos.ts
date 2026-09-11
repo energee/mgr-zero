@@ -126,7 +126,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
           price_money: { amount: variation.priceCents, currency: "USD" },
         },
       })) },
-    }, itemVersion: null, variationVersions: {} as Record<string, number> };
+    }, itemVersion: null, variationVersions: { versions: {} as Record<string, number>, changed: [] as string[] } };
   }
   if (!current || current.type !== "ITEM" || current.id !== source.externalItemId || current.is_deleted === true
     || !Number.isSafeInteger(current.version)) throw new Error("Square catalog item changed or is unavailable");
@@ -139,6 +139,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
   if (!itemData || !Array.isArray(variations)) throw new Error("Square catalog item has no writable variations");
   const changed: Record<string, unknown>[] = [];
   const variationVersions: Record<string, number> = {};
+  const changedVariationIds: string[] = [];
   const ownedIds = new Set(source.variations.flatMap((variation) => variation.externalVariationId ? [variation.externalVariationId] : []));
   for (const sourceVariation of source.variations) {
     if (!sourceVariation.externalVariationId) {
@@ -156,6 +157,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
       && (entry as Record<string, unknown>).id === sourceVariation.externalVariationId) as Record<string, unknown> | undefined;
     if (!original || !variation || original.type !== "ITEM_VARIATION" || original.is_deleted === true
       || !Number.isSafeInteger(original.version)) throw new Error("Square catalog variation changed or is unavailable");
+    const before = JSON.stringify(writableCatalogValue(original));
     const variationData = variation.item_variation_data as Record<string, unknown> | undefined;
     if (!variationData || variationData.item_id !== source.externalItemId) throw new Error("Square catalog ownership changed");
     variationVersions[sourceVariation.externalVariationId] = original.version as number;
@@ -170,6 +172,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
       variationData.location_overrides = overrides;
     }
     setLocationPresence(variation, source.locationId, sourceVariation.present);
+    if (JSON.stringify(variation) !== before) changedVariationIds.push(sourceVariation.externalVariationId);
     changed.push(variation);
   }
   const anyPresent = source.variations.some((variation) => variation.present && variation.priceCents !== null);
@@ -186,7 +189,7 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     object: changed.length === 1 && !String(changed[0].id).startsWith("#")
       && !parentNeedsLocation && !parentNeedsRemoval && !parentNeedsName ? changed[0] : item,
     itemVersion: current.version as number,
-    variationVersions,
+    variationVersions: { versions: variationVersions, changed: changedVariationIds },
   };
 }
 
@@ -218,6 +221,10 @@ const isTerminalAuthorization = (error: unknown): error is SquareProviderError =
 
 export function squareConfig(): SquareConfig {
   return readSquareEnv();
+}
+
+export function isSquareConfigured(env: Record<string, string | undefined> = process.env) {
+  try { readSquareEnv(env); return true; } catch { return false; }
 }
 
 export class SquareClient {
@@ -306,8 +313,8 @@ export class SquareClient {
     do {
       const body = { object_types: ["ITEM", "ITEM_VARIATION"], include_deleted_objects: true, ...(cursor ? { cursor } : {}) };
       const data = await this.api("/v2/catalog/search", accessToken, { method: "POST", body: JSON.stringify(body) });
-      if (!Array.isArray(data.objects)) throw unavailable();
-      objects.push(...data.objects.filter((value): value is Record<string, unknown> => !!value && typeof value === "object"));
+      if (data.objects !== undefined && !Array.isArray(data.objects)) throw unavailable();
+      objects.push(...(data.objects ?? []).filter((value): value is Record<string, unknown> => !!value && typeof value === "object"));
       cursor = data.cursor === undefined ? null : text(data.cursor);
       if (data.cursor !== undefined && !cursor) throw unavailable();
       if (cursor && cursors.has(cursor)) throw unavailable();
@@ -433,12 +440,33 @@ export async function publishSquareCatalogItem(
   let acquired = await leaseOrFinished();
   if ("result" in acquired) return acquired.result;
   let lease = acquired.lease;
+  if (lease.accessExpiresAt && Date.parse(lease.accessExpiresAt) <= Date.now()) {
+    let next: SquareTokens;
+    try { next = await client.refresh(lease.refreshToken); }
+    catch (error) {
+      if (isTerminalAuthorization(error)) {
+        await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+      }
+      throw unavailable();
+    }
+    if (next.merchantId !== lease.merchantId) throw unavailable();
+    await compareAndSwapSquareTokens(ctx, {
+      accessToken: lease.accessToken, refreshToken: lease.refreshToken, connectionId: start.connectionId,
+      credentialVersion: lease.credentialVersion, accessExpiresAt: lease.accessExpiresAt,
+      refreshExpiresAt: null, refreshHardExpiresAt: null,
+    }, next, secondsUntil(next.receivedAt, next.accessExpiresAt));
+    throw new CommandError("Square publication was superseded by refreshed credentials", 409, "conflict");
+  }
   if (!lease.requestBody) {
     let current: Record<string, unknown> | null = null;
     try {
       current = start.source.externalItemId
         ? await client.retrieveCatalogObject(lease.accessToken, start.source.externalItemId) : null;
     } catch (error) {
+      if (isTerminalAuthorization(error)) {
+        await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+        throw unavailable();
+      }
       if (error instanceof SquareCatalogReadError) {
         await finishSquarePublication(ctx, start.attemptId, error.code, null);
         throw new CommandError("Square no longer has the selected catalog item", 409, "conflict");
@@ -462,7 +490,12 @@ export async function publishSquareCatalogItem(
   }
   let result: Awaited<ReturnType<SquareClient["upsertCatalogObject"]>>;
   try { result = await client.upsertCatalogObject(lease.accessToken, lease.requestBody!); }
-  catch { throw unavailable(); }
+  catch (error) {
+    if (isTerminalAuthorization(error)) {
+      await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
+    }
+    throw unavailable();
+  }
   if (!result.ok) {
     if (result.definitive) await finishSquarePublication(ctx, start.attemptId,
       result.versionConflict ? "version_mismatch" : "provider_rejected", null);
@@ -504,6 +537,63 @@ export async function publishSquareMenu(
     throw error;
   }
   return finishSquareMenuPublication(ctx, start.menuAttemptId);
+}
+
+type PublicationCommandResult = {
+  publication: { attemptId: string; status: "succeeded" | "rejected" | "superseded"; errorCode: string | null };
+  result: Record<string, unknown> | null;
+};
+
+function itemCommandResult(start: Awaited<ReturnType<typeof beginSquarePublication>>): PublicationCommandResult | null {
+  if (start.status !== "succeeded" && start.status !== "rejected" && start.status !== "superseded") return null;
+  return { publication: { attemptId: start.attemptId, status: start.status, errorCode: start.errorCode }, result: start.result };
+}
+
+function menuCommandResult(start: Awaited<ReturnType<typeof beginSquareMenuPublication>>): PublicationCommandResult | null {
+  if (start.status !== "succeeded" && start.status !== "rejected" && start.status !== "superseded") return null;
+  return { publication: { attemptId: start.menuAttemptId, status: start.status, errorCode: start.errorCode }, result: start.result };
+}
+
+/** The HTTP command contract includes durable terminal state; transient throws remain retryable under the same request ID. */
+export async function publishSquareCatalogItemCommand(
+  ctx: Ctx,
+  input: Parameters<typeof publishSquareCatalogItem>[1],
+  requestId: string,
+  client: SquareClient,
+) {
+  try {
+    await publishSquareCatalogItem(ctx, input, requestId, client, "publish_pos_item");
+  } catch (error) {
+    try {
+      const terminal = itemCommandResult(await beginSquarePublication(ctx, input, requestId, "publish_pos_item"));
+      if (terminal) return terminal;
+    } catch { /* No durable attempt means the original command failure remains authoritative. */ }
+    throw error;
+  }
+  const terminal = itemCommandResult(await beginSquarePublication(ctx, input, requestId, "publish_pos_item"));
+  if (!terminal) throw new Error("Square publication terminal state was unavailable");
+  return terminal;
+}
+
+/** Menu publication has the same terminal envelope as item publication. */
+export async function publishSquareMenuCommand(
+  ctx: Ctx,
+  input: Parameters<typeof publishSquareMenu>[1],
+  requestId: string,
+  client: SquareClient,
+) {
+  try {
+    await publishSquareMenu(ctx, input, requestId, client);
+  } catch (error) {
+    try {
+      const terminal = menuCommandResult(await beginSquareMenuPublication(ctx, input, requestId));
+      if (terminal) return terminal;
+    } catch { /* No durable attempt means the original command failure remains authoritative. */ }
+    throw error;
+  }
+  const terminal = menuCommandResult(await beginSquareMenuPublication(ctx, input, requestId));
+  if (!terminal) throw new Error("Square menu publication terminal state was unavailable");
+  return terminal;
 }
 
 export async function syncSquareCatalogFacts(client: SquareClient, accessToken: string, merchantId: string) {

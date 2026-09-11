@@ -2205,10 +2205,12 @@ BEGIN
     DELETE FROM public.pos_catalog_variations WHERE connection_id=c.id;
     DELETE FROM public.pos_locations WHERE connection_id=c.id;
   END IF;
-  UPDATE private.command_requests request SET result=v_sync_result
-    FROM private.square_catalog_syncs sync
-    WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
-      AND sync.connection_id=c.id AND request.result IS NULL;
+  IF c.id IS NOT NULL THEN
+    UPDATE private.command_requests request SET result=v_sync_result
+      FROM private.square_catalog_syncs sync
+      WHERE sync.actor_id=request.actor_id AND sync.request_id=request.request_id
+        AND sync.connection_id=c.id AND request.result IS NULL;
+  END IF;
   INSERT INTO public.pos_connections(id,brewery_id,provider,merchant_id,merchant_label,state,access_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at,granted_scopes)
     VALUES(v_id,i.brewery_id,'square',p_merchant_id,p_merchant_label,'connected',p_access_expires_at,'not_requested',null,1,p_actor,now(),p_granted_scopes)
   ON CONFLICT(brewery_id,provider) DO UPDATE SET merchant_id=excluded.merchant_id,merchant_label=excluded.merchant_label,state='connected',
@@ -2246,7 +2248,8 @@ BEGIN
   UPDATE private.integration_tokens t SET access_token=p_access_token,refresh_token=p_refresh_token,
     credential_version=credential_version+1,updated_at=now()
   WHERE t.brewery_id=p_brewery AND t.provider=p_provider AND t.connection_id=p_connection AND t.credential_version=p_expected_version
-    AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role IN ('admin','sales'))
+    AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor
+      AND ((p_provider='square' AND u.role IN ('admin','warehouse')) OR (p_provider='qbo' AND u.role IN ('admin','sales'))))
     AND ((p_provider='qbo' AND EXISTS(SELECT 1 FROM public.qbo_connections q WHERE q.brewery_id=p_brewery AND q.id=p_connection AND q.state='connected'))
       OR (p_provider='square' AND EXISTS(SELECT 1 FROM public.pos_connections p WHERE p.brewery_id=p_brewery AND p.id=p_connection AND p.state='connected')))
   RETURNING credential_version INTO v_version;
@@ -2259,6 +2262,7 @@ BEGIN
   ELSE
     UPDATE public.pos_connections SET access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),credential_version=v_version,updated_at=now()
       WHERE brewery_id=p_brewery AND id=p_connection AND provider='square';
+    PERFORM private.supersede_square_publications(p_connection);
   END IF;
   RETURN true;
 END $$;
@@ -2366,10 +2370,12 @@ BEGIN
   UPDATE public.pos_connections c SET state='recovery_required',last_error='Square authorization expired or was revoked',updated_at=now()
     WHERE c.brewery_id=p_brewery AND c.id=p_connection AND c.provider='square' AND c.state='connected'
       AND c.credential_version=p_expected_version
-      AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
+      AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor
+        AND u.role IN ('admin','warehouse'))
       AND EXISTS(SELECT 1 FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square'
         AND t.connection_id=p_connection AND t.credential_version=p_expected_version);
   GET DIAGNOSTICS changed=ROW_COUNT;
+  IF changed=1 THEN PERFORM private.supersede_square_publications(p_connection); END IF;
   RETURN changed=1;
 END $$;
 
@@ -3244,13 +3250,24 @@ SELECT f.*,
 FROM current_facts f;
 REVOKE ALL ON private.pos_current_sales FROM public,anon,authenticated,service_role;
 
+CREATE FUNCTION public.pos_order_versions()
+RETURNS TABLE(brewery_id uuid,connection_id uuid,external_order_id text,source_version bigint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+  SELECT o.brewery_id,o.connection_id,o.external_order_id,max(o.source_version)
+  FROM private.square_order_snapshots o
+  WHERE public.staff_role(o.brewery_id) IN ('admin','warehouse')
+  GROUP BY o.brewery_id,o.connection_id,o.external_order_id
+$$;
+REVOKE ALL ON FUNCTION public.pos_order_versions() FROM public,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.pos_order_versions() TO authenticated;
+
 ALTER TABLE public.pos_catalog_variations
   ADD CONSTRAINT pos_catalog_variations_connection_variation_key UNIQUE(connection_id,external_variation_id);
 
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
-  WITH ranked AS (
-    SELECT s.*,coalesce((SELECT max(o.source_version) FROM private.square_order_snapshots o
+  WITH order_versions AS (SELECT * FROM public.pos_order_versions()), ranked AS (
+    SELECT s.*,coalesce((SELECT o.source_version FROM order_versions o
       WHERE o.connection_id=s.connection_id AND o.external_order_id=s.external_order_id),
       max(s.source_version) OVER (PARTITION BY s.connection_id,s.external_order_id)) AS order_version,row_number() OVER (
       PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
@@ -3987,7 +4004,7 @@ CREATE TABLE private.square_publications (
   expected_item_version bigint,
   expected_variation_versions jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'needs_snapshot' CHECK(status IN ('needs_snapshot','prepared','succeeded','rejected','superseded')),
-  error_code text CHECK(error_code IN ('version_mismatch','provider_rejected','provider_missing','provider_invalid','credential_changed','catalog_changed','connection_changed','menu_rejected')),
+  error_code text CHECK(error_code IN ('version_mismatch','provider_rejected','provider_missing','provider_invalid','credential_changed','catalog_changed','connection_changed','menu_rejected','role_changed')),
   result jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz,
@@ -4022,20 +4039,13 @@ CREATE INDEX square_publication_events_brewery_idx ON private.square_publication
 ALTER TABLE private.square_publication_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.square_publication_events FROM public,anon,authenticated,service_role;
 
-CREATE FUNCTION private.square_menu_publication_manifest(p_menu uuid,p_connection uuid) RETURNS jsonb
+CREATE FUNCTION private.square_menu_publication_manifest(p_snapshot jsonb,p_connection uuid,p_candidates jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE v_snapshot jsonb; v_manifest jsonb:='[]'::jsonb; v_brand uuid; v_brand_name text;
+DECLARE v_snapshot jsonb:=p_snapshot; v_manifest jsonb:='[]'::jsonb; v_brand uuid; v_brand_name text;
   v_external_item text; v_ownership text; v_variations jsonb;
 BEGIN
-  v_snapshot:=private.pos_menu_snapshot(p_menu);
   FOR v_brand IN
-    SELECT brand_id FROM (
-      SELECT DISTINCT (e->>'brandId')::uuid brand_id
-      FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) e
-      UNION
-      SELECT i.brand_id FROM public.pos_catalog_items i
-        WHERE i.connection_id=p_connection AND i.catalog_group='poured'
-    ) brands ORDER BY brand_id
+    SELECT value::uuid FROM jsonb_array_elements_text(p_candidates) x(value) ORDER BY value::uuid
   LOOP
     v_external_item:=null; v_ownership:='mgr';
     SELECT i.external_item_id,i.ownership INTO v_external_item,v_ownership
@@ -4069,7 +4079,7 @@ BEGIN
   END LOOP;
   RETURN v_manifest;
 END $$;
-REVOKE ALL ON FUNCTION private.square_menu_publication_manifest(uuid,uuid) FROM public,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION private.square_menu_publication_manifest(jsonb,uuid,jsonb) FROM public,anon,authenticated,service_role;
 
 CREATE FUNCTION private.square_menu_publication_state(p_publication uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
@@ -4102,10 +4112,14 @@ BEGIN
   FOR v_attempt IN SELECT * FROM private.square_publications p WHERE p.connection_id=p_connection
     AND p.status IN ('needs_snapshot','prepared') AND (
       v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS DISTINCT FROM v_connection.credential_version
-      OR p.credential_version<>v_connection.credential_version OR p.catalog_generation<>v_connection.catalog_sync_generation)
+      OR p.credential_version<>v_connection.credential_version OR p.catalog_generation<>v_connection.catalog_sync_generation
+      OR NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p.brewery_id AND u.user_id=p.actor_id
+        AND u.role IN ('admin','warehouse')))
     FOR UPDATE
   LOOP
-    v_code:=CASE WHEN v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS NULL THEN 'connection_changed'
+    v_code:=CASE WHEN NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=v_attempt.brewery_id
+        AND u.user_id=v_attempt.actor_id AND u.role IN ('admin','warehouse')) THEN 'role_changed'
+      WHEN v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS NULL THEN 'connection_changed'
       WHEN v_attempt.credential_version<>v_connection.credential_version OR v_token_version<>v_connection.credential_version THEN 'credential_changed'
       ELSE 'catalog_changed' END;
     v_result:=jsonb_build_object('published',false,'superseded',true,'errorCode',v_code);
@@ -4116,10 +4130,14 @@ BEGIN
   FOR v_menu IN SELECT * FROM private.square_menu_publications p WHERE p.connection_id=p_connection
     AND p.status='publishing' AND (
       v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS DISTINCT FROM v_connection.credential_version
-      OR p.credential_version<>v_connection.credential_version OR p.catalog_generation<>v_connection.catalog_sync_generation)
+      OR p.credential_version<>v_connection.credential_version OR p.catalog_generation<>v_connection.catalog_sync_generation
+      OR NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p.brewery_id AND u.user_id=p.actor_id
+        AND u.role IN ('admin','warehouse')))
     FOR UPDATE
   LOOP
-    v_code:=CASE WHEN v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS NULL THEN 'connection_changed'
+    v_code:=CASE WHEN NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=v_menu.brewery_id
+        AND u.user_id=v_menu.actor_id AND u.role IN ('admin','warehouse')) THEN 'role_changed'
+      WHEN v_connection.id IS NULL OR v_connection.state<>'connected' OR v_token_version IS NULL THEN 'connection_changed'
       WHEN v_menu.credential_version<>v_connection.credential_version OR v_token_version<>v_connection.credential_version THEN 'credential_changed'
       ELSE 'catalog_changed' END;
     v_result:=jsonb_build_object('published',false,'superseded',true,'errorCode',v_code);
@@ -4133,7 +4151,8 @@ CREATE FUNCTION public.begin_square_menu_publication(
   p_brewery uuid,p_external_location text,p_retry_conflict boolean,p_request_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_actor uuid; v_replay jsonb; v_connection public.pos_connections; v_menu public.pos_menus;
-  v_attempt private.square_menu_publications; v_manifest jsonb; v_result jsonb; v_entry jsonb;
+  v_attempt private.square_menu_publications; v_manifest jsonb; v_snapshot jsonb; v_candidates jsonb;
+  v_result jsonb; v_entry jsonb; v_brand uuid;
 BEGIN
   v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
   IF nullif(btrim(p_external_location),'') IS NULL OR p_retry_conflict IS NULL THEN
@@ -4164,12 +4183,21 @@ BEGIN
   IF EXISTS(SELECT 1 FROM private.square_menu_publications p WHERE p.connection_id=v_connection.id
     AND p.external_location_id=p_external_location AND p.status='publishing') THEN
     RAISE EXCEPTION 'Another Square menu publication is still unresolved' USING errcode='MG409'; END IF;
-  v_manifest:=private.square_menu_publication_manifest(v_menu.id,v_connection.id);
-  FOR v_entry IN SELECT value FROM jsonb_array_elements(v_manifest)
+  v_snapshot:=private.pos_menu_snapshot(v_menu.id);
+  SELECT coalesce(jsonb_agg(brand_id ORDER BY brand_id),'[]'::jsonb) INTO v_candidates FROM (
+      SELECT DISTINCT (e->>'brandId')::uuid brand_id
+      FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) e
+      WHERE coalesce((e->>'available')::boolean,false) AND e->>'priceCents' IS NOT NULL
+      UNION
+      SELECT i.brand_id FROM public.pos_catalog_items i
+      WHERE i.connection_id=v_connection.id AND i.catalog_group='poured'
+    ) brands;
+  FOR v_brand IN SELECT value::uuid FROM jsonb_array_elements_text(v_candidates) x(value) ORDER BY value::uuid
   LOOP
     PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
-      'square-publish:'||v_connection.id::text||':'||(v_entry->>'brandId')||':poured',0));
+      'square-publish:'||v_connection.id::text||':'||v_brand::text||':poured',0));
   END LOOP;
+  v_manifest:=private.square_menu_publication_manifest(v_snapshot,v_connection.id,v_candidates);
   INSERT INTO private.square_menu_publications(brewery_id,connection_id,actor_id,request_id,
     credential_version,catalog_generation,external_location_id,retry_conflict,manifest)
   VALUES(p_brewery,v_connection.id,v_actor,p_request_id,v_connection.credential_version,
@@ -4290,7 +4318,8 @@ BEGIN
   SELECT * INTO v_attempt FROM private.square_publications p WHERE p.connection_id=v_connection.id
     AND p.brand_id=p_brand AND p.catalog_group='poured' AND p.status IN ('needs_snapshot','prepared') FOR UPDATE;
   IF FOUND THEN
-    IF v_attempt.menu_publication_id IS DISTINCT FROM p_menu_publication
+    IF v_attempt.external_location_id IS DISTINCT FROM p_external_location
+      OR v_attempt.menu_publication_id IS DISTINCT FROM p_menu_publication
       OR p_adopt_item IS NOT NULL AND (p_adopt_item IS DISTINCT FROM v_attempt.external_item_id
       OR p_adopt_variation IS DISTINCT FROM v_attempt.adopt_variation_id)
     THEN RAISE EXCEPTION 'Another Square publication is still unresolved' USING errcode='MG409'; END IF;
@@ -4306,18 +4335,26 @@ BEGIN
     SELECT * INTO v_parent FROM public.pos_catalog_items i WHERE i.connection_id=v_connection.id
       AND i.brand_id=p_brand AND i.catalog_group='poured' FOR SHARE;
     IF p_adopt_item IS NOT NULL THEN
+      IF NOT EXISTS(SELECT 1 FROM public.pos_catalog_variations v
+        JOIN public.pos_item_mappings m ON m.connection_id=v.connection_id AND m.external_item_id=v.external_item_id
+          AND m.external_variation_id=v.external_variation_id AND NOT m.ignored AND m.format_id IS NOT NULL
+        JOIN public.formats f ON f.id=m.format_id AND f.brewery_id=m.brewery_id AND f.brand_id=p_brand AND f.basis='poured'
+        WHERE v.brewery_id=p_brewery AND v.connection_id=v_connection.id AND v.external_item_id=p_adopt_item
+          AND v.external_variation_id=p_adopt_variation AND v.available)
+      THEN RAISE EXCEPTION 'Square adoption must select one observed mapped brand variation'; END IF;
       IF v_parent.connection_id IS NOT NULL THEN
         IF v_parent.external_item_id<>p_adopt_item THEN
           RAISE EXCEPTION 'MGR already owns a different Square item for this brand' USING errcode='MG409'; END IF;
+        IF EXISTS(SELECT 1 FROM public.pos_item_mappings m
+          JOIN public.pos_catalog_ownership o ON o.connection_id=m.connection_id AND o.format_id=m.format_id
+            AND o.brand_id=p_brand AND o.catalog_group='poured' AND o.external_item_id=p_adopt_item
+          WHERE m.connection_id=v_connection.id AND m.external_item_id=p_adopt_item
+            AND m.external_variation_id=p_adopt_variation AND NOT m.ignored
+            AND o.external_variation_id<>p_adopt_variation)
+        THEN RAISE EXCEPTION 'MGR already owns a different Square variation for this format' USING errcode='MG409'; END IF;
         v_ownership:=v_parent.ownership; v_external_item:=v_parent.external_item_id;
       ELSE
-        IF NOT EXISTS(SELECT 1 FROM public.pos_catalog_variations v
-          JOIN public.pos_item_mappings m ON m.connection_id=v.connection_id AND m.external_item_id=v.external_item_id
-            AND m.external_variation_id=v.external_variation_id AND NOT m.ignored AND m.format_id IS NOT NULL
-          JOIN public.formats f ON f.id=m.format_id AND f.brewery_id=m.brewery_id AND f.brand_id=p_brand AND f.basis='poured'
-          WHERE v.brewery_id=p_brewery AND v.connection_id=v_connection.id AND v.external_item_id=p_adopt_item
-            AND v.external_variation_id=p_adopt_variation AND v.available)
-          OR EXISTS(SELECT 1 FROM public.pos_catalog_items i WHERE i.connection_id=v_connection.id AND i.external_item_id=p_adopt_item)
+        IF EXISTS(SELECT 1 FROM public.pos_catalog_items i WHERE i.connection_id=v_connection.id AND i.external_item_id=p_adopt_item)
         THEN RAISE EXCEPTION 'Square adoption must select one observed mapped brand variation'; END IF;
         v_ownership:='adopted'; v_external_item:=p_adopt_item;
       END IF;
@@ -4330,13 +4367,14 @@ BEGIN
     SELECT jsonb_agg(jsonb_build_object('formatId',x.value->>'formatId','format',x.value->>'format',
         'priceCents',CASE WHEN x.value->>'priceCents' IS NULL THEN null ELSE (x.value->>'priceCents')::integer END,
         'present',coalesce((x.value->>'available')::boolean,false) AND x.value->>'priceCents' IS NOT NULL,
-        'externalVariationId',coalesce(o.external_variation_id,CASE WHEN v_external_item IS NOT NULL THEN m.external_variation_id END))
+        'externalVariationId',coalesce(o.external_variation_id,CASE WHEN p_adopt_variation IS NOT NULL AND EXISTS(
+          SELECT 1 FROM public.pos_item_mappings m WHERE m.connection_id=v_connection.id
+            AND m.external_item_id=p_adopt_item AND m.external_variation_id=p_adopt_variation
+            AND m.format_id=(x.value->>'formatId')::uuid AND NOT m.ignored) THEN p_adopt_variation END))
         ORDER BY x.value->>'format',x.value->>'formatId') INTO v_variations
     FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded')) x(value)
     LEFT JOIN public.pos_catalog_ownership o ON o.connection_id=v_connection.id AND o.format_id=(x.value->>'formatId')::uuid
       AND o.brand_id=p_brand AND o.catalog_group='poured' AND o.external_item_id=v_external_item
-    LEFT JOIN public.pos_item_mappings m ON m.connection_id=v_connection.id AND m.external_item_id=v_external_item
-      AND m.format_id=(x.value->>'formatId')::uuid AND NOT m.ignored
     WHERE x.value->>'brandId'=p_brand::text;
   END IF;
   IF v_brand_name IS NULL OR (v_external_item IS NULL AND (jsonb_array_length(coalesce(v_variations,'[]'::jsonb))=0
@@ -4360,7 +4398,9 @@ BEGIN
 END $$;
 
 CREATE FUNCTION public.lease_square_publication(p_brewery uuid,p_publication uuid,p_actor uuid)
-RETURNS TABLE(access_token text,request_body text,superseded boolean) LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+RETURNS TABLE(access_token text,request_body text,superseded boolean,refresh_token text,
+  access_expires_at timestamptz,merchant_id text,credential_version bigint)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_attempt private.square_publications;
 BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor
@@ -4370,10 +4410,11 @@ BEGIN
   PERFORM private.supersede_square_publications(v_attempt.connection_id);
   SELECT p.* INTO v_attempt FROM private.square_publications p WHERE p.id=p_publication FOR UPDATE;
   IF v_attempt.status='superseded' THEN
-    RETURN QUERY SELECT null::text,null::text,true;
+    RETURN QUERY SELECT null::text,null::text,true,null::text,null::timestamptz,null::text,null::bigint;
     RETURN;
   END IF;
-  RETURN QUERY SELECT t.access_token,p.request_body,false FROM private.square_publications p
+  RETURN QUERY SELECT t.access_token,p.request_body,false,t.refresh_token,c.access_expires_at,c.merchant_id,c.credential_version
+  FROM private.square_publications p
   JOIN public.pos_connections c ON c.id=p.connection_id AND c.brewery_id=p.brewery_id AND c.provider='square'
     AND c.state='connected' AND c.credential_version=p.credential_version AND c.catalog_sync_generation=p.catalog_generation
   JOIN private.integration_tokens t ON t.brewery_id=p.brewery_id AND t.provider='square'
@@ -4415,7 +4456,10 @@ BEGIN
   BEGIN v_body:=p_request_body::jsonb; EXCEPTION WHEN others THEN RAISE EXCEPTION 'Square publication body is invalid'; END;
   v_object:=v_body->'object';
   IF v_body->>'idempotency_key'<>v_attempt.provider_key::text OR jsonb_typeof(v_object)<>'object'
-    OR jsonb_typeof(coalesce(p_variation_versions,'{}'::jsonb))<>'object'
+    OR jsonb_typeof(p_variation_versions)<>'object'
+    OR jsonb_typeof(p_variation_versions->'versions')<>'object'
+    OR jsonb_typeof(p_variation_versions->'changed')<>'array'
+    OR EXISTS(SELECT 1 FROM jsonb_array_elements(p_variation_versions->'changed') e WHERE jsonb_typeof(e)<>'string')
     OR p_request_body LIKE '%"sold_out"%' OR p_request_body LIKE '%"sold_out_valid_until"%'
     OR p_request_body LIKE '%access_token%' THEN RAISE EXCEPTION 'Square publication body is invalid'; END IF;
   IF v_attempt.external_item_id IS NULL THEN
@@ -4434,10 +4478,13 @@ CREATE FUNCTION public.finish_square_publication(p_brewery uuid,p_publication uu
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_attempt private.square_publications; v_result jsonb; v_object jsonb; v_maps jsonb; v_source_variation jsonb;
   v_item text; v_variation text; v_item_version bigint; v_variation_version bigint; v_present boolean; v_format uuid;
+  v_expected_versions jsonb; v_changed_variations jsonb; v_request_variation jsonb; v_response_variation jsonb;
 BEGIN
   SELECT * INTO v_attempt FROM private.square_publications WHERE id=p_publication AND brewery_id=p_brewery;
   IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor
     AND u.role IN ('admin','warehouse')) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+    'square-publish:'||v_attempt.connection_id::text||':'||v_attempt.brand_id::text||':'||v_attempt.catalog_group,0));
   PERFORM private.supersede_square_publications(v_attempt.connection_id);
   SELECT * INTO v_attempt FROM private.square_publications WHERE id=p_publication FOR UPDATE;
   IF v_attempt.status IN ('succeeded','rejected','superseded') THEN RETURN v_attempt.result; END IF;
@@ -4458,6 +4505,8 @@ BEGIN
   END IF;
   IF v_attempt.status<>'prepared' THEN RAISE EXCEPTION 'Square publication was not prepared' USING errcode='MG409'; END IF;
   v_object:=p_response->'catalogObject'; v_maps:=p_response->'idMappings';
+  v_expected_versions:=v_attempt.expected_variation_versions->'versions';
+  v_changed_variations:=v_attempt.expected_variation_versions->'changed';
   IF jsonb_typeof(v_object)<>'object' OR jsonb_typeof(v_maps)<>'array' THEN RAISE EXCEPTION 'Square publication response is invalid'; END IF;
   IF v_attempt.external_item_id IS NULL THEN
     SELECT e->>'object_id' INTO v_item FROM jsonb_array_elements(v_maps) e
@@ -4491,14 +4540,21 @@ BEGIN
     END IF;
     IF v_variation IS NULL THEN CONTINUE; END IF;
     IF v_object->>'type'='ITEM' THEN
-      SELECT (e->>'version')::bigint INTO v_variation_version FROM jsonb_array_elements(v_object#>'{item_data,variations}') e
+      SELECT e,(e->>'version')::bigint INTO v_response_variation,v_variation_version
+        FROM jsonb_array_elements(v_object#>'{item_data,variations}') e
         WHERE e->>'id'=v_variation;
-    ELSIF v_object->>'id'=v_variation THEN v_variation_version:=(v_object->>'version')::bigint;
+      SELECT e INTO v_request_variation FROM jsonb_array_elements(v_attempt.request_body::jsonb#>'{object,item_data,variations}') e
+        WHERE e->>'id'=v_variation;
+    ELSIF v_object->>'id'=v_variation THEN
+      v_response_variation:=v_object; v_variation_version:=(v_object->>'version')::bigint;
+      v_request_variation:=v_attempt.request_body::jsonb->'object';
     ELSE CONTINUE;
     END IF;
     IF v_variation_version IS NULL OR v_variation_version<0 OR
-      (v_attempt.expected_variation_versions ? v_variation AND
-        v_variation_version<=(v_attempt.expected_variation_versions->>v_variation)::bigint)
+      ((v_expected_versions ? v_variation) AND
+        (v_variation_version<(v_expected_versions->>v_variation)::bigint
+          OR (v_changed_variations ? v_variation) AND v_variation_version=(v_expected_versions->>v_variation)::bigint
+          OR v_request_variation IS NULL OR NOT (v_response_variation @> (v_request_variation-'version'))))
     THEN RAISE EXCEPTION 'Square publication response version is invalid'; END IF;
     INSERT INTO public.pos_catalog_variations(brewery_id,connection_id,external_item_id,external_variation_id,
       external_item_name,external_variation_name,source_version,available,last_seen_at)

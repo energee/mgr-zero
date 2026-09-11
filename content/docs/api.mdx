@@ -322,6 +322,7 @@ omitted. They have no roles until they are built.
 | `get_pos_integration_health` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_pos_menu` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `get_pos_menu_item` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
+| `get_pos_sale` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
@@ -360,7 +361,8 @@ omitted. They have no roles until they are built.
 | `list_open_taps` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |  |
-| `list_pos_locations` | Inventory & locations | ✓ |  |  |  |  |  |
+| `list_pos_locations` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `list_pos_sales` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `list_pos_variations` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
 | `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
@@ -1899,7 +1901,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_pos_locations [#list_pos_locations]
 
-`query` · admin
+`query` · admin, warehouse
 
 List every observed Square location and its explicit labeled MGR location mapping
 
@@ -4478,6 +4480,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_menu_item", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### get_pos_sale [#get_pos_sale]
+
+`query` · admin, warehouse
+
+Get one immutable Square fact and every retained source revision for its order
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_sale", "input": { "saleId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_qbo_connection [#get_qbo_connection]
 
 `query` · admin, sales
@@ -4527,6 +4546,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
+```
+
+#### list_pos_sales [#list_pos_sales]
+
+`query` · admin, warehouse
+
+List recent immutable Square sale, return, and revision facts with explicit coverage
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_sales", "input": {} }'
 ```
 
 #### list_pos_variations [#list_pos_variations]
