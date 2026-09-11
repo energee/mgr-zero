@@ -96,7 +96,7 @@ export function ComposerConversationView({ messages, model, activity, error, onR
   onNewChat?: () => void;
 }) {
   return (
-    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col">
+    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
         <Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button>

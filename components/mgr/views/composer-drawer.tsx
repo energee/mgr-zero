@@ -4,8 +4,8 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHandle, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 
-const PEEK = "44px";
-const EXPANDED = 0.92;
+const COMPACT = "480px";
+const EXPANDED = 1;
 
 export function ComposerDrawerView({ children, open, onOpenChange }: {
   children: ReactNode;
@@ -25,13 +25,13 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
       modal={false}
       dismissible={false}
       handleOnly
-      snapPoints={[PEEK, EXPANDED]}
-      activeSnapPoint={expanded ? EXPANDED : PEEK}
+      snapPoints={[COMPACT, EXPANDED]}
+      activeSnapPoint={expanded ? EXPANDED : COMPACT}
       setActiveSnapPoint={(point) => setExpanded(point === EXPANDED)}
       fadeFromIndex={1}
       noBodyStyles
     >
-      <DrawerContent className="h-dvh! max-h-none! max-md:bottom-[calc(3rem+env(safe-area-inset-bottom))]! [&>div:first-child]:hidden">
+      <DrawerContent className="h-dvh! max-h-none! [&>div:first-child]:hidden">
         <DrawerHeader className="sr-only">
           <DrawerTitle>Ask MGR</DrawerTitle>
           <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
@@ -41,7 +41,7 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
             <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
           </Button>
         </DrawerHandle>
-        <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4 pt-2">{children}</div>
+        <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${expanded ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>{children}</div>
       </DrawerContent>
     </Drawer>
   );

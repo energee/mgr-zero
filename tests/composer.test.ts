@@ -88,11 +88,13 @@ describe("AI composer", () => {
     const shared = readFileSync("components/mgr/views/composer.tsx", "utf8");
     const drawer = readFileSync("components/mgr/views/composer-drawer.tsx", "utf8");
     expect(shared).toMatch(/export \{ ComposerDrawerView \} from/);
-    expect(drawer).toContain('const PEEK = "44px"');
-    expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[PEEK, EXPANDED\]\}/);
+    expect(drawer).toContain('const COMPACT = "480px"');
+    expect(drawer).toContain("const EXPANDED = 1");
+    expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[COMPACT, EXPANDED\]\}/);
     expect(drawer).toContain("modal={false}");
     expect(drawer).not.toContain("DrawerTrigger");
     expect(drawer).toContain('aria-label={expanded ? "Minimize Ask MGR" : "Open Ask MGR"}');
+    expect(shared).toContain('className="flex min-h-0 flex-1 flex-col overflow-hidden"');
     expect(shared).not.toContain(">Minimize</Button>");
     expect(readFileSync("components/mgr/app-shell.tsx", "utf8")).toContain('className="h-11 shrink-0"');
   });
