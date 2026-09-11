@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { createClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
+import { publicEnv } from "@/lib/env/public";
 import { assembleFinishedGoods, toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
-import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
 import "@/lib/commands/all";
 
 type StockRow = { brewery_id: string; sku_id: string; qty: string };
@@ -86,5 +88,44 @@ describe("complete finished-goods reads", () => {
     expect(atpRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
     expect(model.rows.find((row) => row.title.endsWith("Cap target"))?.detail)
       .toBe("7 on hand · 3 allocated · ATP 4");
+
+    const lowId = fixtureId("00000000", Number.parseInt(crypto.randomUUID().slice(-8), 16));
+    const highId = fixtureId("ffffffff", Number.parseInt(crypto.randomUUID().slice(-8), 16));
+    const churnBrands = ["Low churn", "High churn"].map((name) => ({ brewery_id: brewery.id, name: `${name} ${crypto.randomUUID()}` }));
+    const insertedBrands = await admin.from("brands").insert(churnBrands).select("id");
+    expect(insertedBrands.error).toBeNull();
+    expect((await admin.from("skus").insert([
+      { id: lowId, brewery_id: brewery.id, brand_id: insertedBrands.data![0].id, format_id: format.data!.id, name: "Low churn SKU" },
+      { id: highId, brewery_id: brewery.id, brand_id: insertedBrands.data![1].id, format_id: format.data!.id, name: "High churn SKU" },
+    ])).error).toBeNull();
+    await runCommand("set_standing_allocation", { locationId: location.id, skuId: lowId, qty: 1 }, ctx);
+
+    let churned = false;
+    const staff = await makeStaff(brewery.id, "admin");
+    const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+      auth: { persistSession: false },
+      global: { fetch: async (input, init) => {
+        const response = await globalThis.fetch(input, init);
+        const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+        const range = new Headers(init?.headers).get("range");
+        if (!churned && url.pathname.endsWith("/atp") && init?.method !== "HEAD"
+          && (range === "0-499" || url.searchParams.get("limit") === "500")) {
+          churned = true;
+          await runCommand("set_standing_allocation", { locationId: location.id, skuId: lowId, qty: 0 }, ctx);
+          await runCommand("set_standing_allocation", { locationId: location.id, skuId: highId, qty: 1 }, ctx);
+        }
+        return response;
+      } },
+    });
+    expect((await db.auth.signInWithPassword({ email: staff.email, password: "test-password-1" })).error).toBeNull();
+    const churnRows = await runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, role: "admin" }) as StockRow[];
+    const currentIds = new Set(churnRows.map((row) => row.sku_id));
+    expect(churned).toBe(true);
+    expect(churnRows).toHaveLength(1_002);
+    expect({
+      everyCurrentStock: skuRows.every((sku) => currentIds.has(sku.id)),
+      closedAllocationOnlyRow: currentIds.has(lowId),
+      openedAllocationOnlyRow: currentIds.has(highId),
+    }).toEqual({ everyCurrentStock: true, closedAllocationOnlyRow: false, openedAllocationOnlyRow: true });
   }, 30_000);
 });
