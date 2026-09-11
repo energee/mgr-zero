@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { nextState, type OrderStatus } from "./order-status";
+import { formatDateTime } from "@/lib/date-format";
 
 export type OrderLineView = {
   key: string;
@@ -147,7 +148,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       };
     }),
     events: events.map((e) => [
-      `${new Date(e.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })} · ${e.event.replace(/_/g, " ")}`,
+      `${formatDateTime(e.created_at)} · ${e.event.replace(/_/g, " ")}`,
       e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",

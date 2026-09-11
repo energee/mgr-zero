@@ -11,8 +11,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // edit surface with empty values (Create brewery is the pattern), so Add
 // customer, Add location, New PO, Add keg pool and Create price group open the
 // records already here rather than earning frames of their own. And the
-// composer strip is shell chrome — screen-frame.tsx passes E.comp() to both
-// shells — so it is present under every staff and portal frame without any
+// composer strip is staff shell chrome — screen-frame.tsx passes E.comp() to
+// staff frames — so it is present under every staff frame without any
 // body naming it.
 //
 // Option casing follows the word, never the control that draws it. A proper
@@ -48,6 +48,7 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
 import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
+import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -209,6 +210,7 @@ import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
+import { ComposerAnswerView, ComposerMovementPickerView, ComposerProposalView, ComposerQuestionView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { toMeViewProps } from "@/lib/mgr/me-view";
 import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -275,7 +277,6 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
-import { WifiDisconnected01Icon } from "@hugeicons/core-free-icons";
 
 /** The drawn mash schedule. Rows and footer both read it, so the total and the
  *  conversion rest can never disagree with the steps above them. */
@@ -465,7 +466,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities", writes: "none",
-    states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
+    states: [["empty", "No records found · Search matches record names and numbers, not app pages."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
     spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: <SearchView model={toSearchViewProps(searchPalette)} />,
   },
@@ -556,11 +557,11 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 4, slice: 1, group: "Global", surface: "sheet", name: "Session expired",
-    to: { "Sign in to retry": "Sign in", "Record movement · Hazy": "Offline outbox" },
-    job: "Sign in again; queued writes stay in the outbox",
+    to: { "Sign in to retry": "Sign in", "Record fermentation reading · FV3": "Offline outbox" },
+    job: "Sign in again; queued eligible readings stay in the outbox",
     reads: "local_outbox [client state]", writes: "none",
-    states: [["queue kept", "3 writes waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
-    spec: "Mid-write expiry does not drop the outbox. Sign in, then Offline outbox still has the queued envelopes.",
+    states: [["queue kept", "1 reading waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
+    spec: "Mid-write expiry does not drop an eligible frozen reading. Sign in as its original actor and brewery, then Offline outbox can retry that exact envelope. Movement, pick and transfer actions are never queued.",
     body: <SessionExpiredView model={toSessionExpiredViewProps(sessionExpiredQueued)} />,
   },
   // steps 2–8
@@ -813,8 +814,8 @@ export const SCREENS: Screen[] = [
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
-    spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
+    states: [["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
       {E.pin(<>{E.btn("Record movement", "irr")}</>)}
@@ -851,23 +852,31 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer proposal",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer question" },
-    job: "Candidate language becomes canonical server preview; signed effect leads",
-    reads: "preview_command [view; internal query, not an AI tool]",
+    to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
+    job: "Exact structured fields become a canonical server preview; signed effect leads",
+    reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock · preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
-    states: [["ambiguous", "One question · choice chips · no Commit button", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1], ["offline", "Save candidate; no fake preview"]],
-    spec: "Ambiguity (“half” = ½ bbl keg, or half the remaining ⅙?) renders a question with choice chips and no Commit; this frame is the resolved proposal after that choice. The preview query is internal, never an AI tool.",
-    body: (<>
-      {E.hd("Composer", "proposal")}
-      {E.row("“Blew a half of Hazy at the taproom”")}
-      {E.num("−1 × Hazy IPA · ½ bbl keg", "Taproom · depletion · −½ bbl")}
-      {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
-      {E.pick("Location", "Taproom", ["Warehouse", "Taproom"])}
-      {E.pick("Type", "Depletion", ["Depletion", "Loss", "Adjustment"])}
-      {E.info("Document numbers are assigned on commit.")}
-      {E.sp()}
-      {E.btns([["Open as form", "g"], ["Commit movement", "irr"]])}
-    </>),
+    states: [["editing", "Any field edit removes the proposal and Commit", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1]],
+    spec: "The live no-model path requires exact fields before preview. The preview query is internal, never an AI tool; the proposal contains only its canonical effects and warnings.",
+    body: <>
+      <ComposerMovementPickerView
+        draft={{ skuId: "hazy-half", kind: "depletion", locationId: "taproom", binId: "walk-in", lotChoice: "untracked", qty: "1", saleChannelId: "taproom-channel" }}
+        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
+        locations={[{ id: "taproom", label: "Taproom" }]}
+        bins={[{ id: "walk-in", label: "Walk-in" }]}
+        lots={[]}
+        channels={[{ id: "taproom-channel", label: "Taproom" }]}
+        question={false}
+        proposal
+      />
+      <ComposerProposalView
+        effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
+        warnings={[]}
+        openHref="#"
+        openTo="Record movement"
+        onCommit={() => undefined}
+      />
+    </>,
   },
   {
     step: 4,
@@ -875,60 +884,58 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer question",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer proposal" },
-    job: "One question, chips, no Commit until the SKU is chosen",
-    reads: "preview_command [view; internal query, not an AI tool]",
+    to: { "Preview movement": "Composer question" },
+    job: "One exact missing-field question; no Commit until every required field is chosen",
+    reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
-    states: [["ambiguous", "choice chips · no Commit"], ["resolved", "opens Composer proposal"]],
-    spec: "Named in Composer proposal states and never drawn until now. “Blew a half of Hazy” must pick the package before a Commit exists.",
-    body: (<>
-      {E.hd("Composer", "question")}
-      {E.row("“Blew a half of Hazy at the taproom”")}
-      {E.ttl("Which half?")}
-      {E.chips(["½ bbl keg", "Half the remaining ⅙"], -1)}
-      {E.info("The verb stays off until this is answered.")}
-    </>),
+    states: [["missing SKU", "structured picker · no Commit"], ["resolved", "Preview movement becomes available"]],
+    spec: "The no-model path asks for the first missing structured field. This initial state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
+    body: <>
+      <ComposerMovementPickerView
+        draft={{}}
+        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
+        locations={[{ id: "taproom", label: "Taproom" }]}
+        bins={[]}
+        lots={[]}
+        channels={[{ id: "taproom-channel", label: "Taproom" }]}
+      />
+      <ComposerQuestionView prompt="Which SKU / package?" />
+    </>,
   },
   {
     step: 4,
     slice: 1,
     tab: "Today",
     group: "Global",
-    name: "Composer answer", gatedBy: "Program 15",
+    name: "Composer answer",
     to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
     spec: "History is a visible control in the composer strip; no swipe-only interaction.",
-    body: (<>
-      {E.hd("Composer", "answer")}
-      {E.row("“How much Hazy can I promise Friday?”")}
-      {E.num("11 × ½ bbl", "plus 40 cases · 2 orders compete for 6")}
-      {E.row("Shortfall detail", "who competes for the 6", E.act("Review"))}
-    </>),
+    body: <ComposerAnswerView
+      query="How much Hazy is available to promise?"
+      answer="11 × ½ bbl"
+      detail="plus 40 cases · current brewery ATP"
+      observedAt="Sep 10, 2026, 10:00 AM"
+    />,
   },
   {
     step: 4,
     slice: 1,
     group: "Global",
-    surface: "sheet",
-    name: "Offline outbox", gatedBy: "Program 15",
-    to: { Fix: "Cellar transfer", Discard: "Offline outbox", "Record movement · Hazy": "Record movement", "Record fermentation reading · FV3": "Fermentation reading", "Record cellar transfer · FV2": "Cellar transfer", "Record pick · ORD-0229": "Pick" },
-    job: "Retry safely; separate response loss from permanent rejection",
+    name: "Offline outbox",
+    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading" },
+    job: "Retry an exact captured reading without broadening offline writes",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves the others queued"]],
-    spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result. Discard is per row as well as bulk: a write that can never succeed (a role that changed under it, a validation the server will refuse again) otherwise forces someone to bin the two retryable writes beside it to clear the one that is stuck. A row whose permission changed is never replayed, so it carries no Retry at all; the copy names the role it was written under, because the person holding the phone is usually not the person who changed it.",
-    body: (<>
-      {E.row("Record movement · Hazy", "waiting for wifi", <>{E.act("Retry", "attention")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record fermentation reading · FV3", "response lost", <>{E.act("Check")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record cellar transfer · FV2", "validation failed", <>{E.act("Fix", "attention")}{E.act("Discard", "destructive")}</>, "w", WifiDisconnected01Icon)}
-      {E.row("Record pick · ORD-0229", "your role changed · this will not be sent", E.act("Discard", "destructive"), "w", WifiDisconnected01Icon)}
-      {E.btn("Retry 1 waiting")}
-      {E.note("Discard asks you to confirm. These 4 unsent writes are deleted.")}
-      {E.btn("Discard 4 queued writes", "del")}
-    </>),
+    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"]],
+    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original.",
+    body: <OfflineOutboxView rows={[
+      { id: "reading-fv3", label: "Record fermentation reading · FV3", status: "response not confirmed", retryable: true, fixHref: "#", fixTo: "Fermentation reading" },
+      { id: "reading-fv2", label: "Record fermentation reading · FV2", status: "your role changed from brewer · this will not be sent" },
+    ]} />,
   },
   {
     step: 5,
@@ -1675,22 +1682,20 @@ export const SCREENS: Screen[] = [
     group: "Global",
     surface: "sheet",
     name: "Fermentation reading",
-    to: { "Record reading": "Vessel detail" },
+    to: { "Save reading": "Vessel detail", "Retry exact reading": "Fermentation reading", "Fix as new reading": "Fermentation reading", "Discard FV3 reading": "Fermentation reading" },
     job: "Record any values taken, in the unit set on Settings · Units",
-    reads: "get_cellar_map [view; occupancy + last reading] · get_gravity_unit",
-    writes: "record_fermentation_reading [design; mutable reading row]",
-    states: permitted("brewer or admin required"),
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default. The gravity field is labelled and read in whichever unit the reader chose on Settings, then Units; there is no toggle on this sheet, because a unit is a standing preference rather than a per-reading decision. Gravity is stored in degrees Plato whatever is chosen, so switching never moves a reading already taken.",
-    body: (<>
-      {E.qty("1.019", "prior 1.021", "Gravity (per your unit setting)")}
-      {E.qty("68.2", "°F · prior 67.8", "Temperature")}
-      {E.qty("", "prior 4.21", "pH")}
-      {E.info("Enter only values taken now; blanks are not rewritten.")}
-      {E.inp("Note", "optional")}
-      {E.pin(<>
-        {E.btn("Record reading")}
-      </>)}
-    </>),
+    reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
+    writes: "record_fermentation_reading [one immutable reading row]",
+    states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
+    spec: "Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    body: (() => {
+      const formId = "fermentation-reading-form";
+      const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
+      return <>
+        <FermentationReadingView formId={formId} values={values} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
+      </>;
+    })(),
   },
   {
     step: 7,
@@ -1810,7 +1815,7 @@ export const SCREENS: Screen[] = [
     name: "Packaging runs",
     to: { Resolve: "Close packaging run", Start: "Close packaging run", "Pick source": "Schedule packaging run", "RUN-0030 \u00b7 Pils cans": "Run closed", "RUN-0029 \u00b7 Hazy \u00bd bbl": "Run closed", "RUN-0028 \u00b7 Helles cans": "Run closed" },
     job: "See what is planned, what is due and what closed, and schedule the next run",
-    reads: "list_packaging_runs [design; planned and recent closed, by planned date] · get_material_shortfalls [view; per planned run]",
+    reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
     states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
     spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
@@ -2493,7 +2498,7 @@ export const SCREENS: Screen[] = [
     name: "Planning",
     to: { "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
     job: "See demand gaps and draft one purchase order per vendor, without priority state",
-    reads: "get_planning_shortfalls [view; demand, supply and gap by week; supply must net open purchase orders] · get_material_requirements · list_vendors_and_contracts",
+    reads: "get_material_requirements",
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
     states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
     spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
@@ -2836,6 +2841,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Formats",
+    to: { "Open format": "Format" },
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",

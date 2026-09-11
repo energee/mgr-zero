@@ -32,6 +32,7 @@ describe("POST /api/command bearer auth", () => {
   let secondAdminToken: string;
   let warehouseToken: string;
   const executionHandler = vi.fn(async (_ctx: Ctx, _input: Record<string, never>, execution: CommandExecution) => execution);
+  const chatExecutionHandler = vi.fn(async (_ctx: Ctx, _input: Record<string, never>, execution: CommandExecution) => execution);
 
   beforeAll(async () => {
     breweryId = (await makeBrewery()).id;
@@ -47,6 +48,13 @@ describe("POST /api/command bearer auth", () => {
       input: z.object({}),
       roles: ["admin"],
       handler: executionHandler,
+    });
+    defineCommand({
+      name: "chat_execution_probe", input: z.object({}), roles: ["admin"], aiExposed: true,
+      risk: "append_only", requiresConfirmation: true, compensation: null,
+      idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
+      preview: async () => ({ effects: [], warnings: [], version: {} }),
+      handler: chatExecutionHandler,
     });
   });
 
@@ -68,6 +76,20 @@ describe("POST /api/command bearer auth", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("serializes and propagates chat preview provenance with the expected context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: async () => ({ ok: true, data: {} }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const conversationId = randomUUID();
+    const previewToken = randomUUID();
+    try {
+      await command("brewery-id", "record_movement", {}, randomUUID(), {
+        actorId: "00000000-0000-4000-8000-000000000001", breweryId: "brewery-id",
+      }, { origin: "chat", conversationId, previewToken });
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body).toMatchObject({ origin: "chat", conversationId, previewToken, expectedContext: { breweryId: "brewery-id" } });
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it("forwards the same caller-owned request ID on invitation retries", async () => {
@@ -176,11 +198,31 @@ describe("POST /api/command bearer auth", () => {
     expect(res.status).toBe(200);
     expect(json).toMatchObject({ ok: true, requestId, correlationId: expect.any(String) });
     expect(json.correlationId).not.toBe(requestId);
-    expect(executionHandler).toHaveBeenCalledExactlyOnceWith(
-      expect.anything(),
-      {},
-      { requestId, correlationId: json.correlationId },
-    );
+    const [, input, execution] = executionHandler.mock.calls.at(-1)!;
+    expect(input).toEqual({});
+    expect(execution).toEqual({ requestId, correlationId: json.correlationId, origin: "ui" });
+  });
+
+  it("passes chat provenance only to an exposed confirmed command and rejects missing preview metadata", async () => {
+    const conversationId = randomUUID();
+    const previewToken = randomUUID();
+    const requestId = randomUUID();
+    const accepted = await POST(commandReq({ breweryId, name: "chat_execution_probe", input: {}, requestId,
+      origin: "chat", conversationId, previewToken, expectedContext: { actorId: adminId, breweryId } }, adminToken));
+    expect(accepted.status).toBe(200);
+    expect(chatExecutionHandler).toHaveBeenCalledWith(expect.anything(), {}, expect.objectContaining({
+      requestId, origin: "chat", conversationId, previewToken,
+    }));
+
+    const refused = await POST(commandReq({ breweryId, name: "execution_metadata_probe", input: {}, requestId: randomUUID(),
+      origin: "chat", conversationId }, adminToken));
+    expect(refused.status).toBe(400);
+    await expect(refused.json()).resolves.toMatchObject({ ok: false, error: { code: "preview_required" } });
+
+    const uiWithChatToken = await POST(commandReq({ breweryId, name: "execution_metadata_probe", input: {}, requestId: randomUUID(),
+      origin: "ui", conversationId, previewToken }, adminToken));
+    expect(uiWithChatToken.status).toBe(400);
+    await expect(uiWithChatToken.json()).resolves.toMatchObject({ ok: false, error: { code: "preview_required" } });
   });
 
   it("rejects a bad token", async () => {

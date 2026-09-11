@@ -7,6 +7,7 @@
 // material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
+import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 import { defineCommand, defineQuery, unwrap, CommandError, type Ctx } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
@@ -302,16 +303,11 @@ defineCommand({
 // occupancy takes none at all.
 defineCommand({
   name: "record_fermentation_reading",
-  description: "Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note",
-  input: z.object({
-    occupancyId: z.string().uuid(),
-    at: z.string().datetime({ offset: true }),
-    tempF: z.number(),
-    gravityPlato: z.number().optional(),
-    ph: z.number().optional(),
-    note: z.string().optional(),
-  }),
-  roles: ["admin", "brewer"],
+  description: "Log one timestamped fermentation reading against an open occupancy; this is the only current operation eligible for exact offline replay",
+  input: fermentationReadingInput,
+  roles: [...fermentationReadingOfflinePolicy.roles],
+  idempotency: fermentationReadingOfflinePolicy.idempotency,
+  offlineReplay: fermentationReadingOfflinePolicy.offlineReplay,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_fermentation_reading", {
     p_brewery: ctx.breweryId, p_occupancy: i.occupancyId, p_at: i.at, p_temp_f: i.tempF,
     p_gravity_plato: i.gravityPlato ?? null, p_ph: i.ph ?? null, p_note: i.note ?? null,

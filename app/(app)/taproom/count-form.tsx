@@ -212,7 +212,8 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
       router.refresh();
     } catch (error) {
       const message = countError(error);
-      setState((current) => failCountAttempt(current, countFailureKind(error instanceof CommandResponseError ? error.status : null, message, retrying), message));
+      const response = error instanceof CommandResponseError ? error : null;
+      setState((current) => failCountAttempt(current, countFailureKind(response?.status ?? null, message, retrying, response?.code), message));
     }
   }
 
@@ -269,7 +270,8 @@ export function TaproomCountCorrection({ breweryId, locationId, countId, lines }
       await command(breweryId, "correct_taproom_count", started.attempt.payload, started.attempt.requestId, expectedContext.current);
     } catch (error) {
       const message = countError(error);
-      const failure = countFailureKind(error instanceof CommandResponseError ? error.status : null, message, retrying);
+      const response = error instanceof CommandResponseError ? error : null;
+      const failure = countFailureKind(response?.status ?? null, message, retrying, response?.code);
       setState((current) => failCorrectionAttempt(current, failure === "unknown" ? "unknown" : "error", message));
       return;
     }

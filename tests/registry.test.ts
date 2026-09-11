@@ -37,6 +37,7 @@ describe("command registry", () => {
     const execution: CommandExecution = {
       requestId: "c1fd34ef-bb45-4f64-bff6-6a78d16129cc",
       correlationId: "4b6017b6-66e9-469d-8d83-3f6f7f2db667",
+      origin: "ui",
     };
     const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
 

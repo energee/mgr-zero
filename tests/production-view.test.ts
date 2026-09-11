@@ -51,6 +51,7 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/batches"/);
     expect(page).toMatch(/<BatchesView\b/);
+    expect(page).toMatch(/className="self-start"><VesselForm \/>/);
     expect(page).toMatch(/<NewBatchForm\b/);
     expect(page).not.toMatch(/ScheduleBatchView/);
   });
@@ -67,6 +68,15 @@ describe("Schedule batch view", () => {
     const html = htmlOf(createElement(ScheduleBatchView, { model: toScheduleBatchViewProps(scheduleBatchHazy) }));
     expect(html).toMatch(/>Save schedule</);
     expect(html).not.toMatch(/href="\/batches"/);
+    expect(html).toMatch(/Note · optional/);
+  });
+
+  it("the live new-batch wrapper mounts the shared controlled body", () => {
+    const form = src("app/(app)/batches/new-batch-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/schedule-batch"/);
+    expect(form).toMatch(/<ScheduleBatchView\b/);
+    expect(form).toMatch(/controls=\{controls\}/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 });
 
@@ -143,6 +153,7 @@ describe("Recipes view", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
     expect(page).toMatch(/<NewRecipeForm\b/);
+    expect(src("app/(app)/recipes/new-recipe-form.tsx")).not.toMatch(/New recipe/);
   });
 
   it("the Recipe inventory record is RecipeView", () => {

@@ -13,6 +13,9 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { VolumeField } from "@/components/mgr/volume-field";
+import { ComposerStripView } from "@/components/mgr/views/composer";
+import { composerActions } from "@/lib/composer/state";
+import type { StaffRole } from "@/lib/commands/registry";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,7 +25,6 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -421,14 +423,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (portal = false) => (
-    <InputGroup>
-      <InputGroupTextarea rows={1} placeholder={portal ? "Ask about this account or repeat an order…" : "Say what happened…"} />
-      <InputGroupAddon align="inline-end">
-        <Button variant="ghost" size="sm">History</Button>
-      </InputGroupAddon>
-    </InputGroup>
-  ),
+  comp: (role: StaffRole = "admin") => <ComposerStripView actions={composerActions(role).map((action) => ({ value: action.id, label: action.label }))} />,
 };
 
 function isPin(n: ReactNode) {

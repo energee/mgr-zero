@@ -1,0 +1,249 @@
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { E } from "@/components/mgr/e";
+import { SCREENS } from "@/components/mgr/screens";
+import { ComposerProposalView, ComposerQuestionView, ComposerStripView } from "@/components/mgr/views/composer";
+import { canRun, runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+import {
+  beginComposerCommit,
+  composerActions,
+  composerInitialState,
+  completeComposerCommit,
+  createComposerRequestGuard,
+  editMovementDraft,
+  failComposerCommit,
+  movementFormHref,
+  movementFormInstanceKey,
+  movementIsLocked,
+  movementQuestion,
+  receiveProposal,
+  resetComposerScope,
+  retireMovementProposal,
+  toMovementInput,
+} from "@/lib/composer/state";
+
+const ids = {
+  skuId: "11111111-1111-4111-8111-111111111111",
+  locationId: "22222222-2222-4222-8222-222222222222",
+  binId: "33333333-3333-4333-8333-333333333333",
+  channelId: "44444444-4444-4444-8444-444444444444",
+};
+
+describe("structured composer state", () => {
+  it("drops late success and failure after an in-flight Composer request is retired", async () => {
+    const guard = createComposerRequestGuard();
+    let resolveLate!: (value: string) => void;
+    const lateSuccess = guard.run(() => new Promise<string>((resolve) => { resolveLate = resolve; }));
+    guard.invalidate();
+    resolveLate("stale proposal");
+    await expect(lateSuccess).resolves.toBeNull();
+
+    let rejectLate!: (error: Error) => void;
+    const lateFailure = guard.run(() => new Promise<string>((_resolve, reject) => { rejectLate = reject; }));
+    guard.invalidate();
+    rejectLate(new Error("stale preview failure"));
+    await expect(lateFailure).resolves.toBeNull();
+
+    await expect(guard.run(async () => { throw new Error("current failure"); })).rejects.toThrow("current failure");
+  });
+
+  it("accepts legal decimal strings without binary-float artifacts and rejects unsafe quantities", () => {
+    const complete = {
+      skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
+      locationId: ids.locationId, binId: ids.binId, lotChoice: "untracked" as const,
+    };
+    for (const qty of ["0.07", "0.14", "0.29", "0.58", "1.15", ".5", "10", "10.20"]) {
+      expect(movementQuestion({ ...complete, qty }), qty).toBeNull();
+      expect(toMovementInput({ ...complete, qty })?.qty, qty).toBe(Number(qty));
+    }
+    for (const qty of ["", "0", "-1", "0.001", "1.234", "Infinity", "1e309", "1e2", "not-a-number"]) {
+      expect(movementQuestion({ ...complete, qty })?.field, qty).toBe("qty");
+      expect(toMovementInput({ ...complete, qty }), qty).toBeNull();
+    }
+  });
+
+  it("asks for every risky blank and never creates a commit from a question", () => {
+    let state = composerInitialState("actor:brewery:admin");
+    expect(movementQuestion(state.draft)).toMatchObject({ field: "skuId", prompt: expect.stringMatching(/SKU|package/i) });
+
+    state = editMovementDraft(state, { skuId: ids.skuId, kind: "adjustment" });
+    expect(movementQuestion(state.draft)?.field).toBe("direction");
+    state = editMovementDraft(state, { direction: "remove", locationId: ids.locationId });
+    expect(movementQuestion(state.draft)?.field).toBe("binId");
+    state = editMovementDraft(state, { binId: ids.binId, lotChoice: "untracked", qty: "0.5" });
+    expect(movementQuestion(state.draft)).toBeNull();
+    expect(beginComposerCommit(state)).toMatchObject({ envelope: null });
+  });
+
+  it("derives the signed registered input, invalidates edited previews, and emits one explicit commit", () => {
+    let state = composerInitialState("actor:brewery:admin");
+    state = editMovementDraft(state, {
+      ...ids,
+      kind: "depletion",
+      lotChoice: "untracked",
+      qty: "1",
+      saleChannelId: ids.channelId,
+    });
+    expect(toMovementInput(state.draft)).toEqual({
+      skuId: ids.skuId,
+      locationId: ids.locationId,
+      binId: ids.binId,
+      qty: -1,
+      type: "depletion",
+      saleChannelId: ids.channelId,
+    });
+
+    state = receiveProposal(state, {
+      name: "record_movement",
+      input: toMovementInput(state.draft)!,
+      previewToken: "55555555-5555-4555-8555-555555555555",
+      effects: [{ label: "Hazy IPA case · Taproom · Walk-in", qty: "-1" }],
+      warnings: [],
+    }, "66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777");
+
+    const first = beginComposerCommit(state);
+    expect(first.envelope).toMatchObject({ name: "record_movement", requestId: "77777777-7777-4777-8777-777777777777" });
+    expect(beginComposerCommit(first.state).envelope).toBeNull();
+
+    const edited = editMovementDraft(state, { qty: "2" });
+    expect(edited.proposal).toBeNull();
+    expect(edited.commitRequestId).toBeNull();
+  });
+
+  it("retires an unsubmitted proposal but freezes a dispatched or uncertain attempt on its exact identity", () => {
+    const draft = {
+      skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
+      locationId: ids.locationId, binId: ids.binId, lotChoice: "untracked" as const, qty: "1",
+    };
+    const pending = receiveProposal({ ...composerInitialState("actor:brewery:admin"), draft }, {
+      name: "record_movement", input: toMovementInput(draft)!, previewToken: "55555555-5555-4555-8555-555555555555",
+      effects: [{ label: "Hazy IPA case · Taproom · Walk-in", qty: "1" }], warnings: [],
+    }, "66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777");
+    const retired = retireMovementProposal(pending);
+    expect(retired).toMatchObject({ proposal: null, commitRequestId: null, committing: false, draft, conversationId: pending.conversationId });
+    expect(beginComposerCommit(retired).envelope).toBeNull();
+
+    const dispatched = beginComposerCommit(pending);
+    expect(dispatched.envelope).toMatchObject({ requestId: pending.commitRequestId, input: pending.proposal?.input, retrying: false });
+    expect(movementIsLocked(dispatched.state)).toBe(true);
+    expect(retireMovementProposal(dispatched.state)).toBe(dispatched.state);
+    expect(editMovementDraft(dispatched.state, { qty: "2" })).toBe(dispatched.state);
+
+    const unknown = failComposerCommit(dispatched.state, null);
+    expect(unknown).toMatchObject({
+      proposal: pending.proposal,
+      commitRequestId: pending.commitRequestId,
+      conversationId: pending.conversationId,
+      committing: false,
+      commitHadUncertainOutcome: true,
+    });
+    expect(retireMovementProposal(unknown)).toBe(unknown);
+    const retry = beginComposerCommit(unknown);
+    expect(retry.envelope).toMatchObject({ requestId: pending.commitRequestId, input: pending.proposal?.input, retrying: true });
+    expect(failComposerCommit(retry.state, 409, "conflict")).toMatchObject({
+      proposal: pending.proposal,
+      commitRequestId: pending.commitRequestId,
+      commitHadUncertainOutcome: true,
+    });
+
+    const contextChanged = failComposerCommit(dispatched.state, 409, "context_changed");
+    expect(contextChanged).toMatchObject({ proposal: pending.proposal, commitRequestId: pending.commitRequestId, commitHadUncertainOutcome: true });
+    expect(failComposerCommit(dispatched.state, 409, "conflict")).toMatchObject({ proposal: null, commitRequestId: null, commitHadUncertainOutcome: false });
+    expect(completeComposerCommit(retry.state)).toMatchObject({ proposal: null, commitRequestId: null, committing: false, commitHadUncertainOutcome: false });
+
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toMatch(/function retireMovement\(\)[\s\S]{0,160}movementLockRef\.current[\s\S]{0,160}invalidateMovementRequest\(\)/);
+    expect(live).toMatch(/async function chooseAction[\s\S]{0,220}if \(!retireMovement\(\)\) return/);
+    expect(live).toMatch(/async function changeDraft[\s\S]{0,160}movementLockRef\.current/);
+    expect(live).toMatch(/async function previewMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
+    expect(live).toMatch(/async function commitMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
+    expect(live.match(/requestGuardRef\.current\.run/g)).toHaveLength(2);
+  });
+
+  it("preserves known fields when opening the ordinary movement form", () => {
+    const handoffId = "88888888-8888-4888-8888-888888888888";
+    const href = movementFormHref({
+      skuId: ids.skuId,
+      locationId: ids.locationId,
+      binId: ids.binId,
+      qty: -0.5,
+      type: "depletion",
+      saleChannelId: ids.channelId,
+      note: "Festival tent",
+    }, handoffId);
+    const url = new URL(href, "https://mgr.test");
+    expect(url.pathname).toBe("/inventory");
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      recordMovement: "1",
+      skuId: ids.skuId,
+      locationId: ids.locationId,
+      binId: ids.binId,
+      qty: "-0.5",
+      type: "depletion",
+      saleChannelId: ids.channelId,
+      note: "Festival tent",
+      movementHandoff: handoffId,
+    });
+    expect(movementFormInstanceKey(handoffId)).toBe(movementFormInstanceKey(handoffId));
+    expect(movementFormInstanceKey("99999999-9999-4999-8999-999999999999")).not.toBe(movementFormInstanceKey(handoffId));
+    expect(movementFormInstanceKey()).toBe("manual");
+
+    const page = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    expect(page).toContain("key={movementFormInstanceKey(handoffId)}");
+  });
+
+  it("denies composer and history operations to customers and does not mount a portal composer", async () => {
+    expect(composerActions("customer")).toEqual([]);
+    expect(composerActions("sales").flatMap((action) => action.queries)).toEqual(["list_skus", "get_atp"]);
+    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, role: "customer" } as Parameters<typeof canRun>[0];
+    for (const name of ["preview_command", "create_chat_conversation", "append_chat_message", "list_chat_conversations", "get_chat_history"]) {
+      expect(canRun(customer, name), name).toBe(false);
+      await expect(runCommand(name, {}, customer), name).rejects.toMatchObject({ status: 403, code: "permission_denied" });
+    }
+    expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
+    expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).not.toContain("E.comp(true)");
+
+    const populated = {
+      ...composerInitialState("actor-a:brewery-a:admin"),
+      historyOpen: true,
+      history: [{ id: "message", role: "assistant" as const, content: "private answer", created_at: "now" }],
+    };
+    expect(resetComposerScope(populated, "actor-b:brewery-b:admin")).toEqual(composerInitialState("actor-b:brewery-b:admin"));
+  });
+
+  it("shares structured composer views with the staff shell and filters shell actions by persona role", () => {
+    expect(E.comp().type).toBe(ComposerStripView);
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toContain("<ComposerMovementPickerView");
+    expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
+    expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
+    expect(composerActions("admin").map((action) => action.id)).toEqual(["record_movement", "read_atp"]);
+    expect(composerActions("sales").map((action) => action.id)).toEqual(["read_atp"]);
+    expect(composerActions("brewer")).toEqual([]);
+  });
+
+  it("renders reachable structured picker states and proposals only from canonical effect fields", () => {
+    const question = renderToStaticMarkup(createElement(ComposerQuestionView, { prompt: "Which package?" }));
+    expect(question).not.toContain("Commit movement");
+    const questionScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer question")!.body));
+    const proposalScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer proposal")!.body));
+    for (const label of ["SKU / package", "Type", "Location", "Bin", "Lot", "Positive quantity"]) {
+      expect(questionScreen, label).toContain(label);
+      expect(proposalScreen, label).toContain(label);
+    }
+    expect(questionScreen).not.toContain("Blew a half");
+    expect(proposalScreen).not.toContain("Blew a half");
+    const proposal = renderToStaticMarkup(createElement(ComposerProposalView, {
+      effects: [{ label: "Canonical IPA · Taproom · Cold", qty: "-1", stockBeforeQty: "4", stockAfterQty: "3" }],
+      warnings: ["Registration needs review"],
+      onCommit: () => undefined,
+    }));
+    expect(proposal).toContain("Canonical IPA");
+    expect(proposal).toContain("selected stock 4 to 3");
+    expect(proposal).toContain("Registration needs review");
+    expect(proposal).not.toContain("previewToken");
+  });
+});

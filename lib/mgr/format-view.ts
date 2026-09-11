@@ -14,6 +14,9 @@ export type FormatViewModel = {
   basisOptions: string[];
   packageType: string;
   packageOptions: string[];
+  kegSize: string;
+  kegSizeOptions: string[];
+  unitsPerCase: string;
   volumeValue: string;
   volumeUnits: Array<"oz" | "gal" | "bbl">;
   volumeUnitIndex: number;
@@ -34,6 +37,8 @@ export type FormatSnapshot = {
     name: string;
     basis: "packaged" | "poured";
     package_type: string | null;
+    keg_size?: string | null;
+    units_per_case?: number | null;
     bbl_per_unit: string | number | null;
     composed?: boolean;
   };
@@ -68,6 +73,9 @@ export function toFormatViewProps({
     basisOptions: ["packaged", "poured"],
     packageType: format.package_type ?? "",
     packageOptions,
+    kegSize: format.keg_size ?? "half_bbl",
+    kegSizeOptions: ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"],
+    unitsPerCase: format.units_per_case == null ? "" : String(format.units_per_case),
     volumeValue: volume.value,
     volumeUnits: UNITS,
     volumeUnitIndex: volume.index,

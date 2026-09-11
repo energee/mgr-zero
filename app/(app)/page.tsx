@@ -15,11 +15,12 @@ import "@/lib/commands/all";
 import { FirstRunChecklist, type FirstRun } from "./first-run";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
+import { formatDayHeader } from "@/lib/date-format";
 
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const date = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "numeric", day: "numeric" }).format(new Date());
+  const date = formatDayHeader(new Date());
   if (brewery.role === "admin") {
     const state = (await runCommand("get_first_run_state", {}, ctx)) as FirstRun;
     if (!state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;

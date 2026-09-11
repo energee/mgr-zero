@@ -125,6 +125,7 @@ describe("taproom count controlled state", () => {
   it("keeps a post-commit 500 and other uncertain failures frozen while definitive validation unlocks a fresh request", () => {
     for (const status of [408, 429, 500, 502]) expect(countFailureKind(status, "request not confirmed")).toBe("unknown");
     expect(countFailureKind(409, "count today in the brewery timezone; historical counts cannot use current stock")).toBe("stale");
+    expect(countFailureKind(409, "count today in the brewery timezone; historical counts cannot use current stock", false, "context_changed")).toBe("unknown");
     let state = countDraftFromSnapshot(snapshot, null);
     for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, String(line.qtyBefore));
     state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000006");

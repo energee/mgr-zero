@@ -154,11 +154,11 @@ export function beginTapBoardAttempt(state: TapBoardState, requestId: string): T
   return { ...state, sheet: { ...state.sheet, attempt } };
 }
 
-export function failTapBoardAttempt(state: TapBoardState, status: number | null, message: string, retrying: boolean): TapBoardState {
+export function failTapBoardAttempt(state: TapBoardState, status: number | null, message: string, retrying: boolean, code?: string): TapBoardState {
   if (!state.sheet) return state;
   const attempt = state.sheet.attempt;
   if (attempt.kind !== "submitting") return state;
-  return { ...state, sheet: { ...state.sheet, attempt: status !== null && canRetireCommandFailure(status, retrying)
+  return { ...state, sheet: { ...state.sheet, attempt: status !== null && canRetireCommandFailure(status, retrying, code)
     ? { kind: "error", message }
     : { ...attempt, kind: "unknown", message } } };
 }

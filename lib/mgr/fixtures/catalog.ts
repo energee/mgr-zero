@@ -182,8 +182,8 @@ export const formatCan: FormatSnapshot = {
 export const packageBomCase: PackageBomSnapshot = {
   format: { id: FMT_CASE, name: "case · 24×16 oz" },
   lines: [
-    { id: "bom-can", material: { id: "mat-can", name: "16 oz can" }, qty_per_unit: 24 },
-    { id: "bom-end", material: { id: "mat-end", name: "Can end" }, qty_per_unit: 24 },
-    { id: "bom-tray", material: { id: "mat-tray", name: "Case tray" }, qty_per_unit: 1 },
+    { id: "bom-can", material: { id: "mat-can", name: "16 oz can" }, qty_per_unit: 24, on_break: "consumed" },
+    { id: "bom-end", material: { id: "mat-end", name: "Can end" }, qty_per_unit: 24, on_break: "consumed" },
+    { id: "bom-tray", material: { id: "mat-tray", name: "Case tray" }, qty_per_unit: 1, on_break: "return_to_stock" },
   ],
 };

@@ -13,6 +13,7 @@ import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
 import { ScreenFrame } from "../components/mgr/screen-frame";
+import { DatePicker } from "../components/mgr/date-picker";
 
 /** One screen's body as static markup, by name. Rendered once and kept: the
  *  suite asks for the same handful of screens across a dozen assertions. */
@@ -323,7 +324,7 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
-      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count",
+      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
@@ -464,6 +465,11 @@ describe("SCREENS", () => {
     expect(renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date")))).toContain("Pick a date");
   });
 
+  it("renders the controlled date value used by live shared forms", () => {
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
+    expect(html).toContain("August 31, 2027");
+  });
+
   it("falls back to initials when a person has no fixture photo", () => {
     const render = (node: ReturnType<typeof E.face>) => renderToStaticMarkup(createElement("div", null, node));
     // Initials sit under the photo, so the markup a static export ships keeps
@@ -579,7 +585,7 @@ describe("SCREENS", () => {
       expect(pin.length, `${name}: pin lifted`).toBe(1);
       expect.soft(renderToStaticMarkup(createElement("div", null, s!.body)), `${name}: number input`).toMatch(/<input[^>]*type="number"/);
       const pinHtml = renderToStaticMarkup(createElement("div", null, pin));
-      expect(pinHtml, `${name}: commit verb inside pin`).toMatch(/Record (movement|reading|addition|transfer|count|repack)/);
+      expect(pinHtml, `${name}: commit verb inside pin`).toMatch(/Record (movement|addition|transfer|count|repack)|Save reading/);
     }
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
