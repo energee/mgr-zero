@@ -1,7 +1,7 @@
-// lib/mgr/fixtures/compliance.ts — compliance month, registry, and lot snapshots.
-import type { BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
+// lib/mgr/fixtures/compliance.ts — compliance month, licenses, sheet, and lot snapshots.
+import { APPROVAL_KINDS, type BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
 import type { ComplianceMonthsViewModel } from "@/lib/mgr/compliance-months-view";
-import type { ComplianceRegistrySnapshot } from "@/lib/mgr/compliance-registry-view";
+import type { LicensesSnapshot } from "@/lib/mgr/licenses-view";
 import type { LicenseViewModel } from "@/lib/mgr/license-view";
 import type { LotTraceSnapshot } from "@/lib/mgr/lot-trace-view";
 import type { StateRegistrationViewModel } from "@/lib/mgr/state-registration-view";
@@ -12,39 +12,27 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
     { key: "2026-08", title: "August 2026", detail: "filed 2026-09-02 · 41.20 bbl taxable", tone: "ok" },
     { key: "2026-07", title: "July 2026", detail: "filed 2026-08-04 · 38.75 bbl taxable", tone: "ok" },
   ],
-  registry: { key: "registry", title: "Compliance registry", detail: "brands, states and licenses" },
+  registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses" },
   lots: [{ key: "l-hz", title: "L-240831-HZ", detail: "Hazy IPA · packaged 2026-08-31" }],
 };
 
-export const complianceRegistryDemo: ComplianceRegistrySnapshot = {
-  brands: [
-    {
-      id: "hazy", name: "Hazy IPA",
-      approvals: [{ id: "cola", brand_id: "hazy", kind: "cola", ttb_id: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
-      registrations: [{ id: "oh", brand_id: "hazy", state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],
-    },
-    { id: "stout", name: "Stout", approvals: [], registrations: [] },
-  ],
+export const licensesDemo: LicensesSnapshot = {
   licenses: [
     { id: "pa", state: "PA", kind: "brewery", license_no: "G-21884", expires_on: "2027-06-30", note: null },
   ],
-  note: "Order confirmation does not read this registry yet; a warning for an unregistered destination state is planned and will never block.",
+  note: "Order confirmation does not read licenses yet; a warning for an unlicensed destination state is planned and will never block.",
 };
 
 export const brandApprovalStout: BrandApprovalViewModel = {
-  brandId: "stout",
   brand: "Stout",
-  brandOptions: [],
   kind: "cola",
-  kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
+  kindOptions: APPROVAL_KINDS,
   number: "260135",
   submittedOn: "2026-01-15",
 };
 
 export const stateRegistrationHazy: StateRegistrationViewModel = {
-  brandId: "hazy",
   brand: "Hazy IPA",
-  brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
   state: "OH",
   registrationNo: "OH-88214",
   expiresOn: "2026-12-31",

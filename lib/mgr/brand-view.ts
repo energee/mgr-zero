@@ -1,6 +1,9 @@
 // lib/mgr/brand-view.ts — view-model for Brand detail. list_brands (one row)
-// plus list_price_groups and the brewery's styles paint BrandView.
+// plus list_price_groups, the brewery's styles, and the brand's rows from
+// get_compliance_registry paint BrandView.
+import type { RegistryBrand } from "@/lib/commands/compliance";
 import { plural } from "./plural";
+import { expires, type RegistryRowView } from "./registry-rows";
 
 export type BrandViewModel = {
   backHref?: string;
@@ -16,9 +19,8 @@ export type BrandViewModel = {
   hops: string;
   skuList: string;
   skuListHref: string;
-  /** Federal label approval, as a status line: the COLA row is read-only here. */
-  cola: string;
-  colaHref: string;
+  /** The brand's own compliance: its COLA/formula approvals and state registrations; a pending row when no COLA is on file. */
+  compliance: RegistryRowView[];
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
@@ -41,18 +43,37 @@ export type BrandSnapshot = {
   categories?: string[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
-  /** upsert_brand_approval row for this brand, or null when none is on file.
-   *  `number` is the applicant's own serial; a COLA never expires. */
-  cola?: { number: string | null } | null;
+  /** This brand's rows from get_compliance_registry. Absent means none on file. */
+  compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
 };
+
+/** A COLA is filed under a serial and never expires; a formula keeps its TTB number; registrations do expire. */
+export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
+  const rows: RegistryRowView[] = [
+    ...approvals.map((approval) => ({
+      key: approval.id,
+      title: approval.kind === "cola" ? `COLA serial ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
+      detail: approval.approved_on ? `submitted ${approval.approved_on}` : "not submitted",
+      verb: "Edit",
+    })),
+    ...registrations.map((registration) => ({
+      key: registration.id,
+      title: `${registration.state} registration`,
+      detail: `${registration.registration_no ?? "no number"}${expires(registration.expires_on)}`,
+      verb: "Edit",
+    })),
+  ];
+  if (!approvals.some((approval) => approval.kind === "cola")) rows.unshift({ key: "cola-pending", title: "COLA", detail: "pending", warning: true });
+  return rows;
+}
 
 export function toBrandViewProps({
   brand,
   styles,
   categories = CATEGORIES,
   priceGroups,
-  cola,
+  compliance = { approvals: [], registrations: [] },
   backHref,
 }: BrandSnapshot): BrandViewModel {
   const group = priceGroups.find((g) => g.id === brand.price_group_id);
@@ -74,7 +95,6 @@ export function toBrandViewProps({
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),
     skuListHref: "/catalog",
-    cola: cola?.number ? `Approved · serial ${cola.number}` : "Not on file",
-    colaHref: "/compliance/registry",
+    compliance: brandComplianceRows(compliance),
   };
 }

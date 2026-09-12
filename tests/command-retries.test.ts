@@ -53,10 +53,10 @@ it("only hands a committed result to the form receipt after success, including e
   let form: ReturnType<typeof useCommandForm>;
   function Harness() { form = useCommandForm("record_movement", { build: () => ({ qty: 2 }), reset: vi.fn(), onSuccess: data => received.push(data) }); return null; }
   renderToStaticMarkup(createElement(Harness));
-  await form!.submit({ preventDefault() {} } as React.FormEvent);
+  await form!.submit({ preventDefault() {}, stopPropagation() {} } as React.FormEvent);
   expect(received).toEqual([]);
   fail = false;
-  await form!.submit({ preventDefault() {} } as React.FormEvent);
+  await form!.submit({ preventDefault() {}, stopPropagation() {} } as React.FormEvent);
   expect(ids[0]).toBe(ids[1]);
   expect(received).toEqual([receipt]);
 });

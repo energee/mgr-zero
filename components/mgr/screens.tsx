@@ -38,7 +38,7 @@ import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
-import { ComplianceRegistryView } from "@/components/mgr/views/compliance-registry";
+import { LicensesView } from "@/components/mgr/views/licenses";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
@@ -170,7 +170,7 @@ import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAugust } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
-  brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
 } from "@/lib/mgr/fixtures/compliance";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
@@ -189,7 +189,7 @@ import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
 import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
-import { toComplianceRegistryViewProps } from "@/lib/mgr/compliance-registry-view";
+import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
 import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
@@ -939,7 +939,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_atp",
     writes: "confirm_order · cancel_order",
     states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"]],
-    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the Compliance registry and never blocks.",
+    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
@@ -1429,12 +1429,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { COLA: "Brand approval" },
+    to: { Edit: "Brand approval", "COLA serial 260135": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration" },
     job: "Sellable facts without ledger writes, including the TTB fields",
-    reads: "list_brands · list_skus · get_compliance_registry [the brand's COLA row]",
-    writes: "upsert_brand · update_sku · create_sku",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["no COLA", "the row reads Not on file and still opens Brand approval", 1]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here. The COLA row is a read-only status (approval number, or Not on file) that opens the Brand approval sheet; federal approval is edited there and on Compliance registry, never twice.",
+    reads: "list_brands · list_skus · get_compliance_registry [this brand’s approvals and registrations]",
+    writes: "upsert_brand · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["new brand", "compliance sheets wait until the brand is saved"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. The brewery’s own licenses are the Licenses page under Compliance, never a brand row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} />,
   },
   {
@@ -2180,14 +2180,14 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 6,
     tab: "More",
-    name: "Compliance registry",
-    to: { Edit: "Brand approval", "Hazy IPA": "Brand approval", Stout: "Brand approval" },
-    job: "Maintain brand and state permissions used by order warnings",
+    name: "Licenses",
+    to: { Edit: "License" },
+    job: "Maintain the brewery’s own state licenses",
     reads: "get_compliance_registry",
-    writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license",
-    states: [["pending", "a brand with no COLA is flagged", 1], ["empty", "no brands yet: nothing to register"], ["permission", "sales or admin required", 1]],
-    spec: "Unregistered destination/brand combinations are meant to warn during order confirm and link here; that read is not built yet (drift: order warning). One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
-    body: <ComplianceRegistryView model={toComplianceRegistryViewProps(complianceRegistryDemo)} />,
+    writes: "upsert_brewery_state_license",
+    states: [["current", "orders may proceed"], ["empty", "no licenses yet: Add license is the only action"], ["permission", "sales or admin required", 1]],
+    spec: "The brewery’s licenses, not any brand’s: one row per state and kind (brewery, supplier, direct to consumer), so no brand tab and no toggle. A brand’s COLA, formula approvals and state registrations live on that Brand. Order confirmation is meant to read all three and warn on an unlicensed or unregistered destination; that read is not built yet (drift: order warning).",
+    body: <LicensesView model={toLicensesViewProps(licensesDemo)} />,
   },
   {
     step: 7,
@@ -2195,7 +2195,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Brand approval",
-    to: { "Save approval": "Compliance registry" },
+    to: { "Save approval": "Brand" },
     job: "Record one brand’s federal approval status",
     reads: "get_compliance_registry",
     writes: "upsert_brand_approval",
@@ -2209,7 +2209,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "State registration",
-    to: { "Save registration": "Compliance registry" },
+    to: { "Save registration": "Brand" },
     job: "Record permission to sell one brand in one state",
     reads: "get_compliance_registry",
     writes: "upsert_state_registration",
@@ -2222,7 +2222,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "License",
-    to: { "Save license": "Compliance registry" },
+    to: { "Save license": "Licenses" },
     job: "Record one brewery state license",
     reads: "get_compliance_registry",
     writes: "upsert_brewery_state_license",

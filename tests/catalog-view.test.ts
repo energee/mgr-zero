@@ -140,12 +140,14 @@ describe("Brand view", () => {
     expect(model.hops).toBe("Citra, Mosaic");
     expect(model.skuList).toBe("3 active packages");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
-    expect(model.cola).toBe("Approved · serial 260135");
+    expect(model.compliance.map((row) => row.title)).toEqual(["COLA serial 260135", "OH registration"]);
+    expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15", verb: "Edit" });
+    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
   });
 
-  it("says the COLA is not on file when the brand has no approval", () => {
-    const model = toBrandViewProps({ ...brandHazy, cola: null });
-    expect(model.cola).toBe("Not on file");
+  it("flags a brand with no COLA as pending, with nothing to edit", () => {
+    const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
+    expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {
@@ -154,8 +156,12 @@ describe("Brand view", () => {
     expect(html).toMatch(/Sell sheet/);
     expect(html).toMatch(/SKU list/);
     expect(html).toMatch(/3 active packages/);
-    expect(html).toMatch(/COLA/);
-    expect(html).toMatch(/Approved · serial 260135/);
+    expect(html).toMatch(/Compliance/);
+    expect(html).toMatch(/COLA serial 260135/);
+    expect(html).toMatch(/OH registration/);
+    expect(html).toMatch(/>Add approval</);
+    expect(html).toMatch(/>Add registration</);
+    expect(html).not.toMatch(/Not on file/);
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).not.toMatch(/→/);
   });
