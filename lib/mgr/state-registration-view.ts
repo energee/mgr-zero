@@ -1,9 +1,7 @@
-// lib/mgr/state-registration-view.ts — view-model for State registration sheet.
+// lib/mgr/state-registration-view.ts — view-model for State registration
+// sheet. Opened from one brand, so the brand is stated, not picked.
 export type StateRegistrationViewModel = {
-  brandId: string;
   brand: string;
-  /** Empty when the sheet is opened from a brand: the subject is already known. */
-  brandOptions: { id: string; label: string }[];
   state: string;
   registrationNo?: string;
   expiresOn?: string;

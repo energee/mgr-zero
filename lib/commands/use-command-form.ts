@@ -48,6 +48,16 @@ export function useCommandAction() {
   return { busy, error, failure, setError, run };
 }
 
+/** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them. */
+export function useFields<T extends Record<string, string>>(initial: T) {
+  const [v, setV] = useState(initial);
+  const set = (k: keyof T) => (x: string) => setV((s) => ({ ...s, [k]: x }));
+  return { v, set, reset: () => setV(initial) };
+}
+
+/** An optional field is sent only when filled. */
+export const orUndef = (s: string) => s || undefined;
+
 export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void }) {
   const { busy, error, setError, run } = useCommandAction();
   const [open, setOpenState] = useState(false);
@@ -59,6 +69,9 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // A sheet is a form in a dialog portal; React bubbles its submit through
+    // the tree, so an enclosing page form must never see it.
+    e.stopPropagation();
     await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); });
   }
 

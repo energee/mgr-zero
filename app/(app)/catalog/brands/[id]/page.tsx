@@ -27,7 +27,7 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
       brand={brand}
       styles={[...new Set(brands.map((b) => b.styles?.name).filter((s): s is string => !!s))]}
       priceGroups={groups}
-      compliance={own ? { approvals: own.approvals, registrations: own.registrations } : undefined}
+      compliance={own}
       writable={brewery.role === "admin" || brewery.role === "sales"}
     />
   );

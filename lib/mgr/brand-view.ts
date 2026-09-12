@@ -1,16 +1,9 @@
 // lib/mgr/brand-view.ts — view-model for Brand detail. list_brands (one row)
 // plus list_price_groups, the brewery's styles, and the brand's rows from
 // get_compliance_registry paint BrandView.
-import type { Approval, Registration } from "@/lib/commands/compliance";
+import type { RegistryBrand } from "@/lib/commands/compliance";
 import { plural } from "./plural";
-
-export type BrandComplianceRow = {
-  key: string;
-  title: string;
-  detail: string;
-  verb?: string;
-  warning?: boolean;
-};
+import { expires, type RegistryRowView } from "./registry-rows";
 
 export type BrandViewModel = {
   backHref?: string;
@@ -26,9 +19,8 @@ export type BrandViewModel = {
   hops: string;
   skuList: string;
   skuListHref: string;
-  /** The brand's own compliance: its COLA/formula approvals and state registrations, or one pending row. */
-  compliance: BrandComplianceRow[];
-  colaPending: boolean;
+  /** The brand's own compliance: its COLA/formula approvals and state registrations; a pending row when no COLA is on file. */
+  compliance: RegistryRowView[];
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
@@ -52,15 +44,13 @@ export type BrandSnapshot = {
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
   /** This brand's rows from get_compliance_registry. Absent means none on file. */
-  compliance?: { approvals: Approval[]; registrations: Registration[] };
+  compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
 };
 
-const expires = (date: string | null) => date ? ` · expires ${date}` : "";
-
 /** A COLA is filed under a serial and never expires; a formula keeps its TTB number; registrations do expire. */
-export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): BrandComplianceRow[] {
-  const rows: BrandComplianceRow[] = [
+export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
+  const rows: RegistryRowView[] = [
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA serial ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
@@ -106,6 +96,5 @@ export function toBrandViewProps({
     skuList: plural(active, "active package"),
     skuListHref: "/catalog",
     compliance: brandComplianceRows(compliance),
-    colaPending: !compliance.approvals.some((approval) => approval.kind === "cola"),
   };
 }

@@ -1,5 +1,5 @@
 // lib/mgr/fixtures/compliance.ts — compliance month, licenses, sheet, and lot snapshots.
-import type { BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
+import { APPROVAL_KINDS, type BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
 import type { ComplianceMonthsViewModel } from "@/lib/mgr/compliance-months-view";
 import type { LicensesSnapshot } from "@/lib/mgr/licenses-view";
 import type { LicenseViewModel } from "@/lib/mgr/license-view";
@@ -24,19 +24,15 @@ export const licensesDemo: LicensesSnapshot = {
 };
 
 export const brandApprovalStout: BrandApprovalViewModel = {
-  brandId: "stout",
   brand: "Stout",
-  brandOptions: [],
   kind: "cola",
-  kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
+  kindOptions: APPROVAL_KINDS,
   number: "260135",
   submittedOn: "2026-01-15",
 };
 
 export const stateRegistrationHazy: StateRegistrationViewModel = {
-  brandId: "hazy",
   brand: "Hazy IPA",
-  brandOptions: [],
   state: "OH",
   registrationNo: "OH-88214",
   expiresOn: "2026-12-31",

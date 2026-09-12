@@ -143,12 +143,10 @@ describe("Brand view", () => {
     expect(model.compliance.map((row) => row.title)).toEqual(["COLA serial 260135", "OH registration"]);
     expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15", verb: "Edit" });
     expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
-    expect(model.colaPending).toBe(false);
   });
 
   it("flags a brand with no COLA as pending, with nothing to edit", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
-    expect(model.colaPending).toBe(true);
     expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
   });
 

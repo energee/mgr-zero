@@ -126,7 +126,7 @@ describe("registry sheets", () => {
   });
 
   it("states a known brand instead of picking one", () => {
-    const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, brandOptions: [] } }));
+    const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
     expect(html).toContain("Stout");
     expect(html).not.toMatch(/<button[^>]*aria-label="Brand"/);
   });

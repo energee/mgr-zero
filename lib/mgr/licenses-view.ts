@@ -2,17 +2,11 @@
 // The brewery's own state licenses, one per state and kind. Brand approvals
 // and state registrations are the brand's and paint on Brand (brand-view.ts).
 import type { License } from "@/lib/commands/compliance";
-
-export type LicenseRowView = {
-  key: string;
-  title: string;
-  detail: string;
-  verb?: string;
-};
+import { expires, type RegistryRowView } from "@/lib/mgr/registry-rows";
 
 export type LicensesViewModel = {
   backHref?: string;
-  licenses: LicenseRowView[];
+  licenses: RegistryRowView[];
   note: string;
 };
 
@@ -21,8 +15,6 @@ export type LicensesSnapshot = {
   licenses: License[];
   note: string;
 };
-
-const expires = (date: string | null) => date ? ` · expires ${date}` : "";
 
 export function toLicensesViewProps(s: LicensesSnapshot): LicensesViewModel {
   return {

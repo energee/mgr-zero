@@ -2181,7 +2181,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Licenses",
-    to: { Edit: "License", Compliance: "Compliance months" },
+    to: { Edit: "License" },
     job: "Maintain the brewery’s own state licenses",
     reads: "get_compliance_registry",
     writes: "upsert_brewery_state_license",
