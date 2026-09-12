@@ -23,7 +23,6 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
   const minimized = isMobile ? "92px" : MINIMIZED;
   const snapPoint = !chatOpen ? minimized : expanded ? EXPANDED : COMPACT;
   const setSnapPoint = (point: string | number | null) => {
-    setInteracted(true);
     const nextOpen = point !== minimized;
     setExpanded(point === EXPANDED);
     if (open === undefined) setInternalOpen(nextOpen);
@@ -50,11 +49,10 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
           className="group h-11 w-full shrink-0 cursor-grab touch-pan-x active:cursor-grabbing"
           onPointerDown={(event) => {
             setInteracted(true);
-            const start = { x: event.clientX, y: event.clientY };
-            const release = (end: PointerEvent) => {
-              if (Math.hypot(end.clientX - start.x, end.clientY - start.y) < 8) setSnapPoint(nextSnapPoint);
-            };
-            addEventListener("pointerup", release, { once: true });
+            const startY = event.clientY;
+            addEventListener("pointerup", ({ clientY }) => {
+              if (Math.abs(clientY - startY) < 8) setSnapPoint(nextSnapPoint);
+            }, { once: true });
           }}
         >
           <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="pointer-events-none h-11 w-full rounded-none" onClick={() => setSnapPoint(nextSnapPoint)}>
