@@ -157,7 +157,7 @@ describe("SCREENS", () => {
       "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
       "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
       "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",
-      "app/(app)/catalog/brand-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
+      "app/(app)/catalog/brands/[id]/brand-page.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
       "app/(app)/settings/channels/page.tsx",
       "app/(app)/settings/channels/delete-channel-button.tsx",
     ];

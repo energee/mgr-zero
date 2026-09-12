@@ -22,6 +22,7 @@ export type BrandViewModel = {
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
+export const UNPRICED = "Unpriced";
 
 export type BrandSnapshot = {
   brand: {
@@ -55,6 +56,7 @@ export function toBrandViewProps({
   backHref,
 }: BrandSnapshot): BrandViewModel {
   const group = priceGroups.find((g) => g.id === brand.price_group_id);
+  // "Unpriced" is a real choice: a brand on no group cannot be ordered.
   const active = brand.skus.filter((s) => s.active).length;
   const style = brand.styles?.name ?? "";
   const styleOptions = style && !styles.includes(style) ? [style, ...styles] : styles;
@@ -66,13 +68,13 @@ export function toBrandViewProps({
     abv: brand.abv == null || brand.abv === "" ? "" : String(Number(brand.abv)),
     category: brand.category ?? "",
     categoryOptions: categories,
-    priceGroup: group?.name ?? "",
-    priceGroupOptions: priceGroups.map((g) => g.name),
+    priceGroup: group?.name ?? UNPRICED,
+    priceGroupOptions: [UNPRICED, ...priceGroups.map((g) => g.name)],
     description: brand.description ?? "",
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),
     skuListHref: "/catalog",
     cola: cola?.number ? `Approved · serial ${cola.number}` : "Not on file",
-    colaHref: "/compliance",
+    colaHref: "/compliance/registry",
   };
 }

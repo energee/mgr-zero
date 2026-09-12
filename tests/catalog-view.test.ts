@@ -117,7 +117,10 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    expect(src).toMatch(/<BrandForm\b/);
+    // Brand is a page, not a dialog: New Brand and Edit brand are links to it.
+    expect(src).not.toMatch(/<BrandForm\b/);
+    expect(src).toMatch(/"\/catalog\/brands\/new"/);
+    expect(src).toMatch(/`\/catalog\/brands\/\$\{brand\.id\}`/);
     expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);

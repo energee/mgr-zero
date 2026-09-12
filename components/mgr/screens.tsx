@@ -2198,9 +2198,9 @@ export const SCREENS: Screen[] = [
     to: { "Save approval": "Compliance registry" },
     job: "Record one brand’s federal approval status",
     reads: "get_compliance_registry",
-    writes: "upsert_brand_approval [approved_on carries the submitted date and expires_on is never sent; renaming and dropping them is SCHEMA-GATE]",
+    writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked: the sheet is only ever opened from one brand"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
-    spec: "A COLA is filed under the applicant’s own serial (260135), not a TTB-issued number, and it never expires: the sheet asks for the serial and the date submitted, and offers no expiry. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand.",
+    spec: "A COLA is filed under the applicant’s own serial (260135), not a TTB-issued number, and it never expires: the sheet asks for the serial and the date submitted, and offers no expiry; the stored approval-date column carries the submitted date and the expiry column is never written; renaming and dropping them waits for a migration. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand.",
     body: <BrandApprovalView model={toBrandApprovalViewProps(brandApprovalStout)} />,
   },
   {

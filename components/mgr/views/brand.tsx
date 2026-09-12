@@ -1,37 +1,61 @@
-// components/mgr/views/brand.tsx — Brand detail drawing. Inventory paints
-// edits + Save. Live BrandForm stays a wrapper: E.edit is not a controlled
-// CommandForm.
+// components/mgr/views/brand.tsx — Brand page body, shared by the inventory
+// (fixture values, uncontrolled) and app/(app)/catalog/brands/[id] (controlled
+// through `controls`, bound to upsert_brand). Style is typed against the
+// brewery's own styles as suggestions: an unmatched entry is the Add path.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 
 export type { BrandViewModel };
 
+export type BrandControls = Partial<Record<"name" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
+
+const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
+
 export function BrandView({
   model,
+  controls = {},
   createAction,
+  messages,
   footer,
   linkRows,
 }: {
   model: BrandViewModel;
+  controls?: BrandControls;
   createAction?: ReactNode;
+  messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: SKU list nav is a link. */
+  /** Live: SKU list and COLA rows are links. */
   linkRows?: boolean;
 }) {
+  const styleList = "brand-style-options";
   return (
     <>
-      {E.back("Catalog", model.name, createAction, model.backHref)}
-      {E.edit("Brand name", model.name)}
+      {E.back("Catalog", model.name || "New brand", createAction, model.backHref)}
+      <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />
       {E.cols(
-        <Fragment key="style">{E.pick("Style", model.style, model.styleOptions)}</Fragment>,
-        <Fragment key="abv">{E.edit("ABV", model.abv)}</Fragment>,
-        <Fragment key="category">{E.pick("Category", model.category, model.categoryOptions)}</Fragment>,
-        <Fragment key="price">{E.pick("Price group", model.priceGroup, model.priceGroupOptions)}</Fragment>,
+        <Field key="style">
+          <FieldLabel>Style</FieldLabel>
+          <Input
+            aria-label="Style"
+            list={styleList}
+            value={controls.style ? model.style : undefined}
+            defaultValue={controls.style ? undefined : model.style}
+            onChange={(event) => controls.style?.(event.target.value)}
+          />
+          <datalist id={styleList}>{model.styleOptions.map((o) => <option key={o} value={o} />)}</datalist>
+        </Field>,
+        <Fragment key="abv"><RegistryInput label="ABV" value={model.abv} onChange={controls.abv} /></Fragment>,
+        <Fragment key="category"><RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" /></Fragment>,
+        <Fragment key="price"><RegistrySelect label="Price group" value={model.priceGroup} options={asOptions(model.priceGroupOptions)} onChange={controls.priceGroup} /></Fragment>,
       )}
       {E.ttl("Sell sheet")}
-      {E.edit("Description", model.description)}
-      {E.edit("Hops", model.hops)}
+      <RegistryInput label="Description" value={model.description} onChange={controls.description} />
+      <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
+      {messages}
       {footer !== undefined ? footer : E.btn("Save brand")}
       {E.nav("SKU list", model.skuList, "", undefined, linkRows ? model.skuListHref : undefined)}
       {E.nav("COLA", model.cola, "", undefined, linkRows ? model.colaHref : undefined)}
