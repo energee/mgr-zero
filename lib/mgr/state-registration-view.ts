@@ -2,6 +2,7 @@
 export type StateRegistrationViewModel = {
   brandId: string;
   brand: string;
+  /** Empty when the sheet is opened from a brand: the subject is already known. */
   brandOptions: { id: string; label: string }[];
   state: string;
   registrationNo?: string;

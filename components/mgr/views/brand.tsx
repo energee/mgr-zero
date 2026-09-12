@@ -2,6 +2,8 @@
 // (fixture values, uncontrolled) and app/(app)/catalog/brands/[id] (controlled
 // through `controls`, bound to upsert_brand). Style is typed against the
 // brewery's own styles as suggestions: an unmatched entry is the Add path.
+// Compliance is the brand's: its approvals and state registrations list here
+// with their sheets; the brewery's licenses are their own page.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -22,14 +24,20 @@ export function BrandView({
   messages,
   footer,
   linkRows,
+  actions = {},
+  addCompliance,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
   createAction?: ReactNode;
   messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: SKU list and COLA rows are links. */
+  /** Live: the SKU list row is a link. */
   linkRows?: boolean;
+  /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
+  actions?: Record<string, ReactNode>;
+  /** Live: the Add approval / Add registration sheets; null hides them. */
+  addCompliance?: ReactNode;
 }) {
   const styleList = "brand-style-options";
   return (
@@ -58,7 +66,13 @@ export function BrandView({
       {messages}
       {footer !== undefined ? footer : E.btn("Save brand")}
       {E.nav("SKU list", model.skuList, "", undefined, linkRows ? model.skuListHref : undefined)}
-      {E.nav("COLA", model.cola, "", undefined, linkRows ? model.colaHref : undefined)}
+      {E.ttl("Compliance")}
+      {model.compliance.map((row) => (
+        <Fragment key={row.key}>
+          {E.row(row.title, row.detail, row.key in actions ? actions[row.key] : (row.verb ? E.act(row.verb) : ""), row.warning ? "w" : "")}
+        </Fragment>
+      ))}
+      {addCompliance !== undefined ? addCompliance : E.btns([["Add approval", "g"], ["Add registration", "g"]])}
     </>
   );
 }

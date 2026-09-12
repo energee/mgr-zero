@@ -7,16 +7,18 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
-import { ComplianceRegistryView } from "../components/mgr/views/compliance-registry";
+import { LicensesView } from "../components/mgr/views/licenses";
 import { LicenseView } from "../components/mgr/views/license";
 import { LotTraceView } from "../components/mgr/views/lot-trace";
 import { StateRegistrationView } from "../components/mgr/views/state-registration";
 import {
-  brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
 } from "../lib/mgr/fixtures/compliance";
 import { toBrandApprovalViewProps } from "../lib/mgr/brand-approval-view";
 import { toComplianceMonthsViewProps } from "../lib/mgr/compliance-months-view";
-import { toComplianceRegistryViewProps } from "../lib/mgr/compliance-registry-view";
+import { toLicensesViewProps } from "../lib/mgr/licenses-view";
+import { toBrandViewProps } from "../lib/mgr/brand-view";
+import { brandHazy } from "../lib/mgr/fixtures/catalog";
 import { toLicenseViewProps } from "../lib/mgr/license-view";
 import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
 import { toStateRegistrationViewProps } from "../lib/mgr/state-registration-view";
@@ -33,9 +35,10 @@ describe("Compliance months", () => {
     expect(body.props.model).toEqual(toComplianceMonthsViewProps(complianceMonthsDemo));
   });
 
-  it("renders registry and lot navs without leaking live hrefs", () => {
+  it("renders licenses and lot navs without leaking live hrefs", () => {
     const html = htmlOf(createElement(ComplianceMonthsView, { model: toComplianceMonthsViewProps(complianceMonthsDemo) }));
-    expect(html).toMatch(/Compliance registry/);
+    expect(html).toMatch(/Licenses/);
+    expect(html).not.toMatch(/Compliance registry/);
     expect(html).toMatch(/L-240831-HZ/);
     expect(html).not.toMatch(/href="\/compliance/);
   });
@@ -47,21 +50,31 @@ describe("Compliance months", () => {
   });
 });
 
-describe("Compliance registry", () => {
-  it("the Compliance registry inventory record is ComplianceRegistryView", () => {
-    const body = screen("Compliance registry").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(ComplianceRegistryView);
-    expect(body.props.model).toEqual(toComplianceRegistryViewProps(complianceRegistryDemo));
+describe("Licenses", () => {
+  it("the Licenses inventory record is LicensesView: the brewery's licenses, no brand tab", () => {
+    const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(LicensesView);
+    expect(body.props.model).toEqual(toLicensesViewProps(licensesDemo));
+    const html = htmlOf(screen("Licenses").body);
+    expect(html).not.toMatch(/tablist/);
+    expect(html).not.toMatch(/Hazy IPA|COLA|registration/);
+    expect(html).toMatch(/PA brewery/);
   });
 
-  it("the live registry page mounts ComplianceRegistryView and slots the forms", () => {
-    const page = src("app/(app)/compliance/registry/page.tsx");
-    expect(page).toMatch(/<ComplianceRegistryView\b/);
-    expect(page).toMatch(/<ApprovalForm\b/);
-    expect(page).toMatch(/<RegistrationForm\b/);
+  it("the live licenses page mounts LicensesView and slots the license form only", () => {
+    const page = src("app/(app)/compliance/licenses/page.tsx");
+    expect(page).toMatch(/<LicensesView\b/);
     expect(page).toMatch(/<LicenseForm\b/);
+    expect(page).not.toMatch(/ApprovalForm|RegistrationForm/);
     expect(page).not.toMatch(/import \{ E \}/);
     expect(page).not.toMatch(/\bE\./);
+  });
+
+  it("the live Brand page slots approval and registration sheets per row", () => {
+    const page = src("app/(app)/catalog/brands/[id]/brand-page.tsx");
+    expect(page).toMatch(/<ApprovalForm\b/);
+    expect(page).toMatch(/<RegistrationForm\b/);
+    expect(page).not.toMatch(/LicenseForm/);
   });
 });
 
@@ -85,15 +98,17 @@ describe("registry sheets", () => {
     expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 
-  it("lists a COLA by serial and submitted date, never an expiry", () => {
-    const model = toComplianceRegistryViewProps(complianceRegistryDemo);
-    const brand = model.brands[0]!;
-    const cola = brand.rows.find((row) => String(row.title).startsWith("COLA"))!;
-    expect(brand.detail).toMatch(/^COLA serial /);
-    expect(brand.detail).not.toMatch(/expires/);
+  it("lists a COLA on its brand by serial and submitted date, never an expiry", () => {
+    const cola = toBrandViewProps(brandHazy).compliance.find((row) => row.title.startsWith("COLA"))!;
     expect(cola.title).toMatch(/^COLA serial /);
     expect(cola.detail).toMatch(/^submitted |^not submitted$/);
     expect(cola.detail).not.toMatch(/expires/);
+  });
+
+  it("states a known brand on a registration instead of picking one", () => {
+    const html = htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy }));
+    expect(html).toContain("Hazy IPA");
+    expect(html).not.toMatch(/<button[^>]*aria-label="Brand"/);
   });
 
   it("names the COLA number a serial and never offers an expiry: COLAs do not expire", () => {
@@ -120,22 +135,20 @@ describe("registry sheets", () => {
     expect(htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout, footer: null }))).not.toMatch(/Save approval/);
     expect(htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy, footer: null }))).not.toMatch(/Save registration/);
     expect(htmlOf(createElement(LicenseView, { model: licensePaBrewery, footer: null }))).not.toMatch(/Save license/);
-    const model = toComplianceRegistryViewProps(complianceRegistryDemo);
-    const defaultRegistry = htmlOf(createElement(ComplianceRegistryView, { model }));
-    const registry = htmlOf(createElement(ComplianceRegistryView, {
-      model,
-      actions: { cola: null },
-    }));
-    expect(registry.match(/>Edit<\/button>/g)).toHaveLength((defaultRegistry.match(/>Edit<\/button>/g)?.length ?? 0) - 1);
+    const model = toLicensesViewProps(licensesDemo);
+    const defaultLicenses = htmlOf(createElement(LicensesView, { model }));
+    const licenses = htmlOf(createElement(LicensesView, { model, actions: { pa: null } }));
+    expect(licenses.match(/>Edit<\/button>/g) ?? []).toHaveLength((defaultLicenses.match(/>Edit<\/button>/g)?.length ?? 0) - 1);
   });
 
-  it("the live registry wrappers mount the three shared controlled bodies", () => {
-    const forms = src("app/(app)/compliance/registry/registry-forms.tsx");
-    for (const view of ["BrandApprovalView", "StateRegistrationView", "LicenseView"]) {
+  it("the live sheet wrappers mount the three shared controlled bodies", () => {
+    const brandForms = src("app/(app)/catalog/brands/[id]/compliance-forms.tsx");
+    const licenseForm = src("app/(app)/compliance/licenses/license-form.tsx");
+    for (const [forms, view] of [[brandForms, "BrandApprovalView"], [brandForms, "StateRegistrationView"], [licenseForm, "LicenseView"]] as const) {
       expect(forms).toMatch(new RegExp(`<${view}\\b`));
+      expect(forms).toMatch(/controls=\{controls\}/);
+      expect(forms).not.toMatch(/<Label\b|<Input\b|<Select\b/);
     }
-    expect(forms).toMatch(/controls=\{controls\}/);
-    expect(forms).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 });
 

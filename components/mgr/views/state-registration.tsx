@@ -13,14 +13,18 @@ export function StateRegistrationView({ model, controls = {}, locked = false, me
 }) {
   return (
     <>
-      <RegistrySelect
-        label="Brand"
-        value={model.brandId}
-        options={model.brandOptions.map(({ id, label }) => ({ value: id, label }))}
-        onChange={controls.brandId}
-        placeholder={model.brand}
-        disabled={locked}
-      />
+      {model.brandOptions.length ? (
+        <RegistrySelect
+          label="Brand"
+          value={model.brandId}
+          options={model.brandOptions.map(({ id, label }) => ({ value: id, label }))}
+          onChange={controls.brandId}
+          placeholder={model.brand}
+          disabled={locked}
+        />
+      ) : (
+        E.fld("Brand", model.brand)
+      )}
       {E.cols(
         <RegistryInput key="state" label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
         <RegistryInput key="number" label="Registration number · optional" value={model.registrationNo ?? ""} onChange={controls.registrationNo} />,
