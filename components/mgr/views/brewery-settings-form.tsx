@@ -31,7 +31,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
     {field("ttb", "TTB registry number")}
     {field("pa", "PA license")}
     {field("phone", "Customer-facing phone", "tel")}
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
       <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
       {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: (value) => change("hours", value), min: 1, max: 168 })}
     </div>
