@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { InputGroupAddon } from "@/components/ui/input-group";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import type { GatewayModelOption } from "@/lib/chat/models";
 
@@ -20,23 +24,35 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
   const options = models.some((model) => model.id === value) ? models : [{ id: value, name: value }, ...models];
   const selected = options.find((model) => model.id === value);
   const selectedPrice = priceLabel(selected);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   return <section className="flex flex-col gap-3" aria-label="AI model settings">
     <FieldGroup>
       <Field data-disabled={!onChange || busy || models.length === 0 || undefined} data-invalid={Boolean(error) || undefined}>
         <FieldLabel htmlFor="brewery-ai-model">AI model</FieldLabel>
-        <Select value={value} disabled={!onChange || busy || models.length === 0} onValueChange={onChange}>
-          <SelectTrigger id="brewery-ai-model" className="w-full" aria-invalid={Boolean(error) || undefined}>
-            <SelectValue>{selected ? <><AiModelIcon modelId={selected.id} />{selected.name}</> : value}</SelectValue>
-          </SelectTrigger>
-          <SelectContent position="popper" className="w-(--radix-select-trigger-width)">
-            <SelectGroup>
-              {options.map((model) => {
-                const price = priceLabel(model);
-                return <SelectItem key={model.id} value={model.id}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span>{price && <span className="text-xs text-muted-foreground">{price}</span>}</span></SelectItem>;
-              })}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <Combobox
+          items={options}
+          value={selected ?? null}
+          open={open}
+          inputValue={open ? query : selected?.name ?? value}
+          disabled={!onChange || busy || models.length === 0}
+          itemToStringLabel={(model) => model.name}
+          itemToStringValue={(model) => model.id}
+          onOpenChange={(nextOpen) => { setOpen(nextOpen); if (nextOpen) setQuery(""); }}
+          onInputValueChange={setQuery}
+          onValueChange={(model) => model && onChange?.(model.id)}
+        >
+          <ComboboxInput id="brewery-ai-model" className="w-full" placeholder="Search models…" aria-invalid={Boolean(error) || undefined}>
+            {selected && <InputGroupAddon align="inline-start"><AiModelIcon modelId={selected.id} /></InputGroupAddon>}
+          </ComboboxInput>
+          <ComboboxContent>
+            <ComboboxEmpty>No model found.</ComboboxEmpty>
+            <ComboboxList>{(model: GatewayModelOption) => {
+              const price = priceLabel(model);
+              return <ComboboxItem key={model.id} value={model}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span>{price && <span className="text-xs text-muted-foreground">{price}</span>}</span></ComboboxItem>;
+            }}</ComboboxList>
+          </ComboboxContent>
+        </Combobox>
         <FieldDescription>{selectedPrice && <>{selectedPrice}. </>}Used by Ask MGR for everyone at this brewery. <a href="https://vercel.com/ai-gateway/models" target="_blank" rel="noreferrer">View models and promotions.</a></FieldDescription>
         {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
         <FieldError>{error}</FieldError>

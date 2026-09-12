@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
+import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { ComposerConversationView, ComposerDrawerView, ComposerProposalView } from "@/components/mgr/views/composer";
 import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
@@ -48,14 +49,24 @@ describe("AI composer", () => {
     }));
     const text = html.replace(/<[^>]*>/g, "");
     expect(html).toContain("AI model");
-    expect(text).toContain("GPT-5.4");
+    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="GPT-5\.4"/);
     expect(text).not.toContain("openai/gpt-5.4");
     expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
     expect(html).toContain('href="https://vercel.com/ai-gateway/models"');
     expect(html).toContain("<title>OpenAI</title>");
-    expect(html).toContain('data-slot="select-trigger"');
+    expect(html).toContain('placeholder="Search models…"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
     expect(html).toContain("Save AI model");
+  });
+
+  it("offers the browser's full timezone index in a searchable control", () => {
+    const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, {
+      initial: { name: "Demo", timezone: "America/New_York", ttb: "", pa: "", phone: "", hours: "24" },
+    }));
+    expect(Intl.supportedValuesOf("timeZone").length).toBeGreaterThan(400);
+    expect(html).toContain('placeholder="Search timezones…"');
+    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="America\/New_York"/);
+    expect(html).not.toContain("<datalist");
   });
 
   it("maps Gateway provider aliases to their product icons", () => {
