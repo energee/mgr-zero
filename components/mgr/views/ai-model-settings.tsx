@@ -44,11 +44,11 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
           onValueChange={(model) => model && onChange?.(model.id)}
         >
           <div ref={anchor}>
-            <ComboboxInput id="brewery-ai-model" className="w-full" placeholder="Search models…" aria-invalid={Boolean(error) || undefined}>
+            <ComboboxInput id="brewery-ai-model" placeholder="Search models…" aria-invalid={Boolean(error) || undefined}>
               {selected && !open && <InputGroupAddon align="inline-start"><AiModelIcon modelId={selected.id} /></InputGroupAddon>}
             </ComboboxInput>
           </div>
-          <ComboboxContent anchor={anchor} className="min-w-(--anchor-width)">
+          <ComboboxContent anchor={anchor}>
             <ComboboxEmpty>No model found.</ComboboxEmpty>
             <ComboboxList>{(model: GatewayModelOption) => {
               const price = priceLabel(model);

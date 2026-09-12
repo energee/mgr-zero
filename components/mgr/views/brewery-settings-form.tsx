@@ -47,9 +47,9 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         onValueChange={(timezone) => timezone && change("timezone", timezone)}
       >
         <div ref={timezoneAnchor}>
-          <ComboboxInput id={`${id}-timezone`} className="w-full" placeholder="Search timezones…" required />
+          <ComboboxInput id={`${id}-timezone`} placeholder="Search timezones…" required />
         </div>
-        <ComboboxContent anchor={timezoneAnchor} className="min-w-(--anchor-width)">
+        <ComboboxContent anchor={timezoneAnchor}>
           <ComboboxEmpty>No timezone found.</ComboboxEmpty>
           <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezoneLabel(timezone)}</ComboboxItem>}</ComboboxList>
         </ComboboxContent>
