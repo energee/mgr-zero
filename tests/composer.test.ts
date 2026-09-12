@@ -69,6 +69,14 @@ describe("AI composer", () => {
     expect(html).not.toContain("<datalist");
   });
 
+  it("confirms successful Settings changes with top-right toasts", () => {
+    expect(readFileSync("app/(app)/layout.tsx", "utf8")).toContain("<Toaster />");
+    expect(readFileSync("components/ui/sonner.tsx", "utf8")).toContain('position="top-right"');
+    for (const file of ["settings-form.tsx", "ai-model-settings-form.tsx", "portal-fulfillment-form.tsx"]) {
+      expect(readFileSync(`app/(app)/settings/${file}`, "utf8"), file).toContain("toast.success");
+    }
+  });
+
   it("maps Gateway provider aliases to their product icons", () => {
     for (const [modelId, title] of [
       ["alibaba/qwen3-max", "Qwen"], ["amazon/nova-pro", "Nova"], ["anthropic/claude-sonnet-4.5", "Claude"],

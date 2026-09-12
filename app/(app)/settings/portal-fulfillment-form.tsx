@@ -7,12 +7,14 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { NONE, Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toast } from "sonner";
 
 export function PortalFulfillmentForm({ locations, currentId }: { locations: { id: string; name: string }[]; currentId: string | null }) {
   const [locationId, setLocationId] = useState(currentId ?? "");
   const form = useCommandForm("set_portal_fulfillment_source", {
     build: () => ({ locationId }),
     reset: () => setLocationId(currentId ?? ""),
+    onSuccess: () => toast.success("Fulfillment warehouse updated"),
   });
   return <section className="flex flex-col gap-2">
     <h2 className="font-semibold">Portal fulfillment warehouse</h2>
