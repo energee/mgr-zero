@@ -101,6 +101,7 @@ describe("Ship-to form", () => {
     expect(model.title).toBe("Main ship-to");
     expect(model.city).toBe("Phoenixville");
     expect(model.isDefault).toBe(true);
+    expect(toShipToViewProps({ ...shipToMain, address2: "Dock 2" }).address2).toBe("Dock 2");
   });
 
   it("the Ship-to form inventory record is ShipToView", () => {

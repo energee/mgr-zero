@@ -723,7 +723,7 @@ describe("SCREENS", () => {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const html = renderToStaticMarkup(createElement("div", null, s!.body));
-      expect(html, name).toMatch(/aria-label="Decrease"/);
+      expect(html, name).toMatch(name === "New order" ? /aria-label="Decrease Line 1 quantity"/ : /aria-label="Decrease"/);
     }
     for (const name of ["Short pick", "Ship and invoice"]) {
       const s = SCREENS.find((x) => x.name === name);

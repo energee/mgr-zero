@@ -3,6 +3,7 @@ export type ShipToViewModel = {
   title: string;
   label: string;
   address: string;
+  address2: string;
   city: string;
   state: string;
   zip: string;
@@ -12,6 +13,7 @@ export type ShipToViewModel = {
 export type ShipToSnapshot = {
   label: string;
   address1: string;
+  address2?: string | null;
   city: string;
   state: string;
   zip: string;
@@ -23,6 +25,7 @@ export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
     title: `${s.label} ship-to`,
     label: s.label,
     address: s.address1,
+    address2: s.address2 ?? "",
     city: s.city,
     state: s.state,
     zip: s.zip,

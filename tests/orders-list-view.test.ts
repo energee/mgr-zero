@@ -50,7 +50,7 @@ describe("Orders list view loop", () => {
     const src = readFileSync("app/(app)/orders/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/orders-list"/);
     expect(src).toMatch(/<OrdersView\b/);
-    expect(src).toMatch(/createAction=\{canWrite \? <OrderForm\b/);
+    expect(src).toContain('href="/orders/new"');
     expect(src).not.toMatch(/NewOrderView/);
   });
 });
