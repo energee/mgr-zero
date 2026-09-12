@@ -135,6 +135,7 @@ export function ScreenExplorer() {
     if (el.closest("[data-gated]")) return e.preventDefault();
     if (el.matches("[data-slot=drawer-trigger]")) return;
     const link = el.closest("a");
+    if (link?.matches('[href^="https://"]')) return;
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
     const to = el.getAttribute("data-to");
     if (isInertOn(current[1], label, to)) return e.preventDefault();

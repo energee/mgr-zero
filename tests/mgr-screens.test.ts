@@ -348,6 +348,7 @@ describe("SCREENS", () => {
       // A link whose customer copy is not the screen's name declares its
       // destination with data-to (Sign in's "Forgot password?" → Reset password).
       for (const [, tag, link] of html.matchAll(/(<a [^>]*>)(.*?)<\/a>/g)) {
+        if (/href="https:\/\//.test(tag)) continue;
         const target = tag.match(/data-to="([^"]*)"/)?.[1] ?? link.replace(/<[^>]*>/g, "");
         expect.soft(
           screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),

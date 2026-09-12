@@ -37,7 +37,7 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
             </SelectGroup>
           </SelectContent>
         </Select>
-        <FieldDescription>{selectedPrice && <>{selectedPrice}. </>}Used by Ask MGR for everyone at this brewery.</FieldDescription>
+        <FieldDescription>{selectedPrice && <>{selectedPrice}. </>}Used by Ask MGR for everyone at this brewery. <a href="https://vercel.com/ai-gateway/models" target="_blank" rel="noreferrer">View models and promotions.</a></FieldDescription>
         {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
         <FieldError>{error}</FieldError>
       </Field>

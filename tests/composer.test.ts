@@ -51,6 +51,7 @@ describe("AI composer", () => {
     expect(text).toContain("GPT-5.4");
     expect(text).not.toContain("openai/gpt-5.4");
     expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
+    expect(html).toContain('href="https://vercel.com/ai-gateway/models"');
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('data-slot="select-trigger"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
