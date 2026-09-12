@@ -63,7 +63,7 @@ describe("AI composer", () => {
       ["alibaba/qwen3-max", "Qwen"], ["amazon/nova-pro", "Nova"], ["anthropic/claude-sonnet-4.5", "Claude"],
       ["arcee-ai/trinity-large-thinking", "Arcee"], ["cohere/command-a", "CommandA"], ["google/gemini-3-flash", "Gemini"],
       ["google/gemma-4-31b-it", "Gemma"], ["inception/mercury-2", "Inception"], ["kwaipilot/kat-coder-pro-v2", "KwaiKAT"],
-      ["moonshotai/kimi-k2.5", "Kimi"], ["morph/morph-v3-fast", "Morph"], ["poolside/laguna-s-2.1", "Poolside"],
+      ["meta/llama-4-scout", "Meta"], ["moonshotai/kimi-k2.5", "Kimi"], ["morph/morph-v3-fast", "Morph"], ["poolside/laguna-s-2.1", "Poolside"],
       ["spacexai/grok-4.20", "Grok"], ["tencent/hy4-preview", "Hunyuan"], ["zai/glm-4.7", "Z.ai"],
     ]) expect(renderToStaticMarkup(createElement(AiModelIcon, { modelId }))).toContain(`<title>${title}</title>`);
     const unknown = renderToStaticMarkup(createElement(AiModelIcon, { modelId: "sakana/fugu-max" }));

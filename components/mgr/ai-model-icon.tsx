@@ -10,7 +10,7 @@ import Gemma from "@lobehub/icons/es/Gemma/components/Color";
 import Grok from "@lobehub/icons/es/Grok/components/Mono";
 import Hunyuan from "@lobehub/icons/es/Hunyuan/components/Color";
 import Inception from "@lobehub/icons/es/Inception/components/Mono";
-import Meta from "@lobehub/icons/es/MetaAI/components/Color";
+import Meta from "@lobehub/icons/es/Meta/components/Color";
 import Minimax from "@lobehub/icons/es/Minimax/components/Color";
 import Mistral from "@lobehub/icons/es/Mistral/components/Color";
 import Kimi from "@lobehub/icons/es/Kimi/components/Color";
