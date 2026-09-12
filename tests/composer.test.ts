@@ -32,24 +32,25 @@ describe("AI composer", () => {
 
   it("offers every language model returned by Gateway", () => {
     expect(gatewayLanguageModels([
-      { id: "openai/gpt-5.4", name: "GPT-5.4", modelType: "language" },
+      { id: "openai/gpt-5.4", name: "GPT-5.4", modelType: "language", pricing: { input: "0.0000025", output: "0.000015" } },
       { id: "google/veo", name: "Veo", modelType: "video" },
       { id: "anthropic/claude", name: "Claude", modelType: null },
     ])).toEqual([
       { id: "anthropic/claude", name: "Claude" },
-      { id: "openai/gpt-5.4", name: "GPT-5.4" },
+      { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
     ]);
   });
 
   it("renders model selection as a shared Settings control", () => {
     const html = renderToStaticMarkup(createElement(AiModelSettingsView, {
       value: "openai/gpt-5.4",
-      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4" }],
+      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } }],
     }));
     const text = html.replace(/<[^>]*>/g, "");
     expect(html).toContain("AI model");
     expect(text).toContain("GPT-5.4");
     expect(text).not.toContain("openai/gpt-5.4");
+    expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('data-slot="select-trigger"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);

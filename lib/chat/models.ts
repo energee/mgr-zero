@@ -3,7 +3,7 @@ import { gateway } from "ai";
 export const DEFAULT_CHAT_MODEL = "anthropic/claude-sonnet-4.5";
 const MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
 
-export type GatewayModelOption = { id: string; name: string };
+export type GatewayModelOption = { id: string; name: string; pricing?: { input: string; output: string } | null };
 type GatewayModel = GatewayModelOption & { modelType?: string | null };
 
 export function chatModelFromSettings(settings: unknown, fallback = DEFAULT_CHAT_MODEL) {
@@ -16,7 +16,7 @@ export function chatModelFromSettings(settings: unknown, fallback = DEFAULT_CHAT
 export function gatewayLanguageModels(models: GatewayModel[]): GatewayModelOption[] {
   return models
     .filter((model) => model.modelType == null || model.modelType === "language")
-    .map(({ id, name }) => ({ id, name }))
+    .map(({ id, name, pricing }) => ({ id, name, ...(pricing ? { pricing } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

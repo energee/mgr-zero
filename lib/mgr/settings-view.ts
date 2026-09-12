@@ -1,4 +1,6 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
+import type { GatewayModelOption } from "@/lib/chat/models";
+
 export type SettingsViewModel = {
   backHref?: string;
   name: string;
@@ -9,7 +11,7 @@ export type SettingsViewModel = {
   phone: string;
   overdueHours: string;
   aiModel: string;
-  aiModels: { id: string; name: string }[];
+  aiModels: GatewayModelOption[];
   deployment: string;
   warehouse: string;
   warehouseOptions: string[];

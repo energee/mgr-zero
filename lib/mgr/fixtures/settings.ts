@@ -11,8 +11,8 @@ export const settingsDemo: SettingsViewModel = {
   overdueHours: "24",
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [
-    { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" },
-    { id: "openai/gpt-5.4", name: "GPT-5.4" },
+    { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", pricing: { input: "0.000003", output: "0.000015" } },
+    { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
   ],
   deployment: "dedicated · read-only",
   warehouse: "Warehouse",
