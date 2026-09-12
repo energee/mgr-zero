@@ -10,7 +10,7 @@ import Google from "@lobehub/icons/es/Google/components/Color";
 import Meta from "@lobehub/icons/es/MetaAI/components/Color";
 import Minimax from "@lobehub/icons/es/Minimax/components/Color";
 import Mistral from "@lobehub/icons/es/Mistral/components/Color";
-import Moonshot from "@lobehub/icons/es/Moonshot/components/Mono";
+import Kimi from "@lobehub/icons/es/Kimi/components/Color";
 import Nvidia from "@lobehub/icons/es/Nvidia/components/Color";
 import OpenAI from "@lobehub/icons/es/OpenAI/components/Mono";
 import Perplexity from "@lobehub/icons/es/Perplexity/components/Color";
@@ -19,7 +19,7 @@ import Tencent from "@lobehub/icons/es/Tencent/components/Color";
 import Vercel from "@lobehub/icons/es/Vercel/components/Mono";
 import XAI from "@lobehub/icons/es/XAI/components/Mono";
 import Xiaomi from "@lobehub/icons/es/XiaomiMiMo/components/Mono";
-import Zhipu from "@lobehub/icons/es/Zhipu/components/Color";
+import ZAI from "@lobehub/icons/es/ZAI/components/Mono";
 
 const PROVIDER_ICONS = {
   alibaba: Alibaba,
@@ -32,7 +32,7 @@ const PROVIDER_ICONS = {
   meta: Meta,
   minimax: Minimax,
   mistral: Mistral,
-  moonshotai: Moonshot,
+  moonshotai: Kimi,
   nvidia: Nvidia,
   openai: OpenAI,
   perplexity: Perplexity,
@@ -40,7 +40,7 @@ const PROVIDER_ICONS = {
   stepfun: Stepfun,
   tencent: Tencent,
   xiaomi: Xiaomi,
-  zai: Zhipu,
+  zai: ZAI,
 };
 
 export function AiModelIcon({ modelId }: { modelId: string }) {

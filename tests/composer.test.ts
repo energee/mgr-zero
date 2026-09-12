@@ -58,9 +58,9 @@ describe("AI composer", () => {
     expect(html).toContain("Save AI model");
   });
 
-  it("maps Gateway provider aliases to Lobe icons", () => {
-    const html = renderToStaticMarkup(createElement(AiModelIcon, { modelId: "zai/glm-4.7" }));
-    expect(html).toContain("<title>Zhipu</title>");
+  it("maps Gateway provider aliases to their product icons", () => {
+    expect(renderToStaticMarkup(createElement(AiModelIcon, { modelId: "zai/glm-4.7" }))).toContain("<title>Z.ai</title>");
+    expect(renderToStaticMarkup(createElement(AiModelIcon, { modelId: "moonshotai/kimi-k2.5" }))).toContain("<title>Kimi</title>");
   });
 
   it("shows the brewery model in the conversation header", () => {
