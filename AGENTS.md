@@ -125,7 +125,7 @@ approval before touching anything.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/skills/` — project-local reusable workflows; `.claude/skills` is a symlink to it (Claude Code only reads `.claude/skills`); `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
-- `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
+- `.agents/worktrees/<branch>/` — the only place for worktrees: `scripts/worktree.sh <branch> [base]` creates one, symlinks the gitignored `.env.local`/`.env.test.local` from the main checkout, and runs `bun install` (Turbopack rejects a node_modules symlink, so each worktree owns its own). Plain `git worktree add` leaves a checkout that cannot run `vitest` or `next dev`. Gitignored.
 - `.agents/agents/dreaming.md` — prompt for the dreaming workflow
   (`.github/workflows/dreaming.yml`) that curates the agent docs via a
   `dreaming/main` PR authored by the MGR GitHub App (`mgr[bot]`);
