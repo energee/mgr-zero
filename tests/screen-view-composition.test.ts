@@ -60,10 +60,25 @@ const KNOWN_INLINE_DEBT = [
 ] as const;
 
 const KNOWN_SURFACE_DEBT = [
+  "Search: CommandForm <- app/(app)/search/page.tsx",
   "Session expired: CommandForm <- app/(auth)/login/page.tsx",
+  "Disconnect QuickBooks: CommandForm <- app/(app)/settings/accounting/disconnect/page.tsx",
   "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
   "Disconnect Slack: CommandForm <- app/(app)/settings/chat/disconnect/page.tsx",
 ] as const;
+
+// Audited whole-body replacements, not action/message slots. Extend this
+// focused list as each flow is inspected; a view import alone misses these.
+const BODY_SLOTS: Record<string, string> = {
+  CatalogView: "brands",
+  ShopView: "catalog",
+  SearchView: "palette",
+};
+const KNOWN_BODY_DEBT = [
+  "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
+  "Search: SearchView.palette <- app/(app)/search/page.tsx",
+  "Shop: ShopView.catalog <- app/(portal)/portal/page.tsx",
+];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
   if (!isValidElement<{ children?: ReactNode }>(node)) return out;
@@ -87,14 +102,18 @@ function localModule(from: string, specifier: string): string | undefined {
     .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
 }
 
-/** Components actually mounted by the entry file or a mounted child component. */
-function mountedComponents(entry: string): Set<string> {
+/** Follow function-component exports, not every sibling in an imported module.
+ * Named-only entry files still need explicit route symbols to disambiguate them.
+ * This discovery check does not prove prop/slot or surface configuration parity.
+ */
+function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Set<string> {
   const components = new Set<string>();
   const visited = new Set<string>();
 
-  function visit(path: string) {
-    if (visited.has(path)) return;
-    visited.add(path);
+  function visit(path: string, exported?: string) {
+    const key = `${path}:${exported ?? "entry"}`;
+    if (visited.has(key)) return;
+    visited.add(key);
     const file = sourceFile(path);
     const imports = new Map<string, { imported: string; path?: string }>();
 
@@ -117,11 +136,31 @@ function mountedComponents(entry: string): Set<string> {
         const imported = imports.get(tag);
         const name = imported?.imported === "default" ? tag : (imported?.imported ?? tag);
         components.add(name);
-        if (imported?.path && !name.endsWith("View")) visit(imported.path);
+        if (node.attributes.properties.some(attribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
+          bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
+        }
+        if (imported?.path && !name.endsWith("View")) visit(imported.path, imported.imported);
+        if (!imported) {
+          const declaration = file.statements.find(statement =>
+            ts.isFunctionDeclaration(statement) && statement.name?.text === tag);
+          if (declaration && !visited.has(`${path}:local:${tag}`)) {
+            visited.add(`${path}:local:${tag}`);
+            walk(declaration);
+          }
+        }
       }
       ts.forEachChild(node, walk);
     }
-    walk(file);
+    const functions = file.statements.filter(ts.isFunctionDeclaration);
+    const isDefault = (node: ts.FunctionDeclaration) => node.modifiers?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword);
+    const defaultFunction = functions.find(isDefault);
+    const roots = exported === "default" || (!exported && defaultFunction)
+      ? functions.filter(isDefault)
+      : exported
+        ? functions.filter(node => node.name?.text === exported)
+        : functions.filter(node => node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
+    for (const root of roots) walk(root);
   }
 
   visit(resolve(entry));
@@ -168,5 +207,19 @@ describe("screen/live component parity", () => {
   it("follows mounted components and ignores unused view imports", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/unused.tsx")).not.toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
+  });
+
+  it("records audited whole-body slots even when the expected view is mounted", () => {
+    const bypasses = mapped.flatMap(screen => {
+      const file = routes.get(screen.name)!;
+      const overrides = new Set<string>();
+      mountedComponents(file, overrides);
+      const expected = inventoryViews(screen.body);
+      return [...overrides]
+        .filter(override => expected.has(override.split(".")[0]))
+        .map(override => `${screen.name}: ${override} <- ${file}`);
+    }).sort();
+    expect(bypasses).toEqual(KNOWN_BODY_DEBT);
   });
 });
