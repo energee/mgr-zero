@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxAnchor } from "@/components/ui/combobox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { InputGroupAddon } from "@/components/ui/input-group";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
@@ -26,6 +26,7 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
   const selectedPrice = priceLabel(selected);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const anchor = useComboboxAnchor();
   return <section className="flex flex-col gap-3" aria-label="AI model settings">
     <FieldGroup>
       <Field data-disabled={!onChange || busy || models.length === 0 || undefined} data-invalid={Boolean(error) || undefined}>
@@ -42,10 +43,12 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
           onInputValueChange={setQuery}
           onValueChange={(model) => model && onChange?.(model.id)}
         >
-          <ComboboxInput id="brewery-ai-model" className="w-full" placeholder="Search models…" aria-invalid={Boolean(error) || undefined}>
-            {selected && <InputGroupAddon align="inline-start"><AiModelIcon modelId={selected.id} /></InputGroupAddon>}
-          </ComboboxInput>
-          <ComboboxContent>
+          <div ref={anchor}>
+            <ComboboxInput id="brewery-ai-model" className="w-full" placeholder="Search models…" aria-invalid={Boolean(error) || undefined}>
+              {selected && !open && <InputGroupAddon align="inline-start"><AiModelIcon modelId={selected.id} /></InputGroupAddon>}
+            </ComboboxInput>
+          </div>
+          <ComboboxContent anchor={anchor} className="min-w-(--anchor-width)">
             <ComboboxEmpty>No model found.</ComboboxEmpty>
             <ComboboxList>{(model: GatewayModelOption) => {
               const price = priceLabel(model);

@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxAnchor } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -11,6 +11,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string };
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
+const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
 
 export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null }: {
   initial: BrewerySettingsValues;
@@ -21,6 +22,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   const [values, setValues] = useState(initial);
   const [timezoneOpen, setTimezoneOpen] = useState(false);
   const [timezoneQuery, setTimezoneQuery] = useState("");
+  const timezoneAnchor = useComboboxAnchor();
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
@@ -37,15 +39,19 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         items={TIMEZONES.includes(values.timezone) ? TIMEZONES : [values.timezone, ...TIMEZONES]}
         value={values.timezone}
         open={timezoneOpen}
-        inputValue={timezoneOpen ? timezoneQuery : values.timezone}
+        inputValue={timezoneOpen ? timezoneQuery : timezoneLabel(values.timezone)}
+        itemToStringLabel={timezoneLabel}
+        itemToStringValue={(timezone) => timezone}
         onOpenChange={(open) => { setTimezoneOpen(open); if (open) setTimezoneQuery(""); }}
         onInputValueChange={setTimezoneQuery}
         onValueChange={(timezone) => timezone && change("timezone", timezone)}
       >
-        <ComboboxInput id={`${id}-timezone`} className="w-full" placeholder="Search timezones…" required />
-        <ComboboxContent>
+        <div ref={timezoneAnchor}>
+          <ComboboxInput id={`${id}-timezone`} className="w-full" placeholder="Search timezones…" required />
+        </div>
+        <ComboboxContent anchor={timezoneAnchor} className="min-w-(--anchor-width)">
           <ComboboxEmpty>No timezone found.</ComboboxEmpty>
-          <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezone}</ComboboxItem>}</ComboboxList>
+          <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezoneLabel(timezone)}</ComboboxItem>}</ComboboxList>
         </ComboboxContent>
       </Combobox>
     </div>
