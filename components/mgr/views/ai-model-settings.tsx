@@ -20,11 +20,11 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
         <FieldLabel htmlFor="brewery-ai-model">AI model</FieldLabel>
         <Select value={value} disabled={!onChange || busy || models.length === 0} onValueChange={onChange}>
           <SelectTrigger id="brewery-ai-model" className="w-full" aria-invalid={Boolean(error) || undefined}>
-            <SelectValue>{selected ? <><AiModelIcon modelId={selected.id} />{selected.name} · {selected.id}</> : value}</SelectValue>
+            <SelectValue>{selected ? <><AiModelIcon modelId={selected.id} />{selected.name}</> : value}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              {options.map((model) => <SelectItem key={model.id} value={model.id}><AiModelIcon modelId={model.id} />{model.name} · {model.id}</SelectItem>)}
+              {options.map((model) => <SelectItem key={model.id} value={model.id}><AiModelIcon modelId={model.id} />{model.name}</SelectItem>)}
             </SelectGroup>
           </SelectContent>
         </Select>
