@@ -29,9 +29,11 @@ const orUndef = (s: string) => s || undefined;
 
 
 export function ApprovalForm({ brands, approval }: { brands: Brand[]; approval?: Approval }) {
-  const { v, set, reset } = useFields({ brandId: approval?.brand_id ?? "", kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", approvedOn: approval?.approved_on ?? "", expiresOn: approval?.expires_on ?? "" });
+  // No expiry: a COLA does not expire. The expires_on column stays until a
+  // migration drops it [SCHEMA-GATE] and is simply never sent from here.
+  const { v, set, reset } = useFields({ brandId: approval?.brand_id ?? "", kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", submittedOn: approval?.approved_on ?? "" });
   const form = useCommandForm("upsert_brand_approval", {
-    build: () => ({ id: approval?.id, brandId: v.brandId, kind: v.kind, ttbId: v.ttbId, approvedOn: orUndef(v.approvedOn), expiresOn: orUndef(v.expiresOn) }),
+    build: () => ({ id: approval?.id, brandId: v.brandId, kind: v.kind, ttbId: v.ttbId, approvedOn: orUndef(v.submittedOn) }),
     reset,
   });
   const model = toBrandApprovalViewProps({
@@ -40,14 +42,12 @@ export function ApprovalForm({ brands, approval }: { brands: Brand[]; approval?:
     brandOptions: brands.map(({ id, name: label }) => ({ id, label })),
     kind: v.kind,
     kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
-    numberLabel: v.kind === "cola" ? "COLA number" : "Formula number",
     number: v.ttbId,
-    approvedOn: v.approvedOn,
-    expiresOn: v.expiresOn,
+    submittedOn: v.submittedOn,
   });
   const controls = {
     brandId: set("brandId"), kind: set("kind"), number: set("ttbId"),
-    approvedOn: set("approvedOn"), expiresOn: set("expiresOn"),
+    submittedOn: set("submittedOn"),
   };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={trigger(!!approval, "Add approval")}>

@@ -97,7 +97,7 @@ export const brandHazy: BrandSnapshot = {
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,
-  cola: { number: "14203001000567" },
+  cola: { number: "260135" },
 };
 
 /** Hazy IPA · ½ bbl keg SKU sheet. UPC is the Standard group case code. */

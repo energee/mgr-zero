@@ -20,7 +20,7 @@ export const complianceRegistryDemo: ComplianceRegistrySnapshot = {
   brands: [
     {
       id: "hazy", name: "Hazy IPA",
-      approvals: [{ id: "cola", brand_id: "hazy", kind: "cola", ttb_id: "23001001000123", approved_on: "2026-01-15", expires_on: "2031-01-15", note: null }],
+      approvals: [{ id: "cola", brand_id: "hazy", kind: "cola", ttb_id: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
       registrations: [{ id: "oh", brand_id: "hazy", state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],
     },
     { id: "stout", name: "Stout", approvals: [], registrations: [] },
@@ -34,13 +34,11 @@ export const complianceRegistryDemo: ComplianceRegistrySnapshot = {
 export const brandApprovalStout: BrandApprovalViewModel = {
   brandId: "stout",
   brand: "Stout",
-  brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
+  brandOptions: [],
   kind: "cola",
   kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
-  numberLabel: "COLA number",
-  number: "14203001000567",
-  approvedOn: "2026-01-15",
-  expiresOn: "2031-01-15",
+  number: "260135",
+  submittedOn: "2026-01-15",
 };
 
 export const stateRegistrationHazy: StateRegistrationViewModel = {

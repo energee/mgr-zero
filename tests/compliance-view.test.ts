@@ -85,6 +85,37 @@ describe("registry sheets", () => {
     expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 
+  it("lists a COLA by serial and submitted date, never an expiry", () => {
+    const model = toComplianceRegistryViewProps(complianceRegistryDemo);
+    const brand = model.brands[0]!;
+    const cola = brand.rows.find((row) => String(row.title).startsWith("COLA"))!;
+    expect(brand.detail).toMatch(/^COLA serial /);
+    expect(brand.detail).not.toMatch(/expires/);
+    expect(cola.title).toMatch(/^COLA serial /);
+    expect(cola.detail).toMatch(/^submitted |^not submitted$/);
+    expect(cola.detail).not.toMatch(/expires/);
+  });
+
+  it("names the COLA number a serial and never offers an expiry: COLAs do not expire", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
+    expect(html).toMatch(/Serial number/);
+    expect(html).not.toMatch(/COLA number/);
+    expect(html).not.toMatch(/Expires/);
+    expect(html).toMatch(/Date submitted/);
+    expect(html).not.toMatch(/Approved on/);
+  });
+
+  it("keeps the formula label on a formula approval", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));
+    expect(html).toMatch(/Formula number/);
+  });
+
+  it("states a known brand instead of picking one", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, brandOptions: [] } }));
+    expect(html).toContain("Stout");
+    expect(html).not.toMatch(/<button[^>]*aria-label="Brand"/);
+  });
+
   it("lets live callers suppress fixture form and row-action defaults with null", () => {
     expect(htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout, footer: null }))).not.toMatch(/Save approval/);
     expect(htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy, footer: null }))).not.toMatch(/Save registration/);

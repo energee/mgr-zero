@@ -134,7 +134,7 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 Use **Edit brand** beside an existing brand to change its name, style, ABV, description, category, price group, or hops. The editor starts with all saved values; changing one field keeps the others. Select **Save brand**.
 
-The brand also shows a read-only **COLA** row: the approval number when one is on file, otherwise *Not on file*. Select it to open the same **Add approval** sheet the [compliance registry](#compliance) uses; federal approval is only ever recorded there.
+The brand also shows a read-only **COLA** row: *Approved · serial 260135* when one is on file, otherwise *Not on file*. Select it to open the same **Add approval** sheet the [compliance registry](#compliance) uses; federal approval is only ever recorded there.
 
 ### Create a format
 
@@ -422,7 +422,7 @@ A month is generated from the inventory ledger when you open it, so nothing is s
 
 <Screen name="Compliance registry" />
 
-The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (**Brewery**, **Supplier**, or **Direct to consumer**); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
+The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the approval kind, the number (a COLA is filed under your own **Serial number**, such as `260135`; a formula under its TTB formula number), and an optional **Date submitted**. A COLA does not expire, so no expiry is asked for. The brand is stated rather than chosen when the sheet is opened from one. The same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (**Brewery**, **Supplier**, or **Direct to consumer**); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
 
 Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
 

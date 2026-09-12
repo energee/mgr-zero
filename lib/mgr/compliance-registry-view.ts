@@ -40,13 +40,13 @@ export function toComplianceRegistryViewProps(s: ComplianceRegistrySnapshot): Co
       return {
         key: brand.id,
         title: brand.name,
-        detail: cola ? `COLA ${cola.ttb_id}${expires(cola.expires_on)}` : "COLA pending",
+        detail: cola ? `COLA serial ${cola.ttb_id}` : "COLA pending",
         warning: !cola,
         rows: [
           ...brand.approvals.map((approval) => ({
             key: approval.id,
-            title: `${approval.kind === "cola" ? "COLA" : "Formula"} ${approval.ttb_id}`,
-            detail: `${approval.approved_on ? `approved ${approval.approved_on}` : "no approval date"}${expires(approval.expires_on)}`,
+            title: approval.kind === "cola" ? `COLA serial ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
+            detail: approval.approved_on ? `submitted ${approval.approved_on}` : "not submitted",
             verb: "Edit",
           })),
           ...brand.registrations.map((registration) => ({

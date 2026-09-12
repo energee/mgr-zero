@@ -40,7 +40,8 @@ export type BrandSnapshot = {
   categories?: string[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
-  /** upsert_brand_approval row for this brand, or null when none is on file. */
+  /** upsert_brand_approval row for this brand, or null when none is on file.
+   *  `number` is the applicant's own serial; a COLA never expires. */
   cola?: { number: string | null } | null;
   backHref?: string;
 };
@@ -71,7 +72,7 @@ export function toBrandViewProps({
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),
     skuListHref: "/catalog",
-    cola: cola?.number ? `Approved · ${cola.number}` : "Not on file",
+    cola: cola?.number ? `Approved · serial ${cola.number}` : "Not on file",
     colaHref: "/compliance",
   };
 }
