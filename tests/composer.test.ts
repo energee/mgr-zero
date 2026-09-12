@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
+import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { ComposerConversationView, ComposerDrawerView, ComposerProposalView } from "@/components/mgr/views/composer";
 import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
@@ -47,9 +48,15 @@ describe("AI composer", () => {
     }));
     expect(html).toContain("AI model");
     expect(html).toContain("GPT-5.4");
+    expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('data-slot="select-trigger"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
     expect(html).toContain("Save AI model");
+  });
+
+  it("maps Gateway provider aliases to Lobe icons", () => {
+    const html = renderToStaticMarkup(createElement(AiModelIcon, { modelId: "zai/glm-4.7" }));
+    expect(html).toContain("<title>Zhipu</title>");
   });
 
   it("shows the brewery model in the conversation header", () => {

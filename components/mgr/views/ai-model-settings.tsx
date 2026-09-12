@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import type { GatewayModelOption } from "@/lib/chat/models";
 
 export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = false, error }: {
@@ -19,11 +20,11 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
         <FieldLabel htmlFor="brewery-ai-model">AI model</FieldLabel>
         <Select value={value} disabled={!onChange || busy || models.length === 0} onValueChange={onChange}>
           <SelectTrigger id="brewery-ai-model" className="w-full" aria-invalid={Boolean(error) || undefined}>
-            <SelectValue>{selected ? `${selected.name} · ${selected.id}` : value}</SelectValue>
+            <SelectValue>{selected ? <><AiModelIcon modelId={selected.id} />{selected.name} · {selected.id}</> : value}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              {options.map((model) => <SelectItem key={model.id} value={model.id}>{model.name} · {model.id}</SelectItem>)}
+              {options.map((model) => <SelectItem key={model.id} value={model.id}><AiModelIcon modelId={model.id} />{model.name} · {model.id}</SelectItem>)}
             </SelectGroup>
           </SelectContent>
         </Select>
