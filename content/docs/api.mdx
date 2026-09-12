@@ -3590,15 +3590,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-15 of the 20 operations in this area are available today; the 5 below are not.
+15 of the 19 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_recipe_outcomes` | query | Recipe |
-| `get_water_profile` | query | Water profile |
-| `list_water_profiles` | query | Water, Water profiles |
+| `list_water_profiles` | query | Water, Water profiles, Water profile |
 | `record_batch_addition` | command | Cellar addition |
 | `upsert_water_profile` | command | Water profile |
 
@@ -3845,18 +3844,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_format", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "basis": "packaged" } }'
 ```
-
----
-
-**Designed, not yet available** {/* packaging-designed */}
-
-12 of the 13 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `get_format_components` | query | Repack |
 
 {/* end ops:packaging */}
 
