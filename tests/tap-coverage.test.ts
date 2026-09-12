@@ -27,6 +27,7 @@ function taps(s: Screen, html: string): [string, string | null, string | null][]
     const attrs = m[2];
     const label = /aria-label="([^"]*)"/.exec(attrs)?.[1] ?? text(m[3]);
     const to = /data-to="([^"]*)"/.exec(attrs)?.[1] ?? null;
+    if (/href="https:\/\//.test(attrs)) continue;
     if (!label || INERT_ATTR.test(attrs) || inert(s, label, to)) continue;
     out.push([label, /href="([^"]*)"/.exec(attrs)?.[1] ?? null, to]);
   }

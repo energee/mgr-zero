@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
-import { ComposerConversationView, ComposerProposalView, ComposerStripView, OfflineOutboxView } from "@/components/mgr/views/composer";
+import { ComposerConversationView, ComposerDrawerView, ComposerProposalView, ComposerStripView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
@@ -14,12 +14,16 @@ import type { StaffRole } from "@/lib/commands/registry";
 
 type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
 
+export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
+  event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
+
 export function Composer({ role }: { role: StaffRole }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
   const [conversationId, setConversationId] = useState<string>();
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [minimized, setMinimized] = useState(false);
+  const [model, setModel] = useState("");
+  const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [setupError, setSetupError] = useState<string>();
   const [committing, setCommitting] = useState(false);
@@ -41,7 +45,7 @@ export function Composer({ role }: { role: StaffRole }) {
     clearError(); setSetupError(undefined); setReceipt(undefined);
     try {
       const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, crypto.randomUUID()) as { id: string };
-      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); setMinimized(false);
+      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); setOpen(true);
     } catch (cause) { setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
   }
 
@@ -49,8 +53,12 @@ export function Composer({ role }: { role: StaffRole }) {
     let active = true;
     void (async () => {
       try {
-        const conversations = await run("list_chat_conversations", {}) as { id: string }[];
+        const [conversations, ai] = await Promise.all([
+          run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
+          run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
+        ]);
         if (!active) return;
+        setModel(ai.model);
         if (!conversations[0]) { await newChat(); return; }
         const id = conversations[0].id;
         const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
@@ -67,7 +75,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }, [breweryId, expectedContext.actorId]);
 
   useEffect(() => {
-    const focus = (event: KeyboardEvent) => { if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); promptRef.current?.focus(); } };
+    const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
     addEventListener("keydown", focus); return () => removeEventListener("keydown", focus);
   }, []);
 
@@ -106,11 +114,11 @@ export function Composer({ role }: { role: StaffRole }) {
     discardOutbox(localStorage, scope, ids, confirmation); setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope));
   }
 
-  return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-    {minimized ? <Button type="button" variant="outline" className="self-end" onClick={() => setMinimized(false)}>Open conversation</Button> : <ComposerConversationView messages={transcript} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { clearError(); void regenerate(); }} onNewChat={() => void newChat()} onMinimize={() => setMinimized(true)} />}
+  return <ComposerDrawerView open={open} onOpenChange={setOpen}>
+    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { clearError(); void regenerate(); }} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}
     <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || streaming || committing} streaming={streaming} onStop={stop} />
-  </div>;
+  </ComposerDrawerView>;
 }

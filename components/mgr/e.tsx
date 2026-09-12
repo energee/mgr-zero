@@ -13,7 +13,7 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { VolumeField } from "@/components/mgr/volume-field";
-import { ComposerStripView } from "@/components/mgr/views/composer";
+import { ComposerDrawerView, ComposerStripView } from "@/components/mgr/views/composer";
 import type { StaffRole } from "@/lib/commands/registry";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
@@ -402,13 +402,16 @@ export const E = {
   ),
   /** A search box: the one input whose placeholder is its whole label. */
   search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
-  stq: (v: number, label = "Quantity") => (
+  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string }) => {
+    const step = (delta: number) => controls?.onChange(String(Math.max(controls.min, Math.min(controls.max, v + delta))));
+    return (
     <ButtonGroup>
-      <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
-      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-      <Button variant="outline" size="icon" aria-label="Increase">+</Button>
+      <Button type="button" variant="outline" size="icon" aria-label="Decrease" disabled={controls && v <= controls.min} onClick={controls ? () => step(-1) : undefined}>−</Button>
+      <Input id={controls?.id} type="number" inputMode="numeric" min={controls?.min ?? 0} max={controls?.max} step={1} required={!!controls} value={controls?.value} defaultValue={controls ? undefined : v} onChange={controls ? (event) => controls.onChange(event.target.value) : undefined} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+      <Button type="button" variant="outline" size="icon" aria-label="Increase" disabled={controls && v >= controls.max} onClick={controls ? () => step(1) : undefined}>+</Button>
     </ButtonGroup>
-  ),
+    );
+  },
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
    *  and E.btn already do; fixtures leave it out and the explorer resolves the
@@ -422,7 +425,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (role: StaffRole = "admin") => <ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} />,
+  comp: (role: StaffRole = "admin") => <ComposerDrawerView><ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
 };
 
 function isPin(n: ReactNode) {

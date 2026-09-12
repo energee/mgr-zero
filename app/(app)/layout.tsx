@@ -15,6 +15,7 @@ import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SearchCacheProvider, SearchSheet } from "@/components/mgr/search-palette";
 import { switchBrewery } from "@/app/(auth)/actions";
 import { Composer } from "@/components/mgr/composer";
+import { Toaster } from "@/components/ui/sonner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         >
           {children}
         </AppShell>
+        <Toaster />
       </BreweryProvider>
     </SearchCacheProvider>
   );

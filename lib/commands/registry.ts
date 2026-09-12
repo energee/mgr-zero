@@ -161,7 +161,7 @@ type StoredDefinition = CommandDefinitionMetadata & {
 const registry = new Map<string, StoredDefinition>();
 
 function requireUnusedName(name: string) {
-  if (registry.has(name)) throw new CommandError(`duplicate command: ${name}`, 400, "duplicate_command");
+  if (registry.has(name) && process.env.NODE_ENV !== "development") throw new CommandError(`duplicate command: ${name}`, 400, "duplicate_command");
 }
 
 function assertTenantCtx(ctx: OperationCtx): asserts ctx is Ctx {

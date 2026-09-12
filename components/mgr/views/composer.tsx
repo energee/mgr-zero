@@ -1,11 +1,14 @@
 import type { Ref } from "react";
 import Link from "next/link";
+import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
+
+export { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
 
 export type ComposerStripAction = { value: string; label: string };
 export type OfflineOutboxRow = {
@@ -46,8 +49,7 @@ export function ComposerStripView({
   onStop?: () => void;
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-2 shadow-lg">
-      <form onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
+      <form className="shrink-0" onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
         <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
           <Textarea
             ref={promptRef}
@@ -82,26 +84,25 @@ export function ComposerStripView({
           </InputGroupAddon>
         </InputGroup>
       </form>
-    </div>
   );
 }
 
-export function ComposerConversationView({ messages, activity, error, onRetry, onNewChat, onMinimize }: {
+export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat }: {
   messages: ComposerConversationMessage[];
+  model?: string;
   activity?: string;
   error?: string;
   onRetry?: () => void;
   onNewChat?: () => void;
-  onMinimize?: () => void;
 }) {
   return (
-    <section aria-label="MGR conversation" className="overflow-hidden rounded-2xl border bg-card shadow-xl">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p></div>
-        <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
+    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
+        <Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button>
       </header>
-      <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
-        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] whitespace-pre-wrap text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.content}</div>)}
+      <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
+        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
         {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
         {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
       </div>

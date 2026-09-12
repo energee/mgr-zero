@@ -21,16 +21,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Chat is not configured." }, { status: 503 });
     }
     const ctx = context as Ctx;
-    const history = await runCommand("get_chat_history", { conversationId: body.id }, ctx) as {
+    const [history, ai] = await Promise.all([runCommand("get_chat_history", { conversationId: body.id }, ctx), runCommand("get_brewery_ai_model", {}, ctx)]) as [{
       messages: { role: "user" | "assistant" | "result"; content: string | null }[];
-    };
+    }, { model: string }];
     await runCommand("append_chat_message", { conversationId: body.id, role: "user", content: body.text }, ctx, execution(body.message.id));
     const messages: ModelMessage[] = history.messages
       .filter((message): message is { role: "user" | "assistant"; content: string } => message.role !== "result" && Boolean(message.content))
       .map((message) => ({ role: message.role, content: message.content }));
     messages.push({ role: "user", content: body.text });
     const result = streamText({
-      model: gateway(process.env.AI_GATEWAY_MODEL ?? "anthropic/claude-sonnet-4.5"),
+      model: gateway(ai.model),
       system: SYSTEM,
       messages,
       tools: createComposerTools(ctx, body.id),

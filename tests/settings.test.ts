@@ -13,11 +13,13 @@ type Effective = { brewery: "plato" | "sg"; mine: "plato" | "sg" | null; effecti
 let b: { id: string };
 let adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let brewerCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let taproomCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
   brewerCtx = await makeStaffCtx(b.id, "brewer");
+  taproomCtx = await makeStaffCtx(b.id, "taproom");
 });
 
 describe("gravity unit preference", () => {
@@ -67,5 +69,14 @@ describe("brewery settings (Program 10 task 4)", () => {
     expect(after).toMatchObject({ name: "Renamed Brewing", timezone: "America/Chicago", customer_phone: "(610) 555-0142", fermentation_reading_due_hours: 36 });
     expect((await runCommand("get_brewery", {}, brewerCtx)) as object).toMatchObject({ name: "Renamed Brewing", ttb_registry_no: "BR-PA-12345" });
     await expect(runCommand("update_brewery", { ...input, timezone: "Mars/Olympus" }, adminCtx)).rejects.toThrow();
+  });
+
+  it("stores one brewery-wide AI model and exposes it to staff", async () => {
+    expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "anthropic/claude-sonnet-4.5" });
+    await expect(runCommand("set_brewery_ai_model", { model: "openai/gpt-5.4" }, brewerCtx)).rejects.toThrow(/permission denied/);
+    await runCommand("set_brewery_ai_model", { model: "openai/gpt-5.4" }, adminCtx);
+    expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "openai/gpt-5.4" });
+    expect(await runCommand("get_brewery_ai_model", {}, taproomCtx)).toEqual({ model: "openai/gpt-5.4" });
+    await expect(runCommand("set_brewery_ai_model", { model: "not a model" }, adminCtx)).rejects.toThrow();
   });
 });

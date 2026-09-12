@@ -17,7 +17,7 @@ it("bootstraps own taproom membership without private brewery columns", async ()
   expect((await ctx.db.from("breweries").select().eq("id", ctx.breweryId)).data).toEqual([]);
   const projection = await ctx.db.from("staff_brewery").select().eq("id", ctx.breweryId).single();
   expect(projection.error).toBeNull();
-  expect(Object.keys(projection.data!).sort()).toEqual(["gravity_unit", "id", "name", "timezone"]);
+  expect(Object.keys(projection.data!).sort()).toEqual(["ai_model", "gravity_unit", "id", "name", "timezone"]);
   expect(await runCommand("get_gravity_unit", {}, ctx)).toMatchObject({ effective: "plato" });
   expect(await runCommand("get_notification_preferences", {}, ctx)).toHaveProperty("timezone");
 });

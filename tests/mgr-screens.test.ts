@@ -348,6 +348,7 @@ describe("SCREENS", () => {
       // A link whose customer copy is not the screen's name declares its
       // destination with data-to (Sign in's "Forgot password?" → Reset password).
       for (const [, tag, link] of html.matchAll(/(<a [^>]*>)(.*?)<\/a>/g)) {
+        if (/href="https:\/\//.test(tag)) continue;
         const target = tag.match(/data-to="([^"]*)"/)?.[1] ?? link.replace(/<[^>]*>/g, "");
         expect.soft(
           screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
@@ -746,14 +747,14 @@ describe("SCREENS", () => {
     }
   });
 
-  it("uses the desktop width instead of a centred phone column (#98)", () => {
+  it("uses the full desktop width instead of a centred phone column (#98)", () => {
     // Issue 98: the shell was capped at a phone column, buttons kept a fixed
     // grid and tiles were locked to three, so desktop drew wide gutters.
     // children in the props object keeps this a plain createElement call in a
     // .ts test; the lint rule only allows it away from a literal.
     const shellProps = { brand: "Demo", items: [], active: "Today", children: "body" };
     const shell = renderToStaticMarkup(createElement(AppShell, shellProps));
-    expect(shell).toContain("md:max-w-5xl");
+    expect(shell).not.toMatch(/md:max-w-/);
     expect(shell).not.toContain("md:max-w-2xl");
     const btns = renderToStaticMarkup(E.btns([["Save", "p"], ["Cancel", "g"], ["Third", "g"]], "c3"));
     expect(btns).toContain("md:flex");

@@ -6,6 +6,24 @@ import { defineCommand, defineQuery, runCommand, unwrap, _clearRegistry, Command
 const testDb = null as unknown as Ctx["db"];
 
 describe("command registry", () => {
+  it("replaces a definition re-evaluated by development HMR", async () => {
+    _clearRegistry();
+    vi.stubEnv("NODE_ENV", "development");
+    defineQuery({ name: "hmr_read", input: z.object({}), roles: ["admin"], handler: async () => "old" });
+    defineQuery({ name: "hmr_read", input: z.object({}), roles: ["admin"], handler: async () => "new" });
+    vi.unstubAllEnvs();
+
+    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    await expect(runCommand("hmr_read", {}, ctx)).resolves.toBe("new");
+  });
+
+  it("still rejects duplicate definitions outside development", () => {
+    _clearRegistry();
+    defineQuery({ name: "duplicate_read", input: z.object({}), roles: ["admin"], handler: async () => null });
+    expect(() => defineQuery({ name: "duplicate_read", input: z.object({}), roles: ["admin"], handler: async () => null }))
+      .toThrow("duplicate command: duplicate_read");
+  });
+
   it("validates input and runs handler", async () => {
     _clearRegistry();
     defineCommand({

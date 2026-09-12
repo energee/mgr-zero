@@ -15,7 +15,8 @@ describe("composer conversation surface", () => {
       error: "The response stopped.",
       onRetry: () => undefined,
     }));
-    for (const text of ["What needs attention?", "Two orders need review.", "Checking orders…", "New chat", "Minimize", "Try again"]) expect(html).toContain(text);
+    for (const text of ["What needs attention?", "Two orders need review.", "Checking orders…", "New chat", "Try again"]) expect(html).toContain(text);
+    expect(html).not.toContain("Minimize");
     expect(html).toContain('role="log"');
   });
 

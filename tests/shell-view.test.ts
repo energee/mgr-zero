@@ -352,10 +352,23 @@ describe("Settings view", () => {
 
   it("the live Settings page mounts SettingsView and slots the forms", () => {
     const page = src("app/(app)/settings/page.tsx");
+    const settingsForm = src("app/(app)/settings/settings-form.tsx");
+    const sharedView = src("components/mgr/views/settings.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/settings"/);
     expect(page).toMatch(/<SettingsView\b/);
     expect(page).toMatch(/<SettingsForm\b/);
     expect(page).toMatch(/<PortalFulfillmentForm\b/);
+    expect(settingsForm).toMatch(/<BrewerySettingsFormView\b/);
+    expect(sharedView).toMatch(/<BrewerySettingsFormView\b/);
+    expect(sharedView).toMatch(/from "@\/components\/mgr\/theme-toggle"/);
+    expect(sharedView).toMatch(/<ThemeToggle\b/);
+  });
+
+  it("uses the shadcn Select in the warehouse form", () => {
+    const fulfillmentForm = src("app/(app)/settings/portal-fulfillment-form.tsx");
+    expect(fulfillmentForm).toMatch(/from "@\/components\/ui\/select"/);
+    expect(fulfillmentForm).toMatch(/<SelectTrigger\b/);
+    expect(fulfillmentForm).not.toMatch(/<select\b/);
   });
 });
 

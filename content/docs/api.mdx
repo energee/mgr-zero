@@ -294,6 +294,7 @@ omitted. They have no roles until they are built.
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
+| `get_brewery_ai_model` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_integration_health` | Today & notifications | ✓ |  |  |  |  |  |
@@ -424,6 +425,7 @@ omitted. They have no roles until they are built.
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `search_entities` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `send_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
+| `set_brewery_ai_model` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -4385,6 +4387,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery", "input": {} }'
 ```
 
+#### get_brewery_ai_model [#get_brewery_ai_model]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Read the brewery-wide AI Gateway model used by Ask MGR
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery_ai_model", "input": {} }'
+```
+
 #### get_brewery_operating_defaults [#get_brewery_operating_defaults]
 
 `query` · admin
@@ -4666,6 +4683,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "revoke_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### set_brewery_ai_model [#set_brewery_ai_model]
+
+`command` · admin
+
+Set the brewery-wide AI Gateway model used by Ask MGR
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `model` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_ai_model", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "model": "openai/gpt-5.4" } }'
 ```
 
 #### set_brewery_gravity_unit [#set_brewery_gravity_unit]
