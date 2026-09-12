@@ -34,6 +34,7 @@ export function BrandView({
       {E.edit("Hops", model.hops)}
       {footer !== undefined ? footer : E.btn("Save brand")}
       {E.nav("SKU list", model.skuList, "", undefined, linkRows ? model.skuListHref : undefined)}
+      {E.nav("COLA", model.cola, "", undefined, linkRows ? model.colaHref : undefined)}
     </>
   );
 }

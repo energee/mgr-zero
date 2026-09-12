@@ -16,6 +16,9 @@ export type BrandViewModel = {
   hops: string;
   skuList: string;
   skuListHref: string;
+  /** Federal label approval, as a status line: the COLA row is read-only here. */
+  cola: string;
+  colaHref: string;
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
@@ -37,6 +40,8 @@ export type BrandSnapshot = {
   categories?: string[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
+  /** upsert_brand_approval row for this brand, or null when none is on file. */
+  cola?: { number: string | null } | null;
   backHref?: string;
 };
 
@@ -45,6 +50,7 @@ export function toBrandViewProps({
   styles,
   categories = CATEGORIES,
   priceGroups,
+  cola,
   backHref,
 }: BrandSnapshot): BrandViewModel {
   const group = priceGroups.find((g) => g.id === brand.price_group_id);
@@ -65,5 +71,7 @@ export function toBrandViewProps({
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),
     skuListHref: "/catalog",
+    cola: cola?.number ? `Approved · ${cola.number}` : "Not on file",
+    colaHref: "/compliance",
   };
 }

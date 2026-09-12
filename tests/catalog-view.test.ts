@@ -137,6 +137,12 @@ describe("Brand view", () => {
     expect(model.hops).toBe("Citra, Mosaic");
     expect(model.skuList).toBe("3 active packages");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
+    expect(model.cola).toBe("Approved · 14203001000567");
+  });
+
+  it("says the COLA is not on file when the brand has no approval", () => {
+    const model = toBrandViewProps({ ...brandHazy, cola: null });
+    expect(model.cola).toBe("Not on file");
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {
@@ -145,6 +151,8 @@ describe("Brand view", () => {
     expect(html).toMatch(/Sell sheet/);
     expect(html).toMatch(/SKU list/);
     expect(html).toMatch(/3 active packages/);
+    expect(html).toMatch(/COLA/);
+    expect(html).toMatch(/Approved · 14203001000567/);
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).not.toMatch(/→/);
   });
