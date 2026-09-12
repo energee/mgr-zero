@@ -363,6 +363,13 @@ describe("Settings view", () => {
     expect(sharedView).toMatch(/from "@\/components\/mgr\/theme-toggle"/);
     expect(sharedView).toMatch(/<ThemeToggle\b/);
   });
+
+  it("uses the shadcn Select in the warehouse form", () => {
+    const fulfillmentForm = src("app/(app)/settings/portal-fulfillment-form.tsx");
+    expect(fulfillmentForm).toMatch(/from "@\/components\/ui\/select"/);
+    expect(fulfillmentForm).toMatch(/<SelectTrigger\b/);
+    expect(fulfillmentForm).not.toMatch(/<select\b/);
+  });
 });
 
 describe("Team view", () => {

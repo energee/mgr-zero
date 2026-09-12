@@ -47,6 +47,8 @@ describe("AI composer", () => {
     }));
     expect(html).toContain("AI model");
     expect(html).toContain("GPT-5.4");
+    expect(html).toContain('data-slot="select-trigger"');
+    expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
     expect(html).toContain("Save AI model");
   });
 

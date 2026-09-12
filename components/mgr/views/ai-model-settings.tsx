@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { GatewayModelOption } from "@/lib/chat/models";
 
 export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = false, error }: {
@@ -11,16 +12,26 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
   error?: string;
 }) {
   const options = models.some((model) => model.id === value) ? models : [{ id: value, name: value }, ...models];
+  const selected = options.find((model) => model.id === value);
   return <section className="flex flex-col gap-3" aria-label="AI model settings">
-    <div className="flex flex-col gap-2">
-      <Label htmlFor="brewery-ai-model">AI model</Label>
-      <select id="brewery-ai-model" className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm" value={value} disabled={!onChange || busy || models.length === 0} onChange={(event) => onChange?.(event.target.value)}>
-        {options.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.id}</option>)}
-      </select>
-      <p className="text-sm text-muted-foreground">Used by Ask MGR for everyone at this brewery.</p>
-      {models.length === 0 && <p className="text-sm text-muted-foreground">The Gateway model catalog is unavailable. The saved model remains active.</p>}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    </div>
+    <FieldGroup>
+      <Field data-disabled={!onChange || busy || models.length === 0 || undefined} data-invalid={Boolean(error) || undefined}>
+        <FieldLabel htmlFor="brewery-ai-model">AI model</FieldLabel>
+        <Select value={value} disabled={!onChange || busy || models.length === 0} onValueChange={onChange}>
+          <SelectTrigger id="brewery-ai-model" className="w-full" aria-invalid={Boolean(error) || undefined}>
+            <SelectValue>{selected ? `${selected.name} · ${selected.id}` : value}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {options.map((model) => <SelectItem key={model.id} value={model.id}>{model.name} · {model.id}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription>Used by Ask MGR for everyone at this brewery.</FieldDescription>
+        {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
+        <FieldError>{error}</FieldError>
+      </Field>
+    </FieldGroup>
     <Button type="button" disabled={!onSubmit || busy || models.length === 0} onClick={onSubmit}>{busy ? "Saving…" : "Save AI model"}</Button>
   </section>;
 }

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { NONE, Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -18,11 +19,18 @@ export function PortalFulfillmentForm({ locations, currentId }: { locations: { i
     <p>{locations.find((l) => l.id === currentId)?.name ?? "Not configured"}</p>
     {locations.length ? <CommandForm open={form.open} onOpenChange={form.setOpen} title="Portal fulfillment warehouse" trigger={<Button variant="outline">Change warehouse</Button>}>
       <form className="flex flex-col gap-4" onSubmit={form.submit}>
-        <Label htmlFor="portal-warehouse">Warehouse</Label>
-        <select id="portal-warehouse" className="rounded-md border p-2" required value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-          <option value="" disabled>Choose warehouse</option>
-          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="portal-warehouse">Warehouse</FieldLabel>
+            <Select required value={locationId || NONE} onValueChange={(value) => setLocationId(value === NONE ? "" : value)}>
+              <SelectTrigger id="portal-warehouse" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup>
+                <SelectItem value={NONE} disabled>Choose warehouse</SelectItem>
+                {locations.map((location) => <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>)}
+              </SelectGroup></SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
         <CommandFormMessage error={form.error} />
         <CommandFormFooter><Button type="submit" disabled={form.submitting || !locationId}>{form.submitting ? "Saving…" : "Save warehouse"}</Button></CommandFormFooter>
       </form>
