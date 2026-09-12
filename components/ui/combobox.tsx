@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { Combobox as ComboboxPrimitive } from "@base-ui/react"
 import { cn } from "@/lib/utils"
 
@@ -149,6 +149,28 @@ function useComboboxAnchor() {
   return useRef<HTMLDivElement | null>(null)
 }
 
+/** The open/query bookkeeping every searchable combobox repeats: the input
+ *  shows what you are typing while open and the selected label when closed.
+ *  Spread `props` onto <Combobox>, put `anchor` on the input wrapper. */
+function useComboboxSearch(selectedLabel: string) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const anchor = useComboboxAnchor()
+  return {
+    open,
+    anchor,
+    props: {
+      open,
+      inputValue: open ? query : selectedLabel,
+      onOpenChange: (nextOpen: boolean) => {
+        setOpen(nextOpen)
+        if (nextOpen) setQuery("")
+      },
+      onInputValueChange: setQuery,
+    },
+  }
+}
+
 export {
   Combobox,
   ComboboxInput,
@@ -157,4 +179,5 @@ export {
   ComboboxItem,
   ComboboxEmpty,
   useComboboxAnchor,
+  useComboboxSearch,
 }

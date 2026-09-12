@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
-import { chatModelFromSettings, DEFAULT_CHAT_MODEL } from "@/lib/chat/models";
+import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
 defineQuery({
   name: "get_gravity_unit",
@@ -50,7 +50,7 @@ defineCommand({
 });
 
 const readingDueHours = z.number().int().min(1).max(168);
-const gatewayModel = z.string().trim().min(3).max(200).regex(/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i);
+const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
 const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id";
 
 defineQuery({

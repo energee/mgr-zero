@@ -402,13 +402,16 @@ export const E = {
   ),
   /** A search box: the one input whose placeholder is its whole label. */
   search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
-  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string }) => (
+  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string }) => {
+    const step = (delta: number) => controls?.onChange(String(Math.max(controls.min, Math.min(controls.max, v + delta))));
+    return (
     <ButtonGroup>
-      <Button type="button" variant="outline" size="icon" aria-label="Decrease" disabled={controls && v <= controls.min} onClick={controls ? () => controls.onChange(String(Math.max(controls.min, Math.min(controls.max, v - 1)))) : undefined}>−</Button>
+      <Button type="button" variant="outline" size="icon" aria-label="Decrease" disabled={controls && v <= controls.min} onClick={controls ? () => step(-1) : undefined}>−</Button>
       <Input id={controls?.id} type="number" inputMode="numeric" min={controls?.min ?? 0} max={controls?.max} step={1} required={!!controls} value={controls?.value} defaultValue={controls ? undefined : v} onChange={controls ? (event) => controls.onChange(event.target.value) : undefined} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-      <Button type="button" variant="outline" size="icon" aria-label="Increase" disabled={controls && v >= controls.max} onClick={controls ? () => controls.onChange(String(Math.max(controls.min, Math.min(controls.max, v + 1)))) : undefined}>+</Button>
+      <Button type="button" variant="outline" size="icon" aria-label="Increase" disabled={controls && v >= controls.max} onClick={controls ? () => step(1) : undefined}>+</Button>
     </ButtonGroup>
-  ),
+    );
+  },
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
    *  and E.btn already do; fixtures leave it out and the explorer resolves the

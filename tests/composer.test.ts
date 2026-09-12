@@ -7,7 +7,7 @@ import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { ComposerConversationView, ComposerDrawerView, ComposerProposalView } from "@/components/mgr/views/composer";
-import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
+import { chatModelFromSettings, gatewayLanguageModels, modelMatches, modelProvider } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
@@ -42,6 +42,21 @@ describe("AI composer", () => {
     ]);
   });
 
+  it("names the provider and matches it when searching", () => {
+    expect(modelProvider("anthropic/claude-sonnet-4.5")).toBe("anthropic");
+    expect(modelMatches({ id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" }, "anthro")).toBe(true);
+    expect(modelMatches({ id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" }, "sonnet")).toBe(true);
+    expect(modelMatches({ id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" }, "gpt")).toBe(false);
+  });
+
+  it("groups the catalog by provider, then by name", () => {
+    expect(gatewayLanguageModels([
+      { id: "openai/gpt-5.4", name: "GPT-5.4" },
+      { id: "anthropic/claude-opus", name: "Opus" },
+      { id: "anthropic/claude-haiku", name: "Haiku" },
+    ]).map((model) => model.id)).toEqual(["anthropic/claude-haiku", "anthropic/claude-opus", "openai/gpt-5.4"]);
+  });
+
   it("renders model selection as a shared Settings control", () => {
     const html = renderToStaticMarkup(createElement(AiModelSettingsView, {
       value: "openai/gpt-5.4",
@@ -52,6 +67,7 @@ describe("AI composer", () => {
     expect(html).toMatch(/data-slot="input-group-control"[^>]*value="GPT-5\.4"/);
     expect(text).not.toContain("openai/gpt-5.4");
     expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
+    expect(text).toContain("openai");
     expect(html).toContain('href="https://vercel.com/ai-gateway/models"');
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');

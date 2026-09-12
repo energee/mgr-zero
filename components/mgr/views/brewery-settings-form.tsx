@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxAnchor } from "@/components/ui/combobox";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxSearch } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -20,9 +20,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   error?: string | null;
 }) {
   const [values, setValues] = useState(initial);
-  const [timezoneOpen, setTimezoneOpen] = useState(false);
-  const [timezoneQuery, setTimezoneQuery] = useState("");
-  const timezoneAnchor = useComboboxAnchor();
+  const { anchor: timezoneAnchor, props: timezoneSearch } = useComboboxSearch(timezoneLabel(values.timezone));
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
@@ -38,13 +36,10 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
       <Combobox
         items={TIMEZONES.includes(values.timezone) ? TIMEZONES : [values.timezone, ...TIMEZONES]}
         value={values.timezone}
-        open={timezoneOpen}
-        inputValue={timezoneOpen ? timezoneQuery : timezoneLabel(values.timezone)}
         itemToStringLabel={timezoneLabel}
         itemToStringValue={(timezone) => timezone}
-        onOpenChange={(open) => { setTimezoneOpen(open); if (open) setTimezoneQuery(""); }}
-        onInputValueChange={setTimezoneQuery}
         onValueChange={(timezone) => timezone && change("timezone", timezone)}
+        {...timezoneSearch}
       >
         <div ref={timezoneAnchor}>
           <ComboboxInput id={`${id}-timezone`} placeholder="Search timezones…" required />
