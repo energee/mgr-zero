@@ -35,7 +35,7 @@ describe("packaging views", () => {
     const runs = htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps(packagingRuns) }));
     expect(runs).toMatch(/>Packaging</);
     expect(runs).not.toMatch(/href="\/packaging/);
-    expect(htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun, form: null }))).toBe("<div></div>");
+    expect(htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun }))).toMatch(/Save run plan/);
     expect(htmlOf(createElement(RepackView, { model: repackCase, footer: null }))).not.toMatch(/Record repack/);
   });
 
@@ -44,6 +44,8 @@ describe("packaging views", () => {
     expect(page).toMatch(/from "@\/components\/mgr\/views\/packaging-runs"/);
     expect(page).toMatch(/<PackagingRunsView\b/);
     expect(page).toMatch(/<ScheduleRunForm\b/);
+    const form = readFileSync("app/(app)/packaging/schedule-run-form.tsx", "utf8");
+    expect(form).toMatch(/<SchedulePackagingRunView\b/);
     expect(page).toMatch(/<RepackForm\b/);
     expect(page).not.toMatch(/\bE\./);
   });

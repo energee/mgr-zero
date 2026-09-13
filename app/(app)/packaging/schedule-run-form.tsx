@@ -7,9 +7,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
+import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 
@@ -35,46 +34,15 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule run" trigger={<Button size="sm">Schedule run</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="sr-brand">Brand</Label>
-          <Select value={brandId} onValueChange={setBrandId}>
-            <SelectTrigger id="sr-brand"><SelectValue placeholder="Brand" /></SelectTrigger>
-            <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="sr-source">Source tank · optional</Label>
-          <Select value={occupancyId || NONE} onValueChange={(v) => setOccupancyId(v === NONE ? "" : v)}>
-            <SelectTrigger id="sr-source"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>No source yet</SelectItem>
-              {occupancies.map((o) => (
-                <SelectItem key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="sr-date">Planned date</Label>
-          <Input id="sr-date" type="date" value={plannedOn} onChange={(e) => setPlannedOn(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label>Planned outputs</Label>
-          {lines.map((l, i) => (
-            <div key={i} className="flex gap-2">
-              <Select value={l.skuId} onValueChange={(v) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: v } : x)))}>
-                <SelectTrigger aria-label={`Line ${i + 1} SKU`}><SelectValue placeholder="SKU" /></SelectTrigger>
-                <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Input aria-label={`Line ${i + 1} qty`} type="number" min="0" step="any" className="w-24" value={l.qtyPlanned} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, qtyPlanned: e.target.value } : x)))} />
-            </div>
-          ))}
-          <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={() => setLines((prev) => [...prev, { skuId: "", qtyPlanned: "" }])}>Add line</Button>
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save run plan"}</Button>
-        </CommandFormFooter>
+        <SchedulePackagingRunView model={toSchedulePackagingRunViewProps({ plannedOn: "", source: "", sourceDetail: "", outputs: [], leftInSource: "", leftLabel: "", materials: [] })} controls={{
+          brands, brandId, onBrand: setBrandId, occupancies, occupancyId, onOccupancy: setOccupancyId,
+          plannedOn, onPlannedOn: setPlannedOn, skus, lines,
+          onSku: (index, value) => setLines((prev) => prev.map((line, i) => i === index ? { ...line, skuId: value } : line)),
+          onQty: (index, value) => setLines((prev) => prev.map((line, i) => i === index ? { ...line, qtyPlanned: value } : line)),
+          onAddLine: () => setLines((prev) => [...prev, { skuId: "", qtyPlanned: "" }]),
+          messages: <CommandFormMessage error={form.error} />,
+          footer: <CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save run plan"}</Button></CommandFormFooter>,
+        }} />
       </form>
     </CommandForm>
   );
