@@ -7,7 +7,6 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
 import "@/lib/commands/all";
 import { bbl, JURISDICTION, monthLabel, recentMonths } from "./period";
 
@@ -19,7 +18,7 @@ export default async function CompliancePage() {
   const months = [...new Set([...recentMonths(today), ...filed.keys()])].sort().reverse();
   return (
     <ComplianceMonthsView
-      model={toComplianceMonthsViewProps({
+      model={{
         months: months.map((m) => {
           const f = filed.get(m);
           return f
@@ -28,7 +27,7 @@ export default async function CompliancePage() {
         }),
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },
         lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${l.packaged_on}`, href: `/compliance/lots/${l.id}` })),
-      })}
+      }}
       linkRows
     />
   );

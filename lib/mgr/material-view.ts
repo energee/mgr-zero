@@ -13,7 +13,3 @@ export type MaterialViewModel = {
   lotTracked: boolean;
   active: boolean;
 };
-
-export function toMaterialViewProps(s: MaterialViewModel): MaterialViewModel {
-  return s;
-}

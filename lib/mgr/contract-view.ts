@@ -13,7 +13,3 @@ export type ContractViewModel = {
   unitCost: string;
   contractNo: string;
 };
-
-export function toContractViewProps(s: ContractViewModel): ContractViewModel {
-  return s;
-}

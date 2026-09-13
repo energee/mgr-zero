@@ -7,7 +7,3 @@ export type VendorViewModel = {
   termsOptions: string[];
   leadDays: string;
 };
-
-export function toVendorViewProps(s: VendorViewModel): VendorViewModel {
-  return s;
-}

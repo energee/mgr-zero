@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MaterialView } from "@/components/mgr/views/material";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toMaterialViewProps } from "@/lib/mgr/material-view";
-
 export type Material = {
   id: string; name: string; category: string; base_uom: string; purchase_uom: string; purchase_uom_factor: number;
   lot_tracked: boolean; default_vendor_id: string | null; reorder_point: number | null; active: boolean;
@@ -47,7 +45,7 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Material" trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <MaterialView
-          model={toMaterialViewProps({ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), lotTracked, active })}
+          model={{ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), lotTracked, active }}
           controls={{ name: setName, kind: setCategory, baseUnits: setFactor, purchaseUnit: setPurchaseUom, unit: setBaseUom, defaultVendorId: setVendorId, lotTracked: setLotTracked, active: setActive }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save material"}</Button></CommandFormFooter>}

@@ -8,7 +8,6 @@ import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import "@/lib/commands/all";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -38,7 +37,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
     : (order?.customers?.name ?? "Customer");
   return (
     <ConfirmDeliveryView
-      model={toConfirmDeliveryViewProps({
+      model={{
         backTo: delivery.routes?.name ?? "Route",
         backHref: delivery.routes ? `/routes/${delivery.routes.id}` : "/routes",
         title: `${delivery.routes?.name ?? "Route"} · Stop ${delivery.stop_no}`,
@@ -46,7 +45,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
         shipTo: order?.ship_tos ? `${order.ship_tos.label} · ${order.ship_tos.city}, ${order.ship_tos.state}` : undefined,
         invoiceTiming: timing,
         lines: lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) })),
-      })}
+      }}
       action={deliveryAction(delivery, ctx, invoice, transfer)}
     />
   );

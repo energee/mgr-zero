@@ -15,15 +15,10 @@ import { StateRegistrationView } from "../components/mgr/views/state-registratio
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
 } from "../lib/mgr/fixtures/compliance";
-import { toBrandApprovalViewProps } from "../lib/mgr/brand-approval-view";
-import { toComplianceMonthsViewProps } from "../lib/mgr/compliance-months-view";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
-import { toLicenseViewProps } from "../lib/mgr/license-view";
 import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
-import { toStateRegistrationViewProps } from "../lib/mgr/state-registration-view";
-
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
@@ -33,11 +28,11 @@ describe("Compliance months", () => {
     const body = screen("Compliance months").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Compliance months").body)).toBe(true);
     expect(body.type).toBe(ComplianceMonthsView);
-    expect(body.props.model).toEqual(toComplianceMonthsViewProps(complianceMonthsDemo));
+    expect(body.props.model).toEqual(complianceMonthsDemo);
   });
 
   it("renders licenses and lot navs without leaking live hrefs", () => {
-    const html = htmlOf(createElement(ComplianceMonthsView, { model: toComplianceMonthsViewProps(complianceMonthsDemo) }));
+    const html = htmlOf(createElement(ComplianceMonthsView, { model: complianceMonthsDemo }));
     expect(html).toMatch(/Licenses/);
     expect(html).not.toMatch(/Compliance registry/);
     expect(html).toMatch(/L-240831-HZ/);
@@ -84,19 +79,19 @@ describe("registry sheets", () => {
   it("the Brand approval inventory record is BrandApprovalView", () => {
     const body = screen("Brand approval").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrandApprovalView);
-    expect(body.props.model).toEqual(toBrandApprovalViewProps(brandApprovalStout));
+    expect(body.props.model).toEqual(brandApprovalStout);
   });
 
   it("the State registration inventory record is StateRegistrationView", () => {
     const body = screen("State registration").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(StateRegistrationView);
-    expect(body.props.model).toEqual(toStateRegistrationViewProps(stateRegistrationHazy));
+    expect(body.props.model).toEqual(stateRegistrationHazy);
   });
 
   it("the license and registration fields render without a React key warning (E.cols owns the keys)", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    htmlOf(createElement(LicenseView, { model: toLicenseViewProps(licensePaBrewery) }));
-    htmlOf(createElement(StateRegistrationView, { model: toStateRegistrationViewProps(stateRegistrationHazy) }));
+    htmlOf(createElement(LicenseView, { model: licensePaBrewery }));
+    htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy }));
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 
@@ -106,7 +101,7 @@ describe("registry sheets", () => {
   it("the License inventory record is LicenseView", () => {
     const body = screen("License").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicenseView);
-    expect(body.props.model).toEqual(toLicenseViewProps(licensePaBrewery));
+    expect(body.props.model).toEqual(licensePaBrewery);
     expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 

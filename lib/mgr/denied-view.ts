@@ -6,7 +6,3 @@ export type DeniedViewModel = {
   needs: string;
   hint: string;
 };
-
-export function toDeniedViewProps(s: DeniedViewModel): DeniedViewModel {
-  return s;
-}

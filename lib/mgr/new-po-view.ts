@@ -17,7 +17,3 @@ export type NewPoViewModel = {
   expected: string;
   lines: NewPoLineView[];
 };
-
-export function toNewPoViewProps(s: NewPoViewModel): NewPoViewModel {
-  return s;
-}

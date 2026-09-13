@@ -7,7 +7,3 @@ export type SearchViewModel = {
   heading?: string;
   sub?: string;
 };
-
-export function toSearchViewProps(s: SearchViewModel): SearchViewModel {
-  return s;
-}

@@ -198,28 +198,18 @@ import {
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
-import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
-import { toBrandApprovalViewProps } from "@/lib/mgr/brand-approval-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
-import { toClosePackagingRunViewProps } from "@/lib/mgr/close-packaging-run-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
-import { toContractViewProps } from "@/lib/mgr/contract-view";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
-import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
-import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
-import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
 import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
-import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
-import { toDeniedViewProps } from "@/lib/mgr/denied-view";
-import { toEntryViewProps, toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
+import { toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
-import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
@@ -227,16 +217,12 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
-import { toLicenseViewProps } from "@/lib/mgr/license-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
-import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView, ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
-import { toMeViewProps } from "@/lib/mgr/me-view";
-import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
@@ -257,30 +243,17 @@ import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
-import { toReceiptViewProps } from "@/lib/mgr/receipt-view";
-import { toReceivePoViewProps } from "@/lib/mgr/receive-po-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
-import { toRecipeViewProps } from "@/lib/mgr/recipe-view";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
-import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
-import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
 import { toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
-import { toRepackViewProps } from "@/lib/mgr/repack-view";
-import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
-import { toReturnRouteViewProps } from "@/lib/mgr/return-route-view";
-import { toRouteViewProps } from "@/lib/mgr/route-view";
 import { toRoutesViewProps } from "@/lib/mgr/routes-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
-import { toSearchViewProps } from "@/lib/mgr/search-view";
-import { toSessionExpiredViewProps } from "@/lib/mgr/session-expired-view";
-import { toSettingsViewProps } from "@/lib/mgr/settings-view";
-import { toStateRegistrationViewProps } from "@/lib/mgr/state-registration-view";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
@@ -288,14 +261,11 @@ import { toShopViewProps } from "@/lib/mgr/shop-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
 import { toSkuViewProps } from "@/lib/mgr/sku-view";
-import { toTeamViewProps } from "@/lib/mgr/team-view";
 import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
-import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
-import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -483,7 +453,7 @@ export const SCREENS: Screen[] = [
     reads: "search_entities", writes: "none",
     states: [["empty", "No records found · Search matches record names and numbers, not app pages."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
     spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
-    body: <SearchView model={toSearchViewProps(searchPalette)} />,
+    body: <SearchView model={searchPalette} />,
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
@@ -491,7 +461,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
     spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password, as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
-    body: <MeView model={toMeViewProps(meMaria)} />,
+    body: <MeView model={meMaria} />,
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
@@ -499,7 +469,7 @@ export const SCREENS: Screen[] = [
     reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
-    body: <SettingsView model={toSettingsViewProps(settingsDemo)} />,
+    body: <SettingsView model={settingsDemo} />,
   },
   {
     step: 8,
@@ -533,7 +503,7 @@ export const SCREENS: Screen[] = [
     reads: "none [the denied query never runs]", writes: "none",
     states: [["bookmarked", "direct URL · denied, not empty rows", 1], ["revoked mid-session", "the next command is refused; the shell stays usable", 1]],
     spec: "Plan §3: navigation and Today hide inapplicable actions while the registry and RLS still deny direct URLs and commands, so this frame exists for the URL, not for a link. It names the refusal and the role that would satisfy it, never a blank table, a spinner, or the shape of data the caller may not read.",
-    body: <DeniedView model={toDeniedViewProps(deniedInvoices)} />,
+    body: <DeniedView model={deniedInvoices} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "No membership",
@@ -542,7 +512,7 @@ export const SCREENS: Screen[] = [
     states: [["no brewery", "create a brewery on hosted MGR"], ["dedicated", "creation is hidden"], ["no customer", "contact the brewery"]],
     spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(noMembership)} />,
+    body: <EntryView model={noMembership} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
@@ -560,7 +530,7 @@ export const SCREENS: Screen[] = [
     states: [["expired", "request a new reset link"]],
     spec: "A timed-out recovery token never opens Set new password.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(expiredReset)} />,
+    body: <EntryView model={expiredReset} />,
   },
   {
     step: 4, slice: 1, group: "Global", surface: "sheet", name: "Session expired",
@@ -569,7 +539,7 @@ export const SCREENS: Screen[] = [
     reads: "local_outbox [client state]", writes: "none",
     states: [["queue kept", "1 reading waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
     spec: "Mid-write expiry does not drop an eligible frozen reading. Sign in as its original actor and brewery, then Offline outbox can retry that exact envelope. Movement, pick and transfer actions are never queued.",
-    body: <SessionExpiredView model={toSessionExpiredViewProps(sessionExpiredQueued)} />,
+    body: <SessionExpiredView model={sessionExpiredQueued} />,
   },
   // steps 2–8
   {
@@ -583,7 +553,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_sign_in_with_password · supabase_auth_sign_in_with_otp [platform]",
     states: DEFAULT_STATES,
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(signIn)} />,
+    body: <EntryView model={signIn} />,
   },
   {
     step: 2,
@@ -610,7 +580,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: [["sent", "Check your email"], ["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["error", "Did not load · Retry", 1]],
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(resetPassword)} />,
+    body: <EntryView model={resetPassword} />,
   },
   {
     step: 2,
@@ -624,7 +594,7 @@ export const SCREENS: Screen[] = [
     states: [["expired link", "Request a new reset link", 1], ["wrong audience", "portal user lands in the portal shell"]],
     spec: "The recovery token opens this, never Accept invite: no role row, no “Join” copy. After Save the existing membership decides the shell.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(setPassword)} />,
+    body: <EntryView model={setPassword} />,
   },
   {
     step: 6,
@@ -639,7 +609,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Customer-only accounts land on Order. Forgot password is a text link, not a second primary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(portalSignIn)} />,
+    body: <EntryView model={portalSignIn} />,
   },
   {
     step: 6,
@@ -654,7 +624,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(portalForgotPassword)} />,
+    body: <EntryView model={portalForgotPassword} />,
   },
   {
     step: 6,
@@ -669,7 +639,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "After Save, a customer membership opens Order, not Today.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toEntryViewProps(portalSetPassword)} />,
+    body: <EntryView model={portalSetPassword} />,
   },
   {
     step: 2,
@@ -681,7 +651,7 @@ export const SCREENS: Screen[] = [
     writes: "invite_staff [existing] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
     states: [["last admin", "role change refused · keep one admin", 1], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, derived from their email. Admin invites one staff role and changes or removes other memberships. The roster does not distinguish pending acceptance. Existing accounts cannot be attached or reinvited; removing membership leaves the Auth account.",
-    body: <TeamView model={toTeamViewProps(teamRoster)} />,
+    body: <TeamView model={teamRoster} />,
   },
   {
     step: 2, slice: 1, tab: "More", surface: "sheet", name: "Invite staff",
@@ -731,7 +701,7 @@ export const SCREENS: Screen[] = [
     writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
     spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
-    body: <FirstRunView model={toFirstRunViewProps(firstRunDemo)} />,
+    body: <FirstRunView model={firstRunDemo} />,
   },
   {
     step: 3,
@@ -822,7 +792,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
-    body: <SearchView model={toSearchViewProps(entityPickerPalette)} />,
+    body: <SearchView model={entityPickerPalette} />,
   },
   {
     step: 4,
@@ -1579,7 +1549,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vessel [mutable facts only]",
     states: [["permission", "brewer or admin required", 1], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1]],
     spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here.",
-    body: <VesselDetailView model={toVesselDetailViewProps(vesselFv3)} />,
+    body: <VesselDetailView model={vesselFv3} />,
   },
   {
     step: 7,
@@ -1648,7 +1618,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
     states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
-    body: <ScheduleBatchView model={toScheduleBatchViewProps(scheduleBatchHazy)} />,
+    body: <ScheduleBatchView model={scheduleBatchHazy} />,
   },
   {
     step: 7,
@@ -1661,7 +1631,7 @@ export const SCREENS: Screen[] = [
     writes: "record_brew_day [existing commands: brew date + knockout occupancy] · SCHEMA-GATE: brew-day lot consumption and frozen process sheet are not supported by the existing command/read",
     states: permitted("brewer or admin required"),
     spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <BrewDayView model={toBrewDayViewProps(brewDayHazy)} />,
+    body: <BrewDayView model={brewDayHazy} />,
   },
   {
     step: 7,
@@ -1688,7 +1658,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs] · update_packaging_run [pick the tank, or stamp the run started: both require a tank] · close_packaging_run [one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
     states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Labels are never counted here. Nobody can count what is left on a roll, and a screen that asks will simply be given a guess that posts as fact; the roll is reconciled at cycle count by counting whole rolls instead. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
-    body: <ClosePackagingRunView model={toClosePackagingRunViewProps(closePackagingRunHazy)} />,
+    body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {
     step: 7,
@@ -1701,7 +1671,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "brewer or warehouse required", 1], ["closed", "lot assigned · labels ready"], ["print", "keg collar and lot labels"]],
     spec: "Post-commit of Close packaging run. Print labels moves here; the close verb is gone.",
-    body: <RunClosedView model={toRunClosedViewProps(runClosedHazy)} />,
+    body: <RunClosedView model={runClosedHazy} />,
   },
   {
     step: 8,
@@ -1728,7 +1698,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
-    body: <SchedulePackagingRunView model={toSchedulePackagingRunViewProps(schedulePackagingRun)} />,
+    body: <SchedulePackagingRunView model={schedulePackagingRun} />,
   },
   {
     step: 7,
@@ -1767,7 +1737,7 @@ export const SCREENS: Screen[] = [
     writes: "create_purchase_order [one RPC: draft PO + all lines]",
     states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
     spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
-    body: <NewPoView model={toNewPoViewProps(newPoCountryMalt)} />,
+    body: <NewPoView model={newPoCountryMalt} />,
   },
   {
     step: 7,
@@ -1779,7 +1749,7 @@ export const SCREENS: Screen[] = [
     writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: the purchase-order query does not return recent material lots]",
     states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
-    body: <ReceivePoView model={toReceivePoViewProps(receivePoCountryMalt)} />,
+    body: <ReceivePoView model={receivePoCountryMalt} />,
   },
   {
     step: 7,
@@ -1792,7 +1762,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
-    body: <ReceiptView model={toReceiptViewProps(receiptPoCountryMalt)} />,
+    body: <ReceiptView model={receiptPoCountryMalt} />,
   },
   {
     step: 7,
@@ -1819,7 +1789,7 @@ export const SCREENS: Screen[] = [
     writes: "record_material_count [one RPC: count + lines + adjustment movements against named lots] · Lot allocation preview [SCHEMA-GATE: the read query returns bin totals only] · Roll conversion [SCHEMA-GATE: counts accept base units only]",
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["counted in rolls", "labels are counted as whole rolls · the open roll is excluded and its remainder falls into the variance", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. Labels are the exception to counting units, and the reason is practical: nobody counts two thousand labels left on a roll, and a sheet that asks will be handed a guess that posts as fact. Whole rolls are counted instead and the open roll is excluded, so the error is bounded at one roll and the same variance absorbs it at the next count. Applicator waste is what makes the drift, since packaging consumes one label per unit packaged while the real line wastes a little more; counting rolls on a routine keeps that from accumulating unnoticed.",
-    body: <><CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />{E.pin(<CycleCountFooter />)}</>,
+    body: <><CycleCountView model={cycleCountCans} footer={null} />{E.pin(<CycleCountFooter />)}</>,
   },
   {
     step: 7,
@@ -1859,7 +1829,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_material",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
-    body: <MaterialView model={toMaterialViewProps(materialCitra)} />,
+    body: <MaterialView model={materialCitra} />,
   },
   {
     step: 7,
@@ -1873,7 +1843,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vendor",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name required"], ["active", "available for purchase orders"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
-    body: <VendorView model={toVendorViewProps(vendorYch)} />,
+    body: <VendorView model={vendorYch} />,
   },
   {
     step: 7,
@@ -1900,7 +1870,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_material_contract",
     states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"]],
     spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on.",
-    body: <ContractView model={toContractViewProps(contractYchCitra)} />,
+    body: <ContractView model={contractYchCitra} />,
   },
   {
     step: 7,
@@ -1926,7 +1896,7 @@ export const SCREENS: Screen[] = [
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients, with assumption columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients; SCHEMA-GATE: process-spec columns (pre-boil volume, whirlpool min/temp/rest, knockout temp) remain unbuilt]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
-    body: <RecipeView model={toRecipeViewProps(recipeHazyV4)} />,
+    body: <RecipeView model={recipeHazyV4} />,
   },
   {
     step: 7,
@@ -2072,7 +2042,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["not filed", "ready to review", 1], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
     spec: "This is the shared destination for the registry back link, the month rows, and the lot trace. The last three months always show, plus every filed period; a month is TTB, the API takes other jurisdictions and ranges.",
-    body: <ComplianceMonthsView model={toComplianceMonthsViewProps(complianceMonthsDemo)} />,
+    body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
     step: 7,
@@ -2112,7 +2082,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked: the sheet is only ever opened from one brand"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
     spec: "A COLA is filed under the applicant’s own serial (260135), not a TTB-issued number, and it never expires: the sheet asks for the serial and the date submitted, and offers no expiry; the stored approval-date column carries the submitted date and the expiry column is never written; renaming and dropping them waits for a migration. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand.",
-    body: <BrandApprovalView model={toBrandApprovalViewProps(brandApprovalStout)} />,
+    body: <BrandApprovalView model={brandApprovalStout} />,
   },
   {
     step: 7,
@@ -2125,7 +2095,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_state_registration",
     states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1], ["saved again", "one record per brand and state: saving replaces it"]],
-    body: <StateRegistrationView model={toStateRegistrationViewProps(stateRegistrationHazy)} />,
+    body: <StateRegistrationView model={stateRegistrationHazy} />,
   },
   {
     step: 7,
@@ -2138,7 +2108,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brewery_state_license",
     states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
-    body: <LicenseView model={toLicenseViewProps(licensePaBrewery)} />,
+    body: <LicenseView model={licensePaBrewery} />,
   },
   {
     step: 7,
@@ -2289,7 +2259,7 @@ export const SCREENS: Screen[] = [
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
     spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
-    body: <RouteView model={toRouteViewProps(routeAPlan)} />,
+    body: <RouteView model={routeAPlan} />,
   },
   {
     step: 7,
@@ -2302,7 +2272,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
     spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
-    body: <ReturnRouteView model={toReturnRouteViewProps(returnRouteA)} />,
+    body: <ReturnRouteView model={returnRouteA} />,
   },
   {
     step: 7,
@@ -2315,7 +2285,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Resume opens Confirm delivery"]],
     spec: "The departed route as the driver runs it, reached from Deliveries (Resume) or the stop's Back. Route is for building; this is for running. Only the lowest undelivered stop is next; Today shows the same stop.",
-    body: <DriverRouteView model={toDriverRouteViewProps(driverRouteA)} />,
+    body: <DriverRouteView model={driverRouteA} />,
   },
   {
     step: 7,
@@ -2327,7 +2297,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
-    body: <ConfirmDeliveryView model={toConfirmDeliveryViewProps(confirmDeliveryStop1)} />,
+    body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
   },
   {
     step: 7,
@@ -2724,7 +2694,7 @@ export const SCREENS: Screen[] = [
     writes: "record_repack [SCHEMA-GATE: revision 2 §16.10: repack movement type, shared ref, abs(sum(bbl)) < 0.000001 over the ref]",
     states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +5 four-packs · +1 loss keeps the invariant absolute", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"]],
     spec: "An adjustment cannot express a break: it has no way to pair the two halves, so the break reads as an unexplained loss beside an unexplained gain. The outbound leg's bbl is derived from the inbound leg's frozen total rather than recomputed from barrels per unit (rounding each leg independently leaves −0.00000001 on a 24×16oz case), and the constraint carries a tolerance to catch a hand-entered repack without rejecting a legitimate one. Build-direction repack is out of scope; the whole repack is one RPC sharing one ref so beer and materials cannot disagree.",
-    body: <><RepackView model={toRepackViewProps(repackCase)} footer={null} />{E.pin(E.gated("Record repack", repackCase.unavailable!))}</>,
+    body: <><RepackView model={repackCase} footer={null} />{E.pin(E.gated("Record repack", repackCase.unavailable!))}</>,
   },
   // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack
   // show when MGR writes into them, drawn in each product's own design language

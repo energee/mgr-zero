@@ -20,13 +20,8 @@ import {
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
-import { toBrewDayViewProps, canRecordBrewDay } from "../lib/mgr/brew-day-view";
-import { toClosePackagingRunViewProps } from "../lib/mgr/close-packaging-run-view";
-import { toRecipeViewProps } from "../lib/mgr/recipe-view";
+import { canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
-import { toRunClosedViewProps } from "../lib/mgr/run-closed-view";
-import { toScheduleBatchViewProps } from "../lib/mgr/schedule-batch-view";
-import { toVesselDetailViewProps } from "../lib/mgr/vessel-detail-view";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
 import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
@@ -104,11 +99,11 @@ describe("Schedule batch view", () => {
   it("the Schedule batch inventory record is ScheduleBatchView", () => {
     const body = screen("Schedule batch").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ScheduleBatchView);
-    expect(body.props.model).toEqual(toScheduleBatchViewProps(scheduleBatchHazy));
+    expect(body.props.model).toEqual(scheduleBatchHazy);
   });
 
   it("renders Save schedule without leaking live hrefs", () => {
-    const html = htmlOf(createElement(ScheduleBatchView, { model: toScheduleBatchViewProps(scheduleBatchHazy) }));
+    const html = htmlOf(createElement(ScheduleBatchView, { model: scheduleBatchHazy }));
     expect(html).toMatch(/>Save schedule</);
     expect(html).not.toMatch(/href="\/batches"/);
     expect(html).toMatch(/Note · optional/);
@@ -151,11 +146,11 @@ describe("Brew day view", () => {
   it("the Brew day inventory record is BrewDayView", () => {
     const body = screen("Brew day").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrewDayView);
-    expect(body.props.model).toEqual(toBrewDayViewProps(brewDayHazy));
+    expect(body.props.model).toEqual(brewDayHazy);
   });
 
   it("renders Record brew day and knockout", () => {
-    const html = htmlOf(createElement(BrewDayView, { model: toBrewDayViewProps(brewDayHazy) }));
+    const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy }));
     expect(html).toMatch(/>Record brew day</);
     expect(html).toMatch(/14\.6 bbl/);
     expect(html).toMatch(/FV2/);
@@ -173,7 +168,7 @@ describe("Vessel detail view", () => {
   it("the Vessel detail inventory record is VesselDetailView", () => {
     const body = screen("Vessel detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
-    expect(body.props.model).toEqual(toVesselDetailViewProps(vesselFv3));
+    expect(body.props.model).toEqual(vesselFv3);
   });
 
   it("live cellar shares its tiles and links to the vessel page", () => {
@@ -188,13 +183,13 @@ describe("Close packaging run view", () => {
   it("the Close packaging run inventory record is ClosePackagingRunView", () => {
     const body = screen("Close packaging run").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ClosePackagingRunView);
-    expect(body.props.model).toEqual(toClosePackagingRunViewProps(closePackagingRunHazy));
+    expect(body.props.model).toEqual(closePackagingRunHazy);
   });
 
   it("the Run closed inventory record is RunClosedView", () => {
     const body = screen("Run closed").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(RunClosedView);
-    expect(body.props.model).toEqual(toRunClosedViewProps(runClosedHazy));
+    expect(body.props.model).toEqual(runClosedHazy);
   });
 
   it("the live packaging run page mounts ClosePackagingRunView and RunClosedView", () => {
@@ -230,12 +225,12 @@ describe("Recipes view", () => {
   it("the Recipe inventory record is RecipeView", () => {
     const body = screen("Recipe").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(RecipeView);
-    expect(body.props.model).toEqual(toRecipeViewProps(recipeHazyV4));
+    expect(body.props.model).toEqual(recipeHazyV4);
   });
 
   it("renders recipe numbers in one compact responsive grid without React key warnings", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const html = htmlOf(createElement(RecipeView, { model: toRecipeViewProps(recipeHazyV4) }));
+    const html = htmlOf(createElement(RecipeView, { model: recipeHazyV4 }));
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 

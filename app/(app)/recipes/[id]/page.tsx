@@ -10,7 +10,6 @@ import { RecipeView } from "@/components/mgr/views/recipe";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toRecipeViewProps } from "@/lib/mgr/recipe-view";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -40,7 +39,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
 
   return (
     <RecipeView
-      model={toRecipeViewProps({ title: recipe.name, backHref: "/recipes" })}
+      model={{ title: recipe.name, backHref: "/recipes" }}
       createAction={<NewVersionForm recipeId={recipe.id} materials={materials} unit={gravityUnit.effective} />}
       detail={
         <>

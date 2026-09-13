@@ -9,9 +9,6 @@ import { RepackView } from "../components/mgr/views/repack";
 import { SchedulePackagingRunView } from "../components/mgr/views/schedule-packaging-run";
 import { packagingRuns, repackCase, schedulePackagingRun } from "../lib/mgr/fixtures/packaging";
 import { toPackagingRunsViewProps } from "../lib/mgr/packaging-runs-view";
-import { toRepackViewProps } from "../lib/mgr/repack-view";
-import { toSchedulePackagingRunViewProps } from "../lib/mgr/schedule-packaging-run-view";
-
 const screen = (name: string) => SCREENS.find((entry) => entry.name === name)!;
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -25,10 +22,10 @@ describe("packaging views", () => {
     expect(runs.type).toBe(PackagingRunsView);
     expect(runs.props.model).toEqual(toPackagingRunsViewProps(packagingRuns));
     expect(schedule.type).toBe(SchedulePackagingRunView);
-    expect(schedule.props.model).toEqual(toSchedulePackagingRunViewProps(schedulePackagingRun));
+    expect(schedule.props.model).toEqual(schedulePackagingRun);
     const repackView = (repack.props as unknown as { children: [{ type: unknown; props: { model: unknown } }] }).children[0];
     expect(repackView.type).toBe(RepackView);
-    expect(repackView.props.model).toEqual(toRepackViewProps(repackCase));
+    expect(repackView.props.model).toEqual(repackCase);
   });
 
   it("keeps fixture actions inert and explicit null slots empty", () => {

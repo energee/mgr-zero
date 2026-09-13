@@ -11,9 +11,7 @@ import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import type { Approval, Registration } from "@/lib/commands/compliance";
 import { orUndef, useCommandForm, useFields } from "@/lib/commands/use-command-form";
-import { APPROVAL_KINDS, toBrandApprovalViewProps } from "@/lib/mgr/brand-approval-view";
-import { toStateRegistrationViewProps } from "@/lib/mgr/state-registration-view";
-
+import { APPROVAL_KINDS } from "@/lib/mgr/brand-approval-view";
 type Brand = { id: string; name: string };
 
 export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: Approval }) {
@@ -24,13 +22,13 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
     build: () => ({ id: approval?.id, brandId: brand.id, kind: v.kind, ttbId: v.ttbId, approvedOn: orUndef(v.submittedOn) }),
     reset,
   });
-  const model = toBrandApprovalViewProps({
+  const model = {
     brand: brand.name,
     kind: v.kind,
     kindOptions: APPROVAL_KINDS,
     number: v.ttbId,
     submittedOn: v.submittedOn,
-  });
+  };
   const controls = { kind: set("kind"), number: set("ttbId"), submittedOn: set("submittedOn") };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval")}>
@@ -53,10 +51,10 @@ export function RegistrationForm({ brand, registration }: { brand: Brand; regist
     build: () => ({ brandId: brand.id, state: v.state.toUpperCase(), registrationNo: orUndef(v.registrationNo), expiresOn: orUndef(v.expiresOn) }),
     reset,
   });
-  const model = toStateRegistrationViewProps({
+  const model = {
     brand: brand.name,
     state: v.state, registrationNo: v.registrationNo, expiresOn: v.expiresOn,
-  });
+  };
   const controls = { state: set("state"), registrationNo: set("registrationNo"), expiresOn: set("expiresOn") };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="State registration" trigger={sheetTrigger(!!registration, "Add registration")}>

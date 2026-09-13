@@ -19,7 +19,3 @@ export type VesselDetailViewModel = {
   typeOptions: string[];
   capacity: string;
 };
-
-export function toVesselDetailViewProps(s: VesselDetailViewModel): VesselDetailViewModel {
-  return s;
-}

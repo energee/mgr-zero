@@ -6,7 +6,6 @@ import type { TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
-import { toTeamViewProps } from "@/lib/mgr/team-view";
 import "@/lib/commands/all";
 import { InviteForm } from "./invite-form";
 import { MemberForm } from "./member-form";
@@ -17,7 +16,7 @@ export default async function TeamPage() {
   const members = (await runCommand("list_team_members", {}, await buildContext(brewery.id))) as TeamMember[];
   return (
     <TeamView
-      model={toTeamViewProps({
+      model={{
         backHref: "/settings",
         rows: members.map((m) => ({
           key: m.userId,
@@ -25,7 +24,7 @@ export default async function TeamPage() {
           detail: `${m.email} · ${m.role}`,
           you: m.userId === identity?.userId,
         })),
-      })}
+      }}
       memberActions={Object.fromEntries(members.filter(m => m.userId !== identity?.userId).map(m => [m.userId, <MemberForm key={m.userId} member={m} />]))}
       createAction={<InviteForm />}
     />

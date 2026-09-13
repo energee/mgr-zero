@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toVendorViewProps } from "@/lib/mgr/vendor-view";
-
 export type Vendor = { id: string; name: string; email: string | null; phone: string | null; payment_terms: string; lead_time_days: number | null; active: boolean };
 
 const TERMS: [string, string][] = [["due_on_receipt", "Due on receipt"], ["net15", "Net 15"], ["net30", "Net 30"]];
@@ -32,7 +30,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Vendor" trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <VendorView
-          model={toVendorViewProps({ name, email, phone, terms: TERMS.find(([value]) => value === terms)?.[1] ?? "Net 30", termsOptions: TERMS.map(([, label]) => label), leadDays: lead })}
+          model={{ name, email, phone, terms: TERMS.find(([value]) => value === terms)?.[1] ?? "Net 30", termsOptions: TERMS.map(([, label]) => label), leadDays: lead }}
           controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(TERMS.find(([, value]) => value === label)?.[0] ?? "net30"), leadDays: setLead }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : "Save vendor"}</Button></CommandFormFooter>}

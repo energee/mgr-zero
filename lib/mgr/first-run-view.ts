@@ -3,7 +3,3 @@ export type FirstRunViewModel = {
   brewery: string;
   steps: string;
 };
-
-export function toFirstRunViewProps(s: FirstRunViewModel): FirstRunViewModel {
-  return s;
-}

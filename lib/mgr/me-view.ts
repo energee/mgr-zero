@@ -5,7 +5,3 @@ export type MeViewModel = {
   email: string;
   breweries: { id?: string; name: string; current: boolean }[];
 };
-
-export function toMeViewProps(s: MeViewModel): MeViewModel {
-  return s;
-}

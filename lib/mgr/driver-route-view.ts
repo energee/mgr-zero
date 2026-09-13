@@ -18,7 +18,3 @@ export type DriverRouteViewModel = {
   departed: string;
   stops: DriverStopView[];
 };
-
-export function toDriverRouteViewProps(s: DriverRouteViewModel): DriverRouteViewModel {
-  return s;
-}

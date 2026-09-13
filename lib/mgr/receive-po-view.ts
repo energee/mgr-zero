@@ -30,7 +30,3 @@ export type ReceivePoViewModel = {
   lotSuggestionsUnavailable?: boolean;
   history?: { key: string; label: string; detail: string; href?: string }[];
 };
-
-export function toReceivePoViewProps(s: ReceivePoViewModel): ReceivePoViewModel {
-  return s;
-}

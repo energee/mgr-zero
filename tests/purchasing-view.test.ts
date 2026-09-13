@@ -23,16 +23,10 @@ import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
-import { toContractViewProps } from "../lib/mgr/contract-view";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
-import { toCycleCountViewProps } from "../lib/mgr/cycle-count-view";
-import { toMaterialViewProps } from "../lib/mgr/material-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
-import { toNewPoViewProps } from "../lib/mgr/new-po-view";
 import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
-import { toReceiptViewProps, toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
-import { toReceivePoViewProps } from "../lib/mgr/receive-po-view";
-import { toVendorViewProps } from "../lib/mgr/vendor-view";
+import { toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -60,7 +54,7 @@ describe("Purchase orders", () => {
   it("the New PO inventory record is NewPoView", () => {
     const body = screen("New PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewPoView);
-    expect(body.props.model).toEqual(toNewPoViewProps(newPoCountryMalt));
+    expect(body.props.model).toEqual(newPoCountryMalt);
   });
 
   it("shares decimal counts, untracked lot omission, errors and disabled saving", () => {
@@ -85,12 +79,12 @@ describe("Purchase orders", () => {
   it("the Receive PO inventory record is ReceivePoView", () => {
     const body = screen("Receive PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceivePoView);
-    expect(body.props.model).toEqual(toReceivePoViewProps(receivePoCountryMalt));
+    expect(body.props.model).toEqual(receivePoCountryMalt);
   });
 
   it("renders Receive purchase order without leaking live hrefs", () => {
-    expect(htmlOf(createElement(ReceivePoView, { model: toReceivePoViewProps(receivePoCountryMalt) }))).toMatch(/>Receive purchase order</);
-    expect(htmlOf(createElement(ReceivePoView, { model: toReceivePoViewProps(receivePoCountryMalt) }))).not.toMatch(/href="\/purchase-orders"/);
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).toMatch(/>Receive purchase order</);
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toMatch(/href="\/purchase-orders"/);
   });
 
   it("draft receiving keeps counts read-only and only offers the send attestation", () => {
@@ -110,7 +104,7 @@ describe("Purchase orders", () => {
   it("the Receipt inventory record is ReceiptView", () => {
     const body = screen("Receipt").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceiptView);
-    expect(body.props.model).toEqual(toReceiptViewProps(receiptPoCountryMalt));
+    expect(body.props.model).toEqual(receiptPoCountryMalt);
   });
 
   it("the live PO page mounts ReceivePoView and a durable ReceiptView", () => {
@@ -150,7 +144,7 @@ describe("Materials", () => {
 
   it("the Cycle count inventory shares the complete view including its footer", () => {
     const { rest, pin } = splitPinned(screen("Cycle count").body);
-    expect((rest[0] as { props: { model: unknown } }).props.model).toEqual(toCycleCountViewProps(cycleCountCans));
+    expect((rest[0] as { props: { model: unknown } }).props.model).toEqual(cycleCountCans);
     expect(htmlOf(rest)).toContain("Cans · 16 oz");
     expect(htmlOf(rest)).not.toContain("Record count");
     expect(htmlOf(pin)).toBe(htmlOf(E.pin(createElement(CycleCountFooter))));
@@ -178,7 +172,7 @@ describe("Materials", () => {
 
   it("the Material inventory record is MaterialView", () => {
     expect((screen("Material").body as { type: unknown }).type).toBe(MaterialView);
-    const html = htmlOf(createElement(MaterialView, { model: toMaterialViewProps(materialCitra) }));
+    const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
     expect(html).toMatch(/>Save material</);
     expect(html).toMatch(/Default vendor/);
   });
@@ -208,7 +202,7 @@ describe("Vendors", () => {
 
   it("the Vendor inventory record is VendorView", () => {
     expect((screen("Vendor").body as { type: unknown }).type).toBe(VendorView);
-    const html = htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }));
+    const html = htmlOf(createElement(VendorView, { model: vendorYch }));
     expect(html).toMatch(/>Save vendor</);
     expect(html).toMatch(/Phone/);
     expect(html).toContain("Planning uses this lead time to calculate when to buy. Received orders show a separate observed average.");
@@ -229,14 +223,14 @@ describe("Vendors", () => {
 
   it("the Contract inventory record is ContractView", () => {
     expect((screen("Contract").body as { type: unknown }).type).toBe(ContractView);
-    const html = htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }));
+    const html = htmlOf(createElement(ContractView, { model: contractYchCitra }));
     expect(html).toMatch(/>Save contract</);
     expect(html).toMatch(/Contract number/);
   });
 
   it("the contract's inline field pairs render without a React key warning (E.inline owns the keys)", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }));
+    htmlOf(createElement(ContractView, { model: contractYchCitra }));
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 

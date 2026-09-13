@@ -6,10 +6,6 @@ export type SessionExpiredViewModel = {
   queuedState: string;
 };
 
-export function toSessionExpiredViewProps(s: SessionExpiredViewModel): SessionExpiredViewModel {
-  return s;
-}
-
 export const sessionExpiredModel: SessionExpiredViewModel = {
   note: "Your session ended. Eligible queued readings are still on this device.",
   queuedTitle: "Offline outbox",

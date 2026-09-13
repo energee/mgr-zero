@@ -19,7 +19,3 @@ export type SettingsViewModel = {
   locations: string;
   team: string;
 };
-
-export function toSettingsViewProps(s: SettingsViewModel): SettingsViewModel {
-  return s;
-}

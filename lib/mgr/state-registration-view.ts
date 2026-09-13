@@ -6,7 +6,3 @@ export type StateRegistrationViewModel = {
   registrationNo?: string;
   expiresOn?: string;
 };
-
-export function toStateRegistrationViewProps(s: StateRegistrationViewModel): StateRegistrationViewModel {
-  return s;
-}
