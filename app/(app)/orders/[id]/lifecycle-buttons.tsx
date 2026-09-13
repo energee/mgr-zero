@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AdjustLinesForm } from "./adjust-lines-form";
 import type { PickLine } from "./pick-form";
-import { ShipForm, type ShipLine } from "./ship-form";
+import type { ShipLine } from "./ship-form";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 type Warning = { sku_id: string; atp: number };
@@ -90,7 +90,7 @@ export function LifecycleButtons({
         {canFulfill && (status === "confirmed" || status === "picked") && (
           <Button size="sm" asChild><Link href={`/orders/${orderId}/pick`}>Record pick</Link></Button>
         )}
-        {canFulfill && status === "picked" && <ShipForm transfer={transfer} orderId={orderId} lines={pickLines} />}
+        {canFulfill && status === "picked" && <Button size="sm" asChild><Link href={`/orders/${orderId}/${transfer ? "complete" : "ship"}`}>{transfer ? "Complete transfer" : "Ship"}</Link></Button>}
         {canCancel && (
           <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) { setCancelReason(""); setError(null); } }} title="Cancel order" trigger={<Button size="sm" variant="destructive" disabled={busy}>
                 Cancel

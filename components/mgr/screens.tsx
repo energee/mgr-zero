@@ -25,6 +25,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
+import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
+import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
@@ -145,7 +147,7 @@ import { workWarehouse } from "@/lib/mgr/fixtures/work";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
-import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
+import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
@@ -1015,10 +1017,10 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment] · shortage_reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
-    body: <ShipView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
+    body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipInvoice.lines)} />} model={toShipViewProps(orderShipInvoice)} />,
   },
   {
     step: 5,
@@ -1040,10 +1042,10 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
+    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later] · shortage_reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
-    body: <ShipView model={toShipViewProps(orderShipOnDelivery)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} invoiceTiming={1} />,
+    body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipOnDelivery.lines)} />} model={toShipViewProps(orderShipOnDelivery)} invoiceTiming={1} />,
   },
   {
     step: 5,
@@ -1056,7 +1058,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [explicit source and destination bins preserve lot; taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
-    body: <CompleteTransferView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
+    body: <CompleteTransferView sources={<ShipmentSourcesView {...shipmentSources(orderTransferComplete.lines)} destinationBins={[{ id: "taproom-cooler", name: "Taproom cooler" }]} />} model={toCompleteTransferViewProps(orderTransferComplete)} />,
   },
   {
     step: 5,

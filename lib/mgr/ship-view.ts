@@ -6,6 +6,7 @@ export type ShipLineView = {
   name: string;
   detail: string;
   qty: number;
+  picked: number;
   tone?: "" | "w" | "ok";
 };
 
@@ -44,12 +45,6 @@ export type ShipSnapshot = {
 const pickedOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_picked ?? 0);
 const shipOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_shipped ?? pickedOf(l));
 
-function shortName(name: string, qty: number) {
-  if (/hazy/i.test(name)) return "Hazy ½ bbl";
-  if (/pils/i.test(name)) return qty === 1 ? "Pils case" : "Pils cases";
-  return name;
-}
-
 function saleVolume(qty: number, bblPerUnit: number | undefined) {
   // Sale-removal totals in the inventory are two-decimal bbl (2.00 / 0.87 / 0.97).
   // formatVolume would drop the trailing zeros and turn a half-keg total into a glyph.
@@ -67,11 +62,11 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming = "now"
     const qty = shipOf(l);
     if (qty <= 0) continue;
     const name = l.skus?.name ?? "Line";
-    tape.push([`−${qty} ${shortName(name, qty)} · sale removal · ${dest}`, saleVolume(qty, l.bbl_per_unit)]);
+    tape.push([`−${qty} ${name} · sale removal · ${dest}`, saleVolume(qty, l.bbl_per_unit)]);
   }
-  if (short) {
-    const released = pickedOf(short) - shipOf(short);
-    tape.push([`${released} ${shortName(short.skus?.name ?? "line", released)} released · restock`, ""]);
+  for (const line of lines) {
+    const released = pickedOf(line) - shipOf(line);
+    if (released > 0) tape.push([`${released} ${line.skus?.name ?? "Line"} released · restock`, ""]);
   }
   tape.push(invoiceTiming === "on_delivery"
     ? ["invoice number", "deferred to delivery"]
@@ -91,6 +86,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming = "now"
         name: l.skus?.name ?? "Line",
         detail: anyShort ? `ordered ${ordered} · picked ${picked}` : `picked ${picked}`,
         qty,
+        picked,
         tone: qty < picked ? "w" : "ok",
       };
     }),

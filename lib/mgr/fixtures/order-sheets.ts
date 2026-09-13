@@ -10,6 +10,14 @@ import type { ShipSnapshot } from "@/lib/mgr/ship-view";
 import type { ShipmentDoneSnapshot } from "@/lib/mgr/shipment-done-view";
 import type { ShortPickSnapshot } from "@/lib/mgr/short-pick-view";
 
+/** Recorded example source identity; never imported by live adapters. */
+export function shipmentSources(lines: { id: string; qty_picked: number | null; qty_shipped?: number | null; skus: { name: string } | null }[]) {
+  return {
+    lines: lines.map(line => ({ key: line.id, name: line.skus?.name ?? "Line", qty: Number(line.qty_shipped ?? line.qty_picked ?? 0), options: [{ key: "cooler:legacy", label: "Cooler · Untracked / legacy stock" }] })),
+    allocations: Object.fromEntries(lines.map(line => [line.id, [{ key: "cooler:legacy", qty: String(line.qty_shipped ?? line.qty_picked ?? 0), toBinId: "" }]])),
+  };
+}
+
 const ORDER_229 = "00000000-0000-4000-8000-000000000229";
 const ORDER_231 = "00000000-0000-4000-8000-000000000231";
 

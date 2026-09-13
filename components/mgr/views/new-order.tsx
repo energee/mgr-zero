@@ -47,14 +47,14 @@ export function OrderSkuPicker({ value, label, options, onChange }: { value: str
   </CommandForm>;
 }
 
-export function OrderQuantity({ value, label, onChange, contextualLabels = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean }) {
+export function OrderQuantity({ value, label, onChange, contextualLabels = false, max, step = "any", required = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean; max?: number; step?: string; required?: boolean }) {
   const [internal, setInternal] = useState(String(value));
   const current = onChange ? String(value) : internal;
   const change = (next: string) => { setInternal(next); onChange?.(next); };
   return <ButtonGroup>
     <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} onClick={() => change(String(Math.max(0, Number(current) - 1)))}>−</Button>
-    <Input type="number" min="0" step="any" inputMode="decimal" value={current} onChange={event => change(event.target.value)} aria-label={label} className="w-14 text-center" />
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} onClick={() => change(String(Number(current) + 1))}>+</Button>
+    <Input type="number" min="0" max={max} step={step} required={required} inputMode="decimal" value={current} onChange={event => change(event.target.value)} aria-label={label} className="w-14 text-center" />
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} onClick={() => change(String(Math.min(max ?? Infinity, Number(current) + 1)))}>+</Button>
   </ButtonGroup>;
 }
 

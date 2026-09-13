@@ -110,6 +110,10 @@ describe("Ship view", () => {
     const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
     expect(model.tape[0]).toEqual(["−4 Hazy special can · sale removal · PA", ""]);
   });
+  it("names every held-back line on the restock preview", () => {
+    const model = toShipViewProps({ ...orderShipInvoice, lines: orderShipInvoice.lines.map(line => ({ ...line, qty_shipped: 0 })) });
+    expect(model.tape.filter(row => row[0].includes("released · restock"))).toHaveLength(2);
+  });
   it("maps a short Pils ship onto reason, restock tape, and invoice-now", () => {
     const model = toShipViewProps(orderShipInvoice);
     expect(model.title).toBe("Ship");
@@ -117,9 +121,9 @@ describe("Ship view", () => {
     expect(model.lines[1]).toMatchObject({ qty: 9, tone: "w", detail: "ordered 10 · picked 10" });
     expect(model.shortNote).toMatch(/Shipping 9 of 10 Pils/);
     expect(model.tape).toEqual([
-      ["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"],
-      ["−9 Pils cases · sale removal · PA", "0.87 bbl"],
-      ["1 Pils case released · restock", ""],
+      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
+      ["−9 Pils · 16 oz case · sale removal · PA", "0.87 bbl"],
+      ["1 Pils · 16 oz case released · restock", ""],
       ["invoice number", "assigned on commit"],
     ]);
   });
@@ -152,8 +156,8 @@ describe("Ship view", () => {
       [10, "picked 10", "ok"],
     ]);
     expect(model.tape).toEqual([
-      ["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"],
-      ["−10 Pils cases · sale removal · PA", "0.97 bbl"],
+      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
+      ["−10 Pils · 16 oz case · sale removal · PA", "0.97 bbl"],
       ["invoice number", "deferred to delivery"],
     ]);
   });

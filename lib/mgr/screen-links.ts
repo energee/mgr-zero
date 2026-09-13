@@ -225,6 +225,8 @@ export const INERT: (string | RegExp)[] = [
   "Current state",
   "Online payments",
   "Decrease",
+  "Add source",
+  "Remove source",
   /^(Decrease|Increase) Line \d+ quantity$/,
   /^Line \d+ SKU$/,
   "Delivery enabled",
