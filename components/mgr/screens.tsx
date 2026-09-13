@@ -101,7 +101,7 @@ import { RecipesView } from "@/components/mgr/views/recipes";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
-import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ReturnCreditView, ReturnSourcesView } from "@/components/mgr/views/return-credit";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { RouteView } from "@/components/mgr/views/route";
 import { RoutesView } from "@/components/mgr/views/routes";
@@ -1017,7 +1017,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment] · shortage_reason [SCHEMA-GATE: persistence unavailable]",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment] · Shortage reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
     body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipInvoice.lines)} />} model={toShipViewProps(orderShipInvoice)} />,
@@ -1042,7 +1042,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later] · shortage_reason [SCHEMA-GATE: persistence unavailable]",
+    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later] · Shortage reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
     body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipOnDelivery.lines)} />} model={toShipViewProps(orderShipOnDelivery)} invoiceTiming={1} />,
@@ -1188,10 +1188,10 @@ export const SCREENS: Screen[] = [
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
     reads: "get_invoice, get_invoice_return_sources, list_bins",
-    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
+    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price] · Deposit refund [SCHEMA-GATE: beer returns do not refund deposits]",
     states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
-    body: <ReturnCreditView sources={E.pick("Original shipped source", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ"])} model={toReturnCreditViewProps(orderReturnCredit)} />,
+    body: <ReturnCreditView sources={<ReturnSourcesView groups={[{ key: "l-hazy", name: orderReturnCredit.lines[0].skus?.name ?? "Line", sources: [{ id: "shipped-hazy", label: "L-240831-HZ · shipped from Cooler", shipped: 4 }] }]} quantities={{ "shipped-hazy": "1" }} />} bins={[{ id: "cooler", name: "Cooler" }]} binId="cooler" model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
     step: 5,

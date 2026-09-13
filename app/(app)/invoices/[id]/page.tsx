@@ -7,11 +7,13 @@
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
-import { CreditMemoForm } from "./credit-memo-form";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { QboInvoiceRow } from "@/app/(app)/settings/accounting/qbo-controls";
@@ -19,20 +21,19 @@ import { QboInvoiceRow } from "@/app/(app)/settings/accounting/qbo-controls";
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
 type InvoiceLine = { id: string; kind: string; sku_id: string | null; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null };
 type Question = { id: string; body: string; created_at: string; answered_at: string | null; customers: { name: string } | null };
-type LocationRow = { id: string; name: string };
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ invoice, lines, hasPendingPush }, locations, questions, health] = (await Promise.all([
-    orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)), runCommand("list_locations", {}, ctx),
+  const [{ invoice, lines, hasPendingPush }, questions, health] = (await Promise.all([
+    orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)),
     brewery.role === "warehouse" ? [] : runCommand("list_invoice_questions", { invoiceId: id }, ctx),
     brewery.role === "admin" || brewery.role === "sales" ? runCommand("get_qbo_connection", {}, ctx) : null,
-  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean }, LocationRow[], Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null } | null];
+  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
-  const memo = !credit && brewery.role !== "warehouse"
-    ? <CreditMemoForm shipmentId={invoice.shipment_id} invoiceId={invoice.id} lines={lines.filter(l => l.sku_id).map((l) => ({ id: l.id, skuId: l.sku_id!, label: l.skus?.name ?? l.description, qty: Number(l.qty) }))} locations={locations.map((l) => ({ id: l.id, name: l.name }))} />
+  const memo = !credit && canRun(ctx, "return_shipment")
+    ? <Button size="sm" variant="outline" asChild><Link href={`/invoices/${invoice.id}/return`}>Return</Link></Button>
     : undefined;
   const realm = health?.connected ? health.realmId : null;
   const missingMappings = !invoice.customers?.qbo_customer_id || (realm && invoice.customers.qbo_realm_id !== realm)

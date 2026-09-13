@@ -210,7 +210,7 @@ describe("Return and credit view", () => {
   it("does not include an unsupported deposit refund in the credit amount", () => {
     expect(toReturnCreditViewProps(orderReturnCredit).tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
   });
-  it("maps one Hazy keg plus deposit onto an $180 credit", () => {
+  it("shows the recorded deposit separately from the supported $150 beer credit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
     expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1 });
@@ -219,9 +219,9 @@ describe("Return and credit view", () => {
     expect(model.depositAmount).toBe("−$30.00");
     expect(model.creditInfo).toMatch(/INV-1042/);
     expect(model.tape).toEqual([
-      ["+1 Hazy ½ bbl · return in", "Warehouse"],
-      ["−1 Hazy ½ bbl · loss · damaged", "not sellable"],
-      ["credit memo number · on commit", "−$180.00"],
+      ["+1 Hazy IPA · ½ bbl keg · return in", "Warehouse"],
+      ["−1 Hazy IPA · ½ bbl keg · loss · damaged", "not sellable"],
+      ["credit memo number · on commit", "−$150.00"],
     ]);
   });
 

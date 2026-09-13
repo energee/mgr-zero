@@ -361,12 +361,14 @@ Returns preserve the selected shipment lot and its original recorded volume even
 
 <Screen name="Return and credit" />
 
-1. Open the invoice and select **Return**.
+1. Open the invoice and select **Return** to open the Beer return page.
 2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
-3. Split the returned quantity across the original shipped sources shown under the line. Their sum must equal the line quantity; a source cannot be returned more than was shipped. Choose **Return to location**, the destination **bin**, and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+3. Split the returned quantity under **Original shipped source**. The source amounts must sum to the line quantity; a source cannot be returned more than was shipped. Choose **Return to**, the destination **Return to bin**, and a reason: *unsold* and *wrong item* put the beer back as sellable stock at that location; *damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
 For older invoices that have no shipment, choose the return location; MGR records untracked stock in its first bin. Shipment-backed invoices always require the original source selection.
+
+The preview uses the selected destination and the invoice's captured beer prices. Deposit refunds are not included in this beer return; the deposit-refund field is unavailable. After saving, MGR returns to the original invoice.
 
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 

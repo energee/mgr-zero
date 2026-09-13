@@ -76,7 +76,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Ship and invoice", file: "app/(app)/orders/[id]/ship-form.tsx" },
   { name: "Shipment done", file: "app/(app)/orders/[id]/ship-form.tsx" },
   { name: "Ship on delivery", file: "app/(app)/orders/[id]/ship-form.tsx" },
-  { name: "Return and credit", file: "app/(app)/orders/[id]/page.tsx" },
+  { name: "Return and credit", file: "app/(app)/invoices/[id]/credit-memo-form.tsx" },
   { name: "Put back", file: "app/(app)/orders/[id]/restock/page.tsx" },
   { name: "Transfers", file: "app/(app)/transfers/page.tsx" },
   { name: "New transfer", file: "app/(app)/transfers/page.tsx" },
