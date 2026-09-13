@@ -1,5 +1,6 @@
 // lib/mgr/sale-channels-view.ts — view-model for Sale channels.
 // list_sale_channels paints the domain; optional movements are inventory copy.
+import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { sentenceCase } from "./labels";
 
@@ -13,7 +14,7 @@ export type SaleChannelsRowView = {
 export type SaleChannelsViewModel = {
   backHref?: string;
   rows: SaleChannelsRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type SaleChannelsSnapshot = {
@@ -39,7 +40,7 @@ function detail(c: SaleChannelsSnapshot["channels"][number]): string {
 export function toSaleChannelsViewProps({ channels, backHref }: SaleChannelsSnapshot): SaleChannelsViewModel {
   return {
     backHref,
-    empty: channels.length === 0 ? "No sale channels yet" : undefined,
+    empty: channels.length === 0 ? { title: "No sale channels yet", description: "A channel groups the customers that share a price list." } : undefined,
     rows: channels.map((c) => ({
       key: c.id,
       title: c.name,

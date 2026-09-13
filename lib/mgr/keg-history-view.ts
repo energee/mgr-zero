@@ -1,3 +1,4 @@
+import type { EmptyState } from "./empty-state";
 // lib/mgr/keg-history-view.ts — view-model for Keg event history.
 export type KegHistoryRowView = {
   key: string;
@@ -15,7 +16,7 @@ export type KegHistoryViewModel = {
   pool: string;
   poolOptions: string[];
   rows: KegHistoryRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type KegHistorySnapshot = {
@@ -36,6 +37,6 @@ export function toKegHistoryViewProps(s: KegHistorySnapshot): KegHistoryViewMode
     pool: s.pool ?? "All pools",
     poolOptions: s.poolOptions ?? ["All pools"],
     rows,
-    empty: rows.length === 0 ? "No matching events" : undefined,
+    empty: rows.length === 0 ? { title: "No matching events", description: "Widen the filter to see more of the keg's history." } : undefined,
   };
 }

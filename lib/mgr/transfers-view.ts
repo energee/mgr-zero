@@ -1,4 +1,5 @@
 // lib/mgr/transfers-view.ts — view-model for the Transfers list (list_stock_transfers).
+import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { trfNo } from "./doc-no";
 
@@ -28,7 +29,7 @@ export type TransfersRowView = {
 export type TransfersViewModel = {
   title: string;
   rows: TransfersRowView[];
-  empty?: string;
+  empty?: EmptyState;
   workChips: string[];
   workChipIndex: number;
   workTabs: Record<string, string>;
@@ -52,7 +53,7 @@ export type TransfersSnapshot = {
 export function toTransfersViewProps({ transfers, title }: TransfersSnapshot): TransfersViewModel {
   return {
     title: title ?? "Work",
-    empty: transfers.length === 0 ? "No transfers yet" : undefined,
+    empty: transfers.length === 0 ? { title: "No transfers yet", description: "A transfer moves stock between two locations." } : undefined,
     workChips: TRANSFER_WORK_CHIPS,
     workChipIndex: 2,
     workTabs: TRANSFER_WORK_TABS,

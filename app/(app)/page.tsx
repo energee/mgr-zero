@@ -31,7 +31,7 @@ export default async function TodayPage() {
     if (!location) {
       return (
         <TodayView
-          model={toTodayViewProps({ date, empty: "No taproom location is available", emptyVerb: "Taproom stock", rows: [] })}
+          model={toTodayViewProps({ date, empty: { title: "No taproom location is available", description: "Ask Admin to add one under Locations." }, emptyVerb: "Taproom stock", rows: [] })}
           emptyAction={E.btn("Taproom stock", "g", "/beer")}
         />
       );
@@ -46,7 +46,7 @@ export default async function TodayPage() {
   const items = (await runCommand("get_today", {}, ctx)) as TodayItem[];
   return (
     <TodayView
-      model={toTodayViewProps({ date, items, empty: "Nothing waiting", emptyVerb: "Record movement" })}
+      model={toTodayViewProps({ date, items, empty: { title: "Nothing waiting", description: "Nothing needs your attention right now." }, emptyVerb: "Record movement" })}
       emptyAction={E.btn("Record movement", "g", "/inventory?recordMovement=1")}
       linkRows
     />

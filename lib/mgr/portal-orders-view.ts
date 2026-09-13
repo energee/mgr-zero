@@ -1,5 +1,6 @@
 // lib/mgr/portal-orders-view.ts — view-model for portal Order history.
 // portal_orders rows plus buyerStatus; drafts continue and shipped rows reorder.
+import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
@@ -18,7 +19,7 @@ export type PortalOrdersViewModel = {
   subtitle: string;
   rows: PortalOrdersRowView[];
   info: string;
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type PortalOrdersLineSnapshot = {
@@ -58,7 +59,7 @@ function shortCopy(lines: PortalOrdersLineSnapshot[]): string | undefined {
 export function toPortalOrdersViewProps({ customerName, breweryName, orders }: PortalOrdersSnapshot): PortalOrdersViewModel {
   return {
     subtitle: customerName,
-    empty: orders.length === 0 ? "No orders yet. Start one from Order." : undefined,
+    empty: orders.length === 0 ? { title: "No orders yet", description: "Start one from Order." } : undefined,
     info: `Need a change? Call ${breweryName ?? "the brewery"}. Orders can’t be edited here after they’re placed.`,
     rows: orders.map((o) => {
       const adjusted = shortCopy(o.order_lines);

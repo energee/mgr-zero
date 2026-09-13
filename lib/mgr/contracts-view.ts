@@ -1,3 +1,4 @@
+import type { EmptyState } from "./empty-state";
 // lib/mgr/contracts-view.ts — view-model for the Contracts list.
 export type ContractsRowView = {
   key: string;
@@ -10,12 +11,12 @@ export type ContractsRowView = {
 export type ContractsViewModel = {
   backHref?: string;
   rows: ContractsRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type ContractsSnapshot = { backHref?: string; rows?: ContractsRowView[] };
 
 export function toContractsViewProps(s: ContractsSnapshot): ContractsViewModel {
   const rows = s.rows ?? [];
-  return { backHref: s.backHref, rows, empty: rows.length === 0 ? "No commitments yet" : undefined };
+  return { backHref: s.backHref, rows, empty: rows.length === 0 ? { title: "No commitments yet", description: "A contract records beer promised to a customer before it is brewed." } : undefined };
 }

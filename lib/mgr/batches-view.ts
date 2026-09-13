@@ -1,4 +1,5 @@
 // lib/mgr/batches-view.ts — view-model for the Batches Work list.
+import type { EmptyState } from "./empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { batNo } from "@/lib/mgr/doc-no";
 
@@ -20,7 +21,7 @@ export type BatchesViewModel = {
   completed?: BatchesRowView[];
   vessels?: BatchesRowView[];
   readingUnavailable?: boolean;
-  empty?: string;
+  empty?: EmptyState;
   workChips: string[];
   workChipIndex: number;
   workTabs: Record<string, string>;
@@ -34,7 +35,7 @@ export type BatchesSnapshot = {
   completed?: BatchesRowView[];
   vessels?: BatchesRowView[];
   readingUnavailable?: boolean;
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
@@ -48,7 +49,7 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
     completed: s.completed,
     vessels: s.vessels,
     readingUnavailable: s.readingUnavailable,
-    empty: s.empty ?? (planned.length === 0 && active.length === 0 && !s.completed?.length ? "No batches yet" : undefined),
+    empty: s.empty ?? (planned.length === 0 && active.length === 0 && !s.completed?.length ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 3,
     workTabs: WORK_TABS,

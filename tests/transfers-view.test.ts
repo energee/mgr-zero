@@ -31,7 +31,7 @@ describe("Transfers list", () => {
   it("live title Transfers omits inventing rows on empty", () => {
     const model = toTransfersViewProps({ transfers: [], title: "Transfers" });
     expect(model.title).toBe("Transfers");
-    expect(model.empty).toBe("No transfers yet");
+    expect(model.empty?.title).toBe("No transfers yet");
   });
 
   it("the inventory drawing still offers New transfer, Pick, and Work tabs", () => {

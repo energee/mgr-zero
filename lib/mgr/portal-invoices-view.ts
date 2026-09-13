@@ -1,6 +1,7 @@
 // lib/mgr/portal-invoices-view.ts — view-model for portal Invoice history.
 // portal_invoices returns the synchronized QBO total and frozen invoice lines.
 // The latter remain the fallback for local and not-yet-synchronized records.
+import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
@@ -18,7 +19,7 @@ export type PortalInvoicesRowView = {
 export type PortalInvoicesViewModel = {
   subtitle: string;
   rows: PortalInvoicesRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type PortalInvoicesSnapshot = {
@@ -54,7 +55,7 @@ function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string 
 export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvoicesSnapshot): PortalInvoicesViewModel {
   return {
     subtitle: customerName,
-    empty: invoices.length === 0 ? "No invoices yet" : undefined,
+    empty: invoices.length === 0 ? { title: "No invoices yet", description: "An invoice appears here once the brewery ships an order." } : undefined,
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);

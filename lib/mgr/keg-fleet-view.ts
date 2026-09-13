@@ -1,3 +1,4 @@
+import type { EmptyState } from "./empty-state";
 // lib/mgr/keg-fleet-view.ts — view-model for Keg fleet (inventory drawing).
 export type KegFleetBinRow = { key: string; title: string; detail: string; qty: string };
 export type KegFleetPoolRow = { key: string; title: string; detail: string; bins: KegFleetBinRow[] };
@@ -12,7 +13,7 @@ export type KegFleetViewModel = {
   perFill?: string;
   bins?: KegFleetBinRow[];
   pools?: KegFleetPoolRow[];
-  empty?: string;
+  empty?: EmptyState;
   navRows?: KegFleetNavRow[];
   customerBalance?: string;
   report?: string;

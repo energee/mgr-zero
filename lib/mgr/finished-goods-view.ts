@@ -1,3 +1,4 @@
+import type { EmptyState } from "./empty-state";
 // lib/mgr/finished-goods-view.ts — view-model for Finished goods (get_on_hand / get_atp).
 export type FinishedGoodsRowView = {
   key: string;
@@ -13,7 +14,7 @@ export type FinishedGoodsRowView = {
 export type FinishedGoodsViewModel = {
   backHref?: string;
   rows: FinishedGoodsRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type FinishedGoodsSku = {
@@ -57,7 +58,7 @@ export const skuLabel = (sku: { name: string; brands?: { name: string } | null }
 export function toFinishedGoodsViewProps({ skus, backHref }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
     backHref: backHref ?? "/beer",
-    empty: skus.length === 0 ? "No finished goods yet" : undefined,
+    empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
     rows: skus.map((s) => {
       const allocated = s.on_hand - s.atp;
       const short = s.atp < 0;

@@ -34,7 +34,7 @@ describe("Pick sheet view loop", () => {
 
   it("names an empty sheet without inventing rows", () => {
     const model = toPickSheetViewProps({ orders: [] });
-    expect(model.empty).toBe("Nothing confirmed to pick");
+    expect(model.empty?.title).toBe("Nothing confirmed to pick");
     expect(model.groups).toEqual([]);
   });
 

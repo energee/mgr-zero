@@ -16,7 +16,7 @@ export const todayWarehouse: TodayViewModel = {
 
 export const todayEmpty: TodayViewModel = {
   date: DATE,
-  empty: "Nothing waiting",
+  empty: { title: "Nothing waiting", description: "Nothing needs your attention right now." },
   emptyVerb: "Record movement",
   rows: [],
 };

@@ -1,3 +1,4 @@
+import type { EmptyState } from "./empty-state";
 // lib/mgr/vendors-view.ts — view-model for the Vendors list.
 export type VendorsRowView = {
   key: string;
@@ -12,7 +13,7 @@ export type VendorsViewModel = {
   rows: VendorsRowView[];
   materials: string;
   contracts: string;
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type VendorsSnapshot = {
@@ -29,6 +30,6 @@ export function toVendorsViewProps(s: VendorsSnapshot): VendorsViewModel {
     rows,
     materials: s.materials ?? "",
     contracts: s.contracts ?? "",
-    empty: rows.length === 0 ? "No vendors yet" : undefined,
+    empty: rows.length === 0 ? { title: "No vendors yet", description: "Add the suppliers you buy materials from." } : undefined,
   };
 }
