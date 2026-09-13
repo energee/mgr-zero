@@ -228,6 +228,8 @@ export const INERT: (string | RegExp)[] = [
   "Add source",
   "Remove source",
   "Deposit refund · unavailable",
+  "Change delivery details",
+  "Back to edit",
   /^(Decrease|Increase) Line \d+ quantity$/,
   /^Line \d+ SKU$/,
   "Delivery enabled",
@@ -321,7 +323,7 @@ export const INERT: (string | RegExp)[] = [
 ];
 
 /** Inside the portal shell the same chrome means the buyer's screens. */
-export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history", Orders: "Order history", Order: "Shop", Account: "Account" };
+export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history", Orders: "Order history", Order: "Shop", Account: "Account", "Save draft": "Order detail" };
 
 /** Shell links by route (lib/mgr/nav.ts): the tab bar, the rail and its children. */
 export const ROUTES: Record<string, string> = {

@@ -18,6 +18,21 @@ import { toQuestionInvoiceViewProps } from "../lib/mgr/question-invoice-view";
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement("div", null, node));
 
+it("question shares required input, errors, busy and sent states", () => {
+  const model = { label: "INV-42", breweryName: "Actual brewery" };
+  const pending = htmlOf(createElement(QuestionInvoiceView, { model, body: "Question", onBody: () => {}, sending: true, messages: "Request failed" }));
+  expect(pending).toContain('maxLength="2000"');
+  expect(pending).toContain("required");
+  expect(pending).toContain("Request failed");
+  expect(pending).toContain("Sending…");
+  expect(pending).toContain("disabled");
+  const sent = htmlOf(createElement(QuestionInvoiceView, { model, sent: true }));
+  expect(sent).toContain("Sent to the brewery");
+  expect(sent).toContain(">Close<");
+  expect(sent).not.toContain("textarea");
+  expect(htmlOf(createElement(QuestionInvoiceView, { model, sent: true, footer: null }))).not.toContain(">Close<");
+});
+
 describe("Invoice history view", () => {
   it("maps portal_invoices rows, summing invoice_lines", () => {
     const model = toPortalInvoicesViewProps(portalInvoicesRidgeline);

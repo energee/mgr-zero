@@ -23,7 +23,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
       model={model}
       variant={model.payable ? "pay" : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
       footer={payment}
-      question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} />}
+      question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} breweryName={model.breweryName} />}
     />
   );
 }

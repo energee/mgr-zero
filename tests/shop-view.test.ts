@@ -9,7 +9,7 @@ import { ReviewOrderView } from "../components/mgr/views/review-order";
 import { ShopView } from "../components/mgr/views/shop";
 import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
-import { toReviewOrderViewProps } from "../lib/mgr/review-order-view";
+import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
 import { toShopViewProps } from "../lib/mgr/shop-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -46,25 +46,24 @@ describe("Shop view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("a catalog slot replaces brand/qty rows", () => {
+  it("controlled quantities use the same brand and package controls", () => {
     const html = htmlOf(createElement(ShopView, {
       model: toShopViewProps(ridgelineShop),
-      catalog: "CART",
+      quantities: { [ridgelineShop.catalog[0].skuId]: "7" },
     }));
-    expect(html).toMatch(/CART/);
-    expect(html).not.toMatch(/½ bbl keg/);
-    expect(html).not.toMatch(/Hazy IPA/);
+    expect(html).toMatch(/value="7"/);
+    expect(html).toMatch(/½ bbl keg/);
+    expect(html).toMatch(/Hazy IPA/);
     expect(html).toMatch(/Review order · \$828\.00/);
   });
 
   it("null footer and comingUp omit inventory Review/ship-to and Coming up", () => {
     const html = htmlOf(createElement(ShopView, {
       model: toShopViewProps(ridgelineShop),
-      catalog: "CART",
       footer: null,
       comingUp: null,
     }));
-    expect(html).toMatch(/CART/);
+    expect(html).toMatch(/½ bbl keg/);
     expect(html).not.toMatch(/Review order/);
     expect(html).not.toMatch(/Coming up/);
     expect(html).not.toMatch(/Ships from/);
@@ -75,7 +74,7 @@ describe("Shop view", () => {
 describe("Review order view", () => {
   it("shows current merchandise and keeps unquoted tax and deposits pending", () => {
     const shop = toShopViewProps(ridgelineShop);
-    const model = toReviewOrderViewProps(ridgelineReviewOrder);
+    const model = toReviewOrderViewProps(ridgelineShop);
     expect(shop.reviewVerb).toBe("Review order · $828.00");
     expect(model.lines.map((l) => [l.name, l.price, l.qty])).toEqual([
       ["Hazy IPA · ½ bbl keg", "$150.00", 4],
@@ -95,9 +94,9 @@ describe("Review order view", () => {
   it("renders Place order and Hazy IPA from the adapter", () => {
     const html = htmlOf(createElement(ReviewOrderView, { model: toReviewOrderViewProps(ridgelineReviewOrder) }));
     expect(html).toMatch(/Hazy IPA/);
-    expect(html).toMatch(/Place order · \$828\.00/);
+    expect(html).toMatch(/Place order · \$948\.00 before tax/);
     expect(html).toMatch(/Keg deposit/);
-    expect(html).toMatch(/Pending; not included/);
+    expect(html).toMatch(/Tax pending/);
     expect(html).toMatch(/2026-09-09/);
     expect(html).not.toMatch(/Wed 9\/9/);
     expect(html).not.toMatch(/→/);
@@ -118,11 +117,24 @@ describe("inventory and live Shop", () => {
     expect(body.props.model).toEqual(toReviewOrderViewProps(ridgelineReviewOrder));
   });
 
-  it("the live Shop page mounts ShopView and slots Cart", () => {
+  it("the live Shop delegates to Cart which mounts both shared views", () => {
     const src = readFileSync("app/(portal)/portal/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/shop"/);
-    expect(src).toMatch(/<ShopView\b/);
     expect(src).toMatch(/<Cart\b/);
+    const cart = readFileSync("app/(portal)/portal/cart.tsx", "utf8");
+    expect(cart).toMatch(/<ShopView\b/);
+    expect(cart).toMatch(/<ReviewOrderView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
   });
+});
+
+it("review preserves quoted amounts and identities without inventing missing tax", () => {
+  const quote = { ...ridgelineReviewOrder.quote!, taxStatus: "calculated" as const, subtotalCents: 123, depositCents: 456, amountBeforeTaxCents: 579 };
+  const model = toQuotedReviewOrderViewProps(quote, {});
+  expect(model.subtotal).toBe("$1.23");
+  expect(model.depositAmount).toBe("$4.56");
+  expect(model.tax).toBe("Tax pending");
+  expect(model.estimatedTotal).toBeUndefined();
+  expect(model.placeVerb).toBe("Place order · $5.79 before tax");
+  expect(model.lines[0].key).toBe(quote.lines[0].skuId);
+  expect(model.requestedDate).toBe("Not specified");
 });

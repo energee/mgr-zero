@@ -368,7 +368,8 @@ describe("SCREENS", () => {
       const text = renderToStaticMarkup(createElement("div", null, s.body)).replace(/<[^>]*>/g, " ");
       if (s.name === "Review order") {
         expect.soft(text, s.name).toContain("828");
-        expect.soft(text, s.name).toContain("Pending; not included");
+        expect.soft(text, s.name).toContain("Tax pending");
+        expect.soft(text, s.name).toContain("948.00 before tax");
       } else expect.soft(text, s.name).toContain("948");
       expect.soft(text, s.name).not.toMatch(/1,051|1,240|\b185\.00|\b740\.00|\b252\.00|\b114\.00/);
     }

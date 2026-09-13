@@ -4,6 +4,7 @@
 // kegs + 6 Pils cases = $828.00 merchandise; 4 × $30.00 = $120.00 deposit.
 import { LOC_WAREHOUSE, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { ShopSnapshot } from "@/lib/mgr/shop-view";
+import type { ReviewOrderSnapshot } from "@/lib/mgr/review-order-view";
 
 const CUSTOMER_RIDGELINE = "00000000-0000-4000-8000-0000000000c1";
 const SHIP_MAIN = "00000000-0000-4000-8000-0000000000d1";
@@ -41,4 +42,14 @@ export const ridgelineShop: ShopSnapshot = {
   depositCentsPerKeg: 3000,
 };
 
-export const ridgelineReviewOrder = ridgelineShop;
+export const ridgelineReviewOrder: ReviewOrderSnapshot = {
+  ...ridgelineShop,
+  quote: {
+    quoteId: "fixture-quote", taxStatus: "pending", subtotalCents: 82800,
+    depositCents: 12000, amountBeforeTaxCents: 94800,
+    source: { id: LOC_WAREHOUSE.id, name: LOC_WAREHOUSE.name },
+    destination: { id: SHIP_MAIN, label: "Main", address1: "", city: "Phoenixville", state: "PA", zip: "" },
+    lines: ridgelineShop.catalog.filter(item => item.qty > 0).map(item => ({ ...item, amountCents: item.qty * item.unitPriceCents })),
+    deposits: [{ name: "Hazy IPA", kegSize: "half_bbl", qty: 4, unitPriceCents: 3000, amountCents: 12000 }],
+  },
+};
