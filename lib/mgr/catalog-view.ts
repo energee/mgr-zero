@@ -1,6 +1,7 @@
 // lib/mgr/catalog-view.ts — view-model for Catalog. list_brands plus
 // list_price_groups (and optional list_sale_channels / water-profile count)
 // paint the inventory Catalog drawing.
+import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 
 export type CatalogBrandView = {
@@ -13,7 +14,7 @@ export type CatalogBrandView = {
 export type CatalogViewModel = {
   backHref?: string;
   brands: CatalogBrandView[];
-  empty?: string;
+  empty?: EmptyState;
   priceGroups: string;
   priceGroupsHref: string;
   waterProfiles?: string;
@@ -57,7 +58,9 @@ export function toCatalogViewProps({
   const groupCopy = plural(priceGroups.length, "group");
   return {
     backHref,
-    empty: brands.length === 0 ? "No brands yet" : undefined,
+    empty: brands.length === 0
+      ? { title: "No brands yet", description: "Add a brand to start building the catalog." }
+      : undefined,
     brands: brands.map((b) => ({
       key: b.id,
       title: b.name,

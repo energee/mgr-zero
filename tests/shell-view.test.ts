@@ -109,7 +109,7 @@ describe("Today view", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toTodayViewProps(todayEmpty);
-    expect(model.empty).toBe("Nothing waiting");
+    expect(model.empty?.title).toBe("Nothing waiting");
     expect(model.emptyVerb).toBe("Record movement");
     expect(model.rows).toEqual([]);
   });

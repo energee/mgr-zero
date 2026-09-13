@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/date-format";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { money } from "@/lib/mgr/money";
@@ -29,12 +30,12 @@ export default async function PosMappingPage() {
   }));
   const sales: PosSaleRow[] = facts.sales.map(row => ({
     id: row.id, label: `${row.factKind === "return" ? "Return" : "Sale"} · ${row.itemName} · ${row.variationName}`,
-    detail: `${row.locationName} · ${new Date(row.soldAt).toLocaleString()} · ${row.current ? "current revision" : `revision ${row.sourceVersion}`}`,
+    detail: `${row.locationName} · ${formatDateTime(row.soldAt)} · ${row.current ? "current revision" : `revision ${row.sourceVersion}`}`,
     amount: row.grossCents == null ? "No amount" : money(row.grossCents), status: row.mappingStatus,
     href: `/settings/pos/sales/${row.id}`,
   }));
   const coverage = facts.coverage.filter(row => row.complete).map(row =>
-    `${row.external_location_id} · ${new Date(row.starts_at).toLocaleString()} to ${new Date(row.ends_at).toLocaleString()}`,
+    `${row.external_location_id} · ${formatDateTime(row.starts_at)} to ${formatDateTime(row.ends_at)}`,
   );
   return <PosMappingControl variations={variations} sales={sales} coverage={coverage} canSync={brewery.role === "admin"} targets={[
     ...skus.filter(row => row.active).map(row => ({ value: `sku:${row.id}`, label: `SKU · ${row.name}` })),

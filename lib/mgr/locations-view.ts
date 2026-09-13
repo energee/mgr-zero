@@ -1,4 +1,5 @@
 // lib/mgr/locations-view.ts — view-model for the Locations list (list_locations).
+import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { sentenceCase } from "./labels";
 
@@ -11,7 +12,7 @@ export type LocationsRowView = {
 
 export type LocationsViewModel = {
   rows: LocationsRowView[];
-  empty?: string;
+  empty?: EmptyState;
   backHref?: string;
 };
 
@@ -45,7 +46,7 @@ function detail(l: LocationsRowSnapshot): string {
 export function toLocationsViewProps({ locations, backHref }: LocationsSnapshot): LocationsViewModel {
   return {
     backHref,
-    empty: locations.length === 0 ? "No locations yet" : undefined,
+    empty: locations.length === 0 ? { title: "No locations yet", description: "Add the places you hold stock: the cellar, a taproom, a cold box." } : undefined,
     rows: locations.map((l) => ({
       key: l.id,
       title: l.name,

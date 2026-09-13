@@ -42,7 +42,7 @@ describe("Sale channels view", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toSaleChannelsViewProps({ channels: [] });
-    expect(model.empty).toBe("No sale channels yet");
+    expect(model.empty?.title).toBe("No sale channels yet");
     expect(model.rows).toEqual([]);
   });
 

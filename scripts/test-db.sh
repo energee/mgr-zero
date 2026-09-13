@@ -14,4 +14,5 @@ bunx supabase db reset --workdir "$WD"
   echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres"
   echo "MGR_TEST_STACK=1"
 } > .env.test.local
+bash scripts/wait-rest.sh
 echo "wrote .env.test.local (test stack: API 54351, DB 54352)"

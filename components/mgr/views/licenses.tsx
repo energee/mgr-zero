@@ -18,7 +18,7 @@ export function LicensesView({
 }) {
   return (
     <>
-      {E.back("Compliance months", "Licenses", undefined, model.backHref)}
+      {E.back("Compliance", "Licenses", undefined, model.backHref)}
       {model.licenses.map((row) => (
         <Fragment key={row.key}>
           {E.row(row.title, row.detail, rowAction(row, actions))}

@@ -112,6 +112,8 @@ describe("Catalog view", () => {
       rowExtra: () => "POUR SLOT",
     }));
     expect(html).toMatch(/No brands yet/);
+    // The blank carries a title plus a sentence saying what to do next.
+    expect(html).toMatch(/Add a brand to start building the catalog/);
     expect(html).not.toMatch(/POUR SLOT/);
   });
 

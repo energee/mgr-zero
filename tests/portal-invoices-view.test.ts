@@ -58,7 +58,7 @@ describe("Invoice history view", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toPortalInvoicesViewProps({ customerName: RIDGELINE.name, invoices: [] });
-    expect(model.empty).toBe("No invoices yet");
+    expect(model.empty?.title).toBe("No invoices yet");
     expect(model.rows).toEqual([]);
   });
 

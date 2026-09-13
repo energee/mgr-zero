@@ -2,7 +2,8 @@
 // portal (plan §3, §6), built on shadcn's Sidebar. At md and up the sidebar
 // is the left rail (every tab a menu item with its icon, children indented
 // under it as sub-items, ⌘B
-// collapses it); below md the sidebar is hidden and a bottom tab bar with
+// collapses it to a 48px icon rail — each tab keeps its glyph and names
+// itself in a tooltip, and the sub-items fold away (#305)); below md the sidebar is hidden and a bottom tab bar with
 // 48px targets and safe-area padding takes over. Breakpoints are viewport
 // media queries, which is why the screen inventory renders each frame in an
 // iframe. (pointer: coarse) sizing comes from app/globals.css.
@@ -17,6 +18,7 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
@@ -44,8 +46,9 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
     </span>
   );
   return (
+    <TooltipProvider>
     <SidebarProvider defaultOpen={sidebarOpen}>
-      <Sidebar collapsible="offcanvas">
+      <Sidebar collapsible="icon">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
           {/* Every tab is drawn the same way — icon, label, one menu button —
@@ -58,8 +61,8 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
                 const leaf = !tab.children?.length;
                 return (
                   <SidebarMenuItem key={tab.label}>
-                    <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
-                      <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
+                    <SidebarMenuButton asChild tooltip={tab.label} isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
+                      <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}<span>{tab.label}</span></Link>
                     </SidebarMenuButton>
                     {!leaf && (
                       <SidebarMenuSub>
@@ -93,6 +96,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>
+    </TooltipProvider>
   );
 }
 

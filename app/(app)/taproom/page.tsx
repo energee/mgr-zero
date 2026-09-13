@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/date-format";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -38,9 +39,9 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
     locations: locations.map(item => [item.name, `/taproom?location=${item.id}`]), location: location.name, role, lotLabels,
     receipt: shownReceipt ? {
       date: shownReceipt.counted_on, canCorrect: shownReceipt.correction_eligible,
-      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${new Date(shownReceipt.created_at).toLocaleString()}${shownReceipt.prior_count_id ? "" : " · first count"}`,
+      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at)}${shownReceipt.prior_count_id ? "" : " · first count"}`,
       priorHref: shownReceipt.prior_count_id ? `/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}` : undefined,
-      correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${new Date(shownReceipt.corrected_at).toLocaleString()} · ${shownReceipt.correction_reason}` : undefined,
+      correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${formatDateTime(shownReceipt.corrected_at)} · ${shownReceipt.correction_reason}` : undefined,
       lines: shownReceipt.lines.map((line, index) => {
         const savedIdentity = line.lot_id
           ? role === "taproom" ? `tracked · saved row ${index + 1}` : `tracked lot ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ?? line.lot_id} · saved row ${index + 1}`
@@ -50,7 +51,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
           result: line.movement_id ? `movement ${line.movement_id}` : "matched · no movement" };
       }),
     } : undefined,
-    history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${new Date(count.created_at).toLocaleString()} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted${count.corrected_at ? ` · corrected ${new Date(count.corrected_at).toLocaleString()} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
+    history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${formatDateTime(count.created_at)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
   }}
     draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={role}
       print={<TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />} />}

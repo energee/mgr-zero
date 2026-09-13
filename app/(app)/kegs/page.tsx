@@ -45,7 +45,6 @@ export default async function KegsPage() {
             bins: rows.map((r) => ({ key: `${r.keg_size}-${r.location_name}-${r.bin_name}`, title: `${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, detail: `${r.qty} on hand · ${r.bin_name}`, qty: String(r.qty) })),
           };
         }),
-        empty: "No keg pools yet",
         navRows: [
           { key: "history", href: "/kegs/history", title: "Keg event history", detail: "acquired, shipped, returned, lost, found, retired" },
           ...fleet.customers.map((c) => ({ key: c.customer_id, href: `/kegs/customers/${c.customer_id}`, title: "Customer keg balance", detail: `${c.name} · ${c.kegs_out} out` })),

@@ -26,7 +26,7 @@ describe("Orders list view loop", () => {
 
   it("names an empty filtered list without inventing rows", () => {
     const model = toOrdersListViewProps({ role: "sales", status: "shipped", orders: [] });
-    expect(model.empty).toBe("No shipped orders");
+    expect(model.empty?.title).toBe("No shipped orders");
     expect(model.rows).toEqual([]);
   });
 

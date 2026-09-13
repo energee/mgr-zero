@@ -21,7 +21,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import type { EmptyState } from "@/lib/mgr/empty-state";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -406,12 +407,21 @@ export const E = {
       </TableBody>
     </Table>
   ),
-  blank: (t: React.ReactNode, icon?: IconSvgElement) => (
-    <Empty className="flex-1">
-      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
-      <EmptyDescription>{t}</EmptyDescription>
-    </Empty>
-  ),
+  /** A blank list. A bare node is the whole message; an {@link EmptyState}
+   *  splits it into the fact and the sentence saying what to do next. */
+  blank: (t: React.ReactNode | EmptyState, icon?: IconSvgElement) => {
+    const state = t && typeof t === "object" && "title" in t ? t as EmptyState : undefined;
+    const description = state ? state.description : t as React.ReactNode;
+    return (
+      <Empty className="flex-1">
+        <EmptyHeader>
+          {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
+          {state && <EmptyTitle>{state.title}</EmptyTitle>}
+          {description && <EmptyDescription>{description}</EmptyDescription>}
+        </EmptyHeader>
+      </Empty>
+    );
+  },
   /** A blank labeled input. The label sits over the control like every other
    *  field (shadcn Field default); `hint` is the placeholder, never the label. */
   inp: (label: string, hint?: string) => (

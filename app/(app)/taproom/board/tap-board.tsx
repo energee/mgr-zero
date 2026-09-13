@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/date-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
@@ -27,7 +28,7 @@ import {
 import { TapBoardView, type TapSku, type TapBoardNavigation } from "@/components/mgr/views/tap-board";
 export type { TapSku } from "@/components/mgr/views/tap-board";
 
-const when = (value: string) => new Date(value).toLocaleString();
+const when = (value: string) => formatDateTime(value);
 const actor = (label: string | null) => label ? `@${label}` : "staff";
 
 function closingFact(history: TapHistory[], interval: TapInterval | null) {

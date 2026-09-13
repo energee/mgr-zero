@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/date-format";
 import { PointOfSaleView } from "@/components/mgr/views/pos";
 import { requireAdminContext } from "@/lib/brewery";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -15,7 +16,7 @@ export default async function PosPage() {
   return <PointOfSaleView model={{
     connected: health.connected, merchant: health.merchantLabel ?? "Square seller", state: health.state.replaceAll("_", " "),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
-    lastSync: health.salesSyncedThrough ? new Date(health.salesSyncedThrough).toLocaleString() : "No complete sales coverage yet",
+    lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough) : "No complete sales coverage yet",
     error: health.lastError,
   }} syncAction={health.connected ? <SquareSyncControls /> : undefined} paths={{ back: "/settings", connect: "/settings/pos/connect", disconnect: "/settings/pos/disconnect", locations: "/settings/pos/locations", mapping: "/settings/pos/mapping", menu: "/menu", connector: "/settings/pos/connector" }} />;
 }
