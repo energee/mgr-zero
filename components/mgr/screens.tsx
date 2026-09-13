@@ -44,7 +44,7 @@ import { LicensesView } from "@/components/mgr/views/licenses";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
-import { CycleCountView } from "@/components/mgr/views/cycle-count";
+import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -1904,13 +1904,10 @@ export const SCREENS: Screen[] = [
     to: { Material: "Entity picker", "Record count": "Materials on hand" },
     job: "Post only variance as an append-only movement",
     reads: "get_material_on_hand",
-    writes: "record_material_count [one RPC: count + lines + adjustment movements against named lots]",
+    writes: "record_material_count [one RPC: count + lines + adjustment movements against named lots] · Lot allocation preview [SCHEMA-GATE: the read query returns bin totals only] · Roll conversion [SCHEMA-GATE: counts accept base units only]",
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["counted in rolls", "labels are counted as whole rolls · the open roll is excluded and its remainder falls into the variance", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. Labels are the exception to counting units, and the reason is practical: nobody counts two thousand labels left on a roll, and a sheet that asks will be handed a guess that posts as fact. Whole rolls are counted instead and the open roll is excluded, so the error is bounded at one roll and the same variance absorbs it at the next count. Applicator waste is what makes the drift, since packaging consumes one label per unit packaged while the real line wastes a little more; counting rolls on a routine keeps that from accumulating unnoticed.",
-    body: (<>
-      <CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />
-      {E.pin(<>{E.btn("Record count", "irr")}</>)}
-    </>),
+    body: <><CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />{E.pin(<CycleCountFooter />)}</>,
   },
   {
     step: 7,

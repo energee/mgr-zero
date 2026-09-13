@@ -403,7 +403,7 @@ describe("SCREENS", () => {
   it("marks pickable fields and never pins Required on a filled one", () => {
     const chevrons = new Map([
       ["Record movement", 1], ["Composer proposal", 1], ["Cellar addition", 1],
-      ["Brew day", 3], ["Schedule packaging run", 1], ["Cycle count", 1],
+      ["Brew day", 3], ["Schedule packaging run", 1],
       ["Chat settings", 2], ["Package BOM", 1],
     ]);
     for (const s of SCREENS.filter((s) => !s.venue)) {

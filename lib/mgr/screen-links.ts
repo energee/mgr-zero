@@ -64,6 +64,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Choose who gets it", "Pars and allocation"],
   ["Count", "Cycle count"],
   ["Add material", "Material"],
+  ["Material definitions", "Materials"],
   ["Add SKU", "SKU"],
   ["Taps", "Tap board"],
   ["Cellar", "Cellar map"],

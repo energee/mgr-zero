@@ -83,6 +83,9 @@ export const cycleCountCans: CycleCountViewModel = {
   unitIndex: 0,
   units: ["each", "case"],
   preview: "system 3,100 · variance −50 · from lot L-0774, best by 3/15/27",
+  locationId: "warehouse", binId: "shelf",
+  locations: [{ id: "warehouse", name: "Warehouse" }],
+  bins: [{ id: "shelf", name: "Shelf" }],
 };
 
 export const materialsList: MaterialsSnapshot = {

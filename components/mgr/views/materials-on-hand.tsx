@@ -11,15 +11,18 @@ export function MaterialsOnHandView({
   header,
   createAction,
   rowTrailing,
+  definitionsHref,
 }: {
   model: MaterialsOnHandViewModel;
   header?: ReactNode;
   createAction?: ReactNode;
   rowTrailing?: (row: MaterialsOnHandRowView) => ReactNode;
+  definitionsHref?: string;
 }) {
   return (
     <>
       {header ?? E.back("Beer", "Materials on hand", createAction !== undefined ? createAction : E.btn("Add material"), model.backHref)}
+      {E.nav("Material definitions", "", "", undefined, definitionsHref)}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

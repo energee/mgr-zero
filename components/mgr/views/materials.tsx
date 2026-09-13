@@ -8,9 +8,11 @@ export type { MaterialsViewModel };
 export function MaterialsView({
   model,
   createAction,
+  rowAction,
 }: {
   model: MaterialsViewModel;
   createAction?: ReactNode;
+  rowAction?: (row: MaterialsViewModel["rows"][number]) => ReactNode;
 }) {
   return (
     <>
@@ -18,7 +20,7 @@ export function MaterialsView({
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
-          <Fragment key={row.key}>{E.row(row.title, row.detail, E.act(row.verb))}</Fragment>
+          <Fragment key={row.key}>{E.row(row.title, row.detail, rowAction ? rowAction(row) : E.act(row.verb))}</Fragment>
         ))}
     </>
   );

@@ -8,7 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ContractView } from "../components/mgr/views/contract";
 import { ContractsView } from "../components/mgr/views/contracts";
-import { CycleCountView } from "../components/mgr/views/cycle-count";
+import { CycleCountView, CycleCountFooter } from "../components/mgr/views/cycle-count";
+import { E, splitPinned } from "../components/mgr/e";
 import { MaterialView } from "../components/mgr/views/material";
 import { MaterialsView } from "../components/mgr/views/materials";
 import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
@@ -113,17 +114,32 @@ describe("Materials", () => {
     expect(body.props.model).toEqual(toMaterialsOnHandViewProps(materialsOnHandList));
   });
 
-  it("the Cycle count inventory record mounts CycleCountView with a sibling pin", () => {
-    const kids = (screen("Cycle count").body as { props: { children: unknown } }).props.children;
-    const list = Array.isArray(kids) ? kids : [kids];
-    const view = list.find((c) => isValidElement(c) && c.type === CycleCountView) as { props: { model: unknown; footer: null } } | undefined;
-    expect(view).toBeTruthy();
-    expect(view!.props.model).toEqual(toCycleCountViewProps(cycleCountCans));
-    expect(view!.props.footer).toBeNull();
+  it("the Cycle count inventory shares the complete view including its footer", () => {
+    const { rest, pin } = splitPinned(screen("Cycle count").body);
+    expect(htmlOf(rest)).toBe(htmlOf(createElement(CycleCountView, { model: toCycleCountViewProps(cycleCountCans), footer: null })));
+    expect(htmlOf(rest)).toContain("Cans · 16 oz");
+    expect(htmlOf(rest)).not.toContain("Record count");
+    expect(htmlOf(pin)).toBe(htmlOf(E.pin(createElement(CycleCountFooter))));
+    expect(src("app/(app)/materials/count-form.tsx")).toContain("footer={E.pin(<CycleCountFooter");
   });
 
   it("the Materials inventory record is MaterialsView", () => {
     expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
+  });
+
+  it("count keeps real bin identities, decimal input, unavailable allocation and nullable footer", () => {
+    const html = htmlOf(createElement(CycleCountView, {
+      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }], lotPreviewUnavailable: true },
+      submitting: true, messages: "Count failed", footer: null,
+    }));
+    expect(html).toContain('value="bin-id"');
+    expect(html).toContain('value="0.5"');
+    expect(html).toContain('step="any"');
+    expect(html).toContain("Count failed");
+    expect(html).toContain("Lot allocation preview");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain("Record count");
+    expect(html).not.toContain("L-0774");
   });
 
   it("the Material inventory record is MaterialView", () => {
