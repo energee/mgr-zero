@@ -9,6 +9,11 @@ cd "$(dirname "$0")/.."
 WD=tests/supabase
 bunx supabase start --workdir "$WD" -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
 bunx supabase db reset --workdir "$WD"
+# `db reset` rebuilds the schema behind PostgREST's back, and PostgREST caches
+# it at boot. Without this the whole suite fails with "Could not find the table
+# 'public.breweries' in the schema cache" — a stale cache that reads as a
+# hundred broken tests.
+PGPASSWORD=postgres psql -h 127.0.0.1 -p 54352 -U postgres -d postgres -qc "NOTIFY pgrst, 'reload schema';"
 {
   bunx supabase status --workdir "$WD" -o env | node scripts/supabase-env.mjs
   echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres"

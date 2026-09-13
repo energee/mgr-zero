@@ -67,6 +67,7 @@ const supabaseEnvMapper = readFileSync(resolve(__dirname, "..", "scripts", "supa
 const vitestConfig = readFileSync(resolve(__dirname, "..", "vitest.config.mts"), "utf8");
 const prePush = readFileSync(resolve(__dirname, "..", "scripts", "pre-push.sh"), "utf8");
 const hook = readFileSync(resolve(__dirname, "..", ".githooks", "pre-push"), "utf8");
+const testDb = readFileSync(resolve(__dirname, "..", "scripts", "test-db.sh"), "utf8");
 
 describe("workflow action field reader", () => {
   it("requires a direct scalar child of the action's with mapping", () => {
@@ -156,6 +157,16 @@ describe("production-readiness workflow contract", () => {
       expect(prePush).toContain(command);
     }
     expect(prePush).toContain("tests/mgr-screens.test.ts");
+  });
+
+  // `supabase db reset` rebuilds the schema behind PostgREST, which cached it at
+  // boot; without the reload the whole suite fails with "Could not find the
+  // table 'public.breweries' in the schema cache" and reads as broken code.
+  it("reloads PostgREST's schema cache after resetting the test database", () => {
+    const reset = testDb.indexOf("supabase db reset");
+    const reload = testDb.indexOf("NOTIFY pgrst, 'reload schema'");
+    expect(reset).toBeGreaterThan(-1);
+    expect(reload).toBeGreaterThan(reset);
   });
 
   it("leaves the build and the database shards to CI", () => {
