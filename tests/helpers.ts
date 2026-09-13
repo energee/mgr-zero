@@ -187,6 +187,13 @@ export async function priceSku(breweryId: string, o: { saleChannelId: string; br
 
 // A brewery's seeded sale channel by name (Wholesale, Taproom, DTC, Export —
 // written by the trigger on breweries insert; see 00001_baseline.sql).
+/** A form submit a hook can be handed; `seen` records which contract calls it made. */
+export function submitEvent() {
+  const seen = { prevented: false, stopped: false };
+  const event = { preventDefault() { seen.prevented = true; }, stopPropagation() { seen.stopped = true; } } as unknown as React.FormEvent;
+  return { event, seen };
+}
+
 export async function channelId(breweryId: string, name: string): Promise<string> {
   const { data, error } = await admin.from("sale_channels")
     .select("id").eq("brewery_id", breweryId).eq("name", name).single();

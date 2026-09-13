@@ -1,7 +1,7 @@
 // app/(app)/catalog/brands/[id]/page.tsx — Brand (screen record): one brand's
 // sellable facts on a full page, or a blank one at /catalog/brands/new. Admin
-// and Sales only: the compliance read gates the page, and Catalog shows the
-// links to nobody else. Reads
+// and Sales only (whoever may upsert_brand); Catalog shows the links to nobody
+// else. Reads
 // list_brands, list_price_groups, the brand's approvals and registrations
 // from get_compliance_registry, and its recipe cost (get_brand_recipe_cost)
 // for the price-group suggestion; brand-page.tsx binds the shared BrandView
@@ -9,7 +9,7 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { RegistryBrand } from "@/lib/commands/compliance";
-import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { optionalPageQuery, requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { notFound } from "next/navigation";
 import "@/lib/commands/all";
 import type { BrandSnapshot } from "@/lib/mgr/brand-view";
@@ -19,15 +19,17 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [brands, groups, registry] = await Promise.all([
+  // The page edits; whoever may not save a brand is sent to No access, not shown a read-only form.
+  requirePagePermission(ctx, "upsert_brand", "Brand");
+  const [brands, groups, registry, cost] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<BrandRow[]>,
     runCommand("list_price_groups", {}, ctx) as Promise<BrandSnapshot["priceGroups"]>,
     runCommand("get_compliance_registry", {}, ctx) as Promise<{ brands: RegistryBrand[] }>,
+    // Enrichment: an unknown id fails validation and simply has no suggestion; the brand lookup below still 404s it.
+    id === "new" ? undefined : optionalPageQuery<BrandSnapshot["cost"]>("get_brand_recipe_cost", { brandId: id }, ctx),
   ]);
   const brand = id === "new" ? null : brands.find((b) => b.id === id) ?? notFound();
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
-  // Enrichment only: a failed cost read leaves the suggestion off, never the page.
-  const cost = brand ? await runCommand("get_brand_recipe_cost", { brandId: brand.id }, ctx).then((c) => c as BrandSnapshot["cost"], (e) => { console.error("get_brand_recipe_cost", brand.id, e); return undefined; }) : undefined;
   return (
     <BrandPage
       brand={brand}

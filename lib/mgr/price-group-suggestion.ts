@@ -5,16 +5,14 @@
 // previous group's, so the first ceiling that covers the cost is the band.
 // Nothing here assigns: the Brand page offers Use and a person confirms.
 import { money } from "./money";
-import type { PriceGroupRow } from "./price-groups-view";
-
-export type SuggestionGroups = PriceGroupRow[];
+import { byPosition, type PriceGroupRow } from "./price-groups-view";
 
 export type SuggestionInput = {
   /** cost_cents_per_bbl of the brand's recipe version, or null when the brand has no recipe. */
   costCentsPerBbl: number | null;
   /** Ingredients with no receipt cost yet: the sum above silently omits them, so it cannot be trusted. */
   uncosted: string[];
-  groups: SuggestionGroups;
+  groups: PriceGroupRow[];
 };
 
 export type PriceGroupSuggestion =
@@ -27,9 +25,9 @@ export function suggestPriceGroup({ costCentsPerBbl, uncosted, groups }: Suggest
   if (uncosted.length) return { kind: "unknown", title: "Recipe cost unknown", detail: `no receipt cost yet for ${uncosted.join(", ")}` };
   if (costCentsPerBbl == null) return null;
   const cost = `recipe cost ${perBbl(costCentsPerBbl)}`;
-  const banded = [...groups].sort((a, b) => a.position - b.position).filter((g) => g.cost_ceiling_cents != null);
+  const banded = [...groups].sort(byPosition).flatMap((g) => g.cost_ceiling_cents == null ? [] : [{ id: g.id, name: g.name, ceiling: g.cost_ceiling_cents }]);
   if (!banded.length) return { kind: "cost", title: `Recipe cost ${perBbl(costCentsPerBbl)}`, detail: "no price group has a ceiling" };
-  const hit = banded.find((g) => g.cost_ceiling_cents! >= costCentsPerBbl);
-  if (!hit) return { kind: "above", title: "Above every ceiling", detail: `${cost} · highest ceiling ${perBbl(Math.max(...banded.map((g) => g.cost_ceiling_cents!)))}` };
-  return { kind: "group", groupId: hit.id, title: `Suggested group ${hit.name}`, detail: `${cost} · ceiling ${perBbl(hit.cost_ceiling_cents!)}` };
+  const hit = banded.find((g) => g.ceiling >= costCentsPerBbl);
+  if (!hit) return { kind: "above", title: "Above every ceiling", detail: `${cost} · highest ceiling ${perBbl(Math.max(...banded.map((g) => g.ceiling)))}` };
+  return { kind: "group", groupId: hit.id, title: `Suggested group ${hit.name}`, detail: `${cost} · ceiling ${perBbl(hit.ceiling)}` };
 }

@@ -1,9 +1,4 @@
 // tests/command-retries.test.ts — Shared command transport retains failed submission identity and resets new intent.
-// A sheet's submit must never reach an enclosing page form: both calls are required.
-const submitEvent = () => {
-  const seen = { prevented: false, stopped: false };
-  return Object.assign({ preventDefault() { seen.prevented = true; }, stopPropagation() { seen.stopped = true; } } as unknown as React.FormEvent, { seen });
-};
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
@@ -15,6 +10,7 @@ vi.mock("@/app/(app)/brewery-provider", () => ({
 }));
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { command } from "@/lib/commands/client";
+import { submitEvent } from "./helpers";
 afterEach(() => vi.unstubAllGlobals());
 
 it("retains a failed submission ID and rendered context, resets changed intent, and resets after success", async () => {
@@ -58,14 +54,21 @@ it("only hands a committed result to the form receipt after success, including e
   let form: ReturnType<typeof useCommandForm>;
   function Harness() { form = useCommandForm("record_movement", { build: () => ({ qty: 2 }), reset: vi.fn(), onSuccess: data => received.push(data) }); return null; }
   renderToStaticMarkup(createElement(Harness));
-  const first = submitEvent();
-  await form!.submit(first);
-  expect(first.seen).toEqual({ prevented: true, stopped: true });
+  await form!.submit(submitEvent().event);
   expect(received).toEqual([]);
   fail = false;
-  const again = submitEvent();
-  await form!.submit(again);
-  expect(again.seen.stopped).toBe(true);
+  await form!.submit(submitEvent().event);
   expect(ids[0]).toBe(ids[1]);
   expect(received).toEqual([receipt]);
+});
+
+it("keeps a sheet's submit from reaching an enclosing page form", async () => {
+  // A sheet is a form in a dialog portal; React bubbles its submit through the tree.
+  vi.stubGlobal("fetch", vi.fn(async () => ({ status: 200, json: async () => ({ ok: true, data: {} }) })));
+  let form: ReturnType<typeof useCommandForm>;
+  function Harness() { form = useCommandForm("record_movement", { build: () => ({}), reset: vi.fn() }); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  const { event, seen } = submitEvent();
+  await form!.submit(event);
+  expect(seen).toEqual({ prevented: true, stopped: true });
 });

@@ -1,10 +1,12 @@
 // lib/mgr/brand-view.ts — view-model for Brand detail. list_brands (one row)
 // plus list_price_groups, the brewery's styles, and the brand's rows from
 // get_compliance_registry paint BrandView.
+import { NONE } from "@/components/ui/select";
 import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
 import { plural } from "./plural";
-import { suggestPriceGroup, type PriceGroupSuggestion, type SuggestionGroups } from "./price-group-suggestion";
+import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-suggestion";
+import type { PriceGroupRow } from "./price-groups-view";
 import { expires, type RegistryRowView } from "./registry-rows";
 
 export type BrandViewModel = {
@@ -29,8 +31,8 @@ export type BrandViewModel = {
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
-/** The select value for "no price group": not a name, so no real group can collide with it. */
-export const UNPRICED = "__unpriced";
+/** The select value for "no price group": the Select kit's own sentinel, never a name a real group could carry. */
+export const UNPRICED: string = NONE;
 
 export type BrandSnapshot = {
   brand: {
@@ -48,7 +50,7 @@ export type BrandSnapshot = {
   styles: string[];
   categories?: string[];
   /** list_price_groups; position and ceiling feed the suggestion. */
-  priceGroups: SuggestionGroups;
+  priceGroups: PriceGroupRow[];
   /** get_brand_recipe_cost. Absent means no recipe. */
   cost?: Pick<BrandRecipeCost, "costCentsPerBbl" | "uncosted">;
   /** This brand's rows from get_compliance_registry. Absent means none on file. */

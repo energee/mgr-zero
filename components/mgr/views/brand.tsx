@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
+import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 
 export type { BrandViewModel };
 
@@ -19,7 +20,7 @@ export type BrandControls = Partial<Record<"name" | "style" | "abv" | "category"
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
 
 /** Use fills the select from the live control; the inventory draws the verb. Only a banded suggestion has anything to use. */
-function suggestionAction(suggestion: NonNullable<BrandViewModel["suggestion"]>, priceGroup?: (id: string) => void): ReactNode {
+function suggestionAction(suggestion: PriceGroupSuggestion, priceGroup?: (id: string) => void): ReactNode {
   if (suggestion.kind !== "group") return "";
   return priceGroup
     ? <Button type="button" variant="outline" size="sm" onClick={() => priceGroup(suggestion.groupId)}>Use</Button>

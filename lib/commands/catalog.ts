@@ -201,10 +201,10 @@ defineQuery({
 });
 
 // The cost a brand's recipe implies, for the price-group suggestion on Brand.
-// Cost is recipe_version_costs (derived from last receipt costs, never
-// stored, and NULL while any ingredient has no receipt); the ingredients with
-// no receipt yet are named. The brand's most recently brewed version speaks
-// for it; a never-brewed brand falls back to its newest version.
+// recipe_version_costs owns the rule (derived from last receipt costs, never
+// stored; NULL while any ingredient has no receipt, naming those materials);
+// this read only turns the ids into names. The brand's most recently brewed
+// version speaks for it; a never-brewed brand falls back to its newest.
 export type BrandRecipeCost = { recipeVersionId: string | null; costCentsPerBbl: number | null; uncosted: string[] };
 
 defineQuery({
@@ -223,19 +223,11 @@ defineQuery({
     ]);
     const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
     if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };
-    const [cost, ingredients] = await Promise.all([
-      unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl").eq("recipe_version_id", versionId).maybeSingle()) as Promise<{ cost_cents_per_bbl: number | null } | null>,
-      unwrap(ctx.db.from("recipe_ingredients").select("material_id").eq("recipe_version_id", versionId)) as Promise<{ material_id: string }[]>,
-    ]);
-    // One id per material: an ingredient used at two stages is one gap.
-    const materialIds = [...new Set(ingredients.map((r) => r.material_id))];
-    const [costed, materials] = await Promise.all([
-      unwrap(ctx.db.from("material_last_cost").select("material_id").in("material_id", materialIds)) as Promise<{ material_id: string }[]>,
-      unwrap(ctx.db.from("materials").select("id, name").in("id", materialIds).order("name")) as Promise<{ id: string; name: string }[]>,
-    ]);
-    const hasCost = new Set(costed.map((r) => r.material_id));
-    const uncosted = materials.filter((m) => !hasCost.has(m.id)).map((m) => m.name);
-    return { recipeVersionId: versionId, costCentsPerBbl: cost?.cost_cents_per_bbl ?? null, uncosted };
+    const row = await unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl, uncosted_material_ids").eq("recipe_version_id", versionId).maybeSingle()) as { cost_cents_per_bbl: number | null; uncosted_material_ids: string[] } | null;
+    const uncosted = row?.uncosted_material_ids.length
+      ? (await unwrap(ctx.db.from("materials").select("name").in("id", row.uncosted_material_ids).order("name")) as { name: string }[]).map((m) => m.name)
+      : [];
+    return { recipeVersionId: versionId, costCentsPerBbl: row?.cost_cents_per_bbl ?? null, uncosted };
   },
 });
 

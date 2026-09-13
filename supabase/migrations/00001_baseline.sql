@@ -2359,11 +2359,13 @@ create view material_requirements with (security_invoker = true) as
   left join vendors v on v.id = coalesce(c.vendor_id, m.default_vendor_id);
 
 -- NULL, not a low number, while any ingredient has no receipt cost: a partial
--- sum must never read as the recipe's cost.
+-- sum must never read as the recipe's cost. The view also names which
+-- materials broke it, so no reader re-derives the rule.
 create view recipe_version_costs with (security_invoker = true) as
   select ri.recipe_version_id, ri.brewery_id,
          case when bool_and(c.unit_cost_cents is not null)
-              then sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int end as cost_cents_per_bbl
+              then sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int end as cost_cents_per_bbl,
+         coalesce(array_agg(distinct ri.material_id) filter (where c.unit_cost_cents is null), '{}') as uncosted_material_ids
   from recipe_ingredients ri
   join materials m on m.id = ri.material_id
   left join material_last_cost c on c.material_id = ri.material_id
