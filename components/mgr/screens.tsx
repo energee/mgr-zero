@@ -24,7 +24,19 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // capitalization (Warehouse, Citra, Al's Bar).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
+import { InvoicesView } from "@/components/mgr/views/invoices";
+import { invoiceList } from "@/lib/mgr/fixtures/invoices";
+import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
+import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
+import { ImportView } from "@/components/mgr/views/import";
+import { importPreview } from "@/lib/mgr/fixtures/import";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
+import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
+import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
+import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
+import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
@@ -42,7 +54,16 @@ import { LicensesView } from "@/components/mgr/views/licenses";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
-import { CycleCountView } from "@/components/mgr/views/cycle-count";
+import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
+import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
+import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
+import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
+import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
+import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
+import { accountingExpired } from "@/lib/mgr/fixtures/accounting";
+import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
+import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -99,7 +120,7 @@ import { RecipesView } from "@/components/mgr/views/recipes";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
-import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ReturnCreditView, ReturnSourcesView } from "@/components/mgr/views/return-credit";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { RouteView } from "@/components/mgr/views/route";
 import { RoutesView } from "@/components/mgr/views/routes";
@@ -127,12 +148,14 @@ import { UnitsView } from "@/components/mgr/views/units";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
+import { CellarMapView } from "@/components/mgr/views/cellar-map";
+import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
-import { expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
+import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
 import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
@@ -145,7 +168,7 @@ import { workWarehouse } from "@/lib/mgr/fixtures/work";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
-import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
+import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
@@ -194,7 +217,7 @@ import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { toDeniedViewProps } from "@/lib/mgr/denied-view";
-import { toEntryViewProps } from "@/lib/mgr/entry-view";
+import { toEntryViewProps, toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
@@ -274,7 +297,6 @@ import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
-import { QuickBooksMark, SlackMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
@@ -371,12 +393,7 @@ export const INV = {
   fee: "$9.48",
 } as const;
 
-// Hours before a fermentation reading counts as overdue. Settings owns it;
-// Chat settings shows the same number back.
-const OVERDUE_HOURS = "24";
-
 // A rough remaining fill, wherever a keg comes off a tap.
-const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
 export { WORK_TABS } from "@/lib/mgr/work-view";
 
@@ -534,15 +551,7 @@ export const SCREENS: Screen[] = [
     states: [["expired", "sign in or recover your password"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
     spec: "Plan §5b. A used or timed-out token never opens Accept invite.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Invite expired")}
-      {E.note("This invite is no longer valid.")}
-      {E.info("Sign in or reset your password. Contact the brewery if access is still missing.")}
-      {E.btn("Reset password")}
-      {E.btn("Back to sign in")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={expiredInvite} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
@@ -588,15 +597,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Staff lands on Today; a customer lands on portal Order. The verified membership decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Join Demo Brewing")}
-      {E.row("Role", "", "warehouse")}
-      {E.inp("Your name")}
-      {E.inp("Choose a password")}
-      {E.btn("Join Demo Brewing")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toAcceptInviteViewProps("Demo Brewing", "warehouse")} />,
   },
   {
     step: 2,
@@ -688,12 +689,7 @@ export const SCREENS: Screen[] = [
     job: "Invite one new staff account with one role",
     reads: "none", writes: "invite_staff",
     states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "cannot attach existing accounts", 1]],
-    body: (<>
-      {E.edit("Email", "", "email")}
-      {E.pick("Role", "Warehouse", ["Warehouse", "Sales", "Brewer", "Admin"])}
-      {E.note("Sending an invite emails the recipient. Keep this page open to retry after an error.")}
-      {E.btn("Send invite")}
-    </>),
+    body: <InviteView buyer={false} />,
   },
   {
     step: 2,
@@ -701,19 +697,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave": "Team" },
+    to: { "Save role": "Team", "Remove Dave Chen": "Team" },
     job: "Change one member's role or remove that membership",
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff",
     states: [["permission", "admin only", 1], ["last admin", "keep at least one admin", 1], ["self", "remove refused", 1]],
     spec: "Membership holds one role. Multiple simultaneous staff roles are unsupported. The live form opens only for another member; removing membership leaves their sign-in account.",
-    body: (<>
-      {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
-      {E.pick("Role", "Brewer", ["Warehouse", "Sales", "Brewer", "Admin"])}
-      {E.btn("Save role")}
-      {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
-      {E.btn("Remove Dave", "del")}
-    </>),
+    body: <TeamMemberView name="Dave Chen" email="dave@demobrewing.com" avatar="/mock/dave.jpg" savedRole="brewer" />,
   },
   {
     step: 2,
@@ -728,13 +718,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Hidden in dedicated mode; this is the pre-brewery provisioning boundary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.ttl("New brewery")}
-      {E.edit("Brewery name", "")}
-      {E.pick("Timezone", "America/New_York", ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"])}
-      {E.edit("TTB registry number", "")}
-      {E.btn("Create brewery")}
-    </>),
+    body: <CreateBreweryView />,
   },
   {
     step: 2,
@@ -754,22 +738,15 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Desk",
     name: "Import",
-    job: "Upload, map, preview and independently commit valid rows",
     // The kind chips carry record names ("Customers", "Ship-tos"); authored
     // here so a tap selects the kind instead of resolving to those screens.
-    to: { Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
+    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
+    job: "Upload, map, preview and independently commit valid rows",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
     spec: "One logical row is atomic; siblings commit independently. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry returns original results; correction starts only blocked rows with a new identity. Keep the page open for retry recovery; reopening has no automatic batch recovery.",
-    body: (<>
-      {E.back("Settings", "Import")}
-      {E.stp(["upload", "map", "preview", "commit"], 2)}
-      {E.chips(["Customers", "Ship-tos", "Products / SKUs", "Channel prices", "Opening balances"], 0)}
-      {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "sale channel missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "new", "ready"]])}
-      {E.btn("Import 2 customer rows")}
-      {E.note("Retry returns original results. Correct only blocked rows in a new batch.")}
-    </>),
+    body: <ImportView model={importPreview} />,
   },
   {
     step: 3,
@@ -1018,10 +995,10 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment] · Shortage reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
-    body: <ShipView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
+    body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipInvoice.lines)} />} model={toShipViewProps(orderShipInvoice)} />,
   },
   {
     step: 5,
@@ -1043,10 +1020,10 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order, get_order_ship_sources",
-    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
+    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later] · Shortage reason [SCHEMA-GATE: persistence unavailable]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
-    body: <ShipView model={toShipViewProps(orderShipOnDelivery)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} invoiceTiming={1} />,
+    body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipOnDelivery.lines)} />} model={toShipViewProps(orderShipOnDelivery)} invoiceTiming={1} />,
   },
   {
     step: 5,
@@ -1059,7 +1036,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [explicit source and destination bins preserve lot; taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
-    body: <CompleteTransferView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
+    body: <CompleteTransferView sources={<ShipmentSourcesView {...shipmentSources(orderTransferComplete.lines)} destinationBins={[{ id: "taproom-cooler", name: "Taproom cooler" }]} />} model={toCompleteTransferViewProps(orderTransferComplete)} />,
   },
   {
     step: 5,
@@ -1119,33 +1096,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
     spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
-    body: (<>
-      {E.back("Beer", "Weekly count")}
-      {E.tabs(["Ridgeline Tap Room", "Downtown"], 0, "w-full")}
-      {E.ttl("Expected consumption")}
-      {E.note("Captured prior · Sep 1 · reopen saved count")}
-      {E.row("Hazy IPA", "expected 1.5 bbl · draft actual 1.0 bbl", "difference +0.5 bbl")}
-      {E.btn("Refresh expected", "g")}
-      {E.ttl("Count every stock bucket")}
-      {E.note("Server date Sep 8 · whole remaining packages only · enter zero explicitly. A partly full keg is one.")}
-      {E.btn("Print current stock labels", "g")}
-      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
-      {E.row("Pils · 16 oz case", "Cold · untracked stock · worksheet row 1 · recorded 6", E.stq(4))}
-      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 2 · recorded 3", E.stq(2), "w")}
-      {E.btn("Record count")}
-      {E.ttl("Saved count · Sep 8")}
-      {E.note("Latest uncorrected count · saved row 2 · recorded 7, counted 2")}
-      {E.btn("Correct count", "g")}
-      {E.ttl("Recent saved counts")}
-      {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted · corrected by Admin", E.act("Open count", "primary"))}
-      {E.note("Admin can correct only the latest saved count when a quantity was counted too low. Warehouse and Taproom read the correction history without the action.")}
-    </>),
+    body: <WeeklyCountView model={weeklyCount} />,
   },
   {
     step: 5,
@@ -1155,18 +1112,10 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "SKU detail" },
     job: "Where the gap between poured and counted keeps showing up",
     reads: "list_locations · get_taproom_variance",
-    writes: "none",
+    writes: "none · Recurring brand trend [SCHEMA-GATE: report has no brand-by-period trend projection]",
     states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "mapped expected and variance remain visible; coverage is labeled incomplete"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
     spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen count depletion, and variance is expected minus actual. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
-    body: (<>
-      {E.back("Beer", "Variance")}
-      {E.ttl("Variance by brand")}
-      {E.tabs(["4 weeks", "12 weeks"])}
-      {E.tbl(["Brand", "Expected", "Actual", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "+0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "+0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
-      {E.nav("Hazy IPA", "short 4 weeks running · 1.8 bbl total · −4%")}
-      {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
-      {E.note("Reported, never posted. The count already wrote the depletion; this is the explanation for it.")}
-    </>),
+    body: <TaproomVarianceView model={taproomVariance} />,
   },
   {
     step: 5,
@@ -1189,10 +1138,10 @@ export const SCREENS: Screen[] = [
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
     reads: "get_invoice, get_invoice_return_sources, list_bins",
-    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
+    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price] · Deposit refund [SCHEMA-GATE: beer returns do not refund deposits]",
     states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
-    body: <ReturnCreditView sources={E.pick("Original shipped source", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ"])} model={toReturnCreditViewProps(orderReturnCredit)} />,
+    body: <ReturnCreditView sources={<ReturnSourcesView groups={[{ key: "l-hazy", name: orderReturnCredit.lines[0].skus?.name ?? "Line", sources: [{ id: "shipped-hazy", label: "L-240831-HZ · shipped from Cooler", shipped: 4 }] }]} quantities={{ "shipped-hazy": "1" }} />} bins={[{ id: "cooler", name: "Cooler" }]} binId="cooler" model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
     step: 5,
@@ -1242,12 +1191,7 @@ export const SCREENS: Screen[] = [
     reads: "get_customer",
     writes: "invite_customer_user [existing]",
     states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "attachment is unsupported; contact the admin", 1]],
-    body: (<>
-      {E.edit("Email", PORTAL_BUYER.email, "email")}
-      {E.fld("Role", "Buyer")}
-      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.btn("Send invite")}
-    </>),
+    body: <InviteView buyer defaultEmail={PORTAL_BUYER.email} />,
   },
   {
     step: 5,
@@ -1268,25 +1212,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks" },
+    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
     reads: "get_qbo_connection",
-    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults",
+    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults [existing commands] · Missing-email count [SCHEMA-GATE: connection health has no customer email count] · Recovery disconnect [SCHEMA-GATE: existing disconnect command requires connected state]",
     states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "the Pay route fails closed when QuickBooks returns no approved link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Square already had Settings · Point of sale; QuickBooks had nothing, and Settings · Integrations dead-ended. This is the other half. It exists mainly to make three invisible preconditions visible before a customer meets them: QuickBooks Payments must be active on the company, AllowOnlineACHPayment / AllowOnlineCreditCardPayment must ride every push, and the customer must carry an email. Any one missing and Intuit generates no InvoiceLink, so the portal Pay button either never renders or lands on the unavailable page. Payment method is a money decision, not a checkbox: card runs a percentage fee, so on a four-figure keg invoice the method the customer picks is real money; the fee is visible in the QuickBooks Payment sidebar and MGR does not model it. Push defaults live here rather than per invoice, so an invoice cannot be born unpayable by omission.",
-    body: (<>
-      {E.back("Settings", "Accounting")}
-      {E.ttl("QuickBooks")}
-      {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect", "destructive"), "w")}
-      {E.note("QuickBooks authorization expired. Push, payment links and paid-date sync are paused.")}
-      {E.btn("Reconnect QuickBooks")}
-      {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
-      {E.ttl("Push defaults")}
-      {E.info("Every invoice is pushed ready to pay. Turning both off means customers cannot pay online at all.")}
-      {E.row("Bank transfer (ACH)", "on · lowest fee", E.sw(true, "Bank transfer payments"), "ok")}
-      {E.row("Card", "on · percentage fee applies", E.sw(true, "Card payments"), "ok")}
-      {E.row("Customers missing an email", "2 · cannot be pushed", E.act("Review"), "w")}
-    </>),
+    body: <AccountingView model={accountingExpired} />,
   },
   {
     step: 5,
@@ -1296,16 +1228,11 @@ export const SCREENS: Screen[] = [
     name: "Connect QuickBooks",
     to: { "Connect QuickBooks": "Accounting" },
     job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
-    reads: "none [OAuth returns the selected company]",
+    reads: "get_qbo_connection [OAuth returns the selected company]",
     writes: "connect_qbo",
     states: [["permission", "admin only", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
     spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
-    body: (<>
-      {E.back("Settings", "Connect QuickBooks")}
-      {E.info("MGR reads customers, items, invoice status and payments. It creates wholesale invoices and credit memos.")}
-      {E.note("QuickBooks remains the accounting record. Connecting does not push existing invoices.")}
-      {E.btn("Connect QuickBooks", "irr")}
-    </>),
+    body: <ConnectQuickBooksView />,
   },
   {
     step: 5,
@@ -1320,12 +1247,33 @@ export const SCREENS: Screen[] = [
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
     spec: "A person verifies and enters the exact QuickBooks record ID. MGR never chooses automatically from a matching name. A company already claimed by another brewery cannot be overridden here.",
-    body: (<>
-      {E.note("Two QuickBooks customers have similar names. Verify the intended account in QuickBooks; MGR never chooses automatically.")}
-      {E.edit("QuickBooks customer ID", "184")}
-      {E.btn("Save mapping")}
-      {E.info("If this QuickBooks company belongs to another MGR brewery, disconnect it there first.")}
-    </>),
+    body: <QboMappingView kind="customer" defaultValue="184" companyConflict />,
+  },
+  {
+    step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
+    name: "QuickBooks mappings",
+    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict" },
+    job: "Review verified customer, SKU and deposit mappings for the connected company",
+    reads: "get_qbo_connection · list_customers · list_skus",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers or SKUs"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={[
+      { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
+      { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
+      { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
+    ]} />,
+  },
+  {
+    step: 5, slice: 1, tab: "More",
+    name: "Invoice mappings",
+    to: { "Oak and Barrel": "Fix mapping", "Pils · case": "Fix mapping" },
+    job: "Review one invoice's customer and item mappings before fixing exact provider IDs",
+    reads: "get_invoice",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping",
+    states: [["permission", "sales or admin required", 1], ["unmapped", "verify the provider ID", 1]],
+    body: <QboMappingsView title="Fix QuickBooks mapping" backLabel="Invoice" context="invoice" sections={[
+      { rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }, { id: "sku", label: "Pils · case", kind: "item", detail: "Item mapping required" }] },
+    ]} />,
   },
   {
     step: 5,
@@ -1340,36 +1288,20 @@ export const SCREENS: Screen[] = [
     writes: "disconnect_qbo",
     states: [["permission", "admin only", 1], ["confirmed", "connection disabled and tokens purged"]],
     spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
-    body: (<>
-      {E.note("Stops: invoice push, payment links and paid-date sync.")}
-      {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings.")}
-      {E.btn("Disconnect QuickBooks", "del")}
-    </>),
+    body: <DisconnectQuickBooksView />,
   },
   {
     step: 5,
     slice: 1,
     tab: "More",
     name: "Invoices",
-    to: { Review: "Invoice", Open: "Invoice" , "Write off": "Invoice" },
+    to: { Review: "Invoice", Open: "Invoice", "Write off": "Invoice", "Re-push": "Invoice", "Sync QuickBooks": "Invoices", "Email delivery status": "Invoices" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks and email delivery status [SCHEMA-GATE: invoice query returns no verified provider URL or delivery state]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
-    body: (<>
-      {E.back("More", "Invoices")}
-      {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open"))}
-      {E.row(`${INV.edited} · Al’s Bar`, <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
-      {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off", "destructive"), "w")}
-      {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", E.act("Review"), "w")}
-      {E.row(`${INV.deleted} · Teresa’s`, "deleted in QuickBooks", <>{E.act("Re-push", "attention")}{E.act("Write off", "destructive")}</>, "w")}
-      {E.row(`${INV.unsent} · Al’s Bar`, "pushed · not emailed yet", E.act("Open in QuickBooks"))}
-      {E.row(`${INV.paid} · Ridgeline`, "paid 8/29 from QuickBooks Online", "$980", "ok")}
-      {E.row(`${INV.memo} · Ridgeline`, `credit memo · pushed · against ${INV.no} · −$180`, E.act("Open"))}
-      {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
-    </>),
+    body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "connected · company 9341", canConnect: true }} />,
   },
   {
     step: 5,
@@ -1395,11 +1327,7 @@ export const SCREENS: Screen[] = [
     reads: "get_invoice · get_qbo_connection",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping",
     states: [["permission", "sales or admin required", 1], ["candidate selected", "save enables invoice push"], ["no match", "create it in QuickBooks first", 1]],
-    body: (<>
-      {E.note("Verify the intended item in QuickBooks; MGR never chooses automatically from its name.")}
-      {E.edit("QuickBooks item ID", "307")}
-      {E.btn("Save mapping")}
-    </>),
+    body: <QboMappingView kind="item" defaultValue="307" />,
   },
   {
     step: 5,
@@ -1634,18 +1562,11 @@ export const SCREENS: Screen[] = [
     name: "Cellar map",
     to: { "FV3 \u00b7 fermenter \u00b7 15 bbl": "Vessel detail" , "Add vessel": "Vessel detail" },
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
-    reads: "list_occupancies · list_vessels · list_batches · get_batch_completion_preview",
+    reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [design; mutable single rows] · complete_batch",
     states: [["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
     spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold and residual, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
-    body: (<>
-      {E.back("Beer", "Cellar", E.btn("Add vessel", "g"))}
-      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]], "c2")}
-      {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
-      {E.nav("FV3 · fermenter · 15 bbl", "occupancy, readings and vessel facts")}
-      {E.btn("Complete batch", "g")}
-      {E.sp()}
-    </>),
+    body: <CellarMapView model={cellarMapBrewer} />,
   },
   {
     step: 7,
@@ -1654,8 +1575,8 @@ export const SCREENS: Screen[] = [
     name: "Vessel detail",
     to: { "Stout · BATCH-0168": "Brew day" },
     job: "Inspect one vessel's occupancy and readings and edit its physical facts",
-    reads: "list_vessels [design] · list_fermentation_readings [design]",
-    writes: "upsert_vessel [design; mutable facts only]",
+    reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
+    writes: "upsert_vessel [mutable facts only]",
     states: [["permission", "brewer or admin required", 1], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1]],
     spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here.",
     body: <VesselDetailView model={toVesselDetailViewProps(vesselFv3)} />,
@@ -1709,11 +1630,11 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Batches",
-    to: { Start: "Brew day", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Vessel detail", "B-0413 \u00b7 Stout": "Vessel detail" },
+    to: { Start: "Brew day", Edit: "Vessel detail", "New vessel": "Vessel detail", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Vessel detail", "B-0413 \u00b7 Stout": "Vessel detail" },
     job: "See planned and active batches with the next brew or cellar action",
-    reads: "list_batches [design]",
-    writes: "none [scheduling happens on Schedule batch; recording on Brew day]",
-    states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
+    reads: "list_batches · list_vessels · list_brands · list_recipes",
+    writes: "none [scheduling happens on Schedule batch; recording on Brew day; existing commands] · SCHEMA-GATE: reading summary and direct reading action require occupancy and reading facts not returned by list_batches",
+    states: [["planned", "Start is the next action; live Brew opens the same brew-day page"], ["active", "Open preserves access when the list has no authoritative reading or occupancy facts"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
   },
@@ -1736,8 +1657,8 @@ export const SCREENS: Screen[] = [
     name: "Brew day",
     to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
     job: "Consume actual lots and set knockout baseline",
-    reads: "get_brew_day [design]",
-    writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
+    reads: "get_brew_day · list_vessels",
+    writes: "record_brew_day [existing commands: brew date + knockout occupancy] · SCHEMA-GATE: brew-day lot consumption and frozen process sheet are not supported by the existing command/read",
     states: permitted("brewer or admin required"),
     spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: <BrewDayView model={toBrewDayViewProps(brewDayHazy)} />,
@@ -1750,21 +1671,11 @@ export const SCREENS: Screen[] = [
     name: "Cellar transfer",
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
-    reads: "get_cellar_map [view; occupancy volumes]",
+    reads: "list_occupancies · list_vessels",
     writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
-    body: (<>
-      {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl", ["FV1 · Pils · B-0409 · 12.8 bbl", "FV2 · Hazy IPA · B-0416 · 14.6 bbl"])}
-      {E.pick("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl", ["BT1 · Pils · B-0412 · 7.0 / 10 bbl", "BT2 · empty"])}
-      {E.qty("3.0", "bbl", "Barrels moving")}
-      {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl, or Record as loss books those 9.8 bbl as loss.")}
-      {E.fld("Remainder in FV1", "9.8 bbl")}
-      {E.chips(["Leave in FV1", "Record as loss"], 0)}
-      {E.pin(<>
-        {E.btn("Record transfer", "irr")}
-      </>)}
-    </>),
+    body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
     step: 7,
@@ -1865,7 +1776,7 @@ export const SCREENS: Screen[] = [
     name: "Receive PO",
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order",
-    writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
+    writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: the purchase-order query does not return recent material lots]",
     states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: <ReceivePoView model={toReceivePoViewProps(receivePoCountryMalt)} />,
@@ -1905,13 +1816,10 @@ export const SCREENS: Screen[] = [
     to: { Material: "Entity picker", "Record count": "Materials on hand" },
     job: "Post only variance as an append-only movement",
     reads: "get_material_on_hand",
-    writes: "record_material_count [one RPC: count + lines + adjustment movements against named lots]",
+    writes: "record_material_count [one RPC: count + lines + adjustment movements against named lots] · Lot allocation preview [SCHEMA-GATE: the read query returns bin totals only] · Roll conversion [SCHEMA-GATE: counts accept base units only]",
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["counted in rolls", "labels are counted as whole rolls · the open roll is excluded and its remainder falls into the variance", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. Labels are the exception to counting units, and the reason is practical: nobody counts two thousand labels left on a roll, and a sheet that asks will be handed a guess that posts as fact. Whole rolls are counted instead and the open roll is excluded, so the error is bounded at one roll and the same variance absorbs it at the next count. Applicator waste is what makes the drift, since packaging consumes one label per unit packaged while the real line wastes a little more; counting rolls on a routine keeps that from accumulating unnoticed.",
-    body: (<>
-      <CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />
-      {E.pin(<>{E.btn("Record count", "irr")}</>)}
-    </>),
+    body: <><CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />{E.pin(<CycleCountFooter />)}</>,
   },
   {
     step: 7,
@@ -2328,17 +2236,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: (<>
-      {E.back("Beer", "Tap board")}
-      {E.ttl("On tap")}
-      {E.tabs(["Taproom", "Warehouse"])}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0], ["2", "Hazy IPA · ½ bbl", "on Mon", 0], ["3", "Stout · ⅙ bbl", "on Tue · opened 60%", 0], ["4", "Amber · ½ bbl", "on Sat", 0], ["5", "Helles · ½ bbl", "on Wed", 1], ["6", "Saison · ½ bbl", "on Thu", 0], ["8", "Porter · ⅙ bbl", "on Fri", 0], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1], ["10", "Kolsch · ½ bbl", "on Tue", 0], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0]])}
-      {E.row("7 · Guest cider · keg", "nominal ½ bbl · tapped here by @dana · not our stock · no guest yield", E.act("Kick", "destructive"), "w")}
-      {E.info("Tap 7 is empty. Unnumbered kegs sort last.")}
-      {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
-      {E.row("Recent · Saison swapped in", "Ali · Thu 11:20am")}
-      {E.note("With no usable POS numerator, a row shows what is on and since when, with no bar. Guest labels are never matched to POS. Nothing on this board posts to the ledger; the weekly count does that.")}
-    </>),
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -2352,15 +2250,7 @@ export const SCREENS: Screen[] = [
     writes: "kick_keg",
     states: permitted("taproom, warehouse or admin required").concat([["empty", "tap becomes empty"], ["beer remaining", "closing fill is a coarse observation only"], ["already closed", "safe closer and time shown; reload before acting", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
-    body: (<>
-      {E.ttl("Kick tap 5")}
-      {E.fld("Coming off", "Helles · ½ bbl · on since Wed")}
-      {E.pick("Reason", "Kicked empty", ["Kicked empty", "Flavor change", "Quality hold"])}
-      {E.ttl("Remaining")}
-      {E.chips(FILL_CHIPS, 0)}
-      {E.info("Remaining is a rough observation. Closing this interval does not change finished-goods inventory.")}
-      {E.btn("Kick keg", "del")}
-    </>),
+    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} />,
   },
   {
     step: 7,
@@ -2374,21 +2264,7 @@ export const SCREENS: Screen[] = [
     writes: "swap_keg",
     states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
-    body: (<>
-      {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
-      {E.ttl("Coming off")}
-      {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
-      {E.chips(FILL_CHIPS, 0)}
-      {E.ttl("Going on")}
-      {E.pick("Packaged keg SKU", "Helles · ½ bbl", ["Helles · ½ bbl", "Pils · ½ bbl"])}
-      {E.pick("Identity", "Same own SKU", ["Same own SKU", "Own keg", "Guest keg"])}
-      {E.fld("Guest keg label", "required for a guest")}
-      {E.fld("Guest nominal BBL", "positive number")}
-      {E.fld("Tap number", "5 · optional")}
-      {E.info("Remaining is a rough observation. The atomic swap does not change finished-goods inventory.")}
-      {E.btn("Swap · one record", "irr")}
-      {E.note("The swap is one record. A half-finished swap is not a state this can reach.")}
-    </>),
+    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} closedFact="Helles was swapped out at 7:42pm by Ali" />,
   },
   {
     step: 7,
@@ -2477,14 +2353,7 @@ export const SCREENS: Screen[] = [
     writes: "begin_chat_installation [admin-only, single-use OAuth intent]",
     states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1]],
     spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.",
-    body: (<>
-      {E.back("Settings", "Chat")}
-      {E.ttl("Chat notifications")}
-      {E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}
-      {E.row("Slack", "Not connected", "", "", SlackMark)}
-      {E.nav("Preview surfaces", "App Home · personal DM · team digest")}
-      {E.btn("Connect Slack")}
-    </>),
+    body: <ChatSettingsView health={chatDisconnected} timezone="America/New_York" readingDueHours={24} previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
     step: 8,
@@ -2492,28 +2361,26 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     name: "Chat settings",
-    to: { Disconnect: "Disconnect Slack" , "Open": "Chat settings" },
+    to: { Disconnect: "Disconnect Slack" },
     job: "Operate one brewery/provider installation and inspect every outbound surface",
     reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
     writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
     spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
-    body: (<>
-      {E.back("Settings", "Chat")}
-      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
-      {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private"])}
-      {E.window("Quiet hours", "21:00", "06:00")}
-      {E.fld("Reading overdue after", `${OVERDUE_HOURS} h · set on Settings`)}
-      {E.nav("Health", "last message from Slack today · 8:42 AM")}
-      {E.nav("Linked people", "3 linked")}
-      <div>
-        {E.tabs(["App Home", "Personal DM", "Team digest", "Preferences"])}
-        {[["App Home", "4 current work reasons"], ["Personal DM", "Your assigned and overdue work"], ["Team digest", "Shared brewery work summary"], ["Preferences", "Delivery cadence and quiet hours"]].map(([name, detail], i) => (
-          <div key={name} data-preview hidden={i !== 0}>{E.row(`Preview · ${name}`, `${detail} · fixture data`)}</div>
-        ))}
-      </div>
-      {E.row("Delivery enabled", "turn off all Slack sends", E.sw(true, "Slack delivery"), "ok")}
-    </>),
+    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
+  },
+  {
+    step: 8,
+    slice: "chat",
+    tab: "More",
+    group: "Chat",
+    name: "My notification preferences",
+    job: "Control personal Slack delivery without changing assigned MGR work",
+    reads: "get_notification_preferences",
+    writes: "set_notification_preference · set_notification_destination · set_personal_quiet_hours · unlink_chat_user",
+    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["error", "keep entered quiet hours and show the command error", 1]],
+    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Clearing both personal times follows the brewery quiet hours.",
+    body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
   },
   {
     step: 8,
@@ -2526,13 +2393,7 @@ export const SCREENS: Screen[] = [
     writes: "unlink_chat_user",
     states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: (<>
-      {E.back("Chat", "Linked people")}
-      {E.row("Avery Stone", "Admin · linked 8/29/2026", E.act("Unlink", "destructive"))}
-      {E.row("Casey Lin", "Brewer · linked 8/30/2026", E.act("Unlink", "destructive"))}
-      {E.row("Morgan Reed", "Driver · linked 9/02/2026", E.act("Unlink", "destructive"))}
-      {E.btn("Link your Slack", "g")}
-    </>),
+    body: <ChatLinkedPeopleView people={linkedChatPeople} />,
   },
   {
     step: 8,
@@ -2547,12 +2408,7 @@ export const SCREENS: Screen[] = [
     writes: "consume_chat_link_proof [single-use]",
     states: [["ready", "both identities named"], ["expired", "return to MGR and request a new link", 1]],
     spec: "The entry page names both identities and the brewery before consuming the single-use proof.",
-    body: (<>
-      {E.ttl("Link your Slack")}
-      {E.info("Slack user Avery Stone will be linked to Avery Stone in Demo Brewing.")}
-      {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
-      {E.btn("Link accounts", "irr")}
-    </>),
+    body: <ChatLinkConsentView intent={chatLinkIntent} />,
   },
   {
     step: 8,
@@ -2567,11 +2423,7 @@ export const SCREENS: Screen[] = [
     writes: "disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["confirmed", "installation and identity links removed"]],
     spec: "The confirmation distinguishes stopped delivery from MGR work that remains.",
-    body: (<>
-      {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
-      {E.info("Stays: MGR work, assignments, notification preferences and history.")}
-      {E.btn("Disconnect Slack", "del")}
-    </>),
+    body: <ChatDisconnectView />,
   },
   {
     step: 8,
@@ -2579,19 +2431,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     name: "Reauthorization",
+    to: { Connection: "Reauthorization", "Last successful message from Slack": "Reauthorization", "Last successful delivery": "Reauthorization", queued: "Reauthorization", retrying: "Reauthorization", "Manage delivery": "Chat settings" },
     job: "Fail closed while keeping recovery understandable and personal delivery isolated",
     reads: "get_chat_integration_health",
     writes: "begin_chat_reauthorization · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["token revoked", "all provider sends stop", 1], ["channel externalized", "team digest stops; eligible personal sends continue", 1], ["uninstalled", "links and queued actions invalidated", 1]],
     spec: "Provider errors remain redacted. Emergency disable does not depend on Slack being reachable.",
-    body: (<>
-      {E.back("Chat", "Health")}
-      {E.note("Slack authorization expired. No messages are being sent.")}
-      {E.row("Last message from Slack", "Today · 8:42 AM", E.status("Succeeded", "ok"))}
-      {E.row("Last delivery", "Today · 8:43 AM", E.status("Succeeded", "ok"))}
-      {E.row("Queued", "3 deliveries", E.status("Paused", "w"), "w")}
-      {E.btns([["Reauthorize Slack", "p"], ["Disable integration", "g"]])}
-    </>),
+    body: <ChatHealthView health={chatRecovery} />,
   },
   {
     step: 7,

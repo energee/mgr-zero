@@ -109,7 +109,8 @@ describe("Complete transfer view loop", () => {
 
   it("the live page mounts CompleteTransferView with no second E.* tree", () => {
     const src = noSecondTree("app/(app)/orders/[id]/complete/page.tsx");
-    expect(src).toMatch(/<CompleteTransferView\b/);
+    expect(src).toMatch(/<ShipForm\b/);
+    expect(noSecondTree("app/(app)/orders/[id]/ship-form.tsx")).toMatch(/<CompleteTransferView\b/);
   });
 });
 

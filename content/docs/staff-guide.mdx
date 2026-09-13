@@ -14,7 +14,7 @@ Join through an invitation, then sign in with your email and the password you ch
 2. Select **Sign in**.
 3. MGR opens **Today** for the brewery you're a member of.
 
-Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
+Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, **Session expired** confirms that eligible queued readings remain on this device; select **Sign in to retry** as the original user and brewery. Open **Me** in the header when you want **Sign out**.
 
 <Screen name="Reset password" />
 
@@ -24,11 +24,11 @@ Wrong credentials show **Incorrect email or password.** You can also select **Em
 
 <Screen name="Accept invite" />
 
-Open the invitation email, enter **Your name** and **Choose a password** (at least eight characters), then select **Join**. The page shows the brewery and your assigned role. Staff open Today; buyers open their customer portal. The link is single use. A used, expired, or wrong-audience link opens **Invite expired**; sign in if you have already joined, or use **Reset password** and contact the brewery if access is still missing. There is no resend or existing-account attachment action.
+Open the invitation email, enter **Your name** and **Choose a password** (at least eight characters), then select **Join**. The shared entry card shows the verified brewery and your assigned role. Staff open Today; buyers open their customer portal. The link is single use. A used, expired, or wrong-audience link opens **Invite expired**, with **Reset password** and **Back to sign in**; contact the brewery if access is still missing. Validation keeps your entered name for correction without filling the password back in. There is no resend or existing-account attachment action.
 
 <Screen name="Create brewery" />
 
-On hosted MGR, a signed-in account can open **Create brewery** from **No brewery yet**. Enter **Brewery name**, a valid **Timezone** such as America/New_York, and an optional **TTB registry number**. **Create brewery** creates the brewery and makes you its first admin, then opens Today. Validation errors keep your entries for correction. Dedicated installations hide this entry and refuse its page.
+On hosted MGR, a signed-in account can open **Create brewery** from **No brewery yet**. Enter **Brewery name**, a valid **Timezone** such as America/New_York, and an optional **TTB registry number**. The timezone field suggests common US zones and still accepts another valid IANA zone. **Create brewery** creates the brewery and makes you its first admin, then opens Today. Validation errors keep your entries for correction. Dedicated installations hide this entry and refuse its page.
 
 <Screen name="First-run checklist" />
 
@@ -64,9 +64,13 @@ Admin, Warehouse, and Taproom open **Variance by brand** from Taproom, Beer, or 
 
 Actual is the saved count's depletion. Expected is reconciled POS quantity times its frozen serving size; editing today's pour or package size never changes an existing expectation. A later reconciled sale can update a closed period's expected amount and variance, but cannot change counts or stock. Variance is expected minus actual.
 
+The shared **Variance by brand** screen puts the brand totals first, followed by excluded and unattributed volumes and completed-period coverage. **Recurring brand trend** is unavailable until the report returns brand-by-period data; MGR does not infer a repeated shortage from the aggregate totals.
+
 Without usable POS observations, comparison rows are empty and expected stays blank. A dash means a value is unavailable; read zero alongside coverage and excluded consumption. Mapped lines still contribute when other items need mapping, with coverage and mapping gaps shown. Overlapping taps split each sale equally as an estimate; shares assigned to kegs outside inventory are excluded while count-derived actual stays intact. Sales without a matching open interval remain explicitly unattributed. Guest names do not identify POS sales, so guest yield is unavailable. POS connection and synchronization are not available yet.
 
 ## Taproom physical counts [#taproom-counts]
+
+**Weekly count** uses the shared explorer layout: expected consumption first, then the checked print action and one remaining-package stepper per stock bucket, followed by the saved receipt and recent counts. Type a whole quantity or use minus/plus; blank remains uncounted, and zero must be explicit. **Correct count** opens the same correction sheet from an eligible Admin receipt; its reason and quantities lock during an uncertain retry.
 
 Admin, Warehouse, and Taproom open **Taproom** under Beer to prepare, record, and read physical counts. Choose a taproom location, then enter remaining whole packaged units for every displayed bin, SKU, and lot identity, including zero quantities. A partially full keg counts as one until it is gone; estimated fill levels never change the inventory ledger.
 
@@ -85,6 +89,8 @@ Admin can select **Correct count** on the latest saved count when one or more qu
 The original header, observations, and ledger rows remain unchanged. MGR appends an exact compensation for each changed depletion and, when the corrected amount still falls below recorded stock, a smaller replacement depletion using the original package volume, channel, tax treatment, state, bin, SKU, and lot. The corrected count keeps the original observation time, appears as one logical occurrence in history, becomes the next count's baseline, and updates variance without counting unchanged lines twice. Its signed ledger entries belong to the time when Admin made the correction; an earlier filed compliance snapshot stays byte-for-byte unchanged. If the response is uncertain, **Retry unchanged correction** reuses the frozen reason, quantities, payload, and request ID.
 
 ## Tap intervals [#tap-intervals]
+
+**Tap board** uses the shared vessel-style tiles for owned kegs and a separate guest-keg row, with **Swap** and **Kick** on each. **Tap keg** opens the same entry sheet in the explorer and application. Closing fill is **Empty**, **About ¼ left**, or **About ½ left**; opening fill remains a separate coarse observation. **Swap keg** keeps the outgoing captured SKU available for **Same own SKU**, even if it is no longer in the active SKU chooser. The recent-activity rows show the two most recently opened current intervals; closed intervals remain in recent history. These actions never post finished-goods depletion.
 
 Admin, Warehouse, and Taproom open **Tap board** from Beer, Taproom, or Taproom Today. Choose an owned taproom location. **Tap keg** opens a keg with its packaged keg SKU, or with an explicit guest label and positive nominal size in BBL. Own keg size comes from its format and is frozen by the server for that interval. A guest always shows as not in inventory; an own keg also receives that flag when its taproom has no positive stock. Tapping never changes inventory.
 
@@ -112,7 +118,12 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 <Callout type="warn">
 **Brewer navigation:** Brewer sees Today, Beer (Cellar, Materials), Work (Batches, Packaging), and More (Recipes, Vendors, Planning). Brewer does not have permission to open Taproom, Taps, or Variance by brand. Repack, on the Packaging page, and the Draft purchase orders button on Planning are Admin and Warehouse only, so Brewer does not see them.
+
 </Callout>
+
+Transfers, Packaging, and Purchase orders also show the Work tabs beneath their heading. These tabs open the corresponding lists and include only areas your role may open.
+
+On the **Work** landing itself, chips filter the rows in place. **all** restores your role's default kinds; **Nothing in motion** means the selected filter has no matching rows.
 
 **Me** in the header shows the email you signed in with, your brewery and role, and offers **Change password** and **Sign out**. When your account belongs to more than one brewery, Me also lists them with **Switch** beside each one that is not current. Me is a centered dialog at every screen size. Other forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
 
@@ -132,9 +143,9 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 1. Open **Catalog** and select **New Brand**.
 2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, and **Hops** are optional notes. **Price group** is the row of the [price grid](#pricing) this beer sits on; leave it **Unpriced** and none of its SKUs can be ordered until you choose one. When the brand has a recipe, a line under the field reads its cost per barrel (from the most recently brewed version, or the newest if none has been brewed, using each ingredient’s last receipt cost) against the groups’ ceilings: *Suggested group 2 · recipe cost $48.10/bbl* with **Use**, which only fills the field; **Save brand** still commits. *Above every ceiling* means no band covers it, and *Recipe cost unknown* names an ingredient that has never been received, so no number is shown.
-3. Select **Save brand**. Brand names must be unique within the brewery. You return to **Catalog**, where the brand lands alphabetically and starts as **No SKUs yet**.
+3. Select **Save brand**. Brand names must be unique within the brewery. You return to **Catalog**, where the brand lands alphabetically and its row reads **0 SKUs**. Its **SKU list** says **No SKUs yet** until you add one.
 
-**New Brand** and **Edit brand** both open the brand's own page rather than a dialog, and only Admin and Sales can open it; other roles do not see these links on Catalog and land on **No access** if they open the address directly. **Edit brand** starts with all saved values; changing one field keeps the others. Select **Save brand** to return to **Catalog**.
+**New Brand** opens the brand's own page rather than a dialog, and so does selecting a brand row in **Catalog** — Catalog lists the brands, not their packages. The brand page starts with all saved values; changing one field keeps the others. Select **Save brand** to return to **Catalog**. The brand page is for Admin and Sales; other roles see the catalog without its links.
 
 Under the sell sheet, **Compliance** lists what this brand holds: its COLA or formula approvals and its state registrations, each with **Edit**. A brand with no COLA shows *COLA · pending* until one is added. **Add approval** takes the approval kind, the number (a COLA is filed under your own **Serial number**, such as `260135`; a formula under its TTB formula number), and an optional **Date submitted**; a COLA does not expire, so no expiry is asked for. The same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the two-letter state and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the state fixed. The brand is stated on both sheets, never chosen. A new brand must be saved before its compliance can be recorded. The brewery’s own state licenses are not brand facts; they live under [Compliance → Licenses](#compliance).
 
@@ -155,11 +166,13 @@ For packaging materials, quantities use the material’s displayed base unit. Ch
 
 ### Create a SKU
 
-1. Find the brand and select **New SKU**.
+A brand's packages live on its own **SKU list**: open the brand from **Catalog**, then select the **SKU list** row, which names how many active packages it has.
+
+1. On that brand's **SKU list**, select **New SKU**.
 2. Choose a packaged **Format**. **Name** is optional and defaults to *Brand · Format*; **UPC** is optional.
 3. Select **Create**. A brand has at most one SKU per format. After that, the SKU is available in inventory, pricing, and order forms.
 
-**Edit SKU** beside a SKU changes **Active** and **UPC**. Deactivating it removes it from New Order choices and the portal catalog, and prevents adding it to new orders; recorded inventory and order history remain. Reactivate it to sell it again at its current grid price. UPC is unique within the brewery; clear the field to remove it. The brand and format stay fixed, and provider mappings are preserved.
+**Edit SKU** beside a package on that SKU list changes **Active** and **UPC**. Deactivating it removes it from New Order choices and the portal catalog, and prevents adding it to new orders; recorded inventory and order history remain. Reactivate it to sell it again at its current grid price. UPC is unique within the brewery; clear the field to remove it. The brand and format stay fixed, and provider mappings are preserved.
 
 **BBL per unit** is the barrel volume of one inventory unit and lives on the format, so every SKU in that format shares it. One US beer barrel is 31 gallons (3,968 fl oz). Half-barrel keg = `0.5`. Sixth-barrel keg is about `0.16666667`. A 24 × 16 oz case is `384 ÷ 3968`, about `0.09677419`. Set it on the format before you record inventory.
 
@@ -254,7 +267,7 @@ Customer detail shows **Tax treatment**. Choose **Inherit sale channel** to use 
 
 <Screen name="Ship-to form" />
 
-Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. **Default ship-to for new orders** selects this address for new staff and portal orders. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
+Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address**, **City**, **State** (two letters, uppercased), and **Postal code**. **Address 2 (optional)** holds a suite or second address line. **Default ship-to** selects this address for new staff and portal orders. Select **Save ship-to** to save. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
 Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation. Existing sign-in accounts cannot be attached with this form.
 
@@ -286,16 +299,16 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 
 <Screen name="New order" />
 
-1. Open **Orders** and select **New Order**.
+1. Open **Orders** and select **New order** to open the order-entry page. The **Orders** back link leaves without saving.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
 3. For wholesale, choose the **Customer**; its default **Ship-to** is selected automatically (the first address if no default is set), and you can choose another. For a transfer, choose the destination in **To location**.
-4. Choose the source in **From location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
-5. Optionally choose **Requested ship date** and enter **PO number**.
-6. Add one or more lines. Each needs a SKU and a quantity greater than zero. **Add line** adds a row. **Remove** takes one away, but at least one row stays.
-7. Select **Create**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a from location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. The result is a draft. Wholesale line prices are captured from the cell where the customer's sale channel meets each beer's price group. Later price changes do not rewrite those lines.
+4. Choose the source in **Source location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
+5. Optionally choose **Requested ship** from the calendar and enter **Customer PO**.
+6. Add one or more lines. Select or search the available SKUs, then type a quantity greater than zero or use **−** and **+**. **Add line** adds a row. **Remove** takes one away, but at least one row stays. Availability is shown only when supplied; a missing ATP figure does not mean zero stock.
+7. Select **Save draft**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a source location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. Saving opens the draft order, where you can submit it. Wholesale line prices are captured from the cell where the customer's sale channel meets each beer's price group. Later price changes do not rewrite those lines.
 
 <Callout type="info">
-On a new brewery with nothing to choose yet, the form says **Before creating an order, add a customer, a location, and a SKU.** with links to **Customers** and **Catalog**, and **Create** stays disabled until those exist.
+On a new brewery with nothing to choose yet, the form says **Before creating an order, add a customer, a location, and a SKU.** with links to **Customers** and **Catalog**, and **Save draft** stays disabled until those exist.
 </Callout>
 
 <Callout type="warn">
@@ -310,7 +323,7 @@ A submitted order's **Confirm** on Today, Work, or the Orders list opens a revie
 
 <Screen name="Complete transfer" />
 
-A picked taproom transfer shows **Complete transfer** on its order page: the same step a wholesale order ships with, minus the invoice. Each line moves at its picked quantity from the source to the taproom.
+A picked taproom transfer shows **Complete transfer** on its order page: the same step a wholesale order ships with, minus the invoice. Its page defaults each line to the picked quantity; adjust the amount if needed, assign source and destination bins, then complete the transfer.
 
 <Screen name="Order" />
 
@@ -319,9 +332,9 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 | **Submit** | Draft | Status becomes submitted and the event timeline records it. |
 | **Confirm** | Submitted | Status becomes confirmed and stock is reserved. Negative ATP shows as a warning (**ATP negative for …**) but does not block confirmation. |
 | **Adjust lines** | Confirmed or picked | Replace the full line set and give a required **Reason**. Reservations update. Changing a picked order adds a **staged — needs restocking** badge until it is picked again. Shipping is refused without creating a shipment, invoice, or stock movement while that badge remains. |
-| **Record pick** | Confirmed or picked | Enter a nonnegative picked amount per line. Values default to the current picked amount, or the ordered amount if nothing has been picked yet. Short picks and zero are allowed. Status becomes picked and the restocking badge clears. A count below ordered shows **Short** beside the line, which opens the short-line sheet instead of saving silently. |
-| **Short line** | Confirmed or picked | From **Short** on a pick line (Warehouse or Admin). Enter the count and a required reason, then choose one resolution: **Adjust order to N** makes the count the order, shrinks the reservation so ATP recovers, and the customer sees the line as adjusted; **Keep N owed** records the count and leaves the remainder owed, so the order stays picked but keeps its Pick row on Today until every line reaches its ordered quantity. Either way a *short pick* event is recorded with the reason. A count at or above ordered is refused as not short. |
-| **Ship** | Picked | Enter a shipped amount per line (defaults to picked; every line must be listed, held-back lines at 0). **Carrier** and **tracking** are optional. A transfer adds the same stock to its destination. One transaction writes the shipment, the stock movements, fulfills reservations, and, for a wholesale order, the invoice. Tick **Invoice on delivery** to ship without an invoice; the shipment remembers that choice and the invoice is raised when the delivery is confirmed. Shipping less than was picked flags the order for restocking, so the held-back beer shows on Today as **Put back**. |
+| **Record pick** | Confirmed or picked | Enter a nonnegative picked amount per line. Values default to the current picked amount, or the ordered amount if nothing has been picked yet. Short picks and zero are allowed. Status becomes picked and the restocking badge clears. **Record pick** opens the full Pick page. Use the quantity steppers or type an amount, then **Done picking** to save. **Print pick sheet** prints the page. A count below ordered shows **Short** beside the line, opening the Short pick page instead of saving silently. |
+| **Short line** | Confirmed or picked | From **Short** on a pick line (Warehouse or Admin). Enter the count and a required reason, then select one resolution and use the matching save button: **Adjust order to N** makes the count the order, shrinks the reservation so ATP recovers, and the customer sees the line as adjusted; **Keep N owed** records the count and leaves the remainder owed, so the order stays picked but keeps its Pick row on Today until every line reaches its ordered quantity. Either way a *short pick* event is recorded with the reason. A count at or above ordered is refused as not short. |
+| **Ship** | Picked | Opens the Ship page. Enter a shipped amount per line (defaults to picked; every line must be listed, held-back lines at 0). The fulfillment source is fixed by the order. **Carrier** and **Tracking** are optional. Select **Invoice now** or **On delivery**, then **Ship order**. One transaction writes the shipment and stock movements, fulfills reservations, and creates the wholesale invoice unless deferred to delivery confirmation. Shipping less than was picked flags the held-back beer for **Put back**. Shortage-reason recording is not available yet; that field is disabled. |
 | **Cancel** | Any unshipped order | Give a required **Reason**, then **Cancel order**. Reservations are released. Cancelling after picking leaves the restocking badge as a physical reminder. |
 | **Confirm delivery** | Shipped, on a route stop | Opens from Today's delivery row or the route's **Resume** (the route's assigned driver, or Admin) at the stop's own page: customer, ship-to, shipped lines, and the invoice timing saved at ship. Type the receiving name and press **Delivered**: the stop is stamped delivered and, when the shipment was **Invoice on delivery**, the invoice is raised now from the shipped quantities at the order's prices. Nothing moves in stock; shipping already did that. A delivered stop shows the name and the invoice number instead of the button, and confirming it again is refused as already delivered. |
 | **Put back** | Any order flagged for restocking | Opened from Today's **Put back** row (Warehouse or Admin). The page lists each line's staged quantity: everything picked on a cancelled order, or the picked excess on an order adjusted down. **Put back N** clears the flag and records a *restocked* event; nothing moves in the ledger, because the beer never left the warehouse. An order whose flag is already clear says so instead of offering the button. |
@@ -329,6 +342,8 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The detail includes the fulfillment source and order note when one was entered, but does not display a taproom transfer's destination. Pending restock names what to put back. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
 
 Shipping asks for each line's actual **source bin and lot**. Select **Add source** for every bin/lot used and enter its quantity; the sources must sum to the shipped quantity, and zero lines have no sources. Untracked legacy stock is labeled explicitly. A selected source must have enough stock when the shipment commits. An internal transfer also requires its destination bin and preserves the same lot on both legs. Shipping keeps one invoice line per order line even when several sources supplied it. On-delivery shipping moves the beer once; delivery confirmation creates only the invoice.
+
+After shipping, the confirmation shows the recorded quantities and the invoice link when one was created. **On delivery** shipments say the invoice is deferred. Refreshing this page keeps the recorded confirmation.
 
 ## Pick sheet [#pick-sheet]
 
@@ -347,11 +362,19 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 *Admin and Sales open the Invoices list from **More**. Warehouse can open it by entering the address directly and sees the invoice created by a wholesale shipment from **View invoice** right after shipping. Only Admin and Sales can return beer against an invoice or mark a buyer's question answered.*
 
+Every list row keeps **Open**. **Review**, **Re-push**, and **Write off** also open the invoice, where the permitted action must still be confirmed; selecting a list link performs no accounting write. Accountant-edited rows show the frozen local subtotal separately from the current total. **Open in QuickBooks** and **Email delivery status** are unavailable from the current query, so MGR does not invent a provider link or claim an invoice was emailed. A zero balance without recorded cash is shown as settled, not paid.
+
 The list shows each invoice or credit memo with its customer, total, due date, and current QuickBooks state. **Open** an invoice to see the customer, line quantities, captured unit prices, amounts, total, mapping status, and available accounting action. A portal order with returnable kegs keeps the deposit price the buyer reviewed. If Admin or Sales later adjusts its lines, a retained keg line keeps that frozen deposit price while its deposit quantity follows the new order quantity; a newly added keg line freezes the deposit configured at adjustment time. A pool with a zero deposit remains a valid no-charge keg, while a returnable SKU missing its required keg format or pool is refused before the order changes. Its invoice adds a separate deposit line for each charged returnable-keg quantity actually shipped. An empty list says **No invoices yet.** Payment is display-only; there is no record-payment action.
 
 Admin and Sales can run the QuickBooks invoice sync. It freezes the eligible invoices for that request, reads each one in the same connected company, then updates the whole batch together. If one read or update fails, none of that batch is applied; retrying the same request reads the same frozen invoice set, and a completed retry returns its recorded result. If two syncs overlap, a result from the older read cannot replace the newer invoice state. The sync updates current balance, total, tax, payment state, and edit marker. Staff and portal screens show that current QuickBooks total, while the original local lines and pushed snapshot remain unchanged as audit history, so an edited total can differ from the visible line sum. A partial payment stays due; a payment that is later reversed makes the invoice due again. MGR reads linked Payment details once per batch and records only positive cash that QuickBooks assigns to that invoice. A zero-dollar Payment created by applying credit records no cash and shows the invoice as settled rather than paid; a single-invoice mixed cash-and-credit settlement records only its cash portion. If one Payment covers multiple invoices and its cash is less than their combined applications, MGR records no cash from that ambiguous Payment instead of counting the same cash more than once. Voided and deleted invoices keep any earlier paid date as history but no longer appear paid. MGR compares only fields it originally sent, so a QuickBooks default such as a derived due date is not reported as an accountant edit. MGR reports a real accountant edit and stops; it never overwrites or pushes the invoice automatically.
 
 Admin opens **Settings → Accounting** to connect, reconnect, inspect safe connection health, manage mappings and choose whether future QuickBooks invoices allow bank transfer, card, or both. Admin and Sales can open **Fix mapping** from an invoice and enter an exact customer or item ID they verified in the connected QuickBooks company; MGR never selects a record from a matching name. After a mapping saves, reopening it shows the ID the server retained. The payment choices are copied when the next invoice is pushed and do not change invoices already there. Every push, exact retry, corrected push, or re-push first opens a confirmation that names the invoice and the operation. Closing it sends nothing. Selecting its **Confirm** action invokes the registered command; an exact retry still uses the previously saved request and replay identity. QuickBooks payment, edit, void, and deletion status remains visible after disconnect. After sync confirms an invoice was voided or deleted in its original QuickBooks company, Admin may mark it **Written off** with a reason even while QuickBooks is disconnected. Credit memos never offer write-off. That status records who acted and when inside MGR; it does not change QuickBooks, record cash, or create a credit.
+
+Accounting shares the explorer's connection, online-payment status, and **Bank transfer (ACH)** / **Card** switches. Select **Save push defaults** while connected; saved settings remain read-only during recovery. **Customers missing an email** offers **Review**, but its count is unavailable from the current health query. **Disconnect QuickBooks** opens a confirmation sheet; a recovery-required connection cannot be disconnected by the existing command and must be reconnected first. Closing the sheet changes nothing.
+
+The **QuickBooks mappings** list separates customers, SKUs, and the deposit/refund item. **Map** or **Change** opens **Mapping conflict** from Accounting, or **Fix mapping** from an invoice's mapping list. Each sheet identifies the local record and accepts the exact QuickBooks customer or item ID, without changing leading zeroes or guessing from names. **Save mapping** is unavailable while the ID is blank or a save is pending. Closing discards unsaved edits. A company claimed by another brewery must be disconnected there first; a mapping cannot override that claim.
+
+While connected, invoice detail shows the customer mapping and any missing SKU or keg-deposit mapping for the current QuickBooks company. **Fix** opens the mapping list; a missing deposit mapping requires Admin in Accounting. An old company's ID is not a match. Missing local records show **Mapping unavailable**. The QuickBooks status, balance, buyer questions, and permitted confirmation actions remain visible alongside these rows.
 
 When a buyer asks about an invoice from the portal, the question appears on the invoice as **Buyer asked about this invoice** with their words, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
@@ -361,12 +384,14 @@ Returns preserve the selected shipment lot and its original recorded volume even
 
 <Screen name="Return and credit" />
 
-1. Open the invoice and select **Return**.
+1. Open the invoice and select **Return** to open the Beer return page.
 2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
-3. Split the returned quantity across the original shipped sources shown under the line. Their sum must equal the line quantity; a source cannot be returned more than was shipped. Choose **Return to location**, the destination **bin**, and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+3. Split the returned quantity under **Original shipped source**. The source amounts must sum to the line quantity; a source cannot be returned more than was shipped. Choose **Return to**, the destination **Return to bin**, and a reason: *unsold* and *wrong item* put the beer back as sellable stock at that location; *damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
 For older invoices that have no shipment, choose the return location; MGR records untracked stock in its first bin. Shipment-backed invoices always require the original source selection.
+
+The preview uses the selected destination and the invoice's captured beer prices. Deposit refunds are not included in this beer return; the deposit-refund field is unavailable. After saving, MGR returns to the original invoice.
 
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
@@ -397,6 +422,8 @@ Select **Location bins** on a location to see its bins. Admin and Warehouse can 
 <Screen name="Route" />
 
 The builder takes the **Delivery date**, the **Driver** (any Warehouse or Admin member; staff have no display name yet, so a driver shows as the first characters of their id, as on Team), the **Vehicle**, and an optional **Route name**. Under **Stops**, tick the documents this route delivers and give each a stop number; the list holds this route's stops and everything shipped that is on no route. **Save route plan** writes the header and the stops in one step. A document can sit on only one open route: to move a stop, untick it here and tick it on the other route. A stop already delivered cannot be unticked, and a route cannot be saved without at least one stop.
+
+The route list keeps **Resume**, **Open**, **Assign**, and **Add to route** beside their rows, with Work tabs limited to your role. In the builder, selecting a stop assigns the next number after the highest selected stop; you can edit that number before saving. Delivered stops and their numbers stay locked. Selecting a driver is not enough to depart: save the plan first. Departure uses the saved route, not unsaved edits.
 
 **Depart route** is enabled once a driver is assigned. It stamps the departure, marks every transfer stop *in transit*, and closes the builder; after that the route's stops cannot change. Only the assigned driver or an Admin may depart, confirm, or return a route; another Warehouse member is refused, and the stop page says so instead of offering **Delivered**. A stop cannot be confirmed before its route departs, and it does not appear on Today until then.
 
@@ -443,6 +470,8 @@ A lot is one closed packaging run. Its trace shows the brand and package, the ru
 A pool is one group of kegs you count together: **Owned**, **Leased**, or **Pay per fill**. **Add keg pool** takes the name, the kind, the vendor for a leased or pay-per-fill pool, the per-fill cost (required for pay per fill), and the deposit charged per keg. **Edit** on a pool row changes its name, vendor, costs, or deposit, or takes it out of service; a pool out of service accepts no more events. The kind cannot change after creation, and a per-fill cost or vendor once set can be changed but not removed.
 
 ### Record a keg event
+
+Event entry is unavailable until there is an active pool and a location.
 
 **Record keg event** posts one line to the keg ledger. Choose the pool, the size, the reason, the location and bin the kegs are at (the first bin is preselected), and how many kegs:
 
@@ -506,21 +535,23 @@ Only mash-stage ingredients predict gravity. As you add ingredients, MGR preview
 
 *Admin and Brewer.*
 
-Open **Batches** from the **Work** navigation to see planned and brewed batches by date, newest first, each with the brand, recipe and vessel it names today. Select **New batch** for a **Recipe version** and a **Brand**, both optional, plus the **Planned barrels** and **Date** that actually reserve the slot — a batch names nothing further until it is brewed, and identity is not required until packaging.
+Open **Batches** from the **Work** navigation to see **Planned**, **Active**, and **Completed** groups, newest planned date first within each group, with the brand, recipe and vessel each batch names today. **Brew** opens a planned batch; **Open** keeps brewed and completed batches available. Reading summaries and direct reading actions are unavailable in this list; open the batch or Cellar for current vessel work. Work tabs show only areas your role may open. Select **New batch** for a **Recipe version** and a **Brand**, both optional, plus the **Planned barrels** and **Date** that actually reserve the slot — a batch names nothing further until it is brewed, and identity is not required until packaging.
 
-Select a planned batch to record its brew day: choose the **Vessel** it knocked out into, the **Knockout barrels**, and the **Brewed on** date, then select **Record brew day**. This stamps the brew date and opens the vessel's occupancy in one step; it is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. A brewed batch's page shows the vessel and knockout volume it landed in instead of the brew-day form.
+Select a planned batch to record its brew day: choose the **Vessel** it knocked out into, the **Knockout barrels**, and the **Brewed on** date, review the **Knockout baseline**, then select **Record brew day**. This stamps the brew date and opens the vessel's occupancy in one step; it is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. Material consumption and the frozen brew sheet are marked unavailable here; recording brew day does not consume ingredient lots. A brewed batch's page shows its current open vessel and knockout volume instead of another brew-day form. After the occupancy closes, the page says **No open occupancy** and does not invent the original knockout volume.
 
-Vessels themselves are managed at the bottom of the Batches page: **New vessel** (or **Edit** on a row) takes a **Name**, a **Kind** (*fermenter*, *brite*, *barrel*, *kettle*, or *other*), and a **Capacity** in barrels. A vessel's contents are never entered directly — they always derive from its open occupancy.
+The vessel links at the bottom of Batches open the same full-page **Vessel detail** as Cellar: **New vessel** (or **Edit** on a row) takes a **Name**, a **Type** (*fermenter*, *brite*, *barrel*, *kettle*, or *other*), and a **Capacity (bbl)**. **Save vessel** returns to Cellar. A vessel's contents are never entered directly — they always derive from its open occupancy.
 
 ## Cellar [#cellar]
 
 <Screen name="Cellar transfer" />
 
+The transfer sheet previews the destination volume and the source remainder. **Leave in** keeps the remainder in the source; **Record as loss** explicitly records the whole remainder as loss. For a partial loss, enter **Loss (bbl) · optional** instead. Changing the source or moving volume clears the loss choice so it can be reviewed again. **Record transfer** stays pinned below the fields; quantities cannot exceed the source volume, and a vessel cannot transfer into itself.
+
 <Screen name="Fermentation reading" />
 
 *Admin and Brewer.*
 
-Open **Cellar** from the **Beer** navigation to see every occupied tank: its vessel, the brand it holds, the barrels in it, and how long it has been there. Select **Transfer** for a **From** occupancy, a **To** vessel, the **Barrels moving**, and an optional **Loss (bbl)**. Moving into an empty vessel opens a new occupancy there; moving into an already-occupied vessel blends into it, keeping that vessel's existing batch identity — a blend is never a new batch. A source occupancy closes automatically once it empties.
+Open **Cellar** from the **Beer** navigation to see vessel tiles, including empty vessels. Occupied tiles show the brand, volume against capacity, a fill bar, and the latest reading and timestamp when present. A tile opens **Vessel detail**: current occupancy, **Open batch**, **Reading**, the current occupancy's reading history, and editable physical facts. **Add vessel** opens a blank vessel page. Select **Transfer** for a **From** occupancy, a **To** vessel, the **Barrels moving**, and an optional **Loss (bbl)**. Moving into an empty vessel opens a new occupancy there; moving into an already-occupied vessel blends into it, keeping that vessel's existing batch identity — a blend is never a new batch. A source occupancy closes automatically once it empties.
 
 Select **Complete batch**, choose the batch, and review its server-calculated **Baseline**, **Frozen packaged**, **Prior attributed**, **Threshold**, and **Predicted residual**. The final action accepts no amount or cause. MGR recalculates under the cellar lock, refuses while any packaging run for that batch is open or when packaged and attributed volume exceed the baseline, and then closes the batch and every open occupancy that still belongs to it at one time. A residual at or above the greater of 0.05 bbl or 0.5% of baseline becomes one automatic generic loss for later compliance review; a smaller residual closes without an adjustment. Packaged volume comes from the frozen finished-goods movements written when runs closed, so later format edits and the run's barrels-drawn figure do not rewrite it. If the response is uncertain, keep the form open and select **Retry unchanged completion**; a confirmed response is shown as saved before the page refreshes.
 
@@ -556,17 +587,17 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 ### Materials
 
-**Materials** (Beer tab; Admin, Warehouse, Brewer) lists material definitions with on hand summed across every bin, including inactive materials, marked **inactive**. **Add material** and **Edit** take a name, a kind (malt, hop, yeast, adjunct, chemical, packaging, other), the base unit you consume in, the purchase unit you buy in and how many base units one purchase unit holds (a 44 lb hop box is purchase unit *each*, 44 base units), whether it is **lot-tracked**, an optional **default vendor**, and whether it is **Active** (available to recipes and purchase orders; on by default). Units are refused once the material has movements, because every ledger row was written in them. A lot-tracked material asks for a lot code at every receipt; an untracked one never does.
+**Materials on hand** (Beer tab; Admin, Warehouse, Brewer) shows quantities summed across every bin, including inactive materials, marked **inactive**. **Material definitions** opens the separate definition list, where **Edit** changes a material. **Add material** and **Edit** take a name, a kind (malt, hop, yeast, adjunct, chemical, packaging, other), the base unit you consume in, the purchase unit you buy in and how many base units one purchase unit holds (a 44 lb hop box is purchase unit *each*, 44 base units), whether it is **lot-tracked**, an optional **default vendor**, and whether it is **Active** (available to recipes and purchase orders; on by default). Units are refused once the material has movements, because every ledger row was written in them. A lot-tracked material asks for a lot code at every receipt; an untracked one never does.
 
-**Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. Count label stock as whole rolls and leave the open roll out; its remainder falls into the variance and self-corrects at the next count.
+**Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. The live preview shows the system total and variance for the selected bin. **Lot allocation preview** is marked unavailable because the read query does not return the lot split; allocation happens in the command. Enter base units only: automatic whole-roll conversion is not available.
 
 ### Purchase orders
 
-**Purchase orders** (Work tab; Admin and Warehouse) lists open orders: drafts, sent, and partially received. Each row names its next action. **New PO** takes a vendor, an optional expected date, and lines: a material, a quantity in purchase units, an optional unit cost, and on a lot-tracked material an optional **Expected lot**, the lot the vendor named when you ordered. The expected lot is advisory: it creates nothing, and receiving prefills from it. **Save draft** numbers the order PO-0001 upward.
+**Purchase orders** (Work tab; Admin and Warehouse) lists open orders: drafts, sent, and partially received. Each row names its next action. **New PO** opens a full page with a vendor, an optional expected date, and lines: a material, a quantity in purchase units, an optional unit cost, and on a lot-tracked material an optional **Expected lot**, the lot the vendor named when you ordered. Use the quantity stepper or type a decimal quantity, and **Add line** for another material. Changing a line's material clears its previous expected lot. The expected lot is advisory: it creates nothing, and receiving prefills from it. **Save draft** numbers the order PO-0001 upward and returns to the purchase-order list.
 
 A draft's page offers **Mark sent**. Choose how it went out, **From my mail client** or **Phoned, faxed, or vendor portal**, and confirm. MGR does not send email: it records that you sent the order today. The status then reads **Marked sent** with the date, never *Delivered*, because nothing here can know that. Marking is one-way; a sent order cannot go back to draft.
 
-A sent order's page is the receiving form. Choose the location and bin everything lands in and the received date, then for each line still due type what you **counted**. Lines default to what is still due; type over them. Over and short are both allowed and both recorded. A lot-tracked line asks for the **lot code off the package** (prefilled from the expected lot when the order named one; if the vendor shipped another lot, type what the box says) and an optional best-by date. **Receive purchase order** writes the receipt, its lines, the lots, and receipt movements into that bin in one step; only what you counted posts to inventory. The order becomes **partially received** until every line is met, then **received**. What each line still owes is worked out from the receipts every time, so a second receipt against the same order simply closes the remainder. **Show received and cancelled** at the foot of the list reveals finished orders.
+A sent order's page is the receiving form. Choose the location and bin everything lands in and the received date, then for each line still due type what you **counted**. Lines default to what is still due; type over them. Over and short are both allowed and both recorded. A lot-tracked line asks for the **lot code off the package** (prefilled from the expected lot when the order named one; if the vendor shipped another lot, type what the box says) and an optional best-by date. A preview shows counted base-unit quantities and over/short differences before you commit. **Recent lots** is marked unavailable; read the lot from the package rather than expecting suggestions. **Receive purchase order** writes the receipt, its lines, the lots, and receipt movements into that bin in one step; only what you counted posts to inventory. The saved **Receipt** page opens after receiving and survives refresh. It shows posted base-unit quantities, any recorded lot reference, over/short amounts, and the current **Still owed** balance across all receipts. Open an earlier receipt from the purchase order's **Receipts** list. The order becomes **partially received** until every line is met, then **received**. What each line still owes is worked out from the receipts every time, so a second receipt against the same order simply closes the remainder. **Show received and cancelled** at the foot of the list reveals finished orders.
 
 ### Planning
 
@@ -577,6 +608,8 @@ A sent order's page is the receiving form. Choose the location and bin everythin
 **Draft N purchase orders** (Admin and Warehouse) writes one draft per vendor for every buyable row, quantities rounded up to whole purchase units, priced from the contract for what its available commitment covers and left blank beyond that. The label says how many before you commit, and the page then opens the POs list so you can review and mark them sent.
 
 ## Team [#team]
+
+The invitation and member sheets use the same **Role** selector, including Taproom, with a short description of the selected role. Buyer invitations stay fixed to **Buyer**. In **Team member**, **Save role** enables only after a change; both saving and removal lock the controls until that request finishes. Real roster rows use initials when no photo is supplied, never an explorer fixture photo.
 
 <Screen name="Team" />
 
@@ -659,6 +692,8 @@ In specific gravity you may type either spelling: `1.050` or `1050`.
 
 ## Link your Slack account [#slack]
 
+**Linked people** shows the current MGR role, Slack identity, and link date; **Unlink** removes only that person's link. **Disconnect Slack** uses a confirmation sheet. If credential cleanup fails after delivery stops, the sheet offers **Retry credential cleanup** without restarting sends. The linking consent screen names both accounts, the Slack workspace, and the brewery; **Back** returns to personal preferences without consuming the proof.
+
 <Screen name="Link your Slack" />
 
 Every staff member can open **More → Chat** to set personal notification reasons, even before linking Slack. Those choices remain available after unlinking. For each reason, you can select one of your existing verified, active personal destinations; leaving the default keeps the existing delivery behavior. Admin, Sales, Warehouse, and Brewer can also change personal quiet hours and snooze eligible reminders; Taproom cannot. An admin also manages the brewery connection, its private operations channel, brewery quiet hours, reading cadence, linked people, and health from Chat.
@@ -670,6 +705,8 @@ Linked App Home shows a role-filtered **Today** queue with up to 20 current item
 Linked eligible staff receive private Slack messages when assigned work first becomes due. **Snooze 1 hour** delays that Slack reminder, and muting a reason stops that class of Slack message; neither changes what is due on MGR Today. Quiet hours delay personal messages, including snoozed reminders and retries, using your current personal override or the brewery window. App Home stays current. When work resolves, its message becomes **Resolved**. MGR never posts customer contacts, prices, or notes to Slack. Invoice-question reminders show the invoice number and an **Open in MGR** link; the buyer’s question stays in MGR.
 
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
+
+In Chat settings, **Load private channels**, choose a channel, then **Save operations channel**. Adjust the brewery quiet-hours range or open **Exact times** for minute-precise entry; clear both times to turn quiet hours off, then save. Reading cadence accepts 1–168 hours. **Connection permissions** shows required and granted scopes. The four preview tabs show App Home, Personal DM, Team digest, and Preferences; **All preview states** includes the connection and gated scenarios. Previews use fixture data and never send Slack messages. Turning **Slack delivery** off disables the integration; use reauthorization to enable delivery again.
 
 Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.
 
@@ -717,7 +754,7 @@ The lookup lists show each existing record's label and ID. Map these exact field
 
 Use lookup IDs for references, including the format. Create missing formats first: an import does not infer or create them. Customer `type` is distributor, retailer, brewery, or other; state is two uppercase letters. Prices are nonnegative whole cents. Opening quantity is a positive count of SKU units, and the bin must belong to the location. An existing product is reused without changing its metadata. Duplicate customer or SKU creation is blocked; channel prices update the existing price cell.
 
-The preview marks ready and blocked rows. Fix cells or mapping before committing; **Commit** stays disabled if every row is invalid. On a mixed batch, valid rows commit independently and each blocked row reports its error. A failed product/SKU row leaves none of its new dependent records behind.
+The shared preview keeps the horizontal upload/map/preview/commit steps and a compact row/record/match/state table. Expand **Edit row** to correct that row's fields on either phone or desktop, or go back to mapping. The import kind is fixed after upload; go **Back to upload** to choose another kind. **Import ready rows** (or **Post opening balances**) stays disabled if every row is invalid. On a mixed batch, valid rows commit independently and each blocked row reports its error. A failed product/SKU row leaves none of its new dependent records behind.
 
 Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch** returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows into a fresh editable preview. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading or closing the page loses the wizard's retry state; there is no automatic recovery after reload.
 

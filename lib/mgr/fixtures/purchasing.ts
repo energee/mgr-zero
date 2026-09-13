@@ -34,6 +34,8 @@ export const newPoCountryMalt: NewPoViewModel = {
 };
 
 export const receivePoCountryMalt: ReceivePoViewModel = {
+  state: "sent", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
+  locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "shelf", name: "Shelf" }],
   title: "PO-0142 · Country Malt",
   status: "sent Mon · expected Thu · nothing received yet",
   lines: [
@@ -83,6 +85,9 @@ export const cycleCountCans: CycleCountViewModel = {
   unitIndex: 0,
   units: ["each", "case"],
   preview: "system 3,100 · variance −50 · from lot L-0774, best by 3/15/27",
+  locationId: "warehouse", binId: "shelf",
+  locations: [{ id: "warehouse", name: "Warehouse" }],
+  bins: [{ id: "shelf", name: "Shelf" }],
 };
 
 export const materialsList: MaterialsSnapshot = {

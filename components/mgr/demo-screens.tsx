@@ -1,18 +1,22 @@
-// components/mgr/demo-screens.tsx — the two screens whose drawing is about
-// the signed-in person, redrawn for the explorer's chosen persona
-// (lib/mgr/demo-personas.ts): Me, and Permission denied for the screen the
+// components/mgr/demo-screens.tsx — personal screens redrawn for the explorer's
+// chosen persona (lib/mgr/demo-personas.ts): Me, Slack preferences, and Permission denied for the screen the
 // persona was just refused. Demo only: the inventory keeps its fixture
 // drawings (Maria, "Invoices"); nothing under app/ imports this.
 import { E } from "@/components/mgr/e";
 import type { Screen } from "@/components/mgr/screens";
 import { UserAvatar } from "@/components/mgr/user-avatar";
 import { MeView } from "@/components/mgr/views/me";
+import { ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
+import { personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { needsFor, type Persona } from "@/lib/mgr/demo-personas";
 
 const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "disjunction" }).format(xs) : "admin");
 
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {
+  if (screen.name === "My notification preferences") {
+    return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={persona.role !== "taproom"} back={persona.role === "admin" ? "Chat" : "More"} /> };
+  }
   if (screen.name === "Me") {
     return {
       ...screen,

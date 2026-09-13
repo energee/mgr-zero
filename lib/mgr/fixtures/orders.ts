@@ -1,6 +1,6 @@
 // lib/mgr/fixtures/orders.ts — get_order-shaped snapshots for inventory
 // frames. Views never own sample data: screens pass toXViewProps(snapshot).
-import { formatVolume } from "@/lib/volume";
+import { OUNCES_PER_BBL } from "@/lib/volume";
 import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
 import type { CompleteTransferSnapshot } from "@/lib/mgr/complete-transfer-view";
 import type { ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
@@ -114,8 +114,8 @@ export const orderTransferComplete: CompleteTransferSnapshot = {
     to_location_id: LOC_TAPROOM.id,
   },
   lines: [
-    { id: "l-pils", qty_ordered: 4, qty_picked: 4, skus: { name: SKU_PILS.name } },
-    { id: "l-hazy", qty_ordered: 2, qty_picked: 2, skus: { name: SKU_HAZY.name } },
+    { id: "l-pils", qty_ordered: 4, qty_picked: 4, bbl_per_unit: 384 / OUNCES_PER_BBL, skus: { name: SKU_PILS.name } },
+    { id: "l-hazy", qty_ordered: 2, qty_picked: 2, bbl_per_unit: 0.5, skus: { name: SKU_HAZY.name } },
   ],
   locations: LOCATIONS,
 };
@@ -176,8 +176,3 @@ export const newOrderDraft: NewOrderSnapshot = {
 };
 
 /** Movement preview the live complete page does not yet compute. */
-export const completeTransferTape: [string, string][] = [
-  ["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.39")],
-  ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.39")],
-  ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")],
-];

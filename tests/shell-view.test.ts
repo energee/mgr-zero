@@ -50,7 +50,7 @@ import {
   todayWarehouse,
 } from "../lib/mgr/fixtures/today";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toBeerViewProps } from "../lib/mgr/beer-view";
+import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toDeniedViewProps } from "../lib/mgr/denied-view";
 import { toEntryViewProps } from "../lib/mgr/entry-view";
 import { toFirstRunViewProps } from "../lib/mgr/first-run-view";
@@ -61,7 +61,7 @@ import { toSessionExpiredViewProps } from "../lib/mgr/session-expired-view";
 import { toSettingsViewProps } from "../lib/mgr/settings-view";
 import { toTeamViewProps } from "../lib/mgr/team-view";
 import { toTodayViewProps } from "../lib/mgr/today-view";
-import { toWorkViewProps } from "../lib/mgr/work-view";
+import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -192,6 +192,11 @@ describe("Today view", () => {
 });
 
 describe("Beer view", () => {
+  it("maps taproom navigation and returned stock without an alternate JSX list", () => {
+    const model = taproomBeerView([{ skuId: "actual-sku", locationId: "actual-location", sku: "Actual SKU", location: "Actual taproom", qty: 7 }]);
+    expect(model.navs.map(row => row.title)).toEqual(["Weekly count", "Tap board", "Variance by brand"]);
+    expect(model.stock).toEqual([{ key: "actual-sku:actual-location", title: "Actual SKU", detail: "Actual taproom", qty: "7" }]);
+  });
   it("maps overview counts onto area rows", () => {
     const model = toBeerViewProps({
       overview: {
@@ -246,10 +251,25 @@ describe("Beer view", () => {
     const page = src("app/(app)/beer/page.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/beer"/);
     expect(page).toMatch(/<BeerView\b/);
+    expect(page).not.toMatch(/\bnavs=|\bblank=/);
   });
 });
 
 describe("Work view", () => {
+  it("lets shared Work filters handle explorer clicks", () => {
+    expect(src("components/mgr/screen-explorer.tsx")).toContain("[data-work-filter]");
+    expect(src("components/mgr/views/work.tsx")).toContain("data-work-filter");
+  });
+  it("preserves query identities and role-default filtering without inventing destinations", () => {
+    const common = { id: "same", detail: "Due today", href: "/orders/actual", verb: "Answer", tone: "attention" as const, dueAt: null };
+    const model = workFromQuery([{ ...common, kind: "orders", label: "An invoice question" }, { ...common, kind: "batches", label: "A reading", href: "/cellar/actual/reading" }], "sales default", ["orders"]);
+    expect(model.rows.map(row => row.key)).toEqual(["orders:same", "batches:same"]);
+    expect(filterWorkRows(model, "all").map(row => row.verb)).toEqual(["Answer"]);
+    expect(filterWorkRows(model, "batches")[0]).toMatchObject({ href: "/cellar/actual/reading", icon: "thermometer", warning: true });
+    expect(filterWorkRows(model, "routes")).toEqual([]);
+    expect(filterWorkRows(toWorkViewProps(workWarehouse), "all")).toHaveLength(4);
+    expect(workWarehouse.rows.every(row => row.href === undefined)).toBe(true);
+  });
   it("maps warehouse work rows and chips", () => {
     const model = toWorkViewProps(workWarehouse);
     expect(model.subtitle).toBe("warehouse default");
@@ -263,11 +283,12 @@ describe("Work view", () => {
     expect(body.props.model).toEqual(toWorkViewProps(workWarehouse));
   });
 
-  it("the live Work page mounts WorkView and slots WorkList", () => {
+  it("the live Work adapter delegates its controls and rows to WorkView", () => {
     const page = src("app/(app)/work/page.tsx");
-    expect(page).toMatch(/from "@\/components\/mgr\/views\/work"/);
-    expect(page).toMatch(/<WorkView\b/);
     expect(page).toMatch(/<WorkList\b/);
+    const adapter = src("app/(app)/work/work-list.tsx");
+    expect(adapter).toMatch(/<WorkView\b/);
+    expect(adapter).not.toMatch(/<Tabs\b|E\.row/);
   });
 });
 
@@ -305,12 +326,13 @@ describe("Search view", () => {
     expect(body.props.model).toEqual(toSearchViewProps(entityPickerPalette));
   });
 
-  it("the live Search page mounts SearchView and slots SearchPalette", () => {
+  it("the live Search adapters delegate their controls and results to SearchView", () => {
     const page = src("app/(app)/search/page.tsx");
-    expect(page).toMatch(/from "@\/components\/mgr\/views\/search"/);
-    expect(page).toMatch(/<SearchView\b/);
     expect(page).toMatch(/<SearchPalette\b/);
-    expect(src("components/mgr/search-palette.tsx")).toContain("No records found · Search matches record names and numbers, not app pages.");
+    const palette = src("components/mgr/search-palette.tsx");
+    expect(palette).toMatch(/<SearchView\b/);
+    expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
+    expect(palette).toContain("No records found · Search matches record names and numbers, not app pages.");
     expect(screen("Search").states).toContainEqual(["empty", "No records found · Search matches record names and numbers, not app pages."]);
   });
 });
@@ -444,10 +466,11 @@ describe("Entry views", () => {
     expect(body.props.model).toEqual(toSessionExpiredViewProps(sessionExpiredQueued));
   });
 
-  it("live sign-in and session expiry stay LoginForm", () => {
+  it("live sign-in keeps LoginForm while expiry uses the shared command sheet", () => {
     const page = src("app/(auth)/login/page.tsx");
     expect(page).toMatch(/LoginForm/);
-    expect(page).not.toMatch(/EntryView/);
-    expect(page).not.toMatch(/SessionExpiredView/);
+    expect(page).toMatch(/<CommandForm open/);
+    expect(page).toMatch(/<SessionExpiredView/);
+    expect(page).toContain('signInHref="/login"');
   });
 });

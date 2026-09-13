@@ -18,6 +18,13 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Keg fleet", () => {
+  it("does not restore fixture controls when live slots are explicitly disabled", () => {
+    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools: [], navRows: [] }), eventForm: null }));
+    expect(html).not.toContain("Record keg return");
+    expect(html).not.toContain("Selected pool");
+    expect(html).not.toContain("Customer keg balance");
+    expect(html).not.toContain("Preview:");
+  });
   it("the Keg fleet inventory record is KegFleetView", () => {
     const body = screen("Keg fleet").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Keg fleet").body)).toBe(true);
@@ -36,6 +43,8 @@ describe("Keg fleet", () => {
   it("the live kegs page mounts KegFleetView and slots PoolForm", () => {
     const page = src("app/(app)/kegs/page.tsx");
     expect(page).toMatch(/<KegFleetView\b/);
+    expect(page).not.toMatch(/\blist=/);
+    expect(page).not.toMatch(/\bnavs=/);
     expect(page).toMatch(/<PoolForm\b/);
     expect(page).toMatch(/<KegEventForm\b/);
     expect(page).not.toMatch(/\bnote=/);

@@ -1,5 +1,4 @@
-// components/mgr/views/receipt.tsx — Receipt inventory echo. Live PO page
-// keeps receipts in the ReceivePoView footer.
+// Shared receipt confirmation; the live adapter selects a committed receipt.
 import { E } from "@/components/mgr/e";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
 

@@ -1,49 +1,15 @@
-// app/(app)/batches/[id]/record-brew-day-form.tsx — the one next verb on a
-// planned batch: record_brew_day stamps the brew date and moves it into a
-// vessel that is not already occupied.
+// Bind the shared knockout form to the existing authorized command.
 "use client";
-
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BrewDayView } from "@/components/mgr/views/brew-day";
+import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
-type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
-
-export function RecordBrewDayForm({ batchId, plannedBbl, vessels }: { batchId: string; plannedBbl: number; vessels: Vessel[] }) {
-  const [vesselId, setVesselId] = useState("");
-  const [initialBbl, setInitialBbl] = useState(String(plannedBbl));
-  const [brewedOn, setBrewedOn] = useState(new Date().toISOString().slice(0, 10));
+export function RecordBrewDayForm({ batchId, model }: { batchId: string; model: BrewDayViewModel }) {
+  const [values, setValues] = useState({ vesselId: model.vesselId, initialBbl: model.initialBbl, brewedOn: model.brewedOn });
   const { busy, error, run } = useCommandAction();
-  const ready = vesselId && Number(initialBbl) > 0 && brewedOn;
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="bd-vessel">Vessel</Label>
-        <Select value={vesselId} onValueChange={setVesselId}>
-          <SelectTrigger id="bd-vessel"><SelectValue placeholder="Choose vessel" /></SelectTrigger>
-          <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name} · {v.kind} · {Number(v.capacity_bbl)} bbl</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="bd-bbl">Knockout barrels</Label>
-        <Input id="bd-bbl" type="number" min="0" step="any" value={initialBbl} onChange={(e) => setInitialBbl(e.target.value)} />
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="bd-date">Brewed on</Label>
-        <Input id="bd-date" type="date" value={brewedOn} onChange={(e) => setBrewedOn(e.target.value)} />
-      </div>
-      <CommandFormMessage error={error} />
-      <Button
-        data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit"
-        disabled={busy || !ready}
-        onClick={() => run("record_brew_day", { batchId, vesselId, initialBbl: Number(initialBbl), brewedOn })}
-      >
-        Record brew day
-      </Button>
-    </div>
-  );
+  return <BrewDayView model={{ ...model, ...values }} busy={busy} error={error}
+    onChange={patch => setValues(current => ({ ...current, ...patch }))}
+    onRecord={() => { void run("record_brew_day", { batchId, vesselId: values.vesselId, initialBbl: Number(values.initialBbl), brewedOn: values.brewedOn }); }}
+  />;
 }

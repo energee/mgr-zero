@@ -125,8 +125,12 @@ export function ScreenExplorer() {
   // docs page and the Me control's own sheet never opens outside the box.
   const onTap = (e: React.MouseEvent) => {
     if (!current) return;
+    // Native fields and their labels edit the shared form, never navigate its row.
+    if ((e.target as HTMLElement).closest("input, select, textarea, label")) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
+    // Shared previews and Work filters own their controls, not explorer navigation.
+    if (el.closest("[data-chat-preview], [data-work-filter]")) return;
     // A unit switcher (E.qty's addon) is a tab bar by markup only: it chooses
     // the unit of one number, so it must never filter the rows below it the way
     // a view switcher does. Harmless today only because every screen using one

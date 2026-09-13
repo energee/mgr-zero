@@ -1,35 +1,22 @@
-// app/(app)/orders/[id]/complete/page.tsx — Complete transfer (screen
-// record): finish a picked taproom transfer order with the same ship_order
-// call a wholesale order uses, minus the invoice: paired taproom_transfer
-// movements leave the source and arrive at the destination. Each line moves
-// at its picked quantity (complete-button.tsx).
 import { redirect } from "next/navigation";
-import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
-import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
+import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
+import type { ShipSources } from "@/lib/commands/orders";
+import { ShipForm, type ShippingSnapshot } from "../ship-form";
 import "@/lib/commands/all";
-import { ShipForm } from "../ship-form";
-
-type Order = { id: string; order_no: number | null; kind: string; status: string; from_location_id: string; to_location_id: string | null };
-type Line = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
 
 export default async function CompleteTransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "ship_order");
-  const [{ order, lines }, locations] = await Promise.all([
-    orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[] }>),
-    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
+  const [{ order, lines }, locations, available] = await Promise.all([
+    orNotFound(runPageQuery("get_order", { orderId: id }, ctx)) as Promise<{ order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"] }>,
+    runPageQuery("list_locations", {}, ctx) as Promise<ShippingSnapshot["locations"]>,
+    orNotFound(runPageQuery("get_order_ship_sources", { orderId: id }, ctx)) as Promise<ShipSources>,
   ]);
   if (order.kind !== "taproom_transfer" || order.status !== "picked") redirect(`/orders/${order.id}`);
-  return (
-    <CompleteTransferView
-      model={toCompleteTransferViewProps({ order, lines, locations, backHref: `/orders/${order.id}` })}
-      footer={<ShipForm transfer orderId={order.id} lines={lines.map(l => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? "Line", qtyPicked: Number(l.qty_picked ?? 0) }))} />}
-    />
-  );
+  return <ShipForm snapshot={{ order, lines, locations, backHref: `/orders/${order.id}` }} available={available} />;
 }

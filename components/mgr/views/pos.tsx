@@ -28,33 +28,33 @@ export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalog
   </div>;
 }
 
-export function PointOfSaleView({ model, syncAction, live = false }: {
+export function PointOfSaleView({ model, syncAction, paths }: {
   model: { connected: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null };
-  syncAction?: ReactNode; live?: boolean;
+  syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; mapping?: string; menu?: string; connector?: string };
 }) {
   return <>
-    {E.back("Settings", "Point of sale", undefined, live ? "/settings" : "#")}
+    {E.back("Settings", "Point of sale", undefined, paths?.back)}
     {E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
     {model.connected
-      ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", live ? "/settings/pos/disconnect" : undefined), "ok", SquareMark)
-      : E.row("Square", model.state, E.act("Connect", "primary", live ? "/settings/pos/connect" : undefined), "w", SquareMark)}
+      ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
+      : E.row("Square", model.state, E.act("Connect", "primary", paths?.connect), "w", SquareMark)}
     {model.error && E.note(`Last connection error: ${model.error}`)}
     {model.connected && <>
-      {E.nav("Square locations", model.locations, "", undefined, live ? "/settings/pos/locations" : undefined)}
-      {E.nav("POS mapping", "Map or ignore every Square variation; review sales and coverage", "", undefined, live ? "/settings/pos/mapping" : undefined)}
+      {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
+      {E.nav("POS mapping", "Map or ignore every Square variation; review sales and coverage", "", undefined, paths?.mapping)}
       {E.fld("Last complete sales sync", model.lastSync)}
-      {E.nav("Menu", "One catalog · per-location stock and price", "", undefined, live ? "/menu" : undefined)}
+      {E.nav("Menu", "One catalog · per-location stock and price", "", undefined, paths?.menu)}
       {syncAction}
     </>}
-    {E.nav(<>Square {E.arrow()} QuickBooks connector</>, "Review the separate taproom revenue feed", "w", SquareMark, live ? "/settings/pos/connector" : undefined)}
+    {E.nav(<>Square {E.arrow()} QuickBooks connector</>, "Review the separate taproom revenue feed", "w", SquareMark, paths?.connector)}
   </>;
 }
 
-export function ConnectSquareView({ configured = true, busy = false, error, onConnect, live = false }: {
-  configured?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void; live?: boolean;
+export function ConnectSquareView({ configured = true, busy = false, error, onConnect, backHref }: {
+  configured?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void; backHref?: string;
 }) {
   return <>
-    {E.back("Point of sale", "Connect Square", undefined, live ? "/settings/pos" : "#")}
+    {E.back("Point of sale", "Connect Square", undefined, backHref)}
     {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : "Connect Square"}</Button>
@@ -87,11 +87,11 @@ export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
   </>;
 }
 
-export function SquareConnectorView({ live = false }: { live?: boolean } = {}) {
+export function SquareConnectorView({ accountingHref }: { accountingHref?: string } = {}) {
   return <>
     {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
     {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not configure or synchronize this Square connector.")}
-    {E.btn("Open Accounting", "g", live ? "/settings/accounting" : undefined)}
+    {E.btn("Open Accounting", "g", accountingHref)}
   </>;
 }
 
@@ -120,13 +120,13 @@ function VariationMappingRow({ row, targets, busy, onSave }: {
   </form>;
 }
 
-export function PosMappingView({ variations, targets, sales, coverage, busy, error, syncAction, onSave, live = false }: {
+export function PosMappingView({ variations, targets, sales, coverage, busy, error, syncAction, onSave, backHref }: {
   variations: PosVariationRow[]; targets: { value: string; label: string }[]; sales: PosSaleRow[];
-  coverage: string[]; busy?: boolean; error?: string | null; syncAction?: ReactNode; live?: boolean;
+  coverage: string[]; busy?: boolean; error?: string | null; syncAction?: ReactNode; backHref?: string;
   onSave?: (row: PosVariationRow, target: string) => void;
 }) {
   return <>
-    {E.back("Point of sale", "POS mapping", syncAction, live ? "/settings/pos" : "#")}
+    {E.back("Point of sale", "POS mapping", syncAction, backHref)}
     {E.info("Map a Square variation to one packaged SKU or poured format, or explicitly ignore it. Sales remain source facts and never post inventory.")}
     {E.ttl("Variation queue")}
     {variations.length ? variations.map(row => <VariationMappingRow key={`${row.externalItemId}:${row.externalVariationId}`} row={row} targets={targets} busy={busy} onSave={onSave} />) : E.blank("No Square variations yet")}
@@ -139,12 +139,12 @@ export function PosMappingView({ variations, targets, sales, coverage, busy, err
   </>;
 }
 
-export function PosSaleDetailView({ title, sale, revisions, live = false }: {
+export function PosSaleDetailView({ title, sale, revisions, backHref }: {
   title: string; sale: PosSaleRow & { location: string; soldAt: string; quantity: string; expected: string; source: string };
-  revisions: { label: string; detail: string; current: boolean }[]; live?: boolean;
+  revisions: { label: string; detail: string; current: boolean }[]; backHref?: string;
 }) {
   return <>
-    {E.back("POS mapping", title, undefined, live ? "/settings/pos/mapping" : "#")}
+    {E.back("POS mapping", title, undefined, backHref)}
     {E.row(`${sale.location} · ${sale.soldAt}`, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w", SquareMark)}
     {E.fld("Source identity", sale.source)}
     {E.fld("Quantity", sale.quantity)}
@@ -155,15 +155,15 @@ export function PosSaleDetailView({ title, sale, revisions, live = false }: {
   </>;
 }
 
-export function PosMenuView({ model, bins = [], channels = [], busy, error, notice, onConfigure, onPublish, live = false }: {
+export function PosMenuView({ model, bins = [], channels = [], busy, error, notice, onConfigure, onPublish, backHref }: {
   model: PosMenuModel; bins?: { id: string; name: string }[]; channels?: { id: string; name: string }[];
-  busy?: boolean; error?: string | null; notice?: ReactNode; live?: boolean;
+  busy?: boolean; error?: string | null; notice?: ReactNode; backHref?: string;
   onConfigure?: (binId: string, channelId: string) => void; onPublish?: () => void;
 }) {
   const [binId, setBinId] = useState(""), [channelId, setChannelId] = useState("");
   const configure = (event: FormEvent) => { event.preventDefault(); onConfigure?.(binId, channelId); };
   return <>
-    {E.back("More", model.title ?? "Menu", undefined, live ? "/more" : "#")}
+    {E.back("More", model.title ?? "Menu", undefined, backHref)}
     <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>
     {E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
     {model.message && E.note(model.message)}

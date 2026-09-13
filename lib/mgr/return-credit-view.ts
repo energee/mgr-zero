@@ -7,6 +7,7 @@ export type ReturnCreditLineView = {
   name: string;
   detail: string;
   qty: number;
+  shipped: number;
 };
 
 export type ReturnCreditViewModel = {
@@ -16,7 +17,9 @@ export type ReturnCreditViewModel = {
   lines: ReturnCreditLineView[];
   reasons: string[];
   returnTo: string;
-  returnToOptions: string[];
+  returnToId: string;
+  returnToOptions: { id: string; label: string }[];
+  reason: number;
   depositLabel?: string;
   depositAmount?: string;
   creditInfo: string;
@@ -26,11 +29,12 @@ export type ReturnCreditViewModel = {
 
 export type ReturnCreditSnapshot = {
   backHref?: string;
-  order: {
+  order?: {
     id: string;
     order_no: number | null;
     from_location_id: string;
   };
+  returnLocationId?: string;
   invoice: { invoice_no: number | null };
   lines: {
     id: string;
@@ -41,39 +45,40 @@ export type ReturnCreditSnapshot = {
   }[];
   deposit?: { label: string; cents: number };
   locations: { id: string; name: string }[];
-  reason?: "damaged" | "wrong_item" | "unsold";
+  reason?: "damaged" | "wrong_item" | "unsold" | "";
 };
 
-const REASONS = ["damaged", "wrong item", "unsold"];
-
-function shortName(name: string) {
-  if (/hazy/i.test(name)) return "Hazy ½ bbl";
-  if (/pils/i.test(name)) return "Pils case";
-  return name;
-}
+/** The command value and the chip label for each return reason, in chip order.
+ *  The label carries the consequence because the reason decides whether the
+ *  returned beer restocks or is written to loss in the same call. One table, so
+ *  the chip index stays an implementation detail here instead of a contract
+ *  spelled out again in every caller. */
+export const RETURN_REASONS = [
+  { id: "damaged", label: "damaged · written to loss" },
+  { id: "wrong_item", label: "wrong item · back to stock" },
+  { id: "unsold", label: "unsold · back to stock" },
+] as const;
 
 /** Map get_order / get_invoice plus the return qty onto ReturnCreditView. */
 export function toReturnCreditViewProps({
-  order, invoice, lines, deposit, locations, reason = "damaged", backHref }: ReturnCreditSnapshot): ReturnCreditViewModel {
-  const from = locations.find((l) => l.id === order.from_location_id);
-  const returnToOptions = locations.map((l) => (
-    l.id === order.from_location_id ? `${l.name} · original fulfillment source` : l.name
-  ));
+  order, invoice, lines, deposit, locations, reason = "damaged", backHref, returnLocationId }: ReturnCreditSnapshot): ReturnCreditViewModel {
+  const destinationId = returnLocationId ?? order?.from_location_id ?? "";
+  const from = locations.find((l) => l.id === destinationId);
+  const returnToOptions = locations.map(l => ({ id: l.id, label: l.id === order?.from_location_id ? `${l.name} · original fulfillment source` : l.name }));
   const destName = from?.name ?? "—";
   const inv = docNo("INV", invoice.invoice_no, "Invoice");
-  const beerCents = lines.reduce((n, l) => n + Number(l.qty_returning) * Number(l.unit_price_cents), 0);
-  const creditCents = beerCents + (deposit?.cents ?? 0);
+  const creditCents = lines.reduce((n, l) => n + Math.round(Number(l.qty_returning) * Number(l.unit_price_cents)), 0);
   const tape: [string, string][] = [];
   for (const l of lines) {
     const qty = Number(l.qty_returning);
     if (qty <= 0) continue;
-    const short = shortName(l.skus?.name ?? "line");
+    const short = l.skus?.name ?? "Line";
     tape.push([`+${qty} ${short} · return in`, destName]);
     if (reason === "damaged") tape.push([`−${qty} ${short} · loss · damaged`, "not sellable"]);
   }
   tape.push(["credit memo number · on commit", money(-creditCents)]);
   return {
-    backTo: docNo("ORD", order.order_no, "Order"),
+    backTo: order ? docNo("ORD", order.order_no, "Order") : inv,
     backHref,
     title: "Beer return",
     lines: lines.map((l) => ({
@@ -81,14 +86,17 @@ export function toReturnCreditViewProps({
       name: l.skus?.name ?? "Line",
       detail: `shipped ${Number(l.qty_shipped ?? 0)} · returning`,
       qty: Number(l.qty_returning),
+      shipped: Number(l.qty_shipped ?? 0),
     })),
-    reasons: REASONS,
-    returnTo: from ? `${from.name} · original fulfillment source` : destName,
+    reasons: RETURN_REASONS.map(entry => entry.label),
+    returnTo: returnToOptions.find(option => option.id === destinationId)?.label ?? destName,
+    returnToId: destinationId,
     returnToOptions,
+    reason: RETURN_REASONS.findIndex(entry => entry.id === reason),
     depositLabel: deposit?.label,
     depositAmount: deposit ? money(-deposit.cents) : undefined,
     creditInfo: `Credited at the price on ${inv}, not today’s price group.`,
-    tape,
+    tape: reason ? tape : [],
     note: "Empty-keg asset returns are a different Keg fleet command.",
   };
 }

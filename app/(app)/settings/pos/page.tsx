@@ -17,5 +17,5 @@ export default async function PosPage() {
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
     lastSync: health.salesSyncedThrough ? new Date(health.salesSyncedThrough).toLocaleString() : "No complete sales coverage yet",
     error: health.lastError,
-  }} syncAction={health.connected ? <SquareSyncControls /> : undefined} live />;
+  }} syncAction={health.connected ? <SquareSyncControls /> : undefined} paths={{ back: "/settings", connect: "/settings/pos/connect", disconnect: "/settings/pos/disconnect", locations: "/settings/pos/locations", mapping: "/settings/pos/mapping", menu: "/menu", connector: "/settings/pos/connector" }} />;
 }

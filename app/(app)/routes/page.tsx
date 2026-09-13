@@ -7,6 +7,7 @@ import { RoutesView } from "@/components/mgr/views/routes";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { toRoutesViewProps } from "@/lib/mgr/routes-view";
 import "@/lib/commands/all";
 import { driverLabel, type RouteList } from "./labels";
@@ -15,23 +16,14 @@ export default async function RoutesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { routes, unassigned } = (await runCommand("list_routes", {}, ctx)) as RouteList;
-  return (
-    <RoutesView
-      model={toRoutesViewProps({ title: "Deliveries", subtitle: "routes" })}
-      createAction={E.btn("New route", "p", "/routes/new")}
-      tabs={null}
-      list={
-        <>
-          {routes.length === 0 && unassigned.length === 0 && E.blank("No routes yet")}
-          {routes.map((r) => {
-            const done = r.stops.filter((s) => s.delivered_at).length;
-            const state = r.departed_at ? `departed · ${done} of ${r.stops.length} delivered` : `${r.stops.length} stop${r.stops.length === 1 ? "" : "s"} · ${driverLabel(r.driver_user_id)}`;
-            const verb = r.departed_at ? E.act("Resume", "info", `/routes/${r.id}`) : r.driver_user_id ? E.act("Open", "primary", `/routes/${r.id}`) : E.act("Assign", "attention", `/routes/${r.id}`);
-            return <div key={r.id}>{E.row(`${r.name ?? "Route"} · ${r.delivery_date}`, state, verb, r.driver_user_id ? "" : "w")}</div>;
-          })}
-          {unassigned.map((d) => <div key={d.id}>{E.row(d.label, "shipped · no route", E.act("Add to route", "attention", "/routes/new"), "w")}</div>)}
-        </>
-      }
-    />
-  );
+  return <RoutesView model={toRoutesViewProps({ title: "Work", subtitle: "routes", rows: [
+    ...routes.map(route => ({
+      key: route.id, title: (route.name ?? "Route") + " · " + route.delivery_date,
+      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
+      verb: route.departed_at ? "Resume" : route.driver_user_id ? "Open" : "Assign",
+      tone: route.departed_at ? "info" as const : route.driver_user_id ? "primary" as const : "attention" as const,
+      href: "/routes/" + route.id, warning: !route.driver_user_id,
+    })),
+    ...unassigned.map(document => ({ key: document.id, title: document.label, detail: "shipped · no route", verb: "Add to route", tone: "attention" as const, href: "/routes/new", warning: true })),
+  ] })} createAction={E.btn("New route", "p", "/routes/new")} workHrefs={workHrefsFor(brewery.role)} />;
 }

@@ -1,14 +1,14 @@
-// app/(app)/settings/chat/page.tsx — Admin Slack connection controls, current health and provider-free previews.
+// Admin reads remain at the existing authorized command boundary.
 import { redirect } from "next/navigation";
-import { E } from "@/components/mgr/e";
-import { SlackMark } from "@/components/mgr/brand-icons";
 import { getActiveBrewery } from "@/lib/brewery";
 import { isChatConfigured } from "@/lib/chat/oauth";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
+import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
+import { ChatSettingsView } from "@/components/mgr/views/chat";
 import "@/lib/commands/all";
-import { ChatConnectionAction, ChatPreviewPanel, ChatSettingsControls } from "./chat-settings-client";
+import { ChatConnectionAction, ChatSettingsControls, ChatDelivery } from "./chat-settings-client";
 
 export default async function ChatSettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; installed?: string }> }) {
   const brewery = await getActiveBrewery();
@@ -21,33 +21,11 @@ export default async function ChatSettingsPage({ searchParams }: { searchParams:
   const installation = health.installation;
   const configured = isChatConfigured();
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
-  return <>
-    {E.back("Settings", "Chat", undefined, "/settings")}
-    {E.ttl("Chat notifications")}
-    {E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}
-    {params.error && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.")}
-    {params.installed && E.info("Slack authorization completed. Choose a private operations channel below.")}
-    {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? installation.state.replaceAll("_", " ") : "Not connected", "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
-    {E.fld("Required scopes", "chat:write · im:write · groups:read")}
-    {connected && E.fld("Granted scopes", installation.scopes.join(" · ") || "None recorded — reauthorize Slack")}
-    {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`)}
-    {installation?.state === "disconnected" && installation.lastError === "credential_delete_failed" && E.btn("Retry credential cleanup", "g", "/settings/chat/disconnect")}
-    <div className="grid min-w-0 gap-8 xl:grid-cols-2">
-      <div className="flex min-w-0 flex-col gap-4">
-        {(!connected || installation.state !== "active") && <ChatConnectionAction configured={configured} installationId={connected ? installation.id : undefined} />}
-        {connected && <>
-          {health.destinations.map((d) => <div key={d.id}>{E.row(`Operations channel · ${d.channelId}`, `${d.privacy.replaceAll("_", " ")} · ${d.state}${d.reason ? ` · ${d.reason.replaceAll("_", " ")}` : ""}`)}</div>)}
-          {health.destinations.length === 0 && E.note("No operations channel selected. Eligible personal reminders can still be delivered.")}
-          <ChatSettingsControls key={`${installation.id}:${installation.state}`} installation={installation} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours} />
-          {E.nav("Health", `${health.queue.retrying} retrying · ${health.queue.queued} queued`, "", undefined, "/settings/chat/health")}
-          {E.nav("Linked people", `${health.linkedCount} linked`, "", undefined, "/settings/chat/people")}
-          {E.btn("Disconnect", "del", "/settings/chat/disconnect")}
-        </>}
-        {E.nav("My notification preferences", "Personal reminders and quiet hours", "", undefined, "/settings/chat/preferences")}
-      </div>
-      <section className="min-w-0" aria-label="Preview surfaces">
-        {E.ttl("Preview surfaces")}{E.note("Fixture data only. Previews never send Slack messages.")}<ChatPreviewPanel />
-      </section>
-    </div>
-  </>;
+  return <ChatSettingsView health={health} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours}
+    oauthError={Boolean(params.error)} installed={Boolean(params.installed)} previewFixtures={CHAT_PREVIEW_FIXTURES}
+    backHref="/settings" healthHref="/settings/chat/health" peopleHref="/settings/chat/people" disconnectHref="/settings/chat/disconnect" preferencesHref="/settings/chat/preferences"
+    connection={<ChatConnectionAction configured={configured} installationId={connected ? installation.id : undefined} />}
+    fields={connected ? <ChatSettingsControls key={installation.id + ":" + installation.state} installation={installation} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours} /> : null}
+    delivery={installation && ["active", "needs_reauthorization"].includes(installation.state) ? <ChatDelivery installationId={installation.id} enabled={installation.state === "active"} /> : undefined}
+  />;
 }

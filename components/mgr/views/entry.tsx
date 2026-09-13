@@ -15,6 +15,7 @@ export function EntryView({
   secondaryAction,
   extraAction,
   primaryHref,
+  secondaryHref,
   linkHref,
   hidden,
   defaults = {},
@@ -24,6 +25,7 @@ export function EntryView({
   secondaryAction?: (formData: FormData) => void | Promise<void>;
   extraAction?: (formData: FormData) => void | Promise<void>;
   primaryHref?: string | null;
+  secondaryHref?: string;
   linkHref?: string;
   hidden?: ReactNode;
   defaults?: Record<string, string | undefined>;
@@ -56,7 +58,7 @@ export function EntryView({
       {primary ? <Field>{primary}</Field> : null}
       {model.secondary ? (
         <Field>
-          {secondaryAction
+          {secondaryHref ? <Button variant="outline" asChild><Link href={secondaryHref}>{model.secondary}</Link></Button> : secondaryAction
             ? <Button type="submit" formAction={secondaryAction} variant="outline">{model.secondary}</Button>
             : E.btn(model.secondary, "g")}
         </Field>

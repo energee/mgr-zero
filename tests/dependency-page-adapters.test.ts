@@ -1,13 +1,13 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], source: null as { id: string; name: string } | null }));
+const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
-vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
+vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermission: (_ctx: unknown, name: string, resource?: string) => { state.gates.push([name, resource]); } }));
 async function query(name: string, input: unknown) {
   state.calls.push([name, input]);
   switch (name) {
@@ -27,6 +27,7 @@ async function query(name: string, input: unknown) {
 }
 import PickPage from "@/app/(app)/pick/page";
 import OrdersPage from "@/app/(app)/orders/page";
+import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
 
@@ -37,17 +38,28 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft" }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
+  // New order is its own route now; the list only links to it, and the route
+  // itself carries the create_order gate and the picker options.
   const writable = await OrdersPage({ searchParams: Promise.resolve({}) });
-  expect(writable.props.createAction.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
-  expect(writable.props.createAction.props.customers[0].shipTos[0].is_default).toBe(true);
+  expect(renderToStaticMarkup(writable.props.createAction)).toContain('href="/orders/new"');
+  // New order is its own page now; it owns the option lists and its own gate.
+  state.calls = []; state.gates = [];
+  const form = await NewOrderPage();
+  expect(state.gates).toContainEqual(["create_order", "New order"]);
+  expect(form.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
+  expect(form.props.customers[0].shipTos[0].is_default).toBe(true);
 });
 it("slots the scoped recoverable Cart with the actual configured source or no source", async () => {
   for (const source of [null, { id: "source", name: "Cold room" }]) {
     state.source = source;
+    // The page now returns the Cart itself; Cart mounts ShopView with a real
+    // adapter instead of the page passing a hollow model through a slot.
     const shop = await ShopPage({ searchParams: Promise.resolve({}) });
-    expect(shop.props.catalog.props).toMatchObject({ fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
-    expect(shop.props.footer).toBeNull();
-    expect(shop.props.catalog.key).toBe("actor:buyer:brewery:new");
+    expect(shop.props).toMatchObject({ fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
+    // Cart is the root now and owns the ShopView mount; the recovery scope
+    // still has to remount it per actor/customer/brewery/draft.
+    expect(shop.key).toBe("actor:buyer:brewery:new");
+    expect(shop.props.customerName).toBe("Buyer");
   }
 });
 

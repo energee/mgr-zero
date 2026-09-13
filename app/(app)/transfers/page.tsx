@@ -2,6 +2,7 @@
 // two locations (list_stock_transfers), newest first, each opening its own
 // page; New transfer is new-transfer-form.tsx → create_stock_transfer.
 import { TransfersView } from "@/components/mgr/views/transfers";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -36,7 +37,7 @@ export default async function TransfersPage() {
         })),
       })}
       createAction={<NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} />}
-      tabs={null}
+      workHrefs={workHrefsFor(brewery.role)}
       linkRows
     />
   );

@@ -9,6 +9,7 @@
 // import time, where VolumeField's React.useId() could never run. Screen authors
 // never import this directly; they use E.qty, E.tabs and E.volume.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -72,17 +73,19 @@ export function TabBar({
   cls,
   to,
   onChange,
+  hrefs,
 }: {
   names: string[];
   on: number;
   cls: string;
   to?: Record<string, string>;
   onChange?: (value: string) => void;
+  hrefs?: Record<string, string>;
 }) {
   return (
-    <Tabs value={onChange ? names[on] : undefined} defaultValue={onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
+    <Tabs value={hrefs || onChange ? names[on] : undefined} defaultValue={hrefs || onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
       <TabsList variant="solid" className={cls}>
-        {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}
+        {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
       </TabsList>
     </Tabs>
   );

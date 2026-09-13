@@ -17,7 +17,8 @@ import {
 import { toConfirmDeliveryViewProps } from "../lib/mgr/confirm-delivery-view";
 import { toDriverRouteViewProps } from "../lib/mgr/driver-route-view";
 import { toReturnRouteViewProps } from "../lib/mgr/return-route-view";
-import { toRouteViewProps } from "../lib/mgr/route-view";
+import { toRouteViewProps, toggleRouteStop } from "../lib/mgr/route-view";
+import { workHrefsFor } from "../components/mgr/work-tabs";
 import { toRoutesViewProps } from "../lib/mgr/routes-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -25,6 +26,18 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Routes", () => {
+  it("keeps Transfers and Packaging Work navigation in their shared views", () => {
+    for (const [route, view] of [["transfers", "transfers"], ["packaging", "packaging-runs"], ["purchase-orders", "purchase-orders"]]) {
+      expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.role)}");
+      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<TabBar");
+      expect(src(`components/mgr/views/${view}.tsx`)).not.toMatch(/tabs\?: ReactNode/);
+    }
+  });
+  it("uses the shared list and route-builder controls instead of JSX replacements", () => {
+    expect(src("app/(app)/routes/page.tsx")).not.toMatch(/\blist=|tabs=\{null\}/);
+    expect(src("app/(app)/routes/route-form.tsx")).toContain("<RouteView");
+    expect(src("app/(app)/routes/route-form.tsx")).not.toMatch(/<Input\b|<Label\b|<Select\b/);
+  });
   it("the Routes inventory record is RoutesView", () => {
     const body = screen("Routes").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Routes").body)).toBe(true);
@@ -47,19 +60,47 @@ describe("Routes", () => {
 });
 
 describe("Route", () => {
+  it("lets native stop fields handle clicks before explorer row navigation", () => {
+    const explorer = src("components/mgr/screen-explorer.tsx");
+    const guard = explorer.indexOf('.closest("input, select, textarea, label")');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(explorer.indexOf('closest<HTMLElement>("a, button, [data-slot=item]")'));
+  });
+  it("keeps stop selection immutable and numbers new stops after the highest selected one", () => {
+    const selected = { a: 2, b: 5 };
+    expect(toggleRouteStop(selected, "c", true)).toEqual({ a: 2, b: 5, c: 6 });
+    expect(toggleRouteStop(selected, "a", false)).toEqual({ b: 5 });
+    expect(selected).toEqual({ a: 2, b: 5 });
+  });
+  it("locks delivered stops and departs only with the saved driver, not an unsaved selection", () => {
+    const html = htmlOf(createElement(RouteView, { model: { ...routeAPlan, savedDriverId: null, stops: [{ key: "s1", title: "Delivered stop", detail: "delivered", locked: true }] }, error: "Plan changed" }));
+    expect(html).toContain("Plan changed");
+    expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*disabled/);
+    expect(html).toMatch(/<input[^>]*type="number"[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Depart route/);
+    expect(html).toContain("Assign a driver and save before departing");
+    const empty = htmlOf(createElement(RouteView, { model: { ...routeAPlan, saved: false, selection: {} } }));
+    expect(empty).not.toContain("Depart route");
+    expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
+  });
+  it("keeps Work route links within the staff navigation permissions", () => {
+    expect(workHrefsFor("brewer")).toEqual({ all: "/work", batches: "/batches", runs: "/packaging" });
+    expect(workHrefsFor("warehouse").routes).toBe("/routes");
+    expect(workHrefsFor("sales").routes).toBeUndefined();
+  });
   it("the Route inventory record is RouteView", () => {
     const body = screen("Route").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(RouteView);
     expect(body.props.model).toEqual(toRouteViewProps(routeAPlan));
   });
 
-  it("the live route pages mount RouteView and slot RouteForm", () => {
+  it("the live route pages delegate to RouteForm and the shared RouteView", () => {
     const planned = src("app/(app)/routes/[id]/page.tsx");
     const created = src("app/(app)/routes/new/page.tsx");
-    expect(planned).toMatch(/<RouteView\b/);
     expect(planned).toMatch(/<RouteForm\b/);
-    expect(created).toMatch(/<RouteView\b/);
     expect(created).toMatch(/<RouteForm\b/);
+    expect(src("app/(app)/routes/route-form.tsx")).toMatch(/<RouteView\b/);
+    expect(planned + created).not.toMatch(/\bform=/);
   });
 });
 

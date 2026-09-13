@@ -1,6 +1,5 @@
 // components/mgr/views/close-packaging-run.tsx — Close packaging run.
-// Live slots planned facts and the next-state form; inventory draws the
-// copper review.
+// Shared planned facts and copper review; live supplies only the next action.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
@@ -9,22 +8,18 @@ export type { ClosePackagingRunViewModel };
 
 export function ClosePackagingRunView({
   model,
-  lead,
-  review,
   action,
 }: {
   model: ClosePackagingRunViewModel;
-  lead?: ReactNode;
-  review?: ReactNode | null;
   action?: ReactNode;
 }) {
   return (
     <>
       {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
-      {lead}
-      {review !== undefined
-        ? review
-        : (
+      {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
+      {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
+      {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
+      {model.showCloseReview !== false ? (
           <>
             {E.fld("Packaging source", model.source ?? "")}
             {E.tbl(["need", "have", "short"], (model.needRows ?? []).map(([need, have, short]) => [
@@ -40,7 +35,7 @@ export function ClosePackagingRunView({
             {E.tape(model.tape ?? [])}
             {E.btn("Close packaging run", "irr")}
           </>
-        )}
+        ) : null}
       {action}
     </>
   );

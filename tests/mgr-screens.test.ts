@@ -216,7 +216,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(186);
+    expect(SCREENS).toHaveLength(189);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -368,7 +368,8 @@ describe("SCREENS", () => {
       const text = renderToStaticMarkup(createElement("div", null, s.body)).replace(/<[^>]*>/g, " ");
       if (s.name === "Review order") {
         expect.soft(text, s.name).toContain("828");
-        expect.soft(text, s.name).toContain("Pending; not included");
+        expect.soft(text, s.name).toContain("Tax pending");
+        expect.soft(text, s.name).toContain("948.00 before tax");
       } else expect.soft(text, s.name).toContain("948");
       expect.soft(text, s.name).not.toMatch(/1,051|1,240|\b185\.00|\b740\.00|\b252\.00|\b114\.00/);
     }
@@ -723,7 +724,7 @@ describe("SCREENS", () => {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const html = renderToStaticMarkup(createElement("div", null, s!.body));
-      expect(html, name).toMatch(/aria-label="Decrease"/);
+      expect(html, name).toMatch(name === "New order" ? /aria-label="Decrease Line 1 quantity"/ : /aria-label="Decrease"/);
     }
     for (const name of ["Short pick", "Ship and invoice"]) {
       const s = SCREENS.find((x) => x.name === name);

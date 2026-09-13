@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { E } from "@/components/mgr/e";
 import { TeamView } from "@/components/mgr/views/team";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -27,9 +26,7 @@ export default async function TeamPage() {
           you: m.userId === identity?.userId,
         })),
       })}
-      rows={members.map((m) => m.userId === identity?.userId
-        ? <div key={m.userId}>{E.row(m.handle, `${m.email} · ${m.role}`, "you")}</div>
-        : <MemberForm key={m.userId} member={m} />)}
+      memberActions={Object.fromEntries(members.filter(m => m.userId !== identity?.userId).map(m => [m.userId, <MemberForm key={m.userId} member={m} />]))}
       createAction={<InviteForm />}
     />
   );

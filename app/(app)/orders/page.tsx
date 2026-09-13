@@ -1,8 +1,8 @@
 // app/(app)/orders/page.tsx — Orders (screen record): the Work list with the
-// Orders chip active. Every row names the order's next valid action; a state
-// chip filters by `?status=`. New order opens order-form.tsx; the
-// customer→ship-to lookup it needs is pre-loaded here (one get_customer per
-// customer) so the sheet needs no client-side round trip.
+// Orders chip active. A state chip filters by `?status=`. New order is its own
+// page (new/page.tsx), which loads the customer/location/SKU option lists.
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { LinkTabs, WORK_CHIPS } from "@/components/mgr/work-tabs";
 import { OrdersView } from "@/components/mgr/views/orders-list";
@@ -12,13 +12,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { type OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
-import { OrderForm, type CustomerOption, type LocationOption, type SkuOption } from "./order-form";
 
 type Order = { id: string; order_no: number | null; status: OrderStatus; requested_ship_date: string | null; needs_restock: boolean; customers: { name: string } | null };
 type CustomerRow = { id: string; name: string };
-type ShipTo = { id: string; label: string; is_default: boolean };
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
-type SkuRow = { active: boolean; id: string; name: string; brands: { name: string } | null };
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
@@ -27,13 +23,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canWrite = brewery.role === "admin" || brewery.role === "sales";
-  const [orders, customerRows, locationRows, skuRows] = (await Promise.all([
-    runCommand("list_orders", { status, customerId }, ctx), runCommand("list_customers", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_skus", {}, ctx),
-  ])) as [Order[], CustomerRow[], LocationRow[], SkuRow[]];
-  const shipTosByCustomer = await Promise.all(customerRows.map((c) => runCommand("get_customer", { customerId: c.id }, ctx) as Promise<{ shipTos: ShipTo[] }>));
-  const customers: CustomerOption[] = customerRows.map((c, i) => ({ id: c.id, name: c.name, shipTos: shipTosByCustomer[i].shipTos.map((s) => ({ id: s.id, label: s.label, is_default: s.is_default })) }));
-  const locations: LocationOption[] = locationRows.map((l) => ({ id: l.id, name: l.name, kind: l.kind }));
-  const skus: SkuOption[] = skuRows.filter((s) => s.active).map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
+  const [orders, customerRows] = await Promise.all([
+    runCommand("list_orders", { status, customerId }, ctx) as Promise<Order[]>,
+    runCommand("list_customers", {}, ctx) as Promise<CustomerRow[]>,
+  ]);
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
     if (customerId) query.set("customerId", customerId);
@@ -43,7 +36,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <OrdersView
       model={toOrdersListViewProps({ role: brewery.role, status, orders })}
-      createAction={canWrite ? <OrderForm customers={customers} locations={locations} skus={skus} /> : null}
+      createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
       linkRows
       filters={(
         <>

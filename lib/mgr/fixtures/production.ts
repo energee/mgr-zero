@@ -8,10 +8,27 @@ import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
+import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
+
+export const cellarMapBrewer: CellarMapViewModel = {
+  tiles: [
+    { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
+    { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
+    { name: "FV3", detail: "Stout · 13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90 },
+    { name: "BT1", detail: "Pils · 7.0 / 10 bbl", reading: "carbing", fill: 70 },
+    { name: "BT2", detail: "Empty · 0 / 10 bbl", reading: "available", fill: 0 },
+    { name: "FB1", detail: "Saison · 0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40 },
+  ],
+  detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
+};
 
 export const batchesBrewer: BatchesSnapshot = {
   title: "Work",
   subtitle: "brewer default",
+  vessels: [
+    { key: "fv1", title: "FV1", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+    { key: "fv3", title: "FV3", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+  ],
   planned: [
     { key: "b0416", title: "B-0416 · Hazy IPA v4", detail: "Fri 9/4 · 15 bbl", verb: "Start", tone: "info" },
   ],
@@ -41,8 +58,10 @@ export const brewDayHazy: BrewDayViewModel = {
     { key: "citra", title: "Citra · boil", detail: "lot L-0790 · 6 lb" },
     { key: "yeast", title: "Yeast", detail: "WLP066 · lot Y-0312 · 1 brink" },
   ],
-  knockoutFrom: "14.6 bbl",
-  knockoutTo: "FV2",
+  vesselId: "fv2",
+  initialBbl: "14.6",
+  brewedOn: "2026-09-04",
+  vessels: [{ id: "fv2", name: "FV2", kind: "fermenter", capacity_bbl: 15 }, { id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 15 }],
   sheet: { title: "Brew sheet · Hazy IPA v4", detail: "mash 3 steps · whirlpool 20 min · read only" },
   tapeHead: [
     ["Start B-0416 · Hazy IPA v4", ""],
@@ -136,4 +155,13 @@ export const recipeHazyV4: RecipeViewModel = {
     ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"],
   ],
   actualsNote: "Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?",
+};
+export const cellarTransferPils = {
+  fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",
+  occupancies: [
+    { occupancy_id: "fv1-occupancy", vessel_id: "fv1", vessel_name: "FV1", brand_name: "Pils", batch_no: 409, bbl: 12.8 },
+    { occupancy_id: "fv2-occupancy", vessel_id: "fv2", vessel_name: "FV2", brand_name: "Hazy IPA", batch_no: 416, bbl: 14.6 },
+    { occupancy_id: "bt1-occupancy", vessel_id: "bt1", vessel_name: "BT1", brand_name: "Pils", batch_no: 412, bbl: 7 },
+  ],
+  vessels: [{ id: "bt1", name: "BT1", capacity_bbl: 10 }, { id: "bt2", name: "BT2", capacity_bbl: 10 }],
 };

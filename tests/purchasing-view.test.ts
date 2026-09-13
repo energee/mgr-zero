@@ -8,7 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ContractView } from "../components/mgr/views/contract";
 import { ContractsView } from "../components/mgr/views/contracts";
-import { CycleCountView } from "../components/mgr/views/cycle-count";
+import { CycleCountView, CycleCountFooter } from "../components/mgr/views/cycle-count";
+import { E, splitPinned } from "../components/mgr/e";
 import { MaterialView } from "../components/mgr/views/material";
 import { MaterialsView } from "../components/mgr/views/materials";
 import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
@@ -29,7 +30,7 @@ import { toMaterialViewProps } from "../lib/mgr/material-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { toNewPoViewProps } from "../lib/mgr/new-po-view";
 import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
-import { toReceiptViewProps } from "../lib/mgr/receipt-view";
+import { toReceiptViewProps, toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toReceivePoViewProps } from "../lib/mgr/receive-po-view";
 import { toVendorViewProps } from "../lib/mgr/vendor-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
@@ -46,17 +47,39 @@ describe("Purchase orders", () => {
     expect(body.props.model).toEqual(toPurchaseOrdersViewProps(purchaseOrdersWarehouse));
   });
 
-  it("the live POs page mounts PurchaseOrdersView and slots NewPoForm", () => {
+  it("the live POs list links to a full-page shared New PO form", () => {
     const page = src("app/(app)/purchase-orders/page.tsx");
     expect(page).toMatch(/<PurchaseOrdersView\b/);
-    expect(page).toMatch(/<NewPoForm\b/);
-    expect(page).not.toMatch(/NewPoView/);
+    expect(page).toContain('"/purchase-orders/new"');
+    expect(page).not.toMatch(/<NewPoForm\b|list=\{/);
+    const form = src("app/(app)/purchase-orders/new-po-form.tsx");
+    expect(form).toMatch(/<NewPoView\b/);
+    expect(form).not.toMatch(/<CommandForm\b/);
   });
 
   it("the New PO inventory record is NewPoView", () => {
     const body = screen("New PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewPoView);
     expect(body.props.model).toEqual(toNewPoViewProps(newPoCountryMalt));
+  });
+
+  it("shares decimal counts, untracked lot omission, errors and disabled saving", () => {
+    const html = htmlOf(createElement(NewPoView, {
+      model: { vendor: "vendor-id", vendors: [{ id: "vendor-id", name: "Actual vendor" }], expected: "", lines: [
+        { key: "line", title: "Actual material", detail: "each", qty: "1.5", cost: "" },
+      ] }, submitting: true, messages: "Request failed",
+    }));
+    expect(html).toContain('value="vendor-id"');
+    expect(html).toContain('value="1.5"');
+    expect(html).toContain('step="any"');
+    expect(html).toContain("Request failed");
+    expect(html).toContain("Saving…");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain("Expected lot");
+    expect(html).not.toContain('href="/purchase-orders"');
+    expect(htmlOf(createElement(NewPoView, { model: newPoCountryMalt, footer: null }))).not.toContain("Save draft");
+    const page = src("app/(app)/purchase-orders/new/page.tsx");
+    expect(page.indexOf('requirePagePermission(ctx, "create_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("list_vendors"'));
   });
 
   it("the Receive PO inventory record is ReceivePoView", () => {
@@ -70,18 +93,52 @@ describe("Purchase orders", () => {
     expect(htmlOf(createElement(ReceivePoView, { model: toReceivePoViewProps(receivePoCountryMalt) }))).not.toMatch(/href="\/purchase-orders"/);
   });
 
+  it("draft receiving keeps counts read-only and only offers the send attestation", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "draft" } }));
+    expect(html).toContain("Mark sent");
+    expect(html).toContain("nothing is emailed");
+    expect(html).not.toContain("Receive purchase order");
+    expect(html).not.toContain('type="number"');
+    const receiving = htmlOf(createElement(ReceivePoView, { model: { title: "Actual PO", lines: [{ key: "line-id", title: "Actual material", detail: "expected 4", qty: "5.5", lot: "" }], lotSuggestionsUnavailable: true } }));
+    expect(receiving).toContain('value="5.5"');
+    expect(receiving).toContain("Lot code off the package");
+    expect(receiving).toContain("Best by");
+    expect(receiving).toContain("Recent lots");
+    expect(receiving).not.toContain('max="4"');
+  });
+
   it("the Receipt inventory record is ReceiptView", () => {
     const body = screen("Receipt").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceiptView);
     expect(body.props.model).toEqual(toReceiptViewProps(receiptPoCountryMalt));
   });
 
-  it("the live PO page mounts ReceivePoView and not ReceiptView", () => {
+  it("the live PO page mounts ReceivePoView and a durable ReceiptView", () => {
     const page = src("app/(app)/purchase-orders/[id]/page.tsx");
-    expect(page).toMatch(/<ReceivePoView\b/);
     expect(page).toMatch(/<ReceiveForm\b/);
-    expect(page).not.toMatch(/ReceiptView/);
+    expect(page).toMatch(/<ReceiptView\b/);
+    expect(page).toContain("searchParams");
+    const form = src("app/(app)/purchase-orders/[id]/po-actions.tsx");
+    expect(form).toMatch(/<ReceivePoView\b/);
+    expect(form).not.toMatch(/<Input\b|<Label\b|<Select\b/);
   });
+});
+
+it("posted receipt uses counted quantities, captured lot references and current balances", () => {
+  const snapshot = {
+    id: "po-id", po_no: 42, status: "partially_received",
+    lines: [{ id: "line-id", qty_open: 1, material: { name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" } }],
+    receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id" }] }],
+  };
+  const model = toPostedReceiptViewProps(snapshot, "receipt-id")!;
+  expect(model.title).toBe("PO-0042 · received");
+  expect(model.stillOwed).toBe("1 box Actual material");
+  expect(model.tape[0][0]).toBe("+30 kg Actual material · receipt");
+  expect(model.tape[0][1]).toContain("short 1 box");
+  expect(model.tape[0][1]).toContain("actual-lot-id");
+  expect(model.backHref).toBeUndefined();
+  expect(toPostedReceiptViewProps(snapshot, "wrong-receipt")).toBeUndefined();
+  expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
 });
 
 describe("Materials", () => {
@@ -91,17 +148,32 @@ describe("Materials", () => {
     expect(body.props.model).toEqual(toMaterialsOnHandViewProps(materialsOnHandList));
   });
 
-  it("the Cycle count inventory record mounts CycleCountView with a sibling pin", () => {
-    const kids = (screen("Cycle count").body as { props: { children: unknown } }).props.children;
-    const list = Array.isArray(kids) ? kids : [kids];
-    const view = list.find((c) => isValidElement(c) && c.type === CycleCountView) as { props: { model: unknown; footer: null } } | undefined;
-    expect(view).toBeTruthy();
-    expect(view!.props.model).toEqual(toCycleCountViewProps(cycleCountCans));
-    expect(view!.props.footer).toBeNull();
+  it("the Cycle count inventory shares the complete view including its footer", () => {
+    const { rest, pin } = splitPinned(screen("Cycle count").body);
+    expect((rest[0] as { props: { model: unknown } }).props.model).toEqual(toCycleCountViewProps(cycleCountCans));
+    expect(htmlOf(rest)).toContain("Cans · 16 oz");
+    expect(htmlOf(rest)).not.toContain("Record count");
+    expect(htmlOf(pin)).toBe(htmlOf(E.pin(createElement(CycleCountFooter))));
+    expect(src("app/(app)/materials/count-form.tsx")).toContain("footer={E.pin(<CycleCountFooter");
   });
 
   it("the Materials inventory record is MaterialsView", () => {
     expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
+  });
+
+  it("count keeps real bin identities, decimal input, unavailable allocation and nullable footer", () => {
+    const html = htmlOf(createElement(CycleCountView, {
+      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }], lotPreviewUnavailable: true },
+      submitting: true, messages: "Count failed", footer: null,
+    }));
+    expect(html).toContain('value="bin-id"');
+    expect(html).toContain('value="0.5"');
+    expect(html).toContain('step="any"');
+    expect(html).toContain("Count failed");
+    expect(html).toContain("Lot allocation preview");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain("Record count");
+    expect(html).not.toContain("L-0774");
   });
 
   it("the Material inventory record is MaterialView", () => {
@@ -186,4 +258,26 @@ describe("Vendors", () => {
     expect(page).toMatch(/<VendorForm\b/);
     expect(page).toMatch(/<ContractForm\b/);
   });
+});
+
+it("does not require the fields of a New PO line the user has not begun", () => {
+  // new-po-form submits only lines with a material and a positive qty, so a
+  // blank appended row must not trip native validation: there is no control to
+  // remove it, and the submit button stays enabled while other lines are valid.
+  const noop = () => {};
+  const controls = { vendor: noop, expected: noop, material: noop, quantity: noop, cost: noop, lot: noop, add: noop };
+  const html = renderToStaticMarkup(createElement(NewPoView, {
+    model: {
+      backHref: "/purchase-orders", vendor: "vendor", vendors: [{ id: "vendor", name: "Country Malt" }],
+      materials: [{ id: "malt", name: "2-row", purchase_uom: "bag", lot_tracked: false }], expected: "",
+      lines: [
+        { key: "0", materialId: "malt", title: "2-row", detail: "", qty: "4", cost: "" },
+        { key: "1", materialId: "", title: "", detail: "", qty: "", cost: "" },
+      ],
+    },
+    controls,
+  }));
+  const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
+  expect(line(1)).toContain("required");
+  expect(line(2)).not.toContain("required");
 });

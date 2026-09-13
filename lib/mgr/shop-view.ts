@@ -7,7 +7,7 @@ export type ShopCatalogItem = {
   name: string;
   product: string;
   unitPriceCents: number;
-  badge: string;
+  badge?: string;
   /** Cart quantity for this SKU; not a portal_catalog field. */
   qty: number;
 };
@@ -15,10 +15,10 @@ export type ShopCatalogItem = {
 export type ShopShipTo = {
   id: string;
   label: string;
-  address1: string;
-  city: string;
-  state: string;
-  zip: string;
+  address1?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 };
 
 export type ShopSnapshot = {
@@ -29,7 +29,9 @@ export type ShopSnapshot = {
   source: { name: string };
   catalog: ShopCatalogItem[];
   /** Refundable deposit charged per keg on Review; Shop only mentions it. */
-  depositCentsPerKeg: number;
+  depositCentsPerKeg?: number;
+  poNumber?: string;
+  note?: string;
 };
 
 export type ShopItemView = {
@@ -53,6 +55,12 @@ export type ShopViewModel = {
   depositInfo: string;
   /** Merchandise only — keg deposits are added on Review. */
   reviewVerb: string;
+  shipToId: string;
+  shipTos: { id: string; label: string }[];
+  requestedDate: string;
+  po: string;
+  note: string;
+  subtotal: string;
 };
 
 /** Package label under a brand title: strip a duplicated `Brand · ` prefix. */
@@ -61,7 +69,7 @@ export function packageName(product: string, name: string): string {
   return name.startsWith(prefix) ? name.slice(prefix.length) : name;
 }
 
-export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg: number) {
+export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg = 0) {
   const merchandiseCents = catalog.reduce((n, i) => n + i.qty * i.unitPriceCents, 0);
   const kegs = catalog.reduce((n, i) => n + (/keg/i.test(i.name) ? i.qty : 0), 0);
   const depositCents = kegs * depositCentsPerKeg;
@@ -77,6 +85,8 @@ export function toShopViewProps({
   source,
   catalog,
   depositCentsPerKeg,
+  poNumber,
+  note,
 }: ShopSnapshot): ShopViewModel {
   const groups: ShopGroupView[] = [];
   for (const item of catalog) {
@@ -98,7 +108,13 @@ export function toShopViewProps({
     empty: catalog.length === 0 ? "Nothing is listed for wholesale yet. Call the brewery." : undefined,
     source: source.name,
     shipToLine: `${shipTo?.label ?? "Ship-to"} · ${requestedDate}`,
-    depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal.",
+    depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal. The brewery confirms final invoice amounts and the requested delivery date.",
     reviewVerb: `Review order · ${money(merchandiseCents)}`,
+    shipToId,
+    shipTos: shipTos.map(({ id, label }) => ({ id, label })),
+    requestedDate,
+    po: poNumber ?? "",
+    note: note ?? "",
+    subtotal: money(merchandiseCents),
   };
 }

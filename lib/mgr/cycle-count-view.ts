@@ -5,6 +5,11 @@ export type CycleCountViewModel = {
   unitIndex: number;
   units: string[];
   preview: string;
+  locationId?: string;
+  binId?: string;
+  locations?: { id: string; name: string }[];
+  bins?: { id: string; name: string }[];
+  lotPreviewUnavailable?: boolean;
 };
 
 export function toCycleCountViewProps(s: CycleCountViewModel): CycleCountViewModel {

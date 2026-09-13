@@ -2,6 +2,7 @@
 // NewPoForm and the list_purchase_orders rows; inventory draws Work chips.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { TabBar } from "@/components/mgr/qty";
 import type { PurchaseOrdersViewModel } from "@/lib/mgr/purchase-orders-view";
 
 export type { PurchaseOrdersViewModel };
@@ -9,22 +10,23 @@ export type { PurchaseOrdersViewModel };
 export function PurchaseOrdersView({
   model,
   createAction,
-  tabs,
+  workHrefs,
   list,
   footer,
   linkRows,
 }: {
   model: PurchaseOrdersViewModel;
   createAction?: ReactNode;
-  tabs?: ReactNode | null;
+  workHrefs?: Record<string, string>;
   list?: ReactNode;
   footer?: ReactNode;
   linkRows?: boolean;
 }) {
+  const names = workHrefs ? model.workChips.filter(name => workHrefs[name]) : model.workChips;
   return (
     <>
       {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New PO"))}
-      {tabs === undefined ? E.tabs(model.workChips, model.workChipIndex, "w-full", model.workTabs) : tabs}
+      <TabBar names={names} on={names.indexOf(model.workChips[model.workChipIndex])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
       {list !== undefined
         ? list
         : model.empty

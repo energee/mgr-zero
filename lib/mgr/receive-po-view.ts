@@ -3,7 +3,7 @@ export type ReceivePoLineView = {
   key: string;
   title: string;
   detail: string;
-  qty: number;
+  qty: number | string;
   warning?: boolean;
   ok?: boolean;
   lot?: string;
@@ -19,6 +19,16 @@ export type ReceivePoViewModel = {
   lines?: ReceivePoLineView[];
   tape?: [string, string][];
   info?: string;
+  state?: string;
+  note?: string;
+  locationId?: string;
+  binId?: string;
+  receivedOn?: string;
+  locations?: { id: string; name: string }[];
+  bins?: { id: string; name: string }[];
+  sentVia?: string;
+  lotSuggestionsUnavailable?: boolean;
+  history?: { key: string; label: string; detail: string; href?: string }[];
 };
 
 export function toReceivePoViewProps(s: ReceivePoViewModel): ReceivePoViewModel {

@@ -1,24 +1,12 @@
-// app/(app)/orders/order-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the create_order command.
-// Customer selection cascades to that customer's ship-tos (data pre-loaded by
-// the server page, no extra round trip); kind toggles wholesale (customer +
-// ship-to) vs taproom transfer (to-location only), per the orders check
-// constraint in 00001_baseline.sql. Line editor is a simple add/remove list
-// of sku + qty rows. Create stays disabled until lib/order-form-rules.ts says
-// the input is submittable (audit 2026-09-05, rendered-ux-perf #3); on an
-// empty brewery the same rule renders a hint linking to /customers and
-// /catalog instead of letting the server reject an empty order.
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { NewOrderView } from "@/components/mgr/views/new-order";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { defaultShipToId, isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
-import { SkuPicker } from "@/components/mgr/search-palette";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -41,6 +29,7 @@ export function OrderForm({
   locations: LocationOption[];
   skus: SkuOption[];
 }) {
+  const router = useRouter();
   const [kind, setKind] = useState<OrderKind>("wholesale");
   const [customerId, setCustomerId] = useState("");
   const [shipToId, setShipToId] = useState("");
@@ -81,6 +70,7 @@ export function OrderForm({
         .map((l) => ({ skuId: l.skuId, qty: Number(l.qty) })),
     }),
     reset,
+    onSuccess: data => router.push(`/orders/${(data as { order_id: string }).order_id}`),
   });
 
   function updateLine(index: number, patch: Partial<LineRow>) {
@@ -94,146 +84,25 @@ export function OrderForm({
   }
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New Order" trigger={<Button>New Order</Button>}>
-        <form onSubmit={form.submit} className="flex flex-col gap-4" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="order-kind">Kind</Label>
-            <Select value={kind} onValueChange={(v) => setKind(v as OrderKind)}>
-              <SelectTrigger id="order-kind">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="wholesale">Wholesale</SelectItem>
-                  <SelectItem value="taproom_transfer">Taproom transfer</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {kind === "wholesale" ? (
-            <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="order-customer">Customer</Label>
-                <Select
-                  value={customerId}
-                  onValueChange={(v) => {
-                    setCustomerId(v);
-                    setShipToId(defaultShipToId(customers.find((c) => c.id === v)?.shipTos ?? []));
-                  }}
-                >
-                  <SelectTrigger id="order-customer">
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="order-ship-to">Ship-to</Label>
-                {/* Native options and value commit together; Radix hidden options can emit an empty change during this cascade. */}
-                <select id="order-ship-to" className="rounded-md border p-2" value={shipToId} onChange={e => setShipToId(e.target.value)} disabled={!customerId}>
-                  <option value="">{customerId ? "Select ship-to" : "Select a customer first"}</option>
-                  {shipTos.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="order-to-location">To location</Label>
-              <Select value={toLocationId} onValueChange={setToLocationId}>
-                <SelectTrigger id="order-to-location">
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {locations.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="order-from-location">From location</Label>
-            <Select value={fromLocationId} onValueChange={setFromLocationId}>
-              <SelectTrigger id="order-from-location">
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="order-requested-date">Requested ship date</Label>
-            <Input
-              id="order-requested-date"
-              type="date"
-              value={requestedShipDate}
-              onChange={(e) => setRequestedShipDate(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="order-po">PO number</Label>
-            <Input id="order-po" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>Lines</Label>
-            {lines.map((line, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <SkuPicker value={line.skuId} options={skus} onChange={(skuId) => updateLine(i, { skuId })} />
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Qty"
-                  className="w-24"
-                  value={line.qty}
-                  onChange={(e) => updateLine(i, { qty: e.target.value })}
-                />
-                <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(i)} disabled={lines.length <= 1}>
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-              Add line
-            </Button>
-          </div>
-
-          {readiness.hint && (
-            <p id="order-form-hint" className="text-sm text-muted-foreground">
-              {readiness.hint} Go to <Link href="/customers" className="underline">Customers</Link> or{" "}
-              <Link href="/catalog" className="underline">Catalog</Link>.
-            </p>
-          )}
-          <CommandFormMessage error={form.error} />
-          <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !readiness.submittable}>
-              {form.submitting ? "Creating…" : "Create"}
-            </Button>
-          </CommandFormFooter>
-        </form>
-      </CommandForm>
+    <form onSubmit={form.submit} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
+      <NewOrderView model={{
+        kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
+        customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
+        shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus,
+        requestedShip: requestedShipDate, po: poNumber, backHref: "/orders",
+        lines: lines.map(line => ({ ...line, name: skus.find(sku => sku.id === line.skuId)?.label ?? "", warning: false })),
+      }} controls={{
+        kind: setKind, customer: value => { setCustomerId(value); setShipToId(defaultShipToId(customers.find(customer => customer.id === value)?.shipTos ?? [])); },
+        shipTo: setShipToId, source: setFromLocationId, destination: setToLocationId,
+        requestedShip: setRequestedShipDate, po: setPoNumber,
+        lineSku: (index, skuId) => updateLine(index, { skuId }), lineQty: (index, qty) => updateLine(index, { qty }),
+        addLine, removeLine,
+      }} messages={<>
+        {readiness.hint && <p id="order-form-hint" className="text-sm text-muted-foreground">
+          {readiness.hint} Go to <Link href="/customers" className="underline">Customers</Link> or <Link href="/catalog" className="underline">Catalog</Link>.
+        </p>}
+        <CommandFormMessage error={form.error} />
+      </>} submitting={form.submitting} disabled={!readiness.submittable} />
+    </form>
   );
 }

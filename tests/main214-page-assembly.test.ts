@@ -1,6 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { BreweryProvider } from "@/app/(app)/brewery-provider";
+// These pages live under app/(app), whose layout mounts BreweryProvider; the
+// tests render the page subtree on its own, so they supply it here.
+const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
+  renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
 const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[] }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }), isUuid: () => true }));
@@ -15,6 +20,7 @@ async function query(name: string) {
   state.calls.push(name);
   switch (name) {
     case "list_brands": return [brand];
+    case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: "brand", brands: { name: "Hazy" } }];
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
@@ -28,23 +34,37 @@ async function query(name: string) {
   }
 }
 import CatalogPage from "@/app/(app)/catalog/page";
+import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 import CustomersPage from "@/app/(app)/customers/page";
 import CustomerPage from "@/app/(app)/customers/[id]/page";
 import BinsPage from "@/app/(app)/locations/[id]/bins/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 beforeEach(() => { state.role = "admin"; state.calls = []; });
-it("assembles shared Catalog with full brand, packaged SKU and per-brand pour controls", async () => {
+it("assembles shared Catalog with the brand link and its per-brand pour controls", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
-  const html = renderToStaticMarkup(page);
-  for (const text of ["Edit brand", "Edit SKU", "New pour", "Edit pour", "Inactive", "UPC 123456", "/catalog/formats/keg"]) expect(html).toContain(text);
+  const html = render(page);
+  // Packages are one tap further, on the brand's SKU list.
+  for (const text of ["/catalog/brands/brand", "New pour", "Edit pour", "/catalog/formats/keg"]) expect(html).toContain(text);
+  for (const text of ["Edit brand", "Edit SKU", "UPC 123456"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
+});
+it("assembles the shared SKU list with the brand's packages and both SKU sheets", async () => {
+  const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });
+  expect(page.type).toBe(SkuListView);
+  const html = render(page);
+  for (const text of ["Hazy · SKUs", "Half keg", "inactive", "New SKU", "Edit SKU"]) expect(html).toContain(text);
+  state.role = "warehouse";
+  const readonly = render(await SkuListPage({ params: Promise.resolve({ id: "brand" }) }));
+  expect(readonly).not.toMatch(/New SKU|Edit SKU|Add SKU/);
+  expect(readonly).toContain("Half keg");
 });
 it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied controls for %s", async role => {
   state.role = role;
@@ -54,18 +74,18 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(customers.type).toBe(CustomersView);
   expect(catalog.props.createAction).toBeNull();
   expect(customers.props.createAction).toBeNull();
-  expect(renderToStaticMarkup(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
-  expect(renderToStaticMarkup(customers)).not.toContain("Add customer");
+  expect(render(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
+  expect(render(customers)).not.toContain("Add customer");
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders and Invite", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
   expect(page.type).toBe(CustomerView);
   expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
-  const html = renderToStaticMarkup(page);
+  const html = render(page);
   for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user"]) expect(html).toContain(text);
   state.role = "warehouse";
-  const readonly = renderToStaticMarkup(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
+  const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren/);
   expect(readonly).toContain("Research");
 });
@@ -77,18 +97,18 @@ it("bins shared view retains actual stock move inputs and suppresses Warehouse-o
   state.role = "sales"; state.calls = [];
   const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
-  expect(renderToStaticMarkup(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
+  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
 });
 it("pricing shared tables retain brand-qualified poured columns", async () => {
   const page = await PricingPage();
   expect(page.type).toBe(PriceGroupsView);
-  expect(renderToStaticMarkup(page)).toContain("Hazy · Pint");
+  expect(render(page)).toContain("Hazy · Pint");
 });
 it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();
   const customers = await CustomersPage();
-  expect(renderToStaticMarkup(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
-  expect(renderToStaticMarkup(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
+  expect(render(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
+  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
@@ -96,7 +116,7 @@ it("converted inventory frames never navigate into the live catalog/customer/loc
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();
-    const html = renderToStaticMarkup(createElement("div", null, screen.body));
+    const html = render(createElement("div", null, screen.body));
     expect(html, name).not.toMatch(/href="\//);
   }
 });

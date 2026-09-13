@@ -16,16 +16,20 @@ it("maps explicit fields and rejects blank, fractional cents and nondecimal numb
   expect(validateImportRow("channel_prices", { saleChannelId: "not-a-uuid", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" })).not.toEqual([]);
 });
 
-it("the import wizard composes shadcn Select, Attachment, and Timeline controls", () => {
-  const source = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
+it("the import wizard binds the shared explorer steps, Select, and Attachment controls", () => {
+  const adapter = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
+  expect(adapter).toContain("<ImportView");
+  expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows, expectedContext: renderedContext }");
+  expect(adapter).toContain('"import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext');
+  expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
+  const source = readFileSync("components/mgr/views/import.tsx", "utf8");
   expect(source).toMatch(/from "@\/components\/ui\/select"/);
   expect(source).toMatch(/<SelectGroup>/);
   expect(source).toMatch(/from "@\/components\/ui\/attachment"/);
   expect(source).toMatch(/<Attachment\b/);
-  expect(source).toMatch(/from "@\/components\/ui\/timeline"/);
-  expect(source).toMatch(/className="flex items-start"[\s\S]*<Timeline className="shrink-0/);
-  expect(source).toMatch(/<div className="min-w-0 flex-1/);
+  expect(source).toContain("E.stp");
+  expect(source).toContain("<ToggleGroup");
+  expect(source).toContain('E.tbl(["row", "record", "match", "state"]');
   expect(source).not.toMatch(/<select\b/);
-  expect(source).not.toMatch(/E\.stp/);
   expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);
 });

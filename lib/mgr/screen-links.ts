@@ -64,6 +64,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Choose who gets it", "Pars and allocation"],
   ["Count", "Cycle count"],
   ["Add material", "Material"],
+  ["Material definitions", "Materials"],
   ["Add SKU", "SKU"],
   ["Taps", "Tap board"],
   ["Cellar", "Cellar map"],
@@ -189,6 +190,7 @@ export const INERT: (string | RegExp)[] = [
   /^Switch to (dark|light) mode$/,
   "Send",
   "Refresh expected",
+  "Tap keg",
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",
@@ -225,6 +227,14 @@ export const INERT: (string | RegExp)[] = [
   "Current state",
   "Online payments",
   "Decrease",
+  "Add source",
+  "Remove source",
+  "Deposit refund · unavailable",
+  "Change delivery details",
+  "Back to edit",
+  /^(Decrease|Increase) Line \d+ quantity$/,
+  /^Line \d+ SKU$/,
+  /^Line \d+ material$/,
   "Delivery enabled",
   "Demo Brewing LLC",
   "Demo Brewing",
@@ -238,6 +248,7 @@ export const INERT: (string | RegExp)[] = [
   "Found \u00b7 Al\u2019s Bar",
   "Hazy \u00b7 \u00bd bbl keg",
   "Import 2 customer rows",
+  /^Import \d+ ready rows$/,
   "Increase",
   "Keg deposits held",
   "Last delivery",
@@ -272,6 +283,13 @@ export const INERT: (string | RegExp)[] = [
   "Role",
   "Save brewery",
   "Save AI model",
+  "Load private channels",
+  "Save operations channel",
+  "Save brewery quiet hours",
+  "Save reading cadence",
+  "Save my quiet hours",
+  "Unlink my Slack",
+  /^Operations channel · /,
   "Save warehouse",
   "Save item mapping",
   "Save keg pool",
@@ -316,7 +334,7 @@ export const INERT: (string | RegExp)[] = [
 ];
 
 /** Inside the portal shell the same chrome means the buyer's screens. */
-export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history", Orders: "Order history", Order: "Shop", Account: "Account" };
+export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history", Orders: "Order history", Order: "Shop", Account: "Account", "Save draft": "Order detail" };
 
 /** Shell links by route (lib/mgr/nav.ts): the tab bar, the rail and its children. */
 export const ROUTES: Record<string, string> = {
@@ -328,6 +346,7 @@ export const ROUTES: Record<string, string> = {
   "/materials": "Materials on hand",
   "/kegs": "Keg fleet",
   "/orders": "Orders",
+  "/orders/new": "New order",
   "/pick": "Pick sheet",
   "/replenishment": "Pars and allocation",
   "/transfers": "Transfers",
@@ -371,7 +390,8 @@ const authored = (screen: Screen, l: string, to?: string | null) =>
  * an author named a target for it on this screen, which wins outright. */
 export const isInertOn = (screen: Screen, label: string, to?: string | null) => {
   const l = label.trim();
-  return !authored(screen, l, to) && INERT.some((k) => matches(k, l));
+  const localMapping = l === "Map" && ["QuickBooks mappings", "Invoice mappings"].includes(screen.name);
+  return !authored(screen, l, to) && (localMapping || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];

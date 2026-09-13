@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { E } from "@/components/mgr/e";
-import { LinkTabs } from "@/components/mgr/work-tabs";
+import { TapBoardView } from "@/components/mgr/views/tap-board";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -22,7 +20,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
   ]);
   const locations = allLocations.filter((location) => location.kind === "taproom");
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
-  if (!location) return <>{E.back("Beer", "Tap board", undefined, "/beer")}{E.blank("No taproom locations yet. Ask Admin to add one under Locations.")}</>;
+  if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
   const [open, history] = await Promise.all([
     runCommand("list_open_taps", { locationId: location.id }, ctx) as Promise<TapInterval[]>,
     runCommand("list_tap_history", { locationId: location.id }, ctx) as Promise<TapHistory[]>,
@@ -31,10 +29,8 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
     .map((sku) => ({ id: sku.id, name: sku.name, nominalBbl: Number(sku.format_volume!.bbl_per_unit) }));
   const initial: TapBoardSnapshot = { open, history };
 
-  return <>
-    {E.back("Beer", "Tap board", undefined, "/beer")}
-    <div className="flex flex-wrap gap-3 text-sm"><Link className="underline" href={`/taproom?location=${location.id}`}>Weekly count</Link><Link className="underline" href={`/taproom/variance?location=${location.id}`}>Variance by brand</Link></div>
-    <LinkTabs items={locations.map((item) => [item.name, `/taproom/board?location=${item.id}`])} current={location.name} className="w-full md:w-fit" />
-    <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} />
-  </>;
+  return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} navigation={{
+    backHref: "/beer", countHref: `/taproom?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
+    locations: locations.map(item => [item.name, `/taproom/board?location=${item.id}`]), location: location.name,
+  }} />;
 }

@@ -7,63 +7,35 @@ import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
-const KNOWN_VIEW_DEBT = [
-  "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
-  "Entity picker: SearchView <- components/mgr/search-palette.tsx",
-  "Adjust lines: AdjustLinesView <- app/(app)/orders/[id]/page.tsx",
-  "Short pick: ShortPickView <- app/(app)/orders/[id]/page.tsx",
-  "Pick: PickView <- app/(app)/orders/[id]/page.tsx",
-  "Ship and invoice: ShipView <- app/(app)/orders/[id]/page.tsx",
-  "Shipment done: ShipmentDoneView <- app/(app)/orders/[id]/page.tsx",
-  "Ship on delivery: ShipView <- app/(app)/orders/[id]/page.tsx",
-  "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
-  "New order: NewOrderView <- app/(app)/orders/page.tsx",
-  "Ship-to form: ShipToView <- app/(app)/customers/[id]/page.tsx",
-  "SKU: SkuView <- app/(app)/catalog/page.tsx",
-  "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
-  "Review order: ReviewOrderView <- app/(portal)/portal/page.tsx",
-  "Question invoice: QuestionInvoiceView <- app/(portal)/portal/invoices/[id]/page.tsx",
-  "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
-  "New PO: NewPoView <- app/(app)/purchase-orders/page.tsx",
-  "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
-  "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
-  "Materials: MaterialsView <- app/(app)/materials/page.tsx",
-] as const;
+const KNOWN_VIEW_DEBT = [] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
-const KNOWN_INLINE_DEBT = [
-  "Expired invite",
-  "Accept invite",
-  "Invite staff",
-  "Team member",
-  "Create brewery",
-  "Import",
-  "Weekly count",
-  "Variance by brand",
-  "Invite portal user",
-  "Accounting",
-  "Connect QuickBooks",
-  "Mapping conflict",
-  "Disconnect QuickBooks",
-  "Invoices",
-  "Fix mapping",
-  "Cellar map",
-  "Tap board",
-  "Kick keg",
-  "Swap keg",
-  "Chat disconnected",
-  "Chat settings",
-  "Linked people",
-  "Link your Slack",
-  "Disconnect Slack",
-  "Reauthorization",
-] as const;
+const KNOWN_INLINE_DEBT = [] as const;
 
 const KNOWN_SURFACE_DEBT = [
-  "Session expired: CommandForm <- app/(auth)/login/page.tsx",
-  "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
-  "Disconnect Slack: CommandForm <- app/(app)/settings/chat/disconnect/page.tsx",
 ] as const;
+
+// Audited whole-body replacements, not action/message slots. Extend this
+// focused list as each flow is inspected; a view import alone misses these.
+const BODY_SLOTS: Record<string, string> = {
+  // CatalogView has no body-replacement slot left: `rowExtra` adds under a row
+  // and cannot replace the rows, which tests/catalog-view.test.ts asserts.
+  ShopView: "catalog",
+  NewPoView: "form",
+  ReceivePoView: "review",
+  PurchaseOrdersView: "list",
+  TeamView: "rows",
+  BatchesView: "list",
+  BrewDayView: "body",
+  RoutesView: "list",
+  RouteView: "form",
+  WorkView: "list",
+  InvoiceView: "qboGate",
+  BeerView: "navs",
+  ClosePackagingRunView: "lead",
+  KegFleetView: "list",
+};
+const KNOWN_BODY_DEBT: string[] = [];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
   if (!isValidElement<{ children?: ReactNode }>(node)) return out;
@@ -87,14 +59,18 @@ function localModule(from: string, specifier: string): string | undefined {
     .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
 }
 
-/** Components actually mounted by the entry file or a mounted child component. */
-function mountedComponents(entry: string): Set<string> {
+/** Follow function-component exports, not every sibling in an imported module.
+ * Named-only entry files still need explicit route symbols to disambiguate them.
+ * This discovery check does not prove prop/slot or surface configuration parity.
+ */
+function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Set<string> {
   const components = new Set<string>();
   const visited = new Set<string>();
 
-  function visit(path: string) {
-    if (visited.has(path)) return;
-    visited.add(path);
+  function visit(path: string, exported?: string) {
+    const key = `${path}:${exported ?? "entry"}`;
+    if (visited.has(key)) return;
+    visited.add(key);
     const file = sourceFile(path);
     const imports = new Map<string, { imported: string; path?: string }>();
 
@@ -117,11 +93,31 @@ function mountedComponents(entry: string): Set<string> {
         const imported = imports.get(tag);
         const name = imported?.imported === "default" ? tag : (imported?.imported ?? tag);
         components.add(name);
-        if (imported?.path && !name.endsWith("View")) visit(imported.path);
+        if (node.attributes.properties.some(attribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
+          bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
+        }
+        if (imported?.path) visit(imported.path, imported.imported);
+        if (!imported) {
+          const declaration = file.statements.find(statement =>
+            ts.isFunctionDeclaration(statement) && statement.name?.text === tag);
+          if (declaration && !visited.has(`${path}:local:${tag}`)) {
+            visited.add(`${path}:local:${tag}`);
+            walk(declaration);
+          }
+        }
       }
       ts.forEachChild(node, walk);
     }
-    walk(file);
+    const functions = file.statements.filter(ts.isFunctionDeclaration);
+    const isDefault = (node: ts.FunctionDeclaration) => node.modifiers?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword);
+    const defaultFunction = functions.find(isDefault);
+    const roots = exported === "default" || (!exported && defaultFunction)
+      ? functions.filter(isDefault)
+      : exported
+        ? functions.filter(node => node.name?.text === exported)
+        : functions.filter(node => node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
+    for (const root of roots) walk(root);
   }
 
   visit(resolve(entry));
@@ -168,5 +164,19 @@ describe("screen/live component parity", () => {
   it("follows mounted components and ignores unused view imports", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/unused.tsx")).not.toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
+  });
+
+  it("records audited whole-body slots even when the expected view is mounted", () => {
+    const bypasses = mapped.flatMap(screen => {
+      const file = routes.get(screen.name)!;
+      const overrides = new Set<string>();
+      mountedComponents(file, overrides);
+      const expected = inventoryViews(screen.body);
+      return [...overrides]
+        .filter(override => expected.has(override.split(".")[0]))
+        .map(override => `${screen.name}: ${override} <- ${file}`);
+    }).sort();
+    expect(bypasses).toEqual(KNOWN_BODY_DEBT);
   });
 });

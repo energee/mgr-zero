@@ -39,7 +39,10 @@ export const fromOffset = (offset: number, anchor: number) => (offset + anchor) 
  *  while taproom hours (11:00 → 22:00) cross noon and so run midnight to midnight.
  *  Without this the two offsets come out descending and Radix draws the range
  *  with a negative width, then swaps the ends on the first drag. */
-export const anchorFor = (start: number, end: number) => (start <= end ? 0 : NOON);
+export const anchorFor = (start: number, end: number) => start === end ? start : start < end ? 0 : start >= NOON && end < NOON ? NOON : start;
+
+/** Slider minutes back to the exact 24-hour input accepted by commands. */
+export const toClockInput = (minutes: number) => new Date(Date.UTC(2000, 0, 1, 0, minutes)).toISOString().slice(11, 16);
 
 /** The noon-anchored track, the case a window through midnight needs. */
 export const toNoonOffset = (minutes: number) => toOffset(minutes, NOON);

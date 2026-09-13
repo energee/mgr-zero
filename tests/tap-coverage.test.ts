@@ -14,7 +14,7 @@ import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 
 const text = (h: string) => h.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated/;
+const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
 const INERT_LABEL = /^[−+]$|^History$/;
 // The explorer's own rule, so the coverage report matches what a tap does:
 // a screen that maps an INERT label meant it, and that tap must resolve.
@@ -39,7 +39,7 @@ function taps(s: Screen, html: string): [string, string | null, string | null][]
     const t = /data-slot="item-title"[^>]*>([\s\S]*?)<\/div>/.exec(item);
     // Every switch in the inventory sits in a row's action slot, so a chunk
     // holding one is a toggle row: its title acts in place and is not a tap.
-    if (!t || /role="switch"/.test(item)) continue;
+    if (!t || /role="switch"/.test(item) || /<select\b/.test(t[1])) continue;
     if (!inert(s, text(t[1]))) out.push([text(t[1]), null, null]);
   }
   return out;
@@ -72,4 +72,10 @@ it("includes controls inside portaled sheets", () => {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(taps(screen, markup(screen)).map(([label]) => label), name).toContain(label);
   }
+});
+
+it("does not treat native select options in a row title as navigation", () => {
+  const screen = SCREENS.find(s => s.name === "New PO")!;
+  expect(taps(screen, '<div data-slot="item"><div data-slot="item-title"><select><option>Unknown material</option></select></div><button>Save draft</button></div>'))
+    .toEqual([["Save draft", null, null]]);
 });

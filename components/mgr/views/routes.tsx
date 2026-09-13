@@ -1,37 +1,20 @@
-// components/mgr/views/routes.tsx — Routes / Deliveries list. Live slots the
-// list_routes rows; inventory draws Work chips.
+// Shared Routes list; callers supply query rows and explicit destinations.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { TabBar } from "@/components/mgr/qty";
 import type { RoutesViewModel } from "@/lib/mgr/routes-view";
 
 export type { RoutesViewModel };
 
-export function RoutesView({
-  model,
-  createAction,
-  tabs,
-  list,
-  linkRows,
-}: {
-  model: RoutesViewModel;
-  createAction?: ReactNode;
-  tabs?: ReactNode | null;
-  list?: ReactNode;
-  linkRows?: boolean;
+export function RoutesView({ model, createAction, workHrefs }: {
+  model: RoutesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
 }) {
-  return (
-    <>
-      {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New route"))}
-      {tabs === undefined ? E.tabs(model.workChips, model.workChipIndex, "w-full", model.workTabs) : tabs}
-      {list !== undefined
-        ? list
-        : model.empty
-          ? E.blank(model.empty)
-          : model.rows.map((row) => (
-            <Fragment key={row.key}>
-              {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
-            </Fragment>
-          ))}
-    </>
-  );
+  const names = workHrefs ? model.workChips.filter(name => workHrefs[name]) : model.workChips;
+  return <>
+    {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New route"))}
+    <TabBar names={names} on={names.indexOf(model.workChips[model.workChipIndex])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
+    {model.empty ? E.blank(model.empty) : model.rows.map(row => <Fragment key={row.key}>
+      {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}
+    </Fragment>)}
+  </>;
 }

@@ -17,6 +17,13 @@ import { initialsOf } from "../components/mgr/user-avatar";
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
+  it("keeps personal Slack quiet hours unavailable to Taproom", () => {
+    const screen = asPersona(by("My notification preferences"), { role: "taproom", name: "Taproom staff", handle: "@taproom" });
+    const html = renderToStaticMarkup(createElement("div", null, screen.body));
+    expect(html).not.toContain("Save my quiet hours");
+    expect(html).toContain("pick due");
+    expect(html).toContain("More");
+  });
   it("is one demo user per staff role, each on the Team screen with that role", () => {
     expect(PERSONAS.map((p) => p.role)).toEqual(["admin", "sales", "warehouse", "brewer"]);
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));

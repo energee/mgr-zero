@@ -56,6 +56,10 @@ describe("Adjust lines view", () => {
 });
 
 describe("Short pick view", () => {
+  it("does not infer a unit from a SKU name", () => {
+    const model = toShortPickViewProps({ ...orderShortPick, line: { ...orderShortPick.line, unit: undefined, skus: { name: "Showcase" } } });
+    expect(model.verb).toBe("Adjust order to 7");
+  });
   it("maps the short Pils line onto the adjust-down verb", () => {
     const model = toShortPickViewProps(orderShortPick);
     expect(model.title).toBe("ORD-0231 · short line");
@@ -102,6 +106,14 @@ describe("Pick view", () => {
 });
 
 describe("Ship view", () => {
+  it("preserves exact SKU names without inventing units or barrel volumes", () => {
+    const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
+    expect(model.tape[0]).toEqual(["−4 Hazy special can · sale removal · PA", ""]);
+  });
+  it("names every held-back line on the restock preview", () => {
+    const model = toShipViewProps({ ...orderShipInvoice, lines: orderShipInvoice.lines.map(line => ({ ...line, qty_shipped: 0 })) });
+    expect(model.tape.filter(row => row[0].includes("released · restock"))).toHaveLength(2);
+  });
   it("maps a short Pils ship onto reason, restock tape, and invoice-now", () => {
     const model = toShipViewProps(orderShipInvoice);
     expect(model.title).toBe("Ship");
@@ -109,9 +121,9 @@ describe("Ship view", () => {
     expect(model.lines[1]).toMatchObject({ qty: 9, tone: "w", detail: "ordered 10 · picked 10" });
     expect(model.shortNote).toMatch(/Shipping 9 of 10 Pils/);
     expect(model.tape).toEqual([
-      ["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"],
-      ["−9 Pils cases · sale removal · PA", "0.87 bbl"],
-      ["1 Pils case released · restock", ""],
+      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
+      ["−9 Pils · 16 oz case · sale removal · PA", "0.87 bbl"],
+      ["1 Pils · 16 oz case released · restock", ""],
       ["invoice number", "assigned on commit"],
     ]);
   });
@@ -144,8 +156,8 @@ describe("Ship view", () => {
       [10, "picked 10", "ok"],
     ]);
     expect(model.tape).toEqual([
-      ["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"],
-      ["−10 Pils cases · sale removal · PA", "0.97 bbl"],
+      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
+      ["−10 Pils · 16 oz case · sale removal · PA", "0.97 bbl"],
       ["invoice number", "deferred to delivery"],
     ]);
   });
@@ -167,6 +179,11 @@ describe("Ship view", () => {
 });
 
 describe("Shipment done view", () => {
+  it("does not claim an invoice when the confirmed shipment has none", () => {
+    const model = toShipmentDoneViewProps({ ...orderShipmentDone, invoice: null });
+    expect(model.invoice).toBe("No invoice was created");
+    expect(model.tape.flat().join(" ")).not.toContain("invoiced now");
+  });
   it("maps INV-1042 onto the assigned invoice field", () => {
     const model = toShipmentDoneViewProps(orderShipmentDone);
     expect(model.backTo).toBe("ORD-0231");
@@ -184,18 +201,27 @@ describe("Shipment done view", () => {
 });
 
 describe("Return and credit view", () => {
-  it("maps one Hazy keg plus deposit onto an $180 credit", () => {
+  it("keeps an invoice-only return factual and uses the selected destination", () => {
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, order: undefined, returnLocationId: "taproom", locations: [{ id: "taproom", name: "Taproom" }], deposit: undefined });
+    expect(model.backTo).toBe("INV-1042");
+    expect(model.tape[0]).toEqual(["+1 Hazy IPA · ½ bbl keg · return in", "Taproom"]);
+    expect(model.depositAmount).toBeUndefined();
+  });
+  it("does not include an unsupported deposit refund in the credit amount", () => {
+    expect(toReturnCreditViewProps(orderReturnCredit).tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
+  });
+  it("shows the recorded deposit separately from the supported $150 beer credit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
     expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1 });
-    expect(model.reasons).toEqual(["damaged", "wrong item", "unsold"]);
+    expect(model.reasons).toEqual(["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"]);
     expect(model.returnTo).toBe("Warehouse · original fulfillment source");
     expect(model.depositAmount).toBe("−$30.00");
     expect(model.creditInfo).toMatch(/INV-1042/);
     expect(model.tape).toEqual([
-      ["+1 Hazy ½ bbl · return in", "Warehouse"],
-      ["−1 Hazy ½ bbl · loss · damaged", "not sellable"],
-      ["credit memo number · on commit", "−$180.00"],
+      ["+1 Hazy IPA · ½ bbl keg · return in", "Warehouse"],
+      ["−1 Hazy IPA · ½ bbl keg · loss · damaged", "not sellable"],
+      ["credit memo number · on commit", "−$150.00"],
     ]);
   });
 

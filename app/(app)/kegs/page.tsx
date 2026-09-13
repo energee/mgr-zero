@@ -3,8 +3,6 @@
 // kegs each bin holds per pool × size from get_keg_fleet. Record keg event
 // → record_keg_event. Links to Keg event history and to the balance of each
 // customer holding kegs. Warehouse and Admin.
-import Link from "next/link";
-import { E } from "@/components/mgr/e";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -36,34 +34,28 @@ export default async function KegsPage() {
   const activePools = fleet.pools.filter((p) => p.active);
   return (
     <KegFleetView
-      model={toKegFleetViewProps({ backHref: "/inventory" })}
-      createAction={<PoolForm vendors={vendors} />}
-      list={
-        fleet.pools.length === 0 ? E.blank("No keg pools yet") : fleet.pools.map((p) => {
+      model={toKegFleetViewProps({
+        backHref: "/inventory",
+        pools: fleet.pools.map((p) => {
           const rows = fleet.rows.filter((r) => r.pool_id === p.id && r.qty !== 0);
           const total = rows.reduce((n, r) => n + r.qty, 0);
-          return (
-            <div key={p.id}>
-              {E.row(p.name, `${KIND_LABEL[p.kind]} · ${total} on hand · deposit ${dollars(p.deposit_cents)}${p.active ? "" : " · out of service"}`,
-                <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />)}
-              {rows.map((r) => (
-                <div key={`${r.keg_size}-${r.location_name}-${r.bin_name}`}>
-                  {E.row(`${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, `${r.qty} on hand · ${r.bin_name}`, String(r.qty))}
-                </div>
-              ))}
-            </div>
-          );
-        })
-      }
+          return {
+            key: p.id, title: p.name,
+            detail: `${KIND_LABEL[p.kind]} · ${total} on hand · deposit ${dollars(p.deposit_cents)}${p.active ? "" : " · out of service"}`,
+            bins: rows.map((r) => ({ key: `${r.keg_size}-${r.location_name}-${r.bin_name}`, title: `${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, detail: `${r.qty} on hand · ${r.bin_name}`, qty: String(r.qty) })),
+          };
+        }),
+        empty: "No keg pools yet",
+        navRows: [
+          { key: "history", href: "/kegs/history", title: "Keg event history", detail: "acquired, shipped, returned, lost, found, retired" },
+          ...fleet.customers.map((c) => ({ key: c.customer_id, href: `/kegs/customers/${c.customer_id}`, title: "Customer keg balance", detail: `${c.name} · ${c.kegs_out} out` })),
+        ],
+      })}
+      createAction={<PoolForm vendors={vendors} />}
+      poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
       eventForm={activePools.length > 0 && locations.length > 0
         ? <div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} /></div>
         : null}
-      navs={
-        <>
-          <Link href="/kegs/history">{E.nav("Keg event history", "acquired, shipped, returned, lost, found, retired")}</Link>
-          {fleet.customers.map((c) => <Link key={c.customer_id} href={`/kegs/customers/${c.customer_id}`}>{E.nav("Customer keg balance", `${c.name} · ${c.kegs_out} out`)}</Link>)}
-        </>
-      }
     />
   );
 }

@@ -3,6 +3,10 @@ export type ClosePackagingRunViewModel = {
   backHref?: string;
   backTo?: string;
   title: string;
+  brand?: string;
+  plannedOn?: string;
+  plannedOutputs?: [string, string | number, string | number][];
+  showCloseReview?: boolean;
   source?: string;
   needRows?: [string, string, string][];
   shortNote?: string;
