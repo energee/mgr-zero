@@ -26,7 +26,7 @@ export default async function TodayPage() {
     if (!state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;
   }
   if (brewery.role === "taproom") {
-    const locations = ((await runCommand("list_locations", {}, ctx)) as { id: string; name: string; kind: string }[]).filter((location) => location.kind === "taproom");
+    const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as { id: string; name: string }[];
     const location = locations[0];
     if (!location) {
       return (

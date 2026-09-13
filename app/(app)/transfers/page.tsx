@@ -11,7 +11,7 @@ import "@/lib/commands/all";
 import { NewTransferForm } from "./new-transfer-form";
 
 type Transfer = { id: string; transfer_no: number | null; status: string; from_location_id: string; to_location_id: string; stock_transfer_lines: { id: string }[] };
-type Location = { id: string; name: string; kind: string };
+type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = { id: string; name: string; brands: { name: string } | null };
 

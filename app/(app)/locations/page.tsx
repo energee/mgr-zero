@@ -10,7 +10,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { LocationForm } from "./location-form";
 
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" | "storage" };
+type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 
 export default async function LocationsPage() {
   const brewery = await getActiveBrewery();

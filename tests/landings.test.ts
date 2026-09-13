@@ -31,7 +31,7 @@ describe("get_beer_overview", () => {
 
 describe("list_work", () => {
   it("unions Today rows with the open documents the role may open, tagged by chip", async () => {
-    const wh = await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" });
+    const wh = await ins("locations", { brewery_id: b.id, name: "WH", uses: ["warehouse"] });
     const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
     const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
     const sku = await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "IPA 1/2bbl" });
@@ -61,7 +61,7 @@ describe("get_first_run_state", () => {
     const fresh = await makeBrewery();
     const owner = await makeStaffCtx(fresh.id, "admin");
     expect(await runCommand("get_first_run_state", {}, owner)).toEqual({ hasLocation: false, hasBrand: false, hasMovement: false, hasStaff: false });
-    await runCommand("create_location", { name: "WH", kind: "warehouse" }, owner);
+    await runCommand("create_location", { name: "WH", uses: ["warehouse"] }, owner);
     await makeStaffCtx(fresh.id, "sales");
     expect(await runCommand("get_first_run_state", {}, owner)).toMatchObject({ hasLocation: true, hasBrand: false, hasStaff: true });
   });

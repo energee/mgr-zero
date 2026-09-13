@@ -54,7 +54,7 @@ beforeAll(async () => {
   inst = await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: `T-${b.id.slice(0, 8)}`, display_label: "Demo", state: "active", installer_user_id: adminCtx.userId, token_store_key: `slack:installation:T-${b.id.slice(0, 8)}` });
   await Promise.all([linkWithDm(adminCtx), linkWithDm(sales), linkWithDm(mutedSales), linkWithDm(warehouse)]);
   await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, mutedSales);
-  whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
+  whId = (await ins("locations", { brewery_id: b.id, name: "WH", uses: ["warehouse"] })).id;
   whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
   const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
   const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });

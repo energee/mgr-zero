@@ -18,7 +18,7 @@ it("guards new-order deep links before loading customer and catalog data", async
 it("binds the full-page form to live IDs and active SKUs without fixture availability", async () => {
   query.mockImplementation(async (name, input) => {
     if (name === "list_customers") return [{ id: "c1", name: "Same" }, { id: "c2", name: "Same" }];
-    if (name === "list_locations") return [{ id: "l1", name: "Warehouse", kind: "warehouse" }];
+    if (name === "list_locations") return [{ id: "l1", name: "Warehouse", uses: ["warehouse"] }];
     if (name === "list_skus") return [
       { id: "sku1", name: "Case", active: true, brands: { name: "Brand" } },
       { id: "sku2", name: "Old", active: false, brands: null },

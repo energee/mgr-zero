@@ -19,14 +19,16 @@ export default async function SettingsPage() {
   const serverEnv = getServerEnv();
   if (brewery.role !== "admin") redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
-  const [row, locations, team, ai, aiModels] = await Promise.all([
+  const [row, locations, warehouses, team, ai, aiModels] = await Promise.all([
     runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null }>,
-    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; kind: string }[]>,
+    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
+    // The portal ships from a warehouse, so that select asks for warehouses
+    // rather than sifting the full list.
+    runCommand("list_locations", { use: "warehouse" }, ctx) as Promise<{ id: string; name: string }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
     runCommand("get_brewery_ai_model", {}, ctx) as Promise<{ model: string }>,
     getGatewayLanguageModels().catch(() => []),
   ]);
-  const warehouses = locations.filter((l) => l.kind === "warehouse");
   return (
     <SettingsView
       model={toSettingsViewProps({

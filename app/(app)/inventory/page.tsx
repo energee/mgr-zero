@@ -18,7 +18,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { movementFormInstanceKey, type MovementInput, type MovementKind } from "@/lib/composer/state";
 
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
-type Location = { id: string; name: string; kind: string };
+type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };

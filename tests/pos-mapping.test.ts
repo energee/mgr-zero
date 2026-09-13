@@ -72,7 +72,7 @@ describe("Square explicit mapping", () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const connectionId = await connected(brewery.id);
-    const location = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
+    const location = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
     const brand = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5 });
     const pint = (await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: brand.brandId, name: "Pint", basis: "poured", ounces: 16 }).select("id").single()).data!;
     const half = (await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: brand.brandId, name: "Half pint", basis: "poured", ounces: 8 }).select("id").single()).data!;
@@ -140,8 +140,8 @@ describe("Square explicit mapping", () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const connectionId = await connected(brewery.id);
-    const first = await seedLocation(brewery.id, { name: "First taproom", kind: "taproom" });
-    const second = await seedLocation(brewery.id, { name: "Second taproom", kind: "taproom" });
+    const first = await seedLocation(brewery.id, { name: "First taproom", uses: ["taproom"] });
+    const second = await seedLocation(brewery.id, { name: "Second taproom", uses: ["taproom"] });
     expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connectionId,
       external_location_id: "L-MOVE", external_name: "Movable", location_id: first.id })).error).toBeNull();
     const saleChannelId = await channelId(brewery.id, "Taproom");
@@ -165,7 +165,7 @@ describe("Square explicit mapping", () => {
     const adminCtx = await makeStaffCtx(brewery.id, "admin");
     const warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
     const connectionId = await connected(brewery.id);
-    const location = await seedLocation(brewery.id, { name: "Guest taproom", kind: "taproom" });
+    const location = await seedLocation(brewery.id, { name: "Guest taproom", uses: ["taproom"] });
     expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connectionId,
       external_location_id: "L1", external_name: "Square taproom" })).error).toBeNull();
     expect((await admin.from("pos_catalog_variations").insert([

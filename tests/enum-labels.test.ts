@@ -47,11 +47,11 @@ describe("tax treatments", () => {
   });
 });
 
-describe("location kinds", () => {
-  it("capitalizes the kind in the row detail", () => {
+describe("location uses", () => {
+  it("capitalizes every use in the row detail", () => {
     const model = toLocationsViewProps({
-      locations: [{ id: "loc-1", name: "Taproom", kind: "taproom", taps: 11, bins: 3 }],
+      locations: [{ id: "loc-1", name: "Taproom", uses: ["taproom", "storage"], taps: 11, bins: 3 }],
     });
-    expect(model.rows[0].detail).toBe("Taproom · 11 taps · 3 bins");
+    expect(model.rows[0].detail).toBe("Taproom · Storage · 11 taps · 3 bins");
   });
 });

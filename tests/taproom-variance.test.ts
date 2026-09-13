@@ -6,7 +6,7 @@ import "@/lib/commands/all";
 it("no POS or completed baseline means absent comparison, never fabricated zero", async () => {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "taproom");
-  const location = await seedLocation(brewery.id, { kind: "taproom" });
+  const location = await seedLocation(brewery.id, { uses: ["taproom"] });
   const rpc = await ctx.db.rpc("get_taproom_variance", { p_brewery: brewery.id, p_location: location.id, p_weeks: 4 });
   expect(rpc.error).toBeNull();
   expect(rpc.data).toMatchObject({ rows: [], periods: [], reason: "no_completed_periods" });
@@ -37,7 +37,7 @@ type DraftProjection = {
 async function fixture() {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "taproom");
-  const location = await seedLocation(brewery.id, { kind: "taproom" });
+  const location = await seedLocation(brewery.id, { uses: ["taproom"] });
   const cat = await seedCatalog(brewery.id, { product: "Hazy", packageType: "keg", bblPerUnit: .5 });
   const pour = await ins("formats", { brewery_id: brewery.id, name: "Pint", basis: "poured", brand_id: cat.brandId, ounces: 16 });
   const connection = await ins("pos_connections", { brewery_id: brewery.id, merchant_id: crypto.randomUUID() });
@@ -170,7 +170,7 @@ it("timestamp-active equal shares conserve stock overlaps and retain excluded sh
 it("prior sale boundary excluded and current included once; pending sales excluded, brands and locations cannot bleed", async () => {
   const f = await fixture(); const a = await count(f, -14, null, 0), b = await count(f, -7, a); await count(f, -1, b); await coverage(f);
   for (const d of [-14, -7, -1, 0]) reconcile(f, (await sale(f, d, 248)).id);
-  const other = await seedLocation(f.brewery.id, { name: "Elsewhere", kind: "taproom" });
+  const other = await seedLocation(f.brewery.id, { name: "Elsewhere", uses: ["taproom"] });
   await ins("pos_locations", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_location_id: "OTHER", location_id: other.id });
   reconcile(f, (await sale(f, -10, 999, { external_location_id: "OTHER" })).id);
   expect((await report(f)).rows).toMatchObject([{ expected_bbl: 2, actual_bbl: 4, variance_bbl: -2 }]);

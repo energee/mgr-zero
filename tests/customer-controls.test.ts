@@ -83,7 +83,7 @@ describe("customer controls", () => {
   });
   it("customer order filter combines with status and excludes sibling customer orders", async () => {
     const a = await customer(), b = await customer();
-    const loc = await admin.from("locations").insert({ brewery_id: breweryId, name: "Warehouse", kind: "warehouse" }).select().single();
+    const loc = await admin.from("locations").insert({ brewery_id: breweryId, name: "Warehouse", uses: ["warehouse"] }).select().single();
     expect(loc.error).toBeNull();
     for (const [customerId, status] of [[a.id, "draft"], [a.id, "submitted"], [b.id, "draft"]]) {
       const ship = await runCommand("upsert_ship_to", { ...address, customerId }, ctx) as { id: string };
@@ -98,7 +98,7 @@ describe("customer controls", () => {
 
 it("Settings reads and preserves the configured portal warehouse across unrelated brewery edits", async () => {
   const adminCtx = await makeStaffCtx(breweryId, "admin");
-  const warehouse = await admin.from("locations").insert({ brewery_id: breweryId, name: "Portal warehouse", kind: "warehouse" }).select().single();
+  const warehouse = await admin.from("locations").insert({ brewery_id: breweryId, name: "Portal warehouse", uses: ["warehouse"] }).select().single();
   expect(warehouse.error).toBeNull();
   await runCommand("set_portal_fulfillment_source", { locationId: warehouse.data.id }, adminCtx);
   await runCommand("update_brewery", { name: "Renamed", timezone: "America/New_York", readingDueHours: 24 }, adminCtx);

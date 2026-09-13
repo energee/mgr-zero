@@ -17,7 +17,7 @@ describe("inventory commands", () => {
     const p = (await runCommand("upsert_brand", { name: "Pils" }, ctx)) as EntityWithId;
     const f = (await runCommand("upsert_format", { name: "1/6 bbl keg", basis: "packaged", packageType: "keg", kegSize: "sixth_bbl", bblPerUnit: 0.16666667 }, ctx)) as EntityWithId;
     const s = (await runCommand("create_sku", { brandId: p.id, formatId: f.id }, ctx)) as EntityWithId;
-    const l = (await runCommand("create_location", { name: "WH", kind: "warehouse" }, ctx)) as EntityWithId;
+    const l = (await runCommand("create_location", { name: "WH", uses: ["warehouse"] }, ctx)) as EntityWithId;
     const [bin] = (await runCommand("list_bins", { locationId: l.id }, ctx)) as EntityWithId[];
     await runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: 12, type: "opening_balance" }, ctx);
     const oh = (await runCommand("get_on_hand", { skuId: s.id }, ctx)) as OnHandRow[];
@@ -28,7 +28,7 @@ describe("inventory commands", () => {
     const p = (await runCommand("upsert_brand", { name: "Stout" }, ctx)) as EntityWithId;
     const f = (await runCommand("upsert_format", { name: "1/2 bbl keg", basis: "packaged", packageType: "keg", kegSize: "half_bbl", bblPerUnit: 0.5 }, ctx)) as EntityWithId;
     const s = (await runCommand("create_sku", { brandId: p.id, formatId: f.id }, ctx)) as EntityWithId;
-    const l = (await runCommand("create_location", { name: "WH2", kind: "warehouse" }, ctx)) as EntityWithId;
+    const l = (await runCommand("create_location", { name: "WH2", uses: ["warehouse"] }, ctx)) as EntityWithId;
     const [bin] = (await runCommand("list_bins", { locationId: l.id }, ctx)) as EntityWithId[];
     const wholesale = await channelId(ctx.breweryId, "Wholesale");
     await expect(runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: -1, type: "sale_removal", saleChannelId: wholesale }, ctx))
@@ -41,7 +41,7 @@ describe("inventory commands", () => {
       name: "Movement matrix case", basis: "packaged", packageType: "can", unitsPerCase: 24, bblPerUnit: 0.05,
     }, ctx)) as EntityWithId;
     const sku = (await runCommand("create_sku", { brandId: brand.id, formatId: format.id }, ctx)) as EntityWithId;
-    const location = (await runCommand("create_location", { name: "Movement matrix warehouse", kind: "warehouse" }, ctx)) as EntityWithId;
+    const location = (await runCommand("create_location", { name: "Movement matrix warehouse", uses: ["warehouse"] }, ctx)) as EntityWithId;
     const [bin] = (await runCommand("list_bins", { locationId: location.id }, ctx)) as EntityWithId[];
     const wholesale = await channelId(ctx.breweryId, "Wholesale");
     const movements = [
@@ -104,11 +104,11 @@ describe("inventory commands", () => {
       name: "Archive case", basis: "packaged", packageType: "can", unitsPerCase: 24, bblPerUnit: 0.01,
     }, ctx)) as EntityWithId;
     const sku = (await runCommand("create_sku", { brandId: brand.id, formatId: format.id, name: "Archive IPA case" }, ctx)) as EntityWithId;
-    const location = (await runCommand("create_location", { name: "Old warehouse", kind: "warehouse" }, ctx)) as EntityWithId;
+    const location = (await runCommand("create_location", { name: "Old warehouse", uses: ["warehouse"] }, ctx)) as EntityWithId;
     const [bin] = (await runCommand("list_bins", { locationId: location.id }, ctx)) as EntityWithId[];
     await runCommand("record_movement", { skuId: sku.id, locationId: location.id, binId: bin.id, qty: 3, type: "opening_balance" }, ctx);
 
-    await runCommand("update_location", { locationId: location.id, name: "Historical warehouse", kind: "storage" }, ctx);
+    await runCommand("update_location", { locationId: location.id, name: "Historical warehouse", uses: ["storage"] }, ctx);
     await runCommand("update_bin", { binId: bin.id, name: "Historical rack" }, ctx);
     await runCommand("update_sku", { skuId: sku.id, active: false }, ctx);
 

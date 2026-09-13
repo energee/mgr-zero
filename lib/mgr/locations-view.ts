@@ -19,7 +19,8 @@ export type LocationsViewModel = {
 export type LocationsRowSnapshot = {
   id: string;
   name: string;
-  kind: string;
+  /** Every use this place is put to; a site may be taproom and storage at once. */
+  uses: string[];
   /** Inventory: on-hand units. Live omits this. */
   units?: number;
   /** Inventory: tap count. Live omits this. */
@@ -38,8 +39,8 @@ function detail(l: LocationsRowSnapshot): string {
   if (l.units != null) extras.push(plural(l.units, "inventory unit"));
   if (l.taps != null) extras.push(plural(l.taps, "tap"));
   if (l.bins != null) extras.push(plural(l.bins, "bin"));
-  const kind = sentenceCase(l.kind);
-  return extras.length ? `${kind} · ${extras.join(" · ")}` : kind;
+  const uses = l.uses.map(sentenceCase).join(" · ");
+  return extras.length ? `${uses} · ${extras.join(" · ")}` : uses;
 }
 
 export function toLocationsViewProps({ locations, backHref }: LocationsSnapshot): LocationsViewModel {

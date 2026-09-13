@@ -14,15 +14,27 @@ describe("bins", () => {
   let ctx: Ctx;
   beforeAll(async () => { ctx = await makeStaffCtx((await makeBrewery()).id, "admin"); });
 
+  it("list_locations filters on one use, and a place with several answers to each of them", async () => {
+    const mixed = (await runCommand("create_location", { name: "Lawrenceville", uses: ["taproom", "storage", "warehouse"] }, ctx)) as Row;
+    const storeOnly = (await runCommand("create_location", { name: "Overflow shed", uses: ["storage"] }, ctx)) as Row;
+    const ids = async (use?: "warehouse" | "taproom" | "storage") =>
+      ((await runCommand("list_locations", use ? { use } : {}, ctx)) as Row[]).map((l) => l.id);
+    expect(await ids("taproom")).toContain(mixed.id);
+    expect(await ids("warehouse")).toContain(mixed.id);
+    expect(await ids("storage")).toEqual(expect.arrayContaining([mixed.id, storeOnly.id]));
+    expect(await ids("taproom")).not.toContain(storeOnly.id);
+    expect(await ids()).toEqual(expect.arrayContaining([mixed.id, storeOnly.id]));
+  });
+
   it("create_location seeds Walk-in, Cold and Dry, and accepts the storage kind", async () => {
-    const loc = (await runCommand("create_location", { name: "Overflow", kind: "storage" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Overflow", uses: ["storage"] }, ctx)) as Row;
     const { data } = await admin.from("bins").select("name").eq("location_id", loc.id).order("name");
     expect(data!.map((b) => b.name)).toEqual(["Cold", "Dry", "Walk-in"]);
   });
 
   it("bin names are unique per location, not per brewery", async () => {
-    const a = (await runCommand("create_location", { name: "WH A", kind: "warehouse" }, ctx)) as Row;
-    const b = (await runCommand("create_location", { name: "WH B", kind: "warehouse" }, ctx)) as Row;
+    const a = (await runCommand("create_location", { name: "WH A", uses: ["warehouse"] }, ctx)) as Row;
+    const b = (await runCommand("create_location", { name: "WH B", uses: ["warehouse"] }, ctx)) as Row;
     const dup = await admin.from("bins").insert({ brewery_id: ctx.breweryId, location_id: a.id, name: "Cold" });
     expect(dup.error?.code).toBe("23505");
     const ok = await admin.from("bins").insert({ brewery_id: ctx.breweryId, location_id: b.id, name: "Rack 3" });
@@ -31,14 +43,14 @@ describe("bins", () => {
 
   it("a bin cannot point at another brewery's location", async () => {
     const other = await makeBrewery();
-    const loc = (await runCommand("create_location", { name: "Mine", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Mine", uses: ["warehouse"] }, ctx)) as Row;
     const { error } = await admin.from("bins").insert({ brewery_id: other.id, location_id: loc.id, name: "Stolen" });
     expect(error?.code).toBe("23503");
   });
 
   it("list_bins returns a location's bins alphabetically, warehouse can read", async () => {
     const wh = await makeStaffCtx(ctx.breweryId, "warehouse");
-    const loc = (await runCommand("create_location", { name: "List WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "List WH", uses: ["warehouse"] }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, wh)) as Row[];
     expect(bins.map((b) => b.name)).toEqual(["Cold", "Dry", "Walk-in"]);
     const sales = await makeStaffCtx(ctx.breweryId, "sales");
@@ -48,7 +60,7 @@ describe("bins", () => {
   it("create_bin and update_bin are warehouse-or-admin and idempotent by request", async () => {
     const wh = await makeStaffCtx(ctx.breweryId, "warehouse");
     const sales = await makeStaffCtx(ctx.breweryId, "sales");
-    const loc = (await runCommand("create_location", { name: "Cmd WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Cmd WH", uses: ["warehouse"] }, ctx)) as Row;
     const bin = (await runCommand("create_bin", { locationId: loc.id, name: "Rack 3" }, wh)) as Row;
     expect(bin.name).toBe("Rack 3");
     const renamed = (await runCommand("update_bin", { binId: bin.id, name: "Rack 3 · top" }, wh)) as Row;
@@ -58,7 +70,7 @@ describe("bins", () => {
   });
 
   it("delete_bin removes an empty bin but refuses the last one", async () => {
-    const loc = (await runCommand("create_location", { name: "Del WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Del WH", uses: ["warehouse"] }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     await runCommand("delete_bin", { binId: bins[0].id }, ctx);
     await runCommand("delete_bin", { binId: bins[1].id }, ctx);
@@ -71,7 +83,7 @@ describe("bins", () => {
   });
 
   it("delete_bin clears a menu configured against that empty bin", async () => {
-    const loc = (await runCommand("create_location", { name: "Menu bin", kind: "taproom" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Menu bin", uses: ["taproom"] }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     const connection = await admin.from("pos_connections").insert({ brewery_id: ctx.breweryId,
       merchant_id: `bin-menu-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
@@ -95,14 +107,14 @@ describe("bins", () => {
 
   it("a bin belongs to the caller's brewery or the RPC refuses it", async () => {
     const otherCtx = await makeStaffCtx((await makeBrewery()).id, "admin");
-    const loc = (await runCommand("create_location", { name: "Tenant WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Tenant WH", uses: ["warehouse"] }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     await expect(runCommand("update_bin", { binId: bins[0].id, name: "Hijack" }, otherCtx)).rejects.toBeTruthy();
     await expect(runCommand("delete_bin", { binId: bins[0].id }, otherCtx)).rejects.toBeTruthy();
   });
   it("every ledger row names a bin, and the bin must belong to the row's location", async () => {
-    const a = (await runCommand("create_location", { name: "Ledger A", kind: "warehouse" }, ctx)) as Row;
-    const b = (await runCommand("create_location", { name: "Ledger B", kind: "warehouse" }, ctx)) as Row;
+    const a = (await runCommand("create_location", { name: "Ledger A", uses: ["warehouse"] }, ctx)) as Row;
+    const b = (await runCommand("create_location", { name: "Ledger B", uses: ["warehouse"] }, ctx)) as Row;
     const [binB] = (await runCommand("list_bins", { locationId: b.id }, ctx)) as Row[];
     const { skuId } = await seedCatalog(ctx.breweryId, { product: "Bin Pils", format: "Bin can" });
     const { data: mat } = await admin.from("materials").insert({
@@ -131,8 +143,8 @@ describe("bins", () => {
   });
 
   it("the keg list reads back per pool × size × location: Microstar 36 here, 40 in storage", async () => {
-    const wh = (await runCommand("create_location", { name: "Keg WH", kind: "warehouse" }, ctx)) as Row;
-    const st = (await runCommand("create_location", { name: "Keg storage", kind: "storage" }, ctx)) as Row;
+    const wh = (await runCommand("create_location", { name: "Keg WH", uses: ["warehouse"] }, ctx)) as Row;
+    const st = (await runCommand("create_location", { name: "Keg storage", uses: ["storage"] }, ctx)) as Row;
     const [binW] = (await runCommand("list_bins", { locationId: wh.id }, ctx)) as Row[];
     const [binS] = (await runCommand("list_bins", { locationId: st.id }, ctx)) as Row[];
     const { data: vendor } = await admin.from("vendors").insert({ brewery_id: ctx.breweryId, name: "Microstar" }).select().single();
@@ -153,7 +165,7 @@ describe("bins", () => {
   });
 
   it("record_movement requires a bin and get_bin_on_hand reports per bin while on_hand stays per location", async () => {
-    const loc = (await runCommand("create_location", { name: "Split WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Split WH", uses: ["warehouse"] }, ctx)) as Row;
     const [b1, b2] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     const { skuId } = await seedCatalog(ctx.breweryId, { product: "Split Pils", format: "Split can" });
     await expect(runCommand("record_movement", { skuId, locationId: loc.id, qty: 1, type: "opening_balance" }, ctx)).rejects.toBeTruthy();
@@ -167,7 +179,7 @@ describe("bins", () => {
   });
 
   it("delete_bin refuses a bin that ever recorded stock, even at net zero", async () => {
-    const loc = (await runCommand("create_location", { name: "Stock WH", kind: "warehouse" }, ctx)) as Row;
+    const loc = (await runCommand("create_location", { name: "Stock WH", uses: ["warehouse"] }, ctx)) as Row;
     const [bin] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     const { skuId } = await seedCatalog(ctx.breweryId, { product: "Stock Pils", format: "Stock can" });
     await runCommand("record_movement", { skuId, locationId: loc.id, binId: bin.id, qty: 2, type: "opening_balance" }, ctx);

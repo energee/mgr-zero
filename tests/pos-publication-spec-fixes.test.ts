@@ -12,7 +12,7 @@ const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto
 async function fixture(twoBrands = false) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "warehouse");
-  const location = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
+  const location = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
   const connection = await admin.from("pos_connections").insert({ brewery_id: brewery.id,
     merchant_id: `merchant-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
     catalog_sync_generation: 3 }).select("id").single();

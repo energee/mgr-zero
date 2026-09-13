@@ -7,7 +7,7 @@ import "@/lib/commands/all";
 async function fixture() {
   const brewery = await makeBrewery(), ctx = await makeStaffCtx(brewery.id, "taproom");
   const cat = await seedCatalog(brewery.id, { packageType: "keg", bblPerUnit: .5 });
-  const location = await seedLocation(brewery.id, { kind: "taproom" });
+  const location = await seedLocation(brewery.id, { uses: ["taproom"] });
   return { brewery, ctx, cat, location };
 }
 type F = Awaited<ReturnType<typeof fixture>>;

@@ -16,7 +16,7 @@ const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto
 async function fixture(brandCount = 1) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "admin");
-  const location = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
+  const location = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
   const connection = await admin.from("pos_connections").insert({ brewery_id: brewery.id,
     merchant_id: `merchant-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
     catalog_sync_generation: 0 }).select("id").single();
@@ -75,7 +75,7 @@ function commandSquare(fetcher: typeof globalThis.fetch) {
 describe("Square publication final orchestration fences", () => {
   it("refuses to coalesce an unresolved standalone publication across locations", async () => {
     const f = await fixture();
-    const second = await seedLocation(f.brewery.id, { name: "Beer garden", kind: "taproom" });
+    const second = await seedLocation(f.brewery.id, { name: "Beer garden", uses: ["taproom"] });
     expect((await admin.from("pos_locations").insert({ brewery_id: f.brewery.id, connection_id: f.connectionId,
       external_location_id: "L2", external_name: "Beer garden", available: true, location_id: second.id })).error).toBeNull();
     await runCommand("record_movement", { skuId: f.brands[0]!.skuId, locationId: second.id, binId: second.binId,

@@ -184,7 +184,7 @@ describe("Square quality-review lifecycle fences", () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const connection = await connected(brewery.id);
-    const location = await seedLocation(brewery.id, { name: "Old seller taproom", kind: "taproom" });
+    const location = await seedLocation(brewery.id, { name: "Old seller taproom", uses: ["taproom"] });
     expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connection.connectionId,
       external_location_id: "REUSED-L", external_name: "Old seller location", location_id: location.id })).error).toBeNull();
     const saleChannelId = await channelId(brewery.id, "Taproom");
@@ -215,7 +215,7 @@ describe("Square quality-review lifecycle fences", () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const connection = await connected(brewery.id);
-    const location = await seedLocation(brewery.id, { name: "Concurrent taproom", kind: "taproom" });
+    const location = await seedLocation(brewery.id, { name: "Concurrent taproom", uses: ["taproom"] });
     const catalog = await seedCatalog(brewery.id, { product: "Concurrent", sku: "Concurrent keg", packageType: "keg", bblPerUnit: 0.5 });
     const poured = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: catalog.brandId,
       name: "Concurrent pint", basis: "poured", ounces: 16 }).select("id").single();

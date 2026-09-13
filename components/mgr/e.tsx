@@ -318,6 +318,16 @@ export const E = {
     fieldGrid(fields, fields.length === 3 ? "grid-cols-3" : "grid-cols-2"),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
+  /** Several picked values at once: a location is often a taproom and storage
+   *  and a warehouse, so the control has to admit more than one answer. */
+  picks: (label: string, values: string[], options: string[]) => (
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <ToggleGroup type="multiple" defaultValue={values} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
+        {options.map((o) => <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem>)}
+      </ToggleGroup>
+    </Field>
+  ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
   pick: (label: string, value: string, options: string[]) => (
     <Field>

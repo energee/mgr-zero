@@ -10,7 +10,7 @@ describe("stock_transfers schema", () => {
   it("rejects a transfer whose from and to location are equal", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "admin");
-    const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+    const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
     const { error } = await admin.from("stock_transfers").insert({
       brewery_id: b.id, from_location_id: from.id, to_location_id: from.id, created_by: ctx.userId,
     });
@@ -23,8 +23,8 @@ describe("stock transfer lifecycle", () => {
   it("create_stock_transfer refuses same-location and accepts a sku line across two locations; submit and pick advance it", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "admin");
-    const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
-    const to = await seedLocation(b.id, { name: "Storage", kind: "storage" });
+    const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+    const to = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
     const { data: fromBins } = await admin.from("bins").select("id").eq("location_id", from.id).order("name");
     const { data: toBins } = await admin.from("bins").select("id").eq("location_id", to.id).order("name");
     const { skuId } = await seedCatalog(b.id);
@@ -68,9 +68,9 @@ describe("receive_stock_transfer", () => {
   it("corrects a completed wrong-destination transfer with a linked compensating transfer", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "warehouse");
-    const warehouse = await seedLocation(b.id, { name: "Warehouse", kind: "warehouse" });
-    const wrong = await seedLocation(b.id, { name: "Wrong taproom", kind: "taproom" });
-    const intended = await seedLocation(b.id, { name: "Intended taproom", kind: "taproom" });
+    const warehouse = await seedLocation(b.id, { name: "Warehouse", uses: ["warehouse"] });
+    const wrong = await seedLocation(b.id, { name: "Wrong taproom", uses: ["taproom"] });
+    const intended = await seedLocation(b.id, { name: "Intended taproom", uses: ["taproom"] });
     const { skuId } = await seedCatalog(b.id);
     await runCommand("record_movement", {
       skuId, locationId: warehouse.id, binId: warehouse.binId, qty: 8, type: "opening_balance",
@@ -114,8 +114,8 @@ describe("receive_stock_transfer", () => {
   it("posts paired FG rows whose bbl sums to 0 and paired keg events, then marks the transfer received", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "warehouse");
-    const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
-    const to = await seedLocation(b.id, { name: "Storage", kind: "storage" });
+    const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+    const to = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
     const { skuId } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
     await runCommand("record_movement", { skuId, locationId: from.id, binId: from.binId, qty: 10, type: "opening_balance" }, ctx);
     const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: b.id, name: "Owned", kind: "owned" }).select().single();
@@ -158,8 +158,8 @@ describe("move_stock_bin", () => {
   it("relocates inside one location with paired rows and no document; refuses a cross-location pair", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "warehouse");
-    const wh = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
-    const other = await seedLocation(b.id, { name: "Storage", kind: "storage" });
+    const wh = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+    const other = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
     const { data: bins } = await admin.from("bins").select("id").eq("location_id", wh.id).order("name");
     const { skuId } = await seedCatalog(b.id);
     await runCommand("record_movement", { skuId, locationId: wh.id, binId: bins![0].id, qty: 4, type: "opening_balance" }, ctx);
@@ -180,8 +180,8 @@ describe("move_stock_bin", () => {
 
 it("direct RPCs reject fractional empty kegs at move, draft, pick and receive boundaries", async () => {
   const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
-  const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
-  const to = await seedLocation(b.id, { name: "Other", kind: "storage" });
+  const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+  const to = await seedLocation(b.id, { name: "Other", uses: ["storage"] });
   const { data: bins } = await admin.from("bins").select("id").eq("location_id", from.id);
   const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: b.id, name: "Owned", kind: "owned" }).select().single();
   const move = await ctx.db.rpc("move_stock_bin", { p_brewery: b.id, p_sku: null, p_material: null, p_keg_pool: pool!.id, p_keg_size: "half_bbl", p_qty: 1.5, p_from_bin: bins![0].id, p_to_bin: bins![1].id, p_note: null, p_request_id: crypto.randomUUID() });
@@ -202,7 +202,7 @@ it("direct RPCs reject fractional empty kegs at move, draft, pick and receive bo
 
 it("material bin moves retain an explicit lot, replay once, and reject another material's lot atomically", async () => {
   const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
-  const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+  const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
   const { data: bins } = await admin.from("bins").select("id").eq("location_id", from.id);
   const { data: material } = await admin.from("materials").insert({ brewery_id: b.id, name: "Hops", category: "hop", base_uom: "lb", purchase_uom: "lb", lot_tracked: true }).select().single();
   const { data: lot } = await admin.from("material_lots").insert({ brewery_id: b.id, material_id: material!.id, lot_code: "H1" }).select().single();
@@ -224,7 +224,7 @@ it("material bin moves retain an explicit lot, replay once, and reject another m
 
 it("FG bin moves preserve the chosen lot separately from untracked stock and tenant sources", async () => {
   const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
-  const loc = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+  const loc = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
   const { data: bins } = await admin.from("bins").select("id").eq("location_id", loc.id);
   const cat = await seedCatalog(b.id);
   const { data: run, error: runError } = await admin.from("packaging_runs").insert({ brewery_id: b.id, brand_id: cat.brandId, planned_on: "2026-09-01", created_by: ctx.userId }).select().single();
@@ -251,7 +251,7 @@ it("FG bin moves preserve the chosen lot separately from untracked stock and ten
 
 it("bin stock reads all 1,001 grouped identities beyond the API row cap", async () => {
   const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
-  const loc = await seedLocation(b.id, { name: "Many bins", kind: "warehouse" });
+  const loc = await seedLocation(b.id, { name: "Many bins", uses: ["warehouse"] });
   const { skuId } = await seedCatalog(b.id);
   sql(`insert into public.bins (brewery_id, location_id, name) select '${b.id}', '${loc.id}', 'QA-' || n from generate_series(1,1001) n;
     insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, created_by)

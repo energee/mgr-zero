@@ -51,7 +51,7 @@ describe("Data API mutation boundary", () => {
     const location = await admin.from("locations").insert({
       brewery_id: foreignBrewery.id,
       name: "Foreign taproom",
-      kind: "taproom",
+      uses: ["taproom"],
     }).select("id").single();
     await admin.from("channel_prices").insert({
       brewery_id: foreignBrewery.id,

@@ -140,7 +140,7 @@ it("nets losses and negative adjustments in their original report outflow side",
 
 it("refuses an actual count-owned depletion without changing count history", async () => {
   const { ctx, catalog } = await setup();
-  const location = await seedLocation(ctx.breweryId, { name: "Taproom", kind: "taproom" });
+  const location = await seedLocation(ctx.breweryId, { name: "Taproom", uses: ["taproom"] });
   await ins("inventory_movements", { brewery_id: ctx.breweryId, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, qty: 5, type: "opening_balance", created_by: ctx.userId });
   const snapshot = await ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: location.id });
   expect(snapshot.error).toBeNull();
@@ -152,7 +152,7 @@ it("refuses an actual count-owned depletion without changing count history", asy
 
 it("reads all scoped location balances beyond the API row cap", async () => {
   const { ctx, catalog } = await setup();
-  sql(`with locations as (insert into locations(brewery_id,name,kind) select '${ctx.breweryId}', 'Loc '||n, 'warehouse' from generate_series(1,1001) n returning id),
+  sql(`with locations as (insert into locations(brewery_id,name,uses) select '${ctx.breweryId}', 'Loc '||n, array['warehouse']::location_kind[] from generate_series(1,1001) n returning id),
     bins as (insert into bins(brewery_id,location_id,name) select '${ctx.breweryId}',id,'Stock' from locations returning id,location_id)
     insert into inventory_movements(brewery_id,sku_id,location_id,bin_id,qty,type,created_by)
     select '${ctx.breweryId}','${catalog.skuId}',location_id,id,1,'opening_balance','${ctx.userId}' from bins`, true);

@@ -16,15 +16,15 @@ it("loads every own keg SKU and taproom location for the Taproom board beyond th
     insert into public.brands(brewery_id,name) select '${brewery.id}','Brand '||n from generate_series(1,1001) n returning id,name
   ) insert into public.skus(brewery_id,brand_id,format_id,name)
     select '${brewery.id}',b.id,f.id,'Board keg '||row_number() over(order by b.name) from b join f on replace(b.name,'Brand ','')=replace(f.name,'Keg format ','');
-    insert into public.locations(brewery_id,name,kind)
-    select '${brewery.id}','Taproom '||n,'taproom' from generate_series(1,1001) n`);
+    insert into public.locations(brewery_id,name,uses)
+    select '${brewery.id}','Taproom '||n,array['taproom']::location_kind[] from generate_series(1,1001) n`);
 
   const [skus, locations] = await Promise.all([
     runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string }[]>,
-    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; kind: string }[]>,
+    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
   ]);
   expect(skus).toHaveLength(1001);
-  expect(locations.filter((location) => location.kind === "taproom")).toHaveLength(1001);
+  expect(locations.filter((location) => location.uses.includes("taproom"))).toHaveLength(1001);
   expect(skus.map((row) => row.name)).toEqual(skus.map((row) => row.name).sort((a, b) => a.localeCompare(b)));
   expect(locations.map((row) => row.name)).toEqual(locations.map((row) => row.name).sort((a, b) => a.localeCompare(b)));
 });
@@ -32,8 +32,8 @@ it("loads every own keg SKU and taproom location for the Taproom board beyond th
 it("keeps every location identity when a location is renamed between pages, then sorts the result alphabetically", async () => {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "taproom");
-  sql(`insert into public.locations(brewery_id,name,kind)
-    select '${brewery.id}','Mutable taproom '||lpad(n::text,4,'0'),'taproom' from generate_series(1,1001) n`);
+  sql(`insert into public.locations(brewery_id,name,uses)
+    select '${brewery.id}','Mutable taproom '||lpad(n::text,4,'0'),array['taproom']::location_kind[] from generate_series(1,1001) n`);
   const expectedIds = sql(`select id from public.locations where brewery_id='${brewery.id}' order by id`);
   const target = (await admin.from("locations").select("id").eq("brewery_id", brewery.id)
     .order("name").order("id").range(700, 700).single()).data!;

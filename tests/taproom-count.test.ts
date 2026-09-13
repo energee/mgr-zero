@@ -10,7 +10,7 @@ async function fixture(qty = 7) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "taproom");
   const cat = await seedCatalog(brewery.id, { packageType: "keg", bblPerUnit: 0.5 });
-  const location = await seedLocation(brewery.id, { kind: "taproom" });
+  const location = await seedLocation(brewery.id, { uses: ["taproom"] });
   if (qty) await ins("inventory_movements", { brewery_id: brewery.id, sku_id: cat.skuId, location_id: location.id, bin_id: location.binId, qty, type: "opening_balance", created_by: ctx.userId });
   const day = sql(`select (now() at time zone 'America/New_York')::date`)[0];
   return { brewery, ctx, cat, location, day };
@@ -722,7 +722,7 @@ it("structurally rejects foreign count-line references and NULL-bucket duplicate
   const f = await fixture(), foreign = await fixture();
   const otherLot = await lot(foreign, "FOREIGN");
   const otherMovement = await movement(foreign, 1);
-  const otherLocation = await seedLocation(f.brewery.id, { name: "Other taproom", kind: "taproom" });
+  const otherLocation = await seedLocation(f.brewery.id, { name: "Other taproom", uses: ["taproom"] });
   const header = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: f.day, counted_by: f.ctx.userId });
   const line = { brewery_id: f.brewery.id, count_id: header.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: f.cat.skuId, lot_id: null, qty_before: 7, qty_counted: 7 };
   for (const change of [{ bin_id: foreign.location.binId }, { bin_id: otherLocation.binId }, { sku_id: foreign.cat.skuId },

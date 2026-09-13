@@ -123,13 +123,13 @@ describe("brewery column exposure", () => {
   it("lets a customer read only the configured portal warehouse", async () => {
     const { data: warehouse, error: warehouseError } = await admin
       .from("locations")
-      .insert({ brewery_id: brewery.id, name: "Portal WH", kind: "warehouse" })
+      .insert({ brewery_id: brewery.id, name: "Portal WH", uses: ["warehouse"] })
       .select()
       .single();
     if (warehouseError) throw warehouseError;
     const { data: other, error: otherError } = await admin
       .from("locations")
-      .insert({ brewery_id: brewery.id, name: "Other WH", kind: "warehouse" })
+      .insert({ brewery_id: brewery.id, name: "Other WH", uses: ["warehouse"] })
       .select()
       .single();
     if (otherError) throw otherError;

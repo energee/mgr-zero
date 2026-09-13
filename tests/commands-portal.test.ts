@@ -439,7 +439,7 @@ describe("portal commands", () => {
       id: "00000000-0000-4000-8000-000000000000",
       brewery_id: b.id,
       name: "Earlier warehouse",
-      kind: "warehouse",
+      uses: ["warehouse"],
     });
     const replay = await runCommand("portal_create_order", input, custCtx, execution);
 

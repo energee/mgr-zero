@@ -3,14 +3,15 @@
 export type LocationViewModel = {
   backHref?: string;
   name: string;
-  type: string;
-  typeOptions: string[];
+  /** Every use this place is put to, titled. A site is often several at once. */
+  uses: string[];
+  useOptions: string[];
   timezone: string;
   bins: string;
   binsHref: string;
 };
 
-const TYPES = ["Warehouse", "Taproom", "Storage"];
+const USES = ["Warehouse", "Taproom", "Storage"];
 
 function titleKind(kind: string): string {
   if (kind === "warehouse") return "Warehouse";
@@ -20,7 +21,7 @@ function titleKind(kind: string): string {
 }
 
 export type LocationSnapshot = {
-  location: { id: string; name: string; kind: string };
+  location: { id: string; name: string; uses: string[] };
   bins: { name: string }[];
   /** Inventory: IANA zone after "Brewery default". Live omits this. */
   timezone?: string;
@@ -36,8 +37,8 @@ export function toLocationViewProps({
   return {
     backHref,
     name: location.name,
-    type: titleKind(location.kind),
-    typeOptions: TYPES,
+    uses: location.uses.map(titleKind),
+    useOptions: USES,
     timezone: timezone ? `Brewery default · ${timezone}` : "Brewery default",
     bins: bins.map((b) => b.name).join(" · ") || "none",
     binsHref: `/locations/${location.id}/bins`,

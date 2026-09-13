@@ -27,7 +27,7 @@ async function query(name: string) {
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
     case "get_customer": return { customer, shipTos: [shipTo] };
     case "list_customers": return [customer];
-    case "list_locations": return [{ id: "location", name: "Cold room", kind: "warehouse" }];
+    case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
     case "get_bin_move_stock": return [{ skuId: "sku", qty: 4 }];
     default: throw new Error(name);
