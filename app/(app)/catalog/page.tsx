@@ -39,7 +39,7 @@ export default async function CatalogPage() {
         return (
           <>
             {pours.map((f) => <div key={f.id}>{E.row(`${brand.name} · ${f.name}`, `${f.ounces} oz · poured`, canWrite ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={brand} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined)}</div>)}
-            {canWrite ? E.row("New pour", `a glass poured from ${brand.name}`, <PourForm brand={brand} />) : null}
+            {canWrite ? E.row(`${brand.name} · pours`, "a glass served at the taproom, never a SKU", <PourForm brand={brand} />) : null}
           </>
         );
       }}
