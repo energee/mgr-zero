@@ -25,7 +25,7 @@ export function KegFleetView({
   return (
     <>
       {E.back("Beer", "Keg fleet", createAction, model.backHref)}
-      {list ?? (
+      {list !== undefined ? list : (
         <>
           {E.fld("Selected pool", model.pool ?? "")}
           {E.pick("Kind", model.kind ?? "", model.kindOptions ?? [])}
@@ -37,14 +37,14 @@ export function KegFleetView({
           ))}
         </>
       )}
-      {navs ?? (
+      {navs !== undefined ? navs : (
         <>
           {E.nav("Customer keg balance", model.customerBalance ?? "")}
           {E.nav("Keg report", model.report ?? "")}
           {E.nav("Keg event history", model.history ?? "")}
         </>
       )}
-      {eventForm ?? (
+      {eventForm !== undefined ? eventForm : (
         <>
           {E.chips(model.eventKinds ?? [], model.eventKindIndex ?? 0)}
           {E.pick("Customer", model.customer ?? "", model.customerOptions ?? [])}
