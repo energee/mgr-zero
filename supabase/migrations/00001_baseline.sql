@@ -7559,7 +7559,7 @@ grant select on breweries, brewery_users, customer_users,
 -- only the derived reads consumed by registered commands.
 grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
   format_volumes, occupancy_volumes, product_volume_requirements,
-  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
+  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost, recipe_version_costs,
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;

@@ -3,6 +3,7 @@
 // get_compliance_registry paint BrandView.
 import type { RegistryBrand } from "@/lib/commands/compliance";
 import { plural } from "./plural";
+import { suggestPriceGroup, type PriceGroupSuggestion, type SuggestionGroups } from "./price-group-suggestion";
 import { expires, type RegistryRowView } from "./registry-rows";
 
 export type BrandViewModel = {
@@ -13,8 +14,11 @@ export type BrandViewModel = {
   abv: string;
   category: string;
   categoryOptions: string[];
+  /** The group's id, or UNPRICED. Ids, not names: a group may be named anything, even "Unpriced". */
   priceGroup: string;
-  priceGroupOptions: string[];
+  priceGroupOptions: { value: string; label: string }[];
+  /** What the brand's recipe cost says about the group; null when it has no recipe. */
+  suggestion: PriceGroupSuggestion | null;
   description: string;
   hops: string;
   skuList: string;
@@ -24,7 +28,8 @@ export type BrandViewModel = {
 };
 
 const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
-export const UNPRICED = "Unpriced";
+/** The select value for "no price group": not a name, so no real group can collide with it. */
+export const UNPRICED = "__unpriced";
 
 export type BrandSnapshot = {
   brand: {
@@ -41,8 +46,10 @@ export type BrandSnapshot = {
   /** Brewery styles list; may include an inventory "Add …" option. */
   styles: string[];
   categories?: string[];
-  /** list_price_groups. */
-  priceGroups: { id: string; name: string }[];
+  /** list_price_groups; position and ceiling feed the suggestion. */
+  priceGroups: SuggestionGroups;
+  /** get_brand_recipe_cost. Absent means no recipe. */
+  cost?: { costCentsPerBbl: number | null; uncosted: string[] };
   /** This brand's rows from get_compliance_registry. Absent means none on file. */
   compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
@@ -74,9 +81,9 @@ export function toBrandViewProps({
   categories = CATEGORIES,
   priceGroups,
   compliance = { approvals: [], registrations: [] },
+  cost,
   backHref,
 }: BrandSnapshot): BrandViewModel {
-  const group = priceGroups.find((g) => g.id === brand.price_group_id);
   // "Unpriced" is a real choice: a brand on no group cannot be ordered.
   const active = brand.skus.filter((s) => s.active).length;
   const style = brand.styles?.name ?? "";
@@ -89,8 +96,9 @@ export function toBrandViewProps({
     abv: brand.abv == null || brand.abv === "" ? "" : String(Number(brand.abv)),
     category: brand.category ?? "",
     categoryOptions: categories,
-    priceGroup: group?.name ?? UNPRICED,
-    priceGroupOptions: [UNPRICED, ...priceGroups.map((g) => g.name)],
+    priceGroup: brand.price_group_id ?? UNPRICED,
+    priceGroupOptions: [{ value: UNPRICED, label: "Unpriced" }, ...priceGroups.map((g) => ({ value: g.id, label: g.name }))],
+    suggestion: cost ? suggestPriceGroup({ ...cost, groups: priceGroups }) : null,
     description: brand.description ?? "",
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),

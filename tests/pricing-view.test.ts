@@ -83,7 +83,7 @@ describe("Price group view", () => {
     const model = toPriceGroupViewProps(priceGroupTwo);
     expect(model.name).toBe("2");
     expect(model.position).toBe("2");
-    expect(model.costCeiling).toBe(money(185));
+    expect(model.costCeiling).toBe(money(6500));
     expect(model.previousCeilingLabel).toBe("Cost ceiling · group 1");
     expect(model.previousCeiling).toBe("none");
     expect(model.prices).toBe(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);
@@ -95,7 +95,7 @@ describe("Price group view", () => {
     expect(html).toMatch(/Group name/);
     expect(html).toMatch(/Position/);
     expect(html).toMatch(/Cost ceiling/);
-    expect(html).toContain(money(185));
+    expect(html).toContain(money(6500));
     expect(html).toMatch(/Cost ceiling · group 1/);
     expect(html).toMatch(/none/);
     expect(html).toContain(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);

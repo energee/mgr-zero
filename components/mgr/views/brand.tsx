@@ -3,8 +3,11 @@
 // through `controls`, bound to upsert_brand). Style is typed against the
 // brewery's own styles as suggestions: an unmatched entry is the Add path.
 // Compliance is the brand's: its approvals and state registrations list here
-// with their sheets; the brewery's licenses are their own page.
+// with their sheets; the brewery's licenses are their own page. The recipe
+// cost suggests a price group (lib/mgr/price-group-suggestion.ts); Use only
+// fills the select, and Save brand is still the commit.
 import { Fragment, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
@@ -45,8 +48,15 @@ export function BrandView({
         <Fragment key="style"><RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} /></Fragment>,
         <Fragment key="abv"><RegistryInput label="ABV" value={model.abv} onChange={controls.abv} /></Fragment>,
         <Fragment key="category"><RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" /></Fragment>,
-        <Fragment key="price"><RegistrySelect label="Price group" value={model.priceGroup} options={asOptions(model.priceGroupOptions)} onChange={controls.priceGroup} /></Fragment>,
+        <Fragment key="price"><RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} /></Fragment>,
       )}
+      {model.suggestion
+        ? E.row(model.suggestion.title, model.suggestion.detail, model.suggestion.kind === "group"
+          ? (controls.priceGroup
+            ? <Button type="button" variant="outline" size="sm" onClick={() => controls.priceGroup?.((model.suggestion as { groupId: string }).groupId)}>Use</Button>
+            : E.act("Use"))
+          : "", model.suggestion.kind === "unknown" ? "w" : "")
+        : null}
       {E.ttl("Sell sheet")}
       <RegistryInput label="Description" value={model.description} onChange={controls.description} />
       <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />

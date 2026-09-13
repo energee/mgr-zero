@@ -14,8 +14,8 @@ import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 
 export type BrandRow = BrandSnapshot["brand"];
 
-export function BrandPage({ brand, styles, priceGroups, compliance, writable }: {
-  brand: BrandRow | null; styles: string[]; priceGroups: { id: string; name: string }[]; compliance: BrandSnapshot["compliance"]; writable: boolean;
+export function BrandPage({ brand, styles, priceGroups, compliance, cost, writable }: {
+  brand: BrandRow | null; styles: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"]; writable: boolean;
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
@@ -23,10 +23,10 @@ export function BrandPage({ brand, styles, priceGroups, compliance, writable }: 
     name: brand?.name ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
     description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.price_group_id ?? "", hops: brand?.hops ?? "",
   });
-  // The view speaks in names; the command wants ids. Empty strings are omitted.
+  // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const model = toBrandViewProps({
     brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [] },
-    styles, priceGroups, compliance, backHref: "/catalog",
+    styles, priceGroups, compliance, cost, backHref: "/catalog",
   });
   // Sheets need a saved brand; a read-only role sees rows without verbs.
   const subject = brand && writable ? { id: brand.id, name: brand.name } : null;
@@ -41,7 +41,7 @@ export function BrandPage({ brand, styles, priceGroups, compliance, writable }: 
     : writable ? E.info("Save the brand first, then record its COLA and state registrations here.") : null;
   const controls = writable ? {
     name: set("name"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
-    priceGroup: (name: string) => set("priceGroupId")(name === UNPRICED ? "" : priceGroups.find((g) => g.name === name)?.id ?? ""),
+    priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
   } : {};
   async function submit(e: React.FormEvent) {
     e.preventDefault();

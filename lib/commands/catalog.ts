@@ -200,6 +200,35 @@ defineQuery({
   handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*").eq("brewery_id", ctx.breweryId).order("position")),
 });
 
+// The cost a brand's recipe implies, for the price-group suggestion on Brand.
+// Cost is recipe_version_costs (derived from last receipt costs, never
+// stored); ingredients with no receipt yet are named so a partial sum is
+// never mistaken for the cost. The brand's most recently brewed version
+// speaks for it; a never-brewed brand falls back to its newest version.
+defineQuery({
+  name: "get_brand_recipe_cost", description: "A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet",
+  roles: ["admin", "sales"],
+  input: z.object({ brandId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const brewed = await unwrap(ctx.db.from("batches").select("recipe_version_id")
+      .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null)
+      .order("brewed_on", { ascending: false }).limit(1).maybeSingle()) as { recipe_version_id: string } | null;
+    const newest = brewed ? null : await unwrap(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
+      .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()) as { id: string } | null;
+    const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
+    if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };
+    const [cost, ingredients] = await Promise.all([
+      unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl").eq("recipe_version_id", versionId).maybeSingle()) as Promise<{ cost_cents_per_bbl: number | null } | null>,
+      unwrap(ctx.db.from("recipe_ingredients").select("material_id, materials(name)").eq("recipe_version_id", versionId)) as unknown as Promise<{ material_id: string; materials: { name: string } | null }[]>,
+    ]);
+    const costed = new Set(((await unwrap(ctx.db.from("material_last_cost").select("material_id")
+      .in("material_id", ingredients.map((r) => r.material_id)))) as { material_id: string }[]).map((r) => r.material_id));
+    const uncosted = ingredients.filter((r) => !costed.has(r.material_id)).map((r) => r.materials?.name ?? "an ingredient");
+    return { recipeVersionId: versionId, costCentsPerBbl: cost?.cost_cents_per_bbl ?? null, uncosted };
+  },
+});
+
 defineCommand({
   name: "upsert_price_group", description: "Create or rename a price group (a row of the price grid), set its position and optional cost ceiling",
   roles: ["admin", "sales"],

@@ -35,7 +35,7 @@ export const pricingGrid: PriceGroupsSnapshot = {
   ],
   groups: [
     { id: PG1, name: "1", position: 1, cost_ceiling_cents: null },
-    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 185 },
+    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 6500 },
     { id: PG3, name: "3", position: 3, cost_ceiling_cents: null },
   ],
   formats: [
@@ -62,5 +62,5 @@ export const pricingGrid: PriceGroupsSnapshot = {
   ],
 };
 
-/** Price group 2: ceiling $1.85, previous group none, Hazy cell featured. */
+/** Price group 2: ceiling $65.00/bbl, previous group none, Hazy cell featured. */
 export const priceGroupTwo: PriceGroupSnapshot = { ...pricingGrid, groupId: PG2 };
