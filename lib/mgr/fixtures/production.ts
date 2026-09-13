@@ -150,3 +150,12 @@ export const recipeHazyV4: RecipeViewModel = {
   ],
   actualsNote: "Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?",
 };
+export const cellarTransferPils = {
+  fromId: "fv1-occupancy", toId: "bt1", volume: "3.0", loss: "",
+  occupancies: [
+    { occupancy_id: "fv1-occupancy", vessel_id: "fv1", vessel_name: "FV1", brand_name: "Pils", batch_no: 409, bbl: 12.8 },
+    { occupancy_id: "fv2-occupancy", vessel_id: "fv2", vessel_name: "FV2", brand_name: "Hazy IPA", batch_no: 416, bbl: 14.6 },
+    { occupancy_id: "bt1-occupancy", vessel_id: "bt1", vessel_name: "BT1", brand_name: "Pils", batch_no: 412, bbl: 7 },
+  ],
+  vessels: [{ id: "bt1", name: "BT1", capacity_bbl: 10 }, { id: "bt2", name: "BT2", capacity_bbl: 10 }],
+};

@@ -45,6 +45,8 @@ import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
+import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
+import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -1744,21 +1746,11 @@ export const SCREENS: Screen[] = [
     name: "Cellar transfer",
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
-    reads: "get_cellar_map [view; occupancy volumes]",
+    reads: "list_occupancies · list_vessels",
     writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
-    body: (<>
-      {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl", ["FV1 · Pils · B-0409 · 12.8 bbl", "FV2 · Hazy IPA · B-0416 · 14.6 bbl"])}
-      {E.pick("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl", ["BT1 · Pils · B-0412 · 7.0 / 10 bbl", "BT2 · empty"])}
-      {E.qty("3.0", "bbl", "Barrels moving")}
-      {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl, or Record as loss books those 9.8 bbl as loss.")}
-      {E.fld("Remainder in FV1", "9.8 bbl")}
-      {E.chips(["Leave in FV1", "Record as loss"], 0)}
-      {E.pin(<>
-        {E.btn("Record transfer", "irr")}
-      </>)}
-    </>),
+    body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
     step: 7,
