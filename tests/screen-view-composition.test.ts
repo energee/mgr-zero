@@ -10,9 +10,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 const KNOWN_VIEW_DEBT = [
   "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
   "Entity picker: SearchView <- components/mgr/search-palette.tsx",
-  "Ship and invoice: ShipView <- app/(app)/orders/[id]/page.tsx",
-  "Shipment done: ShipmentDoneView <- app/(app)/orders/[id]/page.tsx",
-  "Ship on delivery: ShipView <- app/(app)/orders/[id]/page.tsx",
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",

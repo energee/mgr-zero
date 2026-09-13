@@ -106,6 +106,10 @@ describe("Pick view", () => {
 });
 
 describe("Ship view", () => {
+  it("preserves exact SKU names without inventing units or barrel volumes", () => {
+    const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
+    expect(model.tape[0]).toEqual(["−4 Hazy special can · sale removal · PA", ""]);
+  });
   it("maps a short Pils ship onto reason, restock tape, and invoice-now", () => {
     const model = toShipViewProps(orderShipInvoice);
     expect(model.title).toBe("Ship");
@@ -171,6 +175,11 @@ describe("Ship view", () => {
 });
 
 describe("Shipment done view", () => {
+  it("does not claim an invoice when the confirmed shipment has none", () => {
+    const model = toShipmentDoneViewProps({ ...orderShipmentDone, invoice: null });
+    expect(model.invoice).toBe("No invoice was created");
+    expect(model.tape.flat().join(" ")).not.toContain("invoiced now");
+  });
   it("maps INV-1042 onto the assigned invoice field", () => {
     const model = toShipmentDoneViewProps(orderShipmentDone);
     expect(model.backTo).toBe("ORD-0231");
