@@ -24,7 +24,6 @@ const KNOWN_INLINE_DEBT = [
   "Create brewery",
   "Import",
   "Weekly count",
-  "Variance by brand",
   "Invite portal user",
   "Accounting",
   "Connect QuickBooks",

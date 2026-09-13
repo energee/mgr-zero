@@ -46,6 +46,8 @@ import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
 import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
+import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
+import { taproomVariance } from "@/lib/mgr/fixtures/taproom";
 import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -1158,18 +1160,10 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "SKU detail" },
     job: "Where the gap between poured and counted keeps showing up",
     reads: "list_locations · get_taproom_variance",
-    writes: "none",
+    writes: "none · Recurring brand trend [SCHEMA-GATE: report has no brand-by-period trend projection]",
     states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "mapped expected and variance remain visible; coverage is labeled incomplete"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
     spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen count depletion, and variance is expected minus actual. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
-    body: (<>
-      {E.back("Beer", "Variance")}
-      {E.ttl("Variance by brand")}
-      {E.tabs(["4 weeks", "12 weeks"])}
-      {E.tbl(["Brand", "Expected", "Actual", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "+0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "+0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
-      {E.nav("Hazy IPA", "short 4 weeks running · 1.8 bbl total · −4%")}
-      {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
-      {E.note("Reported, never posted. The count already wrote the depletion; this is the explanation for it.")}
-    </>),
+    body: <TaproomVarianceView model={taproomVariance} />,
   },
   {
     step: 5,

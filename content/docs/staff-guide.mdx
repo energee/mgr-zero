@@ -64,6 +64,8 @@ Admin, Warehouse, and Taproom open **Variance by brand** from Taproom, Beer, or 
 
 Actual is the saved count's depletion. Expected is reconciled POS quantity times its frozen serving size; editing today's pour or package size never changes an existing expectation. A later reconciled sale can update a closed period's expected amount and variance, but cannot change counts or stock. Variance is expected minus actual.
 
+The shared **Variance by brand** screen puts the brand totals first, followed by excluded and unattributed volumes and completed-period coverage. **Recurring brand trend** is unavailable until the report returns brand-by-period data; MGR does not infer a repeated shortage from the aggregate totals.
+
 Without usable POS observations, comparison rows are empty and expected stays blank. A dash means a value is unavailable; read zero alongside coverage and excluded consumption. Mapped lines still contribute when other items need mapping, with coverage and mapping gaps shown. Overlapping taps split each sale equally as an estimate; shares assigned to kegs outside inventory are excluded while count-derived actual stays intact. Sales without a matching open interval remain explicitly unattributed. Guest names do not identify POS sales, so guest yield is unavailable. POS connection and synchronization are not available yet.
 
 ## Taproom physical counts [#taproom-counts]
