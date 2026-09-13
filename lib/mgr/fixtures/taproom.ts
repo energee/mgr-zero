@@ -15,7 +15,9 @@ const boardTaps = [
 export const tapBoardSkus = [...new Map(boardTaps.map(tap => [tap.sku_id!, { id: tap.sku_id!, name: tap.sku_name!, nominalBbl: tap.nominal_bbl }])).values()];
 export const tapBoard: TapBoardState = { sheet: null, snapshot: {
   open: [...boardTaps, { ...fixtureTap("7", "Guest cider", .5, "09", 1, true), sku_id: null, sku_name: null, brand_id: null, brand_name: null, label: "Guest cider" }],
-  history: [{ ...boardTaps[9], id: "previous-kolsch", closed_at: "2026-09-08T20:10:00Z", closed_by: "dana", closed_by_label: "dana", closing_fill: 0, close_reason: "Kicked empty" }],
+  // Tap 7 is appended separately below, so indices trail tap numbers from
+  // index 6 on: the Kolsch tap ("10") is boardTaps[8], not [9].
+  history: [{ ...boardTaps[8], id: "previous-kolsch", closed_at: "2026-09-08T20:10:00Z", closed_by: "dana", closed_by_label: "dana", closing_fill: 0, close_reason: "Kicked empty" }],
 } };
 export const kickKeg = openTapBoardSheet(tapBoard.snapshot, "kick", boardTaps[4]).sheet!;
 export const swapKeg = openTapBoardSheet(tapBoard.snapshot, "swap", boardTaps[4]).sheet!;

@@ -44,3 +44,18 @@ it("freezes kick fields while retaining the unchanged retry", () => {
   expect(html).toContain("Retry unchanged");
   expect(html).not.toContain("Guest keg label");
 });
+
+it("closes the keg the history entry names, as its own interval", () => {
+  // Tap 7 is appended separately, so tap numbers run ahead of array indices
+  // from index 6 on; indexing by tap number lands on the wrong keg, and the
+  // board then shows that beer as both kicked and pouring.
+  const [closed] = tapBoard.snapshot.history;
+  expect(closed.id).toBe("previous-kolsch");
+  expect(closed.sku_name).toContain("Kolsch");
+  expect(closed.tap_number).toBe("10");
+  // The same tap pours a fresh keg now; the closed one is a separate interval.
+  const open = tapBoard.snapshot.open.filter(tap => tap.tap_number === closed.tap_number);
+  expect(open).toHaveLength(1);
+  expect(open[0].id).not.toBe(closed.id);
+  expect(open[0].sku_id).toBe(closed.sku_id);
+});
