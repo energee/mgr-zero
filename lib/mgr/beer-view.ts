@@ -6,6 +6,8 @@ export type BeerNavView = { key: string; title: string; detail: string; href?: s
 export type BeerViewModel = {
   navs: BeerNavView[];
   blank: string;
+  stock?: { key: string; title: string; detail: string; qty: string }[];
+  stockEmpty?: string;
 };
 
 export type BeerOverview = {
@@ -42,4 +44,17 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
     { key: "kegs", title: "Kegs", detail: `${o.kegsOut} out at customers`, href: "/kegs" },
   );
   return { navs, blank: BLANK };
+}
+
+export function taproomBeerView(stock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[]): BeerViewModel {
+  return {
+    blank: "",
+    navs: [
+      { key: "count", title: "Weekly count", detail: "record physical stock and review expected consumption", href: "/taproom" },
+      { key: "board", title: "Tap board", detail: "open, swap, and kick kegs", href: "/taproom/board" },
+      { key: "variance", title: "Variance by brand", detail: "compare completed count periods", href: "/taproom/variance" },
+    ],
+    stock: stock.map(row => ({ key: `${row.skuId}:${row.locationId}`, title: row.sku, detail: row.location, qty: String(row.qty) })),
+    stockEmpty: "No taproom stock recorded",
+  };
 }

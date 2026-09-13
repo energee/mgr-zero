@@ -50,7 +50,7 @@ import {
   todayWarehouse,
 } from "../lib/mgr/fixtures/today";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toBeerViewProps } from "../lib/mgr/beer-view";
+import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toDeniedViewProps } from "../lib/mgr/denied-view";
 import { toEntryViewProps } from "../lib/mgr/entry-view";
 import { toFirstRunViewProps } from "../lib/mgr/first-run-view";
@@ -192,6 +192,11 @@ describe("Today view", () => {
 });
 
 describe("Beer view", () => {
+  it("maps taproom navigation and returned stock without an alternate JSX list", () => {
+    const model = taproomBeerView([{ skuId: "actual-sku", locationId: "actual-location", sku: "Actual SKU", location: "Actual taproom", qty: 7 }]);
+    expect(model.navs.map(row => row.title)).toEqual(["Weekly count", "Tap board", "Variance by brand"]);
+    expect(model.stock).toEqual([{ key: "actual-sku:actual-location", title: "Actual SKU", detail: "Actual taproom", qty: "7" }]);
+  });
   it("maps overview counts onto area rows", () => {
     const model = toBeerViewProps({
       overview: {
@@ -246,6 +251,7 @@ describe("Beer view", () => {
     const page = src("app/(app)/beer/page.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/beer"/);
     expect(page).toMatch(/<BeerView\b/);
+    expect(page).not.toMatch(/\bnavs=|\bblank=/);
   });
 });
 
