@@ -38,6 +38,7 @@ const BODY_SLOTS: Record<string, string> = {
   BrewDayView: "body",
   RoutesView: "list",
   RouteView: "form",
+  WorkView: "list",
 };
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",

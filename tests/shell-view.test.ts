@@ -61,7 +61,7 @@ import { toSessionExpiredViewProps } from "../lib/mgr/session-expired-view";
 import { toSettingsViewProps } from "../lib/mgr/settings-view";
 import { toTeamViewProps } from "../lib/mgr/team-view";
 import { toTodayViewProps } from "../lib/mgr/today-view";
-import { toWorkViewProps } from "../lib/mgr/work-view";
+import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -250,6 +250,20 @@ describe("Beer view", () => {
 });
 
 describe("Work view", () => {
+  it("lets shared Work filters handle explorer clicks", () => {
+    expect(src("components/mgr/screen-explorer.tsx")).toContain("[data-work-filter]");
+    expect(src("components/mgr/views/work.tsx")).toContain("data-work-filter");
+  });
+  it("preserves query identities and role-default filtering without inventing destinations", () => {
+    const common = { id: "same", detail: "Due today", href: "/orders/actual", verb: "Answer", tone: "attention" as const, dueAt: null };
+    const model = workFromQuery([{ ...common, kind: "orders", label: "An invoice question" }, { ...common, kind: "batches", label: "A reading", href: "/cellar/actual/reading" }], "sales default", ["orders"]);
+    expect(model.rows.map(row => row.key)).toEqual(["orders:same", "batches:same"]);
+    expect(filterWorkRows(model, "all").map(row => row.verb)).toEqual(["Answer"]);
+    expect(filterWorkRows(model, "batches")[0]).toMatchObject({ href: "/cellar/actual/reading", icon: "thermometer", warning: true });
+    expect(filterWorkRows(model, "routes")).toEqual([]);
+    expect(filterWorkRows(toWorkViewProps(workWarehouse), "all")).toHaveLength(4);
+    expect(workWarehouse.rows.every(row => row.href === undefined)).toBe(true);
+  });
   it("maps warehouse work rows and chips", () => {
     const model = toWorkViewProps(workWarehouse);
     expect(model.subtitle).toBe("warehouse default");
@@ -263,11 +277,12 @@ describe("Work view", () => {
     expect(body.props.model).toEqual(toWorkViewProps(workWarehouse));
   });
 
-  it("the live Work page mounts WorkView and slots WorkList", () => {
+  it("the live Work adapter delegates its controls and rows to WorkView", () => {
     const page = src("app/(app)/work/page.tsx");
-    expect(page).toMatch(/from "@\/components\/mgr\/views\/work"/);
-    expect(page).toMatch(/<WorkView\b/);
     expect(page).toMatch(/<WorkList\b/);
+    const adapter = src("app/(app)/work/work-list.tsx");
+    expect(adapter).toMatch(/<WorkView\b/);
+    expect(adapter).not.toMatch(/<Tabs\b|E\.row/);
   });
 });
 
