@@ -217,6 +217,7 @@ describe("Recipes view", () => {
   it("maps live list_recipes onto Open rows without inventing a style", () => {
     const model = toRecipesViewProps({ recipes: [{ id: "r1", name: "Hazy IPA", brand: null }] });
     expect(model.rows[0]).toMatchObject({ title: "Hazy IPA", detail: "no brand yet", verb: "Open", href: "/recipes/r1" });
+    expect(htmlOf(createElement(RecipesView, { model }))).toContain('href="/recipes/r1"');
   });
 
   it("the live Recipes page mounts RecipesView and slots NewRecipeForm", () => {
