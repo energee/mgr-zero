@@ -165,13 +165,11 @@ describe("Brand view", () => {
 
   it("renders the field row without a React key warning (E.cols owns the keys)", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-      const keyWarnings = error.mock.calls.filter((call) => call.some((arg) => /unique "key" prop/.test(String(arg))));
-      expect(keyWarnings).toEqual([]);
-    } finally {
-      error.mockRestore();
-    }
+    htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {
