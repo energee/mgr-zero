@@ -135,6 +135,8 @@ On the **Work** landing itself, chips filter the rows in place. **all** restores
 
 ## Catalog: brands, formats, and SKUs [#catalog]
 
+<Screen name="Catalog" />
+
 *A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in one packaged format, the thing inventory, pricing, and orders refer to. Admin and Sales can create brands, formats, and SKUs. Warehouse opens **Menu** under More and reads Catalog at its address without catalog mutation controls. Catalog is not reachable by Brewer.*
 
 ### Create a brand
@@ -151,6 +153,9 @@ Under the sell sheet, **Compliance** lists what this brand holds: its COLA or fo
 
 ### Create a format
 
+<Screen name="Formats" />
+<Screen name="Format" />
+
 1. Under **Formats**, select **New Format**.
 2. Enter **Name**. This form creates a packaged format that holds stock.
 3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case**. Enter **Volume** in ounces, gallons, or barrels; MGR stores its canonical barrel value.
@@ -165,6 +170,9 @@ Components must be other atomic packaged formats with a typed volume. To create 
 For packaging materials, quantities use the material’s displayed base unit. Choose **Consumed** or **Return to stock** for what happens when the package is broken open. Existing inactive materials remain visible. Changes apply to this format’s complete list; if a different package needs its own list, create a separate format. Correcting an existing definition affects future calculations and open plans. Recorded movement volumes, closed packaging yield, and consumed material quantities stay as recorded.
 
 ### Create a SKU
+
+<Screen name="SKU list" />
+<Screen name="SKU" />
 
 A brand's packages live on its own **SKU list**: open the brand from **Catalog**, then select the **SKU list** row, which names how many active packages it has.
 
@@ -195,6 +203,8 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 </Cards>
 
 **Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Removing an otherwise empty bin also clears any POS menu configured to use it, so configure that location's menu against another bin before publishing again. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
+
+<Screen name="SKU detail" />
 
 **Review** on an inventory row opens its SKU detail, separate from **Edit SKU** in Catalog. It shows on-hand by location, global ATP and allocations, and immutable paginated movement history, including inactive and zero-stock SKUs. Locations and bins retain their recorded identities; untracked lots are labeled **Untracked**.
 
@@ -398,6 +408,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 ## Locations [#locations]
 
 <Screen name="Locations" />
+<Screen name="Location detail" />
 
 **Locations** (open `/locations`; Settings links here) lists every location with what it is used for. Admin sees **Add location**: a name and its **Uses** — any of *Warehouse*, *Taproom* and *Storage*, and a place is often more than one: a building that pours pints, holds pallets and ships orders is all three, so select all three. At least one use is required. Names are unique within the brewery. Admin returns to **Settings**; other staff return to **Beer**. **All finished goods inventory** opens the global inventory, not a location filter. Select **Edit** (Admin) or **Review** (read-only staff) on a row to open the location: its uses, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its uses with **Edit** then **Save location**; movement history stays exactly as recorded. Anywhere the application asks for a taproom — the tap board, the weekly count, variance — every location with *Taproom* among its uses is offered, and the same for a warehouse.
 
@@ -543,6 +554,8 @@ The vessel links at the bottom of Batches open the same full-page **Vessel detai
 
 ## Cellar [#cellar]
 
+<Screen name="Cellar map" />
+<Screen name="Vessel detail" />
 <Screen name="Cellar transfer" />
 
 The transfer sheet previews the destination volume and the source remainder. **Leave in** keeps the remainder in the source; **Record as loss** explicitly records the whole remainder as loss. For a partial loss, enter **Loss (bbl) · optional** instead. Changing the source or moving volume clears the loss choice so it can be reviewed again. **Record transfer** stays pinned below the fields; quantities cannot exceed the source volume, and a vessel cannot transfer into itself.
@@ -581,17 +594,26 @@ Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **
 
 ### Vendors and contracts
 
+<Screen name="Vendors" />
+<Screen name="Contracts" />
+
 **Vendors** (More tab; Admin, Warehouse, Brewer) lists your suppliers. **Add vendor** and **Edit** take a name, optional email and phone, payment terms (due on receipt, net 15, net 30 default), and a **Lead time** in days. The lead time is the vendor's, not the material's: it is what Planning subtracts from a needed-by date to get a buy-by date. Once a vendor has received orders, the row also shows the observed average from sent to last receipt, with how many orders it rests on (n=3 is weak evidence) and how it was sent, because a date someone typed for an order phoned in is not the same evidence as one MGR stamped.
 
 Below the vendors, **Contracts** lists commitments: one vendor, one material, a quantity in purchase units, an optional price, window, and **Contract number**. A contract with a number shows it as the row's label; without one, the row falls back to the material name. A contract is not an order. You order against it all year, so each row shows four numbers: **committed**, **received**, **on order** (placed but not yet arrived), and **available**, which is committed less both. Available is the one to decide against; received is the one accounting reconciles. A contract never stops you ordering: exceed it and the extra lines are ordinary spot lines.
 
 ### Materials
 
+<Screen name="Materials on hand" />
+<Screen name="Materials" />
+
 **Materials on hand** (Beer tab; Admin, Warehouse, Brewer) shows quantities summed across every bin, including inactive materials, marked **inactive**. **Material definitions** opens the separate definition list, where **Edit** changes a material. **Add material** and **Edit** take a name, a kind (malt, hop, yeast, adjunct, chemical, packaging, other), the base unit you consume in, the purchase unit you buy in and how many base units one purchase unit holds (a 44 lb hop box is purchase unit *each*, 44 base units), whether it is **lot-tracked**, an optional **default vendor**, and whether it is **Active** (available to recipes and purchase orders; on by default). Units are refused once the material has movements, because every ledger row was written in them. A lot-tracked material asks for a lot code at every receipt; an untracked one never does.
 
 **Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. The live preview shows the system total and variance for the selected bin. **Lot allocation preview** is marked unavailable because the read query does not return the lot split; allocation happens in the command. Enter base units only: automatic whole-roll conversion is not available.
 
 ### Purchase orders
+
+<Screen name="New PO" />
+<Screen name="Receipt" />
 
 **Purchase orders** (Work tab; Admin and Warehouse) lists open orders: drafts, sent, and partially received. Each row names its next action. **New PO** opens a full page with a vendor, an optional expected date, and lines: a material, a quantity in purchase units, an optional unit cost, and on a lot-tracked material an optional **Expected lot**, the lot the vendor named when you ordered. Use the quantity stepper or type a decimal quantity, and **Add line** for another material. Changing a line's material clears its previous expected lot. The expected lot is advisory: it creates nothing, and receiving prefills from it. **Save draft** numbers the order PO-0001 upward and returns to the purchase-order list.
 
@@ -612,6 +634,7 @@ A sent order's page is the receiving form. Choose the location and bin everythin
 The invitation and member sheets use the same **Role** selector, including Taproom, with a short description of the selected role. Buyer invitations stay fixed to **Buyer**. In **Team member**, **Save role** enables only after a change; both saving and removal lock the controls until that request finishes. Real roster rows use initials when no photo is supplied, never an explorer fixture photo.
 
 <Screen name="Team" />
+<Screen name="Team member" />
 
 Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. Success says **Invite sent**. The roster shows memberships, without a pending-acceptance status. After an error, keep the page open and retry unchanged details to finish the same invitation. Editing the email or role starts a new request; a successful invite clears the form. Closing and reopening the form on this page preserves a failed attempt, but reloading the page does not recover it. Existing accounts cannot be attached, and there is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
 
