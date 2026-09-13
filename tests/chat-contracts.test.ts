@@ -1,8 +1,9 @@
 // Proves portable chat notifications validate without provider-specific rendering types.
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   assertPortableNotification,
   type ChatCapabilitySet,
+  type PortableAction,
   type PortableNotification,
 } from "@/lib/chat/contracts";
 
@@ -20,6 +21,7 @@ const validNotification: PortableNotification = {
 
 describe("portable chat presentation contracts", () => {
   it("accepts a provider-neutral notification", () => {
+    expectTypeOf<PortableNotification["actions"]>().toEqualTypeOf<readonly PortableAction[]>();
     expect(() => assertPortableNotification(validNotification)).not.toThrow();
   });
 
