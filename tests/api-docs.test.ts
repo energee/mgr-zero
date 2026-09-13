@@ -211,7 +211,7 @@ describe("HTTP API reference", () => {
   // The errors page is the caller's whole failure contract, so a code raised in
   // the endpoint that it does not explain is a hole a developer falls into.
   it("explains every error code the endpoint can raise", () => {
-    const sources = ["app/api/command/route.ts", "lib/commands/registry.ts", "lib/supabase/invites.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
+    const sources = ["app/api/command/route.ts", "lib/request-json.ts", "lib/commands/registry.ts", "lib/supabase/invites.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
       .filter((f) => f.endsWith(".ts"))
       .map(read).join("\n");
     const raised = new Set([

@@ -17,32 +17,7 @@ import {
 import { z } from "zod";
 import "@/lib/commands/all"; // side-effect: registers every command
 import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
-
-async function readJsonBody(req: Request): Promise<unknown> {
-  const declared = req.headers.get("content-length");
-  if (declared !== null && /^\d+$/.test(declared) && Number(declared) > MAX_COMMAND_BODY_BYTES) {
-    throw new CommandError("request body is too large", 413, "request_too_large");
-  }
-  if (!req.body) throw new CommandError("request body must be JSON", 400, "invalid_request");
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_COMMAND_BODY_BYTES) {
-      try { await reader.cancel(); } catch { /* The 413 remains stable after overflow is known. */ }
-      throw new CommandError("request body is too large", 413, "request_too_large");
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
-  catch { throw new CommandError("request body must be JSON", 400, "invalid_request"); }
-}
+import { readBoundedJson } from "@/lib/request-json";
 
 // null = no Authorization header (use the cookie session); "" = a header that
 // is present but malformed, which must fail closed as 401 rather than fall
@@ -88,7 +63,7 @@ export async function POST(req: Request) {
   let requestId: string | undefined;
 
   try {
-    const body: unknown = await readJsonBody(req);
+    const body: unknown = await readBoundedJson(req, MAX_COMMAND_BODY_BYTES);
     if (!isCommandRequest(body)) {
       throw new CommandError("invalid command request", 400, "invalid_request");
     }

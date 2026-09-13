@@ -22,4 +22,13 @@ describe("chat request boundary", () => {
     const request = new Request("http://localhost/api/chat", { method: "POST", body: " ".repeat(24 * 1024 + 1) });
     await expect(readChatRequest(request)).rejects.toMatchObject({ status: 413 });
   });
+
+  it("keeps the stable 413 when stream cancellation rejects", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) { controller.enqueue(new Uint8Array(24 * 1024 + 1)); },
+      cancel: () => Promise.reject(new Error("cancel failed")),
+    });
+    const request = new Request("http://localhost/api/chat", { method: "POST", body, duplex: "half" } as RequestInit);
+    await expect(readChatRequest(request)).rejects.toMatchObject({ status: 413, code: "request_too_large" });
+  });
 });
