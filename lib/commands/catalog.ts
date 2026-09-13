@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 // Brands (§16.1): the sellable identity. Style is found or created in the
 // brewery's own styles list; description, category, price group and hops are
@@ -212,14 +212,11 @@ defineQuery({
   roles: ["admin", "sales"],
   input: z.object({ brandId: z.string().uuid() }),
   handler: async (ctx, i): Promise<BrandRecipeCost> => {
-    // id breaks ties so a same-day pair of batches, or versions created in one instant, never flip the answer between reads.
     const [brewed, newest] = await Promise.all([
-      unwrap(ctx.db.from("batches").select("recipe_version_id")
-        .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null)
-        .order("brewed_on", { ascending: false }).order("id").limit(1).maybeSingle()) as Promise<{ recipe_version_id: string } | null>,
-      unwrap(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
-        .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId)
-        .order("created_at", { ascending: false }).order("id").limit(1).maybeSingle()) as Promise<{ id: string } | null>,
+      latestOf<{ recipe_version_id: string }>(ctx.db.from("batches").select("recipe_version_id")
+        .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null), "brewed_on"),
+      latestOf<{ id: string }>(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
+        .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId), "created_at"),
     ]);
     const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
     if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };

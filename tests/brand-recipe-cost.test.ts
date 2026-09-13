@@ -4,7 +4,7 @@
 // ingredients, and which version speaks for the brand (last brewed, else
 // newest). Also the view's reach: staff read it, a customer cannot.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, seedMaterial } from "./helpers";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, seedMaterial, seedMovement } from "./helpers";
 import { runCommand, unwrap } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -18,9 +18,8 @@ let wh: { id: string; binId: string };
 let recipeId: string;
 let v1: string;
 
-const receipt = (materialId: string, unitCostCents: number) => unwrap(admin.from("material_movements").insert({
-  brewery_id: ctx.breweryId, material_id: materialId, location_id: wh.id, bin_id: wh.binId, qty: 100, type: "receipt", unit_cost_cents: unitCostCents, created_by: ctx.userId,
-}));
+const receipt = (materialId: string, unitCostCents: number) =>
+  seedMovement(ctx.breweryId, { materialId, locationId: wh.id, binId: wh.binId, qty: 100, type: "receipt", unitCostCents, createdBy: ctx.userId });
 const cost = () => runCommand("get_brand_recipe_cost", { brandId }, ctx);
 
 beforeAll(async () => {
