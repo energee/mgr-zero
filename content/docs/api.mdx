@@ -1871,9 +1871,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Warehouses and taprooms, alphabetical
+Locations and what each is used for, alphabetical; `use` keeps only the places put to that use (a place with several uses answers to each of them)
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `use` | warehouse or taproom or storage | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -235,16 +235,21 @@ defineQuery({
 
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
-  name: "list_locations", description: "Warehouses and taprooms, alphabetical",
-  input: z.object({}), roles: STAFF_ROLES,
+  name: "list_locations", description: "Locations and what each is used for, alphabetical; `use` keeps only the places put to that use (a place with several uses answers to each of them)",
+  input: z.object({ use: z.enum(["warehouse", "taproom", "storage"]).optional() }), roles: STAFF_ROLES,
   aiExposed: true,
-  handler: async (ctx) => {
+  handler: async (ctx, i) => {
+    // Postgres does the membership test (`uses @> {use}`): asking for taprooms
+    // and scanning the answer would spend the row cap on locations the caller
+    // is about to throw away.
+    const scope = <T extends { contains: (column: string, value: string[]) => T }>(query: T) =>
+      i.use ? query.contains("uses", [i.use]) : query;
     const rows = await completeRows("Location list", async afterId => {
-      let query = ctx.db.from("locations").select("id, name, uses").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      let query = scope(ctx.db.from("locations").select("id, name, uses").eq("brewery_id", ctx.breweryId).order("id").limit(500));
       if (afterId) query = query.gt("id", afterId);
       const [result, counted] = await Promise.all([
         query,
-        ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+        scope(ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId)),
       ]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     });

@@ -188,6 +188,16 @@ a gap to close, not a convention to trust.
 
 ## Pre-implementation gates
 
+- **A page asks the query for the rows it wants.** When a page needs a subset —
+  taprooms, warehouses, open orders — the filter is an input on the registered
+  query and Postgres applies it (`list_locations` takes `use`). Reading
+  everything and narrowing it in the page spends the row cap on rows the caller
+  discards, and copies the domain rule into every page that asks. A predicate
+  repeated across pages (`l.kind === "taproom"`, `l.uses.includes("taproom")`)
+  is the signal that the query is missing an input, not that the pages need a
+  shared helper. The same reflex applies when one column becomes many (a `kind`
+  that becomes a set of `uses`): change the question the query answers, then
+  let the callers ask it.
 - **Replayable commands are idempotent at the server.** `/api/command` carries
   one stable `requestId` per write action. `private.command_requests` binds it
   to the authenticated actor, brewery, command, and canonical payload, commits

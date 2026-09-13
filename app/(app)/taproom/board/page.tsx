@@ -14,11 +14,10 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "list_open_taps", "Tap board");
-  const [allLocations, allSkus] = await Promise.all([
-    runCommand("list_locations", {}, ctx) as Promise<Location[]>,
+  const [locations, allSkus] = await Promise.all([
+    runCommand("list_locations", { use: "taproom" }, ctx) as Promise<Location[]>,
     runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
   ]);
-  const locations = allLocations.filter(location => location.uses.includes("taproom"));
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
   const [open, history] = await Promise.all([

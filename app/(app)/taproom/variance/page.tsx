@@ -13,7 +13,7 @@ export default async function TaproomVariancePage({ searchParams }: { searchPara
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_taproom_variance", "Variance by brand");
-  const locations = ((await runCommand("list_locations", {}, ctx)) as Location[]).filter(location => location.uses.includes("taproom"));
+  const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as Location[];
   const location = locations.find(item => item.id === selected.location) ?? locations[0];
   if (!location) return <TaproomVarianceView model={{ backHref: "/beer", weeks }} />;
   const report = await runCommand("get_taproom_variance", { locationId: location.id, weeks }, ctx) as VarianceReport;

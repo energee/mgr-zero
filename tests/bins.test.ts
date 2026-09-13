@@ -14,6 +14,18 @@ describe("bins", () => {
   let ctx: Ctx;
   beforeAll(async () => { ctx = await makeStaffCtx((await makeBrewery()).id, "admin"); });
 
+  it("list_locations filters on one use, and a place with several answers to each of them", async () => {
+    const mixed = (await runCommand("create_location", { name: "Lawrenceville", uses: ["taproom", "storage", "warehouse"] }, ctx)) as Row;
+    const storeOnly = (await runCommand("create_location", { name: "Overflow shed", uses: ["storage"] }, ctx)) as Row;
+    const ids = async (use?: "warehouse" | "taproom" | "storage") =>
+      ((await runCommand("list_locations", use ? { use } : {}, ctx)) as Row[]).map((l) => l.id);
+    expect(await ids("taproom")).toContain(mixed.id);
+    expect(await ids("warehouse")).toContain(mixed.id);
+    expect(await ids("storage")).toEqual(expect.arrayContaining([mixed.id, storeOnly.id]));
+    expect(await ids("taproom")).not.toContain(storeOnly.id);
+    expect(await ids()).toEqual(expect.arrayContaining([mixed.id, storeOnly.id]));
+  });
+
   it("create_location seeds Walk-in, Cold and Dry, and accepts the storage kind", async () => {
     const loc = (await runCommand("create_location", { name: "Overflow", uses: ["storage"] }, ctx)) as Row;
     const { data } = await admin.from("bins").select("name").eq("location_id", loc.id).order("name");

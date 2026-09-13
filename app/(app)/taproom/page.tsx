@@ -18,7 +18,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_taproom_count_snapshot", "Weekly count");
-  const locations = (await runCommand("list_locations", {}, ctx) as Location[]).filter(location => location.uses.includes("taproom"));
+  const locations = await runCommand("list_locations", { use: "taproom" }, ctx) as Location[];
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <WeeklyCountView model={{ backHref: "/beer", locations: [], location: "", role: brewery.role as "admin" | "warehouse" | "taproom", lotLabels: {}, history: [] }} />;
 
