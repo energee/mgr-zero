@@ -8,8 +8,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [
-  "Entity picker: SearchView <- components/mgr/search-palette.tsx",
-  "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
 ] as const;
@@ -18,7 +16,6 @@ const KNOWN_VIEW_DEBT = [
 const KNOWN_INLINE_DEBT = [] as const;
 
 const KNOWN_SURFACE_DEBT = [
-  "Search: CommandForm <- app/(app)/search/page.tsx",
 ] as const;
 
 // Audited whole-body replacements, not action/message slots. Extend this
@@ -26,7 +23,6 @@ const KNOWN_SURFACE_DEBT = [
 const BODY_SLOTS: Record<string, string> = {
   CatalogView: "brands",
   ShopView: "catalog",
-  SearchView: "palette",
   NewPoView: "form",
   ReceivePoView: "review",
   PurchaseOrdersView: "list",
@@ -40,7 +36,6 @@ const BODY_SLOTS: Record<string, string> = {
 };
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
-  "Search: SearchView.palette <- app/(app)/search/page.tsx",
 ];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {

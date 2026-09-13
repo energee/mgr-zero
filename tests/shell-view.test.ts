@@ -320,12 +320,13 @@ describe("Search view", () => {
     expect(body.props.model).toEqual(toSearchViewProps(entityPickerPalette));
   });
 
-  it("the live Search page mounts SearchView and slots SearchPalette", () => {
+  it("the live Search adapters delegate their controls and results to SearchView", () => {
     const page = src("app/(app)/search/page.tsx");
-    expect(page).toMatch(/from "@\/components\/mgr\/views\/search"/);
-    expect(page).toMatch(/<SearchView\b/);
     expect(page).toMatch(/<SearchPalette\b/);
-    expect(src("components/mgr/search-palette.tsx")).toContain("No records found · Search matches record names and numbers, not app pages.");
+    const palette = src("components/mgr/search-palette.tsx");
+    expect(palette).toMatch(/<SearchView\b/);
+    expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
+    expect(palette).toContain("No records found · Search matches record names and numbers, not app pages.");
     expect(screen("Search").states).toContainEqual(["empty", "No records found · Search matches record names and numbers, not app pages."]);
   });
 });

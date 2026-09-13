@@ -9,10 +9,10 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Icon } from "@/components/mgr/icon";
+import { SearchView } from "@/components/mgr/views/search";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
@@ -31,7 +31,7 @@ export function SearchCacheProvider({ children }: { children: React.ReactNode })
 
 type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
 
-export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits }: { placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[] }) {
+export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub }: { placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
   const breweryId = useBrewery();
   const cache = useContext(SearchCache)!;
   const router = useRouter();
@@ -85,36 +85,18 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     if (onPick) onPick(hit);
     else router.push(hit.href);
   };
-  const groups = Map.groupBy(hits, (h) => h.kind);
-  return (
-    <Command label={placeholder} shouldFilter={false} className="h-auto">
-      <CommandInput placeholder={placeholder} aria-label={placeholder} value={q} onValueChange={setQ} />
-      <CommandList>
-        {!term && visibleRecent.length > 0 && (
-          <CommandGroup heading="Recent">
-            {visibleRecent.map((h) => <SearchItem key={`recent:${h.kind}:${h.id}`} hit={h} onSelect={open} />)}
-          </CommandGroup>
-        )}
-        {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map((n) => <Skeleton key={n} className="h-12" />)}</div>}
-        {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
-        {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
-        {term && currentStatus === "ready" && hits.length === 0 && <CommandEmpty>No records found · Search matches record names and numbers, not app pages.</CommandEmpty>}
-        {[...groups].map(([kind, items]) => (
-          <CommandGroup key={kind} heading={HEADING[kind]}>
-            {items.map((h) => <SearchItem key={`${h.kind}:${h.id}`} hit={h} onSelect={open} />)}
-          </CommandGroup>
-        ))}
-      </CommandList>
-    </Command>
-  );
-}
-
-function SearchItem({ hit, onSelect }: { hit: SearchHit; onSelect: (hit: SearchHit) => void }) {
-  return (
-    <CommandItem value={`${hit.kind}:${hit.id}`} onSelect={() => onSelect(hit)} className="min-h-12 cursor-pointer">
-      <div className="flex min-w-0 flex-col text-left"><div>{hit.label}</div><span className="text-xs text-muted-foreground">{hit.detail}</span></div>
-    </CommandItem>
-  );
+  const shown = !term ? visibleRecent : hits;
+  const byKey = new Map(shown.map(hit => [`${hit.kind}:${hit.id}`, hit]));
+  const groups = Map.groupBy(shown, hit => !term ? "recent" : hit.kind);
+  const before = <>
+    {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map(n => <Skeleton key={n} className="h-12" />)}</div>}
+    {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
+    {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
+  </>;
+  return <SearchView model={{ placeholder, heading, sub, groups: [...groups].map(([kind, items]) => ({ heading: kind === "recent" ? "Recent" : HEADING[kind], items: items.map(hit => [hit.label, hit.detail, `${hit.kind}:${hit.id}`]) })) }}
+    value={q} onValueChange={setQ} shouldFilter={false} before={before}
+    emptyMessage={term && currentStatus === "ready" ? "No records found · Search matches record names and numbers, not app pages." : ""}
+    onSelect={key => { const hit = byKey.get(key); if (hit) open(hit); }} />;
 }
 
 export function SearchSheet() {

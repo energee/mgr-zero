@@ -29,7 +29,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Swap keg", file: "app/(app)/taproom/board/tap-board.tsx" },
   { name: "Work", file: "app/(app)/work/page.tsx" },
   { name: "More", file: "app/(app)/more/page.tsx" },
-  { name: "Search", file: "app/(app)/search/page.tsx" },
+  { name: "Search", file: "components/mgr/search-palette.tsx" },
   { name: "Entity picker", file: "components/mgr/search-palette.tsx" },
   { name: "Composer proposal", file: "components/mgr/composer.tsx" },
   { name: "Composer question", file: "components/mgr/composer.tsx" },
