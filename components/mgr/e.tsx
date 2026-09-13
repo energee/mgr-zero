@@ -80,8 +80,13 @@ type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
  *  row, never by inspecting the child. */
 const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50";
 
+/** Keys the fields itself: a field group is a fixed, ordered list that is never
+ *  reordered or filtered, so the index is the identity and callers pass bare
+ *  elements. (Children.toArray keys too late — React has already warned.) */
 const fieldGrid = (fields: React.ReactNode[], className: string) => (
-  <div className={cn("grid gap-2 [&>*]:min-w-0", className)}>{Children.toArray(fields)}</div>
+  <div className={cn("grid gap-2 [&>*]:min-w-0", className)}>
+    {fields.map((field, i) => <Fragment key={i}>{field}</Fragment>)}
+  </div>
 );
 
 export const E = {

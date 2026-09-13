@@ -15,8 +15,8 @@ export function StateRegistrationView({ model, controls = {}, locked = false, me
     <>
       {E.fld("Brand", model.brand)}
       {E.cols(
-        <RegistryInput key="state" label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
-        <RegistryInput key="number" label="Registration number · optional" value={model.registrationNo ?? ""} onChange={controls.registrationNo} />,
+        <RegistryInput label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
+        <RegistryInput label="Registration number · optional" value={model.registrationNo ?? ""} onChange={controls.registrationNo} />,
       )}
       <RegistryDate label="Expires · optional" value={model.expiresOn ?? ""} onChange={controls.expiresOn} />
       {E.note("One record per brand and state: saving again replaces it.")}
