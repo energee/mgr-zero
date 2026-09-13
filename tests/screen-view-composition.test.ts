@@ -23,7 +23,6 @@ const BODY_SLOTS: Record<string, string> = {
   ShopView: "catalog",
   NewPoView: "form",
   ReceivePoView: "review",
-  PurchaseOrdersView: "list",
   TeamView: "rows",
   BatchesView: "list",
   BrewDayView: "body",
