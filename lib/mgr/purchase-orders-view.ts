@@ -27,6 +27,8 @@ export type PurchaseOrdersSnapshot = {
   subtitle: string;
   rows?: PurchaseOrdersRowView[];
   empty?: EmptyState;
+  /** Closed orders included, so an empty list means there are none at all. */
+  includeClosed?: boolean;
 };
 
 export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOrdersViewModel {
@@ -35,7 +37,9 @@ export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOr
     title: s.title,
     subtitle: s.subtitle,
     rows,
-    empty: s.empty ?? (rows.length === 0 ? { title: "No open purchase orders", description: "Raise one to order materials from a vendor." } : undefined),
+    empty: s.empty ?? (rows.length === 0
+      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders", description: "Raise one to order materials from a vendor." }
+      : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 5,
     workTabs: WORK_TABS,

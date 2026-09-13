@@ -46,7 +46,7 @@ export default async function TodayPage() {
   const items = (await runCommand("get_today", {}, ctx)) as TodayItem[];
   return (
     <TodayView
-      model={toTodayViewProps({ date, items, empty: { title: "Nothing waiting", description: "Nothing needs your attention right now." }, emptyVerb: "Record movement" })}
+      model={toTodayViewProps({ date, items, emptyVerb: "Record movement" })}
       emptyAction={E.btn("Record movement", "g", "/inventory?recordMovement=1")}
       linkRows
     />

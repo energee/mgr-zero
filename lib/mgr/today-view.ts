@@ -51,6 +51,8 @@ export type TodaySnapshot = {
   taproom?: TaproomTodayRow[];
 };
 
+export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
+
 export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   if (s.rows !== undefined) {
     return { date: s.date, empty: s.empty, emptyVerb: s.emptyVerb, rows: s.rows };
@@ -74,7 +76,7 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   if (items.length === 0) {
     return {
       date: s.date,
-      empty: s.empty ?? { title: "Nothing waiting", description: "Nothing needs your attention right now." },
+      empty: s.empty ?? NOTHING_WAITING,
       emptyVerb: s.emptyVerb ?? "Record movement",
       rows: [],
     };

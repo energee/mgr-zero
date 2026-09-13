@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/finished-goods-view.ts — view-model for Finished goods (get_on_hand / get_atp).
+import type { EmptyState } from "./empty-state";
 export type FinishedGoodsRowView = {
   key: string;
   title: string;

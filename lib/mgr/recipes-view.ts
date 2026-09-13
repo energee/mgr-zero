@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/recipes-view.ts — view-model for the Recipes list.
+import type { EmptyState } from "./empty-state";
 export type RecipesRowView = {
   key: string;
   title: string;
@@ -22,14 +22,16 @@ export type RecipesSnapshot = {
   recipes?: { id: string; name: string; brand?: string | null }[];
 };
 
+const NO_RECIPES: EmptyState = { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." };
+
 export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
   if (s.rows) {
-    return { backHref: s.backHref, rows: s.rows, empty: s.rows.length === 0 ? { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." } : undefined };
+    return { backHref: s.backHref, rows: s.rows, empty: s.rows.length === 0 ? NO_RECIPES : undefined };
   }
   const recipes = s.recipes ?? [];
   return {
     backHref: s.backHref,
-    empty: recipes.length === 0 ? { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." } : undefined,
+    empty: recipes.length === 0 ? NO_RECIPES : undefined,
     rows: recipes.map((r) => ({
       key: r.id,
       title: r.name,

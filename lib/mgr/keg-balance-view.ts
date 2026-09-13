@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/keg-balance-view.ts — view-model for Customer keg balance.
+import type { EmptyState } from "./empty-state";
 export type KegBalanceRowView = {
   key: string;
   title: string;

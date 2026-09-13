@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/materials-view.ts — view-model for the Materials definition list.
+import type { EmptyState } from "./empty-state";
 export type MaterialsRowView = {
   key: string;
   title: string;

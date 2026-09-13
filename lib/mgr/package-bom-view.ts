@@ -1,6 +1,6 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/package-bom-view.ts — view-model for Package BOM. replace_format_bom
 // lines (material + qty per unit) paint the Format's packaging bill.
+import type { EmptyState } from "./empty-state";
 export type PackageBomRowView = {
   key: string;
   title: string;

@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/customers-view.ts — view-model for the Customers list.
+import type { EmptyState } from "./empty-state";
 export type CustomersRowView = {
   key: string;
   title: string;

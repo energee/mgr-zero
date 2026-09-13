@@ -26,7 +26,7 @@ export function KegFleetView({
       {model.pools ? (model.pools.length ? model.pools.map((pool) => <div key={pool.key}>
         {E.row(pool.title, pool.detail, poolActions?.[pool.key])}
         {pool.bins.map((row) => <div key={row.key}>{E.row(row.title, row.detail, row.qty)}</div>)}
-      </div>) : E.blank(model.empty ?? "No keg pools yet")) : (
+      </div>) : E.blank(model.empty)) : (
         <>
           {E.fld("Selected pool", model.pool ?? "")}
           {E.pick("Kind", model.kind ?? "", model.kindOptions ?? [])}

@@ -1,5 +1,5 @@
-import type { EmptyState } from "./empty-state";
 // lib/mgr/keg-history-view.ts — view-model for Keg event history.
+import type { EmptyState } from "./empty-state";
 export type KegHistoryRowView = {
   key: string;
   title: string;

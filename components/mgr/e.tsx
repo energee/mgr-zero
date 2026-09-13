@@ -401,14 +401,13 @@ export const E = {
    *  splits it into the fact and the sentence saying what to do next. */
   blank: (t: React.ReactNode | EmptyState, icon?: IconSvgElement) => {
     const state = t && typeof t === "object" && "title" in t ? t as EmptyState : undefined;
+    const description = state ? state.description : t as React.ReactNode;
     return (
       <Empty className="flex-1">
         <EmptyHeader>
           {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
-          {state ? <EmptyTitle>{state.title}</EmptyTitle> : null}
-          {state
-            ? state.description && <EmptyDescription>{state.description}</EmptyDescription>
-            : <EmptyDescription>{t as React.ReactNode}</EmptyDescription>}
+          {state && <EmptyTitle>{state.title}</EmptyTitle>}
+          {description && <EmptyDescription>{description}</EmptyDescription>}
         </EmptyHeader>
       </Empty>
     );

@@ -1,6 +1,6 @@
 // lib/mgr/fixtures/today.ts — get_today-shaped snapshots for Today personas.
 // Views own no sample data.
-import type { TodayViewModel } from "@/lib/mgr/today-view";
+import { NOTHING_WAITING, type TodayViewModel } from "@/lib/mgr/today-view";
 
 const DATE = "Thu 9/3";
 
@@ -16,7 +16,7 @@ export const todayWarehouse: TodayViewModel = {
 
 export const todayEmpty: TodayViewModel = {
   date: DATE,
-  empty: { title: "Nothing waiting", description: "Nothing needs your attention right now." },
+  empty: NOTHING_WAITING,
   emptyVerb: "Record movement",
   rows: [],
 };
