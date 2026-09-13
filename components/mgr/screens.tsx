@@ -27,6 +27,7 @@ import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList } from "@/lib/mgr/fixtures/invoices";
+import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -703,12 +704,7 @@ export const SCREENS: Screen[] = [
     job: "Invite one new staff account with one role",
     reads: "none", writes: "invite_staff",
     states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "cannot attach existing accounts", 1]],
-    body: (<>
-      {E.edit("Email", "", "email")}
-      {E.pick("Role", "Warehouse", ["Warehouse", "Sales", "Brewer", "Admin"])}
-      {E.note("Sending an invite emails the recipient. Keep this page open to retry after an error.")}
-      {E.btn("Send invite")}
-    </>),
+    body: <InviteView buyer={false} />,
   },
   {
     step: 2,
@@ -716,19 +712,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave": "Team" },
+    to: { "Save role": "Team", "Remove Dave Chen": "Team" },
     job: "Change one member's role or remove that membership",
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff",
     states: [["permission", "admin only", 1], ["last admin", "keep at least one admin", 1], ["self", "remove refused", 1]],
     spec: "Membership holds one role. Multiple simultaneous staff roles are unsupported. The live form opens only for another member; removing membership leaves their sign-in account.",
-    body: (<>
-      {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
-      {E.pick("Role", "Brewer", ["Warehouse", "Sales", "Brewer", "Admin"])}
-      {E.btn("Save role")}
-      {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
-      {E.btn("Remove Dave", "del")}
-    </>),
+    body: <TeamMemberView name="Dave Chen" email="dave@demobrewing.com" avatar="/mock/dave.jpg" savedRole="brewer" />,
   },
   {
     step: 2,
@@ -1226,12 +1216,7 @@ export const SCREENS: Screen[] = [
     reads: "get_customer",
     writes: "invite_customer_user [existing]",
     states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "attachment is unsupported; contact the admin", 1]],
-    body: (<>
-      {E.edit("Email", PORTAL_BUYER.email, "email")}
-      {E.fld("Role", "Buyer")}
-      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.btn("Send invite")}
-    </>),
+    body: <InviteView buyer defaultEmail={PORTAL_BUYER.email} />,
   },
   {
     step: 5,

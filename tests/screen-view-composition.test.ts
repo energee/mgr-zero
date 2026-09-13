@@ -19,11 +19,8 @@ const KNOWN_VIEW_DEBT = [
 const KNOWN_INLINE_DEBT = [
   "Expired invite",
   "Accept invite",
-  "Invite staff",
-  "Team member",
   "Create brewery",
   "Import",
-  "Invite portal user",
   "Chat disconnected",
   "Chat settings",
   "Linked people",
@@ -48,6 +45,7 @@ const BODY_SLOTS: Record<string, string> = {
   NewPoView: "form",
   ReceivePoView: "review",
   PurchaseOrdersView: "list",
+  TeamView: "rows",
 };
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
