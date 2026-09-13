@@ -127,6 +127,8 @@ export function ScreenExplorer() {
     if (!current) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
+    // Provider previews own their picker; their illustrative actions never navigate.
+    if (el.closest("[data-chat-preview]")) return;
     // A unit switcher (E.qty's addon) is a tab bar by markup only: it chooses
     // the unit of one number, so it must never filter the rows below it the way
     // a view switcher does. Harmless today only because every screen using one

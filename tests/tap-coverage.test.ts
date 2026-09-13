@@ -14,7 +14,7 @@ import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 
 const text = (h: string) => h.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated/;
+const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
 const INERT_LABEL = /^[−+]$|^History$/;
 // The explorer's own rule, so the coverage report matches what a tap does:
 // a screen that maps an INERT label meant it, and that tap must resolve.

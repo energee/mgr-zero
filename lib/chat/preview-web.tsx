@@ -1,6 +1,7 @@
 // lib/chat/preview-web.tsx — accessible web renderer for the committed chat
 // preview fixtures. Pure presentation: no provider calls, no live tenant data.
 // Reused by the Settings › Chat page; the same fixtures feed renderer tests.
+import { useId } from "react";
 import type { ChatPreviewFixture, ChatPreviewId, PortableAction, PortableNotification } from "./contracts";
 import { CHAT_PREVIEW_FIXTURES } from "./preview-fixtures";
 
@@ -20,7 +21,7 @@ const BTN = "inline-flex min-h-6 min-w-6 items-center rounded border px-3 py-1 t
 function Action({ action }: { action: PortableAction }) {
   const disabled = !action.enabled;
   return (
-    <button type="button" className={BTN + (disabled ? " opacity-60" : "")} aria-disabled={disabled || undefined}>
+    <button data-preview-action type="button" className={BTN + (disabled ? " opacity-60" : "")} aria-disabled={disabled || undefined}>
       {action.label}
       {disabled && action.disabledReason ? <small className="ml-2 text-xs">{action.disabledReason}</small> : null}
     </button>
@@ -42,7 +43,7 @@ function Item({ item }: { item: PortableNotification }) {
 
 /** One fixture drawn as the surface a person would see, labelled as preview data. */
 export function ChatPreview({ fixture }: { fixture: ChatPreviewFixture }) {
-  const headingId = `chat-preview-${fixture.id}`;
+  const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3 rounded border p-4">
       <p className="text-xs text-muted-foreground">{SURFACE_LABEL[fixture.surface]} · {fixture.eyebrow} · Preview data</p>
@@ -58,7 +59,7 @@ export function ChatPreview({ fixture }: { fixture: ChatPreviewFixture }) {
       {fixture.items.length > 0 ? <ul className="list-none">{fixture.items.map((item) => <Item key={item.resolutionKey} item={item} />)}</ul> : null}
       {fixture.gated ? (
         <div className="flex flex-col gap-1">
-          <button type="button" className={BTN + " opacity-60"} aria-disabled="true">{fixture.gated.label}</button>
+          <button data-preview-action type="button" className={BTN + " opacity-60"} aria-disabled="true">{fixture.gated.label}</button>
           <small className="text-xs text-muted-foreground">{fixture.gated.reason}</small>
         </div>
       ) : null}
@@ -69,6 +70,7 @@ export function ChatPreview({ fixture }: { fixture: ChatPreviewFixture }) {
 
 /** Radio-group picker: keyboard-operable by default, selected state shown as text. */
 export function ChatPreviewPicker({ selected, onSelect }: { selected: ChatPreviewId; onSelect: (id: ChatPreviewId) => void }) {
+  const groupName = useId();
   return (
     <fieldset className="flex flex-wrap gap-2">
       <legend className="text-sm font-medium">Preview surface</legend>
@@ -76,7 +78,7 @@ export function ChatPreviewPicker({ selected, onSelect }: { selected: ChatPrevie
         const checked = fixture.id === selected;
         return (
           <label key={fixture.id} className={BTN + " cursor-pointer gap-2 has-[:focus-visible]:ring-2" + (checked ? " border-foreground font-medium" : "")}>
-            <input type="radio" name="chat-preview" value={fixture.id} checked={checked} onChange={() => onSelect(fixture.id)} className="sr-only" />
+            <input type="radio" name={groupName} value={fixture.id} checked={checked} onChange={() => onSelect(fixture.id)} className="sr-only" />
             {fixture.title}
             {checked ? <span className="text-xs">Selected</span> : null}
           </label>

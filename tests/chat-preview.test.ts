@@ -60,6 +60,14 @@ describe("chat preview fixtures", () => {
 });
 
 describe("chat preview web renderer", () => {
+  it("isolates headings and radio groups when settings frames appear together", () => {
+    const fixture = CHAT_PREVIEW_FIXTURES[0];
+    const html = renderToStaticMarkup(createElement("div", null, ...[1, 2].map(key => createElement("div", { key }, createElement(ChatPreview, { fixture }), createElement(ChatPreviewPicker, { selected: "app-home", onSelect: () => {} })))));
+    const headings = [...html.matchAll(/<h3 id="([^"]+)"/g)].map(match => match[1]);
+    const groups = [...html.matchAll(/<input[^>]*type="radio"[^>]*name="([^"]+)"/g)].map(match => match[1]);
+    expect(new Set(headings).size).toBe(2);
+    expect(new Set(groups).size).toBe(2);
+  });
   it("renders every fixture as a named surface with preview labelling and no live provider data", () => {
     for (const fixture of CHAT_PREVIEW_FIXTURES) {
       const html = renderToStaticMarkup(createElement(ChatPreview, { fixture }));

@@ -31,8 +31,9 @@ import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { ImportView } from "@/components/mgr/views/import";
 import { importPreview } from "@/lib/mgr/fixtures/import";
-import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView } from "@/components/mgr/views/chat";
-import { linkedChatPeople, chatLinkIntent, chatRecovery } from "@/lib/mgr/fixtures/chat";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
+import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
+import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -296,7 +297,6 @@ import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
-import { SlackMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
@@ -392,10 +392,6 @@ export const INV = {
   creditMajor: "106",
   fee: "$9.48",
 } as const;
-
-// Hours before a fermentation reading counts as overdue. Settings owns it;
-// Chat settings shows the same number back.
-const OVERDUE_HOURS = "24";
 
 // A rough remaining fill, wherever a keg comes off a tap.
 
@@ -2355,14 +2351,7 @@ export const SCREENS: Screen[] = [
     writes: "begin_chat_installation [admin-only, single-use OAuth intent]",
     states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1]],
     spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.",
-    body: (<>
-      {E.back("Settings", "Chat")}
-      {E.ttl("Chat notifications")}
-      {E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}
-      {E.row("Slack", "Not connected", "", "", SlackMark)}
-      {E.nav("Preview surfaces", "App Home · personal DM · team digest")}
-      {E.btn("Connect Slack")}
-    </>),
+    body: <ChatSettingsView health={chatDisconnected} timezone="America/New_York" readingDueHours={24} previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
     step: 8,
@@ -2370,28 +2359,26 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     name: "Chat settings",
-    to: { Disconnect: "Disconnect Slack" , "Open": "Chat settings" },
+    to: { Disconnect: "Disconnect Slack" },
     job: "Operate one brewery/provider installation and inspect every outbound surface",
     reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
     writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
     spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
-    body: (<>
-      {E.back("Settings", "Chat")}
-      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
-      {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private"])}
-      {E.window("Quiet hours", "21:00", "06:00")}
-      {E.fld("Reading overdue after", `${OVERDUE_HOURS} h · set on Settings`)}
-      {E.nav("Health", "last message from Slack today · 8:42 AM")}
-      {E.nav("Linked people", "3 linked")}
-      <div>
-        {E.tabs(["App Home", "Personal DM", "Team digest", "Preferences"])}
-        {[["App Home", "4 current work reasons"], ["Personal DM", "Your assigned and overdue work"], ["Team digest", "Shared brewery work summary"], ["Preferences", "Delivery cadence and quiet hours"]].map(([name, detail], i) => (
-          <div key={name} data-preview hidden={i !== 0}>{E.row(`Preview · ${name}`, `${detail} · fixture data`)}</div>
-        ))}
-      </div>
-      {E.row("Delivery enabled", "turn off all Slack sends", E.sw(true, "Slack delivery"), "ok")}
-    </>),
+    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
+  },
+  {
+    step: 8,
+    slice: "chat",
+    tab: "More",
+    group: "Chat",
+    name: "My notification preferences",
+    job: "Control personal Slack delivery without changing assigned MGR work",
+    reads: "get_notification_preferences",
+    writes: "set_notification_preference · set_notification_destination · set_personal_quiet_hours · unlink_chat_user",
+    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["error", "keep entered quiet hours and show the command error", 1]],
+    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Clearing both personal times follows the brewery quiet hours.",
+    body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
   },
   {
     step: 8,

@@ -16,10 +16,7 @@ const KNOWN_VIEW_DEBT = [
 ] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
-const KNOWN_INLINE_DEBT = [
-  "Chat disconnected",
-  "Chat settings",
-] as const;
+const KNOWN_INLINE_DEBT = [] as const;
 
 const KNOWN_SURFACE_DEBT = [
   "Search: CommandForm <- app/(app)/search/page.tsx",

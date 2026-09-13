@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorFor, formatClock, formatWindow, fromNoonOffset, fromOffset, parseClock, toNoonOffset, toOffset } from "@/lib/time-window";
+import { anchorFor, formatClock, formatWindow, fromNoonOffset, fromOffset, parseClock, toNoonOffset, toOffset, toClockInput } from "@/lib/time-window";
 
 describe("parseClock", () => {
   it.each([["00:00", 0], ["06:00", 360], ["21:00", 1260], ["21:30", 1290]])(
@@ -10,6 +10,11 @@ describe("parseClock", () => {
 });
 
 describe("formatClock", () => {
+  it("round-trips exact minutes for command inputs", () => {
+    expect(toClockInput(1267)).toBe("21:07");
+    expect(toClockInput(1440)).toBe("00:00");
+    expect(anchorFor(1260, 1260)).toBe(1260);
+  });
   it.each([
     [0, "12:00 AM"],
     [360, "6:00 AM"],
@@ -46,6 +51,8 @@ describe("the anchor a window can be drawn against", () => {
     ["11:00", "22:00"], // taproom hours, through noon
     ["08:00", "17:00"], // a delivery window, through noon
     ["00:00", "23:30"],
+    ["23:00", "13:00"], // wraps both midnight and noon
+    ["06:00", "05:00"], // nearly a full day
   ])("keeps %s – %s ascending on its track", (start, end) => {
     const [from, to] = offsets(start, end);
     expect(from).toBeLessThan(to);

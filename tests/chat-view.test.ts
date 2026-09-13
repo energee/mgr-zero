@@ -1,7 +1,24 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView } from "../components/mgr/views/chat";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
+
+it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null }, canSetQuietHours: false }));
+  expect(html).toContain("pick due");
+  expect(html).toContain("Link MGR account");
+  expect(html).not.toContain("Save my quiet hours");
+  expect(html).not.toContain("Unlink my Slack");
+});
+
+it("shares disconnected settings without inventing connection data or allowing unconfigured OAuth", () => {
+  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24 }));
+  expect(html).toContain("Not connected");
+  expect(html).toContain("Connect Slack");
+  expect(html).toContain("disabled");
+  expect(html).not.toContain("Save operations channel");
+  expect(html).not.toContain('href="/');
+});
 
 it("distinguishes stopped delivery from incomplete credential cleanup", () => {
   const html = renderToStaticMarkup(createElement(ChatDisconnectView, { cleanupPending: true, busy: true, error: "Cleanup unavailable" }));
