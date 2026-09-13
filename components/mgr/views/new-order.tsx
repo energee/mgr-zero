@@ -37,7 +37,7 @@ function OrderPick({ label, value, options, onChange }: { label: string; value: 
 
 // Options are already loaded and permission-filtered by the route. Search the
 // same supplied SKU set in both render paths; selection always returns an ID.
-function OrderSkuPicker({ value, label, options, onChange }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void }) {
+export function OrderSkuPicker({ value, label, options, onChange }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   return <CommandForm title="Select SKU" open={open} onOpenChange={setOpen}
     trigger={<Button type="button" variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label}>{options.find(option => option.id === value)?.label ?? "Select SKU"}</Button>}>
@@ -47,14 +47,14 @@ function OrderSkuPicker({ value, label, options, onChange }: { value: string; la
   </CommandForm>;
 }
 
-function OrderQuantity({ value, label, onChange }: { value: string | number; label: string; onChange?: (value: string) => void }) {
+export function OrderQuantity({ value, label, onChange, contextualLabels = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean }) {
   const [internal, setInternal] = useState(String(value));
   const current = onChange ? String(value) : internal;
   const change = (next: string) => { setInternal(next); onChange?.(next); };
   return <ButtonGroup>
-    <Button type="button" variant="outline" size="icon" aria-label={`Decrease ${label}`} onClick={() => change(String(Math.max(0, Number(current) - 1)))}>−</Button>
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} onClick={() => change(String(Math.max(0, Number(current) - 1)))}>−</Button>
     <Input type="number" min="0" step="any" inputMode="decimal" value={current} onChange={event => change(event.target.value)} aria-label={label} className="w-14 text-center" />
-    <Button type="button" variant="outline" size="icon" aria-label={`Increase ${label}`} onClick={() => change(String(Number(current) + 1))}>+</Button>
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} onClick={() => change(String(Number(current) + 1))}>+</Button>
   </ButtonGroup>;
 }
 
@@ -86,7 +86,7 @@ export function NewOrderView({ model, controls = {}, messages, footer, submittin
       {E.row(
         <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
         line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
-        <OrderQuantity label={`Line ${index + 1} quantity`} value={line.qty} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
+        <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",
       )}
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => controls.removeLine?.(index)}>Remove</Button>}

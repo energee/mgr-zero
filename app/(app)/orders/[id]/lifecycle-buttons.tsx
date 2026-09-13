@@ -10,21 +10,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AdjustLinesForm } from "./adjust-lines-form";
-import { PickForm, type PickLine } from "./pick-form";
+import type { PickLine } from "./pick-form";
 import { ShipForm, type ShipLine } from "./ship-form";
-import { ShortPickForm, type ShortLine } from "./short-pick-form";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 type Warning = { sku_id: string; atp: number };
 
 export function LifecycleButtons({
   orderId,
+  orderNo,
   status,
   lines,
   skus,
@@ -37,6 +38,7 @@ export function LifecycleButtons({
   canSell: boolean;
   canFulfill: boolean;
   orderId: string;
+  orderNo?: number | null;
   status: OrderStatus;
   lines: { skuId: string; skuName: string; qty: number }[];
   skus: { id: string; label: string }[];
@@ -47,7 +49,6 @@ export function LifecycleButtons({
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const [short, setShort] = useState<ShortLine | null>(null);
 
   const skuNames = new Map(lines.map((l) => [l.skuId, l.skuName]));
 
@@ -84,13 +85,10 @@ export function LifecycleButtons({
           </Button>
         )}
         {canSell && (status === "confirmed" || status === "picked") && (
-          <AdjustLinesForm orderId={orderId} currentLines={lines.map((l) => ({ skuId: l.skuId, qty: l.qty }))} skus={skus} />
+          <AdjustLinesForm orderId={orderId} orderNo={orderNo} currentLines={lines.map((l) => ({ skuId: l.skuId, qty: l.qty, qtyPicked: pickLines.find(pick => pick.skuId === l.skuId)?.qtyPicked }))} skus={skus} />
         )}
         {canFulfill && (status === "confirmed" || status === "picked") && (
-          <>
-            <PickForm orderId={orderId} lines={pickLines} onShort={(line, qty) => setShort({ line, qty })} />
-            <ShortPickForm orderId={orderId} short={short} onOpenChange={(open) => { if (!open) setShort(null); }} />
-          </>
+          <Button size="sm" asChild><Link href={`/orders/${orderId}/pick`}>Record pick</Link></Button>
         )}
         {canFulfill && status === "picked" && <ShipForm transfer={transfer} orderId={orderId} lines={pickLines} />}
         {canCancel && (

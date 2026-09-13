@@ -56,6 +56,10 @@ describe("Adjust lines view", () => {
 });
 
 describe("Short pick view", () => {
+  it("does not infer a unit from a SKU name", () => {
+    const model = toShortPickViewProps({ ...orderShortPick, line: { ...orderShortPick.line, unit: undefined, skus: { name: "Showcase" } } });
+    expect(model.verb).toBe("Adjust order to 7");
+  });
   it("maps the short Pils line onto the adjust-down verb", () => {
     const model = toShortPickViewProps(orderShortPick);
     expect(model.title).toBe("ORD-0231 · short line");

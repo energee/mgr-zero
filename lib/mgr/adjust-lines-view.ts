@@ -3,9 +3,10 @@ import { docNo } from "./doc-no";
 
 export type AdjustLinesLineView = {
   key: string;
+  skuId?: string;
   name: string;
   detail: string;
-  qty: number;
+  qty: number | string;
   tone?: "" | "w" | "ok";
 };
 
@@ -14,6 +15,7 @@ export type AdjustLinesViewModel = {
   backHref?: string;
   title: string;
   lines: AdjustLinesLineView[];
+  skus?: { id: string; label: string }[];
 };
 
 export type AdjustLinesSnapshot = {
@@ -39,6 +41,7 @@ export function toAdjustLinesViewProps({ order, lines, backHref }: AdjustLinesSn
       const picked = l.qty_picked === null ? null : Number(l.qty_picked);
       return {
         key: l.id,
+        skuId: l.sku_id,
         name: l.skus?.name ?? "Line",
         detail: picked !== null && ordered < picked ? `picked ${picked}` : "",
         qty: ordered,

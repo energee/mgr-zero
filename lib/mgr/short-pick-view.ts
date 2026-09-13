@@ -29,16 +29,11 @@ export type ShortPickSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_picked: number | null;
+    unit?: string | null;
     skus: { name: string } | null;
   };
   locations: { id: string; name: string }[];
 };
-
-function unitWord(name: string) {
-  if (/case/i.test(name)) return "cases";
-  if (/keg/i.test(name)) return "kegs";
-  return "units";
-}
 
 /** Map get_order + the short line's count onto ShortPickView. */
 export function toShortPickViewProps({ order, line, locations, backHref }: ShortPickSnapshot): ShortPickViewModel {
@@ -60,6 +55,6 @@ export function toShortPickViewProps({ order, line, locations, backHref }: Short
     missing,
     resolveTitle: `Resolve the missing ${missing}`,
     chips: [`Adjust order to ${counted}`, `Keep ${missing} owed · staged`],
-    verb: `Adjust order to ${counted} ${unitWord(name)}`,
+    verb: `Adjust order to ${counted}${line.unit ? ` ${line.unit}` : ""}`,
   };
 }

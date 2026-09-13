@@ -71,7 +71,7 @@ export const orderShortPick: ShortPickSnapshot = {
     from_location_id: LOC_WAREHOUSE.id,
     customers: { name: RIDGELINE.name },
   },
-  line: line("l-pils", SKU_PILS, 10, 7),
+  line: { ...line("l-pils", SKU_PILS, 10, 7), unit: "cases" },
   locations: LOCATIONS,
 };
 
@@ -122,4 +122,3 @@ export const orderReturnCredit: ReturnCreditSnapshot = {
   locations: [LOC_WAREHOUSE, LOC_TAPROOM],
   reason: "damaged",
 };
-
