@@ -201,6 +201,15 @@ describe("Shipment done view", () => {
 });
 
 describe("Return and credit view", () => {
+  it("keeps an invoice-only return factual and uses the selected destination", () => {
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, order: undefined, returnLocationId: "taproom", locations: [{ id: "taproom", name: "Taproom" }], deposit: undefined });
+    expect(model.backTo).toBe("INV-1042");
+    expect(model.tape[0]).toEqual(["+1 Hazy IPA · ½ bbl keg · return in", "Taproom"]);
+    expect(model.depositAmount).toBeUndefined();
+  });
+  it("does not include an unsupported deposit refund in the credit amount", () => {
+    expect(toReturnCreditViewProps(orderReturnCredit).tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
+  });
   it("maps one Hazy keg plus deposit onto an $180 credit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
