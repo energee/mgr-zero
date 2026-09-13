@@ -1,4 +1,3 @@
-import { E } from "@/components/mgr/e";
 import { redirect } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -18,5 +17,5 @@ export default async function ImportPage() {
     const brand = (f as typeof f & { brands?: { name: string } | null }).brands;
     return { ...f, name: brand ? `${brand.name} · ${f.name}` : f.name };
   });
-  return <>{E.back("Settings", "Import", undefined, "/settings")}<ImportWizard breweryId={brewery.id} lookups={lookups} /></>;
+  return <ImportWizard breweryId={brewery.id} lookups={lookups} />;
 }

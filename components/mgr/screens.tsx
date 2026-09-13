@@ -29,6 +29,8 @@ import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList } from "@/lib/mgr/fixtures/invoices";
 import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
+import { ImportView } from "@/components/mgr/views/import";
+import { importPreview } from "@/lib/mgr/fixtures/import";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -738,19 +740,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Desk",
     name: "Import",
+    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import" },
     job: "Upload, map, preview and independently commit valid rows",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
     spec: "One logical row is atomic; siblings commit independently. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry returns original results; correction starts only blocked rows with a new identity. Keep the page open for retry recovery; reopening has no automatic batch recovery.",
-    body: (<>
-      {E.back("Settings", "Import")}
-      {E.stp(["upload", "map", "preview", "commit"], 2)}
-      {E.chips(["customers", "ship-tos", "products", "channel prices", "opening balances"], 0)}
-      {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "sale channel missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "new", "ready"]])}
-      {E.btn("Import 2 customer rows")}
-      {E.note("Retry returns original results. Correct only blocked rows in a new batch.")}
-    </>),
+    body: <ImportView model={importPreview} />,
   },
   {
     step: 3,

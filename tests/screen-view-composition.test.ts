@@ -17,7 +17,6 @@ const KNOWN_VIEW_DEBT = [
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
 const KNOWN_INLINE_DEBT = [
-  "Import",
   "Chat disconnected",
   "Chat settings",
   "Linked people",

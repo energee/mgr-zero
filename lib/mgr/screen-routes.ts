@@ -14,7 +14,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
   { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
   { name: "Invite portal user", file: "app/(app)/customers/[id]/page.tsx" },
-  { name: "Import", file: "app/(app)/settings/import/page.tsx" },
+  { name: "Import", file: "app/(app)/settings/import/import-wizard.tsx" },
   { name: "Create brewery", file: "app/(auth)/create-brewery/page.tsx" },
   { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
