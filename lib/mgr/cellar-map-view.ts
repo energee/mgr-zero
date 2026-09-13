@@ -12,3 +12,11 @@ export function toCellarMapViewProps(vessels: { id: string; name: string; capaci
     return { name: vessel.name, detail: `${occupancy ? occupancy.brand_name ?? "No brand yet" : "Empty"} · ${quantity} / ${capacity} bbl`, reading: occupancy ? readings[occupancy.occupancy_id] ?? "No readings yet" : "available", fill: capacity > 0 ? quantity / capacity * 100 : undefined, href: hrefs[vessel.id] };
   }) };
 }
+
+/** The map draws one Reading button, so the live page can only bind it when a
+ *  single tank is occupied — with several there is no unambiguous target and
+ *  guessing records the reading against the wrong occupancy. Callers pass the
+ *  result in; the adapter above never manufactures a live path itself. */
+export function cellarReadingHref(occupancies: { occupancy_id: string }[]) {
+  return occupancies.length === 1 ? `/cellar/${occupancies[0].occupancy_id}/reading` : null;
+}

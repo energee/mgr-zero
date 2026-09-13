@@ -108,7 +108,7 @@ export function toShopViewProps({
     empty: catalog.length === 0 ? "Nothing is listed for wholesale yet. Call the brewery." : undefined,
     source: source.name,
     shipToLine: `${shipTo?.label ?? "Ship-to"} · ${requestedDate}`,
-    depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal.",
+    depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal. The brewery confirms final invoice amounts and the requested delivery date.",
     reviewVerb: `Review order · ${money(merchandiseCents)}`,
     shipToId,
     shipTos: shipTos.map(({ id, label }) => ({ id, label })),

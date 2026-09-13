@@ -259,3 +259,25 @@ describe("Vendors", () => {
     expect(page).toMatch(/<ContractForm\b/);
   });
 });
+
+it("does not require the fields of a New PO line the user has not begun", () => {
+  // new-po-form submits only lines with a material and a positive qty, so a
+  // blank appended row must not trip native validation: there is no control to
+  // remove it, and the submit button stays enabled while other lines are valid.
+  const noop = () => {};
+  const controls = { vendor: noop, expected: noop, material: noop, quantity: noop, cost: noop, lot: noop, add: noop };
+  const html = renderToStaticMarkup(createElement(NewPoView, {
+    model: {
+      backHref: "/purchase-orders", vendor: "vendor", vendors: [{ id: "vendor", name: "Country Malt" }],
+      materials: [{ id: "malt", name: "2-row", purchase_uom: "bag", lot_tracked: false }], expected: "",
+      lines: [
+        { key: "0", materialId: "malt", title: "2-row", detail: "", qty: "4", cost: "" },
+        { key: "1", materialId: "", title: "", detail: "", qty: "", cost: "" },
+      ],
+    },
+    controls,
+  }));
+  const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
+  expect(line(1)).toContain("required");
+  expect(line(2)).not.toContain("required");
+});

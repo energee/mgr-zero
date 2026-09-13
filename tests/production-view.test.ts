@@ -28,7 +28,7 @@ import { toRunClosedViewProps } from "../lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "../lib/mgr/schedule-batch-view";
 import { toVesselDetailViewProps } from "../lib/mgr/vessel-detail-view";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
-import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
+import { cellarReadingHref, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -247,4 +247,18 @@ describe("Recipes view", () => {
     expect(page).toMatch(/<RecipeView\b/);
     expect(page).toMatch(/<NewVersionForm\b/);
   });
+});
+
+it("only offers the cellar Reading shortcut when one tank could be meant", () => {
+  // The map draws a single Reading button. With more than one tank occupied
+  // there is no unambiguous target, and guessing records a fermentation
+  // reading against the wrong occupancy; the tile opens the right tank.
+  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }];
+  const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
+  const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
+  expect(cellarReadingHref(one)).toBe("/cellar/o1/reading");
+  expect(cellarReadingHref(two)).toBeNull();
+  expect(cellarReadingHref([])).toBeNull();
+  // The adapter itself still invents no live path.
+  expect(toCellarMapViewProps(vessels, one).readingHref).toBeUndefined();
 });

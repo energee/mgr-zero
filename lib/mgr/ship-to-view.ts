@@ -22,7 +22,7 @@ export type ShipToSnapshot = {
 
 export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
   return {
-    title: `${s.label} ship-to`,
+    title: `${s.label || "New"} ship-to`,
     label: s.label,
     address: s.address1,
     address2: s.address2 ?? "",

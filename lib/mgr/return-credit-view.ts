@@ -49,6 +49,10 @@ export type ReturnCreditSnapshot = {
 };
 
 const REASONS = ["damaged", "wrong item", "unsold"];
+// Chip labels carry the consequence, because the reason decides whether the
+// returned beer restocks or is written to loss in the same command. Display
+// only: credit-memo-form maps the chip index, not this text.
+const REASON_LABELS = ["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"];
 
 /** Map get_order / get_invoice plus the return qty onto ReturnCreditView. */
 export function toReturnCreditViewProps({
@@ -79,7 +83,7 @@ export function toReturnCreditViewProps({
       qty: Number(l.qty_returning),
       shipped: Number(l.qty_shipped ?? 0),
     })),
-    reasons: REASONS,
+    reasons: REASON_LABELS,
     returnTo: returnToOptions.find(option => option.id === destinationId)?.label ?? destName,
     returnToId: destinationId,
     returnToOptions,

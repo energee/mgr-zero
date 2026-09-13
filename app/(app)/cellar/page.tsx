@@ -2,7 +2,7 @@
 // now (list_occupancies), each opening its reading log; Transfer is
 // cellar-transfer-form.tsx → record_cellar_transfer.
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
-import { toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
+import { cellarReadingHref, toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
 import { formatVesselReading, type VesselReading } from "@/lib/mgr/vessel-detail-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -36,7 +36,7 @@ export default async function CellarPage() {
     return [occupancy.occupancy_id, history[0] ? `${formatVesselReading(history[0], unit.effective)} · ${history[0].at}` : "No readings yet"];
   })));
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])));
+  model.readingHref = cellarReadingHref(occupancies);
   model.backHref = "/beer"; model.addHref = "/cellar/vessels/new"; model.brewHref = "/batches";
-  model.readingHref = occupancies[0] ? `/cellar/${occupancies[0].occupancy_id}/reading` : null;
   return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }

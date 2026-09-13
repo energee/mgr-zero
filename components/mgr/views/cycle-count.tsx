@@ -19,7 +19,7 @@ export function CycleCountView({ model, footer, onQuantity, onLocation, onBin, m
 }) {
   return <>
     <fieldset disabled={submitting} className="flex flex-col gap-3">
-      {E.fld("Material", model.material)}
+      {E.nav("Material", model.material)}
       {model.locations && <div className="grid grid-cols-2 gap-2">
         <Field><FieldLabel>Location</FieldLabel><select aria-label="Location" required className="min-w-0 rounded border bg-background p-2" value={onLocation ? model.locationId : undefined} defaultValue={onLocation ? undefined : model.locationId} onChange={event => onLocation?.(event.target.value)}>
           <option value="">Select location</option>{model.locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}

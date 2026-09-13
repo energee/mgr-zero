@@ -34,3 +34,16 @@ it("the live draft, correction and print bindings delegate to shared controls", 
   expect(source).not.toContain("<Input");
   expect(source).not.toContain("<form");
 });
+
+it("marks the count quantities invalid when the save was rejected", () => {
+  // The error message alone is not announced as belonging to the inputs; a
+  // screen reader needs the fields themselves flagged (this was lost when the
+  // live form's per-input aria-invalid moved into the shared control).
+  let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Actual keg", brand_id: "brand", brand_name: "Actual brand", bbl_per_unit: 0.5, lot_id: "lot", qty_before: 3 }] }, { prior_count: null, expected_bbl: null, reason: "no_pos_coverage", rows: [] });
+  state = updateCountQuantity(state, state.draft.lines[0].key, "2");
+  const ok = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, role: "taproom", lotLabels: {} }));
+  expect(ok).not.toContain('aria-invalid="true"');
+  const rejected = failCountAttempt(beginCountAttempt(state, "request"), "error", "Bin no longer holds that lot");
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: rejected, role: "taproom", lotLabels: {} }));
+  expect(html).toContain('aria-invalid="true"');
+});

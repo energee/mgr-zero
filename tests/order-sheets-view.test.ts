@@ -214,7 +214,7 @@ describe("Return and credit view", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
     expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1 });
-    expect(model.reasons).toEqual(["damaged", "wrong item", "unsold"]);
+    expect(model.reasons).toEqual(["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"]);
     expect(model.returnTo).toBe("Warehouse · original fulfillment source");
     expect(model.depositAmount).toBe("−$30.00");
     expect(model.creditInfo).toMatch(/INV-1042/);

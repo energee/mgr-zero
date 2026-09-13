@@ -102,6 +102,8 @@ describe("Ship-to form", () => {
     expect(model.city).toBe("Phoenixville");
     expect(model.isDefault).toBe(true);
     expect(toShipToViewProps({ ...shipToMain, address2: "Dock 2" }).address2).toBe("Dock 2");
+    // A new ship-to has no label yet; the heading must not read " ship-to".
+    expect(toShipToViewProps({ ...shipToMain, label: "" }).title).toBe("New ship-to");
   });
 
   it("the Ship-to form inventory record is ShipToView", () => {

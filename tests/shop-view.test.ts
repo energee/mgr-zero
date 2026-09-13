@@ -138,3 +138,12 @@ it("review preserves quoted amounts and identities without inventing missing tax
   expect(model.lines[0].key).toBe(quote.lines[0].skuId);
   expect(model.requestedDate).toBe("Not specified");
 });
+
+it("tells the buyer the amounts and the requested date are not final", () => {
+  // A portal request is not an order: the brewery confirms both the money and
+  // the date. Dropping either half of this leaves the buyer reading the
+  // subtotal as a quote and the requested date as a commitment.
+  const info = toShopViewProps(ridgelineShop).depositInfo;
+  expect(info).toContain("not included");
+  expect(info).toContain("The brewery confirms final invoice amounts and the requested delivery date.");
+});
