@@ -13,8 +13,6 @@ const KNOWN_VIEW_DEBT = [
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
-  "Review order: ReviewOrderView <- app/(portal)/portal/page.tsx",
-  "Question invoice: QuestionInvoiceView <- app/(portal)/portal/invoices/[id]/page.tsx",
   "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
   "New PO: NewPoView <- app/(app)/purchase-orders/page.tsx",
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
@@ -69,7 +67,6 @@ const BODY_SLOTS: Record<string, string> = {
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
   "Search: SearchView.palette <- app/(app)/search/page.tsx",
-  "Shop: ShopView.catalog <- app/(portal)/portal/page.tsx",
 ];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
