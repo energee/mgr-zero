@@ -216,9 +216,9 @@ access is anonymous. All other operations use the following membership checks.
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
 in. Being signed in is not enough. The caller must be a member of that brewery:
-staff (`brewery_users` with role `admin`, `sales`, `warehouse` or `brewer`) or
-a portal user (`customer_users` linked to one of the brewery's customers, role
-`customer`).
+staff (`brewery_users` with role `admin`, `sales`, `warehouse`, `brewer` or
+`taproom`) or a portal user (`customer_users` linked to one of the brewery's
+customers, role `customer`).
 
 The two failures are different, and that difference is worth handling.
 `401 unauthenticated` means the token is missing or expired: sign in again.
@@ -626,10 +626,13 @@ calendar day. A requested ship date is a day, not an instant. Fields that
 genuinely mean an instant, such as `now` on `get_today`, take an offset-aware
 ISO timestamp so the server never has to guess a timezone.
 
-**Volumes are numeric strings.** `bblPerUnit` is `"0.1651"`, not `0.1651`. A
-barrel figure feeds excise reporting, and binary floating point cannot represent
-most decimal fractions exactly. Passing it as a string keeps the exact decimal
-the brewery entered all the way to the tax form.
+**Most volumes are plain numbers; one takes an exact decimal string.**
+`bblPerUnit` on `upsert_format` is a JSON number, like `0.1651`. `reattribute_loss`'s
+`bbl` is the exception: it accepts either a number or a string such as
+`"0.1651"`, because that figure feeds excise reporting and binary floating
+point cannot represent most decimal fractions exactly. A string there keeps
+the exact decimal the brewery entered all the way to the tax form. Check each
+operation's field table rather than assuming a volume field takes a string.
 
 **`limit` defaults to 50 and caps at 200** on every operation that takes one.
 
@@ -640,9 +643,9 @@ computed from the SKU and the quantity. A field an operation does not declare is
 dropped before the handler runs rather than trusted, so sending your own `bbl`
 does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
-`publish_pos_item` and `publish_pos_menu` are the exception: their schemas
-refuse an undeclared field outright with `400 invalid_input` instead of
-dropping it.
+`publish_pos_item`, `publish_pos_menu`, and `record_fermentation_reading` are
+the exception: their schemas refuse an undeclared field outright with
+`400 invalid_input` instead of dropping it.
 
 Prices on order lines are snapshotted at creation from the customer's price
 group. You do not send them, and changing a price group later does not rewrite
@@ -3311,8 +3314,8 @@ A recipe is versioned: a batch references the version it was brewed to, so a
 later recipe change never rewrites the history of beer already made.
 
 The cellar map is the read behind vessel work: what is in each tank, and for how
-long. Fermentation readings are appended per batch and are what an overdue
-reading notification is measured against.
+long. Fermentation readings are appended per open occupancy and are what an
+overdue reading notification is measured against.
 
 {/* ops:production */}
 
@@ -4248,8 +4251,8 @@ curl -X POST "$MGR_URL/api/command" \
 
 ### Team & brewery settings [#team]
 
-Staff roles are `admin`, `sales`, `warehouse` and `brewer`, and every operation
-in this reference lists the roles allowed to call it. A membership is what ties a
+Staff roles are `admin`, `sales`, `warehouse`, `brewer` and `taproom`, and
+every operation in this reference lists the roles allowed to call it. A membership is what ties a
 user to a brewery. Revoking one ends access without deleting the history that
 member wrote.
 
