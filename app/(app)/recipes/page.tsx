@@ -27,7 +27,6 @@ export default async function RecipesPage() {
         recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id) })),
       })}
       header={E.hd("Recipes", "brewing process specs", <NewRecipeForm brands={brands} />)}
-      linkRows
     />
   );
 }
