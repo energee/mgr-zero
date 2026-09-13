@@ -2,8 +2,6 @@
 // Submit buttons (app/(portal)/portal/cart.tsx), kept out of the component so
 // vitest can pin them down: which command syncs the cart to the database, and
 // when the buttons are disabled.
-import { canRetireCommandFailure } from "@/lib/commands/failure";
-
 /** Which command writes the cart's current lines/fields to the database. A
  *  first save creates the draft; every later save replaces the saved draft's
  *  lines, so a quantity edited after Save draft (or after a submit that created
@@ -105,9 +103,4 @@ export async function executePortalAttempt(
   }
   storage.removeItem(portalAttemptKey(attempt.scope));
   return id;
-}
-
-// A later refusal cannot establish whether an earlier uncertain send committed.
-export function canRetirePortalFailure(status: number, retrying: boolean, code?: string) {
-  return canRetireCommandFailure(status, retrying, code);
 }
