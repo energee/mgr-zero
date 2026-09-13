@@ -1,6 +1,24 @@
 import type { TaproomVarianceViewModel } from "@/lib/mgr/taproom-variance-view";
 import type { WeeklyCountViewModel } from "@/components/mgr/views/weekly-count";
 import { countDraftFromSnapshot, correctionStateFromReceipt } from "@/lib/mgr/taproom-count-state";
+import { openTapBoardSheet, type TapInterval, type TapBoardState } from "@/lib/mgr/tap-board-state";
+
+function fixtureTap(number: string | null, name: string, bbl: number, day: string, fill = 1, excluded = false): TapInterval {
+  return { id: `tap-${number ?? "none"}`, location_id: "taproom", sku_id: `sku-${name}`, sku_name: name, brand_id: name, brand_name: name.split(" · ")[0], label: null, nominal_bbl: bbl, tap_number: number, opening_fill: fill, not_in_inventory: excluded, opened_at: `2026-09-${day}T16:00:00Z`, opened_by: "dana", opened_by_label: "dana" };
+}
+const boardTaps = [
+  fixtureTap("1", "Pils · ½ bbl", .5, "07"), fixtureTap("2", "Hazy IPA · ½ bbl", .5, "07"), fixtureTap("3", "Stout · ⅙ bbl", 1 / 6, "08", .6),
+  fixtureTap("4", "Amber · ½ bbl", .5, "05"), fixtureTap("5", "Helles · ½ bbl", .5, "09", 1, true), fixtureTap("6", "Saison · ½ bbl", .5, "10"),
+  fixtureTap("8", "Porter · ⅙ bbl", 1 / 6, "11"), fixtureTap("9", "Hazy IPA · ½ bbl", .5, "10", 1, true), fixtureTap("10", "Kolsch · ½ bbl", .5, "08"),
+  fixtureTap("11", "Barrel Dark · ⅙ bbl", 1 / 6, "06"), fixtureTap(null, "Wild Ale · ⅙ bbl", 1 / 6, "10"),
+];
+export const tapBoardSkus = [...new Map(boardTaps.map(tap => [tap.sku_id!, { id: tap.sku_id!, name: tap.sku_name!, nominalBbl: tap.nominal_bbl }])).values()];
+export const tapBoard: TapBoardState = { sheet: null, snapshot: {
+  open: [...boardTaps, { ...fixtureTap("7", "Guest cider", .5, "09", 1, true), sku_id: null, sku_name: null, brand_id: null, brand_name: null, label: "Guest cider" }],
+  history: [{ ...boardTaps[9], id: "previous-kolsch", closed_at: "2026-09-08T20:10:00Z", closed_by: "dana", closed_by_label: "dana", closing_fill: 0, close_reason: "Kicked empty" }],
+} };
+export const kickKeg = openTapBoardSheet(tapBoard.snapshot, "kick", boardTaps[4]).sheet!;
+export const swapKeg = openTapBoardSheet(tapBoard.snapshot, "swap", boardTaps[4]).sheet!;
 
 const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_on: "Sep 8", prior_count: { id: "sep1", counted_on: "Sep 1" }, revision: "fixture-count", lines: [
   { bin_id: "cold", bin_name: "Cold", sku_id: "pils-case", sku_name: "Pils · 16 oz case", brand_id: "pils", brand_name: "Pils", bbl_per_unit: 384 / 3968, lot_id: null, qty_before: 6 },

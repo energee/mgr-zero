@@ -49,6 +49,8 @@ import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views
 import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
+import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -385,7 +387,6 @@ export const INV = {
 const OVERDUE_HOURS = "24";
 
 // A rough remaining fill, wherever a keg comes off a tap.
-const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
 export { WORK_TABS } from "@/lib/mgr/work-view";
 
@@ -2286,17 +2287,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: (<>
-      {E.back("Beer", "Tap board")}
-      {E.ttl("On tap")}
-      {E.tabs(["Taproom", "Warehouse"])}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0], ["2", "Hazy IPA · ½ bbl", "on Mon", 0], ["3", "Stout · ⅙ bbl", "on Tue · opened 60%", 0], ["4", "Amber · ½ bbl", "on Sat", 0], ["5", "Helles · ½ bbl", "on Wed", 1], ["6", "Saison · ½ bbl", "on Thu", 0], ["8", "Porter · ⅙ bbl", "on Fri", 0], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1], ["10", "Kolsch · ½ bbl", "on Tue", 0], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0]])}
-      {E.row("7 · Guest cider · keg", "nominal ½ bbl · tapped here by @dana · not our stock · no guest yield", E.act("Kick", "destructive"), "w")}
-      {E.info("Tap 7 is empty. Unnumbered kegs sort last.")}
-      {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
-      {E.row("Recent · Saison swapped in", "Ali · Thu 11:20am")}
-      {E.note("With no usable POS numerator, a row shows what is on and since when, with no bar. Guest labels are never matched to POS. Nothing on this board posts to the ledger; the weekly count does that.")}
-    </>),
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -2310,15 +2301,7 @@ export const SCREENS: Screen[] = [
     writes: "kick_keg",
     states: permitted("taproom, warehouse or admin required").concat([["empty", "tap becomes empty"], ["beer remaining", "closing fill is a coarse observation only"], ["already closed", "safe closer and time shown; reload before acting", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
-    body: (<>
-      {E.ttl("Kick tap 5")}
-      {E.fld("Coming off", "Helles · ½ bbl · on since Wed")}
-      {E.pick("Reason", "Kicked empty", ["Kicked empty", "Flavor change", "Quality hold"])}
-      {E.ttl("Remaining")}
-      {E.chips(FILL_CHIPS, 0)}
-      {E.info("Remaining is a rough observation. Closing this interval does not change finished-goods inventory.")}
-      {E.btn("Kick keg", "del")}
-    </>),
+    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} />,
   },
   {
     step: 7,
@@ -2332,21 +2315,7 @@ export const SCREENS: Screen[] = [
     writes: "swap_keg",
     states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
-    body: (<>
-      {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
-      {E.ttl("Coming off")}
-      {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
-      {E.chips(FILL_CHIPS, 0)}
-      {E.ttl("Going on")}
-      {E.pick("Packaged keg SKU", "Helles · ½ bbl", ["Helles · ½ bbl", "Pils · ½ bbl"])}
-      {E.pick("Identity", "Same own SKU", ["Same own SKU", "Own keg", "Guest keg"])}
-      {E.fld("Guest keg label", "required for a guest")}
-      {E.fld("Guest nominal BBL", "positive number")}
-      {E.fld("Tap number", "5 · optional")}
-      {E.info("Remaining is a rough observation. The atomic swap does not change finished-goods inventory.")}
-      {E.btn("Swap · one record", "irr")}
-      {E.note("The swap is one record. A half-finished swap is not a state this can reach.")}
-    </>),
+    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} closedFact="Helles was swapped out at 7:42pm by Ali" />,
   },
   {
     step: 7,

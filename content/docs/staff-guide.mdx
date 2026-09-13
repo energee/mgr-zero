@@ -90,6 +90,8 @@ The original header, observations, and ledger rows remain unchanged. MGR appends
 
 ## Tap intervals [#tap-intervals]
 
+**Tap board** uses the shared vessel-style tiles for owned kegs and a separate guest-keg row, with **Swap** and **Kick** on each. **Tap keg** opens the same entry sheet in the explorer and application. Closing fill is **Empty**, **About ¼ left**, or **About ½ left**; opening fill remains a separate coarse observation. **Swap keg** keeps the outgoing captured SKU available for **Same own SKU**, even if it is no longer in the active SKU chooser. The recent-activity rows show the two most recently opened current intervals; closed intervals remain in recent history. These actions never post finished-goods depletion.
+
 Admin, Warehouse, and Taproom open **Tap board** from Beer, Taproom, or Taproom Today. Choose an owned taproom location. **Tap keg** opens a keg with its packaged keg SKU, or with an explicit guest label and positive nominal size in BBL. Own keg size comes from its format and is frozen by the server for that interval. A guest always shows as not in inventory; an own keg also receives that flag when its taproom has no positive stock. Tapping never changes inventory.
 
 Opening fill is about ¼, ½, 60%, or full. A tap number is optional and can repeat. Kick closes an interval with a reason and estimated remaining fill: empty, about ¼, or about ½. Swap closes and replaces it in one action. Omit the incoming keg to reuse the outgoing own SKU; a guest replacement always requires an explicit name and size. An omitted replacement number leaves the new interval unnumbered.

@@ -190,6 +190,7 @@ export const INERT: (string | RegExp)[] = [
   /^Switch to (dark|light) mode$/,
   "Send",
   "Refresh expected",
+  "Tap keg",
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",

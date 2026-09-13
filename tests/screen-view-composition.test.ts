@@ -30,9 +30,6 @@ const KNOWN_INLINE_DEBT = [
   "Disconnect QuickBooks",
   "Invoices",
   "Fix mapping",
-  "Tap board",
-  "Kick keg",
-  "Swap keg",
   "Chat disconnected",
   "Chat settings",
   "Linked people",
@@ -124,7 +121,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
           ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
           bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
         }
-        if (imported?.path && !name.endsWith("View")) visit(imported.path, imported.imported);
+        if (imported?.path) visit(imported.path, imported.imported);
         if (!imported) {
           const declaration = file.statements.find(statement =>
             ts.isFunctionDeclaration(statement) && statement.name?.text === tag);

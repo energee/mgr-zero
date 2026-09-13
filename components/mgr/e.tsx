@@ -367,11 +367,11 @@ export const E = {
       ))}
     </div>
   ),
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?][], c: "c2" | "c3" = "c3") => (
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][], c: "c2" | "c3" = "c3") => (
     <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
-      {arr.map(([n, s, g, w, f, href], i) => (
+      {arr.map(([n, s, g, w, f, href, actions], i) => (
         <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
-          {href ? <Link href={href}><TileContent {...{ n, s, g, w, f }} /></Link> : <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>}
+          {actions ? <div><TileContent {...{ n, s, g, w, f }} />{actions}</div> : href ? <Link href={href}><TileContent {...{ n, s, g, w, f }} /></Link> : <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>}
         </Item>
       ))}
     </ItemGroup>
