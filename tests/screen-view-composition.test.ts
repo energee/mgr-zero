@@ -21,7 +21,6 @@ const KNOWN_INLINE_DEBT = [] as const;
 const KNOWN_SURFACE_DEBT = [
   "Search: CommandForm <- app/(app)/search/page.tsx",
   "Session expired: CommandForm <- app/(auth)/login/page.tsx",
-  "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
 ] as const;
 
 // Audited whole-body replacements, not action/message slots. Extend this

@@ -40,7 +40,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Chat settings", file: "app/(app)/settings/chat/page.tsx" },
   { name: "My notification preferences", file: "app/(app)/settings/chat/chat-settings-client.tsx" },
   { name: "Linked people", file: "app/(app)/settings/chat/chat-settings-client.tsx" },
-  { name: "Link your Slack", file: "app/(app)/settings/chat/link/page.tsx" },
+  { name: "Link your Slack", file: "app/(auth)/settings/chat/link/page.tsx" },
   { name: "Disconnect Slack", file: "app/(app)/settings/chat/disconnect/page.tsx" },
   { name: "Reauthorization", file: "app/(app)/settings/chat/health/page.tsx" },
   { name: "Settings", file: "app/(app)/settings/page.tsx" },
