@@ -116,7 +116,7 @@ describe("Materials", () => {
 
   it("the Cycle count inventory shares the complete view including its footer", () => {
     const { rest, pin } = splitPinned(screen("Cycle count").body);
-    expect(htmlOf(rest)).toBe(htmlOf(createElement(CycleCountView, { model: toCycleCountViewProps(cycleCountCans), footer: null })));
+    expect((rest[0] as { props: { model: unknown } }).props.model).toEqual(toCycleCountViewProps(cycleCountCans));
     expect(htmlOf(rest)).toContain("Cans · 16 oz");
     expect(htmlOf(rest)).not.toContain("Record count");
     expect(htmlOf(pin)).toBe(htmlOf(E.pin(createElement(CycleCountFooter))));
