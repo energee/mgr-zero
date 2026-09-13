@@ -12,8 +12,6 @@ export function invoiceCurrentState(invoice: {
   return invoice.paid_at && (invoice.qbo_balance_cents == null || invoice.qbo_balance_cents === 0) ? "paid" : "unpaid";
 }
 
-export const invoiceIsCurrentlyPaid = (invoice: Parameters<typeof invoiceCurrentState>[0]) => invoiceCurrentState(invoice) === "paid";
-
 export const invoiceIsSettledWithoutPayment = (invoice: Parameters<typeof invoiceCurrentState>[0]) =>
   invoiceCurrentState(invoice) === "unpaid"
   && invoice.qbo_remote_state === "live"

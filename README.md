@@ -185,8 +185,12 @@ Enable the tracked pre-push check once per clone:
 git config core.hooksPath .githooks
 ```
 
-For code changes, it runs the same lint, typecheck, build, pure-screen, and
-isolated-database test commands as CI. Documentation-only pushes skip the gate.
+For code changes it runs lint, the typecheck, and the pure-screen vitest
+files — about a minute. `next build` and the database-backed suites are left
+to CI, which runs them in parallel jobs against a database built from scratch
+and is the merge gate; locally they took ten minutes and reset a database
+other worktrees share. Run them by hand with `bash scripts/test-db.sh && bunx
+vitest run`. Documentation-only pushes skip the gate.
 
 `.github/workflows/ci.yml` runs on every push and pull request: installs
 deps, starts a local Supabase stack with only the services the tests use

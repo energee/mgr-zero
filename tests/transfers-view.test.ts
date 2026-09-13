@@ -13,6 +13,7 @@ import { newTransferDraft, transferDetailSubmitted, transfersList } from "../lib
 import { toNewTransferViewProps } from "../lib/mgr/new-transfer-view";
 import { toTransferDetailViewProps } from "../lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "../lib/mgr/transfers-view";
+import { WORK_CHIPS, WORK_TABS } from "../lib/mgr/work-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -22,6 +23,8 @@ describe("Transfers list", () => {
     const model = toTransfersViewProps(transfersList);
     expect(model.title).toBe("Work");
     expect(model.workChipIndex).toBe(2);
+    expect(model.workChips).toBe(WORK_CHIPS);
+    expect(model.workTabs).toBe(WORK_TABS);
     expect(model.rows.map((r) => [r.title, r.detail, r.verb])).toEqual([
       ["TRF-0007", `${LOC_WAREHOUSE.name} to ${LOC_TAPROOM.name} · 2 lines · submitted`, "Pick"],
       ["TRF-0006", `${LOC_WAREHOUSE.name} to Storage · 1 line · picked`, "Receive"],

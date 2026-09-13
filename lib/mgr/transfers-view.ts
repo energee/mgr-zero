@@ -2,12 +2,7 @@
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { trfNo } from "./doc-no";
-
-export const TRANSFER_WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
-export const TRANSFER_WORK_TABS: Record<string, string> = {
-  all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
-  runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
-};
+import { WORK_CHIPS, WORK_TABS } from "./work-view";
 
 const VERB: Record<string, { label: string; tone: "info" | "attention" | "success" | "primary" }> = {
   draft: { label: "Submit", tone: "info" },
@@ -54,9 +49,9 @@ export function toTransfersViewProps({ transfers, title }: TransfersSnapshot): T
   return {
     title: title ?? "Work",
     empty: transfers.length === 0 ? { title: "No transfers yet", description: "A transfer moves stock between two locations." } : undefined,
-    workChips: TRANSFER_WORK_CHIPS,
+    workChips: WORK_CHIPS,
     workChipIndex: 2,
-    workTabs: TRANSFER_WORK_TABS,
+    workTabs: WORK_TABS,
     rows: transfers.map((t) => {
       const verb = VERB[t.status] ?? { label: "Open", tone: "primary" as const };
       const open = t.status !== "received" && t.status !== "cancelled";

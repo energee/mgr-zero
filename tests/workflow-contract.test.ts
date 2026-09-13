@@ -67,6 +67,7 @@ const supabaseEnvMapper = readFileSync(resolve(__dirname, "..", "scripts", "supa
 const vitestConfig = readFileSync(resolve(__dirname, "..", "vitest.config.mts"), "utf8");
 const prePush = readFileSync(resolve(__dirname, "..", "scripts", "pre-push.sh"), "utf8");
 const hook = readFileSync(resolve(__dirname, "..", ".githooks", "pre-push"), "utf8");
+const testDb = readFileSync(resolve(__dirname, "..", "scripts", "test-db.sh"), "utf8");
 
 describe("workflow action field reader", () => {
   it("requires a direct scalar child of the action's with mapping", () => {
@@ -145,15 +146,39 @@ describe("production-readiness workflow contract", () => {
     expect(ci).not.toMatch(/cache: npm/);
   });
 
-  it("keeps the tracked pre-push gate aligned with CI checks", () => {
+  // The hook is a preflight, not a second CI. It runs what is cheap and
+  // unambiguous locally; `next build` and the database shards belong to CI,
+  // which runs them in parallel on a database built from scratch and is the
+  // merge gate. Running them here cost ten minutes a push and reset a database
+  // the other worktrees share.
+  it("keeps the tracked pre-push gate to the checks worth a local minute", () => {
     expect(hook).toContain("scripts/pre-push.sh");
-    for (const command of ["bun run lint", "bunx tsc --noEmit", "bun run build", "scripts/test-db.sh"]) {
+    for (const command of ["bun run lint", "bunx tsc --noEmit"]) {
       expect(prePush).toContain(command);
     }
     expect(prePush).toContain("tests/mgr-screens.test.ts");
-    expect(prePush).toContain("--exclude tests/mgr-screens.test.ts");
-    expect(prePush).toContain("for shard in 1/3 2/3 3/3");
-    expect(prePush).toContain("supabase db reset --workdir tests/supabase");
+  });
+
+  // `supabase db reset` rebuilds the schema behind PostgREST, which cached it at
+  // boot; without the reload the whole suite fails with "Could not find the
+  // table 'public.breweries' in the schema cache" and reads as broken code.
+  it("reloads PostgREST's schema cache after resetting the test database", () => {
+    const reset = testDb.indexOf("supabase db reset");
+    const reload = testDb.indexOf("NOTIFY pgrst, 'reload schema'");
+    expect(reset).toBeGreaterThan(-1);
+    expect(reload).toBeGreaterThan(reset);
+  });
+
+  it("leaves the build and the database shards to CI", () => {
+    // Comments name the manual escape hatch; only what the hook runs counts.
+    const runs = prePush.split("\n").filter((line) => !line.trimStart().startsWith("#")).join("\n");
+    for (const command of ["bun run build", "scripts/test-db.sh", "for shard in", "supabase db reset"]) {
+      expect(runs).not.toContain(command);
+    }
+    // Whatever the hook skips, CI still runs.
+    expect(ci).toMatch(/^ {6}- run: bun run build(?:\s+#.*)?\s*$/m);
+    expect(ci).toContain("supabase start");
+    expect(ci).toContain("--shard=");
   });
 
   it("maps Supabase CLI keys into the modern application environment contract", () => {
