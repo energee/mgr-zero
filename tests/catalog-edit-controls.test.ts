@@ -90,5 +90,6 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   for (const component of ["SkuForm", "SkuEditForm", "FormatForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
   // New Brand and Edit brand are links to the Brand page, gated the same way.
   for (const verb of ["New Brand", "Edit brand"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*E\\.btn\\("${verb}"`));
-  expect(readFileSync("app/(app)/orders/page.tsx", "utf8")).toContain("skuRows.filter((s) => s.active)");
+  // New order moved to its own page; dependency-page-adapters proves the options.
+  expect(readFileSync("app/(app)/orders/new/page.tsx", "utf8")).toContain("skus.filter(sku => sku.active)");
 });

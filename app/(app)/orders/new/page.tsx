@@ -1,3 +1,5 @@
+// app/(app)/orders/new/page.tsx — New order: the live adapter that loads the
+// customer→ship-to, location and active-SKU option lists for OrderForm.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
