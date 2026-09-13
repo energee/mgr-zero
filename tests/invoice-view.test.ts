@@ -9,11 +9,30 @@ import { SCREENS } from "../components/mgr/screens";
 import { InvoiceView } from "../components/mgr/views/invoice";
 import { invoiceFailedAls } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
-import { toInvoiceViewProps } from "../lib/mgr/invoice-view";
+import { invoiceMappingRows, toInvoiceViewProps } from "../lib/mgr/invoice-view";
 
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Invoice view", () => {
+  it("checks mappings in the current realm, deduplicates SKUs, and gates unavailable fixes", () => {
+    const customer = { name: "Actual customer", qbo_customer_id: "00227", qbo_realm_id: "current" };
+    const line = { id: "line1", kind: "sku", sku_id: "sku1", description: "Actual SKU", skus: { name: "Actual SKU", qbo_item_id: "009", qbo_realm_id: "old" } };
+    const rows = invoiceMappingRows(customer, [line, { ...line, id: "line2" }, { ...line, id: "deposit", kind: "keg_deposit", sku_id: null }], "current", null, "/invoices/actual/mapping");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ detail: "Actual customer · customer 00227", tone: "ok" });
+    expect(rows[1]).toMatchObject({ title: "Actual SKU", detail: "QuickBooks item is missing", href: "/invoices/actual/mapping" });
+    expect(rows[2]).toMatchObject({ unavailable: true, href: undefined });
+    expect(invoiceMappingRows(customer, [{ ...line, skus: { ...line.skus, qbo_realm_id: "current" } }], "current", null, "/mapping")).toHaveLength(1);
+    expect(invoiceMappingRows(null, [], "current", null, "/mapping")[0].unavailable).toBe(true);
+  });
+  it("keeps mappings and questions beside shared QuickBooks status and authorized actions", () => {
+    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail: "Push failed", balanceCents: 12000, healthy: false }, accountingActions: "Retry exact push" }));
+    expect(html).toContain("Customer mapping");
+    expect(html).toContain("$120.00 balance");
+    expect(html).toContain("Retry exact push");
+    expect(html).toContain("Mark answered");
+    expect(html).not.toContain("Push invoice to QuickBooks Online");
+  });
   it("maps get_invoice + questions through the adapter", () => {
     const model = toInvoiceViewProps(invoiceFailedAls);
     expect(model.title).toBe("INV-1039");
@@ -76,7 +95,8 @@ describe("Invoice view", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/invoice"/);
     expect(src).toMatch(/<InvoiceView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).toMatch(/qboGate=/);
+    expect(src).not.toMatch(/qboGate=|<QboInvoiceRow/);
+    expect(src).toMatch(/<QboInvoiceActions/);
     expect(src).toMatch(/<MarkAnswered\b/);
   });
 });

@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { E } from "@/components/mgr/e";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
-import { money } from "@/lib/mgr/money";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
@@ -80,15 +78,4 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
       </form>
     </CommandForm>}
   </div>;
-}
-
-export function QboInvoiceRow({ invoiceId, invoiceLabel, detail, balanceCents, actions, healthy }: {
-  invoiceId: string; invoiceLabel: string; detail: string; balanceCents: number | null; actions: QboInvoiceAction[]; healthy: boolean;
-}) {
-  return E.row(
-    "QuickBooks",
-    `${detail}${balanceCents != null && balanceCents > 0 && !detail.includes(money(balanceCents)) ? ` · ${money(balanceCents)} balance` : ""}`,
-    <QboInvoiceActions invoiceId={invoiceId} invoiceLabel={invoiceLabel} actions={actions} />,
-    healthy ? "ok" : "w",
-  );
 }

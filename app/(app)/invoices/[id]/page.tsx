@@ -11,12 +11,12 @@ import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
+import { invoiceMappingRows, toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
-import { QboInvoiceRow } from "@/app/(app)/settings/accounting/qbo-controls";
+import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
 
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
 type InvoiceLine = { id: string; kind: string; sku_id: string | null; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null };
@@ -39,13 +39,16 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const missingMappings = !invoice.customers?.qbo_customer_id || (realm && invoice.customers.qbo_realm_id !== realm)
     || lines.some(line => line.kind === "sku" ? !line.skus?.qbo_item_id || (realm && line.skus.qbo_realm_id !== realm) : /keg_deposit/.test(line.kind) && !health?.depositItemId);
   const presentation = qboInvoicePresentation({ kind: invoice.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
-  const model = toInvoiceViewProps({ invoice, lines, questions, backHref: "/invoices" });
+  const mappings = !credit && realm && (brewery.role === "admin" || brewery.role === "sales")
+    ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.role === "admin" ? "/settings/accounting/mappings" : undefined) : undefined;
+  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, backHref: "/invoices" });
   return (
     <InvoiceView
       model={model}
       headerAction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
-      qboGate={<QboInvoiceRow invoiceId={invoice.id} invoiceLabel={model.title} detail={presentation.detail} balanceCents={invoice.qbo_balance_cents} actions={presentation.actions} healthy={invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift} />}
+      quickbooks={{ detail: presentation.detail, balanceCents: invoice.qbo_balance_cents, healthy: invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift }}
+      accountingActions={<QboInvoiceActions invoiceId={invoice.id} invoiceLabel={model.title} actions={presentation.actions} />}
     />
   );
 }

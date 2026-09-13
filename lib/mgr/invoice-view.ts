@@ -1,6 +1,5 @@
 // lib/mgr/invoice-view.ts — view-model for one invoice. get_invoice +
-// list_invoice_questions paint the domain; optional mapping rows are
-// inventory-only QuickBooks presentation, not a mode flag.
+// list_invoice_questions paint the domain; adapters supply mapping facts.
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { plural } from "./plural";
@@ -25,6 +24,8 @@ export type InvoiceMappingView = {
   title: string;
   detail: string;
   tone?: "" | "w" | "ok";
+  href?: string;
+  unavailable?: boolean;
 };
 
 export type InvoiceViewModel = {
@@ -70,9 +71,26 @@ export type InvoiceSnapshot = {
     answered_at: string | null;
     customers: { name: string } | null;
   }[];
-  /** Inventory-only QuickBooks mapping rows. Live omits these. */
+  /** Mapping facts from the connected company, or fixture equivalents. */
   mappings?: InvoiceMappingView[];
 };
+
+export function invoiceMappingRows(customer: { name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null,
+  lines: { id: string; kind: string; sku_id: string | null; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null }[],
+  realm: string, depositItemId: string | null | undefined, mappingHref: string, depositHref?: string): InvoiceMappingView[] {
+  const customerMapped = Boolean(customer?.qbo_customer_id && customer.qbo_realm_id === realm);
+  const rows: InvoiceMappingView[] = [{ key: "customer", title: "Customer mapping", detail: customerMapped ? `${customer!.name} · customer ${customer!.qbo_customer_id}` : "QuickBooks customer is missing", tone: customerMapped ? "ok" : "w", href: customer ? mappingHref : undefined, unavailable: !customer }];
+  const seen = new Set<string>();
+  for (const line of lines) {
+    if (line.kind !== "sku" || (line.skus?.qbo_item_id && line.skus.qbo_realm_id === realm)) continue;
+    const key = line.sku_id ?? line.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ key, title: line.skus?.name ?? line.description, detail: "QuickBooks item is missing", tone: "w", href: line.sku_id ? mappingHref : undefined, unavailable: !line.sku_id });
+  }
+  if (!depositItemId && lines.some(line => /keg_deposit/.test(line.kind))) rows.push({ key: "deposit", title: "Keg deposit mapping", detail: "QuickBooks deposit item is missing", tone: "w", href: depositHref, unavailable: !depositHref });
+  return rows;
+}
 
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
 export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref }: InvoiceSnapshot): InvoiceViewModel {
