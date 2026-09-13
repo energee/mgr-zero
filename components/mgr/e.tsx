@@ -80,9 +80,11 @@ type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
  *  row, never by inspecting the child. */
 const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50";
 
-/** Keys the fields itself: a field group is a fixed, ordered list that is never
- *  reordered or filtered, so the index is the identity and callers pass bare
- *  elements. (Children.toArray keys too late — React has already warned.) */
+/** Keys the fields itself, so callers pass bare elements. The index is the
+ *  identity because a field group is a fixed, ordered list — never reordered,
+ *  filtered, or conditionally dropped. Children.toArray cannot do this job:
+ *  React validates the caller's array for keys before this function runs, so
+ *  it has already warned by the time toArray gets to re-key the clones. */
 const fieldGrid = (fields: React.ReactNode[], className: string) => (
   <div className={cn("grid gap-2 [&>*]:min-w-0", className)}>
     {fields.map((field, i) => <Fragment key={i}>{field}</Fragment>)}
@@ -301,13 +303,16 @@ export const E = {
     );
   },
   /** Short field pairs sit side by side on desk; larger groups fit four on desk
-   *  and two on phone. The frame is an iframe, so md: is the frame width. */
+   *  and two on phone. The frame is an iframe, so md: is the frame width.
+   *  Pass bare fields — the grid keys them. Pass the same fields in the same
+   *  order on every render; a conditional field would shift the index keys. */
   cols: (...fields: React.ReactNode[]) => fieldGrid(
     fields,
     fields.length > 2 ? "grid-cols-2 md:grid-cols-4 md:gap-x-6" : "md:grid-cols-2 md:gap-x-6",
   ),
   /** Fields that read as one phrase (a quantity, its unit, and what it is per)
-   *  stay on one line at every width; three at most, or the phone can’t. */
+   *  stay on one line at every width; three at most, or the phone can’t.
+   *  Keyed by the grid, and fixed in order, exactly as in cols. */
   inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>
     fieldGrid(fields, fields.length === 3 ? "grid-cols-3" : "grid-cols-2"),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
