@@ -12,6 +12,10 @@ import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 describe("POS UI truth", () => {
+  it("uses explicit destinations instead of a live rendering mode", () => {
+    expect(readFileSync("components/mgr/views/pos.tsx", "utf8")).not.toMatch(/\blive\b/);
+    expect(readFileSync("components/mgr/views/pos-controls.tsx", "utf8")).not.toMatch(/\blive\b/);
+  });
   it("freezes corrected publication input for an exact retry after an unknown result", () => {
     const corrected = selectExactCommandAttempt(null, { name: "publish_pos_item", input: {
       posLocationId: "L1", brandId: "brand-1", retryConflict: true,

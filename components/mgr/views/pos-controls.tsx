@@ -32,7 +32,7 @@ export function PosRouteSheet({ title, backHref, children }: { title: string; ba
 
 export function SquareConnectControl({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
-  return <ConnectSquareView configured={configured} busy={action.busy} error={action.error} live onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
+  return <ConnectSquareView configured={configured} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
 export function SquareDisconnectControl({ connectionId }: { connectionId: string }) {
@@ -67,7 +67,7 @@ export function PosMappingControl({ variations, targets, sales, coverage, canSyn
   canSync: boolean;
 }) {
   const action = useCommandAction();
-  return <PosMappingView variations={variations} targets={targets} sales={sales} coverage={coverage} busy={action.busy} error={action.error} live
+  return <PosMappingView variations={variations} targets={targets} sales={sales} coverage={coverage} busy={action.busy} error={action.error} backHref="/settings/pos"
     syncAction={canSync ? <SquareSyncControls /> : undefined} onSave={(row, target) => {
       const [kind, id] = target.split(":", 2);
       void action.run("set_pos_item_mapping", {
@@ -98,7 +98,7 @@ export function PosMenuControl({ model, bins, channels }: {
   const outcome = readPublicationOutcome(publication.result);
   const terminal = isTerminalPublication(outcome?.status);
   const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_menu", { posLocationId: model.selectedLocationId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt);
-  return <PosMenuView model={model} bins={bins} channels={channels} busy={command.busy || publication.busy} error={command.error ?? publication.error} live
+  return <PosMenuView model={model} bins={bins} channels={channels} busy={command.busy || publication.busy} error={command.error ?? publication.error} backHref="/more"
     notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
     onConfigure={(binId, saleChannelId) => void command.run("configure_pos_menu", { posLocationId: model.selectedLocationId, binId, saleChannelId })}
     onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
