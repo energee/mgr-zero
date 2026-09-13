@@ -145,15 +145,29 @@ describe("production-readiness workflow contract", () => {
     expect(ci).not.toMatch(/cache: npm/);
   });
 
-  it("keeps the tracked pre-push gate aligned with CI checks", () => {
+  // The hook is a preflight, not a second CI. It runs what is cheap and
+  // unambiguous locally; `next build` and the database shards belong to CI,
+  // which runs them in parallel on a database built from scratch and is the
+  // merge gate. Running them here cost ten minutes a push and reset a database
+  // the other worktrees share.
+  it("keeps the tracked pre-push gate to the checks worth a local minute", () => {
     expect(hook).toContain("scripts/pre-push.sh");
-    for (const command of ["bun run lint", "bunx tsc --noEmit", "bun run build", "scripts/test-db.sh"]) {
+    for (const command of ["bun run lint", "bunx tsc --noEmit"]) {
       expect(prePush).toContain(command);
     }
     expect(prePush).toContain("tests/mgr-screens.test.ts");
-    expect(prePush).toContain("--exclude tests/mgr-screens.test.ts");
-    expect(prePush).toContain("for shard in 1/3 2/3 3/3");
-    expect(prePush).toContain("supabase db reset --workdir tests/supabase");
+  });
+
+  it("leaves the build and the database shards to CI", () => {
+    // Comments name the manual escape hatch; only what the hook runs counts.
+    const runs = prePush.split("\n").filter((line) => !line.trimStart().startsWith("#")).join("\n");
+    for (const command of ["bun run build", "scripts/test-db.sh", "for shard in", "supabase db reset"]) {
+      expect(runs).not.toContain(command);
+    }
+    // Whatever the hook skips, CI still runs.
+    expect(ci).toMatch(/^ {6}- run: bun run build(?:\s+#.*)?\s*$/m);
+    expect(ci).toContain("supabase start");
+    expect(ci).toContain("--shard=");
   });
 
   it("maps Supabase CLI keys into the modern application environment contract", () => {
