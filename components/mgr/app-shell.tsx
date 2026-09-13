@@ -18,6 +18,7 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
     </span>
   );
   return (
+    <TooltipProvider>
     <SidebarProvider defaultOpen={sidebarOpen}>
       <Sidebar collapsible="icon">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
@@ -94,6 +96,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>
+    </TooltipProvider>
   );
 }
 

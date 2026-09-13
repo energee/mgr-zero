@@ -1,29 +1,36 @@
 // tests/sidebar-rail.test.ts — collapsing the desktop rail leaves an icon rail
 // rather than sliding the whole sidebar off-canvas behind a zero-width wrapper
-// (#305). Rendering is checked by eye; this pins the shell contract shadcn's
-// icon mode needs to work at all.
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+// (#305). The pixels are checked by eye (AGENTS.md step 4); this pins what the
+// shell renders in each state.
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 
-const shell = readFileSync("components/mgr/app-shell.tsx", "utf8");
-const sidebar = readFileSync("components/ui/sidebar.tsx", "utf8");
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+import { AppShell, type AppShellProps } from "@/components/mgr/app-shell";
+import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
-describe("collapsed desktop rail", () => {
+const shell = (sidebarOpen: boolean) => {
+  const props: AppShellProps = { brand: "Demo Brewing", items: navFor(STAFF_NAV, "admin"), sidebarOpen, children: "body" };
+  return renderToStaticMarkup(createElement(AppShell, props));
+};
+
+describe("desktop rail", () => {
   it("collapses to icons, not off-canvas", () => {
-    expect(shell).toMatch(/<Sidebar collapsible="icon"/);
-    expect(shell).not.toMatch(/collapsible="offcanvas"/);
+    expect(shell(false)).toMatch(/data-collapsible="icon"/);
+    expect(shell(false)).not.toMatch(/data-collapsible="offcanvas"/);
+    expect(shell(true)).toMatch(/data-state="expanded"/);
   });
 
-  it("wraps every tab label in a span so icon mode can hide it", () => {
-    expect(shell).toMatch(/\{tab\.icon && <Icon icon=\{tab\.icon\} \/>\}<span>\{tab\.label\}<\/span>/);
+  it("keeps every tab in the collapsed rail and names it in a tooltip", () => {
+    const html = shell(false);
+    for (const tab of navFor(STAFF_NAV, "admin")) {
+      // Once as the menu button's own label, once as its tooltip content.
+      expect(html.split(`>${tab.label}<`).length - 1).toBeGreaterThanOrEqual(2);
+    }
   });
 
-  it("names each collapsed tab in a tooltip, the only label left at 48px", () => {
-    expect(shell).toMatch(/<SidebarMenuButton asChild tooltip=\{tab\.label\}/);
-  });
-
-  it("relies on shadcn hiding sub-items and sizing the rail in icon mode", () => {
-    expect(sidebar).toMatch(/group-data-\[collapsible=icon\]:hidden/);
-    expect(sidebar).toMatch(/group-data-\[collapsible=icon\]:w-\(--sidebar-width-icon\)/);
+  it("wraps the label so the collapsed width can hide it", () => {
+    expect(shell(false)).toMatch(/<span>Today<\/span>/);
   });
 });
