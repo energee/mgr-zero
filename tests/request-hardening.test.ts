@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { POST } from "@/app/api/command/route";
 import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
+import { readBoundedJson } from "@/lib/request-json";
 
 function streamed(chunks: Uint8Array[], headers: Record<string, string> = {}) {
   let cancelled = false;
@@ -16,6 +17,11 @@ function streamed(chunks: Uint8Array[], headers: Record<string, string> = {}) {
 }
 
 describe("bounded command request bodies", () => {
+  it("shares bounded JSON reading without changing the caller's limit", async () => {
+    const request = new Request("http://localhost/test", { method: "POST", body: '{"ok":true}' });
+    await expect(readBoundedJson(request, 11)).resolves.toEqual({ ok: true });
+  });
+
   it("leaves room for a realistic 5,000-row CSV import envelope", () => {
     const body = JSON.stringify({ breweryId: crypto.randomUUID(), name: "import_csv", requestId: crypto.randomUUID(), input: {
       kind: "customers", rows: Array.from({ length: 5_000 }, (_, i) => ({ name: `Customer ${i}`, type: "retailer", state: "PA", paymentTerms: "Net 30" })),
