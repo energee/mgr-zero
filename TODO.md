@@ -28,3 +28,43 @@ in the mapped records above. Cellar transfer now uses the existing occupancy and
   from `.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`,
   then perform hosted release readiness. Hosted Supabase, Vercel, integration
   credentials, advisors, pruning, and scheduler setup remain ask-first.
+
+## Parity follow-ups from the PR #336 review
+
+Found reviewing the non-Catalog parity conversion. The P1s and the behavior
+losses were fixed on that branch; these were left because each needs a design
+decision, not a repair.
+
+- [ ] Rebuild the live Schedule packaging run dialog on the shared model.
+  `components/mgr/views/schedule-packaging-run.tsx` early-returns into a second
+  JSX tree when `controls` is present, and `app/(app)/packaging/schedule-run-form.tsx`
+  mounts it with a wholly empty model, so the live dialog shows none of the
+  planned outputs, short materials, warning note, or closing info the explorer
+  draws. The parity contract rejects a branch that selects an alternate layout.
+  Because the fork is inside the view rather than a slot,
+  `tests/screen-view-composition.test.ts` cannot see it and reports the screen
+  as converted; the guard needs to reject in-view early returns too. The screen
+  itself is also gated under Issue #278.
+- [ ] Decide whether `.claude/project-remainder.plan.md` belongs in the repo.
+  141 lines of whole-program roadmap arrived with the parity conversion, while
+  plans otherwise live in `.agents/superpowers/plans/` and `.claude/` tracks
+  only the `agents` and `skills` symlinks.
+- [ ] Decide whether `/login?error=expired` should still render a sign-in form
+  without JavaScript. It now returns only an open `CommandForm`, which portals
+  client-side, and the `"expired"` entry was dropped from `ERRORS`, so the one
+  URL a lapsed session lands on has no server-rendered way back in.
+- [ ] Settle the surface for Adjust lines. `components/mgr/views/adjust-lines.tsx`
+  opens with a screen back-header, but `app/(app)/orders/[id]/adjust-lines-form.tsx`
+  mounts it in a dialog, so the modal shows the title twice and offers a back
+  link inside itself, while the inventory renders the same view full-page.
+  Every comparable flow in that conversion became a full route instead.
+- [ ] Batch the Cellar landing's reading lookup. `app/(app)/cellar/page.tsx`
+  issues one `list_fermentation_readings` per open occupancy to fill a tile
+  subtitle, unbounded by tank count; there is no latest-reading-per-occupancy
+  query in `lib/commands/production.ts`.
+- [ ] Keep the portal cart's review verb consistent with its subtotal.
+  `app/(portal)/portal/cart.tsx` overrides `subtotal` to the unavailable
+  message for a pending request but leaves `reviewVerb` reading
+  `Review order · $X`, so the button contradicts the line above it.
+- [ ] Point the posted-receipt back link at the PO just received against.
+  `app/(app)/purchase-orders/[id]/page.tsx` returns to the list instead.
