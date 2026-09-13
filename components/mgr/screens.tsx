@@ -47,7 +47,8 @@ import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
 import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
 import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
-import { taproomVariance } from "@/lib/mgr/fixtures/taproom";
+import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
+import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -1124,33 +1125,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
     spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
-    body: (<>
-      {E.back("Beer", "Weekly count")}
-      {E.tabs(["Ridgeline Tap Room", "Downtown"], 0, "w-full")}
-      {E.ttl("Expected consumption")}
-      {E.note("Captured prior · Sep 1 · reopen saved count")}
-      {E.row("Hazy IPA", "expected 1.5 bbl · draft actual 1.0 bbl", "difference +0.5 bbl")}
-      {E.btn("Refresh expected", "g")}
-      {E.ttl("Count every stock bucket")}
-      {E.note("Server date Sep 8 · whole remaining packages only · enter zero explicitly. A partly full keg is one.")}
-      {E.btn("Print current stock labels", "g")}
-      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
-      {E.row("Pils · 16 oz case", "Cold · untracked stock · worksheet row 1 · recorded 6", E.stq(4))}
-      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 2 · recorded 3", E.stq(2), "w")}
-      {E.btn("Record count")}
-      {E.ttl("Saved count · Sep 8")}
-      {E.note("Latest uncorrected count · saved row 2 · recorded 7, counted 2")}
-      {E.btn("Correct count", "g")}
-      {E.ttl("Recent saved counts")}
-      {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted · corrected by Admin", E.act("Open count", "primary"))}
-      {E.note("Admin can correct only the latest saved count when a quantity was counted too low. Warehouse and Taproom read the correction history without the action.")}
-    </>),
+    body: <WeeklyCountView model={weeklyCount} />,
   },
   {
     step: 5,
