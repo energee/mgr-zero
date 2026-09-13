@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/date-format";
 import { PosSaleDetailView } from "@/components/mgr/views/pos";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -16,7 +17,7 @@ export default async function PosSalePage({ params }: { params: Promise<{ id: st
   return <PosSaleDetailView backHref="/settings/pos/mapping" title={`Square ${sale.factKind} ${sale.externalOrderId}`} sale={{
     id: sale.id, label: `${sale.itemName} · ${sale.variationName}`, detail: `${sale.factStatus} · ${sale.mappingLabel ?? sale.mappingStatus}`,
     amount: sale.grossCents == null ? "No amount" : money(sale.grossCents), status: sale.mappingStatus,
-    location: sale.locationName, soldAt: new Date(sale.soldAt).toLocaleString(), quantity: sale.quantity ?? "Not supplied",
+    location: sale.locationName, soldAt: formatDateTime(sale.soldAt), quantity: sale.quantity ?? "Not supplied",
     expected: sale.expectedBbl == null ? "Not available until mapped" : `${sale.expectedBbl} bbl${sale.servingOunces == null ? "" : ` · ${sale.servingOunces} oz`}`,
     source: `order ${sale.sourceOrderId ?? sale.externalOrderId} · line ${sale.sourceLineId ?? sale.externalLineId} · revision ${sale.sourceVersion}`,
   }} revisions={data.revisions.map(row => ({

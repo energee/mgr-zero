@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/date-format";
 import type { StaffRole } from "@/lib/commands/registry";
 import { docNo } from "./doc-no";
 import { money } from "./money";
@@ -10,7 +11,7 @@ export type InvoiceListRow = { id: string; title: string; detail: string; tone: 
 export function toInvoiceListRow(inv: InvoiceListRecord, role: StaffRole, connected: boolean): InvoiceListRow {
   const credit = inv.kind === "credit_memo", state = invoiceCurrentState(inv);
   const qbo = qboInvoicePresentation({ kind: inv.kind, role, connected, syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, cashCollectedCents: inv.qbo_cash_collected_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
-  const paid = state === "paid" && inv.paid_at ? ` · paid ${new Date(inv.paid_at).toLocaleDateString()}` : "";
+  const paid = state === "paid" && inv.paid_at ? ` · paid ${formatDate(inv.paid_at)}` : "";
   return {
     id: inv.id, title: `${docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice")} · ${inv.customers?.name ?? "Customer unavailable"}`,
     detail: `${credit ? "credit memo · " : ""}${qbo.detail}${paid}${!credit && state === "unpaid" && inv.due_on ? ` · due ${inv.due_on}` : ""}${inv.qbo_accountant_drift ? ` · local subtotal ${money(inv.subtotal_cents)} · current total` : ""} · ${money(inv.total_cents)}`,

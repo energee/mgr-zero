@@ -1,11 +1,14 @@
 // tests/qa-chrome-copy.test.ts — chrome copy the 2026-09-13 QA sweep flagged:
 // breadcrumbs that name the wrong parent (#258, #259), section nouns that
 // disagree with their page (#261), and timestamps that bypass the shared
-// formatters (#253).
+// formatters (#253). The "never toLocaleString" half of #253 is an eslint
+// rule (no-restricted-syntax in eslint.config.mjs), which covers every file
+// rather than a list this test would have to keep.
 import { readFileSync } from "node:fs";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { SCREENS } from "@/components/mgr/screens";
 import { E } from "@/components/mgr/e";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
@@ -68,13 +71,9 @@ describe("timestamps use the shared formatters (#253)", () => {
     expect(detail).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
   });
 
-  it("no view formats a user-facing timestamp with toLocaleString", () => {
-    for (const file of ["components/mgr/views/tap-board.tsx", "components/mgr/views/taproom-variance.tsx", "components/mgr/views/weekly-count.tsx", "lib/mgr/taproom-today.ts"]) {
-      expect(src(file)).not.toMatch(/new Date\([^)]*\)\.toLocale(String|DateString)\(\)/);
-    }
-  });
-
-  it("the Weekly count note dates the server day through the shared formatter", () => {
-    expect(src("components/mgr/views/weekly-count.tsx")).toMatch(/formatDate\(state\.draft\.countedOn\)/);
+  it("the Weekly count draft dates the server day through the shared formatter", () => {
+    const html = htmlOf(SCREENS.find((screen) => screen.name === "Weekly count")!.body);
+    expect(html).toMatch(/Server date Sep 8, 2026/);
+    expect(html).not.toMatch(/Server date 2026-09-08/);
   });
 });
