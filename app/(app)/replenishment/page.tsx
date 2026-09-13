@@ -9,7 +9,7 @@ import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
 import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
 
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
+type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 type Shortfall = { skuId: string; skuName: string; onHand: number; allocated: number; atp: number; reservations: { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] };
 type Suggestion = { skuId: string; sku: string; par: number; onHand: number; suggested: number };
 
@@ -19,8 +19,8 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const ctx = await buildContext(brewery.id);
   const shortfalls = await runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Shortfall[];
   const locationRows = (await runCommand("list_locations", {}, ctx)) as LocationRow[];
-  const taprooms = locationRows.filter((l) => l.kind === "taproom");
-  const warehouses = locationRows.filter((l) => l.kind === "warehouse");
+  const taprooms = locationRows.filter((l) => l.uses.includes("taproom"));
+  const warehouses = locationRows.filter((l) => l.uses.includes("warehouse"));
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
   const [skus, allocations, suggestions] = await Promise.all([
