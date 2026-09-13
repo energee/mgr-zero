@@ -762,7 +762,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Import")}
       {E.stp(["upload", "map", "preview", "commit"], 2)}
-      {E.chips(["customers", "ship-tos", "products", "channel prices", "opening balances"], 0)}
+      {E.chips(["Customers", "Ship-tos", "Products / SKUs", "Channel prices", "Opening balances"], 0)}
       {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "sale channel missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "new", "ready"]])}
       {E.btn("Import 2 customer rows")}
       {E.note("Retry returns original results. Correct only blocked rows in a new batch.")}

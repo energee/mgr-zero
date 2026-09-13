@@ -26,6 +26,9 @@ export function Composer({ role }: { role: StaffRole }) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [setupError, setSetupError] = useState<string>();
+  // #329: bumping this re-runs the setup load below, so Try again can recover
+  // from a failed restore instead of only regenerating the last AI turn.
+  const [setupNonce, setSetupNonce] = useState(0);
   const [committing, setCommitting] = useState(false);
   const [receipt, setReceipt] = useState<string>();
   const [outboxOpen, setOutboxOpen] = useState(false);
@@ -72,7 +75,7 @@ export function Composer({ role }: { role: StaffRole }) {
     return () => { active = false; };
     // One server-owned restore per actor/brewery scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breweryId, expectedContext.actorId]);
+  }, [breweryId, expectedContext.actorId, setupNonce]);
 
   useEffect(() => {
     const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
@@ -115,7 +118,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { clearError(); void regenerate(); }} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { if (setupError) { setSetupError(undefined); setSetupNonce((n) => n + 1); return; } clearError(); void regenerate(); }} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

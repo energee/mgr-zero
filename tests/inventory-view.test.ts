@@ -100,17 +100,17 @@ describe("Finished goods view", () => {
 describe("Record movement view", () => {
   it("maps festival removal onto chips index 4 and the Hazy preview", () => {
     const model = toRecordMovementViewProps(recordMovementFestival);
-    expect(model.kind).toBe("festival removal");
+    expect(model.kind).toBe("Festival removal");
     expect(model.kindIndex).toBe(4);
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
-    expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · festival removal · PA · amounts are entered positive`);
+    expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {
     const html = htmlOf(createElement(RecordMovementView, { model: toRecordMovementViewProps(recordMovementFestival) }));
-    expect(html).toMatch(/festival removal/);
+    expect(html).toMatch(/Festival removal/);
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toMatch(/Destination state/);
     expect(html).toMatch(/>Record movement</);
@@ -132,7 +132,7 @@ describe("Movement recorded view", () => {
   it("maps the festival echo onto the tape and gated correction", () => {
     const model = toMovementRecordedViewProps(movementRecordedFestival);
     expect(model.title).toBe("Hazy IPA · ½ bbl");
-    expect(model.tapeLabel).toBe("−1 keg · festival removal · PA");
+    expect(model.tapeLabel).toBe("−1 keg · Festival removal · PA");
     expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
     expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
     expect(model.correctionGate).not.toMatch(/unavailable/i);
@@ -140,7 +140,7 @@ describe("Movement recorded view", () => {
 
   it("renders the tape and Record inventory correction", () => {
     const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
-    expect(html).toMatch(/festival removal/);
+    expect(html).toMatch(/Festival removal/);
     expect(html).toMatch(/Record inventory correction/);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);

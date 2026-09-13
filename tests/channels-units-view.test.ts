@@ -23,10 +23,10 @@ describe("Sale channels view", () => {
     expect(model.backHref).toBeUndefined();
     expect(model.empty).toBeUndefined();
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
-      ["Wholesale", "taxable · 118 movements"],
-      ["Taproom", "taxable · 402 movements"],
-      ["DTC", "taxable · 34 movements"],
-      ["Export", "export · 6 movements"],
+      ["Wholesale", "Taxable · 118 movements"],
+      ["Taproom", "Taxable · 402 movements"],
+      ["DTC", "Taxable · 34 movements"],
+      ["Export", "Export · 6 movements"],
     ]);
   });
 
@@ -37,7 +37,7 @@ describe("Sale channels view", () => {
         { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond" },
       ],
     });
-    expect(model.rows.map((r) => r.detail)).toEqual(["taxable", "transfer in bond"]);
+    expect(model.rows.map((r) => r.detail)).toEqual(["Taxable", "Transfer in bond"]);
   });
 
   it("names an empty list without inventing rows", () => {
@@ -51,13 +51,13 @@ describe("Sale channels view", () => {
     expect(html).toMatch(/>Add channel</);
     expect(html).toMatch(/Sale channels/);
     expect(html).toMatch(/Wholesale/);
-    expect(html).toMatch(/taxable · 118 movements/);
+    expect(html).toMatch(/Taxable · 118 movements/);
     expect(html).toMatch(/Taproom/);
-    expect(html).toMatch(/taxable · 402 movements/);
+    expect(html).toMatch(/Taxable · 402 movements/);
     expect(html).toMatch(/DTC/);
-    expect(html).toMatch(/taxable · 34 movements/);
+    expect(html).toMatch(/Taxable · 34 movements/);
     expect(html).toMatch(/Export/);
-    expect(html).toMatch(/export · 6 movements/);
+    expect(html).toMatch(/Export · 6 movements/);
     expect(html).toMatch(/aria-label="Open"/);
     expect(html).not.toMatch(/No sale channels yet/);
     expect(html).not.toMatch(/never restates a filed month/);
@@ -116,7 +116,7 @@ describe("Channel view", () => {
   it("maps Export onto chips index 1", () => {
     const model = toChannelViewProps(channelExport);
     expect(model.name).toBe("Export");
-    expect(model.taxOptions).toEqual(["taxable", "export", "vessel supplies", "research", "transfer in bond"]);
+    expect(model.taxOptions).toEqual(["Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"]);
     expect(model.taxIndex).toBe(1);
   });
 
@@ -127,18 +127,18 @@ describe("Channel view", () => {
       tax_treatment: "vessel_supplies",
     });
     expect(model.taxIndex).toBe(2);
-    expect(model.taxOptions[2]).toBe("vessel supplies");
+    expect(model.taxOptions[2]).toBe("Vessel supplies");
   });
 
   it("renders Channel name, export chips, override info, and Save channel", () => {
     const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps(channelExport) }));
     expect(html).toMatch(/Channel name/);
     expect(html).toMatch(/value="Export"/);
-    expect(html).toMatch(/>taxable</);
-    expect(html).toMatch(/>export</);
-    expect(html).toMatch(/>vessel supplies</);
-    expect(html).toMatch(/>research</);
-    expect(html).toMatch(/>transfer in bond</);
+    expect(html).toMatch(/>Taxable</);
+    expect(html).toMatch(/>Export</);
+    expect(html).toMatch(/>Vessel supplies</);
+    expect(html).toMatch(/>Research</);
+    expect(html).toMatch(/>Transfer in bond</);
     expect(html).toMatch(/Customers may override this/);
     expect(html).toMatch(/A channel with movements cannot be deleted/);
     expect(html).toMatch(/>Save channel</);

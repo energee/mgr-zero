@@ -2,13 +2,13 @@
 // Live create/edit stays channel-form.tsx. Labels match screens.tsx TAX_TREATMENTS.
 import { channelTreatmentLabel } from "./sale-channels-view";
 
-/** Display labels for the tax-treatment chips (spaces, not snake_case). */
+/** Display labels for the tax-treatment chips (sentence case, not snake_case). */
 export const CHANNEL_TAX_TREATMENTS = [
-  "taxable",
-  "export",
-  "vessel supplies",
-  "research",
-  "transfer in bond",
+  "Taxable",
+  "Export",
+  "Vessel supplies",
+  "Research",
+  "Transfer in bond",
 ] as const;
 
 export type ChannelViewModel = {

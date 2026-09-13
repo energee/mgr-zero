@@ -1,5 +1,6 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
+import { sentenceCase } from "./labels";
 
 export type CustomerViewModel = {
   backHref?: string;
@@ -21,7 +22,7 @@ export type CustomerViewModel = {
 
 const TYPES = ["Retailer", "Distributor"];
 const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
-const TAX = ["Inherit from channel", "taxable", "export", "vessel supplies", "research", "transfer in bond"];
+const TAX = ["Inherit from channel", "Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"];
 
 function titleType(type: string): string {
   if (type === "retailer") return "Retailer";
@@ -55,9 +56,7 @@ export function toCustomerViewProps({
   orders,
   backHref,
 }: CustomerSnapshot): CustomerViewModel {
-  const tax = customer.tax_treatment
-    ? customer.tax_treatment.replaceAll("_", " ")
-    : "Inherit from channel";
+  const tax = customer.tax_treatment ? sentenceCase(customer.tax_treatment) : "Inherit from channel";
   return {
     backHref,
     name: customer.name,

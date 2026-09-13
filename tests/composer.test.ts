@@ -134,6 +134,16 @@ describe("AI composer", () => {
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });
 
+  // #329: a failed setup (list_chat_conversations / get_brewery_ai_model) left
+  // the drawer dead — Try again only regenerated the last AI turn, which never
+  // re-ran the load that failed.
+  it("retries the setup load, not just the AI turn, after a setup error", () => {
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toMatch(/const \[setupNonce, setSetupNonce\] = useState\(0\)/);
+    expect(live).toMatch(/\}, \[breweryId, expectedContext\.actorId, setupNonce\]\)/);
+    expect(live).toMatch(/onRetry=\{\(\) => \{ if \(setupError\)/);
+  });
+
   it("shares the AI SDK composer between live and inventory surfaces", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
     const live = readFileSync("components/mgr/composer.tsx", "utf8");

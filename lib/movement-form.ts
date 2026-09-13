@@ -1,6 +1,7 @@
 import type { BinMoveStock } from "./commands/inventory";
 
-export const movementTypeLabel = (type: string) => type.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+/** @deprecated prefer sentenceCase; kept as the movement-specific name. */
+export { sentenceCase as movementTypeLabel } from "@/lib/mgr/labels";
 
 /** Positive form quantities become the existing signed movement API input. */
 export function movementFields(type: string, quantity: string, direction: "add" | "remove", state: string, channel: string) {

@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
   redirects: async () => [
     { source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true },
     { source: "/docs/:guide(staff-guide|portal-guide).html", destination: "/docs/:guide", permanent: true },
+    // #325 split the compliance registry: brewery licenses stand alone, brand
+    // approvals moved onto the brand. Bookmarks of the old page land on Licenses.
+    { source: "/compliance/registry", destination: "/compliance/licenses", permanent: false },
   ],
   headers: async () => [{
     source: "/:path*",

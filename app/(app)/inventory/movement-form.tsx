@@ -105,7 +105,7 @@ export function MovementForm({
       ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
-  const kindOptions = MOVEMENT_TYPES.map(value => value.replaceAll("_", " "));
+  const kindOptions = MOVEMENT_TYPES.map(movementTypeLabel);
   const selectedSku = skus.find(item => item.id === skuId);
   const selectedLocation = locations.find(item => item.id === locationId);
   const selectedBin = bins.find(item => item.id === binId);
@@ -113,14 +113,14 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    kind: type.replaceAll("_", " "), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
+    kind: movementTypeLabel(type), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
     sku: selectedSku?.label ?? "", skuOptions: skus.map(item => item.label),
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
     channel: selectedChannel?.name ?? "", channelOptions: requiresChannel(type) ? channels.map(item => item.name) : [],
     destState, destStateOptions: [], destStateInput: type === "sample" || type === "festival_removal",
     qty,
-    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${type.replaceAll("_", " ")}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
+    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${movementTypeLabel(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
     direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
     directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
     lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "Untracked / legacy stock",
