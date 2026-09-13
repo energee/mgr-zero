@@ -26,6 +26,13 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Routes", () => {
+  it("keeps Transfers and Packaging Work navigation in their shared views", () => {
+    for (const [route, view] of [["transfers", "transfers"], ["packaging", "packaging-runs"], ["purchase-orders", "purchase-orders"]]) {
+      expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.role)}");
+      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<TabBar");
+      expect(src(`components/mgr/views/${view}.tsx`)).not.toMatch(/tabs\?: ReactNode/);
+    }
+  });
   it("uses the shared list and route-builder controls instead of JSX replacements", () => {
     expect(src("app/(app)/routes/page.tsx")).not.toMatch(/\blist=|tabs=\{null\}/);
     expect(src("app/(app)/routes/route-form.tsx")).toContain("<RouteView");

@@ -5,6 +5,7 @@
 // shape change unrelated to any one run — admin/warehouse only (record_repack's
 // own roles), so it is hidden from a brewer rather than offered and refused.
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -38,7 +39,7 @@ export default async function PackagingPage() {
 
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, (id) => `/packaging/${id}`)}
-    tabs={null}
+    workHrefs={workHrefsFor(brewery.role)}
     actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : null}</div>}
   />;
 }

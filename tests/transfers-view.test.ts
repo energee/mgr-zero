@@ -45,17 +45,19 @@ describe("Transfers list", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction, tabs null, and linkRows slot for live Transfers", () => {
+  it("binds live actions and permitted navigation without replacing the tabs", () => {
     const html = htmlOf(createElement(TransfersView, {
       model: toTransfersViewProps({ ...transfersList, title: "Transfers" }),
       createAction: "NEW",
-      tabs: null,
+      workHrefs: { all: "/work", transfers: "/transfers" },
       linkRows: true,
     }));
     expect(html).toMatch(/NEW/);
     expect(html).not.toMatch(/>New transfer</);
     expect(html).toMatch(/href="\/transfers\//);
-    expect(html).not.toMatch(/>all</);
+    expect(html).toMatch(/href="\/work"/);
+    expect(html).toMatch(/href="\/transfers"/);
+    expect(html).not.toMatch(/>batches</);
   });
 
   it("the Transfers inventory record is TransfersView", () => {
