@@ -51,7 +51,7 @@ describe("order commands", () => {
 
 describe("standing taproom allocations", () => {
   it("concurrent sets for the same (location, sku) leave exactly one open allocation", async () => {
-    const tap = await seedLocation(b.id, { name: "Tap race", kind: "taproom" });
+    const tap = await seedLocation(b.id, { name: "Tap race", uses: ["taproom"] });
     await Promise.all([
       runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 3 }, adminCtx),
       runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 5 }, adminCtx),
@@ -62,7 +62,7 @@ describe("standing taproom allocations", () => {
   });
 
   it("set creates an open allocation, shows in list, and reduces ATP; qty 0 releases it", async () => {
-    const tap = await seedLocation(b.id, { name: "Tap", kind: "taproom" });
+    const tap = await seedLocation(b.id, { name: "Tap", uses: ["taproom"] });
     const tapId = tap.id;
     await ins("inventory_movements", {
       brewery_id: b.id, sku_id: skuId, location_id: tapId, bin_id: tap.binId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
@@ -94,7 +94,7 @@ describe("standing taproom allocations", () => {
   });
 
   it("brewer role cannot set standing allocations", async () => {
-    const tap = await seedLocation(b.id, { name: "Tap2", kind: "taproom" });
+    const tap = await seedLocation(b.id, { name: "Tap2", uses: ["taproom"] });
     await expect(runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 1 }, brewerCtx)).rejects.toThrow(/permission denied/);
   });
 });

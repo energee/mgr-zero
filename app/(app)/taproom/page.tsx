@@ -7,7 +7,7 @@ import { plural } from "@/lib/mgr/plural";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
 
-type Location = { id: string; name: string; kind: string };
+type Location = { id: string; name: string; uses: string[] };
 type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number };
 type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null };
 type Receipt = CountHeader & { correction_eligible: boolean; lines: ReceiptLine[] };
@@ -18,7 +18,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_taproom_count_snapshot", "Weekly count");
-  const locations = (await runCommand("list_locations", {}, ctx) as Location[]).filter((location) => location.kind === "taproom");
+  const locations = (await runCommand("list_locations", {}, ctx) as Location[]).filter(location => location.uses.includes("taproom"));
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <WeeklyCountView model={{ backHref: "/beer", locations: [], location: "", role: brewery.role as "admin" | "warehouse" | "taproom", lotLabels: {}, history: [] }} />;
 

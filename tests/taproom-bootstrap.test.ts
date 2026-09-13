@@ -134,7 +134,7 @@ it("rejects quiet-hour changes through a verified Slack callback as well as the 
 
 it("Beer reads only allowed taproom stock and never queries forbidden aggregates", async () => {
   const cat = await seedCatalog(ctx.breweryId);
-  const taproom = await seedLocation(ctx.breweryId, { name: "Taproom", kind: "taproom" });
+  const taproom = await seedLocation(ctx.breweryId, { name: "Taproom", uses: ["taproom"] });
   const warehouse = await seedLocation(ctx.breweryId, { name: "Warehouse" });
   for (const location of [taproom, warehouse]) await ins("inventory_movements", { brewery_id: ctx.breweryId, sku_id: cat.skuId, location_id: location.id, bin_id: location.binId, qty: 7, type: "opening_balance", created_by: ctx.userId });
   const fetch = vi.spyOn(globalThis, "fetch");
@@ -209,7 +209,7 @@ it("loads complete Taproom stock and names SKUs beyond the catalog response cap"
   const brewery = await makeBrewery();
   const staff = await makeStaffCtx(brewery.id, "taproom");
   const cat = await seedCatalog(brewery.id);
-  const location = await seedLocation(brewery.id, { kind: "taproom", name: "Big taproom" });
+  const location = await seedLocation(brewery.id, { uses: ["taproom"], name: "Big taproom" });
   const brands = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: brewery.id, name: `Brand ${n}` }));
   expect((await admin.from("brands").insert(brands)).error).toBeNull();
   const skus = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: brewery.id,

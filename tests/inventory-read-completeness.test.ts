@@ -16,7 +16,7 @@ describe("complete finished-goods reads", () => {
   it("assembles every owned stock row beyond the PostgREST row cap", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
-    const location = await seedLocation(brewery.id, { kind: "taproom" });
+    const location = await seedLocation(brewery.id, { uses: ["taproom"] });
     const format = await admin.from("formats").insert({
       brewery_id: brewery.id,
       name: `Complete ${crypto.randomUUID()}`,

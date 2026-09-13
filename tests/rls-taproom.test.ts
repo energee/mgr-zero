@@ -54,8 +54,8 @@ async function fixtures() {
   const put = (table: Table, row: Row) => ins(table, { brewery_id: brewery.id, ...row });
   const cat = await seedCatalog(brewery.id);
   const wh = await seedLocation(brewery.id, { name: "Warehouse" });
-  const taps = await Promise.all(["Tap A", "Tap B"].map(name => seedLocation(brewery.id, { name, kind: "taproom" })));
-  const storage = await seedLocation(brewery.id, { name: "Storage", kind: "storage" });
+  const taps = await Promise.all(["Tap A", "Tap B"].map(name => seedLocation(brewery.id, { name, uses: ["taproom"] })));
+  const storage = await seedLocation(brewery.id, { name: "Storage", uses: ["storage"] });
   const customer = await seedCustomer(brewery.id);
   await ins("customer_users", { customer_id: customer.customerId, user_id: owner.id });
   const vendor = await put("vendors", { name: "Vendor" });

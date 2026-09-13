@@ -52,8 +52,8 @@ describe("derived POS menus", () => {
   it("offers poured formats only from active keg stock in the configured bin", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
-    const taproom = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
-    const other = await seedLocation(brewery.id, { name: "Other", kind: "taproom" });
+    const taproom = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
+    const other = await seedLocation(brewery.id, { name: "Other", uses: ["taproom"] });
     await connectedLocation(brewery.id, "L1", taproom.id);
     const channel = await channelId(brewery.id, "Taproom");
     const keg = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5, format: "Half bbl" });

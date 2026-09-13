@@ -23,14 +23,14 @@ export function LocationView({
       {E.back("Locations", model.name, headerAction, model.backHref)}
       {readOnly ? (
         <>
-          {E.fld("Type", model.type)}
+          {E.fld("Uses", model.uses.join(" · "))}
           {E.fld("Timezone", model.timezone)}
           {E.row("Location bins", model.bins, E.act("Open", "primary", model.binsHref))}
         </>
       ) : (
         <>
           {E.edit("Location name", model.name)}
-          {E.pick("Type", model.type, model.typeOptions)}
+          {E.picks("Uses", model.uses, model.useOptions)}
           {E.fld("Timezone", model.timezone)}
           {E.nav("Location bins", model.bins)}
         </>

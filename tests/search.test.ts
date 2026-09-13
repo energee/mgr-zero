@@ -13,7 +13,7 @@ let b: { id: string }, adminCtx: Ctx, orderId: string, skuId: string, customerId
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
-  const wh = await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" });
+  const wh = await ins("locations", { brewery_id: b.id, name: "WH", uses: ["warehouse"] });
   const brand = await ins("brands", { brewery_id: b.id, name: "Hazy IPA" });
   const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
   skuId = (await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "Hazy IPA 1/2 bbl" })).id;

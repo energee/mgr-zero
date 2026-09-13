@@ -13,7 +13,7 @@ describe("GET /api/public/menus/[publicId]", () => {
   it("returns only explicitly published current safe rows without opening menu tables", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
-    const location = await seedLocation(brewery.id, { name: "Public Taproom", kind: "taproom" });
+    const location = await seedLocation(brewery.id, { name: "Public Taproom", uses: ["taproom"] });
     const connection = await admin.from("pos_connections").insert({
       brewery_id: brewery.id, merchant_id: `private-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
     }).select("id").single();

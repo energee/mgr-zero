@@ -43,7 +43,7 @@ export function MovementForm({
   autoOpen?: boolean;
   initial?: Partial<MovementInput>;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
-  locations: { id: string; name: string; kind: string }[];
+  locations: { id: string; name: string; uses: string[] }[];
   bins: { id: string; location_id: string; name: string }[];
   channels: { id: string; name: string }[];
 }) {

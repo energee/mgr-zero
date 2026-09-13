@@ -27,7 +27,7 @@ describe("final screen parity", () => {
   it("returns competing order and standing reservations only for the requested SKU and tenant", async () => {
     const b = await makeBrewery(), ctx = await makeStaffCtx(b.id);
     const cat = await seedCatalog(b.id), other = await seedCatalog(b.id, { product: "Other", sku: "Other case" });
-    const wh = await seedLocation(b.id), tap = await seedLocation(b.id, { name: "Tap", kind: "taproom" });
+    const wh = await seedLocation(b.id), tap = await seedLocation(b.id, { name: "Tap", uses: ["taproom"] });
     const customer = await seedCustomer(b.id);
     await priceSku(b.id, { saleChannelId: customer.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 100 });
     const orders: string[] = [];
@@ -65,7 +65,7 @@ describe("final screen parity", () => {
   });
   it("sums and projects more than 1,000 filtered reservation and location rows", async () => {
     const b = await makeBrewery(), ctx = await makeStaffCtx(b.id), cat = await seedCatalog(b.id);
-    const locations = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: b.id, name: `Tap ${n}`, kind: "taproom" }));
+    const locations = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: b.id, name: `Tap ${n}`, uses: ["taproom"] }));
     expect((await admin.from("locations").insert(locations)).error).toBeNull();
     const bins = locations.map(l => ({ id: crypto.randomUUID(), brewery_id: b.id, location_id: l.id, name: "Count" }));
     expect((await admin.from("bins").insert(bins)).error).toBeNull();

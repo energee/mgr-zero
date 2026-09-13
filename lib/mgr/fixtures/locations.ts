@@ -16,17 +16,18 @@ const TAPROOM_BINS = [
   { id: BIN_DRY, name: "Dry" },
 ] as const;
 
-/** Settings → Locations: Warehouse units plus Taproom taps and bins. */
+/** Settings → Locations: Warehouse units plus the Taproom, which pours, stores
+ *  and ships from one building — the case a single `kind` could never say. */
 export const locationsList: LocationsSnapshot = {
   locations: [
-    { id: LOC_WAREHOUSE.id, name: LOC_WAREHOUSE.name, kind: "warehouse", units: 186 },
-    { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, kind: "taproom", taps: 11, bins: 3 },
+    { id: LOC_WAREHOUSE.id, name: LOC_WAREHOUSE.name, uses: ["warehouse"], units: 186 },
+    { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"], taps: 11, bins: 3 },
   ],
 };
 
 /** Taproom facts for Location detail. */
 export const locationTaproom: LocationSnapshot = {
-  location: { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, kind: "taproom" },
+  location: { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"] },
   bins: TAPROOM_BINS.map((b) => ({ name: b.name })),
   timezone: "America/New_York",
 };

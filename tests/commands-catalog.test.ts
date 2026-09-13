@@ -21,7 +21,7 @@ describe("catalog commands", () => {
     const brand = await runCommand("upsert_brand", { name: "Command Lager", style: "Lager", abv: 5.1, priceGroupId: await seedPriceGroup(salesCtx.breweryId, "Standard", 1) }, salesCtx) as { id: string; style_id: string };
     const fmt = await runCommand("upsert_format", { name: "16 oz can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, salesCtx) as { id: string };
     const sku = await runCommand("create_sku", { brandId: brand.id, formatId: fmt.id }, salesCtx) as { id: string; name: string };
-    const location = await runCommand("create_location", { name: "Command Warehouse", kind: "warehouse" }, adminCtx) as { id: string };
+    const location = await runCommand("create_location", { name: "Command Warehouse", uses: ["warehouse"] }, adminCtx) as { id: string };
 
     expect(brand.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(brand.style_id).toMatch(/^[0-9a-f-]{36}$/i); // the style row was created with the brand
@@ -41,13 +41,13 @@ describe("catalog commands", () => {
   });
 
   it("denies sales members admin-only location creation in the registry and raw RPC", async () => {
-    await expect(runCommand("create_location", { name: "Sales Warehouse", kind: "warehouse" }, salesCtx))
+    await expect(runCommand("create_location", { name: "Sales Warehouse", uses: ["warehouse"] }, salesCtx))
       .rejects.toMatchObject({ code: "permission_denied" });
 
     const raw = await salesCtx.db.rpc("create_location", {
       p_brewery: salesCtx.breweryId,
       p_name: "Raw sales warehouse",
-      p_kind: "warehouse",
+      p_uses: ["warehouse"],
       p_request_id: crypto.randomUUID(),
     });
     expect(raw.error).not.toBeNull();
@@ -56,10 +56,10 @@ describe("catalog commands", () => {
 
 describe("update_location", () => {
   it("admin renames a location and may change its kind; sales is denied", async () => {
-    const loc = await runCommand("create_location", { name: "Old WH", kind: "warehouse" }, adminCtx) as { id: string };
-    const row = await runCommand("update_location", { locationId: loc.id, name: "Main WH", kind: "taproom" }, adminCtx) as { id: string; name: string; kind: string };
-    expect(row).toMatchObject({ id: loc.id, name: "Main WH", kind: "taproom" });
-    await expect(runCommand("update_location", { locationId: loc.id, name: "Nope", kind: "warehouse" }, salesCtx))
+    const loc = await runCommand("create_location", { name: "Old WH", uses: ["warehouse"] }, adminCtx) as { id: string };
+    const row = await runCommand("update_location", { locationId: loc.id, name: "Main WH", uses: ["taproom"] }, adminCtx) as { id: string; name: string; kind: string };
+    expect(row).toMatchObject({ id: loc.id, name: "Main WH", uses: ["taproom"] });
+    await expect(runCommand("update_location", { locationId: loc.id, name: "Nope", uses: ["warehouse"] }, salesCtx))
       .rejects.toMatchObject({ code: "permission_denied" });
   });
 });

@@ -146,7 +146,7 @@ describe("Square reviewed sync invariants", () => {
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
     const { connectionId } = await connected(brewery.id);
-    const mappedLocation = await seedLocation(brewery.id, { name: "Mapped taproom", kind: "taproom" });
+    const mappedLocation = await seedLocation(brewery.id, { name: "Mapped taproom", uses: ["taproom"] });
     const catalog = await seedCatalog(brewery.id, { product: "Paged", sku: "Paged case" });
     const ids = Array.from({ length: 1005 }, (_, index) => String(index).padStart(4, "0"));
     expect((await admin.from("pos_locations").insert(ids.map((id, index) => ({ brewery_id: brewery.id,

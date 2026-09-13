@@ -6,7 +6,7 @@ import type { TapBoardSnapshot, TapHistory, TapInterval } from "@/lib/mgr/tap-bo
 import "@/lib/commands/all";
 import { TapBoard, type TapSku } from "./tap-board";
 
-type Location = { id: string; name: string; kind: string };
+type Location = { id: string; name: string; uses: string[] };
 type Sku = { id: string; name: string; active: boolean; formats: { package_type: string | null } | null; format_volume: { bbl_per_unit: number | null } | null };
 
 export default async function TapBoardPage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
@@ -18,7 +18,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
     runCommand("list_locations", {}, ctx) as Promise<Location[]>,
     runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
   ]);
-  const locations = allLocations.filter((location) => location.kind === "taproom");
+  const locations = allLocations.filter(location => location.uses.includes("taproom"));
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
   const [open, history] = await Promise.all([

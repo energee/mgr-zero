@@ -166,7 +166,7 @@ it("on-delivery lot shipping posts once, then both credit entry points retain th
   await expect(runCommand("create_credit_memo", input, ctx)).rejects.toThrow();
 });
 it("complete transfer preserves an explicit lot into its chosen destination bin", async () => {
-  const dest = await seedLocation(ctx.breweryId, { name: "Complete lot taproom", kind: "taproom" });
+  const dest = await seedLocation(ctx.breweryId, { name: "Complete lot taproom", uses: ["taproom"] });
   const o = await runCommand("create_order", { kind: "taproom_transfer", fromLocationId: loc.id, toLocationId: dest.id, lines: [{ skuId: cat.skuId, qty: 1 }] }, ctx) as { order_id: string };
   await runCommand("submit_order", { orderId: o.order_id }, ctx); await runCommand("confirm_order", { orderId: o.order_id }, ctx);
   const line = (await admin.from("order_lines").select("id").eq("order_id", o.order_id).single()).data!.id;

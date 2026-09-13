@@ -1695,18 +1695,18 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Create a warehouse, taproom or storage location; it starts with the Walk-in, Cold and Dry bins
+Create a location and say what it is used for — one place may be warehouse, taproom and storage at once; it starts with the Walk-in, Cold and Dry bins
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
-| `kind` | warehouse or taproom or storage | yes |
+| `uses` | array of warehouse or taproom or storage | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "warehouse" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "uses": [ "warehouse" ] } }'
 ```
 
 #### create_stock_transfer [#create_stock_transfer]
@@ -2078,19 +2078,19 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Rename a location or change its kind (warehouse, taproom or storage); movement history is untouched
+Rename a location or change what it is used for (any of warehouse, taproom, storage); movement history is untouched
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `locationId` | uuid | yes |
 | `name` | string | yes |
-| `kind` | warehouse or taproom or storage | yes |
+| `uses` | array of warehouse or taproom or storage | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "name": "string", "kind": "warehouse" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "name": "string", "uses": [ "warehouse" ] } }'
 ```
 
 {/* end ops:inventory */}

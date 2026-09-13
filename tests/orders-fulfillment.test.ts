@@ -13,7 +13,7 @@ beforeAll(async () => {
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffEmail = staff.email; staffDb = await asUser(staff.email);
   ({ id: whId, binId: whBinId } = await seedLocation(b.id));
-  tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
+  tapId = (await seedLocation(b.id, { name: "Taproom", uses: ["taproom"] })).id;
   const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
   skuId = cat.skuId;
   const cust = await seedCustomer(b.id);

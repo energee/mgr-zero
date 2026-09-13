@@ -15,7 +15,7 @@ async function query(name: string, input: unknown) {
     case "list_orders": return [];
     case "list_customers": return [{ id: "buyer", name: "Buyer" }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
-    case "list_locations": return [{ id: "tap", name: "Taproom", kind: "taproom" }];
+    case "list_locations": return [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
     case "get_shortfalls": return [{ skuId: "active", skuName: "Keg", onHand: 1, allocated: 3, atp: -2, reservations: [{ id: "reserve", source: "order_line", ref: "line", qty: 3, orderId: "order", orderNo: 42 }] }];
     case "list_standing_allocations": return [];

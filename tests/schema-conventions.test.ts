@@ -21,7 +21,7 @@ async function seed() {
   });
   const lot = await mk<{ id: string }>("material_lots", { brewery_id: b.id, material_id: tracked.id, lot_code: "L1" });
   const pool = await mk<{ id: string }>("keg_pools", { brewery_id: b.id, name: "Owned", kind: "owned" });
-  const loc = await mk<{ id: string }>("locations", { brewery_id: b.id, name: "Conv WH", kind: "warehouse" });
+  const loc = await mk<{ id: string }>("locations", { brewery_id: b.id, name: "Conv WH", uses: ["warehouse"] });
   const bin = await mk<{ id: string }>("bins", { brewery_id: b.id, location_id: loc.id, name: "Conv bin" });
   return { b, staff, db, tracked, untracked, lot, pool, loc, bin };
 }

@@ -1,5 +1,5 @@
 // app/(app)/locations/[id]/page.tsx — Location detail (screen record
-// Location detail): name and kind with Edit → update_location. Timezone is
+// Location detail): name and uses with Edit → update_location. Timezone is
 // the brewery's; bins open /locations/[id]/bins.
 import { LocationView } from "@/components/mgr/views/location";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
@@ -11,7 +11,7 @@ import { isUuid } from "@/lib/commands/context";
 import { notFound } from "next/navigation";
 import { LocationForm } from "../location-form";
 
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" | "storage" };
+type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 
 export default async function LocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

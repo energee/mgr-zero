@@ -66,7 +66,7 @@ describe("command request idempotency", () => {
     const commandMismatch = await staffDb.rpc("create_location", {
       p_brewery: breweryId,
       p_name: "Wrong command",
-      p_kind: "warehouse",
+      p_uses: ["warehouse"],
       p_request_id: requestId,
     });
     expect(commandMismatch.error?.message).toMatch(/request id.*different payload/i);

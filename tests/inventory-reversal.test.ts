@@ -140,7 +140,7 @@ it("nets losses and negative adjustments in their original report outflow side",
 
 it("refuses an actual count-owned depletion without changing count history", async () => {
   const { ctx, catalog } = await setup();
-  const location = await seedLocation(ctx.breweryId, { name: "Taproom", kind: "taproom" });
+  const location = await seedLocation(ctx.breweryId, { name: "Taproom", uses: ["taproom"] });
   await ins("inventory_movements", { brewery_id: ctx.breweryId, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, qty: 5, type: "opening_balance", created_by: ctx.userId });
   const snapshot = await ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: location.id });
   expect(snapshot.error).toBeNull();

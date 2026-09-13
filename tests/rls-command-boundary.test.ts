@@ -34,7 +34,7 @@ beforeAll(async () => {
   const cat = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" });
   ({ formatId, skuId } = cat);
   ({ id: locationId, binId } = await seedLocation(brewery.id, { name: "Boundary warehouse" }));
-  taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
+  taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", uses: ["taproom"] })).id;
   ({ customerId, shipToId, saleChannelId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
   const { data: posConnection, error: posConnectionError } = await admin.from("pos_connections").insert({ brewery_id: brewery.id, merchant_id: `boundary-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
   if (posConnectionError) throw posConnectionError;
@@ -74,10 +74,10 @@ describe("staff command database boundary", () => {
 
   it("keeps admin-only location and sales/admin customer RPCs role-bound", async () => {
     const location = await adminCtx.db.rpc("create_location", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_name: "admin rpc location", p_kind: "taproom",
+      p_brewery: brewery.id, p_name: "admin rpc location", p_uses: ["taproom"],
     });
     const salesLocation = await salesCtx.db.rpc("create_location", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_name: "sales rpc location", p_kind: "taproom",
+      p_brewery: brewery.id, p_name: "sales rpc location", p_uses: ["taproom"],
     });
     const customer = await salesCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "sales rpc customer", p_type: "retailer", p_state: "PA",
@@ -145,7 +145,7 @@ const nextPosition = async () => {
 };
 
 async function posMenuFixture(role: StaffRole, configured = false) {
-  const location = await seedLocation(brewery.id, { name: unique("matrix pos location", role), kind: "taproom" });
+  const location = await seedLocation(brewery.id, { name: unique("matrix pos location", role), uses: ["taproom"] });
   const catalog = await seedCatalog(brewery.id, { product: unique("matrix pos brand", role), sku: unique("matrix pos keg", role), packageType: "keg", bblPerUnit: 0.5, format: unique("Half bbl", role) });
   const { data: poured, error: pouredError } = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: catalog.brandId, name: unique("Pint", role), basis: "poured", ounces: 16 }).select("id").single();
   if (pouredError) throw pouredError;
@@ -302,8 +302,8 @@ describe("registered staff mutation role × RPC matrix", () => {
       input: async role => {
         const name = unique("matrix location", role);
         return {
-          command: { name, kind: "taproom" },
-          rpc: { p_brewery: brewery.id, p_name: name, p_kind: "taproom" },
+          command: { name, uses: ["taproom"] },
+          rpc: { p_brewery: brewery.id, p_name: name, p_uses: ["taproom"] },
         };
       },
     },
@@ -351,7 +351,7 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "create_stock_transfer", rpc: "create_stock_transfer", allowed: ["admin", "warehouse"],
       input: async () => {
-        const to = await seedLocation(brewery.id, { name: unique("matrix storage", "admin"), kind: "storage" });
+        const to = await seedLocation(brewery.id, { name: unique("matrix storage", "admin"), uses: ["storage"] });
         return {
           command: { fromLocationId: locationId, toLocationId: to.id, lines: [{ skuId, qty: 1, fromBinId: binId, toBinId: to.binId }] },
           rpc: { p_brewery: brewery.id, p_from: locationId, p_to: to.id, p_requested: null, p_note: null,
@@ -362,7 +362,7 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "receive_stock_transfer", rpc: "receive_stock_transfer", allowed: ["admin", "warehouse"],
       input: async () => {
-        const to = await seedLocation(brewery.id, { name: unique("matrix receive", "admin"), kind: "storage" });
+        const to = await seedLocation(brewery.id, { name: unique("matrix receive", "admin"), uses: ["storage"] });
         const db = contexts().admin.db;
         const { data } = await db.rpc("create_stock_transfer", { p_brewery: brewery.id, p_from: locationId, p_to: to.id, p_requested: null, p_note: null,
           p_lines: [{ sku_id: skuId, qty: 1, from_bin_id: binId, to_bin_id: to.binId }], p_request_id: crypto.randomUUID() });
@@ -583,7 +583,7 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "record_taproom_count", rpc: "record_taproom_count", allowed: ["admin", "warehouse", "taproom"],
       input: async () => {
-        const loc = await seedLocation(brewery.id, { name: `Count ${crypto.randomUUID()}`, kind: "taproom" });
+        const loc = await seedLocation(brewery.id, { name: `Count ${crypto.randomUUID()}`, uses: ["taproom"] });
         const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: loc.id }, adminCtx) as { revision: string; counted_on: string };
         return {
           command: { locationId: loc.id, countedOn: snapshot.counted_on, revision: snapshot.revision, lines: [] },
@@ -594,7 +594,7 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "correct_taproom_count", rpc: "correct_taproom_count", allowed: ["admin"],
       input: async () => {
-        const loc = await seedLocation(brewery.id, { name: `Correct count ${crypto.randomUUID()}`, kind: "taproom" });
+        const loc = await seedLocation(brewery.id, { name: `Correct count ${crypto.randomUUID()}`, uses: ["taproom"] });
         await ins("inventory_movements", { brewery_id: brewery.id, sku_id: skuId, location_id: loc.id,
           bin_id: loc.binId, qty: 2, type: "opening_balance", created_by: adminCtx.userId });
         const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: loc.id }, adminCtx) as { revision: string; counted_on: string; lines: { bin_id: string; sku_id: string; lot_id: null; qty_before: number }[] };

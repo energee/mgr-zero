@@ -21,23 +21,23 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Locations list", () => {
-  it("maps list_locations through kind, with optional units / taps / bins copy", () => {
+  it("maps list_locations through every use, with optional units / taps / bins copy", () => {
     const model = toLocationsViewProps(locationsList);
     expect(model.rows.map((r) => [r.title, r.detail, r.href])).toEqual([
       ["Warehouse", "Warehouse · 186 inventory units", `/locations/${LOC_WAREHOUSE.id}`],
-      ["Taproom", "Taproom · 11 taps · 3 bins", `/locations/${LOC_TAPROOM.id}`],
+      ["Taproom", "Storage · Taproom · Warehouse · 11 taps · 3 bins", `/locations/${LOC_TAPROOM.id}`],
     ]);
     expect(model.empty).toBeUndefined();
   });
 
-  it("uses kind alone when inventory extras are omitted", () => {
+  it("uses the use list alone when inventory extras are omitted", () => {
     const model = toLocationsViewProps({
       locations: [
-        { id: LOC_WAREHOUSE.id, name: LOC_WAREHOUSE.name, kind: "warehouse" },
-        { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, kind: "taproom" },
+        { id: LOC_WAREHOUSE.id, name: LOC_WAREHOUSE.name, uses: ["warehouse"] },
+        { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, uses: ["taproom", "storage"] },
       ],
     });
-    expect(model.rows.map((r) => r.detail)).toEqual(["Warehouse", "Taproom"]);
+    expect(model.rows.map((r) => r.detail)).toEqual(["Warehouse", "Taproom · Storage"]);
   });
 
   it("names an empty list without inventing rows", () => {
@@ -53,7 +53,7 @@ describe("Locations list", () => {
     expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Warehouse · 186 inventory units/);
     expect(html).toMatch(/Taproom/);
-    expect(html).toMatch(/Taproom · 11 taps · 3 bins/);
+    expect(html).toMatch(/Storage · Taproom · Warehouse · 11 taps · 3 bins/);
     expect(html).toMatch(/Settings/);
     expect(html).not.toMatch(/href="\/locations\//);
     expect(html).not.toMatch(/→/);
@@ -108,8 +108,8 @@ describe("Location detail", () => {
   it("maps a list_locations row plus bins and timezone extras", () => {
     const model = toLocationViewProps(locationTaproom);
     expect(model.name).toBe(LOC_TAPROOM.name);
-    expect(model.type).toBe("Taproom");
-    expect(model.typeOptions).toEqual(["Warehouse", "Taproom", "Storage"]);
+    expect(model.uses).toEqual(["Storage", "Taproom", "Warehouse"]);
+    expect(model.useOptions).toEqual(["Warehouse", "Taproom", "Storage"]);
     expect(model.timezone).toBe("Brewery default · America/New_York");
     expect(model.bins).toBe("Walk-in · Cold · Dry");
     expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
@@ -129,12 +129,14 @@ describe("Location detail", () => {
     expect(model.bins).toBe("none");
   });
 
-  it("the inventory drawing still has Save location and the type pick", () => {
+  it("the inventory drawing still has Save location and every use picked", () => {
     const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom) }));
     expect(html).toMatch(/>Save location</);
     expect(html).toMatch(/Location name/);
-    expect(html).toMatch(/Type/);
+    expect(html).toMatch(/Uses/);
     expect(html).toMatch(/Taproom/);
+    expect(html).toMatch(/Storage/);
+    expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Timezone/);
     expect(html).toMatch(/Brewery default · America\/New_York/);
     expect(html).toMatch(/Location bins/);
@@ -143,15 +145,15 @@ describe("Location detail", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("readOnly paints Type as a field and Open on bins, not Save", () => {
+  it("readOnly paints the uses as a field and Open on bins, not Save", () => {
     const html = htmlOf(createElement(LocationView, {
       model: toLocationViewProps(locationTaproom),
       readOnly: true,
       headerAction: "EDIT",
     }));
     expect(html).toMatch(/EDIT/);
-    expect(html).toMatch(/Type/);
-    expect(html).toMatch(/Taproom/);
+    expect(html).toMatch(/Uses/);
+    expect(html).toMatch(/Storage · Taproom · Warehouse/);
     expect(html).toMatch(/>Open</);
     expect(html).toMatch(new RegExp(`href="/locations/${LOC_TAPROOM.id}/bins"`));
     expect(html).not.toMatch(/>Save location</);

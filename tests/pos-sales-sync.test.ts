@@ -77,8 +77,8 @@ async function fixture(options: { squareCatalog?: boolean } = {}) {
   expect(connection.error).toBeNull();
   sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
     values('${brewery.id}','square','${connection.data!.id}','access','refresh',1)`);
-  const one = await seedLocation(brewery.id, { name: "Taproom", kind: "taproom" });
-  const two = await seedLocation(brewery.id, { name: "Beer garden", kind: "taproom" });
+  const one = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
+  const two = await seedLocation(brewery.id, { name: "Beer garden", uses: ["taproom"] });
   const catalog = await seedCatalog(brewery.id, { product: "Hazy", packageType: "keg", bblPerUnit: .5 });
   const pour = await admin.from("formats").insert({
     brewery_id: brewery.id, brand_id: catalog.brandId, name: "Pint", basis: "poured", ounces: 16,

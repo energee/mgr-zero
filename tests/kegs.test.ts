@@ -19,8 +19,8 @@ beforeAll(async () => {
   const { data, error } = await admin.from("vendors").insert({ brewery_id: b.id, name: "Microstar" }).select("id").single();
   if (error) throw error;
   vendorId = data.id;
-  taproom = await seedLocation(b.id, { name: "Taproom", kind: "taproom" });
-  storage = await seedLocation(b.id, { name: "Storage", kind: "storage" });
+  taproom = await seedLocation(b.id, { name: "Taproom", uses: ["taproom"] });
+  storage = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
 });
 
 const event = (i: Record<string, unknown>) => runCommand("record_keg_event", i, ctx);

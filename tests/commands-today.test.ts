@@ -34,7 +34,7 @@ beforeAll(async () => {
   [adminCtx, sales, warehouse, brewer] = await Promise.all([
     makeStaffCtx(b.id, "admin"), makeStaffCtx(b.id, "sales"), makeStaffCtx(b.id, "warehouse"), makeStaffCtx(b.id, "brewer"),
   ]);
-  whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
+  whId = (await ins("locations", { brewery_id: b.id, name: "WH", uses: ["warehouse"] })).id;
   whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
   const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
   const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
