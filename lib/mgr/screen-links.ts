@@ -127,6 +127,8 @@ export const TAPS: [string | RegExp, string][] = [
   [/^(Hazy IPA|Pils|Stout) v\d+$/, "Recipe"],
   [/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/, "Monthly compliance"],
   ["Save filed snapshot", "Compliance months"],
+  // The months list is titled Compliance on the glass; its children crumb to that (#259).
+  ["Compliance", "Compliance months"],
   ["Add approval", "Brand approval"],
   [/^COLA serial \w+$/, "Brand approval"],
   ["Add registration", "State registration"],

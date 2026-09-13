@@ -8,7 +8,7 @@ export const moreNavs: MoreNavView[] = [
   { key: "customers", title: "Customers", detail: "accounts and ship-tos" },
   { key: "recipes", title: "Recipes", detail: "formulas and versions" },
   { key: "compliance", title: "Compliance months", detail: "reports and filing status" },
-  { key: "vendors", title: "Vendors", detail: "suppliers" },
+  { key: "vendors", title: "Vendors", detail: "who you buy from" },
   { key: "channels", title: "Sale channels", detail: "tax treatment" },
   { key: "formats", title: "Formats", detail: "package composition" },
   { key: "planning", title: "Planning" },

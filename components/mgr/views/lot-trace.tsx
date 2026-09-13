@@ -22,7 +22,7 @@ export function LotTraceView({
 }) {
   return (
     <>
-      {E.back(model.backTo ?? "Compliance months", model.title, undefined, model.backHref)}
+      {E.back(model.backTo ?? "Compliance", model.title, undefined, model.backHref)}
       {E.row(model.sku, model.skuDetail, model.skuTrailing)}
       {E.fld("Tank · batch", model.tankBatch)}
       {E.fld("Drawn", model.drawn)}

@@ -1,5 +1,6 @@
 // lib/mgr/invoice-view.ts — view-model for one invoice. get_invoice +
 // list_invoice_questions paint the domain; adapters supply mapping facts.
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { plural } from "./plural";
@@ -98,7 +99,7 @@ export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHr
   const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
   const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
   const state = invoiceCurrentState(invoice);
-  const stateDetail = state === "paid" ? ` · paid ${new Date(invoice.paid_at!).toLocaleDateString()}`
+  const stateDetail = state === "paid" ? ` · paid ${formatDate(invoice.paid_at!)}`
     : state === "written_off" ? " · written off" : state === "unpaid" ? "" : ` · ${state}`;
   const drift = invoice.qbo_accountant_drift ? " · edited in QuickBooks" : "";
   return {
@@ -117,7 +118,7 @@ export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHr
     questions: questions.map((q) => ({
       key: q.id,
       id: q.id,
-      detail: `“${q.body}” · ${q.customers?.name ?? "buyer"}, ${new Date(q.created_at).toLocaleDateString()}`,
+      detail: `“${q.body}” · ${q.customers?.name ?? "buyer"}, ${formatDate(q.created_at)}`,
       answered: Boolean(q.answered_at),
     })),
     mappings,

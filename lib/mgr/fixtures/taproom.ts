@@ -22,10 +22,10 @@ export const tapBoard: TapBoardState = { sheet: null, snapshot: {
 export const kickKeg = openTapBoardSheet(tapBoard.snapshot, "kick", boardTaps[4]).sheet!;
 export const swapKeg = openTapBoardSheet(tapBoard.snapshot, "swap", boardTaps[4]).sheet!;
 
-const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_on: "Sep 8", prior_count: { id: "sep1", counted_on: "Sep 1" }, revision: "fixture-count", lines: [
+const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_on: "2026-09-08", prior_count: { id: "sep1", counted_on: "2026-09-01" }, revision: "fixture-count", lines: [
   { bin_id: "cold", bin_name: "Cold", sku_id: "pils-case", sku_name: "Pils · 16 oz case", brand_id: "pils", brand_name: "Pils", bbl_per_unit: 384 / 3968, lot_id: null, qty_before: 6 },
   { bin_id: "cold", bin_name: "Cold", sku_id: "hazy-half", sku_name: "Hazy · ½ bbl keg", brand_id: "hazy", brand_name: "Hazy IPA", bbl_per_unit: 0.5, lot_id: "hazy-lot", qty_before: 3 },
-] }, { prior_count: { id: "sep1", counted_on: "Sep 1" }, expected_bbl: 1.5, reason: null, rows: [{ brand_id: "hazy", brand_name: "Hazy IPA", expected_bbl: 1.5, excluded_bbl: 0, unattributed_bbl: 0, split: false }] });
+] }, { prior_count: { id: "sep1", counted_on: "2026-09-01" }, expected_bbl: 1.5, reason: null, rows: [{ brand_id: "hazy", brand_name: "Hazy IPA", expected_bbl: 1.5, excluded_bbl: 0, unattributed_bbl: 0, split: false }] });
 weeklyDraft.draft.lines[0].quantity = "4";
 weeklyDraft.draft.lines[1].quantity = "2";
 export const weeklyCount: WeeklyCountViewModel = {

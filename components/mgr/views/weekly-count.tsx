@@ -2,6 +2,7 @@
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { formatDate, formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -68,10 +69,10 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
   return <>
     <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
-    {E.note(prior ? <>Captured prior · {priorHref ? <Link href={priorHref}>{prior.counted_on}</Link> : prior.counted_on} · reopen saved count</> : "Captured prior · first count")}
+    {E.note(prior ? <>Captured prior · {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)} · reopen saved count</> : "Captured prior · first count")}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
       : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable · {(projection?.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
-    {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{new Date(projection.starts_at).toLocaleString()} through {new Date(projection.as_of).toLocaleString()}</p>}
+    {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at)} through {formatDateTime(projection.as_of)}</p>}
     {comparison.map(row => <div key={row.brandId}>{E.row(row.brandName, `expected ${bbl(row.expectedBbl)} · draft actual ${row.complete ? bbl(row.actualBbl) : "Enter all buckets"}`, `difference ${bbl(row.differenceBbl)}`)}</div>)}
     {comparison.length > 0 && <p className="text-xs text-muted-foreground">Draft actual is an estimate from this snapshot&apos;s package volumes. Expected minus actual is a comparison only; the saved receipt is authoritative.</p>}
     {aligned && projection && ((projection.unmapped_lines ?? 0) > 0 || (projection.ignored_lines ?? 0) > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) && <p className="text-xs text-muted-foreground">Coverage {projection.coverage_complete ? "complete" : "incomplete"} · {projection.unmapped_lines} unmapped · {projection.ignored_lines} ignored · {projection.excluded_bbl} bbl excluded · {projection.unattributed_bbl} bbl unattributed</p>}
@@ -81,7 +82,7 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
     <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
       {E.ttl("Count every stock bucket")}
-      {E.note(`Server date ${state.draft.countedOn} · whole remaining packages only · enter zero explicitly. A partly full keg is one.`)}
+      {E.note(`Server date ${formatDate(state.draft.countedOn)} · whole remaining packages only · enter zero explicitly. A partly full keg is one.`)}
       </div>
       {print !== undefined ? print : <WeeklyCountPrintAction />}
       <div className="contents print:hidden">
