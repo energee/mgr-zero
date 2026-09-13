@@ -9,13 +9,20 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const scriptPath = resolve(__dirname, "..", "scripts", "worktree.sh");
 
+// git exports GIT_DIR, GIT_INDEX_FILE and friends to its hooks, so a suite run
+// from pre-push would point every git call below at the real repository
+// instead of the throwaway one. The temp repo gets a clean environment.
+const noGitEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))) as NodeJS.ProcessEnv;
+
+const git = (projectRoot: string, args: string[]) => spawnSync("git", args, { cwd: projectRoot, env: noGitEnv });
+
 function initRepo(projectRoot: string) {
-  spawnSync("git", ["init", "-q", "-b", "main"], { cwd: projectRoot });
-  spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: projectRoot });
-  spawnSync("git", ["config", "user.name", "Test"], { cwd: projectRoot });
+  git(projectRoot, ["init", "-q", "-b", "main"]);
+  git(projectRoot, ["config", "user.email", "test@example.com"]);
+  git(projectRoot, ["config", "user.name", "Test"]);
   writeFileSync(join(projectRoot, "file.txt"), "hi");
-  spawnSync("git", ["add", "."], { cwd: projectRoot });
-  spawnSync("git", ["commit", "-q", "-m", "initial"], { cwd: projectRoot });
+  git(projectRoot, ["add", "."]);
+  git(projectRoot, ["commit", "-q", "-m", "initial"]);
 }
 
 function fakeBun(projectRoot: string) {
@@ -32,7 +39,7 @@ function runWorktreeScript(projectRoot: string, binDir: string, branch: string, 
   const args = base === undefined ? [scriptPath, branch] : [scriptPath, branch, base];
   return spawnSync("bash", args, {
     cwd: projectRoot,
-    env: { ...process.env, PATH: `${binDir}:${process.env.PATH}` },
+    env: { ...noGitEnv, PATH: `${binDir}:${process.env.PATH}` },
     encoding: "utf8",
   });
 }
@@ -61,7 +68,7 @@ describe("scripts/worktree.sh", () => {
     expect(realpathSync(join(worktreeDir, ".env.local"))).toBe(realpathSync(join(projectRoot, ".env.local")));
     expect(realpathSync(join(worktreeDir, ".env.test.local"))).toBe(realpathSync(join(projectRoot, ".env.test.local")));
     expect(readFileSync(logPath, "utf8").trim()).toBe(`${realpathSync(worktreeDir)} install --frozen-lockfile`);
-    expect(result.stdout).toContain(`ready: ${worktreeDir} (feature/x)`);
+    expect(result.stdout).toContain(`ready: ${realpathSync(worktreeDir)} (feature/x)`);
   });
 
   it("skips env files that do not exist in the main checkout instead of failing", () => {
@@ -82,16 +89,16 @@ describe("scripts/worktree.sh", () => {
     const projectRoot = mkdtempSync(join(tmpdir(), "worktree-script-"));
     createdRoots.push(projectRoot);
     initRepo(projectRoot);
-    spawnSync("git", ["branch", "release"], { cwd: projectRoot });
+    git(projectRoot, ["branch", "release"]);
     writeFileSync(join(projectRoot, "file.txt"), "changed on main");
-    spawnSync("git", ["commit", "-qam", "advance main"], { cwd: projectRoot });
+    git(projectRoot, ["commit", "-qam", "advance main"]);
     const { binDir } = fakeBun(projectRoot);
 
     const result = runWorktreeScript(projectRoot, binDir, "from-release", "release");
 
     expect(result.status).toBe(0);
     const worktreeDir = join(projectRoot, ".agents", "worktrees", "from-release");
-    const merged = spawnSync("git", ["merge-base", "--is-ancestor", "from-release", "release"], { cwd: worktreeDir });
+    const merged = git(worktreeDir, ["merge-base", "--is-ancestor", "from-release", "release"]);
     expect(merged.status).toBe(0);
   });
 });
