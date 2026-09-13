@@ -30,7 +30,7 @@ import { toMaterialViewProps } from "../lib/mgr/material-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { toNewPoViewProps } from "../lib/mgr/new-po-view";
 import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
-import { toReceiptViewProps } from "../lib/mgr/receipt-view";
+import { toReceiptViewProps, toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toReceivePoViewProps } from "../lib/mgr/receive-po-view";
 import { toVendorViewProps } from "../lib/mgr/vendor-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
@@ -93,18 +93,52 @@ describe("Purchase orders", () => {
     expect(htmlOf(createElement(ReceivePoView, { model: toReceivePoViewProps(receivePoCountryMalt) }))).not.toMatch(/href="\/purchase-orders"/);
   });
 
+  it("draft receiving keeps counts read-only and only offers the send attestation", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "draft" } }));
+    expect(html).toContain("Mark sent");
+    expect(html).toContain("nothing is emailed");
+    expect(html).not.toContain("Receive purchase order");
+    expect(html).not.toContain('type="number"');
+    const receiving = htmlOf(createElement(ReceivePoView, { model: { title: "Actual PO", lines: [{ key: "line-id", title: "Actual material", detail: "expected 4", qty: "5.5", lot: "" }], lotSuggestionsUnavailable: true } }));
+    expect(receiving).toContain('value="5.5"');
+    expect(receiving).toContain("Lot code off the package");
+    expect(receiving).toContain("Best by");
+    expect(receiving).toContain("Recent lots");
+    expect(receiving).not.toContain('max="4"');
+  });
+
   it("the Receipt inventory record is ReceiptView", () => {
     const body = screen("Receipt").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceiptView);
     expect(body.props.model).toEqual(toReceiptViewProps(receiptPoCountryMalt));
   });
 
-  it("the live PO page mounts ReceivePoView and not ReceiptView", () => {
+  it("the live PO page mounts ReceivePoView and a durable ReceiptView", () => {
     const page = src("app/(app)/purchase-orders/[id]/page.tsx");
-    expect(page).toMatch(/<ReceivePoView\b/);
     expect(page).toMatch(/<ReceiveForm\b/);
-    expect(page).not.toMatch(/ReceiptView/);
+    expect(page).toMatch(/<ReceiptView\b/);
+    expect(page).toContain("searchParams");
+    const form = src("app/(app)/purchase-orders/[id]/po-actions.tsx");
+    expect(form).toMatch(/<ReceivePoView\b/);
+    expect(form).not.toMatch(/<Input\b|<Label\b|<Select\b/);
   });
+});
+
+it("posted receipt uses counted quantities, captured lot references and current balances", () => {
+  const snapshot = {
+    id: "po-id", po_no: 42, status: "partially_received",
+    lines: [{ id: "line-id", qty_open: 1, material: { name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" } }],
+    receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id" }] }],
+  };
+  const model = toPostedReceiptViewProps(snapshot, "receipt-id")!;
+  expect(model.title).toBe("PO-0042 · received");
+  expect(model.stillOwed).toBe("1 box Actual material");
+  expect(model.tape[0][0]).toBe("+30 kg Actual material · receipt");
+  expect(model.tape[0][1]).toContain("short 1 box");
+  expect(model.tape[0][1]).toContain("actual-lot-id");
+  expect(model.backHref).toBeUndefined();
+  expect(toPostedReceiptViewProps(snapshot, "wrong-receipt")).toBeUndefined();
+  expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
 });
 
 describe("Materials", () => {

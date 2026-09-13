@@ -14,7 +14,6 @@ const KNOWN_VIEW_DEBT = [
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
   "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
-  "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
 ] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
@@ -60,6 +59,9 @@ const BODY_SLOTS: Record<string, string> = {
   CatalogView: "brands",
   ShopView: "catalog",
   SearchView: "palette",
+  NewPoView: "form",
+  ReceivePoView: "review",
+  PurchaseOrdersView: "list",
 };
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
