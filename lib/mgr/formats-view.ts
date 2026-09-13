@@ -1,5 +1,6 @@
 // lib/mgr/formats-view.ts — view-model for the Formats table. list_formats
 // plus optional format_components paint Basis / Volume / From.
+import type { EmptyState } from "./empty-state";
 import { formatVolume } from "@/lib/volume";
 
 export type FormatsRowView = {
@@ -12,7 +13,7 @@ export type FormatsViewModel = {
   backHref?: string;
   headers: string[];
   rows: FormatsRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type FormatsFormatRow = {
@@ -66,7 +67,7 @@ export function toFormatsViewProps({ formats, components = [], backHref, formatH
   return {
     backHref,
     headers: ["Format", "Basis", "Volume", "From"],
-    empty: formats.length === 0 ? "No formats yet" : undefined,
+    empty: formats.length === 0 ? { title: "No formats yet", description: "A format is a container a beer ships in: a 1/2 bbl keg, a 16 oz can." } : undefined,
     rows: formats.map((f) => ({
       key: f.id,
       href: formatHref?.(f),

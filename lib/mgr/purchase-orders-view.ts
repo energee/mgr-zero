@@ -1,4 +1,5 @@
 // lib/mgr/purchase-orders-view.ts — view-model for the Purchase orders list.
+import type { EmptyState } from "./empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
 export type PurchaseOrdersRowView = {
@@ -15,7 +16,7 @@ export type PurchaseOrdersViewModel = {
   title: string;
   subtitle: string;
   rows: PurchaseOrdersRowView[];
-  empty?: string;
+  empty?: EmptyState;
   workChips: string[];
   workChipIndex: number;
   workTabs: Record<string, string>;
@@ -25,7 +26,9 @@ export type PurchaseOrdersSnapshot = {
   title: string;
   subtitle: string;
   rows?: PurchaseOrdersRowView[];
-  empty?: string;
+  empty?: EmptyState;
+  /** Closed orders included, so an empty list means there are none at all. */
+  includeClosed?: boolean;
 };
 
 export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOrdersViewModel {
@@ -34,7 +37,9 @@ export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOr
     title: s.title,
     subtitle: s.subtitle,
     rows,
-    empty: s.empty ?? (rows.length === 0 ? "No open purchase orders" : undefined),
+    empty: s.empty ?? (rows.length === 0
+      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders", description: "Raise one to order materials from a vendor." }
+      : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 5,
     workTabs: WORK_TABS,

@@ -34,7 +34,7 @@ describe("Finished goods view", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toFinishedGoodsViewProps({ skus: [] });
-    expect(model.empty).toBe("No finished goods yet");
+    expect(model.empty?.title).toBe("No finished goods yet");
     expect(model.rows).toEqual([]);
   });
 

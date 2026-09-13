@@ -1,4 +1,5 @@
 // lib/mgr/keg-balance-view.ts — view-model for Customer keg balance.
+import type { EmptyState } from "./empty-state";
 export type KegBalanceRowView = {
   key: string;
   title: string;
@@ -14,7 +15,7 @@ export type KegBalanceViewModel = {
   kegs: string;
   deposits: string;
   rows: KegBalanceRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type KegBalanceSnapshot = {
@@ -33,6 +34,6 @@ export function toKegBalanceViewProps(s: KegBalanceSnapshot): KegBalanceViewMode
     kegs: s.kegs,
     deposits: s.deposits,
     rows,
-    empty: rows.length === 0 ? "No kegs currently out" : undefined,
+    empty: rows.length === 0 ? { title: "No kegs currently out", description: "Every keg in the fleet is back at the brewery." } : undefined,
   };
 }

@@ -41,7 +41,7 @@ describe("breadcrumb parents name the destination the user came from", () => {
 
 describe("section nouns agree with the page they sit on (#261)", () => {
   it("an empty contracts list says contracts, not commitments", () => {
-    expect(toContractsViewProps({ rows: [] }).empty).toBe("No contracts yet");
+    expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
   });
 
   it("Contracts accepts a header so the Vendors page does not link to itself", () => {

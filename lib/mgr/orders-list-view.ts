@@ -1,4 +1,5 @@
 // lib/mgr/orders-list-view.ts — view-model for the Work → Orders list.
+import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { nextAction, type ActionTone, type OrderStatus } from "./order-status";
 
@@ -15,7 +16,7 @@ export type OrdersListRowView = {
 export type OrdersListViewModel = {
   subtitle: string;
   rows: OrdersListRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type OrdersListSnapshot = {
@@ -34,7 +35,7 @@ export type OrdersListSnapshot = {
 export function toOrdersListViewProps({ role, status, orders }: OrdersListSnapshot): OrdersListViewModel {
   return {
     subtitle: `${role} default`,
-    empty: orders.length === 0 ? (status ? `No ${status} orders` : "No orders yet") : undefined,
+    empty: orders.length === 0 ? { title: status ? `No ${status} orders` : "No orders yet", description: "Orders appear here once they are placed." } : undefined,
     rows: orders.map((o) => {
       const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id);
       const ships = o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : "";

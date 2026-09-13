@@ -39,7 +39,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
       model={toPurchaseOrdersViewProps({
         title: "Work",
         subtitle: all === "1" ? "every order" : "open orders",
-        empty: pos.length === 0 ? (all === "1" ? "No purchase orders yet" : "No open purchase orders") : undefined,
+        includeClosed: all === "1",
         rows: pos.map(po => {
           const [label, tone] = verb(po);
           return { key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), verb: label, tone, href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" };

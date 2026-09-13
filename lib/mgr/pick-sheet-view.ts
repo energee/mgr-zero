@@ -1,6 +1,7 @@
 // lib/mgr/pick-sheet-view.ts — view-model for Work → Pick sheet.
 // Groups daily_pick_sheet rows by requested_ship_date the way the live page
 // does; weekday chips stay a filters slot, not this mapping.
+import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { plural } from "./plural";
 
@@ -21,7 +22,7 @@ export type PickSheetGroupView = {
 
 export type PickSheetViewModel = {
   groups: PickSheetGroupView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type PickSheetSnapshot = {
@@ -43,7 +44,7 @@ export type PickSheetSnapshot = {
 
 export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetViewModel {
   if (orders.length === 0) {
-    return { groups: [], empty: "Nothing confirmed to pick" };
+    return { groups: [], empty: { title: "Nothing confirmed to pick", description: "Confirm an order to add its lines to the pick sheet." } };
   }
   const grouped = Map.groupBy(orders, (o) => o.requested_ship_date ?? "Unscheduled");
   return {

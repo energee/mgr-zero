@@ -1,4 +1,5 @@
 // lib/mgr/customers-view.ts — view-model for the Customers list.
+import type { EmptyState } from "./empty-state";
 export type CustomersRowView = {
   key: string;
   title: string;
@@ -9,7 +10,7 @@ export type CustomersRowView = {
 
 export type CustomersViewModel = {
   rows: CustomersRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type CustomersSnapshot = {
@@ -39,7 +40,7 @@ function detail(c: CustomersSnapshot["customers"][number]): string {
 
 export function toCustomersViewProps({ customers }: CustomersSnapshot): CustomersViewModel {
   return {
-    empty: customers.length === 0 ? "No customers yet" : undefined,
+    empty: customers.length === 0 ? { title: "No customers yet", description: "Add the accounts you sell to so orders have somewhere to go." } : undefined,
     rows: customers.map((c) => ({
       key: c.id,
       title: c.name,

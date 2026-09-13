@@ -1,5 +1,6 @@
 // lib/mgr/sku-list-view.ts — view-model for SKU list. list_skus for one brand,
 // with formats.bbl_per_unit, paints each package row.
+import type { EmptyState } from "./empty-state";
 import { formatVolume } from "@/lib/volume";
 
 export type SkuListRowView = {
@@ -13,7 +14,7 @@ export type SkuListViewModel = {
   backHref?: string;
   title: string;
   rows: SkuListRowView[];
-  empty?: string;
+  empty?: EmptyState;
 };
 
 export type SkuListSnapshot = {
@@ -32,7 +33,7 @@ export function toSkuListViewProps({ brand, skus, backHref }: SkuListSnapshot): 
   return {
     backHref,
     title: `${brand.name} · SKUs`,
-    empty: skus.length === 0 ? "No SKUs yet" : undefined,
+    empty: skus.length === 0 ? { title: "No SKUs yet", description: "A SKU pairs a brand with a format, and is what a customer orders." } : undefined,
     rows: skus.map((s) => {
       const volume = s.formats?.bbl_per_unit != null ? formatVolume(s.formats.bbl_per_unit) : "—";
       return {

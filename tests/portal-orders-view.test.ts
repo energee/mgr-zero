@@ -55,7 +55,8 @@ describe("Order history view", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toPortalOrdersViewProps({ customerName: RIDGELINE.name, breweryName: "Demo Brewing", orders: [] });
-    expect(model.empty).toBe("No orders yet. Start one from Order.");
+    expect(model.empty?.title).toBe("No orders yet");
+    expect(model.empty?.description).toBe("Start one from Order.");
     expect(model.rows).toEqual([]);
   });
 

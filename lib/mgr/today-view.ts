@@ -1,4 +1,5 @@
 // lib/mgr/today-view.ts — view-model for Today and the persona landings.
+import type { EmptyState } from "./empty-state";
 import type { TodayItem } from "@/lib/commands/today";
 import type { TaproomTodayRow } from "@/lib/mgr/taproom-today";
 
@@ -18,7 +19,7 @@ export type TodayRowView = {
 
 export type TodayViewModel = {
   date: string;
-  empty?: string;
+  empty?: EmptyState;
   emptyVerb?: string;
   rows: TodayRowView[];
 };
@@ -43,12 +44,14 @@ const TODAY_VERB: Record<TodayItem["reason"], [string, NonNullable<TodayRowView[
 
 export type TodaySnapshot = {
   date: string;
-  empty?: string;
+  empty?: EmptyState;
   emptyVerb?: string;
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
 };
+
+export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
 
 export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   if (s.rows !== undefined) {
@@ -73,7 +76,7 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   if (items.length === 0) {
     return {
       date: s.date,
-      empty: s.empty ?? "Nothing waiting",
+      empty: s.empty ?? NOTHING_WAITING,
       emptyVerb: s.emptyVerb ?? "Record movement",
       rows: [],
     };

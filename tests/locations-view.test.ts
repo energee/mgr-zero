@@ -42,7 +42,7 @@ describe("Locations list", () => {
 
   it("names an empty list without inventing rows", () => {
     const model = toLocationsViewProps({ locations: [] });
-    expect(model.empty).toBe("No locations yet");
+    expect(model.empty?.title).toBe("No locations yet");
     expect(model.rows).toEqual([]);
   });
 
