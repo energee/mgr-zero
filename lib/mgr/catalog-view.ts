@@ -62,7 +62,7 @@ export function toCatalogViewProps({
       key: b.id,
       title: b.name,
       detail: brandDetail(b),
-      href: "/catalog",
+      href: `/catalog/brands/${b.id}`,
     })),
     priceGroups: channels
       ? `${plural(channels.length, "channel")} · ${groupCopy}`

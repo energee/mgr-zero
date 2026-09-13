@@ -106,7 +106,7 @@ export function toBrandViewProps({
     description: brand.description ?? "",
     hops: brand.hops ?? "",
     skuList: plural(active, "active package"),
-    skuListHref: "/catalog",
+    skuListHref: brand.id ? `/catalog/brands/${brand.id}/skus` : "/catalog",
     compliance: brandComplianceRows(compliance),
   };
 }

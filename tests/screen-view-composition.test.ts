@@ -7,10 +7,7 @@ import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
-const KNOWN_VIEW_DEBT = [
-  "SKU: SkuView <- app/(app)/catalog/page.tsx",
-  "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
-] as const;
+const KNOWN_VIEW_DEBT = [] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
 const KNOWN_INLINE_DEBT = [] as const;
@@ -21,7 +18,8 @@ const KNOWN_SURFACE_DEBT = [
 // Audited whole-body replacements, not action/message slots. Extend this
 // focused list as each flow is inspected; a view import alone misses these.
 const BODY_SLOTS: Record<string, string> = {
-  CatalogView: "brands",
+  // CatalogView has no body-replacement slot left: `rowExtra` adds under a row
+  // and cannot replace the rows, which tests/catalog-view.test.ts asserts.
   ShopView: "catalog",
   NewPoView: "form",
   ReceivePoView: "review",
@@ -37,9 +35,7 @@ const BODY_SLOTS: Record<string, string> = {
   ClosePackagingRunView: "lead",
   KegFleetView: "list",
 };
-const KNOWN_BODY_DEBT = [
-  "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",
-];
+const KNOWN_BODY_DEBT: string[] = [];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
   if (!isValidElement<{ children?: ReactNode }>(node)) return out;

@@ -42,6 +42,7 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   // itself carries the create_order gate and the picker options.
   const writable = await OrdersPage({ searchParams: Promise.resolve({}) });
   expect(renderToStaticMarkup(writable.props.createAction)).toContain('href="/orders/new"');
+  // New order is its own page now; it owns the option lists and its own gate.
   state.calls = []; state.gates = [];
   const form = await NewOrderPage();
   expect(state.gates).toContainEqual(["create_order", "New order"]);
@@ -54,8 +55,11 @@ it("slots the scoped recoverable Cart with the actual configured source or no so
     // The page now returns the Cart itself; Cart mounts ShopView with a real
     // adapter instead of the page passing a hollow model through a slot.
     const shop = await ShopPage({ searchParams: Promise.resolve({}) });
-    expect(shop.props).toMatchObject({ customerName: "Buyer", fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
+    expect(shop.props).toMatchObject({ fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
+    // Cart is the root now and owns the ShopView mount; the recovery scope
+    // still has to remount it per actor/customer/brewery/draft.
     expect(shop.key).toBe("actor:buyer:brewery:new");
+    expect(shop.props.customerName).toBe("Buyer");
   }
 });
 

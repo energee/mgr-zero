@@ -1,3 +1,6 @@
+// app/(app)/orders/page.tsx — Orders (screen record): the Work list with the
+// Orders chip active. A state chip filters by `?status=`. New order is its own
+// page (new/page.tsx), which loads the customer/location/SKU option lists.
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";

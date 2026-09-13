@@ -44,6 +44,8 @@ describe("Catalog view", () => {
       brandOf(SKU_STOUT),
     ]);
     expect(model.brands[0]?.detail).toBe("IPA · 6.8% · 3 SKUs");
+    // The row is the link to that brand's page; Catalog draws no Edit brand button.
+    expect(model.brands[0]?.href).toBe(`/catalog/brands/${model.brands[0]!.key}`);
     expect(model.brands[1]?.detail).toBe("Lager · 4.9% · 2 SKUs");
     expect(model.brands[2]?.detail).toBe("Stout · 7.2% · 1 SKU");
     expect(model.priceGroups).toBe("3 channels · 8 groups");
@@ -89,21 +91,28 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_HAZY));
   });
 
-  it("brands slot replaces inventory brand navs and the empty blank", () => {
+  it("draws every brand row itself; rowExtra only adds beside one", () => {
+    const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
-      model: toCatalogViewProps({
-        brands: [],
-        priceGroups: catalogBrands.priceGroups,
-        channels: catalogBrands.channels,
-        waterProfileCount: catalogBrands.waterProfileCount,
-      }),
-      brands: "LIVE BRANDS",
+      model,
+      linkRows: true,
+      rowExtra: (row: { key: string }) => (row.key === model.brands[0]!.key ? "POUR SLOT" : null),
     }));
-    expect(html).toMatch(/LIVE BRANDS/);
-    expect(html).not.toMatch(/No brands yet/);
-    expect(html).not.toContain(brandOf(SKU_HAZY));
-    expect(html).toMatch(/Price groups/);
-    expect(html).toMatch(/Water profiles/);
+    // The shared view still owns the rows: the slot cannot replace them.
+    expect(html).toContain(brandOf(SKU_HAZY));
+    expect(html).toContain(brandOf(SKU_PILS));
+    expect(html).toMatch(/IPA · 6\.8% · 3 SKUs/);
+    expect(html).toMatch(/POUR SLOT/);
+    expect(html).toMatch(/href="\/catalog\/brands\//);
+  });
+
+  it("still blanks an empty catalog", () => {
+    const html = htmlOf(createElement(CatalogView, {
+      model: toCatalogViewProps({ brands: [], priceGroups: catalogBrands.priceGroups }),
+      rowExtra: () => "POUR SLOT",
+    }));
+    expect(html).toMatch(/No brands yet/);
+    expect(html).not.toMatch(/POUR SLOT/);
   });
 
   it("the Catalog inventory record is CatalogView", () => {
@@ -117,14 +126,16 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    // Brand is a page, not a dialog: New Brand and Edit brand are links to it.
+    // Brand is a page, not a dialog: New Brand links to it, as does each row.
     expect(src).not.toMatch(/<BrandForm\b/);
     expect(src).toMatch(/"\/catalog\/brands\/new"/);
-    expect(src).toMatch(/`\/catalog\/brands\/\$\{brand\.id\}`/);
     expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
     expect(src).toMatch(/backHref: "\/more"/);
+    // The page no longer redraws the brand rows or nests packages in them.
+    expect(src).not.toMatch(/brands=\{/);
+    expect(src).not.toMatch(/<SkuForm\b|<SkuEditForm\b/);
   });
 });
 
@@ -198,7 +209,7 @@ describe("Brand view", () => {
       linkRows: true,
     }));
     expect(html).not.toMatch(/>Save brand</);
-    expect(html).toMatch(/href="\/catalog"/);
+    expect(html).toMatch(/href="\/catalog\/brands\/[^"]+\/skus"/);
     expect(html).toMatch(/SKU list/);
   });
 
@@ -227,6 +238,37 @@ describe("SKU view", () => {
     expect(html).toMatch(/UPC \(optional\)/);
     expect(html).toMatch(/aria-label="Format"/);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("controls make the fields controlled and slots add the live Name", () => {
+    const html = htmlOf(createElement(SkuView, {
+      model: toSkuViewProps(skuHazyHalf),
+      controls: { format: () => {}, active: () => {}, upc: () => {} },
+      activeRow: null,
+      fields: "NAME FIELD",
+      footer: "LIVE FOOTER",
+    }));
+    expect(html).toMatch(/NAME FIELD/);
+    expect(html).toMatch(/LIVE FOOTER/);
+    expect(html).not.toMatch(/>Save SKU</);
+    expect(html).not.toMatch(/available to price and sell/);
+    expect(html).toContain("00810123450127");
+  });
+
+  it("a locked SKU shows its format as a fact, not a picker", () => {
+    const html = htmlOf(createElement(SkuView, { model: toSkuViewProps(skuHazyHalf), locked: true }));
+    expect(html).not.toMatch(/aria-label="Format"/);
+    expect(html).toMatch(/½ bbl keg/);
+  });
+
+  it("the live SKU forms mount the shared controlled SkuView", () => {
+    const form = readFileSync("app/(app)/catalog/sku-form.tsx", "utf8");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/sku"/);
+    expect(form.match(/<SkuView\b/g)).toHaveLength(2);
+    expect(form).toMatch(/controls=\{\{/);
+    // Only the live-only Name input is drawn here; Format, Active and UPC are the view's.
+    expect(form).not.toMatch(/<Select\b|<Input\b/);
+    expect(form).not.toMatch(/aria-label="UPC/);
   });
 
   it("the SKU inventory record is SkuView", () => {
@@ -265,6 +307,25 @@ describe("SKU list view", () => {
     }));
     expect(html).toMatch(/NEW SKU/);
     expect(html).not.toMatch(/>Add SKU</);
+  });
+
+  it("rowAction replaces the inventory Edit tap", () => {
+    const html = htmlOf(createElement(SkuListView, {
+      model: toSkuListViewProps(skuListHazy),
+      rowAction: () => "EDIT SHEET",
+    }));
+    expect(html).toMatch(/EDIT SHEET/);
+    expect(html).not.toMatch(/>Edit</);
+    expect(html).toMatch(/½ bbl keg/);
+  });
+
+  it("the live SKU list page mounts the shared SkuListView", () => {
+    const page = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
+    expect(page).toMatch(/from "@\/components\/mgr\/views\/sku-list"/);
+    expect(page).toMatch(/<SkuListView\b/);
+    expect(page).toMatch(/createAction=\{canWrite \? <SkuForm/);
+    expect(page).toMatch(/<SkuEditForm\b/);
+    expect(page).toMatch(/backHref: `\/catalog\/brands\/\$\{id\}`/);
   });
 
   it("the SKU list inventory record is SkuListView", () => {

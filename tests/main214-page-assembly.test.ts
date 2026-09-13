@@ -20,6 +20,7 @@ async function query(name: string) {
   state.calls.push(name);
   switch (name) {
     case "list_brands": return [brand];
+    case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: "brand", brands: { name: "Hazy" } }];
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
@@ -33,23 +34,37 @@ async function query(name: string) {
   }
 }
 import CatalogPage from "@/app/(app)/catalog/page";
+import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 import CustomersPage from "@/app/(app)/customers/page";
 import CustomerPage from "@/app/(app)/customers/[id]/page";
 import BinsPage from "@/app/(app)/locations/[id]/bins/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 beforeEach(() => { state.role = "admin"; state.calls = []; });
-it("assembles shared Catalog with full brand, packaged SKU and per-brand pour controls", async () => {
+it("assembles shared Catalog with the brand link and its per-brand pour controls", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
   const html = render(page);
-  for (const text of ["Edit brand", "Edit SKU", "New pour", "Edit pour", "Inactive", "UPC 123456", "/catalog/formats/keg"]) expect(html).toContain(text);
+  // Packages are one tap further, on the brand's SKU list.
+  for (const text of ["/catalog/brands/brand", "New pour", "Edit pour", "/catalog/formats/keg"]) expect(html).toContain(text);
+  for (const text of ["Edit brand", "Edit SKU", "UPC 123456"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
+});
+it("assembles the shared SKU list with the brand's packages and both SKU sheets", async () => {
+  const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });
+  expect(page.type).toBe(SkuListView);
+  const html = render(page);
+  for (const text of ["Hazy · SKUs", "Half keg", "inactive", "New SKU", "Edit SKU"]) expect(html).toContain(text);
+  state.role = "warehouse";
+  const readonly = render(await SkuListPage({ params: Promise.resolve({ id: "brand" }) }));
+  expect(readonly).not.toMatch(/New SKU|Edit SKU|Add SKU/);
+  expect(readonly).toContain("Half keg");
 });
 it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied controls for %s", async role => {
   state.role = role;
