@@ -187,6 +187,25 @@ export async function priceSku(breweryId: string, o: { saleChannelId: string; br
 
 // A brewery's seeded sale channel by name (Wholesale, Taproom, DTC, Export —
 // written by the trigger on breweries insert; see 00001_baseline.sql).
+/** One material ledger row (an opening balance or a costed receipt) at a bin. */
+export async function seedMovement(breweryId: string, o: {
+  materialId: string; locationId: string; binId: string; qty: number; createdBy: string;
+  type?: "opening_balance" | "receipt"; unitCostCents?: number; lotId?: string;
+}) {
+  const { error } = await admin.from("material_movements").insert({
+    brewery_id: breweryId, material_id: o.materialId, location_id: o.locationId, bin_id: o.binId, lot_id: o.lotId,
+    qty: o.qty, type: o.type ?? "opening_balance", unit_cost_cents: o.unitCostCents, created_by: o.createdBy,
+  });
+  if (error) throw error;
+}
+
+/** A form submit a hook can be handed; `seen` records which contract calls it made. */
+export function submitEvent() {
+  const seen = { prevented: false, stopped: false };
+  const event = { preventDefault() { seen.prevented = true; }, stopPropagation() { seen.stopped = true; } } as unknown as React.FormEvent;
+  return { event, seen };
+}
+
 export async function channelId(breweryId: string, name: string): Promise<string> {
   const { data, error } = await admin.from("sale_channels")
     .select("id").eq("brewery_id", breweryId).eq("name", name).single();

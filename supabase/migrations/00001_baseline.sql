@@ -2358,9 +2358,14 @@ create view material_requirements with (security_invoker = true) as
     order by mc.ends_on nulls last limit 1) c on true
   left join vendors v on v.id = coalesce(c.vendor_id, m.default_vendor_id);
 
+-- NULL, not a low number, while any ingredient has no receipt cost: a partial
+-- sum must never read as the recipe's cost. The view also names which
+-- materials broke it, so no reader re-derives the rule.
 create view recipe_version_costs with (security_invoker = true) as
   select ri.recipe_version_id, ri.brewery_id,
-         sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int as cost_cents_per_bbl
+         case when bool_and(c.unit_cost_cents is not null)
+              then sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int end as cost_cents_per_bbl,
+         coalesce(array_agg(distinct ri.material_id) filter (where c.unit_cost_cents is null), '{}') as uncosted_material_ids
   from recipe_ingredients ri
   join materials m on m.id = ri.material_id
   left join material_last_cost c on c.material_id = ri.material_id
@@ -7559,7 +7564,7 @@ grant select on breweries, brewery_users, customer_users,
 -- only the derived reads consumed by registered commands.
 grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
   format_volumes, occupancy_volumes, product_volume_requirements,
-  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
+  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost, recipe_version_costs,
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;

@@ -1,5 +1,6 @@
-// tests/compliance-view.test.ts — Compliance months, registry, sheets, and
-// lot trace. Views own no sample data. Live registry forms stay wrappers.
+// tests/compliance-view.test.ts — Compliance months, Licenses, the brand's
+// approval and registration sheets, and lot trace. Views own no sample data.
+// Live sheet wrappers mount the shared bodies.
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -55,6 +56,7 @@ describe("Licenses", () => {
     const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicensesView);
     expect(body.props.model).toEqual(toLicensesViewProps(licensesDemo));
+    expect(toLicensesViewProps(licensesDemo).licenses[0]).toEqual({ key: "pa", title: "PA brewery", detail: "G-21884 · expires 2027-06-30", verb: "Edit" });
     const html = htmlOf(screen("Licenses").body);
     expect(html).not.toMatch(/tablist/);
     expect(html).not.toMatch(/Hazy IPA|COLA|registration/);
