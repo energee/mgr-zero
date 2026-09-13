@@ -7,16 +7,20 @@ export type { ContractsViewModel };
 
 export function ContractsView({
   model,
+  header,
   createAction,
   rowTrailing,
 }: {
   model: ContractsViewModel;
+  /** Live: the Vendors page mounts this as a section and heads it, so the
+   * standalone back crumb would link the page to itself (#261). */
+  header?: ReactNode;
   createAction?: ReactNode;
   rowTrailing?: (row: ContractsViewModel["rows"][number]) => ReactNode;
 }) {
   return (
     <>
-      {E.back("Vendors", "Contracts", createAction !== undefined ? createAction : E.btn("Add contract"), model.backHref)}
+      {header ?? E.back("Vendors", "Contracts", createAction !== undefined ? createAction : E.btn("Add contract"), model.backHref)}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

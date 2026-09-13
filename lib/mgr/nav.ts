@@ -74,7 +74,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Customers", href: "/customers", roles: ["sales"], about: "accounts and ship-tos" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], about: "rows of the price grid" },
       { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "formulas and versions" },
-      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "suppliers" },
+      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "who you buy from" },
       { label: "Compliance", href: "/compliance", roles: ["sales"], about: "reports and filing status" },
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"] },
       { label: "Import", href: "/settings/import", roles: ["admin"] },

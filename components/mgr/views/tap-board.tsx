@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -11,7 +12,7 @@ import { LinkTabs } from "@/components/mgr/work-tabs";
 import { tapLabel, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
-const when = (value: string) => new Date(value).toLocaleString();
+const when = (value: string) => formatDateTime(value);
 const day = (value: string) => new Date(value).toLocaleDateString("en-US", { weekday: "short" });
 const volume = (value: number) => `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl`;
 const actor = (label: string | null) => label ? `@${label}` : "staff";

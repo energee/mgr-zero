@@ -71,7 +71,7 @@ export default async function VendorsPage() {
               warning: c.qty_available <= 0,
             })),
           })}
-          createAction={<ContractForm vendors={options} materials={materials} />}
+          header={E.hd("Contracts", "committed quantities", <ContractForm vendors={options} materials={materials} />)}
           rowTrailing={(row) => {
             const contract = contracts.find((c) => c.id === row.key)!;
             return <ContractForm contract={contract} vendors={options} materials={materials} />;

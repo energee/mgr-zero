@@ -17,5 +17,5 @@ export type ContractsSnapshot = { backHref?: string; rows?: ContractsRowView[] }
 
 export function toContractsViewProps(s: ContractsSnapshot): ContractsViewModel {
   const rows = s.rows ?? [];
-  return { backHref: s.backHref, rows, empty: rows.length === 0 ? "No commitments yet" : undefined };
+  return { backHref: s.backHref, rows, empty: rows.length === 0 ? "No contracts yet" : undefined };
 }

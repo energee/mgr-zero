@@ -9,7 +9,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction }: {
   fileAction?: ReactNode;
 }) {
   return <>
-    {E.back("Compliance months", model.title, undefined, model.backHref)}
+    {E.back("Compliance", model.title, undefined, model.backHref)}
     {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
     {model.losses.length === 0 ? E.info("No completion reconciliation losses posted in this period.") : model.losses.map((loss) => <section key={loss.key} className="rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{loss.title}</p><p className="text-sm text-muted-foreground">{loss.detail}</p></div>{lossAction ? lossAction(loss.source) : E.btn("Reattribute loss", "g")}</div>
