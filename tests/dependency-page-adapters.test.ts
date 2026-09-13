@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null }));
+const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
@@ -15,9 +15,9 @@ async function query(name: string, input: unknown) {
     case "list_orders": return [];
     case "list_customers": return [{ id: "buyer", name: "Buyer" }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
-    case "list_locations": return [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
+    case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
-    case "get_shortfalls": return [{ skuId: "active", skuName: "Keg", onHand: 1, allocated: 3, atp: -2, reservations: [{ id: "reserve", source: "order_line", ref: "line", qty: 3, orderId: "order", orderNo: 42 }] }];
+    case "get_shortfalls": return [{ skuId: "active", skuName: "Keg", onHand: 1, allocated: 3, atp: -2, reservations: state.reservations ?? [{ id: "reserve", source: "order_line", ref: "line", qty: 3, orderId: "order", orderNo: 42 }] }];
     case "list_standing_allocations": return [];
     case "replenishment_suggestions": return [];
     case "portal_catalog": return [];
@@ -61,6 +61,19 @@ it("slots the scoped recoverable Cart with the actual configured source or no so
     expect(shop.key).toBe("actor:buyer:brewery:new");
     expect(shop.props.customerName).toBe("Buyer");
   }
+});
+
+// A standing allocation may be held at any location — set_standing_allocation
+// asks for no particular use — so the shortfall card names the place it is held
+// even when that place is not a taproom. Reading only the taprooms showed a raw id.
+it("names the location a standing allocation is held at, taproom or not", async () => {
+  state.role = "warehouse"; state.calls = [];
+  state.locations = [{ id: "tap", name: "Taproom", uses: ["taproom"] }, { id: "shed", name: "Overflow shed", uses: ["storage"] }];
+  state.reservations = [{ id: "standing", source: "taproom_standing", ref: "shed", qty: 2 }];
+  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
+  const model = page.props.children[1][0].props.children.props.model;
+  expect(model.rows[0]).toMatchObject({ title: "Standing allocation · Overflow shed", detail: "2 keg reserved" });
+  state.locations = null; state.reservations = null;
 });
 
 it("renders the selected shortfall with actual package volume and competing order", async () => {
