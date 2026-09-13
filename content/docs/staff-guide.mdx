@@ -361,6 +361,8 @@ Admin opens **Settings → Accounting** to connect, reconnect, inspect safe conn
 
 Accounting shares the explorer's connection, online-payment status, and **Bank transfer (ACH)** / **Card** switches. Select **Save push defaults** while connected; saved settings remain read-only during recovery. **Customers missing an email** offers **Review**, but its count is unavailable from the current health query. **Disconnect QuickBooks** opens a confirmation sheet; a recovery-required connection cannot be disconnected by the existing command and must be reconnected first. Closing the sheet changes nothing.
 
+The **QuickBooks mappings** list separates customers, SKUs, and the deposit/refund item. **Map** or **Change** opens **Mapping conflict** from Accounting, or **Fix mapping** from an invoice's mapping list. Each sheet identifies the local record and accepts the exact QuickBooks customer or item ID, without changing leading zeroes or guessing from names. **Save mapping** is unavailable while the ID is blank or a save is pending. Closing discards unsaved edits. A company claimed by another brewery must be disconnected there first; a mapping cannot override that claim.
+
 When a buyer asks about an invoice from the portal, the question appears on the invoice as **Buyer asked about this invoice** with their words, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
 Returns preserve the selected shipment lot and its original recorded volume even if the format definition later changes. A damaged return writes that same volume back out as loss atomically.

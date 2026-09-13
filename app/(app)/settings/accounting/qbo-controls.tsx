@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
+import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { money } from "@/lib/mgr/money";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
@@ -27,26 +28,20 @@ export function QboDisconnectAction({ connectionId }: { connectionId: string }) 
   return <DisconnectQuickBooksView busy={action.busy} error={action.error} onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, () => router.push("/settings/accounting/connect"))} />;
 }
 
-type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null };
-export function QboMappingForm({ kind, localId, label, currentId }: MappingProps) {
-  return <QboMappingFields key={qboMappingVersion(currentId)} kind={kind} localId={localId} label={label} currentId={currentId} />;
+type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
+export function QboMappingForm(props: MappingProps) {
+  return <QboMappingFields key={qboMappingVersion(props.currentId)} {...props} />;
 }
 
-function QboMappingFields({ kind, localId, label, currentId }: MappingProps) {
+function QboMappingFields({ kind, localId, label, currentId, context = "accounting" }: MappingProps) {
   const [remoteId, setRemoteId] = useState(currentId ?? "");
   const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping" : "set_qbo_deposit_mapping";
   const build = () => kind === "customer" ? { customerId: localId, qboCustomerId: remoteId }
     : kind === "item" ? { skuId: localId, qboItemId: remoteId } : { qboItemId: remoteId };
   const form = useCommandForm(name, { build, reset: () => setRemoteId(currentId ?? "") });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title={`Map ${label}`} trigger={<Button variant="outline" size="sm">{currentId ? "Change" : "Map"}</Button>}>
-    <form className="flex flex-col gap-3" onSubmit={form.submit}>
-      <p className="text-sm text-muted-foreground">Verify the record in the connected QuickBooks company and enter its exact ID. MGR never chooses automatically from a matching name.</p>
-      <Label htmlFor={`qbo-${kind}-${localId ?? "default"}`}>QuickBooks {kind === "item" ? "item" : kind} ID</Label>
-      <Input id={`qbo-${kind}-${localId ?? "default"}`} value={remoteId} onChange={e => setRemoteId(e.target.value)} required />
-      <CommandFormMessage error={form.error} />
-      <CommandFormFooter><Button disabled={form.submitting || !remoteId.trim()}>{form.submitting ? "Saving…" : "Save mapping"}</Button></CommandFormFooter>
-    </form>
-  </CommandForm>;
+  return <QboMappingSheetView open={form.open} onOpenChange={form.setOpen} context={context} currentId={currentId}>
+    <QboMappingView kind={kind} label={label} value={remoteId} onChange={setRemoteId} onSubmit={form.submit} busy={form.submitting} error={form.error} companyConflict={context === "accounting"} />
+  </QboMappingSheetView>;
 }
 
 export function QboSyncButton() {

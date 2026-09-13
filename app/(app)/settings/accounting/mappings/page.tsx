@@ -1,4 +1,4 @@
-import { E } from "@/components/mgr/e";
+import { QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { requireAdminContext } from "@/lib/brewery";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -14,14 +14,9 @@ export default async function QuickBooksMappingsPage() {
     runCommand("list_customers", {}, ctx) as Promise<Customer[]>,
     runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
   ]);
-  return <>
-    {E.back("Accounting", "QuickBooks mappings", undefined, "/settings/accounting")}
-    {!health.connected ? E.note("Connect QuickBooks before saving mappings.") : E.info(`Mappings are bound to ${health.realmLabel ?? "the verified QuickBooks company"}. Verify each record there; MGR never chooses automatically from a matching name.`)}
-    {E.ttl("Customers")}
-    {customers.length ? customers.map(row => <div key={row.id}>{E.row(row.name, row.qbo_customer_id ? `QuickBooks customer ${row.qbo_customer_id}` : "Not mapped", health.connected ? <QboMappingForm kind="customer" localId={row.id} label={row.name} currentId={row.qbo_customer_id} /> : "", row.qbo_customer_id ? "ok" : "w")}</div>) : E.blank("No customers yet")}
-    {E.ttl("SKUs")}
-    {skus.length ? skus.map(row => <div key={row.id}>{E.row(row.name, row.qbo_item_id ? `QuickBooks item ${row.qbo_item_id}` : "Not mapped", health.connected ? <QboMappingForm kind="item" localId={row.id} label={row.name} currentId={row.qbo_item_id} /> : "", row.qbo_item_id ? "ok" : "w")}</div>) : E.blank("No SKUs yet")}
-    {E.ttl("Returnable-keg deposits")}
-    {E.row("Deposit and refund item", health.depositItemId ? `QuickBooks item ${health.depositItemId}` : "One verified QuickBooks item for frozen keg charges and refunds", health.connected ? <QboMappingForm kind="deposit" label="returnable-keg deposits" currentId={health.depositItemId} /> : "", health.depositItemId ? "ok" : "w")}
-  </>;
+  return <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" backHref="/settings/accounting" connected={health.connected} company={health.realmLabel} sections={[
+    { title: "Customers", empty: "No customers yet", rows: customers.map(row => ({ id: row.id, label: row.name, kind: "customer", currentId: row.qbo_customer_id, action: <QboMappingForm kind="customer" localId={row.id} label={row.name} currentId={row.qbo_customer_id} /> })) },
+    { title: "SKUs", empty: "No SKUs yet", rows: skus.map(row => ({ id: row.id, label: row.name, kind: "item", currentId: row.qbo_item_id, action: <QboMappingForm kind="item" localId={row.id} label={row.name} currentId={row.qbo_item_id} /> })) },
+    { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", currentId: health.depositItemId, detail: "One verified QuickBooks item for frozen keg charges and refunds", action: <QboMappingForm kind="deposit" label="returnable-keg deposits" currentId={health.depositItemId} /> }] },
+  ]} />;
 }

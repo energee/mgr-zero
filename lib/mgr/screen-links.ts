@@ -382,7 +382,8 @@ const authored = (screen: Screen, l: string, to?: string | null) =>
  * an author named a target for it on this screen, which wins outright. */
 export const isInertOn = (screen: Screen, label: string, to?: string | null) => {
   const l = label.trim();
-  return !authored(screen, l, to) && INERT.some((k) => matches(k, l));
+  const localMapping = l === "Map" && ["QuickBooks mappings", "Invoice mappings"].includes(screen.name);
+  return !authored(screen, l, to) && (localMapping || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];

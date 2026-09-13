@@ -24,6 +24,7 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // not an oversight.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -1284,12 +1285,33 @@ export const SCREENS: Screen[] = [
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
     spec: "A person verifies and enters the exact QuickBooks record ID. MGR never chooses automatically from a matching name. A company already claimed by another brewery cannot be overridden here.",
-    body: (<>
-      {E.note("Two QuickBooks customers have similar names. Verify the intended account in QuickBooks; MGR never chooses automatically.")}
-      {E.edit("QuickBooks customer ID", "184")}
-      {E.btn("Save mapping")}
-      {E.info("If this QuickBooks company belongs to another MGR brewery, disconnect it there first.")}
-    </>),
+    body: <QboMappingView kind="customer" defaultValue="184" companyConflict />,
+  },
+  {
+    step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
+    name: "QuickBooks mappings",
+    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict" },
+    job: "Review verified customer, SKU and deposit mappings for the connected company",
+    reads: "get_qbo_connection · list_customers · list_skus",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers or SKUs"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={[
+      { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
+      { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
+      { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
+    ]} />,
+  },
+  {
+    step: 5, slice: 1, tab: "More",
+    name: "Invoice mappings",
+    to: { "Oak and Barrel": "Fix mapping", "Pils · case": "Fix mapping" },
+    job: "Review one invoice's customer and item mappings before fixing exact provider IDs",
+    reads: "get_invoice",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping",
+    states: [["permission", "sales or admin required", 1], ["unmapped", "verify the provider ID", 1]],
+    body: <QboMappingsView title="Fix QuickBooks mapping" backLabel="Invoice" context="invoice" sections={[
+      { rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }, { id: "sku", label: "Pils · case", kind: "item", detail: "Item mapping required" }] },
+    ]} />,
   },
   {
     step: 5,
@@ -1355,11 +1377,7 @@ export const SCREENS: Screen[] = [
     reads: "get_invoice · get_qbo_connection",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping",
     states: [["permission", "sales or admin required", 1], ["candidate selected", "save enables invoice push"], ["no match", "create it in QuickBooks first", 1]],
-    body: (<>
-      {E.note("Verify the intended item in QuickBooks; MGR never chooses automatically from its name.")}
-      {E.edit("QuickBooks item ID", "307")}
-      {E.btn("Save mapping")}
-    </>),
+    body: <QboMappingView kind="item" defaultValue="307" />,
   },
   {
     step: 5,

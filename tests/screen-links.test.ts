@@ -135,6 +135,10 @@ describe("reported explorer flows", () => {
 // map is the first tier of the resolver. The explorer must not let the
 // suppression list silently outrank it.
 describe("isInertOn", () => {
+  it("opens mapping controls locally without redirecting QuickBooks edits to POS", () => {
+    for (const name of ["QuickBooks mappings", "Invoice mappings"]) expect(isInertOn(by(name), "Map")).toBe(true);
+    expect(isInertOn(by("POS mapping"), "Map")).toBe(false);
+  });
   it("still suppresses an inert label the screen does not map", () => {
     expect(isInertOn(by("Pars and allocation"), "Paid")).toBe(true);
     expect(isInertOn(by("Pars and allocation"), "Print labels")).toBe(true);

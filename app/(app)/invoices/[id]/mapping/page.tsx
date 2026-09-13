@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { E } from "@/components/mgr/e";
+import { QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { deniedHref } from "@/lib/mgr/denied";
@@ -15,11 +15,8 @@ export default async function InvoiceMappingPage({ params }: { params: Promise<{
   if (brewery.role !== "admin" && brewery.role !== "sales") redirect(deniedHref("Fix mapping", ["admin", "sales"]));
   const snapshot = await orNotFound(runCommand("get_invoice", { invoiceId: id }, await buildContext(brewery.id)) as Promise<Snapshot>);
   const customer = snapshot.invoice.customers;
-  return <>
-    {E.back("Invoice", "Fix QuickBooks mapping", undefined, `/invoices/${id}`)}
-    {E.info("Verify the intended record in the connected QuickBooks company. Similar names are never matched automatically.")}
-    {customer && E.row(customer.name, customer.qbo_customer_id ? `QuickBooks customer ${customer.qbo_customer_id}` : "Customer mapping required", <QboMappingForm kind="customer" localId={customer.id} label={customer.name} currentId={customer.qbo_customer_id} />, customer.qbo_customer_id ? "ok" : "w")}
-    {snapshot.lines.filter(line => line.kind === "sku" && line.sku_id).map(line => <div key={line.id}>{E.row(line.skus?.name ?? line.description, line.skus?.qbo_item_id ? `QuickBooks item ${line.skus.qbo_item_id}` : "Item mapping required", <QboMappingForm kind="item" localId={line.sku_id!} label={line.skus?.name ?? line.description} currentId={line.skus?.qbo_item_id} />, line.skus?.qbo_item_id ? "ok" : "w")}</div>)}
-    {snapshot.lines.some(line => /keg_deposit/.test(line.kind)) && brewery.role === "admin" ? E.row("Returnable-keg deposit", "Configured from Accounting", E.act("Open Accounting mappings", "attention", "/settings/accounting/mappings")) : null}
-  </>;
+  return <QboMappingsView title="Fix QuickBooks mapping" backLabel="Invoice" backHref={`/invoices/${id}`} context="invoice" sections={[
+    { rows: customer ? [{ id: customer.id, label: customer.name, kind: "customer", currentId: customer.qbo_customer_id, detail: "Customer mapping required", action: <QboMappingForm context="invoice" kind="customer" localId={customer.id} label={customer.name} currentId={customer.qbo_customer_id} /> }] : [] },
+    { rows: snapshot.lines.filter(line => line.kind === "sku" && line.sku_id).map(line => ({ id: line.id, label: line.skus?.name ?? line.description, kind: "item", currentId: line.skus?.qbo_item_id, detail: "Item mapping required", action: <QboMappingForm context="invoice" kind="item" localId={line.sku_id!} label={line.skus?.name ?? line.description} currentId={line.skus?.qbo_item_id} /> })) },
+  ]} depositHref={snapshot.lines.some(line => /keg_deposit/.test(line.kind)) && brewery.role === "admin" ? "/settings/accounting/mappings" : undefined} />;
 }
