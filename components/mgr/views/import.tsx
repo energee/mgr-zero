@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { importKindLabel } from "@/lib/mgr/labels";
 
 export type ImportViewModel = {
   kind: ImportKind; step: number; fileName?: string | null; headers?: string[]; csvRowCount?: number;
   mapping: Record<string, number>; rows: Record<string, string>[]; validation: string[][]; lookups: ImportLookups;
   batchId?: string; result?: ImportResult | null; error?: string | null; busy?: boolean; backHref?: string;
 };
-const KIND_LABELS = ["customers", "ship-tos", "products", "channel prices", "opening balances"];
 
 export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked }: {
   model: ImportViewModel; onKind?: (kind: ImportKind) => void; onFile?: (file?: File) => void; onStep?: (step: number) => void;
@@ -34,7 +34,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     {E.stp(["upload", "map", "preview", "commit"], step)}
     <fieldset disabled={step !== 0 || busy} className="min-w-0">
       <ToggleGroup type="single" value={kind} onValueChange={value => { if (value) onKind?.(value as ImportKind); }} variant="outline" size="sm" className="flex-wrap justify-start">
-        {IMPORT_KINDS.map((value, index) => <ToggleGroupItem key={value} value={value}>{KIND_LABELS[index]}</ToggleGroupItem>)}
+        {IMPORT_KINDS.map(value => <ToggleGroupItem key={value} value={value}>{importKindLabel(value)}</ToggleGroupItem>)}
       </ToggleGroup>
     </fieldset>
     {model.error && <p role="alert" className="text-destructive">{model.error}</p>}

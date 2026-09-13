@@ -12,7 +12,8 @@
     "test:e2e": "bun tests-e2e/portal-smoke.ts",
     "test:e2e:chat": "tsx tests-e2e/chat-previews.ts",
     "render:slack-manifest": "tsx scripts/render-slack-manifest.ts",
-    "docs:api": "bun scripts/write-api-docs.ts"
+    "docs:api": "bun scripts/write-api-docs.ts",
+    "migrations:lock": "bun run scripts/lock-migrations.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.100",

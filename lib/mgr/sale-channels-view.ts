@@ -1,6 +1,7 @@
 // lib/mgr/sale-channels-view.ts — view-model for Sale channels.
 // list_sale_channels paints the domain; optional movements are inventory copy.
 import { plural } from "./plural";
+import { sentenceCase } from "./labels";
 
 export type SaleChannelsRowView = {
   key: string;
@@ -26,8 +27,8 @@ export type SaleChannelsSnapshot = {
   }[];
 };
 
-/** "vessel_supplies" → "vessel supplies"; matches tax-treatments.treatmentLabel. */
-export const channelTreatmentLabel = (t: string) => t.replaceAll("_", " ");
+/** "vessel_supplies" → "Vessel supplies"; matches tax-treatments.treatmentLabel. */
+export const channelTreatmentLabel = sentenceCase;
 
 function detail(c: SaleChannelsSnapshot["channels"][number]): string {
   const label = channelTreatmentLabel(c.tax_treatment);

@@ -106,12 +106,21 @@ push; it is the merge gate.
 
 ## Authority
 
-Do freely: edit code, edit the baseline migration in place, `supabase db reset`,
-reseed, create worktrees under `.agents/worktrees/<branch>`.
+Do freely: edit code, `supabase db reset`, reseed, create worktrees under
+`.agents/worktrees/<branch>`.
+
+Never edit a committed migration. `supabase db push` applies a version once and
+never reads that file again, so an edit reaches CI — which builds a database
+from scratch — and never reaches hosted. That is what broke `/settings`, `/menu`
+and Ask MGR on live (#329, #330). A schema change is a new migration file, and
+`supabase/migrations.lock.json` pins every file's hash so an edit fails
+`tests/migrations-applied.test.ts`. After adding a migration, run
+`bun run migrations:lock`. (Before #285 the baseline was edited in place; that
+window closed the day it was first pushed.)
 
 Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
-dependency, adding a second migration file, anything that would `DELETE`
-production data (there is none yet — keep it that way by asking).
+dependency, anything that would `DELETE` production data (there is none yet —
+keep it that way by asking).
 
 Do not move, rename, or delete files outside the explicit scope of the
 request. If a restructure seems necessary, list the proposed moves and wait for

@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
   redirects: async () => [
     { source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true },
     { source: "/docs/:guide(staff-guide|portal-guide).html", destination: "/docs/:guide", permanent: true },
+    // #325 split the compliance registry: brewery licenses stand alone, brand
+    // approvals moved onto the brand. Nothing in the app links here any more, so
+    // this serves old bookmarks only — not permanent, because compliance is still
+    // being restructured and a cached redirect would outlive the destination.
+    { source: "/compliance/registry", destination: "/compliance/licenses", permanent: false },
   ],
   headers: async () => [{
     source: "/:path*",
