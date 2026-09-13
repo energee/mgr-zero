@@ -66,7 +66,7 @@ export function GroupForm({ group, model, defaultPosition = 1 }: { group?: Price
           <Input id="group-position" type="number" min="1" step="1" value={position} onChange={(e) => setPosition(e.target.value)} required />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="group-ceiling">Cost ceiling (USD, optional)</Label>
+          <Label htmlFor="group-ceiling">Cost ceiling ($/bbl, optional)</Label>
           <Input id="group-ceiling" type="number" step="0.01" min="0" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
         </div>
         <p className="text-sm text-muted-foreground">

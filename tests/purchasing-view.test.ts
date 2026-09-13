@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ContractView } from "../components/mgr/views/contract";
 import { ContractsView } from "../components/mgr/views/contracts";
@@ -160,6 +160,15 @@ describe("Vendors", () => {
     const html = htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }));
     expect(html).toMatch(/>Save contract</);
     expect(html).toMatch(/Contract number/);
+  });
+
+  it("the contract's inline field pairs render without a React key warning (E.inline owns the keys)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("the live contract form mounts the shared controlled body", () => {

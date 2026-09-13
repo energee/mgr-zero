@@ -30,8 +30,8 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer }:
       {back !== undefined ? back : E.back("Price groups", model.name, undefined, model.backHref)}
       <EditField label="Group name" value={model.name} onChange={controls.name} />
       <EditField label="Position" value={model.position} type="number" onChange={controls.position} />
-      <EditField label="Cost ceiling" value={controls.costCeiling ? model.costCeilingInput : model.costCeiling} type="number" onChange={controls.costCeiling} />
-      {E.info("Groups sort by position, and the lower bound of a ceiling is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically. Leave it empty and it reads none.")}
+      <EditField label="Cost ceiling ($/bbl)" value={controls.costCeiling ? model.costCeilingInput : model.costCeiling} type="number" onChange={controls.costCeiling} />
+      {E.info("Ceilings are dollars per barrel of recipe cost. Groups sort by position, and the lower bound of a ceiling is the previous group’s. A brand whose recipe cost lands inside this band gets this group suggested on Brand; nobody is moved automatically. Leave it empty and it reads none.")}
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}

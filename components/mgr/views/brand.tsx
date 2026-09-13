@@ -3,17 +3,29 @@
 // through `controls`, bound to upsert_brand). Style is typed against the
 // brewery's own styles as suggestions: an unmatched entry is the Add path.
 // Compliance is the brand's: its approvals and state registrations list here
-// with their sheets; the brewery's licenses are their own page.
+// with their sheets; the brewery's licenses are their own page. The recipe
+// cost suggests a price group (lib/mgr/price-group-suggestion.ts); Use only
+// fills the select, and Save brand is still the commit.
 import { Fragment, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
+import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 
 export type { BrandViewModel };
 
 export type BrandControls = Partial<Record<"name" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
+
+/** Use fills the select from the live control; the inventory draws the verb. Only a banded suggestion has anything to use. */
+function suggestionAction(suggestion: PriceGroupSuggestion, priceGroup?: (id: string) => void): ReactNode {
+  if (suggestion.kind !== "group") return "";
+  return priceGroup
+    ? <Button type="button" variant="outline" size="sm" onClick={() => priceGroup(suggestion.groupId)}>Use</Button>
+    : E.act("Use");
+}
 
 export function BrandView({
   model,
@@ -42,11 +54,14 @@ export function BrandView({
       {E.back("Catalog", model.name || "New brand", createAction, model.backHref)}
       <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />
       {E.cols(
-        <Fragment key="style"><RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} /></Fragment>,
-        <Fragment key="abv"><RegistryInput label="ABV" value={model.abv} onChange={controls.abv} /></Fragment>,
-        <Fragment key="category"><RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" /></Fragment>,
-        <Fragment key="price"><RegistrySelect label="Price group" value={model.priceGroup} options={asOptions(model.priceGroupOptions)} onChange={controls.priceGroup} /></Fragment>,
+        <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
+        <RegistryInput label="ABV" value={model.abv} onChange={controls.abv} />,
+        <RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" />,
+        <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />,
       )}
+      {model.suggestion
+        ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
+        : null}
       {E.ttl("Sell sheet")}
       <RegistryInput label="Description" value={model.description} onChange={controls.description} />
       <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />

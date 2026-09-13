@@ -15,13 +15,13 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // staff frames — so it is present under every staff frame without any
 // body naming it.
 //
-// Option casing follows the word, never the control that draws it. A proper
-// noun or a named record (Warehouse, Taproom, Wholesale, Admin, Citra) is
-// Title case in a chip, a tab and a picker alike; a generic domain term
-// (depletion, dry hop, taxable, packaged) stays lowercase, as do units (lb,
-// oz, bbl); an option that is a phrase rather than a term takes sentence case
-// (Empty, About ¼ left, Customer remits). A lowercase list here is the rule,
-// not an oversight.
+// Option casing: every option an operator picks reads as a label, in sentence
+// case — Depletion, Taxable, Festival removal — including the generic domain
+// terms #132 once kept lowercase. #333 (QA sweep, 2026-09-13) supersedes that
+// rule: raw enum casing leaking into pickers was reported as a bug, and a list
+// that mixes "taproom" with "Warehouse" reads as an oversight whatever the
+// intent. Units stay as written (lb, oz, bbl), and a named record keeps its own
+// capitalization (Warehouse, Citra, Al's Bar).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
@@ -755,6 +755,9 @@ export const SCREENS: Screen[] = [
     group: "Desk",
     name: "Import",
     job: "Upload, map, preview and independently commit valid rows",
+    // The kind chips carry record names ("Customers", "Ship-tos"); authored
+    // here so a tap selects the kind instead of resolving to those screens.
+    to: { Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
@@ -762,7 +765,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Import")}
       {E.stp(["upload", "map", "preview", "commit"], 2)}
-      {E.chips(["customers", "ship-tos", "products", "channel prices", "opening balances"], 0)}
+      {E.chips(["Customers", "Ship-tos", "Products / SKUs", "Channel prices", "Opening balances"], 0)}
       {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "sale channel missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "new", "ready"]])}
       {E.btn("Import 2 customer rows")}
       {E.note("Retry returns original results. Correct only blocked rows in a new batch.")}
@@ -785,7 +788,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "SKU detail",
-    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · adjustment": "Reverse movement" },
+    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · Adjustment": "Reverse movement" },
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",
@@ -1429,12 +1432,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { Edit: "Brand approval", "COLA serial 260135": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration" },
+    to: { Edit: "Brand approval", "COLA serial 260135": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand" },
     job: "Sellable facts without ledger writes, including the TTB fields",
-    reads: "list_brands · list_skus · get_compliance_registry [this brand’s approvals and registrations]",
+    reads: "list_brands · list_skus · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient]",
     writes: "upsert_brand · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["new brand", "compliance sheets wait until the brand is saved"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. The brewery’s own licenses are the Licenses page under Compliance, never a brand row.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "compliance sheets wait until the brand is saved"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} />,
   },
   {
@@ -2833,8 +2836,8 @@ export const SCREENS: Screen[] = [
     job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
     reads: "list_price_groups",
     writes: "upsert_price_group · delete_price_group",
-    states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
-    spec: "A price group is one row of the grid and holds no prices of its own: the prices are the cells on Price groups. What lives here is the row itself: its name, its position in the sheet, and the optional cost ceiling that sorts the rows and suggests a group for a beer whose cost lands in the band. Nobody is moved automatically, and costing does not exist yet, so nothing reads the ceiling today. Removal is refused while a brand sits on the group or any cell prices it, in product words rather than a foreign-key error.",
+    states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group on Brand · a person confirms"], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
+    spec: "A price group is one row of the grid and holds no prices of its own: the prices are the cells on Price groups. What lives here is the row itself: its name, its position in the sheet, and the optional cost ceiling that sorts the rows and suggests a group for a beer whose cost lands in the band. Ceilings are dollars per barrel of recipe cost, the unit the recipe cost view already derives from last receipt costs. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group or any cell prices it, in product words rather than a foreign-key error.",
     body: <PriceGroupView model={toPriceGroupViewProps(priceGroupTwo)} />,
   },
   {

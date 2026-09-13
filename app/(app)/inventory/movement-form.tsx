@@ -5,7 +5,8 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "../brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFields, movementTypeLabel } from "@/lib/movement-form";
+import { movementFields } from "@/lib/movement-form";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -91,7 +92,7 @@ export function MovementForm({
     sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
     qty: receipt.qty,
     unit: "SKU unit",
-    kind: movementTypeLabel(receipt.type),
+    kind: sentenceCase(receipt.type),
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
     when: formatDateTime(receipt.created_at),
@@ -105,7 +106,7 @@ export function MovementForm({
       ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
-  const kindOptions = MOVEMENT_TYPES.map(value => value.replaceAll("_", " "));
+  const kindOptions: string[] = MOVEMENT_TYPES.map(sentenceCase);
   const selectedSku = skus.find(item => item.id === skuId);
   const selectedLocation = locations.find(item => item.id === locationId);
   const selectedBin = bins.find(item => item.id === binId);
@@ -113,14 +114,14 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    kind: type.replaceAll("_", " "), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
+    kind: sentenceCase(type), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
     sku: selectedSku?.label ?? "", skuOptions: skus.map(item => item.label),
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
     channel: selectedChannel?.name ?? "", channelOptions: requiresChannel(type) ? channels.map(item => item.name) : [],
     destState, destStateOptions: [], destStateInput: type === "sample" || type === "festival_removal",
     qty,
-    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${type.replaceAll("_", " ")}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
+    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${sentenceCase(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
     direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
     directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
     lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "Untracked / legacy stock",

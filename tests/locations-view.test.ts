@@ -24,8 +24,8 @@ describe("Locations list", () => {
   it("maps list_locations through kind, with optional units / taps / bins copy", () => {
     const model = toLocationsViewProps(locationsList);
     expect(model.rows.map((r) => [r.title, r.detail, r.href])).toEqual([
-      ["Warehouse", "warehouse · 186 inventory units", `/locations/${LOC_WAREHOUSE.id}`],
-      ["Taproom", "taproom · 11 taps · 3 bins", `/locations/${LOC_TAPROOM.id}`],
+      ["Warehouse", "Warehouse · 186 inventory units", `/locations/${LOC_WAREHOUSE.id}`],
+      ["Taproom", "Taproom · 11 taps · 3 bins", `/locations/${LOC_TAPROOM.id}`],
     ]);
     expect(model.empty).toBeUndefined();
   });
@@ -37,7 +37,7 @@ describe("Locations list", () => {
         { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, kind: "taproom" },
       ],
     });
-    expect(model.rows.map((r) => r.detail)).toEqual(["warehouse", "taproom"]);
+    expect(model.rows.map((r) => r.detail)).toEqual(["Warehouse", "Taproom"]);
   });
 
   it("names an empty list without inventing rows", () => {
@@ -51,9 +51,9 @@ describe("Locations list", () => {
     expect(html).toMatch(/>Add location</);
     expect(html).toMatch(/>Edit</);
     expect(html).toMatch(/Warehouse/);
-    expect(html).toMatch(/warehouse · 186 inventory units/);
+    expect(html).toMatch(/Warehouse · 186 inventory units/);
     expect(html).toMatch(/Taproom/);
-    expect(html).toMatch(/taproom · 11 taps · 3 bins/);
+    expect(html).toMatch(/Taproom · 11 taps · 3 bins/);
     expect(html).toMatch(/Settings/);
     expect(html).not.toMatch(/href="\/locations\//);
     expect(html).not.toMatch(/→/);

@@ -9,6 +9,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Timeline, TimelineItem } from "@/components/ui/timeline";
 import { command } from "@/lib/commands/client";
+import { importKindLabel } from "@/lib/mgr/labels";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
@@ -69,7 +70,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
           <Select value={kind} onValueChange={value => { setKind(value as ImportKind); setCsv(null); setFileName(null); }}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
-              {IMPORT_KINDS.map(k => <SelectItem key={k} value={k}>{k.replaceAll("_", " ")}</SelectItem>)}
+              {IMPORT_KINDS.map(k => <SelectItem key={k} value={k}>{importKindLabel(k)}</SelectItem>)}
             </SelectGroup></SelectContent>
           </Select>
         </Field>

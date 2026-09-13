@@ -80,6 +80,18 @@ export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: 
   return data;
 }
 
+type Orderable = {
+  order(column: string, options?: { ascending?: boolean }): Orderable;
+  limit(count: number): { maybeSingle(): PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }> };
+};
+
+/** The newest row by `column`, or null. The id breaks ties so two rows written
+ *  in the same instant (or brewed on the same day) never flip the answer
+ *  between reads. Every "latest of" read goes through here for that reason. */
+export function latestOf<T>(query: Orderable, column: string): Promise<T | null> {
+  return unwrap(query.order(column, { ascending: false }).order("id").limit(1).maybeSingle()) as Promise<T | null>;
+}
+
 /** unwrap for a list read; supabase-js without generated types cannot say what the rows are, so the caller names T. */
 export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
 

@@ -14,10 +14,14 @@ export type PriceGroupsViewModel = {
   channels: PriceGroupsChannelView[];
 };
 
+/** One row of list_price_groups: the grid row and its $/bbl ceiling. */
+export type PriceGroupRow = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
+export const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
+
 export type PriceGroupsSnapshot = {
   backHref?: string;
   channels: { id: string; name: string }[];
-  groups: { id: string; name: string; position: number; cost_ceiling_cents: number | null }[];
+  groups: PriceGroupRow[];
   formats: { id: string; name: string }[];
   cells: {
     sale_channel_id: string;

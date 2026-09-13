@@ -8,7 +8,7 @@
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
-import { defineCommand, defineQuery, unwrap, CommandError, type Ctx } from "./registry";
+import { defineCommand, defineQuery, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 
@@ -94,9 +94,10 @@ defineQuery({
     const [recipe, version] = await Promise.all([
       unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
         .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
-      unwrap(ctx.db.from("recipe_versions")
-        .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at")
-        .eq("recipe_id", i.recipeId).order("version", { ascending: false }).limit(1).maybeSingle()),
+      latestOf<{ id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number | null; yeast_attenuation: number | null; boil_minutes: number | null; target_ibu: number | null; note: string | null; created_at: string }>(
+        ctx.db.from("recipe_versions")
+          .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at")
+          .eq("recipe_id", i.recipeId), "version"),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
     if (!version) return { recipe, version: null, ingredients: [], ogPlato: null, fgPlato: null, abv: null };

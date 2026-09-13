@@ -1,15 +1,10 @@
 // lib/mgr/channel-view.ts — view-model for the Channel sheet (inventory).
 // Live create/edit stays channel-form.tsx. Labels match screens.tsx TAX_TREATMENTS.
-import { channelTreatmentLabel } from "./sale-channels-view";
+import { TAX_TREATMENTS, treatmentLabel } from "@/app/(app)/settings/channels/tax-treatments";
 
-/** Display labels for the tax-treatment chips (spaces, not snake_case). */
-export const CHANNEL_TAX_TREATMENTS = [
-  "taxable",
-  "export",
-  "vessel supplies",
-  "research",
-  "transfer in bond",
-] as const;
+/** Display labels for the tax-treatment chips, derived from the enum so the
+ *  chip order and the treatment list can never drift apart. */
+export const CHANNEL_TAX_TREATMENTS = TAX_TREATMENTS.map(treatmentLabel);
 
 export type ChannelViewModel = {
   name: string;
@@ -25,8 +20,8 @@ export type ChannelSnapshot = {
 
 /** Map one list_sale_channels row onto ChannelView. */
 export function toChannelViewProps({ name, tax_treatment }: ChannelSnapshot): ChannelViewModel {
-  const label = channelTreatmentLabel(tax_treatment);
-  const taxIndex = (CHANNEL_TAX_TREATMENTS as readonly string[]).indexOf(label);
+  const label = treatmentLabel(tax_treatment);
+  const taxIndex = CHANNEL_TAX_TREATMENTS.indexOf(label);
   return {
     name,
     taxOptions: [...CHANNEL_TAX_TREATMENTS],

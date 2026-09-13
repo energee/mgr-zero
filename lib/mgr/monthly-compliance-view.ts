@@ -1,4 +1,5 @@
 import type { Filing, LossReview, Report } from "@/lib/commands/compliance";
+import { sentenceCase } from "./labels";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
@@ -30,7 +31,7 @@ const REMOVAL_LABEL: Record<string, string> = {
 const CLASS_LABEL = { keg: "kegs", can: "cans", bottle: "bottles" } as const;
 const bbl = (value: number) => `${value.toFixed(2)} bbl`;
 const removalBbl = (key: string, value: number) => key === "loss" ? `${value.toLocaleString("en-US", { maximumFractionDigits: 8 })} bbl` : bbl(value);
-const label = (value: string) => REMOVAL_LABEL[value] ?? value.replace(/_/g, " ");
+const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
 
 export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot): MonthlyComplianceViewModel {
   const figures = snapshot.report.figures;

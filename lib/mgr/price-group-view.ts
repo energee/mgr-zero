@@ -3,7 +3,7 @@
 // summarises list_channel_prices for that group.
 import { money } from "./money";
 import { plural } from "./plural";
-import type { PriceGroupsSnapshot } from "./price-groups-view";
+import { byPosition, type PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
   backHref?: string;
@@ -42,7 +42,7 @@ function pricesSummary(snapshot: PriceGroupSnapshot, groupId: string): string {
 
 /** Map one list_price_groups row plus its grid cells onto PriceGroupView. */
 export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupViewModel {
-  const ordered = [...snapshot.groups].sort((a, b) => a.position - b.position);
+  const ordered = [...snapshot.groups].sort(byPosition);
   const index = ordered.findIndex((g) => g.id === snapshot.groupId);
   const group = ordered[index];
   if (!group) throw new Error("price group not found");

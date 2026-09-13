@@ -28,9 +28,12 @@ const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a5";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a6";
 const PG_3 = "00000000-0000-4000-8000-0000000000p3";
 
+// Ceilings are $/bbl; the first three band, the rest are chosen by hand.
 const priceGroups = Array.from({ length: 8 }, (_, i) => ({
   id: i === 2 ? PG_3 : `00000000-0000-4000-8000-0000000000p${i + 1}`,
   name: String(i + 1),
+  position: i + 1,
+  cost_ceiling_cents: [4500, 6500, 8500][i] ?? null,
 }));
 
 const hazySkus = [
@@ -97,6 +100,8 @@ export const brandHazy: BrandSnapshot = {
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,
+  // Hazy sits on group 3 by hand; its recipe cost lands in group 2's band.
+  cost: { costCentsPerBbl: 4810, uncosted: [] },
   compliance: {
     approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ttb_id: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
     registrations: [{ id: "oh", brand_id: BRAND_HAZY, state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],

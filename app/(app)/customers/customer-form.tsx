@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { TAX_TREATMENTS, treatmentLabel, type TaxTreatment } from "@/app/(app)/settings/channels/tax-treatments";
 
-const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
-export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+export type { TaxTreatment };
 
 const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
 type CustomerType = (typeof CUSTOMER_TYPES)[number];
@@ -128,7 +128,7 @@ export function CustomerForm({
             <Label htmlFor="customer-tax">Tax treatment</Label>
             <select id="customer-tax" className="rounded-md border p-2" value={taxTreatment} onChange={(e) => setTaxTreatment(e.target.value as TaxTreatment | "")}>
               <option value="">Inherit sale channel</option>
-              {TAX_TREATMENTS.map((t) => <option key={t} value={t}>{t.replaceAll("_", " ")}</option>)}
+              {TAX_TREATMENTS.map((t) => <option key={t} value={t}>{treatmentLabel(t)}</option>)}
             </select>
           </div>
           <CommandFormMessage error={form.error} />

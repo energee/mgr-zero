@@ -3,7 +3,7 @@
 // Lead time lives on the vendor (spec 2026-09-07 §3); a PO status is derived
 // from counted receipts and an empty PO never looks received (§2).
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -228,7 +228,7 @@ describe("planning: draft purchase orders from material gaps", () => {
     }, brewer)) as { id: string };
     await runCommand("schedule_batch", { recipeVersionId: version.id, plannedOn: "2026-10-01", plannedBbl: 10 }, brewer);
     const wh = await seedLocation(b.id, { name: "Grain room" });
-    await admin.from("material_movements").insert({ brewery_id: b.id, material_id: pale.id, location_id: wh.id, bin_id: wh.binId, qty: 130, type: "opening_balance", created_by: ctx.userId });
+    await seedMovement(b.id, { materialId: pale.id, locationId: wh.id, binId: wh.binId, qty: 130, createdBy: ctx.userId });
 
     const reqs = (await runCommand("get_material_requirements", {}, ctx)) as {
       material_id: string; required: number; on_hand: number; on_order: number; short: number; needed_by: string;
@@ -259,7 +259,7 @@ describe("material cycle count", () => {
   it("equal count writes only the header; a shortage posts one negative count_adjustment", async () => {
     const wh = await seedLocation(b.id, { name: "Packaging store" });
     const cans = (await runCommand("upsert_material", { name: "Cans 16 oz", category: "packaging", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
-    await admin.from("material_movements").insert({ brewery_id: b.id, material_id: cans.id, location_id: wh.id, bin_id: wh.binId, qty: 3100, type: "opening_balance", created_by: ctx.userId });
+    await seedMovement(b.id, { materialId: cans.id, locationId: wh.id, binId: wh.binId, qty: 3100, createdBy: ctx.userId });
 
     const same = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3100 }] }, ctx)) as { id: string; lines: { material_id: string; qty_expected: number; qty_counted: number; movement_ids: string[] }[] };
     expect(same.lines).toEqual([{ material_id: cans.id, qty_expected: 3100, qty_counted: 3100, movement_ids: [] }]);
@@ -276,7 +276,7 @@ describe("material cycle count", () => {
     const hop = (await runCommand("upsert_material", { name: "Simcoe", category: "hop", baseUom: "lb", purchaseUom: "lb", lotTracked: true }, ctx)) as { id: string };
     const lot = async (code: string, bestBy: string | null, receivedOn: string, qty: number) => {
       const { data } = await admin.from("material_lots").insert({ brewery_id: b.id, material_id: hop.id, lot_code: code, best_by: bestBy, received_on: receivedOn }).select("id").single();
-      await admin.from("material_movements").insert({ brewery_id: b.id, material_id: hop.id, location_id: wh.id, bin_id: wh.binId, lot_id: data!.id, qty, type: "receipt", created_by: ctx.userId });
+      await seedMovement(b.id, { materialId: hop.id, locationId: wh.id, binId: wh.binId, lotId: data!.id, qty, type: "receipt", createdBy: ctx.userId });
       return data!.id as string;
     };
     const old = await lot("S-24", "2026-12-01", "2026-01-10", 10);   // expires first

@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BrandView } from "../components/mgr/views/brand";
 import { CatalogView } from "../components/mgr/views/catalog";
@@ -22,7 +22,7 @@ import {
   skuListHazy,
 } from "../lib/mgr/fixtures/catalog";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
-import { toBrandViewProps } from "../lib/mgr/brand-view";
+import { toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
 import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
@@ -135,7 +135,9 @@ describe("Brand view", () => {
     expect(model.style).toBe(brandOf(SKU_HAZY));
     expect(model.abv).toBe("6.8");
     expect(model.category).toBe("Core");
-    expect(model.priceGroup).toBe("3");
+    expect(model.priceGroup).toBe(brandHazy.brand.price_group_id);
+    expect(model.priceGroupOptions[0]).toEqual({ value: UNPRICED, label: "Unpriced" });
+    expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");
     expect(model.skuList).toBe("3 active packages");
@@ -145,9 +147,29 @@ describe("Brand view", () => {
     expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
   });
 
+  it("has no suggestion without a recipe, and Unpriced when on no group", () => {
+    const model = toBrandViewProps({ ...brandHazy, cost: undefined, brand: { ...brandHazy.brand, price_group_id: null } });
+    expect(model.suggestion).toBeNull();
+    expect(model.priceGroup).toBe(UNPRICED);
+  });
+
+  it("puts the pending COLA row first even when registrations exist", () => {
+    const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: brandHazy.compliance!.registrations } });
+    expect(model.compliance.map((row) => row.key)).toEqual(["cola-pending", "oh"]);
+  });
+
   it("flags a brand with no COLA as pending, with nothing to edit", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
     expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
+  });
+
+  it("renders the field row without a React key warning (E.cols owns the keys)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {
@@ -159,6 +181,9 @@ describe("Brand view", () => {
     expect(html).toMatch(/Compliance/);
     expect(html).toMatch(/COLA serial 260135/);
     expect(html).toMatch(/OH registration/);
+    expect(html).toMatch(/Suggested group 2/);
+    expect(html).toMatch(/recipe cost \$48\.10\/bbl/);
+    expect(html).toMatch(/>Use</);
     expect(html).toMatch(/>Add approval</);
     expect(html).toMatch(/>Add registration</);
     expect(html).not.toMatch(/Not on file/);

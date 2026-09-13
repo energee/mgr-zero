@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 // Brands (§16.1): the sellable identity. Style is found or created in the
 // brewery's own styles list; description, category, price group and hops are
@@ -198,6 +198,34 @@ defineQuery({
   roles: ["admin", "sales", "warehouse"],
   input: z.object({}),
   handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*").eq("brewery_id", ctx.breweryId).order("position")),
+});
+
+// The cost a brand's recipe implies, for the price-group suggestion on Brand.
+// recipe_version_costs owns the rule (derived from last receipt costs, never
+// stored; NULL while any ingredient has no receipt, naming those materials);
+// this read only turns the ids into names. The brand's most recently brewed
+// version speaks for it; a never-brewed brand falls back to its newest.
+export type BrandRecipeCost = { recipeVersionId: string | null; costCentsPerBbl: number | null; uncosted: string[] };
+
+defineQuery({
+  name: "get_brand_recipe_cost", description: "A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet",
+  roles: ["admin", "sales"],
+  input: z.object({ brandId: z.string().uuid() }),
+  handler: async (ctx, i): Promise<BrandRecipeCost> => {
+    const [brewed, newest] = await Promise.all([
+      latestOf<{ recipe_version_id: string }>(ctx.db.from("batches").select("recipe_version_id")
+        .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null), "brewed_on"),
+      latestOf<{ id: string }>(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
+        .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId), "created_at"),
+    ]);
+    const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
+    if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };
+    const row = await unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl, uncosted_material_ids").eq("recipe_version_id", versionId).maybeSingle()) as { cost_cents_per_bbl: number | null; uncosted_material_ids: string[] } | null;
+    const uncosted = row?.uncosted_material_ids.length
+      ? (await unwrap(ctx.db.from("materials").select("name").in("id", row.uncosted_material_ids).order("name")) as { name: string }[]).map((m) => m.name)
+      : [];
+    return { recipeVersionId: versionId, costCentsPerBbl: row?.cost_cents_per_bbl ?? null, uncosted };
+  },
 });
 
 defineCommand({

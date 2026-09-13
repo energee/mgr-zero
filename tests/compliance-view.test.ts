@@ -1,9 +1,10 @@
-// tests/compliance-view.test.ts — Compliance months, registry, sheets, and
-// lot trace. Views own no sample data. Live registry forms stay wrappers.
+// tests/compliance-view.test.ts — Compliance months, Licenses, the brand's
+// approval and registration sheets, and lot trace. Views own no sample data.
+// Live sheet wrappers mount the shared bodies.
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
@@ -55,6 +56,7 @@ describe("Licenses", () => {
     const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicensesView);
     expect(body.props.model).toEqual(toLicensesViewProps(licensesDemo));
+    expect(toLicensesViewProps(licensesDemo).licenses[0]).toEqual({ key: "pa", title: "PA brewery", detail: "G-21884 · expires 2027-06-30", verb: "Edit" });
     const html = htmlOf(screen("Licenses").body);
     expect(html).not.toMatch(/tablist/);
     expect(html).not.toMatch(/Hazy IPA|COLA|registration/);
@@ -89,6 +91,16 @@ describe("registry sheets", () => {
     const body = screen("State registration").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(StateRegistrationView);
     expect(body.props.model).toEqual(toStateRegistrationViewProps(stateRegistrationHazy));
+  });
+
+  it("the license and registration fields render without a React key warning (E.cols owns the keys)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    htmlOf(createElement(LicenseView, { model: toLicenseViewProps(licensePaBrewery) }));
+    htmlOf(createElement(StateRegistrationView, { model: toStateRegistrationViewProps(stateRegistrationHazy) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("the License inventory record is LicenseView", () => {
@@ -172,7 +184,7 @@ describe("Lot trace", () => {
       tape: null,
       movements: createElement("p", null, "Live movements"),
     }));
-    expect(html).not.toMatch(/production in/);
+    expect(html).not.toMatch(/production in/i);
     expect(html).toMatch(/Live movements/);
   });
 
@@ -184,7 +196,7 @@ describe("Lot trace", () => {
     const html = htmlOf(createElement(LotTraceView, { model, tape: null, balances: null, recipients: null, movements: null }));
     expect(html).not.toMatch(/href="\/(orders|customers|invoices)/);
     expect(html).not.toMatch(/Recorded balances by SKU and bin[\s\S]*118 units/);
-    expect(html).not.toMatch(/Order 7|production in/);
+    expect(html).not.toMatch(/Order 7|production in/i);
   });
 
   it("preserves live movement provenance and links", () => {
@@ -204,12 +216,12 @@ describe("Lot trace", () => {
     expect(model.skuDetail).toBe("run 28 · packaged 8/31 · best by 2/27");
     expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed 8/10");
     expect(model.tape).toEqual([
-      { key: "in", label: "+120 · production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
-      { key: "sample", label: "−2 · sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
+      { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
+      { key: "sample", label: "−2 · Sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
     ]);
     expect(model.movements?.map(({ title, detail }) => ({ title, detail }))).toEqual([
-      { title: "+120 · production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
-      { title: "-2 · sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
+      { title: "+120 · Production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
+      { title: "-2 · Sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
     ]);
     expect(model.balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
     expect(toLotTraceViewProps({

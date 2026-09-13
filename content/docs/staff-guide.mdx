@@ -131,7 +131,7 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 <Screen name="Brand" />
 
 1. Open **Catalog** and select **New Brand**.
-2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, and **Hops** are optional notes. **Price group** is the row of the [price grid](#pricing) this beer sits on; leave it **Unpriced** and none of its SKUs can be ordered until you choose one.
+2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, and **Hops** are optional notes. **Price group** is the row of the [price grid](#pricing) this beer sits on; leave it **Unpriced** and none of its SKUs can be ordered until you choose one. When the brand has a recipe, a line under the field reads its cost per barrel (from the most recently brewed version, or the newest if none has been brewed, using each ingredient’s last receipt cost) against the groups’ ceilings: *Suggested group 2 · recipe cost $48.10/bbl* with **Use**, which only fills the field; **Save brand** still commits. *Above every ceiling* means no band covers it, and *Recipe cost unknown* names an ingredient that has never been received, so no number is shown.
 3. Select **Save brand**. Brand names must be unique within the brewery. You return to **Catalog**, where the brand lands alphabetically and starts as **No SKUs yet**.
 
 **New Brand** and **Edit brand** both open the brand's own page rather than a dialog, and only Admin and Sales can open it; other roles do not see these links on Catalog and land on **No access** if they open the address directly. **Edit brand** starts with all saved values; changing one field keeps the others. Select **Save brand** to return to **Catalog**.
@@ -266,11 +266,11 @@ Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete 
 
 Price groups are the rows of one grid per [sale channel](#channels), with formats across the top. Put each brand on a group (**Catalog** → **Brand** → **Price group**) and fill the cells; every SKU of that brand then sells at its format's cell on the customer's channel. An empty cell means unpriced, and an order for that SKU is refused. Clear a cell to unprice it. A group a brand sits on, or a cell is filled for, cannot be deleted.
 
-1. Open **Price groups** and select **Create price group**. Enter a required name and a **Position** (where the row sits in the grid), optionally a **Cost ceiling**, and **Save price group**. Name and position must each be unique within the brewery.
+1. Open **Price groups** and select **Create price group**. Enter a required name and a **Position** (where the row sits in the grid), optionally a **Cost ceiling ($/bbl)**, and **Save price group**. Name and position must each be unique within the brewery.
 2. Select a cell in a channel's table, enter the price in dollars (stored as whole cents), and **Save price**. Every SKU of every brand on that group sells at that price, in that format, on that channel.
 3. **Clear** on a filled cell empties it again.
 
-A cost ceiling only sorts the rows and suggests a group for a beer; nobody is moved automatically. A brewery with no groups yet says **Add a price group, then put each brand on one from Catalog.**
+A cost ceiling is dollars per barrel of recipe cost. It sorts the rows and lets a brand’s page suggest a group (see [Catalog](#catalog)); nobody is moved automatically. A brewery with no groups yet says **Add a price group, then put each brand on one from Catalog.**
 
 ## Staff orders [#orders]
 
@@ -638,7 +638,7 @@ A sale channel is a named way your brewery sells beer. Every brewery starts with
 2. To rename a channel or change its treatment, select **Edit** on its row, change the fields, and select **Save channel**.
 3. To remove a channel, select **Delete** on its row.
 
-The tax treatment — *taxable*, *export*, *vessel supplies*, *research*, or *transfer in bond* — is the default for removals recorded on that channel. A customer may override it on their own record, and the treatment that applies is frozen onto each movement the moment it is recorded. Editing a channel later never restates a month you have already filed.
+The tax treatment — **Taxable**, **Export**, **Vessel supplies**, **Research**, or **Transfer in bond** — is the default for removals recorded on that channel. A customer may override it on their own record, and the treatment that applies is frozen onto each movement the moment it is recorded. Editing a channel later never restates a month you have already filed.
 
 Two removals are refused, each with the reason shown beside the row:
 
