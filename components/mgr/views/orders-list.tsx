@@ -4,14 +4,10 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { OrdersListViewModel } from "@/lib/mgr/orders-list-view";
+import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
 export type { OrdersListViewModel };
 
-const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
-const WORK_TABS: Record<string, string> = {
-  all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
-  runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
-};
 const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
 
 export function OrdersView({
