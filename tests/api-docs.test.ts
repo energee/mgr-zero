@@ -8,12 +8,13 @@ import { resolve } from "node:path";
 import { compile, run } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { SCREENS } from "@/components/mgr/screens";
 import { API_AREAS, apiOperations, areaOf, operationsInArea } from "@/lib/mgr/api-operations";
 import { BACKLOG_PATH, opsEnd, opsStart, renderArea, renderBacklog } from "@/lib/mgr/api-reference";
 import { API_ERRORS } from "@/lib/mgr/api-errors";
 import { getCommandDefinition, listTools } from "@/lib/commands/registry";
-import { fieldsOf, sampleInput } from "@/lib/mgr/api-schema";
+import { fieldsOf, isNullable, isOptional, sampleInput } from "@/lib/mgr/api-schema";
 import "@/lib/commands/all";
 
 const root = resolve(__dirname, "..");
@@ -25,6 +26,16 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const PAGE = () => read("content/docs/api.mdx");
 
 describe("HTTP API reference", () => {
+  it("asks Zod whether nested wrappers accept omission and null", () => {
+    expect(isOptional(z.string().nullable().optional().readonly())).toBe(true);
+    expect(isOptional(z.string().nullable())).toBe(false);
+    expect(isOptional(z.string().default("fallback"))).toBe(true);
+    expect(isOptional(z.string().catch("fallback"))).toBe(true);
+    expect(isNullable(z.string().optional().nullable().readonly())).toBe(true);
+    expect(isNullable(z.string().optional())).toBe(false);
+    expect(isNullable(z.string().catch("fallback"))).toBe(true);
+  });
+
   it("renders taproom descriptions with literal braces in MDX", async () => {
     const source = renderArea("taproom");
     expect(source).toContain("keg is &#123;skuId&#125;");
