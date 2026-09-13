@@ -50,6 +50,8 @@ import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
+import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
+import { accountingExpired } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
@@ -1247,25 +1249,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks" },
+    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
     reads: "get_qbo_connection",
-    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults",
+    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults [existing commands] · Missing-email count [SCHEMA-GATE: connection health has no customer email count] · Recovery disconnect [SCHEMA-GATE: existing disconnect command requires connected state]",
     states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "the Pay route fails closed when QuickBooks returns no approved link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Square already had Settings · Point of sale; QuickBooks had nothing, and Settings · Integrations dead-ended. This is the other half. It exists mainly to make three invisible preconditions visible before a customer meets them: QuickBooks Payments must be active on the company, AllowOnlineACHPayment / AllowOnlineCreditCardPayment must ride every push, and the customer must carry an email. Any one missing and Intuit generates no InvoiceLink, so the portal Pay button either never renders or lands on the unavailable page. Payment method is a money decision, not a checkbox: card runs a percentage fee, so on a four-figure keg invoice the method the customer picks is real money; the fee is visible in the QuickBooks Payment sidebar and MGR does not model it. Push defaults live here rather than per invoice, so an invoice cannot be born unpayable by omission.",
-    body: (<>
-      {E.back("Settings", "Accounting")}
-      {E.ttl("QuickBooks")}
-      {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect", "destructive"), "w")}
-      {E.note("QuickBooks authorization expired. Push, payment links and paid-date sync are paused.")}
-      {E.btn("Reconnect QuickBooks")}
-      {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
-      {E.ttl("Push defaults")}
-      {E.info("Every invoice is pushed ready to pay. Turning both off means customers cannot pay online at all.")}
-      {E.row("Bank transfer (ACH)", "on · lowest fee", E.sw(true, "Bank transfer payments"), "ok")}
-      {E.row("Card", "on · percentage fee applies", E.sw(true, "Card payments"), "ok")}
-      {E.row("Customers missing an email", "2 · cannot be pushed", E.act("Review"), "w")}
-    </>),
+    body: <AccountingView model={accountingExpired} />,
   },
   {
     step: 5,
@@ -1275,16 +1265,11 @@ export const SCREENS: Screen[] = [
     name: "Connect QuickBooks",
     to: { "Connect QuickBooks": "Accounting" },
     job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
-    reads: "none [OAuth returns the selected company]",
+    reads: "get_qbo_connection [OAuth returns the selected company]",
     writes: "connect_qbo",
     states: [["permission", "admin only", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
     spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
-    body: (<>
-      {E.back("Settings", "Connect QuickBooks")}
-      {E.info("MGR reads customers, items, invoice status and payments. It creates wholesale invoices and credit memos.")}
-      {E.note("QuickBooks remains the accounting record. Connecting does not push existing invoices.")}
-      {E.btn("Connect QuickBooks", "irr")}
-    </>),
+    body: <ConnectQuickBooksView />,
   },
   {
     step: 5,
@@ -1319,11 +1304,7 @@ export const SCREENS: Screen[] = [
     writes: "disconnect_qbo",
     states: [["permission", "admin only", 1], ["confirmed", "connection disabled and tokens purged"]],
     spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
-    body: (<>
-      {E.note("Stops: invoice push, payment links and paid-date sync.")}
-      {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings.")}
-      {E.btn("Disconnect QuickBooks", "del")}
-    </>),
+    body: <DisconnectQuickBooksView />,
   },
   {
     step: 5,

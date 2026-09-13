@@ -24,10 +24,7 @@ const KNOWN_INLINE_DEBT = [
   "Create brewery",
   "Import",
   "Invite portal user",
-  "Accounting",
-  "Connect QuickBooks",
   "Mapping conflict",
-  "Disconnect QuickBooks",
   "Invoices",
   "Fix mapping",
   "Chat disconnected",
@@ -41,7 +38,6 @@ const KNOWN_INLINE_DEBT = [
 const KNOWN_SURFACE_DEBT = [
   "Search: CommandForm <- app/(app)/search/page.tsx",
   "Session expired: CommandForm <- app/(auth)/login/page.tsx",
-  "Disconnect QuickBooks: CommandForm <- app/(app)/settings/accounting/disconnect/page.tsx",
   "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
   "Disconnect Slack: CommandForm <- app/(app)/settings/chat/disconnect/page.tsx",
 ] as const;
