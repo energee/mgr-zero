@@ -524,12 +524,12 @@ reload or reconnect retries that same envelope. `record_movement`,
 `record_pick`, and stock transfers require current server state and are never
 queued; a stable request ID alone does not make an operation safe offline.
 
-This holds for every command that writes through a ledger RPC. Five do not yet:
-`set_notification_preference`, `set_brewery_quiet_hours`,
-`set_notification_destination`, `consume_chat_link_proof`, and
-`unlink_chat_user` still require a `requestId`, but nothing on the server
-checks it. A retry with a different payload lands as `200`, not `409`. Treat
-those five as not-yet-idempotent until this note is removed.
+This holds beyond the ledger RPCs too. `set_notification_preference`,
+`set_brewery_quiet_hours`, `set_notification_destination`,
+`consume_chat_link_proof`, and `unlink_chat_user` dedupe the same way through
+a separate request-claim table keyed on the caller and `requestId`: a reused
+id with a matching payload replays the original result, and a reused id with
+a different payload is `409 conflict`.
 
 ### Where to generate it [#where]
 
@@ -640,6 +640,9 @@ computed from the SKU and the quantity. A field an operation does not declare is
 dropped before the handler runs rather than trusted, so sending your own `bbl`
 does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
+`publish_pos_item` and `publish_pos_menu` are the exception: their schemas
+refuse an undeclared field outright with `400 invalid_input` instead of
+dropping it.
 
 Prices on order lines are snapshotted at creation from the customer's price
 group. You do not send them, and changing a price group later does not rewrite
@@ -5168,17 +5171,5 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_update_draft_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
-
----
-
-**Designed, not yet available** {/* portal-designed */}
-
-11 of the 12 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `portal_schedule` | query | Coming up |
 
 {/* end ops:portal */}
