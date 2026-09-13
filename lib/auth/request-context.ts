@@ -148,5 +148,3 @@ export const getCustomerMemberships = cache(() => getRscRequestAuthContext().get
 export const getStaffMembership = cache((breweryId: string) => getRscRequestAuthContext().getStaffMembership(breweryId));
 
 export const getCustomerMembership = cache((breweryId: string) => getRscRequestAuthContext().getCustomerMembership(breweryId));
-
-export const getRequestSupabaseClient = cache(() => getRscRequestAuthContext().getSupabaseClient());
