@@ -240,7 +240,7 @@ defineQuery({
   aiExposed: true,
   handler: async (ctx) => {
     const rows = await completeRows("Location list", async afterId => {
-      let query = ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      let query = ctx.db.from("locations").select("id, name, uses").eq("brewery_id", ctx.breweryId).order("id").limit(500);
       if (afterId) query = query.gt("id", afterId);
       const [result, counted] = await Promise.all([
         query,

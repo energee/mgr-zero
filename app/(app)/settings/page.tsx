@@ -21,12 +21,12 @@ export default async function SettingsPage() {
   const ctx = await buildContext(brewery.id);
   const [row, locations, team, ai, aiModels] = await Promise.all([
     runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null }>,
-    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; kind: string }[]>,
+    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
     runCommand("get_brewery_ai_model", {}, ctx) as Promise<{ model: string }>,
     getGatewayLanguageModels().catch(() => []),
   ]);
-  const warehouses = locations.filter((l) => l.kind === "warehouse");
+  const warehouses = locations.filter((l) => l.uses.includes("warehouse"));
   return (
     <SettingsView
       model={toSettingsViewProps({
