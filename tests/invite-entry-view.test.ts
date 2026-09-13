@@ -1,9 +1,23 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { EntryView } from "../components/mgr/views/entry";
-import { toAcceptInviteViewProps } from "../lib/mgr/entry-view";
+import { toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
 import { expiredInvite } from "../lib/mgr/fixtures/entry";
+
+it("keeps fixture dependencies out of live password and account entry pages", () => {
+  for (const page of ["password", "reset", "no-membership"]) {
+    expect(readFileSync(`app/(auth)/${page}/page.tsx`, "utf8")).not.toContain("/fixtures/");
+  }
+});
+
+it("uses the authenticated account in the shared password form", () => {
+  const html = renderToStaticMarkup(createElement(EntryView, { model: toSetPasswordViewProps("actual@example.com") }));
+  expect(html).toContain("actual@example.com");
+  expect(html).not.toContain("demobrewing");
+  expect(html).toMatch(/minlength="8"/i);
+});
 
 it("binds verified invitation display data and keeps password validation", () => {
   const model = toAcceptInviteViewProps("Actual brewery", "customer");
