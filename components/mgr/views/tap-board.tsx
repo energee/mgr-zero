@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -11,7 +12,6 @@ import { LinkTabs } from "@/components/mgr/work-tabs";
 import { tapLabel, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
-const when = (value: string) => new Date(value).toLocaleString();
 const day = (value: string) => new Date(value).toLocaleDateString("en-US", { weekday: "short" });
 const volume = (value: number) => `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl`;
 const actor = (label: string | null) => label ? `@${label}` : "staff";
@@ -30,7 +30,7 @@ export function TapKegView({ sheet: controlledSheet, skus, onEdit, closedFact, o
   return <>
     {closedFact && E.row("Already swapped", closedFact, <Button type="button" variant="outline" onClick={onReload}>Reload</Button>, "w")}
     <fieldset disabled={locked} className="flex flex-col gap-3">
-      {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? `Kick tap ${sheet.interval.tap_number ?? "unnumbered"}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : `Tap ${sheet.interval.tap_number ?? "unnumbered"}`, `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${when(sheet.interval.opened_at)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
+      {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? `Kick tap ${sheet.interval.tap_number ?? "unnumbered"}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : `Tap ${sheet.interval.tap_number ?? "unnumbered"}`, `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${formatDateTime(sheet.interval.opened_at)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
       {sheet.kind !== "tap" && <>
         <Field><FieldLabel>Reason</FieldLabel><select aria-label="Reason" className="min-w-0 rounded border bg-background p-2" value={sheet.fields.reason} onChange={e => edit({ reason: e.target.value })}>{["Kicked empty", "Flavor change", "Quality hold"].map(reason => <option key={reason}>{reason}</option>)}</select></Field>
         {E.ttl("Remaining")}
@@ -73,7 +73,7 @@ export function TapBoardView({ state: controlledState, skus, navigation, recentE
   const open = onOpen ?? ((kind: "tap" | "kick" | "swap", interval: TapInterval | null) => setInternalState(current => openTapBoardSheet(current.snapshot, kind, interval)));
   const edit = onEdit ?? ((fields: Partial<TapSheetFields>) => setInternalState(current => editTapBoardSheet(current, fields)));
   const sheet = state.sheet;
-  const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `Recent · ${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${when(tap.opened_at)}` }));
+  const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `Recent · ${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${formatDateTime(tap.opened_at)}` }));
   const closed = sheet?.interval && state.snapshot.history.find(tap => tap.id === sheet.interval?.id);
   const locked = sheet?.attempt.kind === "submitting" || sheet?.attempt.kind === "unknown";
   const actions = (tap: TapInterval) => <div className="mt-2 flex flex-wrap gap-1"><Button type="button" size="sm" variant="outline" onClick={() => open("swap", tap)}>Swap</Button><Button type="button" size="sm" variant="destructive" onClick={() => open("kick", tap)}>Kick</Button></div>;
@@ -83,17 +83,17 @@ export function TapBoardView({ state: controlledState, skus, navigation, recentE
     {(navigation.countHref || navigation.varianceHref) && <div className="flex flex-wrap gap-3 text-sm">{navigation.countHref && <Link className="underline" href={navigation.countHref}>Weekly count</Link>}{navigation.varianceHref && <Link className="underline" href={navigation.varianceHref}>Variance by brand</Link>}</div>}
     {navigation.locations.length > 0 && (navigation.locations.some(([, href]) => href) ? <LinkTabs items={navigation.locations.map(([name, href]) => [name, href ?? "#"])} current={navigation.location} /> : E.tabs(navigation.locations.map(([name]) => name), navigation.locations.findIndex(([name]) => name === navigation.location)))}
     <CommandForm open={Boolean(sheet)} onOpenChange={next => { if (!next && !locked) { if (onClose) onClose(); else setInternalState(current => ({ ...current, sheet: null })); } }} title={sheet?.kind === "kick" ? "Kick keg" : sheet?.kind === "swap" ? "Swap keg" : "Tap keg"}>
-      {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${when(closed.closed_at)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
+      {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
     </CommandForm>
     <CommandFormMessage tone="warning">{pollError}</CommandFormMessage>
     {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") : <>
-      {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={when(tap.opened_at)}>{day(tap.opened_at)}</time> · {actor(tap.opened_by_label)} · opened {Math.round(Number(tap.opening_fill) * 100)}%{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
-      {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${when(tap.opened_at)} by ${actor(tap.opened_by_label)} · opened ${Math.round(Number(tap.opening_fill) * 100)}%${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
+      {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at)}>{day(tap.opened_at)}</time> · {actor(tap.opened_by_label)} · opened {Math.round(Number(tap.opening_fill) * 100)}%{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
+      {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${formatDateTime(tap.opened_at)} by ${actor(tap.opened_by_label)} · opened ${Math.round(Number(tap.opening_fill) * 100)}%${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
     </>}
     {E.info("Unnumbered kegs sort last.")}
     {recent.map((event, index) => <div key={index}>{E.row(event.title, event.detail)}</div>)}
     {E.ttl("Recent history")}
-    {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${Math.round(Number(tap.closing_fill) * 100)}% left · closed ${when(tap.closed_at)} by ${actor(tap.closed_by_label)}`)}</div>)}
+    {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${Math.round(Number(tap.closing_fill) * 100)}% left · closed ${formatDateTime(tap.closed_at)} by ${actor(tap.closed_by_label)}`)}</div>)}
     {E.note("With no usable POS numerator, a row shows what is on and since when, with no bar. Guest labels are never matched to POS. Nothing on this board posts to the ledger; the weekly count does that.")}
   </>;
 }

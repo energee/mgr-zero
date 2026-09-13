@@ -30,6 +30,20 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Issue #253: one date format per context, from lib/date-format.ts. A bare
+    // new Date(x).toLocaleString() renders "9/13/2026, 2:46:03 AM" — the format
+    // the QA sweep kept finding. Calls that pass explicit options (a weekday,
+    // a number's fraction digits) are deliberate and unaffected.
+    files: ["app/**", "lib/**", "components/**"],
+    ignores: ["components/ui/**"],
+    rules: {
+      "no-restricted-syntax": ["error", {
+        selector: "CallExpression[arguments.length=0][callee.object.type='NewExpression'][callee.object.callee.name='Date'][callee.property.name=/^toLocale(Date|Time)?String$/]",
+        message: "Use formatDate / formatDateTime / formatDayHeader from @/lib/date-format so every surface reads the same (#253).",
+      }],
+    },
+  },
+  {
     // Tests and seed scripts cast Supabase responses freely; `any` is fine there.
     files: ["tests/**", "scripts/**"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },

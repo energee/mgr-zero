@@ -1,6 +1,7 @@
 // app/(app)/kegs/history/page.tsx — Keg event history (screen record Keg
 // event history): the immutable keg ledger newest first from
 // list_keg_events, filtered by ?pool= and ?customer= query params.
+import { formatDate } from "@/lib/date-format";
 import Link from "next/link";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -37,7 +38,7 @@ export default async function KegHistoryPage({ searchParams }: { searchParams: P
         rows: events.map((e) => ({
           key: e.id,
           title: `${REASON_LABEL[e.reason] ?? e.reason}${e.customer_id ? ` · ${name(customers, e.customer_id) ?? "customer"}` : ""}`,
-          detail: `${new Date(e.at).toLocaleDateString()} · ${e.qty} × ${name(pools, e.pool_id) ?? "pool"} ${SIZE_LABEL[e.keg_size] ?? e.keg_size}${e.note ? ` · ${e.note}` : ""}`,
+          detail: `${formatDate(e.at)} · ${e.qty} × ${name(pools, e.pool_id) ?? "pool"} ${SIZE_LABEL[e.keg_size] ?? e.keg_size}${e.note ? ` · ${e.note}` : ""}`,
           warning: e.reason === "lost",
           ok: e.reason === "returned",
         })),
