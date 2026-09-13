@@ -17,7 +17,7 @@ bunx vitest run --fileParallelism --maxWorkers=2 \
   tests/design-docs.test.ts tests/docs.test.ts
 bash scripts/test-db.sh
 for shard in 1/3 2/3 3/3; do
-  if [[ "$shard" != "1/3" ]]; then bunx supabase db reset --workdir tests/supabase; fi
+  if [[ "$shard" != "1/3" ]]; then bunx supabase db reset --workdir tests/supabase; bash scripts/wait-rest.sh; fi
   bunx vitest run --shard="$shard" \
     --exclude tests/mgr-screens.test.ts --exclude tests/tap-coverage.test.ts \
     --exclude tests/screen-links.test.ts --exclude tests/theme-contrast.test.ts \
