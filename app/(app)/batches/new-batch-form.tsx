@@ -10,9 +10,6 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
 import { NONE } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
-
-
 type Brand = { id: string; name: string };
 type RecipeVersion = { id: string; label: string };
 
@@ -30,7 +27,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     reset: () => { setIntendedBrandId(""); setRecipeVersionId(""); setPlannedOn(""); setPlannedBbl(""); setNote(""); },
   });
   const ready = plannedOn && Number(plannedBbl) > 0;
-  const model = toScheduleBatchViewProps({
+  const model = {
     backHref: "/batches",
     title: "New batch",
     recipeId: recipeVersionId,
@@ -42,7 +39,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     plannedBbl,
     date: plannedOn,
     note,
-  });
+  };
   const optional = (set: (value: string) => void) => (value: string) => set(value === NONE ? "" : value);
   const controls = {
     recipeId: optional(setRecipeVersionId),

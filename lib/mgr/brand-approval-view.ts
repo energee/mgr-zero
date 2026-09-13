@@ -16,7 +16,3 @@ export const APPROVAL_KINDS = [{ value: "cola", label: "COLA" }, { value: "formu
 export function approvalNumberLabel(kind: string): string {
   return kind === "formula" ? "Formula number" : "Serial number";
 }
-
-export function toBrandApprovalViewProps(s: BrandApprovalViewModel): BrandApprovalViewModel {
-  return s;
-}

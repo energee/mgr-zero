@@ -7,7 +7,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
 import { plural } from "@/lib/mgr/plural";
-import { toSettingsViewProps } from "@/lib/mgr/settings-view";
 import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
@@ -31,7 +30,7 @@ export default async function SettingsPage() {
   const warehouses = locations.filter((l) => l.uses.includes("warehouse"));
   return (
     <SettingsView
-      model={toSettingsViewProps({
+      model={{
         backHref: "/more",
         name: row.name,
         timezone: row.timezone,
@@ -48,7 +47,7 @@ export default async function SettingsPage() {
         sourceWater: "water profiles aren’t available yet",
         locations: locations.map((l) => l.name).join(" · ") || "none yet",
         team: plural(team.length, "member"),
-      })}
+      }}
       breweryForm={<SettingsForm brewery={row} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}

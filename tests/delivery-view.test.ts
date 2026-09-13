@@ -14,10 +14,7 @@ import { RoutesView } from "../components/mgr/views/routes";
 import {
   confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver,
 } from "../lib/mgr/fixtures/delivery";
-import { toConfirmDeliveryViewProps } from "../lib/mgr/confirm-delivery-view";
-import { toDriverRouteViewProps } from "../lib/mgr/driver-route-view";
-import { toReturnRouteViewProps } from "../lib/mgr/return-route-view";
-import { toRouteViewProps, toggleRouteStop } from "../lib/mgr/route-view";
+import { toggleRouteStop } from "../lib/mgr/route-view";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 import { toRoutesViewProps } from "../lib/mgr/routes-view";
 
@@ -91,7 +88,7 @@ describe("Route", () => {
   it("the Route inventory record is RouteView", () => {
     const body = screen("Route").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(RouteView);
-    expect(body.props.model).toEqual(toRouteViewProps(routeAPlan));
+    expect(body.props.model).toEqual(routeAPlan);
   });
 
   it("the live route pages delegate to RouteForm and the shared RouteView", () => {
@@ -108,7 +105,7 @@ describe("Return route", () => {
   it("the Return route inventory record is ReturnRouteView", () => {
     const body = screen("Return route").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReturnRouteView);
-    expect(body.props.model).toEqual(toReturnRouteViewProps(returnRouteA));
+    expect(body.props.model).toEqual(returnRouteA);
   });
 
   it("the live route page mounts ReturnRouteView when every stop is delivered", () => {
@@ -122,11 +119,11 @@ describe("Driver route", () => {
   it("the Driver route inventory record is DriverRouteView", () => {
     const body = screen("Driver route").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(DriverRouteView);
-    expect(body.props.model).toEqual(toDriverRouteViewProps(driverRouteA));
+    expect(body.props.model).toEqual(driverRouteA);
   });
 
   it("renders Resume without leaking live hrefs", () => {
-    const html = htmlOf(createElement(DriverRouteView, { model: toDriverRouteViewProps(driverRouteA) }));
+    const html = htmlOf(createElement(DriverRouteView, { model: driverRouteA }));
     expect(html).toMatch(/>Resume</);
     expect(html).not.toMatch(/href="\/work\/deliveries/);
   });
@@ -141,11 +138,11 @@ describe("Confirm delivery", () => {
   it("the Confirm delivery inventory record is ConfirmDeliveryView", () => {
     const body = screen("Confirm delivery").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ConfirmDeliveryView);
-    expect(body.props.model).toEqual(toConfirmDeliveryViewProps(confirmDeliveryStop1));
+    expect(body.props.model).toEqual(confirmDeliveryStop1);
   });
 
   it("draws invoice timing once from the model", () => {
-    const html = htmlOf(createElement(ConfirmDeliveryView, { model: toConfirmDeliveryViewProps(confirmDeliveryStop1) }));
+    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
     expect(html.match(/Invoice timing/g)?.length).toBe(1);
     expect(html).toMatch(/On delivery · saved/);
   });

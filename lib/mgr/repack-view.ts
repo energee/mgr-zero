@@ -8,7 +8,3 @@ export type RepackViewModel = {
   damaged: string;
   unavailable?: string;
 };
-
-export function toRepackViewProps(model: RepackViewModel): RepackViewModel {
-  return model;
-}

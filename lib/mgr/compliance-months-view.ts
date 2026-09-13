@@ -12,7 +12,3 @@ export type ComplianceMonthsViewModel = {
   registry: ComplianceNavView;
   lots: ComplianceNavView[];
 };
-
-export function toComplianceMonthsViewProps(s: ComplianceMonthsViewModel): ComplianceMonthsViewModel {
-  return s;
-}

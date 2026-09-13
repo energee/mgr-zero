@@ -5,7 +5,3 @@ export type LicenseViewModel = {
   licenseNo?: string;
   expiresOn?: string;
 };
-
-export function toLicenseViewProps(s: LicenseViewModel): LicenseViewModel {
-  return s;
-}

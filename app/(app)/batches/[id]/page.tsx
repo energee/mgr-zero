@@ -7,7 +7,6 @@ import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { batNo } from "@/lib/mgr/doc-no";
@@ -30,12 +29,12 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[]];
 
   const recorded = Boolean(batch.brewed_on || occupancy);
-  const model = toBrewDayViewProps({
+  const model = {
     title: batNo(batch.batch_no), backHref: "/batches",
     planned: Number(batch.planned_bbl) + " bbl · " + batch.planned_on, note: batch.note ?? undefined,
     recorded, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
     brewedOn: batch.brewed_on ?? (recorded ? "" : new Date().toISOString().slice(0, 10)),
-  });
+  };
   return recorded ? <BrewDayView model={model} /> : <RecordBrewDayForm key={batch.id} batchId={batch.id} model={model} />;
 }

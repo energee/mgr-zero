@@ -10,10 +10,6 @@ export type ReceiptViewModel = {
   info: string;
 };
 
-export function toReceiptViewProps(s: ReceiptViewModel): ReceiptViewModel {
-  return s;
-}
-
 type PostedReceiptSnapshot = {
   id: string; po_no: number; status: string;
   lines: { id: string; qty_open: number; material: { name: string; purchase_uom: string; purchase_uom_factor: number; base_uom: string } | null }[];

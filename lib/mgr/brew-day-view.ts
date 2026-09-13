@@ -18,10 +18,6 @@ export type BrewDayViewModel = {
   tapeHead?: [string, string][];
 };
 
-export function toBrewDayViewProps(s: BrewDayViewModel): BrewDayViewModel {
-  return s;
-}
-
 export function canRecordBrewDay(model: BrewDayViewModel) {
   return !model.recorded && model.vessels.some(vessel => vessel.id === model.vesselId) && Number.isFinite(Number(model.initialBbl)) && Number(model.initialBbl) > 0 && Boolean(model.brewedOn);
 }

@@ -12,7 +12,3 @@ export type ConfirmDeliveryViewModel = {
   receivedBy?: string;
   receivedSuggestions?: string[];
 };
-
-export function toConfirmDeliveryViewProps(s: ConfirmDeliveryViewModel): ConfirmDeliveryViewModel {
-  return s;
-}

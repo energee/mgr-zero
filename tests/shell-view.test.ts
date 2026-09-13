@@ -51,15 +51,7 @@ import {
 } from "../lib/mgr/fixtures/today";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
-import { toDeniedViewProps } from "../lib/mgr/denied-view";
-import { toEntryViewProps } from "../lib/mgr/entry-view";
-import { toFirstRunViewProps } from "../lib/mgr/first-run-view";
-import { toMeViewProps } from "../lib/mgr/me-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
-import { toSearchViewProps } from "../lib/mgr/search-view";
-import { toSessionExpiredViewProps } from "../lib/mgr/session-expired-view";
-import { toSettingsViewProps } from "../lib/mgr/settings-view";
-import { toTeamViewProps } from "../lib/mgr/team-view";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
@@ -317,13 +309,13 @@ describe("Search view", () => {
   it("the Search inventory record is SearchView", () => {
     const body = screen("Search").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SearchView);
-    expect(body.props.model).toEqual(toSearchViewProps(searchPalette));
+    expect(body.props.model).toEqual(searchPalette);
   });
 
   it("the Entity picker inventory record is SearchView", () => {
     const body = screen("Entity picker").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SearchView);
-    expect(body.props.model).toEqual(toSearchViewProps(entityPickerPalette));
+    expect(body.props.model).toEqual(entityPickerPalette);
   });
 
   it("the live Search adapters delegate their controls and results to SearchView", () => {
@@ -341,7 +333,7 @@ describe("Me view", () => {
   it("the Me inventory record is MeView", () => {
     const body = screen("Me").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MeView);
-    expect(body.props.model).toEqual(toMeViewProps(meMaria));
+    expect(body.props.model).toEqual(meMaria);
   });
 
   it("live staff and portal Me use the inventory views in the shared centered dialog", () => {
@@ -369,7 +361,7 @@ describe("Settings view", () => {
   it("the Settings inventory record is SettingsView", () => {
     const body = screen("Settings").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SettingsView);
-    expect(body.props.model).toEqual(toSettingsViewProps(settingsDemo));
+    expect(body.props.model).toEqual(settingsDemo);
   });
 
   it("the live Settings page mounts SettingsView and slots the forms", () => {
@@ -398,7 +390,7 @@ describe("Team view", () => {
   it("the Team inventory record is TeamView", () => {
     const body = screen("Team").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(TeamView);
-    expect(body.props.model).toEqual(toTeamViewProps(teamRoster));
+    expect(body.props.model).toEqual(teamRoster);
   });
 
   it("the live Team page mounts TeamView and slots MemberForm / InviteForm", () => {
@@ -412,7 +404,7 @@ describe("Team view", () => {
 
 describe("Permission denied view", () => {
   it("maps deniedCopy onto the three lines", () => {
-    const model = toDeniedViewProps(deniedInvoices);
+    const model = deniedInvoices;
     expect(model.note).toBe("You do not have access to Invoices.");
     expect(model.needs).toBe("admin or sales");
   });
@@ -420,7 +412,7 @@ describe("Permission denied view", () => {
   it("the Permission denied inventory record is DeniedView", () => {
     const body = screen("Permission denied").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(DeniedView);
-    expect(body.props.model).toEqual(toDeniedViewProps(deniedInvoices));
+    expect(body.props.model).toEqual(deniedInvoices);
   });
 
   it("the live denied page mounts DeniedView", () => {
@@ -434,7 +426,7 @@ describe("First-run view", () => {
   it("the First-run checklist inventory record is FirstRunView", () => {
     const body = screen("First-run checklist").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(FirstRunView);
-    expect(body.props.model).toEqual(toFirstRunViewProps(firstRunDemo));
+    expect(body.props.model).toEqual(firstRunDemo);
   });
 
   it("the live first-run checklist mounts FirstRunView", () => {
@@ -457,13 +449,13 @@ describe("Entry views", () => {
   ] as const)("the %s inventory record is EntryView", (name, fixture) => {
     const body = screen(name).body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(EntryView);
-    expect(body.props.model).toEqual(toEntryViewProps(fixture));
+    expect(body.props.model).toEqual(fixture);
   });
 
   it("the Session expired inventory record is SessionExpiredView", () => {
     const body = screen("Session expired").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SessionExpiredView);
-    expect(body.props.model).toEqual(toSessionExpiredViewProps(sessionExpiredQueued));
+    expect(body.props.model).toEqual(sessionExpiredQueued);
   });
 
   it("live sign-in keeps LoginForm while expiry uses the shared command sheet", () => {

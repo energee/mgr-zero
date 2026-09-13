@@ -11,7 +11,3 @@ export type TeamViewModel = {
   backHref?: string;
   rows: TeamRowView[];
 };
-
-export function toTeamViewProps(s: TeamViewModel): TeamViewModel {
-  return s;
-}

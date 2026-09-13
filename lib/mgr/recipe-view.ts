@@ -25,7 +25,3 @@ export type RecipeViewModel = {
   tape?: [string, string][];
   actualsNote?: string;
 };
-
-export function toRecipeViewProps(s: RecipeViewModel): RecipeViewModel {
-  return s;
-}

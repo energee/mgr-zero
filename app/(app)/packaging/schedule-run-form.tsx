@@ -8,7 +8,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
-import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 
@@ -34,7 +33,7 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule run" trigger={<Button size="sm">Schedule run</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <SchedulePackagingRunView model={toSchedulePackagingRunViewProps({ plannedOn: "", source: "", sourceDetail: "", outputs: [], leftInSource: "", leftLabel: "", materials: [] })} controls={{
+        <SchedulePackagingRunView model={{ plannedOn: "", source: "", sourceDetail: "", outputs: [], leftInSource: "", leftLabel: "", materials: [] }} controls={{
           brands, brandId, onBrand: setBrandId, occupancies, occupancyId, onOccupancy: setOccupancyId,
           plannedOn, onPlannedOn: setPlannedOn, skus, lines,
           onSku: (index, value) => setLines((prev) => prev.map((line, i) => i === index ? { ...line, skuId: value } : line)),

@@ -1,6 +1,5 @@
 import { E } from "@/components/mgr/e";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { InviteForm } from "./settings/team/invite-form";
 import { LocationForm } from "./locations/location-form";
 
@@ -9,7 +8,7 @@ export type FirstRun = { hasLocation: boolean; hasBrand: boolean; hasMovement: b
 export function FirstRunChecklist({ brewery, state }: { brewery: string; state: FirstRun }) {
   return (
     <FirstRunView
-      model={toFirstRunViewProps({ brewery, steps: "5 steps" })}
+      model={{ brewery, steps: "5 steps" }}
       steps={
         <>
           {E.row("1 · Add locations", "a warehouse, a taproom, or both", state.hasLocation ? "done" : <LocationForm />, state.hasLocation ? "ok" : "")}

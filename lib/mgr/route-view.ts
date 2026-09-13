@@ -22,10 +22,6 @@ export type RouteViewModel = {
   savedDriverId?: string | null;
 };
 
-export function toRouteViewProps(s: RouteViewModel): RouteViewModel {
-  return s;
-}
-
 export function toggleRouteStop(selection: Record<string, number>, id: string, on: boolean) {
   const next = { ...selection };
   if (on) next[id] = Math.max(0, ...Object.values(next)) + 1; else delete next[id];

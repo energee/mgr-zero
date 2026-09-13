@@ -8,8 +8,6 @@ import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
-import { toReturnRouteViewProps } from "@/lib/mgr/return-route-view";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/time-window";
@@ -40,7 +38,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
   if (openStops.length === 0) {
     return (
       <ReturnRouteView
-        model={toReturnRouteViewProps({
+        model={{
           title,
           backTo: "Deliveries",
           backHref: "/routes",
@@ -51,14 +49,14 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
             title: `Stop ${s.stop_no} · ${s.label}`,
             detail: s.delivered_at ? `delivered ${formatTime(s.delivered_at)}` : "",
           })),
-        })}
+        }}
         action={action}
       />
     );
   }
   return (
     <DriverRouteView
-      model={toDriverRouteViewProps({
+      model={{
         title,
         backTo: "Deliveries",
         backHref: "/routes",
@@ -78,7 +76,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
             warning: isNext,
           };
         }),
-      })}
+      }}
       linkRows
       action={action}
     />

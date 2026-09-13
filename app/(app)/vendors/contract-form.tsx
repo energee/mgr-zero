@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toContractViewProps } from "@/lib/mgr/contract-view";
-
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
   starts_on: string | null; ends_on: string | null; qty_committed: number;
@@ -38,7 +36,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
   const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;
   const unit = contract?.base_uom ? ` ${contract.base_uom}` : "";
-  const model = toContractViewProps({
+  const model = {
     vendorId,
     vendorOptions: vendors.map(({ id, name }) => ({ id, label: name })),
     materialId,
@@ -51,7 +49,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
     ends: endsOn,
     unitCost: cost,
     contractNo,
-  });
+  };
   const controls = {
     vendorId: setVendorId,
     materialId: setMaterialId,

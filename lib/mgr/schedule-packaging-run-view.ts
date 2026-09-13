@@ -8,7 +8,3 @@ export type SchedulePackagingRunViewModel = {
   materials: (string | number)[][];
   warning?: string;
 };
-
-export function toSchedulePackagingRunViewProps(model: SchedulePackagingRunViewModel): SchedulePackagingRunViewModel {
-  return model;
-}

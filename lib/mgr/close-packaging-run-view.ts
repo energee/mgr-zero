@@ -21,7 +21,3 @@ export type ClosePackagingRunViewModel = {
   writeOffOptions?: string[];
   tape?: [string, string][];
 };
-
-export function toClosePackagingRunViewProps(s: ClosePackagingRunViewModel): ClosePackagingRunViewModel {
-  return s;
-}

@@ -11,7 +11,3 @@ export type CycleCountViewModel = {
   bins?: { id: string; name: string }[];
   lotPreviewUnavailable?: boolean;
 };
-
-export function toCycleCountViewProps(s: CycleCountViewModel): CycleCountViewModel {
-  return s;
-}

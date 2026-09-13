@@ -13,7 +13,3 @@ export type ReturnRouteViewModel = {
   departed: string;
   stops: ReturnRouteStopView[];
 };
-
-export function toReturnRouteViewProps(s: ReturnRouteViewModel): ReturnRouteViewModel {
-  return s;
-}

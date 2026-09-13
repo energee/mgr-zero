@@ -9,8 +9,6 @@ import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from
 import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
 import { orUndef, useCommandForm, useFields } from "@/lib/commands/use-command-form";
-import { toLicenseViewProps } from "@/lib/mgr/license-view";
-
 // state and kind are locked when editing: a license is addressed by them, so changing one would add a row, not move it
 export function LicenseForm({ license }: { license?: License }) {
   const { v, set, reset } = useFields({ state: license?.state ?? "", kind: license?.kind ?? "brewery", licenseNo: license?.license_no ?? "", expiresOn: license?.expires_on ?? "" });
@@ -18,9 +16,9 @@ export function LicenseForm({ license }: { license?: License }) {
     build: () => ({ state: v.state.toUpperCase(), kind: v.kind, licenseNo: orUndef(v.licenseNo), expiresOn: orUndef(v.expiresOn) }),
     reset,
   });
-  const model = toLicenseViewProps({
+  const model = {
     state: v.state, kind: v.kind, licenseNo: v.licenseNo, expiresOn: v.expiresOn,
-  });
+  };
   const controls = {
     state: set("state"), kind: set("kind"),
     licenseNo: set("licenseNo"), expiresOn: set("expiresOn"),

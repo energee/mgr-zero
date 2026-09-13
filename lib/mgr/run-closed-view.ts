@@ -7,7 +7,3 @@ export type RunClosedViewModel = {
   output?: string;
   yield?: string;
 };
-
-export function toRunClosedViewProps(s: RunClosedViewModel): RunClosedViewModel {
-  return s;
-}

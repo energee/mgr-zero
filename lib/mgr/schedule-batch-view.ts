@@ -12,7 +12,3 @@ export type ScheduleBatchViewModel = {
   date: string;
   note: string;
 };
-
-export function toScheduleBatchViewProps(s: ScheduleBatchViewModel): ScheduleBatchViewModel {
-  return s;
-}

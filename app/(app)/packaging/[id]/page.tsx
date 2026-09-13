@@ -7,8 +7,6 @@ import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toClosePackagingRunViewProps } from "@/lib/mgr/close-packaging-run-view";
-import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runNo } from "@/lib/mgr/doc-no";
@@ -41,7 +39,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={toRunClosedViewProps({ title, backTo: "Packaging", backHref: "/packaging" })}
+        model={{ title, backTo: "Packaging", backHref: "/packaging" }}
         fields={
           <>
             {E.fld("Barrels drawn", run.bbl_drawn === null ? "—" : Number(run.bbl_drawn))}
@@ -54,11 +52,11 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   }
   return (
     <ClosePackagingRunView
-      model={toClosePackagingRunViewProps({
+      model={{
         title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—",
         plannedOn: run.planned_on, source: run.vessel_name ?? "no source yet", showCloseReview: false,
         plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "—" : Number(o.qty_actual)]),
-      })}
+      }}
       action={
         <>
           {E.sp()}
