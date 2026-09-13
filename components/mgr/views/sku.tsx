@@ -3,9 +3,7 @@
 // pass `controls` to take the fields over; everything visible is drawn here.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { Switch } from "@/components/ui/switch";
 import type { SkuViewModel } from "@/lib/mgr/sku-view";
 
@@ -22,8 +20,9 @@ export function SkuView({
   controls = {},
   /** A SKU already in use cannot change format; create another SKU instead. */
   locked,
-  /** Live create adds Name here; `null` drops the row (create has no active flag). */
+  /** `null` drops the row: live create has no active flag, a new SKU is active. */
   activeRow,
+  /** Live create adds its optional Name here. */
   fields,
   messages,
   footer,
@@ -40,24 +39,13 @@ export function SkuView({
     <>
       {locked
         ? E.fld("Format", model.format)
-        : (
-          <Field>
-            <FieldLabel>Format</FieldLabel>
-            <Select value={controls.format ? model.format : undefined} defaultValue={controls.format ? undefined : model.format} onValueChange={controls.format}>
-              <SelectTrigger aria-label="Format"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectGroup>{model.formatOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectGroup></SelectContent>
-            </Select>
-          </Field>
-        )}
+        : <RegistrySelect label="Format" value={model.format} options={model.formatOptions.map((name) => ({ value: name, label: name }))} onChange={controls.format} />}
       {activeRow !== undefined
         ? activeRow
         : E.row("Active", "available to price and sell",
           <Switch checked={controls.active ? model.active : undefined} defaultChecked={controls.active ? undefined : model.active} onCheckedChange={controls.active} aria-label="Active" />)}
       {fields}
-      <Field>
-        <FieldLabel>UPC (optional)</FieldLabel>
-        <Input aria-label="UPC (optional)" value={controls.upc ? model.upc : undefined} defaultValue={controls.upc ? undefined : model.upc} onChange={(event) => controls.upc?.(event.target.value)} />
-      </Field>
+      <RegistryInput label="UPC (optional)" value={model.upc} onChange={controls.upc} />
       {E.info(model.volumeInfo)}
       {messages}
       {footer !== undefined ? footer : E.btn("Save SKU")}

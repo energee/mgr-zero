@@ -25,8 +25,9 @@ export function RegistrySelect({ label, value, options, onChange, disabled, plac
   );
 }
 
-export function RegistryInput({ label, value, onChange, disabled, required, suggestions }: {
+export function RegistryInput({ label, value, onChange, disabled, required, suggestions, placeholder }: {
   label: string; value: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean;
+  placeholder?: string;
   /** Typed against these as a datalist: an unmatched entry is still accepted. */
   suggestions?: string[];
 }) {
@@ -44,6 +45,7 @@ export function RegistryInput({ label, value, onChange, disabled, required, sugg
         onChange={(event) => onChange?.(event.target.value)}
         disabled={disabled}
         required={Boolean(required && onChange)}
+        placeholder={placeholder}
       />
       {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
     </Field>

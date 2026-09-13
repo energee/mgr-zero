@@ -18,7 +18,8 @@ const KNOWN_SURFACE_DEBT = [
 // Audited whole-body replacements, not action/message slots. Extend this
 // focused list as each flow is inspected; a view import alone misses these.
 const BODY_SLOTS: Record<string, string> = {
-  CatalogView: "brands",
+  // CatalogView has no body-replacement slot left: `rowExtra` adds under a row
+  // and cannot replace the rows, which tests/catalog-view.test.ts asserts.
   ShopView: "catalog",
   NewPoView: "form",
   ReceivePoView: "review",

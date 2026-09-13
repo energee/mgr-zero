@@ -8,7 +8,7 @@ export type SkuViewModel = {
   volumeInfo: string;
 };
 
-const VOLUME_INFO =
+export const VOLUME_INFO =
   "Volume and packaging come from the Format. Create another Format when either differs.";
 
 export type SkuSnapshot = {

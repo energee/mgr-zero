@@ -33,7 +33,7 @@ export default async function CatalogPage() {
       model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more" })}
       createAction={canWrite ? E.btn("New Brand", "p", "/catalog/brands/new") : null}
       linkRows
-      brandExtra={(row) => {
+      rowExtra={(row) => {
         const brand = brands.find((b) => b.id === row.key)!;
         const pours = formats.filter((f) => f.brand_id === brand.id);
         return (

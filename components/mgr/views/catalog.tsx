@@ -1,7 +1,7 @@
 // components/mgr/views/catalog.tsx — Catalog drawing. Every brand row is drawn
-// here; live slots New Brand as createAction, per-row controls as brandAction,
-// brand-owned pour rows as brandExtra, and Formats into footer. Packages are
-// not nested here — a brand row links to its SKU list.
+// here; live slots New Brand as createAction, brand-owned pour rows as rowExtra,
+// and Formats into footer. Packages are not nested here — a brand row links to
+// its SKU list.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CatalogViewModel } from "@/lib/mgr/catalog-view";
@@ -13,15 +13,15 @@ export function CatalogView({
   createAction,
   footer,
   linkRows,
-  brandExtra,
+  rowExtra,
 }: {
   model: CatalogViewModel;
   createAction?: ReactNode;
   footer?: ReactNode;
   /** Live: brand rows, Price groups and water profiles are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
-  /** Live: that brand's own poured formats and New pour, beside its row. */
-  brandExtra?: (row: CatalogViewModel["brands"][number]) => ReactNode;
+  /** Live: content under one row — that brand's own poured formats and New pour. */
+  rowExtra?: (row: CatalogViewModel["brands"][number]) => ReactNode;
 }) {
   return (
     <>
@@ -31,7 +31,7 @@ export function CatalogView({
         : model.brands.map((row) => (
           <Fragment key={row.key}>
             {E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
-            {brandExtra?.(row)}
+            {rowExtra?.(row)}
           </Fragment>
         ))}
       {E.nav("Price groups", model.priceGroups, "", undefined, linkRows ? model.priceGroupsHref : undefined)}

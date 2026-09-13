@@ -91,12 +91,12 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_HAZY));
   });
 
-  it("draws every brand row itself; brandExtra only adds beside one", () => {
+  it("draws every brand row itself; rowExtra only adds beside one", () => {
     const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
       model,
       linkRows: true,
-      brandExtra: (row: { key: string }) => (row.key === model.brands[0]!.key ? "POUR SLOT" : null),
+      rowExtra: (row: { key: string }) => (row.key === model.brands[0]!.key ? "POUR SLOT" : null),
     }));
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
@@ -109,7 +109,7 @@ describe("Catalog view", () => {
   it("still blanks an empty catalog", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps({ brands: [], priceGroups: catalogBrands.priceGroups }),
-      brandExtra: () => "POUR SLOT",
+      rowExtra: () => "POUR SLOT",
     }));
     expect(html).toMatch(/No brands yet/);
     expect(html).not.toMatch(/POUR SLOT/);
@@ -126,10 +126,9 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    // Brand is a page, not a dialog: New Brand and Edit brand are links to it.
+    // Brand is a page, not a dialog: New Brand links to it, as does each row.
     expect(src).not.toMatch(/<BrandForm\b/);
     expect(src).toMatch(/"\/catalog\/brands\/new"/);
-
     expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
@@ -268,7 +267,7 @@ describe("SKU view", () => {
     expect(form.match(/<SkuView\b/g)).toHaveLength(2);
     expect(form).toMatch(/controls=\{\{/);
     // Only the live-only Name input is drawn here; Format, Active and UPC are the view's.
-    expect(form).not.toMatch(/<Select\b/);
+    expect(form).not.toMatch(/<Select\b|<Input\b/);
     expect(form).not.toMatch(/aria-label="UPC/);
   });
 

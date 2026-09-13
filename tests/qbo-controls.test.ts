@@ -19,7 +19,7 @@ describe("QuickBooks control boundaries", () => {
   });
 
   it("remounts mapping field state from the current saved server value", () => {
-    expect(source).toMatch(/key=\{qboMappingVersion\(props\.currentId\)\}/);
+    expect(source).toMatch(/key=\{qboMappingVersion\([\w.]*currentId\)\}/);
   });
 
   it("uses QuickBooks presentation for unpaid pushed rows even when they drifted", () => {
