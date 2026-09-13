@@ -2,7 +2,7 @@
 // submitted-order transition, catch-up scan idempotence, semantic keys,
 // recipient fan-out (roles, mutes, links), and resolved suppression (live DB).
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { admin, channelId, ins, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { toNotification } from "@/lib/chat/jobs";
 import { renderSlackMessage } from "@/lib/chat/slack-renderer";
 import { runCommand } from "@/lib/commands/registry";
@@ -12,13 +12,6 @@ type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, mutedSales: Ctx, warehouse: Ctx, unlinkedSales: Ctx;
 let inst: { id: string };
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
-
-async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
-  if (table === "inventory_movements") return insertFixture<T>(table, row)[0];
-  const { data, error } = await admin.from(table).insert(row).select().single();
-  if (error) throw new Error(`${table}: ${error.message}`);
-  return data as T;
-}
 
 async function linkWithDm(ctx: Ctx) {
   await ins("chat_user_links", { brewery_id: b.id, installation_id: inst.id, provider: "slack", external_user_id: `U-${ctx.userId.slice(0, 8)}`, user_id: ctx.userId, state: "active", linked_at: new Date().toISOString() });
