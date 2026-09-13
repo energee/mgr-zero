@@ -3,7 +3,7 @@
 // its next action — Mark sent on a draft, Receive on a sent one — and opening
 // its own page. New PO is new-po-form.tsx → create_purchase_order.
 import Link from "next/link";
-import { E } from "@/components/mgr/e";
+import { Button } from "@/components/ui/button";
 import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -11,11 +11,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import "@/lib/commands/all";
 import { poNo } from "@/lib/mgr/doc-no";
-import { NewPoForm } from "./new-po-form";
+
 
 type Po = { id: string; po_no: number; status: string; expected_on: string | null; ordered_on: string | null; vendor_name: string | null; lines_open: number };
-type Vendor = { id: string; name: string; active: boolean };
-type Material = { id: string; name: string; purchase_uom: string; lot_tracked: boolean };
 
 function verb(po: Po): [string, "info" | "attention" | "success"] {
   if (po.status === "draft") return ["Mark sent", "info"];
@@ -33,27 +31,21 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
   const { all } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [pos, vendors, materials] = (await Promise.all([
-    runCommand("list_purchase_orders", { includeClosed: all === "1" }, ctx),
-    runCommand("list_vendors", {}, ctx), runCommand("list_materials", {}, ctx),
-  ])) as [Po[], Vendor[], Material[]];
+  const pos = await runCommand("list_purchase_orders", { includeClosed: all === "1" }, ctx) as Po[];
 
   return (
     <PurchaseOrdersView
       model={toPurchaseOrdersViewProps({
-        title: "Purchase orders",
+        title: "Work",
         subtitle: all === "1" ? "every order" : "open orders",
+        empty: pos.length === 0 ? (all === "1" ? "No purchase orders yet" : "No open purchase orders") : undefined,
+        rows: pos.map(po => {
+          const [label, tone] = verb(po);
+          return { key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), verb: label, tone, href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" };
+        }),
       })}
-      createAction={<NewPoForm vendors={vendors.filter((v) => v.active)} materials={materials} />}
-      tabs={null}
-      list={
-        pos.length === 0
-          ? E.blank(all === "1" ? "No purchase orders yet" : "No open purchase orders")
-          : pos.map((po) => {
-            const [label, tone] = verb(po);
-            return <div key={po.id}>{E.row(`${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, status(po), E.act(label, tone, `/purchase-orders/${po.id}`), po.status === "partially_received" ? "w" : "")}</div>;
-          })
-      }
+      createAction={<Button size="sm" asChild><Link href="/purchase-orders/new">New PO</Link></Button>}
+      linkRows
       footer={
         <p className="text-sm text-muted-foreground">
           {all === "1" ? <Link href="/purchase-orders" className="underline">Open orders only</Link> : <Link href="/purchase-orders?all=1" className="underline">Show received and cancelled</Link>}

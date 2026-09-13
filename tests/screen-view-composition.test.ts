@@ -14,7 +14,6 @@ const KNOWN_VIEW_DEBT = [
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
   "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
-  "New PO: NewPoView <- app/(app)/purchase-orders/page.tsx",
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",

@@ -46,17 +46,39 @@ describe("Purchase orders", () => {
     expect(body.props.model).toEqual(toPurchaseOrdersViewProps(purchaseOrdersWarehouse));
   });
 
-  it("the live POs page mounts PurchaseOrdersView and slots NewPoForm", () => {
+  it("the live POs list links to a full-page shared New PO form", () => {
     const page = src("app/(app)/purchase-orders/page.tsx");
     expect(page).toMatch(/<PurchaseOrdersView\b/);
-    expect(page).toMatch(/<NewPoForm\b/);
-    expect(page).not.toMatch(/NewPoView/);
+    expect(page).toContain('"/purchase-orders/new"');
+    expect(page).not.toMatch(/<NewPoForm\b|list=\{/);
+    const form = src("app/(app)/purchase-orders/new-po-form.tsx");
+    expect(form).toMatch(/<NewPoView\b/);
+    expect(form).not.toMatch(/<CommandForm\b/);
   });
 
   it("the New PO inventory record is NewPoView", () => {
     const body = screen("New PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewPoView);
     expect(body.props.model).toEqual(toNewPoViewProps(newPoCountryMalt));
+  });
+
+  it("shares decimal counts, untracked lot omission, errors and disabled saving", () => {
+    const html = htmlOf(createElement(NewPoView, {
+      model: { vendor: "vendor-id", vendors: [{ id: "vendor-id", name: "Actual vendor" }], expected: "", lines: [
+        { key: "line", title: "Actual material", detail: "each", qty: "1.5", cost: "" },
+      ] }, submitting: true, messages: "Request failed",
+    }));
+    expect(html).toContain('value="vendor-id"');
+    expect(html).toContain('value="1.5"');
+    expect(html).toContain('step="any"');
+    expect(html).toContain("Request failed");
+    expect(html).toContain("Saving…");
+    expect(html).toContain("disabled");
+    expect(html).not.toContain("Expected lot");
+    expect(html).not.toContain('href="/purchase-orders"');
+    expect(htmlOf(createElement(NewPoView, { model: newPoCountryMalt, footer: null }))).not.toContain("Save draft");
+    const page = src("app/(app)/purchase-orders/new/page.tsx");
+    expect(page.indexOf('requirePagePermission(ctx, "create_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("list_vendors"'));
   });
 
   it("the Receive PO inventory record is ReceivePoView", () => {

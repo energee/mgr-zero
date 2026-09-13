@@ -232,6 +232,7 @@ export const INERT: (string | RegExp)[] = [
   "Back to edit",
   /^(Decrease|Increase) Line \d+ quantity$/,
   /^Line \d+ SKU$/,
+  /^Line \d+ material$/,
   "Delivery enabled",
   "Demo Brewing LLC",
   "Demo Brewing",
