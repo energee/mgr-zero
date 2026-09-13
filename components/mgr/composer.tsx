@@ -25,13 +25,20 @@ export function Composer({ role }: { role: StaffRole }) {
   const [model, setModel] = useState("");
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [setupError, setSetupError] = useState<string>();
+  // A failure carries the recovery that fits it, so Try again re-runs what
+  // actually failed — the setup load, the new chat, or the proposal commit —
+  // instead of one handler guessing from a bare message string (#329).
+  const [failure, setFailure] = useState<{ message: string; retry: () => void }>();
+  const failed = (cause: unknown, fallback: string, retry: () => void) =>
+    setFailure({ message: cause instanceof Error ? cause.message : fallback, retry });
   const [committing, setCommitting] = useState(false);
   const [receipt, setReceipt] = useState<string>();
   const [outboxOpen, setOutboxOpen] = useState(false);
   const [outboxBusy, setOutboxBusy] = useState(false);
   const [outboxEntries, setOutboxEntries] = useState<OutboxAttempt[]>([]);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Identifies the current setup load; a superseded run drops its response.
+  const setupRun = useRef(0);
   const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) => command(breweryId, name, input, requestId, expectedContext, provenance);
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/chat",
@@ -42,11 +49,11 @@ export function Composer({ role }: { role: StaffRole }) {
   const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
   async function newChat() {
-    clearError(); setSetupError(undefined); setReceipt(undefined);
+    clearError(); setFailure(undefined); setReceipt(undefined);
     try {
       const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, crypto.randomUUID()) as { id: string };
       setInitialMessages([]); setConversationId(conversation.id); setMessages([]); setOpen(true);
-    } catch (cause) { setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
+    } catch (cause) { failed(cause, "Composer unavailable", () => void newChat()); }
   }
 
   // Restores the server-owned conversation for this actor/brewery scope. Named
@@ -68,19 +75,25 @@ export function Composer({ role }: { role: StaffRole }) {
         id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
       })) as UIMessage[];
       setInitialMessages(restored); setConversationId(id);
-    } catch (cause) { if (live()) setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
+    } catch (cause) { if (live()) failed(cause, "Composer unavailable", reloadSetup); }
+  }
+
+  // A retry outlives the scope it started in, so the reload holds the scope it
+  // was issued for and a later one supersedes it.
+  function reloadSetup() {
+    const issued = ++setupRun.current;
+    setFailure(undefined);
+    void (async () => { await loadSetup(() => issued === setupRun.current); })();
   }
 
   function retry() {
-    if (!setupError) { clearError(); void regenerate(); return; }
-    setSetupError(undefined);
-    void loadSetup(() => true);
+    if (failure) { failure.retry(); return; }
+    clearError(); void regenerate();
   }
 
   useEffect(() => {
-    let active = true;
-    void (async () => { await loadSetup(() => active); })();
-    return () => { active = false; };
+    const issued = ++setupRun.current;
+    void (async () => { await loadSetup(() => issued === setupRun.current); })();
     // One server-owned restore per actor/brewery scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [breweryId, expectedContext.actorId]);
@@ -104,11 +117,11 @@ export function Composer({ role }: { role: StaffRole }) {
 
   async function commitProposal() {
     if (!proposal || committing || !conversationId) return;
-    setCommitting(true); setSetupError(undefined);
+    setCommitting(true); setFailure(undefined);
     try {
       const result = await run(proposal.name, proposal.input, crypto.randomUUID(), { origin: "chat", conversationId, previewToken: proposal.previewToken }) as { id?: string };
       setReceipt(result.id ? `Recorded · ${result.id}` : "Recorded");
-    } catch (cause) { setSetupError(cause instanceof Error ? cause.message : "Could not record proposal"); }
+    } catch (cause) { failed(cause, "Could not record proposal", () => void commitProposal()); }
     finally { setCommitting(false); }
   }
 
@@ -126,7 +139,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

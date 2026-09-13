@@ -150,7 +150,7 @@ function effectDescription(effect: ComposerEffect) {
     effect.bbl != null && `${effect.bbl} bbl`,
     effect.stockBeforeQty != null && effect.stockAfterQty != null && `selected stock ${effect.stockBeforeQty} to ${effect.stockAfterQty}`,
     effect.taxTreatment && `tax: ${sentenceCase(effect.taxTreatment)}`,
-    effect.correction && `correction: ${effect.correction.replaceAll("_", " ")}`,
+    effect.correction && `correction: ${sentenceCase(effect.correction)}`,
   ].filter(Boolean).join(" · ");
 }
 

@@ -24,7 +24,7 @@ export function toChannelViewProps({ name, tax_treatment }: ChannelSnapshot): Ch
   const taxIndex = CHANNEL_TAX_TREATMENTS.indexOf(label);
   return {
     name,
-    taxOptions: CHANNEL_TAX_TREATMENTS,
+    taxOptions: [...CHANNEL_TAX_TREATMENTS],
     taxIndex: taxIndex < 0 ? 0 : taxIndex,
   };
 }

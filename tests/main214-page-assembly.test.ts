@@ -63,11 +63,11 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders and I
   expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
   const html = renderToStaticMarkup(page);
-  for (const text of ["Tax treatment", "research", "Dock · default", "/orders?customerId=buyer", "Invite portal user"]) expect(html).toContain(text);
+  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user"]) expect(html).toContain(text);
   state.role = "warehouse";
   const readonly = renderToStaticMarkup(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren/);
-  expect(readonly).toContain("research");
+  expect(readonly).toContain("Research");
 });
 it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
   const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });

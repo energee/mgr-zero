@@ -139,10 +139,13 @@ describe("AI composer", () => {
   // re-ran the load that failed.
   it("retries the setup load, not just the AI turn, after a setup error", () => {
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/async function loadSetup\(/);
-    // Retry re-runs the setup load when setup is what failed; only an AI-turn
-    // failure falls through to regenerate().
-    expect(live).toMatch(/function retry\(\) \{\s*if \(!setupError\) \{ clearError\(\); void regenerate\(\); return; \}[\s\S]*?void loadSetup\(/);
+    // Every failure carries its own recovery, so Try again re-runs what failed
+    // — the setup load, the new chat, or the commit — and only an AI-turn error
+    // falls through to regenerate().
+    expect(live).toMatch(/setFailure\(\{ message: [^}]*retry \}\)/);
+    expect(live).toMatch(/failed\(cause, "Composer unavailable", reloadSetup\)/);
+    expect(live).toMatch(/failed\(cause, "Could not record proposal", \(\) => void commitProposal\(\)\)/);
+    expect(live).toMatch(/if \(failure\) \{ failure\.retry\(\); return; \}/);
     expect(live).toMatch(/onRetry=\{retry\}/);
   });
 
