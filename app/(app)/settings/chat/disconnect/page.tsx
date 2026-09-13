@@ -1,5 +1,6 @@
 // app/(app)/settings/chat/disconnect/page.tsx — Explicit disconnect confirmation and retryable credential cleanup.
-import { E } from "@/components/mgr/e";
+import { ChatDisconnectView } from "@/components/mgr/views/chat";
+import { PosRouteSheet as ChatRouteSheet } from "@/components/mgr/views/pos-controls";
 import { requireAdminContext } from "@/lib/brewery";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
@@ -8,5 +9,5 @@ import { ChatDisconnect } from "../chat-settings-client";
 export default async function DisconnectChatPage() {
   const { ctx } = await requireAdminContext("Disconnect Slack");
   const health = await runCommand("get_chat_integration_health", {}, ctx) as ChatHealth;
-  return <>{E.back("Chat", "Disconnect Slack", undefined, "/settings/chat")}{health.installation ? <ChatDisconnect installationId={health.installation.id} cleanupPending={health.installation.lastError === "credential_delete_failed"} /> : E.info("Slack is not connected.")}</>;
+  return <ChatRouteSheet title="Disconnect Slack" backHref="/settings/chat">{health.installation ? <ChatDisconnect installationId={health.installation.id} cleanupPending={health.installation.lastError === "credential_delete_failed"} /> : <ChatDisconnectView connected={false} />}</ChatRouteSheet>;
 }

@@ -38,7 +38,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Me", file: "app/(app)/layout.tsx" },
   { name: "Chat disconnected", file: "app/(app)/settings/chat/page.tsx" },
   { name: "Chat settings", file: "app/(app)/settings/chat/page.tsx" },
-  { name: "Linked people", file: "app/(app)/settings/chat/people/page.tsx" },
+  { name: "Linked people", file: "app/(app)/settings/chat/chat-settings-client.tsx" },
   { name: "Link your Slack", file: "app/(app)/settings/chat/link/page.tsx" },
   { name: "Disconnect Slack", file: "app/(app)/settings/chat/disconnect/page.tsx" },
   { name: "Reauthorization", file: "app/(app)/settings/chat/health/page.tsx" },

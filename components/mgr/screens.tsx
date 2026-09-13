@@ -31,6 +31,8 @@ import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { ImportView } from "@/components/mgr/views/import";
 import { importPreview } from "@/lib/mgr/fixtures/import";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView } from "@/components/mgr/views/chat";
+import { linkedChatPeople, chatLinkIntent, chatRecovery } from "@/lib/mgr/fixtures/chat";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -2402,13 +2404,7 @@ export const SCREENS: Screen[] = [
     writes: "unlink_chat_user",
     states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: (<>
-      {E.back("Chat", "Linked people")}
-      {E.row("Avery Stone", "Admin · linked 8/29/2026", E.act("Unlink", "destructive"))}
-      {E.row("Casey Lin", "Brewer · linked 8/30/2026", E.act("Unlink", "destructive"))}
-      {E.row("Morgan Reed", "Driver · linked 9/02/2026", E.act("Unlink", "destructive"))}
-      {E.btn("Link your Slack", "g")}
-    </>),
+    body: <ChatLinkedPeopleView people={linkedChatPeople} />,
   },
   {
     step: 8,
@@ -2423,12 +2419,7 @@ export const SCREENS: Screen[] = [
     writes: "consume_chat_link_proof [single-use]",
     states: [["ready", "both identities named"], ["expired", "return to MGR and request a new link", 1]],
     spec: "The entry page names both identities and the brewery before consuming the single-use proof.",
-    body: (<>
-      {E.ttl("Link your Slack")}
-      {E.info("Slack user Avery Stone will be linked to Avery Stone in Demo Brewing.")}
-      {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
-      {E.btn("Link accounts", "irr")}
-    </>),
+    body: <ChatLinkConsentView intent={chatLinkIntent} />,
   },
   {
     step: 8,
@@ -2443,11 +2434,7 @@ export const SCREENS: Screen[] = [
     writes: "disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["confirmed", "installation and identity links removed"]],
     spec: "The confirmation distinguishes stopped delivery from MGR work that remains.",
-    body: (<>
-      {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
-      {E.info("Stays: MGR work, assignments, notification preferences and history.")}
-      {E.btn("Disconnect Slack", "del")}
-    </>),
+    body: <ChatDisconnectView />,
   },
   {
     step: 8,
@@ -2455,19 +2442,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     name: "Reauthorization",
+    to: { Connection: "Reauthorization", "Last successful message from Slack": "Reauthorization", "Last successful delivery": "Reauthorization", queued: "Reauthorization", retrying: "Reauthorization", "Manage delivery": "Chat settings" },
     job: "Fail closed while keeping recovery understandable and personal delivery isolated",
     reads: "get_chat_integration_health",
     writes: "begin_chat_reauthorization · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["token revoked", "all provider sends stop", 1], ["channel externalized", "team digest stops; eligible personal sends continue", 1], ["uninstalled", "links and queued actions invalidated", 1]],
     spec: "Provider errors remain redacted. Emergency disable does not depend on Slack being reachable.",
-    body: (<>
-      {E.back("Chat", "Health")}
-      {E.note("Slack authorization expired. No messages are being sent.")}
-      {E.row("Last message from Slack", "Today · 8:42 AM", E.status("Succeeded", "ok"))}
-      {E.row("Last delivery", "Today · 8:43 AM", E.status("Succeeded", "ok"))}
-      {E.row("Queued", "3 deliveries", E.status("Paused", "w"), "w")}
-      {E.btns([["Reauthorize Slack", "p"], ["Disable integration", "g"]])}
-    </>),
+    body: <ChatHealthView health={chatRecovery} />,
   },
   {
     step: 7,

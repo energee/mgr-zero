@@ -25,17 +25,12 @@ import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ChatHealth, ChatLinkIntent, ChatPreferences, ChatLinkedPerson } from "@/lib/commands/chat";
+import { ChatConnectionView, ChatDisableView, ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView } from "@/components/mgr/views/chat";
 
 export function ChatConnectionAction({ installationId, configured }: { installationId?: string; configured: boolean }) {
   const action = useCommandAction();
-  return <div className="flex flex-col gap-3">
-    {!configured && E.note("Slack connection setup is unavailable. Your administrator must finish the server setup. Fixture previews remain available.")}
-    <Button disabled={!configured || action.busy} onClick={() => void action.run(installationId ? "begin_chat_reauthorization" : "begin_chat_installation",
-      installationId ? { installationId } : {}, (data) => { location.assign((data as { authorizeUrl: string }).authorizeUrl); })}>
-      {action.busy ? "Opening Slack…" : installationId ? "Reauthorize Slack" : "Connect Slack"}
-    </Button>
-    <CommandFormMessage error={action.error} />
-  </div>;
+  return <ChatConnectionView configured={configured} reauthorize={Boolean(installationId)} busy={action.busy} error={action.error} onConnect={() => void action.run(installationId ? "begin_chat_reauthorization" : "begin_chat_installation",
+      installationId ? { installationId } : {}, data => { location.assign((data as { authorizeUrl: string }).authorizeUrl); })} />;
 }
 
 export function ChatSettingsControls({ installation, readingDueHours, timezone, configured }: { installation: NonNullable<ChatHealth["installation"]>; readingDueHours: number; timezone: string; configured: boolean }) {
@@ -102,39 +97,23 @@ export function ChatPersonalPreferences({ preferences, canSetQuietHours = true }
 
 export function ChatLinkConsent({ proof, intent }: { proof: string; intent: ChatLinkIntent }) {
   const action = useCommandAction(), router = useRouter();
-  return <div className="flex flex-col gap-4">
-    {E.info(`Slack user ${intent.slackIdentity} in ${intent.workspace} will be linked to ${intent.mgrIdentity} in ${intent.brewery}.`)}
-    {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
-    <Button disabled={action.busy} onClick={() => void action.run("consume_chat_link_proof", { proof }, () => router.push("/settings/chat/preferences?linked=1"))}>Link accounts</Button>
-    <CommandFormMessage error={action.error} />
-  </div>;
+  return <ChatLinkConsentView intent={intent} backHref="/settings/chat/preferences" busy={action.busy} error={action.error} onLink={() => void action.run("consume_chat_link_proof", { proof }, () => router.push("/settings/chat/preferences?linked=1"))} />;
 }
 
 export function ChatDisconnect({ installationId, cleanupPending = false }: { installationId: string; cleanupPending?: boolean }) {
   const action = useCommandAction(), router = useRouter();
   const [pending, setPending] = useState(cleanupPending);
-  return <div className="flex flex-col gap-4">
-    {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
-    {E.info("Stays: MGR work, assignments, notification preferences and history.")}
-    {pending && E.note("Slack delivery has stopped. Credential cleanup failed; retry cleanup to finish disconnecting.")}
-    <Button variant="destructive" disabled={action.busy} onClick={() => void action.run("disconnect_chat_installation", { installationId }, (data) => {
+  return <ChatDisconnectView cleanupPending={pending} busy={action.busy} error={action.error} onDisconnect={() => void action.run("disconnect_chat_installation", { installationId }, (data) => {
       if ((data as { credentialDeleted: boolean }).credentialDeleted) router.push("/settings/chat"); else setPending(true);
-    })}>{pending ? "Retry credential cleanup" : "Disconnect Slack"}</Button>
-    <CommandFormMessage error={action.error} />
-  </div>;
+    })} />;
 }
 
 export function ChatLinkedPeople({ people }: { people: ChatLinkedPerson[] }) {
   const action = useCommandAction();
-  return <div className="flex flex-col gap-3">
-    {people.length === 0 && E.info("No current staff have linked Slack yet.")}
-    {people.map((person) => <div key={person.id}>{E.row(person.name, `${person.role} · Slack ${person.slackIdentity} · linked ${person.linkedAt.slice(0, 10)}`,
-      <Button variant="outline" disabled={action.busy} onClick={() => void action.run("unlink_chat_user", { linkId: person.id })}>Unlink</Button>)}</div>)}
-    <CommandFormMessage error={action.error} />
-  </div>;
+  return <ChatLinkedPeopleView people={people} backHref="/settings/chat" linkHref="/settings/chat/link" busy={action.busy} error={action.error} onUnlink={linkId => void action.run("unlink_chat_user", { linkId })} />;
 }
 
 export function ChatDisable({ installationId }: { installationId: string }) {
   const action = useCommandAction();
-  return <div className="flex flex-col gap-3"><Button variant="outline" disabled={action.busy} onClick={() => void action.run("disable_chat_installation", { installationId })}>Disable integration</Button><CommandFormMessage error={action.error} /></div>;
+  return <ChatDisableView busy={action.busy} error={action.error} onDisable={() => void action.run("disable_chat_installation", { installationId })} />;
 }
