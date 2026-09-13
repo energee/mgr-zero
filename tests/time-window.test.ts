@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorFor, formatClock, formatWindow, fromNoonOffset, fromOffset, parseClock, toNoonOffset, toOffset, toClockInput } from "@/lib/time-window";
+import { anchorFor, formatClock, formatWindow, fromOffset, NOON, parseClock, toOffset, toClockInput } from "@/lib/time-window";
 
 describe("parseClock", () => {
   it.each([["00:00", 0], ["06:00", 360], ["21:00", 1260], ["21:30", 1290]])(
@@ -27,14 +27,14 @@ describe("formatClock", () => {
 describe("the noon-anchored axis", () => {
   it.each([[720, 0], [1260, 540], [0, 720], [360, 1080], [719, 1439]])(
     "%i sits at offset %i",
-    (minutes, offset) => expect(toNoonOffset(minutes)).toBe(offset),
+    (minutes, offset) => expect(toOffset(minutes, NOON)).toBe(offset),
   );
 
   it("round-trips every half hour", () => {
-    for (let m = 0; m < 1440; m += 30) expect(fromNoonOffset(toNoonOffset(m))).toBe(m);
+    for (let m = 0; m < 1440; m += 30) expect(fromOffset(toOffset(m, NOON), NOON)).toBe(m);
   });
 
-  it("wraps a full turn back to noon", () => expect(fromNoonOffset(1440)).toBe(720));
+  it("wraps a full turn back to noon", () => expect(fromOffset(1440, NOON)).toBe(720));
 });
 
 describe("the anchor a window can be drawn against", () => {

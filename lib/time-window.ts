@@ -44,10 +44,6 @@ export const anchorFor = (start: number, end: number) => start === end ? start :
 /** Slider minutes back to the exact 24-hour input accepted by commands. */
 export const toClockInput = (minutes: number) => new Date(Date.UTC(2000, 0, 1, 0, minutes)).toISOString().slice(11, 16);
 
-/** The noon-anchored track, the case a window through midnight needs. */
-export const toNoonOffset = (minutes: number) => toOffset(minutes, NOON);
-export const fromNoonOffset = (offset: number) => fromOffset(offset, NOON);
-
 /** How long the window lasts, counting forward from start. Start == end is a
  *  whole day: a window covering nothing would be "off", which is its own control. */
 function windowMinutes(start: number, end: number) {
