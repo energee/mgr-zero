@@ -26,7 +26,7 @@ export function CellarTransferForm({ occupancies, vessels }: { occupancies: Occu
   });
   const ready = fromOccupancyId && toVesselId && Number(volumeBbl) > 0;
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Transfer" trigger={<Button size="sm">Transfer</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={<Button size="sm" variant="outline">Transfer</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ct-from">From</Label>

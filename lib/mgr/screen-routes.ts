@@ -120,7 +120,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Paid invoice", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
   { name: "Account", file: "app/(portal)/portal/account/page.tsx" },
   { name: "Portal Me", file: "app/(portal)/layout.tsx" },
-  { name: "Vessel detail", file: "app/(app)/cellar/page.tsx" },
+  { name: "Vessel detail", file: "app/(app)/batches/vessel-form.tsx" },
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
   { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/reading-form.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },

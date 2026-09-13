@@ -12,7 +12,6 @@ import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import "@/lib/commands/all";
 import { batNo } from "@/lib/mgr/doc-no";
 import { NewBatchForm } from "./new-batch-form";
-import { VesselForm } from "./vessel-form";
 
 type Batch = {
   id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null;
@@ -56,12 +55,12 @@ export default async function BatchesPage() {
         <>
           {E.sp()}
           {E.ttl("Vessels")}
-          <div className="self-start"><VesselForm /></div>
+          <div className="self-start">{E.btn("New vessel", "p", "/cellar/vessels/new")}</div>
           {vessels.length === 0
             ? E.blank("No vessels yet")
             : vessels.map((v) => (
               <div key={v.id}>
-                {E.row(v.name, `${v.kind} · ${Number(v.capacity_bbl)} bbl`, <VesselForm vessel={v} />)}
+                {E.row(v.name, `${v.kind} · ${Number(v.capacity_bbl)} bbl`, E.act("Edit", "info", `/cellar/vessels/${v.id}`))}
               </div>
             ))}
         </>

@@ -13,7 +13,6 @@ const KNOWN_VIEW_DEBT = [
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
-  "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
 ] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
@@ -33,7 +32,6 @@ const KNOWN_INLINE_DEBT = [
   "Disconnect QuickBooks",
   "Invoices",
   "Fix mapping",
-  "Cellar map",
   "Tap board",
   "Kick keg",
   "Swap keg",

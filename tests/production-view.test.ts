@@ -27,10 +27,36 @@ import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { toRunClosedViewProps } from "../lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "../lib/mgr/schedule-batch-view";
 import { toVesselDetailViewProps } from "../lib/mgr/vessel-detail-view";
+import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
+import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
+import { CellarMapView } from "../components/mgr/views/cellar-map";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
+
+it("cellar derives fills from occupancy and keeps links explicit", () => {
+  const vessels = [{ id: "v1", name: "Actual tank", capacity_bbl: 10 }, { id: "v2", name: "Empty tank", capacity_bbl: 5 }];
+  const occupancies = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2.5 }];
+  const model = toCellarMapViewProps(vessels, occupancies);
+  expect(model.tiles[0]).toMatchObject({ fill: 25, detail: "No brand yet · 2.5 / 10 bbl", reading: "No readings yet", href: undefined });
+  expect(model.tiles[1]).toMatchObject({ fill: 0, reading: "available" });
+  const live = toCellarMapViewProps(vessels, occupancies, { o1: "Actual reading" }, { v1: "/cellar/vessels/v1" });
+  expect(htmlOf(createElement(CellarMapView, { model: live }))).toContain('href="/cellar/vessels/v1"');
+  expect(htmlOf(createElement(CellarMapView, { model }))).not.toContain('href="/cellar');
+  expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
+});
+
+it("vessel readings preserve optional measurements and do not invent actors", () => {
+  const reading = { id: "r1", at: "2026-09-12", temp_f: 68, gravity_plato: null, ph: null, note: null };
+  expect(formatVesselReading(reading, "plato")).toBe("68 °F");
+  const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, history: [{ key: "r1", title: reading.at, detail: "68 °F" }] }, submitting: true, messages: "Save failed", footer: null }));
+  expect(html).toContain("No open occupancy");
+  expect(html).toContain("Save failed");
+  expect(html).toContain("disabled");
+  expect(html).not.toContain("Save vessel");
+  expect(html).not.toContain("Dana");
+});
 
 describe("Batches view", () => {
   it("maps planned Start and overdue Reading", () => {
@@ -51,7 +77,7 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/batches"/);
     expect(page).toMatch(/<BatchesView\b/);
-    expect(page).toMatch(/className="self-start"><VesselForm \/>/);
+    expect(page).toContain('"/cellar/vessels/new"');
     expect(page).toMatch(/<NewBatchForm\b/);
     expect(page).not.toMatch(/ScheduleBatchView/);
   });
@@ -109,10 +135,11 @@ describe("Vessel detail view", () => {
     expect(body.props.model).toEqual(toVesselDetailViewProps(vesselFv3));
   });
 
-  it("live cellar stays the occupancy list", () => {
+  it("live cellar shares its tiles and links to the vessel page", () => {
     const page = src("app/(app)/cellar/page.tsx");
-    expect(page).not.toMatch(/VesselDetailView/);
+    expect(page).toMatch(/<CellarMapView\b/);
     expect(page).toMatch(/list_occupancies/);
+    expect(src("app/(app)/batches/vessel-form.tsx")).toMatch(/<VesselDetailView\b/);
   });
 });
 

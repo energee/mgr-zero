@@ -8,6 +8,19 @@ import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
+import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
+
+export const cellarMapBrewer: CellarMapViewModel = {
+  tiles: [
+    { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
+    { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
+    { name: "FV3", detail: "Stout · 13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90 },
+    { name: "BT1", detail: "Pils · 7.0 / 10 bbl", reading: "carbing", fill: 70 },
+    { name: "BT2", detail: "Empty · 0 / 10 bbl", reading: "available", fill: 0 },
+    { name: "FB1", detail: "Saison · 0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40 },
+  ],
+  detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
+};
 
 export const batchesBrewer: BatchesSnapshot = {
   title: "Work",
