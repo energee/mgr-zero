@@ -6,7 +6,8 @@ import { CommandError, runCommand } from "@/lib/commands/registry";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { getServerEnv } from "@/lib/env/server";
 import "@/lib/commands/all";
-import { Entry } from "../entry";
+import { EntrySurface } from "@/components/mgr/entry-surface";
+import { MgrIcon } from "@/components/mgr-icon";
 import { CreateBreweryForm, type CreateBreweryState } from "./form";
 
 async function provision(_previous: CreateBreweryState, form: FormData): Promise<CreateBreweryState> {
@@ -41,8 +42,8 @@ export default async function CreateBreweryPage() {
   const identity = await getRequestIdentity();
   if (getServerEnv().dedicated) notFound();
   if (!identity) redirect("/login");
-  return <Entry title="Create brewery">
-    {E.note("You will be the brewery’s first admin.")}
+  return <EntrySurface>
+    {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
     <CreateBreweryForm action={provision} requestId={crypto.randomUUID()} actorId={identity.userId} />
-  </Entry>;
+  </EntrySurface>;
 }

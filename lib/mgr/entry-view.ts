@@ -14,3 +14,7 @@ export type EntryViewModel = {
 export function toEntryViewProps(s: EntryViewModel): EntryViewModel {
   return s;
 }
+
+export function toAcceptInviteViewProps(breweryName: string, role: string): EntryViewModel {
+  return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: role }, primary: `Join ${breweryName}` };
+}

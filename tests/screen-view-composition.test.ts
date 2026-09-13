@@ -17,9 +17,6 @@ const KNOWN_VIEW_DEBT = [
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
 const KNOWN_INLINE_DEBT = [
-  "Expired invite",
-  "Accept invite",
-  "Create brewery",
   "Import",
   "Chat disconnected",
   "Chat settings",

@@ -28,6 +28,7 @@ import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapp
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList } from "@/lib/mgr/fixtures/invoices";
 import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
+import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -149,7 +150,7 @@ import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
-import { expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
+import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
 import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
@@ -211,7 +212,7 @@ import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { toDeniedViewProps } from "@/lib/mgr/denied-view";
-import { toEntryViewProps } from "@/lib/mgr/entry-view";
+import { toEntryViewProps, toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
@@ -550,15 +551,7 @@ export const SCREENS: Screen[] = [
     states: [["expired", "sign in or recover your password"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
     spec: "Plan §5b. A used or timed-out token never opens Accept invite.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Invite expired")}
-      {E.note("This invite is no longer valid.")}
-      {E.info("Sign in or reset your password. Contact the brewery if access is still missing.")}
-      {E.btn("Reset password")}
-      {E.btn("Back to sign in")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={expiredInvite} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
@@ -604,15 +597,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Staff lands on Today; a customer lands on portal Order. The verified membership decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Join Demo Brewing")}
-      {E.row("Role", "", "warehouse")}
-      {E.inp("Your name")}
-      {E.inp("Choose a password")}
-      {E.btn("Join Demo Brewing")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toAcceptInviteViewProps("Demo Brewing", "warehouse")} />,
   },
   {
     step: 2,
@@ -733,13 +718,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Hidden in dedicated mode; this is the pre-brewery provisioning boundary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.ttl("New brewery")}
-      {E.edit("Brewery name", "")}
-      {E.pick("Timezone", "America/New_York", ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"])}
-      {E.edit("TTB registry number", "")}
-      {E.btn("Create brewery")}
-    </>),
+    body: <CreateBreweryView />,
   },
   {
     step: 2,
