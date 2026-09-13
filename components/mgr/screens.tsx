@@ -1415,7 +1415,7 @@ export const SCREENS: Screen[] = [
     name: "Coming up",
     to: { "Hazy IPA": "Shop", "Pils": "Shop", "Saison": "Shop" },
     job: "See what the brewery plans to brew next and jump to that brand on Shop",
-    reads: "portal_schedule [SCHEMA/RLS-GATE: view over planned batches exposing brand + planned week only; no customer policy on batches]",
+    reads: "portal_schedule [view; SCHEMA/RLS-GATE: planned batches exposing brand + planned week only; no customer policy on batches]",
     writes: "none",
     states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
     spec: "Planned batches (not yet brewed) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
@@ -2737,7 +2737,7 @@ export const SCREENS: Screen[] = [
     name: "Pushed invoice",
     job: "What the accountant opens after one shipment invoices, and the two steps the push does not perform",
     reads: "none [QuickBooks renders; MGR wrote it]",
-    writes: "push_invoice [design; requestid, online-only, AllowOnlineACHPayment + AllowOnlineCreditCardPayment]",
+    writes: "push_invoice_to_qbo [existing; requestid, online-only, AllowOnlineACHPayment + AllowOnlineCreditCardPayment]",
     states: [["not sent", "created by MGR; QuickBooks has emailed nobody", 1], ["accepted", "the QuickBooks invoice id is stored on the MGR invoice"], ["rejected", "the QuickBooks sync error is shown in MGR; nothing created here", 1], ["response lost", "the same requestid returns the first invoice, never a second"], ["tax intent missing", "AST does not engage and the invoice books at 0.00 tax", 1], ["no customer email", "push refuses; an invoice without one can never be paid online", 1], ["viewed", "the customer opened it, a signal MGR has no column for", 1]],
     spec: "Drawn as QuickBooks actually presents it: the Sales transactions list with a right sidebar, because QuickBooks has no separate full-page record. Every Product/Service line resolves through the SKU's QuickBooks item reference and the bill-to through the customer's QuickBooks customer reference. MGR sends tax intent, never tax amounts: Intuit requires a transaction-level tax code (TxnTaxCodeRef) to opt the transaction into Automated Sales Tax, and an unmarked line is treated as TAX, so a keg deposit must carry TaxCodeRef NON explicitly or it books as taxable revenue. The header carries the second finding: a pushed invoice reads Not sent. Creating and delivering are different acts and the push performs only the first.",
     body: (<>
@@ -2790,7 +2790,7 @@ export const SCREENS: Screen[] = [
     name: "Push rejected",
     job: "What QuickBooks refuses when a SKU carries no usable item reference",
     reads: "none",
-    writes: "push_invoice [design; rejected, no partial invoice]",
+    writes: "push_invoice_to_qbo [existing; rejected, no partial invoice]",
     states: [["failed", "MGR AR row reads push failed", 1], ["unmapped", "the SKU carries no QuickBooks item reference"], ["archived in QuickBooks Online", "mapped, but the item went inactive: same error, different fix", 1], ["never partial", "no half invoice is left behind here"]],
     spec: "Drawn because the failure is external and the recovery is not. MGR stores the raw provider reason as the invoice's sync error and leaves its sync status failed; the row stays in AR. Re-pushing reuses the same requestid, so a fixed mapping cannot produce a second invoice. Two causes share this one message (the SKU was never mapped, or the QuickBooks item has since gone inactive) and the recovery differs, so the error copy must not assume the first. Nothing appears in the list behind this panel, which is the point.",
     body: (<>
