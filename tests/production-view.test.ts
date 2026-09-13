@@ -20,7 +20,7 @@ import {
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
-import { toBrewDayViewProps } from "../lib/mgr/brew-day-view";
+import { toBrewDayViewProps, canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { toClosePackagingRunViewProps } from "../lib/mgr/close-packaging-run-view";
 import { toRecipeViewProps } from "../lib/mgr/recipe-view";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
@@ -124,6 +124,30 @@ describe("Schedule batch view", () => {
 });
 
 describe("Brew day view", () => {
+  it("requires actual form values and never offers to brew an already brewed batch again", () => {
+    expect(canRecordBrewDay(brewDayHazy)).toBe(true);
+    for (const patch of [{ initialBbl: "0" }, { initialBbl: "Infinity" }, { vesselId: "missing" }, { brewedOn: "" }, { recorded: true }]) expect(canRecordBrewDay({ ...brewDayHazy, ...patch })).toBe(false);
+    const html = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, initialBbl: "", vesselId: "", vesselName: undefined, lots: [], sheet: undefined, tapeHead: [] } }));
+    expect(html).toContain("No open occupancy");
+    expect(html).toContain("Unavailable after the occupancy closes");
+    expect(html).not.toMatch(/>Record brew day</);
+    expect(html).not.toContain("14.6");
+    expect(src("app/(app)/batches/[id]/page.tsx")).toContain("Boolean(batch.brewed_on || occupancy)");
+  });
+  it("retains knockout inputs and command errors while pending", () => {
+    const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));
+    expect(html).toContain("Vessel occupied");
+    expect(html).toContain('value="14.6"');
+    expect(html).toContain("September 4, 2026");
+    expect(html).toContain("disabled");
+    expect(html).toContain("Material consumption unavailable");
+    expect(html).not.toContain('href="/');
+  });
+  it("does not substitute a separate live form for the brew-day screen", () => {
+    expect(src("app/(app)/batches/[id]/record-brew-day-form.tsx")).toContain("<BrewDayView");
+    expect(src("app/(app)/batches/[id]/record-brew-day-form.tsx")).not.toMatch(/<Input\b|<Label\b|<Select\b/);
+    expect(src("app/(app)/batches/[id]/page.tsx")).not.toMatch(/\bbody=/);
+  });
   it("the Brew day inventory record is BrewDayView", () => {
     const body = screen("Brew day").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrewDayView);

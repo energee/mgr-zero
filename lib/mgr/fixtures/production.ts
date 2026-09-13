@@ -58,8 +58,10 @@ export const brewDayHazy: BrewDayViewModel = {
     { key: "citra", title: "Citra · boil", detail: "lot L-0790 · 6 lb" },
     { key: "yeast", title: "Yeast", detail: "WLP066 · lot Y-0312 · 1 brink" },
   ],
-  knockoutFrom: "14.6 bbl",
-  knockoutTo: "FV2",
+  vesselId: "fv2",
+  initialBbl: "14.6",
+  brewedOn: "2026-09-04",
+  vessels: [{ id: "fv2", name: "FV2", kind: "fermenter", capacity_bbl: 15 }, { id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 15 }],
   sheet: { title: "Brew sheet · Hazy IPA v4", detail: "mash 3 steps · whirlpool 20 min · read only" },
   tapeHead: [
     ["Start B-0416 · Hazy IPA v4", ""],
