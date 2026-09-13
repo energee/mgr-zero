@@ -139,9 +139,11 @@ describe("AI composer", () => {
   // re-ran the load that failed.
   it("retries the setup load, not just the AI turn, after a setup error", () => {
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/const \[setupNonce, setSetupNonce\] = useState\(0\)/);
-    expect(live).toMatch(/\}, \[breweryId, expectedContext\.actorId, setupNonce\]\)/);
-    expect(live).toMatch(/onRetry=\{\(\) => \{ if \(setupError\)/);
+    expect(live).toMatch(/async function loadSetup\(/);
+    // Retry re-runs the setup load when setup is what failed; only an AI-turn
+    // failure falls through to regenerate().
+    expect(live).toMatch(/function retry\(\) \{\s*if \(!setupError\) \{ clearError\(\); void regenerate\(\); return; \}[\s\S]*?void loadSetup\(/);
+    expect(live).toMatch(/onRetry=\{retry\}/);
   });
 
   it("shares the AI SDK composer between live and inventory surfaces", () => {

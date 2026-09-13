@@ -17,4 +17,4 @@ export const IMPORT_KIND_LABELS: Record<ImportKind, string> = {
   opening_balances: "Opening balances",
 };
 
-export const importKindLabel = (kind: ImportKind) => IMPORT_KIND_LABELS[kind] ?? sentenceCase(kind);
+export const importKindLabel = (kind: ImportKind) => IMPORT_KIND_LABELS[kind];

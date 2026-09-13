@@ -26,9 +26,6 @@ export function Composer({ role }: { role: StaffRole }) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [setupError, setSetupError] = useState<string>();
-  // #329: bumping this re-runs the setup load below, so Try again can recover
-  // from a failed restore instead of only regenerating the last AI turn.
-  const [setupNonce, setSetupNonce] = useState(0);
   const [committing, setCommitting] = useState(false);
   const [receipt, setReceipt] = useState<string>();
   const [outboxOpen, setOutboxOpen] = useState(false);
@@ -52,30 +49,41 @@ export function Composer({ role }: { role: StaffRole }) {
     } catch (cause) { setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
   }
 
+  // Restores the server-owned conversation for this actor/brewery scope. Named
+  // so Try again can re-run the load that failed (#329) rather than only
+  // regenerating the last AI turn; `live` drops a response the scope outlived.
+  async function loadSetup(live: () => boolean) {
+    try {
+      const [conversations, ai] = await Promise.all([
+        run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
+        run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
+      ]);
+      if (!live()) return;
+      setModel(ai.model);
+      if (!conversations[0]) { await newChat(); return; }
+      const id = conversations[0].id;
+      const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
+      if (!live()) return;
+      const restored = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
+        id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
+      })) as UIMessage[];
+      setInitialMessages(restored); setConversationId(id);
+    } catch (cause) { if (live()) setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
+  }
+
+  function retry() {
+    if (!setupError) { clearError(); void regenerate(); return; }
+    setSetupError(undefined);
+    void loadSetup(() => true);
+  }
+
   useEffect(() => {
     let active = true;
-    void (async () => {
-      try {
-        const [conversations, ai] = await Promise.all([
-          run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
-          run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
-        ]);
-        if (!active) return;
-        setModel(ai.model);
-        if (!conversations[0]) { await newChat(); return; }
-        const id = conversations[0].id;
-        const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
-        if (!active) return;
-        const restored = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
-          id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
-        })) as UIMessage[];
-        setInitialMessages(restored); setConversationId(id);
-      } catch (cause) { if (active) setSetupError(cause instanceof Error ? cause.message : "Composer unavailable"); }
-    })();
+    void (async () => { await loadSetup(() => active); })();
     return () => { active = false; };
     // One server-owned restore per actor/brewery scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breweryId, expectedContext.actorId, setupNonce]);
+  }, [breweryId, expectedContext.actorId]);
 
   useEffect(() => {
     const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
@@ -118,7 +126,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { if (setupError) { setSetupError(undefined); setSetupNonce((n) => n + 1); return; } clearError(); void regenerate(); }} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

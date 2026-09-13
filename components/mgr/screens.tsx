@@ -785,7 +785,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "SKU detail",
-    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · adjustment": "Reverse movement" },
+    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · Adjustment": "Reverse movement" },
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",

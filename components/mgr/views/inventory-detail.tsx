@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { E } from "@/components/mgr/e";
 import type { InventoryDetailViewModel, InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import { formatDateTime } from "@/lib/date-format";
@@ -14,7 +15,7 @@ export function InventoryDetailView({ model, movementAction, footer }: {
     {model.onHand.length ? model.onHand.map(row => <div key={row.location_id}>{E.row(row.locations?.name ?? row.location_id, "", String(row.qty))}</div>) : E.blank("No inventory recorded yet")}
     {E.ttl("Movement history")}
     {model.movements.length ? model.movements.map(m => <div key={m.id} id={`movement-${m.id}`}>
-      {E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} · ${m.type.replaceAll("_", " ")}`, "", movementAction?.(m), "", undefined, <>
+      {E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} · ${sentenceCase(m.type)}`, "", movementAction?.(m), "", undefined, <>
         <p className="text-sm">{m.locations?.name ?? m.location_id} · {m.bins?.name ?? m.bin_id} · {m.lot_id ? m.lots?.code ?? m.lot_id : "Untracked"} · {m.bbl} bbl · {m.package_type}{m.tax_treatment ? ` · ${m.tax_treatment}` : ""}{m.dest_state ? ` · ${m.dest_state}` : ""}</p>
         <p className="break-all text-xs text-muted-foreground">{formatDateTime(m.created_at)} · {m.id}{m.note ? ` · ${m.note}` : ""}{m.ref ? ` · source ${m.ref}` : ""}{m.source_movement_id ? ` · source movement ${m.source_movement_id}` : ""}</p>
       </>)}
