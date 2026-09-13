@@ -12,6 +12,8 @@ Your login starts with an invitation from the brewery. Open the email, enter **Y
 
 Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**. **Forgot password?** opens **Reset password**: enter your email and select **Send reset link**; the page says a link is on its way whenever that email is on an account, and the link opens **Set new password**.
 
+<Screen name="Portal forgot password" />
+
 A used, expired, or wrong-audience invitation opens **Invite expired**. Sign in if you already joined, or select **Reset password**. Contact brewery staff if your customer access is missing. The brewery cannot resend an invitation or attach an existing sign-in account through the invite form. Entry cards sit near the bottom of a phone screen and center on wider screens.
 
 <Screen name="Portal set password" />
@@ -31,6 +33,8 @@ The brewery's public taproom menu is a separate read-only website feed. Publishi
 3. Select **Change** beside the ship-to summary to open **Delivery details**, then choose **Ship to**. Your default address is selected for a new cart.
 4. Optionally enter **Requested date**, **PO number** and **Note** in Delivery details, select **Done**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft. Shop states that tax and keg deposits are not in that subtotal, and that the brewery confirms the final invoice amounts and the requested delivery date — the date you enter is a request, not a commitment.
 5. Select **Review order**. MGR takes a current server quote for the selected ship-to, fulfillment source, channel prices, and returnable-keg deposits. Review shows the deposit separately. When the brewery has entitled QuickBooks tax calculation configured, it also shows calculated **Tax** and **Estimated total**. Otherwise it says **Tax pending**: the subtotal and deposits are current, and the invoice supplies the final tax and total. Select **Place order** (the amount is marked **before tax** when tax is pending), or choose **Back to edit**. Changing a quantity in Review returns you to Shop and requires a fresh review before placing the order. **Save draft** on Shop saves without submitting. The brewery reviews submitted orders before they are confirmed.
+
+<Screen name="Review order" />
 
 New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
 
@@ -76,6 +80,7 @@ Brewery line adjustments show the quantities before and after, plus the reason. 
 
 ## Invoices and credits [#invoices]
 
+<Screen name="Invoice history" />
 <Screen name="Pay invoice" />
 
 **Invoices** lists invoice or credit-memo number, kind, total, and current payment state. A credit memo is a separate negative billing record created by the brewery for a correction or return. With no billing records, the page says **No invoices yet**. Open a number to see the record: total, issue date, invoice due date when applicable, its status, and each line's quantity and amount. After QuickBooks sync, the list, detail, and linked order show the current QuickBooks total; the original line amounts remain visible as billing history and can differ after an accountant edit. An invoice changed by an accountant says **Review** and does not offer Pay until the brewery reviews the change. An invoice that QuickBooks reports as voided, deleted, or written off says **This invoice is not payable**; it does not show a due date or ask you to pay, even when the brewery retains an earlier paid date in its records. A live zero-balance invoice with no positive cash payment says **Settled** and is not payable; this can happen when a credit covers the balance. A live invoice with a current positive QuickBooks balance offers **Pay invoice** and opens the payment handoff in a new tab. MGR first checks that the invoice still belongs to your account, asks QuickBooks for a fresh payment link, then checks the balance and your access again before redirecting. A not-yet-known balance leaves payment unavailable. A reversed payment can reopen an invoice: its earlier paid date remains in the history, while its current positive balance makes it payable again. MGR never saves or displays the QuickBooks payment link. If the invoice, connection, or link is unavailable, the payment page tells you to contact the brewery instead. A number that is not yours shows **Not found**.
