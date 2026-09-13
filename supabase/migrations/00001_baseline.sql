@@ -2358,9 +2358,12 @@ create view material_requirements with (security_invoker = true) as
     order by mc.ends_on nulls last limit 1) c on true
   left join vendors v on v.id = coalesce(c.vendor_id, m.default_vendor_id);
 
+-- NULL, not a low number, while any ingredient has no receipt cost: a partial
+-- sum must never read as the recipe's cost.
 create view recipe_version_costs with (security_invoker = true) as
   select ri.recipe_version_id, ri.brewery_id,
-         sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int as cost_cents_per_bbl
+         case when bool_and(c.unit_cost_cents is not null)
+              then sum(ri.per_bbl_qty * c.unit_cost_cents / m.purchase_uom_factor)::int end as cost_cents_per_bbl
   from recipe_ingredients ri
   join materials m on m.id = ri.material_id
   left join material_last_cost c on c.material_id = ri.material_id

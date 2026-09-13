@@ -202,29 +202,39 @@ defineQuery({
 
 // The cost a brand's recipe implies, for the price-group suggestion on Brand.
 // Cost is recipe_version_costs (derived from last receipt costs, never
-// stored); ingredients with no receipt yet are named so a partial sum is
-// never mistaken for the cost. The brand's most recently brewed version
-// speaks for it; a never-brewed brand falls back to its newest version.
+// stored, and NULL while any ingredient has no receipt); the ingredients with
+// no receipt yet are named. The brand's most recently brewed version speaks
+// for it; a never-brewed brand falls back to its newest version.
+export type BrandRecipeCost = { recipeVersionId: string | null; costCentsPerBbl: number | null; uncosted: string[] };
+
 defineQuery({
   name: "get_brand_recipe_cost", description: "A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet",
   roles: ["admin", "sales"],
   input: z.object({ brandId: z.string().uuid() }),
-  handler: async (ctx, i) => {
-    const brewed = await unwrap(ctx.db.from("batches").select("recipe_version_id")
-      .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null)
-      .order("brewed_on", { ascending: false }).limit(1).maybeSingle()) as { recipe_version_id: string } | null;
-    const newest = brewed ? null : await unwrap(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
-      .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle()) as { id: string } | null;
+  handler: async (ctx, i): Promise<BrandRecipeCost> => {
+    // id breaks ties so a same-day pair of batches, or versions created in one instant, never flip the answer between reads.
+    const [brewed, newest] = await Promise.all([
+      unwrap(ctx.db.from("batches").select("recipe_version_id")
+        .eq("brewery_id", ctx.breweryId).eq("intended_brand_id", i.brandId).not("brewed_on", "is", null).not("recipe_version_id", "is", null)
+        .order("brewed_on", { ascending: false }).order("id").limit(1).maybeSingle()) as Promise<{ recipe_version_id: string } | null>,
+      unwrap(ctx.db.from("recipe_versions").select("id, recipes!inner(brand_id)")
+        .eq("brewery_id", ctx.breweryId).eq("recipes.brand_id", i.brandId)
+        .order("created_at", { ascending: false }).order("id").limit(1).maybeSingle()) as Promise<{ id: string } | null>,
+    ]);
     const versionId = brewed?.recipe_version_id ?? newest?.id ?? null;
     if (!versionId) return { recipeVersionId: null, costCentsPerBbl: null, uncosted: [] };
     const [cost, ingredients] = await Promise.all([
       unwrap(ctx.db.from("recipe_version_costs").select("cost_cents_per_bbl").eq("recipe_version_id", versionId).maybeSingle()) as Promise<{ cost_cents_per_bbl: number | null } | null>,
-      unwrap(ctx.db.from("recipe_ingredients").select("material_id, materials(name)").eq("recipe_version_id", versionId)) as unknown as Promise<{ material_id: string; materials: { name: string } | null }[]>,
+      unwrap(ctx.db.from("recipe_ingredients").select("material_id").eq("recipe_version_id", versionId)) as Promise<{ material_id: string }[]>,
     ]);
-    const costed = new Set(((await unwrap(ctx.db.from("material_last_cost").select("material_id")
-      .in("material_id", ingredients.map((r) => r.material_id)))) as { material_id: string }[]).map((r) => r.material_id));
-    const uncosted = ingredients.filter((r) => !costed.has(r.material_id)).map((r) => r.materials?.name ?? "an ingredient");
+    // One id per material: an ingredient used at two stages is one gap.
+    const materialIds = [...new Set(ingredients.map((r) => r.material_id))];
+    const [costed, materials] = await Promise.all([
+      unwrap(ctx.db.from("material_last_cost").select("material_id").in("material_id", materialIds)) as Promise<{ material_id: string }[]>,
+      unwrap(ctx.db.from("materials").select("id, name").in("id", materialIds).order("name")) as Promise<{ id: string; name: string }[]>,
+    ]);
+    const hasCost = new Set(costed.map((r) => r.material_id));
+    const uncosted = materials.filter((m) => !hasCost.has(m.id)).map((m) => m.name);
     return { recipeVersionId: versionId, costCentsPerBbl: cost?.cost_cents_per_bbl ?? null, uncosted };
   },
 });

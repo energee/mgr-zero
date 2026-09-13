@@ -36,6 +36,24 @@ describe("suggestPriceGroup", () => {
     });
   });
 
+  it("bands by position, not array order, and skips a group with no ceiling in the middle", () => {
+    const scrambled = [
+      { id: "g3", name: "3", position: 3, cost_ceiling_cents: 9000 },
+      { id: "g2", name: "2", position: 2, cost_ceiling_cents: null },
+      { id: "g1", name: "1", position: 1, cost_ceiling_cents: 5000 },
+    ];
+    expect(suggestPriceGroup({ costCentsPerBbl: 7000, uncosted: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g3" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 4000, uncosted: [], groups: scrambled })).toMatchObject({ kind: "group", groupId: "g1" });
+  });
+
+  it("names the highest ceiling above, even when a later group's is lower", () => {
+    const dipping = [
+      { id: "g1", name: "1", position: 1, cost_ceiling_cents: 9000 },
+      { id: "g2", name: "2", position: 2, cost_ceiling_cents: 5000 },
+    ];
+    expect(suggestPriceGroup({ costCentsPerBbl: 9500, uncosted: [], groups: dipping })).toMatchObject({ kind: "above", detail: "recipe cost $95.00/bbl · highest ceiling $90.00/bbl" });
+  });
+
   it("is silent for a brand with no recipe", () => {
     expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: [], groups })).toBeNull();
   });

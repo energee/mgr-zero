@@ -1,4 +1,9 @@
 // tests/command-retries.test.ts — Shared command transport retains failed submission identity and resets new intent.
+// A sheet's submit must never reach an enclosing page form: both calls are required.
+const submitEvent = () => {
+  const seen = { prevented: false, stopped: false };
+  return Object.assign({ preventDefault() { seen.prevented = true; }, stopPropagation() { seen.stopped = true; } } as unknown as React.FormEvent, { seen });
+};
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
@@ -53,10 +58,14 @@ it("only hands a committed result to the form receipt after success, including e
   let form: ReturnType<typeof useCommandForm>;
   function Harness() { form = useCommandForm("record_movement", { build: () => ({ qty: 2 }), reset: vi.fn(), onSuccess: data => received.push(data) }); return null; }
   renderToStaticMarkup(createElement(Harness));
-  await form!.submit({ preventDefault() {}, stopPropagation() {} } as React.FormEvent);
+  const first = submitEvent();
+  await form!.submit(first);
+  expect(first.seen).toEqual({ prevented: true, stopped: true });
   expect(received).toEqual([]);
   fail = false;
-  await form!.submit({ preventDefault() {}, stopPropagation() {} } as React.FormEvent);
+  const again = submitEvent();
+  await form!.submit(again);
+  expect(again.seen.stopped).toBe(true);
   expect(ids[0]).toBe(ids[1]);
   expect(received).toEqual([receipt]);
 });

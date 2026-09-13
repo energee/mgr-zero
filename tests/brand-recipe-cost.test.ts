@@ -1,9 +1,10 @@
 // tests/brand-recipe-cost.test.ts — get_brand_recipe_cost: the cost per
 // barrel a brand's recipe implies, from recipe_version_costs (last receipt
-// cost per ingredient), naming ingredients with no receipt yet, and which
-// version speaks for the brand (last brewed, else newest).
+// cost per ingredient; NULL while any ingredient has none), naming those
+// ingredients, and which version speaks for the brand (last brewed, else
+// newest). Also the view's reach: staff read it, a customer cannot.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial } from "./helpers";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, seedMaterial } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -14,10 +15,13 @@ let brandId: string;
 let malt: string;
 let hop: string;
 let wh: { id: string; binId: string };
+let recipeId: string;
+let v1: string;
 
 const receipt = (materialId: string, unitCostCents: number) => admin.from("material_movements").insert({
   brewery_id: ctx.breweryId, material_id: materialId, location_id: wh.id, bin_id: wh.binId, qty: 100, type: "receipt", unit_cost_cents: unitCostCents, created_by: ctx.userId,
 });
+const cost = () => runCommand("get_brand_recipe_cost", { brandId }, ctx);
 
 beforeAll(async () => {
   const b = await makeBrewery();
@@ -33,36 +37,67 @@ beforeAll(async () => {
 
 describe("get_brand_recipe_cost", () => {
   it("is empty for a brand with no recipe", async () => {
-    expect(await runCommand("get_brand_recipe_cost", { brandId }, ctx)).toEqual({ recipeVersionId: null, costCentsPerBbl: null, uncosted: [] });
+    expect(await cost()).toEqual({ recipeVersionId: null, costCentsPerBbl: null, uncosted: [] });
   });
 
-  it("names an ingredient with no receipt cost, then sums per barrel once every ingredient has one", async () => {
-    const recipe = (await runCommand("create_recipe", { name: "Costed IPA", brandId }, brewer)) as { id: string };
-    const v1 = (await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
-      ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }, { materialId: hop, perBblQty: 1.5, stage: "boil", timingMinutes: 60 }],
-    }, brewer)) as { id: string };
-    // The hop has never been received: the partial sum must not pass as a cost.
-    expect(await runCommand("get_brand_recipe_cost", { brandId }, ctx)).toEqual({ recipeVersionId: v1.id, costCentsPerBbl: 6000, uncosted: ["Citra"] });
+  it("reports no cost while an ingredient has no receipt, naming it once, then sums per barrel", async () => {
+    ({ id: recipeId } = (await runCommand("create_recipe", { name: "Costed IPA", brandId }, brewer)) as { id: string });
+    // Citra at two stages is one gap, not two.
+    ({ id: v1 } = (await runCommand("create_recipe_version", {
+      recipeId, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [
+        { materialId: malt, perBblQty: 60, stage: "mash" },
+        { materialId: hop, perBblQty: 1, stage: "boil", timingMinutes: 60 },
+        { materialId: hop, perBblQty: 0.5, stage: "dry_hop" },
+      ],
+    }, brewer)) as { id: string });
+    // The view is NULL, not the malt-only partial sum, until every ingredient has a receipt.
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: null, uncosted: ["Citra"] });
     const { error } = await receipt(hop, 2000);
     if (error) throw error;
-    // 60 × $1.00 + 1.5 × $20.00 per bbl.
-    expect(await runCommand("get_brand_recipe_cost", { brandId }, ctx)).toEqual({ recipeVersionId: v1.id, costCentsPerBbl: 9000, uncosted: [] });
+    // 60 × $1.00 + (1 + 0.5) × $20.00 per bbl.
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [] });
   });
 
-  it("lets the last brewed version speak for the brand over a newer unbrewed one", async () => {
-    const recipe = (await runCommand("list_recipes", {}, brewer) as { id: string; name: string }[]).find((r) => r.name === "Costed IPA")!;
-    const versions = (await admin.from("recipe_versions").select("id, version").eq("recipe_id", recipe.id).order("version")).data as { id: string; version: number }[];
-    const v1 = versions[0]!.id;
-    const v2 = (await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 150, brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
-      ingredients: [{ materialId: malt, perBblQty: 80, stage: "mash" }],
-    }, brewer)) as { id: string };
-    expect((await runCommand("get_brand_recipe_cost", { brandId }, ctx) as { recipeVersionId: string }).recipeVersionId).toBe(v2.id);
-    const { error } = await admin.from("batches").insert({
-      brewery_id: ctx.breweryId, intended_brand_id: brandId, recipe_version_id: v1, planned_on: "2026-09-01", planned_bbl: 15, brewed_on: "2026-09-02", created_by: ctx.userId,
-    });
+  it("divides a receipt cost by the material's purchase factor", async () => {
+    // Bought by the 4-unit case at $4.00 a case: $1.00 per base unit.
+    const hulls = await seedMaterial(ctx.breweryId, { name: "Rice hulls", category: "adjunct" });
+    await admin.from("materials").update({ purchase_uom_factor: 4 }).eq("id", hulls);
+    const { error } = await receipt(hulls, 400);
     if (error) throw error;
-    expect(await runCommand("get_brand_recipe_cost", { brandId }, ctx)).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [] });
+    const other = (await runCommand("create_recipe", { name: "Hulls only", brandId }, brewer)) as { id: string };
+    const v = (await runCommand("create_recipe_version", { recipeId: other.id, mashTempF: 150, brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: hulls, perBblQty: 10, stage: "mash" }] }, brewer)) as { id: string };
+    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 1000, uncosted: [] });
+  });
+
+  it("lets the last brewed version speak for the brand over a newer one, ignoring other brands and unrecorded brews", async () => {
+    const other = await seedCatalog(ctx.breweryId, { product: "Someone Else", sku: "Someone Else · ½ bbl" });
+    const theirs = (await runCommand("create_recipe", { name: "Theirs", brandId: other.brandId }, brewer)) as { id: string };
+    const theirV = (await runCommand("create_recipe_version", { recipeId: theirs.id, mashTempF: 150, brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: malt, perBblQty: 1, stage: "mash" }] }, brewer)) as { id: string };
+    const batch = (recipeVersionId: string | null, intended: string, brewedOn: string) => admin.from("batches").insert({
+      brewery_id: ctx.breweryId, intended_brand_id: intended, recipe_version_id: recipeVersionId, planned_on: "2026-09-01", planned_bbl: 15, brewed_on: brewedOn, created_by: ctx.userId,
+    });
+    // Another brand's brew, and a brew of ours that never named a version, change nothing.
+    for (const { error } of [await batch(theirV.id, other.brandId, "2026-09-05"), await batch(null, brandId, "2026-09-06")]) if (error) throw error;
+    expect((await cost() as { recipeVersionId: string }).recipeVersionId).not.toBe(theirV.id);
+    const { error } = await batch(v1, brandId, "2026-09-02");
+    if (error) throw error;
+    expect(await cost()).toEqual({ recipeVersionId: v1, costCentsPerBbl: 9000, uncosted: [] });
+  });
+
+  it("is a Sales and Admin read", async () => {
+    const warehouse = await makeStaffCtx(ctx.breweryId, "warehouse");
+    await expect(runCommand("get_brand_recipe_cost", { brandId }, warehouse)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("keeps the cost view inside the brewery: staff see rows, a customer sees none", async () => {
+    const mine = await ctx.db.from("recipe_version_costs").select("recipe_version_id").eq("recipe_version_id", v1);
+    expect(mine.error).toBeNull();
+    expect(mine.data).toHaveLength(1);
+    const customer = await seedCustomer(ctx.breweryId);
+    const user = await makeCustomerUser(customer.customerId);
+    const theirs = await (await asUser(user.email)).from("recipe_version_costs").select("recipe_version_id");
+    expect(theirs.error).toBeNull();
+    expect(theirs.data).toEqual([]);
   });
 });

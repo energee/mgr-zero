@@ -18,6 +18,14 @@ export type BrandControls = Partial<Record<"name" | "style" | "abv" | "category"
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
 
+/** Use fills the select from the live control; the inventory draws the verb. Only a banded suggestion has anything to use. */
+function suggestionAction(suggestion: NonNullable<BrandViewModel["suggestion"]>, priceGroup?: (id: string) => void): ReactNode {
+  if (suggestion.kind !== "group") return "";
+  return priceGroup
+    ? <Button type="button" variant="outline" size="sm" onClick={() => priceGroup(suggestion.groupId)}>Use</Button>
+    : E.act("Use");
+}
+
 export function BrandView({
   model,
   controls = {},
@@ -45,17 +53,13 @@ export function BrandView({
       {E.back("Catalog", model.name || "New brand", createAction, model.backHref)}
       <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />
       {E.cols(
-        <Fragment key="style"><RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} /></Fragment>,
-        <Fragment key="abv"><RegistryInput label="ABV" value={model.abv} onChange={controls.abv} /></Fragment>,
-        <Fragment key="category"><RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" /></Fragment>,
-        <Fragment key="price"><RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} /></Fragment>,
+        <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
+        <RegistryInput label="ABV" value={model.abv} onChange={controls.abv} />,
+        <RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" />,
+        <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />,
       )}
       {model.suggestion
-        ? E.row(model.suggestion.title, model.suggestion.detail, model.suggestion.kind === "group"
-          ? (controls.priceGroup
-            ? <Button type="button" variant="outline" size="sm" onClick={() => controls.priceGroup?.((model.suggestion as { groupId: string }).groupId)}>Use</Button>
-            : E.act("Use"))
-          : "", model.suggestion.kind === "unknown" ? "w" : "")
+        ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
         : null}
       {E.ttl("Sell sheet")}
       <RegistryInput label="Description" value={model.description} onChange={controls.description} />

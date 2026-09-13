@@ -1,7 +1,7 @@
 // app/(app)/catalog/brands/[id]/brand-page.tsx — binds BrandView to
 // upsert_brand: controlled fields, Save brand, back to Catalog on success,
 // and the brand's compliance sheets (compliance-forms.tsx) on their rows.
-// Read-only roles get the same page with no controls, footer, or sheets.
+// Always writable: page.tsx admits Admin and Sales only.
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -14,8 +14,8 @@ import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 
 export type BrandRow = BrandSnapshot["brand"];
 
-export function BrandPage({ brand, styles, priceGroups, compliance, cost, writable }: {
-  brand: BrandRow | null; styles: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"]; writable: boolean;
+export function BrandPage({ brand, styles, priceGroups, compliance, cost }: {
+  brand: BrandRow | null; styles: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
@@ -28,8 +28,8 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost, writab
     brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [] },
     styles, priceGroups, compliance, cost, backHref: "/catalog",
   });
-  // Sheets need a saved brand; a read-only role sees rows without verbs.
-  const subject = brand && writable ? { id: brand.id, name: brand.name } : null;
+  // Sheets need a saved brand.
+  const subject = brand ? { id: brand.id, name: brand.name } : null;
   const actions = subject
     ? Object.fromEntries([
       ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} />]),
@@ -38,11 +38,11 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost, writab
     : Object.fromEntries(model.compliance.map((row) => [row.key, null]));
   const addCompliance = subject
     ? <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>
-    : writable ? E.info("Save the brand first, then record its COLA and state registrations here.") : null;
-  const controls = writable ? {
+    : E.info("Save the brand first, then record its COLA and state registrations here.");
+  const controls = {
     name: set("name"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
     priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
-  } : {};
+  };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const ok = await run("upsert_brand", {
@@ -57,8 +57,8 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost, writab
         model={model}
         controls={controls}
         linkRows
-        messages={writable ? <CommandFormMessage error={error} /> : E.info("Admin or Sales can edit a brand.")}
-        footer={writable ? E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p") : null}
+        messages={<CommandFormMessage error={error} />}
+        footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}
         actions={actions}
         addCompliance={addCompliance}
       />

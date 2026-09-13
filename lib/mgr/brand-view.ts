@@ -1,6 +1,7 @@
 // lib/mgr/brand-view.ts — view-model for Brand detail. list_brands (one row)
 // plus list_price_groups, the brewery's styles, and the brand's rows from
 // get_compliance_registry paint BrandView.
+import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
 import { plural } from "./plural";
 import { suggestPriceGroup, type PriceGroupSuggestion, type SuggestionGroups } from "./price-group-suggestion";
@@ -49,7 +50,7 @@ export type BrandSnapshot = {
   /** list_price_groups; position and ceiling feed the suggestion. */
   priceGroups: SuggestionGroups;
   /** get_brand_recipe_cost. Absent means no recipe. */
-  cost?: { costCentsPerBbl: number | null; uncosted: string[] };
+  cost?: Pick<BrandRecipeCost, "costCentsPerBbl" | "uncosted">;
   /** This brand's rows from get_compliance_registry. Absent means none on file. */
   compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
@@ -93,7 +94,8 @@ export function toBrandViewProps({
     name: brand.name,
     style,
     styleOptions,
-    abv: brand.abv == null || brand.abv === "" ? "" : String(Number(brand.abv)),
+    // Echoed as typed: a live form's "12x" stays "12x" for the person to fix, never "NaN".
+    abv: brand.abv == null ? "" : String(brand.abv),
     category: brand.category ?? "",
     categoryOptions: categories,
     priceGroup: brand.price_group_id ?? UNPRICED,

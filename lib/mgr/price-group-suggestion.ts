@@ -5,8 +5,9 @@
 // previous group's, so the first ceiling that covers the cost is the band.
 // Nothing here assigns: the Brand page offers Use and a person confirms.
 import { money } from "./money";
+import type { PriceGroupRow } from "./price-groups-view";
 
-export type SuggestionGroups = { id: string; name: string; position: number; cost_ceiling_cents: number | null }[];
+export type SuggestionGroups = PriceGroupRow[];
 
 export type SuggestionInput = {
   /** cost_cents_per_bbl of the brand's recipe version, or null when the brand has no recipe. */

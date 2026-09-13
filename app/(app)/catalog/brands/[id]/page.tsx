@@ -1,5 +1,7 @@
 // app/(app)/catalog/brands/[id]/page.tsx — Brand (screen record): one brand's
-// sellable facts on a full page, or a blank one at /catalog/brands/new. Reads
+// sellable facts on a full page, or a blank one at /catalog/brands/new. Admin
+// and Sales only: the compliance read gates the page, and Catalog shows the
+// links to nobody else. Reads
 // list_brands, list_price_groups, the brand's approvals and registrations
 // from get_compliance_registry, and its recipe cost (get_brand_recipe_cost)
 // for the price-group suggestion; brand-page.tsx binds the shared BrandView
@@ -24,7 +26,8 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   ]);
   const brand = id === "new" ? null : brands.find((b) => b.id === id) ?? notFound();
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
-  const cost = brand ? await runCommand("get_brand_recipe_cost", { brandId: brand.id }, ctx) as BrandSnapshot["cost"] : undefined;
+  // Enrichment only: a failed cost read leaves the suggestion off, never the page.
+  const cost = brand ? await runCommand("get_brand_recipe_cost", { brandId: brand.id }, ctx).then((c) => c as BrandSnapshot["cost"], (e) => { console.error("get_brand_recipe_cost", brand.id, e); return undefined; }) : undefined;
   return (
     <BrandPage
       brand={brand}
@@ -32,7 +35,6 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
       priceGroups={groups}
       cost={cost}
       compliance={own}
-      writable={brewery.role === "admin" || brewery.role === "sales"}
     />
   );
 }

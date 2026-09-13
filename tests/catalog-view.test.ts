@@ -153,6 +153,11 @@ describe("Brand view", () => {
     expect(model.priceGroup).toBe(UNPRICED);
   });
 
+  it("puts the pending COLA row first even when registrations exist", () => {
+    const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: brandHazy.compliance!.registrations } });
+    expect(model.compliance.map((row) => row.key)).toEqual(["cola-pending", "oh"]);
+  });
+
   it("flags a brand with no COLA as pending, with nothing to edit", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
     expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
