@@ -28,7 +28,7 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   expect(source).toMatch(/from "@\/components\/ui\/attachment"/);
   expect(source).toMatch(/<Attachment\b/);
   expect(source).toContain("E.stp");
-  expect(source).toContain("<TabBar");
+  expect(source).toContain("<ToggleGroup");
   expect(source).toContain('E.tbl(["row", "record", "match", "state"]');
   expect(source).not.toMatch(/<select\b/);
   expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);

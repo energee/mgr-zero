@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
-import { TabBar } from "@/components/mgr/qty";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -33,7 +33,9 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     {E.back("Settings", "Import", undefined, model.backHref)}
     {E.stp(["upload", "map", "preview", "commit"], step)}
     <fieldset disabled={step !== 0 || busy} className="min-w-0">
-      <TabBar names={KIND_LABELS} on={IMPORT_KINDS.indexOf(kind)} cls="h-auto flex-wrap" onChange={onKind ? label => onKind(IMPORT_KINDS[KIND_LABELS.indexOf(label)]) : undefined} />
+      <ToggleGroup type="single" value={kind} onValueChange={value => { if (value) onKind?.(value as ImportKind); }} variant="outline" size="sm" className="flex-wrap justify-start">
+        {IMPORT_KINDS.map((value, index) => <ToggleGroupItem key={value} value={value}>{KIND_LABELS[index]}</ToggleGroupItem>)}
+      </ToggleGroup>
     </fieldset>
     {model.error && <p role="alert" className="text-destructive">{model.error}</p>}
     {step === 0 && <>

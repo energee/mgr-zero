@@ -9,6 +9,7 @@ it("shares an editable mixed preview and prevents all-invalid batches from commi
   expect(html).toContain("2 ready · 1 blocked");
   expect(html).toContain("Import 2 ready rows");
   expect(html).toContain("Edit row 2");
+  expect(html).toContain('data-slot="toggle-group-item"');
   expect(html).not.toContain('href="/');
   const blocked = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, validation: importPreview.rows.map(() => ["Invalid row"]) } }));
   expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 ready rows/);
