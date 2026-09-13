@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync("app/(app)/settings/accounting/qbo-controls.tsx", "utf8");
 const invoiceList = readFileSync("app/(app)/invoices/page.tsx", "utf8");
+const listRow = readFileSync("lib/mgr/invoices-view.ts", "utf8");
 
 describe("QuickBooks control boundaries", () => {
   it("opens one confirmation surface before every remote-create action", () => {
@@ -18,11 +19,13 @@ describe("QuickBooks control boundaries", () => {
   });
 
   it("remounts mapping field state from the current saved server value", () => {
-    expect(source).toMatch(/key=\{qboMappingVersion\(currentId\)\}/);
+    expect(source).toMatch(/key=\{qboMappingVersion\([\w.]*currentId\)\}/);
   });
 
   it("uses QuickBooks presentation for unpaid pushed rows even when they drifted", () => {
-    expect(invoiceList).toMatch(/qbo_sync_status === "pushed" && state === "unpaid"/);
-    expect(invoiceList).not.toMatch(/&& !inv\.qbo_accountant_drift/);
+    // The list row adapter owns this now, and it uses qbo.detail unconditionally.
+    expect(invoiceList).toMatch(/toInvoiceListRow\(invoice, brewery\.role/);
+    expect(listRow).toMatch(/\$\{qbo\.detail\}/);
+    expect(listRow).not.toMatch(/&& !inv\.qbo_accountant_drift/);
   });
 });

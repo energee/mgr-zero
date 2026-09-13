@@ -7,7 +7,7 @@ vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: st
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
-vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
+vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermission: () => {} }));
 async function query(name: string, input: unknown) {
   state.calls.push([name, input]);
   switch (name) {
@@ -29,6 +29,7 @@ import PickPage from "@/app/(app)/pick/page";
 import OrdersPage from "@/app/(app)/orders/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
+import NewOrderPage from "@/app/(app)/orders/new/page";
 
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];
@@ -38,16 +39,21 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
   const writable = await OrdersPage({ searchParams: Promise.resolve({}) });
-  expect(writable.props.createAction.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
-  expect(writable.props.createAction.props.customers[0].shipTos[0].is_default).toBe(true);
+  expect(writable.props.createAction).not.toBeNull();
+  // New order is its own page now; it still owns the option lists.
+  const form = await NewOrderPage();
+  expect(form.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
+  expect(form.props.customers[0].shipTos[0].is_default).toBe(true);
 });
 it("slots the scoped recoverable Cart with the actual configured source or no source", async () => {
   for (const source of [null, { id: "source", name: "Cold room" }]) {
     state.source = source;
     const shop = await ShopPage({ searchParams: Promise.resolve({}) });
-    expect(shop.props.catalog.props).toMatchObject({ fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
-    expect(shop.props.footer).toBeNull();
-    expect(shop.props.catalog.key).toBe("actor:buyer:brewery:new");
+    expect(shop.props).toMatchObject({ fulfillmentSource: source, scope: { actorId: "actor", customerId: "buyer", breweryId: "brewery" }, shipTos: [{ id: "ship", is_default: true, label: "Door (Town, PA)" }] });
+    // Cart is the root now and owns the ShopView mount; the recovery scope
+    // still has to remount it per actor/customer/brewery/draft.
+    expect(shop.key).toBe("actor:buyer:brewery:new");
+    expect(shop.props.customerName).toBe("Buyer");
   }
 });
 
