@@ -14,16 +14,16 @@ export function LicenseView({ model, controls = {}, locked = false, messages, fo
   return (
     <>
       {E.cols(
-        <RegistryInput key="state" label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
-        <RegistrySelect key="kind" label="Kind" value={model.kind} onChange={controls.kind} disabled={locked} options={[
+        <RegistryInput label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
+        <RegistrySelect label="Kind" value={model.kind} onChange={controls.kind} disabled={locked} options={[
           { value: "brewery", label: "Brewery" },
           { value: "supplier", label: "Supplier" },
           { value: "direct to consumer", label: "Direct to consumer" },
         ]} />,
       )}
       {E.cols(
-        <RegistryInput key="number" label="License number · optional" value={model.licenseNo ?? ""} onChange={controls.licenseNo} />,
-        <RegistryDate key="expires" label="Expires · optional" value={model.expiresOn ?? ""} onChange={controls.expiresOn} />,
+        <RegistryInput label="License number · optional" value={model.licenseNo ?? ""} onChange={controls.licenseNo} />,
+        <RegistryDate label="Expires · optional" value={model.expiresOn ?? ""} onChange={controls.expiresOn} />,
       )}
       {E.note("Kind is the license class the state uses. One record per state and kind.")}
       {messages}

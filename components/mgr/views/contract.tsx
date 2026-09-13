@@ -74,7 +74,7 @@ export function ContractView({ model, controls = {}, messages, footer }: {
       <ContractSelect label="Vendor" value={model.vendorId} options={model.vendorOptions} onChange={controls.vendorId} />
       <ContractSelect label="Material" value={model.materialId} options={model.materialOptions} onChange={controls.materialId} />
       {E.inline(
-        <Field key="quantity">
+        <Field>
           <FieldLabel>Contract quantity</FieldLabel>
           <ButtonGroup>
             <Button type="button" variant="outline" size="icon" aria-label="Decrease" onClick={() => controls.quantity?.(String(Math.max(0, quantity - 1)))}>−</Button>
@@ -82,18 +82,18 @@ export function ContractView({ model, controls = {}, messages, footer }: {
             <Button type="button" variant="outline" size="icon" aria-label="Increase" onClick={() => controls.quantity?.(String(quantity + 1))}>+</Button>
           </ButtonGroup>
         </Field>,
-        <ContractInput key="cost" label="Unit cost ($) · optional" type="number" value={model.unitCost} onChange={controls.unitCost} />,
+        <ContractInput label="Unit cost ($) · optional" type="number" value={model.unitCost} onChange={controls.unitCost} />,
       )}
       {model.received && E.fld("Received", model.received)}
       {model.onOrder && E.fld("On order", model.onOrder)}
       {model.available && E.fld("Available to release", model.available)}
       {E.inline(
         controls.starts
-          ? <DatePicker key="starts" label="Starts · optional" value={model.starts} onChange={controls.starts} />
-          : <DatePicker key="starts" label="Starts · optional" defaultValue={model.starts} />,
+          ? <DatePicker label="Starts · optional" value={model.starts} onChange={controls.starts} />
+          : <DatePicker label="Starts · optional" defaultValue={model.starts} />,
         controls.ends
-          ? <DatePicker key="ends" label="Ends · optional" value={model.ends} onChange={controls.ends} />
-          : <DatePicker key="ends" label="Ends · optional" defaultValue={model.ends} />,
+          ? <DatePicker label="Ends · optional" value={model.ends} onChange={controls.ends} />
+          : <DatePicker label="Ends · optional" defaultValue={model.ends} />,
       )}
       <ContractInput label="Contract number · optional" value={model.contractNo} onChange={controls.contractNo} />
       {messages}

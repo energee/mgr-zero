@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BrandView } from "../components/mgr/views/brand";
 import { CatalogView } from "../components/mgr/views/catalog";
@@ -161,6 +161,15 @@ describe("Brand view", () => {
   it("flags a brand with no COLA as pending, with nothing to edit", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
     expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
+  });
+
+  it("renders the field row without a React key warning (E.cols owns the keys)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {

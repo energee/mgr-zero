@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
@@ -91,6 +91,16 @@ describe("registry sheets", () => {
     const body = screen("State registration").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(StateRegistrationView);
     expect(body.props.model).toEqual(toStateRegistrationViewProps(stateRegistrationHazy));
+  });
+
+  it("the license and registration fields render without a React key warning (E.cols owns the keys)", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    htmlOf(createElement(LicenseView, { model: toLicenseViewProps(licensePaBrewery) }));
+    htmlOf(createElement(StateRegistrationView, { model: toStateRegistrationViewProps(stateRegistrationHazy) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
   });
 
   it("the License inventory record is LicenseView", () => {
