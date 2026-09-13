@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import { sentenceCase } from "@/lib/mgr/labels";
 import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -148,8 +149,8 @@ function effectDescription(effect: ComposerEffect) {
     effect.qty != null && `${effect.qty} unit${effect.qty === "1" || effect.qty === "-1" ? "" : "s"}`,
     effect.bbl != null && `${effect.bbl} bbl`,
     effect.stockBeforeQty != null && effect.stockAfterQty != null && `selected stock ${effect.stockBeforeQty} to ${effect.stockAfterQty}`,
-    effect.taxTreatment && `tax: ${effect.taxTreatment.replaceAll("_", " ")}`,
-    effect.correction && `correction: ${effect.correction.replaceAll("_", " ")}`,
+    effect.taxTreatment && `tax: ${sentenceCase(effect.taxTreatment)}`,
+    effect.correction && `correction: ${sentenceCase(effect.correction)}`,
   ].filter(Boolean).join(" · ");
 }
 

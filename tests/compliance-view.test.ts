@@ -184,7 +184,7 @@ describe("Lot trace", () => {
       tape: null,
       movements: createElement("p", null, "Live movements"),
     }));
-    expect(html).not.toMatch(/production in/);
+    expect(html).not.toMatch(/production in/i);
     expect(html).toMatch(/Live movements/);
   });
 
@@ -196,7 +196,7 @@ describe("Lot trace", () => {
     const html = htmlOf(createElement(LotTraceView, { model, tape: null, balances: null, recipients: null, movements: null }));
     expect(html).not.toMatch(/href="\/(orders|customers|invoices)/);
     expect(html).not.toMatch(/Recorded balances by SKU and bin[\s\S]*118 units/);
-    expect(html).not.toMatch(/Order 7|production in/);
+    expect(html).not.toMatch(/Order 7|production in/i);
   });
 
   it("preserves live movement provenance and links", () => {
@@ -216,12 +216,12 @@ describe("Lot trace", () => {
     expect(model.skuDetail).toBe("run 28 · packaged 8/31 · best by 2/27");
     expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed 8/10");
     expect(model.tape).toEqual([
-      { key: "in", label: "+120 · production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
-      { key: "sample", label: "−2 · sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
+      { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
+      { key: "sample", label: "−2 · Sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
     ]);
     expect(model.movements?.map(({ title, detail }) => ({ title, detail }))).toEqual([
-      { title: "+120 · production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
-      { title: "-2 · sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
+      { title: "+120 · Production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
+      { title: "-2 · Sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
     ]);
     expect(model.balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
     expect(toLotTraceViewProps({

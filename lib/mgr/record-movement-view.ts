@@ -2,7 +2,7 @@
 import { formatVolume } from "@/lib/volume";
 
 export const MOVEMENT_KIND_OPTIONS = [
-  "opening balance", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment", "production in", "return in",
+  "Opening balance", "Depletion", "Loss", "Sample", "Festival removal", "Destruction", "Adjustment", "Production in", "Return in",
 ] as const;
 
 export const MOVEMENT_CHANNEL_OPTIONS = ["Wholesale", "Taproom", "DTC", "Export"];
@@ -47,7 +47,7 @@ export type RecordMovementSnapshot = {
 
 export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMovementViewModel {
   const kindIndex = MOVEMENT_KIND_OPTIONS.indexOf(s.kind);
-  const sign = s.kind === "opening balance" || s.kind === "adjustment" ? "" : "−";
+  const sign = s.kind === "Opening balance" || s.kind === "Adjustment" ? "" : "−";
   return {
     kind: s.kind,
     kindIndex: kindIndex < 0 ? 0 : kindIndex,

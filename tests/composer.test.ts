@@ -134,6 +134,21 @@ describe("AI composer", () => {
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });
 
+  // #329: a failed setup (list_chat_conversations / get_brewery_ai_model) left
+  // the drawer dead — Try again only regenerated the last AI turn, which never
+  // re-ran the load that failed.
+  it("retries the setup load, not just the AI turn, after a setup error", () => {
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    // Every failure carries its own recovery, so Try again re-runs what failed
+    // — the setup load, the new chat, or the commit — and only an AI-turn error
+    // falls through to regenerate().
+    expect(live).toMatch(/setFailure\(\{ message: [^}]*retry \}\)/);
+    expect(live).toMatch(/failed\(cause, "Composer unavailable", reloadSetup\)/);
+    expect(live).toMatch(/failed\(cause, "Could not record proposal", \(\) => void commitProposal\(\)\)/);
+    expect(live).toMatch(/if \(failure\) \{ failure\.retry\(\); return; \}/);
+    expect(live).toMatch(/onRetry=\{retry\}/);
+  });
+
   it("shares the AI SDK composer between live and inventory surfaces", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
