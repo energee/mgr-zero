@@ -34,6 +34,7 @@ const BODY_SLOTS: Record<string, string> = {
   ReceivePoView: "review",
   PurchaseOrdersView: "list",
   TeamView: "rows",
+  BatchesView: "list",
 };
 const KNOWN_BODY_DEBT = [
   "Catalog: CatalogView.brands <- app/(app)/catalog/page.tsx",

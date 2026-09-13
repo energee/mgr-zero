@@ -25,6 +25,10 @@ export const cellarMapBrewer: CellarMapViewModel = {
 export const batchesBrewer: BatchesSnapshot = {
   title: "Work",
   subtitle: "brewer default",
+  vessels: [
+    { key: "fv1", title: "FV1", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+    { key: "fv3", title: "FV3", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+  ],
   planned: [
     { key: "b0416", title: "B-0416 · Hazy IPA v4", detail: "Fri 9/4 · 15 bbl", verb: "Start", tone: "info" },
   ],

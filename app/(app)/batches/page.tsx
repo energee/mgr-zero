@@ -1,25 +1,16 @@
-// app/(app)/batches/page.tsx — Work › Batches: planned and brewed batches
-// (list_batches), each opening its brew day; New batch is
-// new-batch-form.tsx → schedule_batch. Vessels are managed inline here
-// (upsert_vessel via vessel-form.tsx) since they exist only to be picked at
-// brew day and in the cellar, never as their own tab.
-import { E } from "@/components/mgr/e";
+// Batches and vessel reads remain at their existing authorized command boundary.
 import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toBatchesViewProps } from "@/lib/mgr/batches-view";
+import { toBatchesViewProps, batchesFromQuery, type BatchListRow, type BatchVessel } from "@/lib/mgr/batches-view";
+import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
+import { WORK_CHIPS } from "@/components/mgr/work-tabs";
 import "@/lib/commands/all";
-import { batNo } from "@/lib/mgr/doc-no";
 import { NewBatchForm } from "./new-batch-form";
 
-type Batch = {
-  id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null;
-  brand_name: string | null; recipe_name: string | null; vessel_name: string | null;
-};
 type Brand = { id: string; name: string };
 type Recipe = { id: string; name: string; latest_version_id: string | null; latest_version: number | null };
-type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export default async function BatchesPage() {
   const brewery = await getActiveBrewery();
@@ -27,44 +18,14 @@ export default async function BatchesPage() {
   const [batches, brands, recipes, vessels] = (await Promise.all([
     runCommand("list_batches", {}, ctx), runCommand("list_brands", {}, ctx),
     runCommand("list_recipes", {}, ctx), runCommand("list_vessels", {}, ctx),
-  ])) as [Batch[], Brand[], Recipe[], Vessel[]];
-
-  const recipeVersions = recipes.flatMap((r) =>
-    r.latest_version_id ? [{ id: r.latest_version_id, label: `${r.name} v${r.latest_version}` }] : []);
-
-  return (
-    <BatchesView
-      model={toBatchesViewProps({ title: "Batches", subtitle: "brewed and planned" })}
-      createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} />}
-      tabs={null}
-      list={
-        batches.length === 0
-          ? E.blank("No batches yet")
-          : batches.map((b) => (
-            <div key={b.id}>
-              {E.row(
-                batNo(b.batch_no),
-                `${b.brand_name ?? "no brand yet"} · ${b.recipe_name ?? "no recipe"} · ${Number(b.planned_bbl)} bbl · ${b.planned_on}${b.vessel_name ? ` · ${b.vessel_name}` : ""}`,
-                E.act(b.brewed_on ? "Open" : "Brew", b.brewed_on ? "primary" : "info", `/batches/${b.id}`),
-                b.brewed_on ? "ok" : "",
-              )}
-            </div>
-          ))
-      }
-      footer={
-        <>
-          {E.sp()}
-          {E.ttl("Vessels")}
-          <div className="self-start">{E.btn("New vessel", "p", "/cellar/vessels/new")}</div>
-          {vessels.length === 0
-            ? E.blank("No vessels yet")
-            : vessels.map((v) => (
-              <div key={v.id}>
-                {E.row(v.name, `${v.kind} · ${Number(v.capacity_bbl)} bbl`, E.act("Edit", "info", `/cellar/vessels/${v.id}`))}
-              </div>
-            ))}
-        </>
-      }
-    />
-  );
+  ])) as [BatchListRow[], Brand[], Recipe[], BatchVessel[]];
+  const recipeVersions = recipes.flatMap(recipe =>
+    recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version }] : []);
+  const work = navFor(STAFF_NAV, brewery.role).find(item => item.href === "/work");
+  const allowed = new Set([work?.href, ...work?.children?.map(item => item.href) ?? []]);
+  return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }))}
+    createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} />}
+    workHrefs={Object.fromEntries(WORK_CHIPS.filter(([, href]) => allowed.has(href)))}
+    newVesselHref="/cellar/vessels/new"
+  />;
 }

@@ -19,7 +19,7 @@ import {
   batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
-import { toBatchesViewProps } from "../lib/mgr/batches-view";
+import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { toBrewDayViewProps } from "../lib/mgr/brew-day-view";
 import { toClosePackagingRunViewProps } from "../lib/mgr/close-packaging-run-view";
 import { toRecipeViewProps } from "../lib/mgr/recipe-view";
@@ -59,6 +59,23 @@ it("vessel readings preserve optional measurements and do not invent actors", ()
 });
 
 describe("Batches view", () => {
+  it("groups returned lifecycle facts without inventing readings or hiding closed batches", () => {
+    const base: BatchListRow = { id: "planned", batch_no: null, planned_on: "2026-09-12", planned_bbl: 12.5, brewed_on: null, closed_at: null, brand_name: null, recipe_name: null, vessel_name: null };
+    expect(batchesFromQuery([base], []).planned?.[0].href).toBeUndefined();
+    const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: "Actual tank" }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12" }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
+    expect(model.planned[0]).toMatchObject({ verb: "Brew", href: "/batches/planned" });
+    expect(model.active[0]).toMatchObject({ verb: "Open", href: "/batches/active" });
+    expect(model.completed?.[0].key).toBe("closed");
+    const html = htmlOf(createElement(BatchesView, { model, workHrefs: { all: "/work", batches: "/batches" }, newVesselHref: "/cellar/vessels/new" }));
+    for (const text of ["Planned", "Active", "Completed", "Reading details unavailable", "Actual tank", "12.5 bbl", "No vessels yet"]) expect(html).toContain(text);
+    expect(html).not.toContain("°P");
+    expect(html).toContain('href="/batches"');
+    expect(html).not.toContain('href="/orders"');
+  });
+  it("does not allow live JSX to replace the planned and active lists", () => {
+    const page = src("app/(app)/batches/page.tsx");
+    expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
+  });
   it("maps planned Start and overdue Reading", () => {
     const model = toBatchesViewProps(batchesBrewer);
     expect(model.planned[0]?.verb).toBe("Start");
