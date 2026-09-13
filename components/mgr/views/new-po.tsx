@@ -16,13 +16,14 @@ export type NewPoControls = {
   add?: () => void;
 };
 
+// A row the user has not begun is dropped on submit, so requiring its fields
+// would block the form with no way to clear it (there is no Remove line).
+const started = (line: NewPoViewModel["lines"][number]) => Boolean(line.materialId || line.qty || line.cost || line.lot);
+
 export function NewPoView({ model, controls = {}, messages, footer, submitting = false, disabled = false }: {
   model: NewPoViewModel; controls?: NewPoControls; messages?: ReactNode; footer?: ReactNode;
   submitting?: boolean; disabled?: boolean;
 }) {
-  // A row the user has not begun is dropped on submit, so requiring its fields
-  // would block the form with no way to clear it (there is no Remove line).
-  const started = (line: NewPoViewModel["lines"][number]) => Boolean(line.materialId || line.qty || line.cost || line.lot);
   return <>
     {E.back("Purchase orders", "New PO", undefined, model.backHref)}
     <fieldset disabled={submitting} className="flex flex-col gap-3">

@@ -54,14 +54,12 @@ it("rounds credits at captured line prices and does not preselect a live reason"
   expect(blank.reason).toBe(-1); expect(blank.tape).toEqual([]);
 });
 
-it("names what each return reason does to stock, and keeps reason indexes stable", () => {
+it("round-trips every return reason through its chip index", () => {
   const snapshot = { invoice: { invoice_no: 35 }, locations: [], lines: [{ id: "line", qty_shipped: 2, qty_returning: 0.5, unit_price_cents: 101, skus: null }] };
-  // staff-guide.mdx promises this distinction at the point of choice: damaged
-  // writes the returned quantity straight back out to loss, the others restock.
-  const model = toReturnCreditViewProps({ ...snapshot, reason: "damaged" });
-  expect(model.reasons).toEqual(["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"]);
-  // credit-memo-form maps the chip index onto ["damaged","wrong_item","unsold"].
-  expect(model.reason).toBe(0);
+  // credit-memo-form turns the chip index straight back into RETURN_REASONS[i].id,
+  // so the selected reason must round-trip through the index for every value.
+  // (order-sheets-view.test.ts owns the label wording.)
+  expect(toReturnCreditViewProps({ ...snapshot, reason: "damaged" }).reason).toBe(0);
   expect(toReturnCreditViewProps({ ...snapshot, reason: "wrong_item" }).reason).toBe(1);
   expect(toReturnCreditViewProps({ ...snapshot, reason: "unsold" }).reason).toBe(2);
 });

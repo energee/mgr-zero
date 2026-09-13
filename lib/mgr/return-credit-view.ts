@@ -48,11 +48,16 @@ export type ReturnCreditSnapshot = {
   reason?: "damaged" | "wrong_item" | "unsold" | "";
 };
 
-const REASONS = ["damaged", "wrong item", "unsold"];
-// Chip labels carry the consequence, because the reason decides whether the
-// returned beer restocks or is written to loss in the same command. Display
-// only: credit-memo-form maps the chip index, not this text.
-const REASON_LABELS = ["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"];
+/** The command value and the chip label for each return reason, in chip order.
+ *  The label carries the consequence because the reason decides whether the
+ *  returned beer restocks or is written to loss in the same call. One table, so
+ *  the chip index stays an implementation detail here instead of a contract
+ *  spelled out again in every caller. */
+export const RETURN_REASONS = [
+  { id: "damaged", label: "damaged · written to loss" },
+  { id: "wrong_item", label: "wrong item · back to stock" },
+  { id: "unsold", label: "unsold · back to stock" },
+] as const;
 
 /** Map get_order / get_invoice plus the return qty onto ReturnCreditView. */
 export function toReturnCreditViewProps({
@@ -83,11 +88,11 @@ export function toReturnCreditViewProps({
       qty: Number(l.qty_returning),
       shipped: Number(l.qty_shipped ?? 0),
     })),
-    reasons: REASON_LABELS,
+    reasons: RETURN_REASONS.map(entry => entry.label),
     returnTo: returnToOptions.find(option => option.id === destinationId)?.label ?? destName,
     returnToId: destinationId,
     returnToOptions,
-    reason: reason === "wrong_item" ? 1 : REASONS.indexOf(reason),
+    reason: RETURN_REASONS.findIndex(entry => entry.id === reason),
     depositLabel: deposit?.label,
     depositAmount: deposit ? money(-deposit.cents) : undefined,
     creditInfo: `Credited at the price on ${inv}, not today’s price group.`,

@@ -58,6 +58,13 @@ decision, not a repair.
   mounts it in a dialog, so the modal shows the title twice and offers a back
   link inside itself, while the inventory renders the same view full-page.
   Every comparable flow in that conversion became a full route instead.
+- [ ] Give New PO a way to remove a line, and let one owner decide which rows
+  count. `components/mgr/views/new-po.tsx` requires a row once any field is
+  touched, while `app/(app)/purchase-orders/new-po-form.tsx` submits only rows
+  with a material and a positive quantity — so a row with just a unit cost is
+  required but unsubmittable, and a row with quantity 0 is neither. The
+  conditional `required` is a workaround for there being no Remove control;
+  whether the explorer draws one is a screen-parity design call.
 - [ ] Batch the Cellar landing's reading lookup. `app/(app)/cellar/page.tsx`
   issues one `list_fermentation_readings` per open occupancy to fill a tile
   subtitle, unbounded by tank count; there is no latest-reading-per-occupancy

@@ -1,6 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { BreweryProvider } from "@/app/(app)/brewery-provider";
+// These pages live under app/(app), whose layout mounts BreweryProvider; the
+// tests render the page subtree on its own, so they supply it here.
+const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
+  renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
 const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[] }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }), isUuid: () => true }));
@@ -42,7 +47,7 @@ beforeEach(() => { state.role = "admin"; state.calls = []; });
 it("assembles shared Catalog with full brand, packaged SKU and per-brand pour controls", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
-  const html = renderToStaticMarkup(page);
+  const html = render(page);
   for (const text of ["Edit brand", "Edit SKU", "New pour", "Edit pour", "Inactive", "UPC 123456", "/catalog/formats/keg"]) expect(html).toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
 });
@@ -54,18 +59,18 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(customers.type).toBe(CustomersView);
   expect(catalog.props.createAction).toBeNull();
   expect(customers.props.createAction).toBeNull();
-  expect(renderToStaticMarkup(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
-  expect(renderToStaticMarkup(customers)).not.toContain("Add customer");
+  expect(render(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
+  expect(render(customers)).not.toContain("Add customer");
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders and Invite", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
   expect(page.type).toBe(CustomerView);
   expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
-  const html = renderToStaticMarkup(page);
+  const html = render(page);
   for (const text of ["Tax treatment", "research", "Dock · default", "/orders?customerId=buyer", "Invite portal user"]) expect(html).toContain(text);
   state.role = "warehouse";
-  const readonly = renderToStaticMarkup(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
+  const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren/);
   expect(readonly).toContain("research");
 });
@@ -77,18 +82,18 @@ it("bins shared view retains actual stock move inputs and suppresses Warehouse-o
   state.role = "sales"; state.calls = [];
   const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
-  expect(renderToStaticMarkup(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
+  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
 });
 it("pricing shared tables retain brand-qualified poured columns", async () => {
   const page = await PricingPage();
   expect(page.type).toBe(PriceGroupsView);
-  expect(renderToStaticMarkup(page)).toContain("Hazy · Pint");
+  expect(render(page)).toContain("Hazy · Pint");
 });
 it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();
   const customers = await CustomersPage();
-  expect(renderToStaticMarkup(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
-  expect(renderToStaticMarkup(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
+  expect(render(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
+  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
@@ -96,7 +101,7 @@ it("converted inventory frames never navigate into the live catalog/customer/loc
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();
-    const html = renderToStaticMarkup(createElement("div", null, screen.body));
+    const html = render(createElement("div", null, screen.body));
     expect(html, name).not.toMatch(/href="\//);
   }
 });

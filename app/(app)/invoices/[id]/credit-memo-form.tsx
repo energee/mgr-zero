@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReturnCreditView, ReturnSourcesView } from "@/components/mgr/views/return-credit";
-import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { RETURN_REASONS, toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ReturnSource } from "@/lib/commands/orders";
 
@@ -46,7 +46,7 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locati
       () => router.push(`/invoices/${invoiceId}`));
   }}>
     <ReturnCreditView model={model} quantities={qtys} onQuantity={(id, value) => setQtys(prev => ({ ...prev, [id]: value }))}
-      onReason={index => setReason((["damaged", "wrong_item", "unsold"] as const)[index])}
+      onReason={index => setReason(RETURN_REASONS[index]?.id ?? "")}
       onReturnTo={id => { setLocationId(id); setBinId(""); }}
       bins={shipmentId === null ? undefined : bins.filter(bin => bin.location_id === locationId)} binId={binId} onBin={setBinId}
       sources={shipmentId === null ? null : <ReturnSourcesView groups={lines.map(line => ({
