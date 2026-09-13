@@ -128,11 +128,13 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 ### Create a brand
 
+<Screen name="Brand" />
+
 1. Open **Catalog** and select **New Brand**.
 2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, and **Hops** are optional notes. **Price group** is the row of the [price grid](#pricing) this beer sits on; leave it **Unpriced** and none of its SKUs can be ordered until you choose one.
 3. Select **Save brand**. Brand names must be unique within the brewery. You return to **Catalog**, where the brand lands alphabetically and starts as **No SKUs yet**.
 
-**New Brand** and **Edit brand** both open the brand's own page rather than a dialog. **Edit brand** starts with all saved values; changing one field keeps the others. Select **Save brand** to return to **Catalog**. Admin and Sales can edit; other roles see the same page read-only.
+**New Brand** and **Edit brand** both open the brand's own page rather than a dialog, and only Admin and Sales can open it; other roles do not see these links on Catalog and land on **No access** if they open the address directly. **Edit brand** starts with all saved values; changing one field keeps the others. Select **Save brand** to return to **Catalog**.
 
 Under the sell sheet, **Compliance** lists what this brand holds: its COLA or formula approvals and its state registrations, each with **Edit**. A brand with no COLA shows *COLA · pending* until one is added. **Add approval** takes the approval kind, the number (a COLA is filed under your own **Serial number**, such as `260135`; a formula under its TTB formula number), and an optional **Date submitted**; a COLA does not expire, so no expiry is asked for. The same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the two-letter state and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the state fixed. The brand is stated on both sheets, never chosen. A new brand must be saved before its compliance can be recorded. The brewery’s own state licenses are not brand facts; they live under [Compliance → Licenses](#compliance).
 
