@@ -8,7 +8,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [
-  "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
   "Entity picker: SearchView <- components/mgr/search-palette.tsx",
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
@@ -20,7 +19,6 @@ const KNOWN_INLINE_DEBT = [] as const;
 
 const KNOWN_SURFACE_DEBT = [
   "Search: CommandForm <- app/(app)/search/page.tsx",
-  "Session expired: CommandForm <- app/(auth)/login/page.tsx",
 ] as const;
 
 // Audited whole-body replacements, not action/message slots. Extend this

@@ -5,10 +5,12 @@
  * (the session ended mid-work).
  */
 import { LoginForm } from "@/components/login-form"
+import { CommandForm } from "@/components/mgr/command-form"
+import { SessionExpiredView } from "@/components/mgr/views/session-expired"
+import { sessionExpiredModel } from "@/lib/mgr/session-expired-view"
 
 const ERRORS: Record<string, string> = {
   "1": "Incorrect email or password.",
-  "expired": "Your session ended. Sign in to retry.",
 }
 
 export default async function LoginPage({
@@ -17,5 +19,8 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; sent?: string }>
 }) {
   const { error, sent } = await searchParams
+  if (error === "expired") return <CommandForm open title="Session expired">
+    <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
+  </CommandForm>
   return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
 }

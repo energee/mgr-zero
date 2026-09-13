@@ -459,10 +459,11 @@ describe("Entry views", () => {
     expect(body.props.model).toEqual(toSessionExpiredViewProps(sessionExpiredQueued));
   });
 
-  it("live sign-in and session expiry stay LoginForm", () => {
+  it("live sign-in keeps LoginForm while expiry uses the shared command sheet", () => {
     const page = src("app/(auth)/login/page.tsx");
     expect(page).toMatch(/LoginForm/);
-    expect(page).not.toMatch(/EntryView/);
-    expect(page).not.toMatch(/SessionExpiredView/);
+    expect(page).toMatch(/<CommandForm open/);
+    expect(page).toMatch(/<SessionExpiredView/);
+    expect(page).toContain('signInHref="/login"');
   });
 });
