@@ -15,7 +15,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `portal_schedule` | query | Coming up |
-## Production: 4 to build, 16 built
+## Production: 4 to build, 15 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |

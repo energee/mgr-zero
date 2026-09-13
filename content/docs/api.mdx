@@ -292,7 +292,7 @@ omitted. They have no roles until they are built.
 | `get_beer_overview` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_bin_move_stock` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
-| `get_brand_recipe_cost` | Production | ✓ | ✓ |  |  |  |  |
+| `get_brand_recipe_cost` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_ai_model` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -2110,6 +2110,13 @@ with an integer `unitPriceCents`, and every SKU of that group and format sells
 at it on that channel. `clear_channel_price` empties the cell, which unprices
 those SKUs on that channel. There is no per-SKU exception.
 
+A price group's `costCeilingCents`, when set, is dollars per barrel of recipe
+cost. Groups sort by `position`, and a ceiling's lower bound is the previous
+group's ceiling. `get_brand_recipe_cost` returns the same figure for a
+brand — from its last brewed (else newest) recipe version's ingredients, at
+each one's last receipt cost — so a caller can band one against the other;
+nothing assigns a group automatically.
+
 {/* ops:catalog */}
 
 #### clear_channel_price [#clear_channel_price]
@@ -2183,6 +2190,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_sale_channel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "channelId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_brand_recipe_cost [#get_brand_recipe_cost]
+
+`query` · admin, sales
+
+A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brand_recipe_cost", "input": { "brandId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### list_brands [#list_brands]
@@ -3388,23 +3412,6 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_batch_completion_preview", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
-#### get_brand_recipe_cost [#get_brand_recipe_cost]
-
-`query` · admin, sales
-
-A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet
-
-| Field | Type | Required |
-| --- | --- | --- |
-| `brandId` | uuid | yes |
-
-```bash
-curl -X POST "$MGR_URL/api/command" \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brand_recipe_cost", "input": { "brandId": "00000000-0000-0000-0000-000000000000" } }'
-```
-
 #### get_brew_day [#get_brew_day]
 
 `query` · admin, brewer
@@ -3608,7 +3615,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-16 of the 20 operations in this area are available today; the 4 below are not.
+15 of the 19 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
