@@ -7,6 +7,10 @@ import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { AccountingViewModel } from "@/lib/mgr/accounting-view";
 
+export function QboSyncView({ busy = false, error, onSync }: { busy?: boolean; error?: string | null; onSync?: () => void }) {
+  return <div className="flex flex-col items-end gap-2"><Button variant="outline" disabled={busy} onClick={onSync}>{busy ? "Syncing…" : "Sync QuickBooks"}</Button><CommandFormMessage error={error} /></div>;
+}
+
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-2">
     <Button type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening QuickBooks…" : reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"}</Button>

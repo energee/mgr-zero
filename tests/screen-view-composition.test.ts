@@ -24,7 +24,6 @@ const KNOWN_INLINE_DEBT = [
   "Create brewery",
   "Import",
   "Invite portal user",
-  "Invoices",
   "Chat disconnected",
   "Chat settings",
   "Linked people",

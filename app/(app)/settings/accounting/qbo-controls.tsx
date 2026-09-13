@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
+import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { money } from "@/lib/mgr/money";
@@ -46,7 +46,7 @@ function QboMappingFields({ kind, localId, label, currentId, context = "accounti
 
 export function QboSyncButton() {
   const action = useCommandAction();
-  return <div className="flex flex-col items-end gap-2"><Button variant="outline" disabled={action.busy} onClick={() => void action.run("sync_qbo_payments", {})}>{action.busy ? "Syncing…" : "Sync QuickBooks"}</Button><CommandFormMessage error={action.error} /></div>;
+  return <QboSyncView busy={action.busy} error={action.error} onSync={() => void action.run("sync_qbo_payments", {})} />;
 }
 
 export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoiceId: string; invoiceLabel: string; actions: QboInvoiceAction[] }) {

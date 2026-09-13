@@ -25,6 +25,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
+import { InvoicesView } from "@/components/mgr/views/invoices";
+import { invoiceList } from "@/lib/mgr/fixtures/invoices";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -288,7 +290,7 @@ import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
-import { QuickBooksMark, SlackMark } from "@/components/mgr/brand-icons";
+import { SlackMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
@@ -1333,25 +1335,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Invoices",
-    to: { Review: "Invoice", Open: "Invoice" , "Write off": "Invoice" },
+    to: { Review: "Invoice", Open: "Invoice", "Write off": "Invoice", "Re-push": "Invoice", "Sync QuickBooks": "Invoices", "Email delivery status": "Invoices" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks and email delivery status [SCHEMA-GATE: invoice query returns no verified provider URL or delivery state]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
-    body: (<>
-      {E.back("More", "Invoices")}
-      {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open"))}
-      {E.row(`${INV.edited} · Al’s Bar`, <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
-      {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off", "destructive"), "w")}
-      {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", E.act("Review"), "w")}
-      {E.row(`${INV.deleted} · Teresa’s`, "deleted in QuickBooks", <>{E.act("Re-push", "attention")}{E.act("Write off", "destructive")}</>, "w")}
-      {E.row(`${INV.unsent} · Al’s Bar`, "pushed · not emailed yet", E.act("Open in QuickBooks"))}
-      {E.row(`${INV.paid} · Ridgeline`, "paid 8/29 from QuickBooks Online", "$980", "ok")}
-      {E.row(`${INV.memo} · Ridgeline`, `credit memo · pushed · against ${INV.no} · −$180`, E.act("Open"))}
-      {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
-    </>),
+    body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "connected · company 9341", canConnect: true }} />,
   },
   {
     step: 5,
