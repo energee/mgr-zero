@@ -106,6 +106,11 @@ export function CommandForm({
 }
 
 /** Action row at the bottom of a CommandForm body: stacked on phone, right-aligned on desk. */
+/** The row-or-add trigger every registry sheet shares: ghost Edit on a row, outline add beside the list. */
+export function sheetTrigger(edit: boolean, add: string) {
+  return edit ? <Button variant="ghost" size="sm">Edit</Button> : <Button variant="outline" size="sm">{add}</Button>;
+}
+
 export function CommandFormFooter({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("flex flex-col gap-2 pt-2 md:flex-row md:justify-end", className)} {...props} />;
 }

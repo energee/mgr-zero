@@ -36,4 +36,4 @@ export const SKU_STOUT = {
 } as const;
 
 /** Inventory-only until confirm reads the compliance registry. */
-export const OHIO_STOUT_NOTE = "Stout isn’t registered for Ohio. Check the Compliance registry.";
+export const OHIO_STOUT_NOTE = "Stout isn’t registered for Ohio. Add the registration on the Stout brand.";

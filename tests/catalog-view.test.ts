@@ -117,7 +117,10 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    expect(src).toMatch(/<BrandForm\b/);
+    // Brand is a page, not a dialog: New Brand and Edit brand are links to it.
+    expect(src).not.toMatch(/<BrandForm\b/);
+    expect(src).toMatch(/"\/catalog\/brands\/new"/);
+    expect(src).toMatch(/`\/catalog\/brands\/\$\{brand\.id\}`/);
     expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
@@ -137,6 +140,14 @@ describe("Brand view", () => {
     expect(model.hops).toBe("Citra, Mosaic");
     expect(model.skuList).toBe("3 active packages");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
+    expect(model.compliance.map((row) => row.title)).toEqual(["COLA serial 260135", "OH registration"]);
+    expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15", verb: "Edit" });
+    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
+  });
+
+  it("flags a brand with no COLA as pending, with nothing to edit", () => {
+    const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
+    expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
   });
 
   it("renders Save brand, Sell sheet, and SKU list", () => {
@@ -145,6 +156,12 @@ describe("Brand view", () => {
     expect(html).toMatch(/Sell sheet/);
     expect(html).toMatch(/SKU list/);
     expect(html).toMatch(/3 active packages/);
+    expect(html).toMatch(/Compliance/);
+    expect(html).toMatch(/COLA serial 260135/);
+    expect(html).toMatch(/OH registration/);
+    expect(html).toMatch(/>Add approval</);
+    expect(html).toMatch(/>Add registration</);
+    expect(html).not.toMatch(/Not on file/);
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).not.toMatch(/→/);
   });

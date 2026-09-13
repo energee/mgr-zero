@@ -1,5 +1,5 @@
 // app/(app)/catalog/page.tsx — Catalog (screen record): brands with their
-// SKUs, then formats. Add brand opens brand-form.tsx (Brand), Add SKU on a
+// SKUs, then formats. New Brand and Edit brand open brands/[id] (Brand), Add SKU on a
 // brand opens sku-form.tsx (SKU), Add format opens format-form.tsx. Open format
 // links to its components and Package BOM. A SKU is one brand × one packaged
 // format; bbl per unit lives on the format.
@@ -14,7 +14,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { plural } from "@/lib/mgr/plural";
 import { formatVolume } from "@/lib/volume";
 import "@/lib/commands/all";
-import { BrandForm } from "./brand-form";
 import { PourForm } from "./pour-form";
 import { FormatForm } from "./format-form";
 import { SkuForm, SkuEditForm, type FormatOption } from "./sku-form";
@@ -36,12 +35,12 @@ export default async function CatalogPage() {
   return (
     <CatalogView
       model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more" })}
-      createAction={canWrite ? <BrandForm groups={groups} /> : null}
+      createAction={canWrite ? E.btn("New Brand", "p", "/catalog/brands/new") : null}
       linkRows
       brands={brands.length === 0 ? E.blank("No brands yet") : brands.map((brand) => (
         <div key={brand.id}>
           {E.row(brand.name, `${brand.styles?.name ?? "style not set"}${brand.abv != null ? ` · ${brand.abv}% ABV` : ""} · ${plural(brand.skus.length, "SKU")}`,
-            canWrite ? <div className="flex max-w-44 flex-wrap gap-2 md:max-w-none"><BrandForm key={JSON.stringify(brand)} groups={groups} brand={{ id: brand.id, name: brand.name, style: brand.styles?.name ?? null, abv: brand.abv, description: brand.description, category: brand.category, priceGroupId: brand.price_group_id, hops: brand.hops }} /><SkuForm brandId={brand.id} formats={packaged} /><PourForm brand={brand} /></div> : undefined, "", undefined,
+            canWrite ? <div className="flex max-w-44 flex-wrap gap-2 md:max-w-none">{E.btn("Edit brand", "g", `/catalog/brands/${brand.id}`)}<SkuForm brandId={brand.id} formats={packaged} /><PourForm brand={brand} /></div> : undefined, "", undefined,
             brand.skus.length ? brand.skus.map((sku) => {
               const f = formatById.get(sku.format_id);
               return <div key={sku.id} className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{sku.name} · {sku.active ? "Active" : "Inactive"}{sku.upc ? ` · UPC ${sku.upc}` : ""}</span><span className="text-muted-foreground">{f?.name ?? "—"}{f?.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}</span>{canWrite && <SkuEditForm sku={sku} formatName={f?.name ?? "—"} />}</div>;

@@ -157,7 +157,7 @@ describe("SCREENS", () => {
       "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
       "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
       "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",
-      "app/(app)/catalog/brand-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
+      "app/(app)/catalog/brands/[id]/brand-page.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
       "app/(app)/settings/channels/page.tsx",
       "app/(app)/settings/channels/delete-channel-button.tsx",
     ];
@@ -277,7 +277,7 @@ describe("SCREENS", () => {
     const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
-    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price group", "Location bins"]) {
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Licenses", "Sale channels", "Formats", "Price group", "Location bins"]) {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
@@ -836,7 +836,7 @@ describe("SCREENS", () => {
     // one-option chip group, a link and a role editor.
     const html = (name: string) =>
       renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const name of ["Compliance registry", "Chat settings", "Menu", "Tap board", "Variance by brand"]) {
+    for (const name of ["Chat settings", "Menu", "Tap board", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {

@@ -7,8 +7,9 @@ import "../lib/commands/all";
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
 beforeAll(async () => { ctx = await makeStaffCtx((await makeBrewery()).id, "sales"); });
 it("edits a prefilled brand without losing unrelated persisted fields", async () => {
-  const source = readFileSync("app/(app)/catalog/brand-form.tsx", "utf8");
-  for (const field of ["id", "name", "style", "abv", "description", "category", "priceGroupId", "hops"]) expect(source).toContain(`brand?.${field}`);
+  // Brand is a page: brand-page.tsx prefills every field from the list_brands row.
+  const source = readFileSync("app/(app)/catalog/brands/[id]/brand-page.tsx", "utf8");
+  for (const field of ["id", "name", "styles?.name", "abv", "description", "category", "price_group_id", "hops"]) expect(source).toContain(`brand?.${field}`);
   const input = { name: "Original", style: "Lager", abv: 0, description: "Crisp", category: "Lager", hops: "Saaz", priceGroupId: await seedPriceGroup(ctx.breweryId) };
   const row = await runCommand("upsert_brand", input, ctx) as { id: string; style_id: string };
   const edited = await runCommand("upsert_brand", { ...input, id: row.id, name: "Renamed" }, ctx);
@@ -86,6 +87,8 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
 it("gates catalog mutators and excludes inactive SKUs from New Order picker options", () => {
   const page = readFileSync("app/(app)/catalog/page.tsx", "utf8");
   expect(page).toContain('brewery.role === "admin" || brewery.role === "sales"');
-  for (const component of ["BrandForm", "SkuForm", "SkuEditForm", "FormatForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
+  for (const component of ["SkuForm", "SkuEditForm", "FormatForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
+  // New Brand and Edit brand are links to the Brand page, gated the same way.
+  for (const verb of ["New Brand", "Edit brand"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*E\\.btn\\("${verb}"`));
   expect(readFileSync("app/(app)/orders/page.tsx", "utf8")).toContain("skuRows.filter((s) => s.active)");
 });
