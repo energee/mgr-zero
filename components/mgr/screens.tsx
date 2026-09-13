@@ -15,13 +15,13 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // staff frames — so it is present under every staff frame without any
 // body naming it.
 //
-// Option casing follows the word, never the control that draws it. A proper
-// noun or a named record (Warehouse, Taproom, Wholesale, Admin, Citra) is
-// Title case in a chip, a tab and a picker alike; a generic domain term
-// (depletion, dry hop, taxable, packaged) stays lowercase, as do units (lb,
-// oz, bbl); an option that is a phrase rather than a term takes sentence case
-// (Empty, About ¼ left, Customer remits). A lowercase list here is the rule,
-// not an oversight.
+// Option casing: every option an operator picks reads as a label, in sentence
+// case — Depletion, Taxable, Festival removal — including the generic domain
+// terms #132 once kept lowercase. #333 (QA sweep, 2026-09-13) supersedes that
+// rule: raw enum casing leaking into pickers was reported as a bug, and a list
+// that mixes "taproom" with "Warehouse" reads as an oversight whatever the
+// intent. Units stay as written (lb, oz, bbl), and a named record keeps its own
+// capitalization (Warehouse, Citra, Al's Bar).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
@@ -738,7 +738,9 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Desk",
     name: "Import",
-    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import" },
+    // The kind chips carry record names ("Customers", "Ship-tos"); authored
+    // here so a tap selects the kind instead of resolving to those screens.
+    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
     job: "Upload, map, preview and independently commit valid rows",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
@@ -763,7 +765,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "SKU detail",
-    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · adjustment": "Reverse movement" },
+    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · Adjustment": "Reverse movement" },
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",
