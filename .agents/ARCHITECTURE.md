@@ -197,7 +197,10 @@ a gap to close, not a convention to trust.
   is the signal that the query is missing an input, not that the pages need a
   shared helper. The same reflex applies when one column becomes many (a `kind`
   that becomes a set of `uses`): change the question the query answers, then
-  let the callers ask it.
+  let the callers ask it. The exception is a page that needs the whole list
+  anyway — `/settings` prints every location and offers the warehouses — where
+  a second filtered read is a round trip for rows already in hand, so derive
+  the subset from the list you fetched.
 - **Replayable commands are idempotent at the server.** `/api/command` carries
   one stable `requestId` per write action. `private.command_requests` binds it
   to the authenticated actor, brewery, command, and canonical payload, commits

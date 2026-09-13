@@ -2,7 +2,9 @@
 -- taproom and storage and a warehouse at once; `locations.kind` could only say
 -- one of those, so every guard that asked "is this a taproom?" was really
 -- asking "is a taproom what this place mainly is?". `uses location_kind[]`
--- answers membership instead, and every predicate becomes `'x' = any(uses)`.
+-- answers membership instead: `private.location_used_as` for the guards that
+-- ask about one owned place, `'x' = any(uses)` inline where the test is part
+-- of a join or an RLS policy.
 --
 -- Order matters: add and backfill the column, replace every function and policy
 -- that read `kind`, then drop the column. create_location/update_location change
@@ -25,6 +27,16 @@ begin
   select array_agg(distinct u order by u) into v_uses from unnest(p_uses) u;
   return v_uses;
 end $$;
+
+-- "Is this place, which this brewery owns, put to this use?" — the question
+-- every taproom and warehouse guard below asks. Spelled once here rather than
+-- nine times inline, so a later use rule changes in one place.
+create function private.location_used_as(p_location uuid, p_brewery uuid, p_use public.location_kind)
+returns boolean language sql stable set search_path = '' as $$
+  select exists (
+    select 1 from public.locations
+    where id = p_location and brewery_id = p_brewery and p_use = any(uses));
+$$;
 
 -- Predicates rewritten from kind = 'x' to 'x' = any(uses).
 CREATE OR REPLACE FUNCTION private.get_taproom_count(p_brewery uuid, p_count uuid)
@@ -184,7 +196,7 @@ CREATE OR REPLACE FUNCTION private.require_taproom_count_location()
  SET search_path TO ''
 AS $function$
 begin
-  if not exists (select 1 from public.locations where id = new.location_id and brewery_id = new.brewery_id and 'taproom' = any(uses)) then
+  if not private.location_used_as(new.location_id, new.brewery_id, 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
   return new;
@@ -200,7 +212,7 @@ CREATE OR REPLACE FUNCTION public.get_taproom_count_snapshot(p_brewery uuid, p_l
 AS $function$
 begin
   perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and 'taproom' = any(uses)) then
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
   return private.taproom_count_snapshot(p_brewery, p_location);
@@ -217,7 +229,7 @@ AS $function$
 declare v_count record; v_as_of timestamptz:=now(); v_result jsonb;
 begin
   perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and 'taproom' = any(uses)) then raise exception 'choose an owned taproom location'; end if;
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then raise exception 'choose an owned taproom location'; end if;
   select root_id,effective_id,counted_on,observed_at,created_at into v_count from private.taproom_effective_counts
     where brewery_id=p_brewery and location_id=p_location
     group by root_id,effective_id,counted_on,observed_at,created_at order by observed_at desc,effective_id desc limit 1;
@@ -286,7 +298,7 @@ AS $function$
 declare v_snapshot jsonb;
 begin
   perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and 'taproom' = any(uses)) then
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
   v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
@@ -328,7 +340,7 @@ declare v_today date; v_start date; v_result jsonb;
 begin
   perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if p_weeks is null or p_weeks not in (4,12) then raise exception 'choose 4 or 12 weeks'; end if;
-  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and 'taproom' = any(uses)) then raise exception 'choose an owned taproom location'; end if;
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then raise exception 'choose an owned taproom location'; end if;
   select (now() at time zone timezone)::date into v_today from public.breweries where id=p_brewery;
   v_start:=v_today-p_weeks*7+1;
   with counts as materialized (
@@ -425,7 +437,7 @@ CREATE OR REPLACE FUNCTION public.list_open_taps(p_brewery uuid, p_location uuid
 AS $function$
 begin
   perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and 'taproom' = any(uses)) then raise exception 'choose an owned taproom location'; end if;
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('sku_name',s.name,'brand_id',s.brand_id,'brand_name',b.name,'opened_by_label',split_part(u.email,'@',1))
     order by t.tap_number nulls last,t.opened_at,t.id),'[]'::jsonb)
     from public.tap_intervals t left join public.skus s on s.id=t.sku_id and s.brewery_id=t.brewery_id
@@ -444,7 +456,7 @@ CREATE OR REPLACE FUNCTION public.list_tap_history(p_brewery uuid, p_location uu
 AS $function$
 begin
   perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and 'taproom' = any(uses)) then raise exception 'choose an owned taproom location'; end if;
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('opened_by_label',split_part(o.email,'@',1),
     'closed_by_label',split_part(c.email,'@',1),'sku_name',s.name,'brand_name',b.name) order by t.closed_at desc,t.id),'[]'::jsonb) from
     (select * from public.tap_intervals where brewery_id=p_brewery and location_id=p_location and closed_at is not null order by closed_at desc,id limit 50) t
@@ -463,7 +475,7 @@ AS $function$
 declare v_result jsonb;
 begin
   perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
-  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and 'taproom' = any(uses)) then raise exception 'choose an owned taproom location'; end if;
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then raise exception 'choose an owned taproom location'; end if;
   with headers as (
     select root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason,
       count(line_id) observations,count(movement_id) movements,
@@ -512,7 +524,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'record_taproom_count', p_request_id,
     jsonb_build_object('location', p_location, 'counted_on', p_counted_on, 'revision', p_revision, 'lines', p_lines));
   if v_replay is not null then return v_replay; end if;
-  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and 'taproom' = any(uses)) then
+  if not private.location_used_as(p_location, p_brewery, 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
   if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'count lines must be an array'; end if;
@@ -585,9 +597,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'set_portal_fulfillment_source', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'location', p_location));
   if v_replay is not null then return v_replay; end if;
-  if not exists (
-    select 1 from public.locations where id = p_location and brewery_id = p_brewery and 'warehouse' = any(uses)
-  ) then
+  if not private.location_used_as(p_location, p_brewery, 'warehouse') then
     raise exception 'portal fulfillment source must be a brewery warehouse';
   end if;
   update public.breweries set portal_fulfillment_location_id = p_location where id = p_brewery;

@@ -1,4 +1,5 @@
 // lib/mgr/location-view.ts — view-model for Location detail (list_locations + list_bins).
+import { sentenceCase } from "./labels";
 
 export type LocationViewModel = {
   backHref?: string;
@@ -12,13 +13,6 @@ export type LocationViewModel = {
 };
 
 const USES = ["Warehouse", "Taproom", "Storage"];
-
-function titleKind(kind: string): string {
-  if (kind === "warehouse") return "Warehouse";
-  if (kind === "taproom") return "Taproom";
-  if (kind === "storage") return "Storage";
-  return kind;
-}
 
 export type LocationSnapshot = {
   location: { id: string; name: string; uses: string[] };
@@ -37,7 +31,7 @@ export function toLocationViewProps({
   return {
     backHref,
     name: location.name,
-    uses: location.uses.map(titleKind),
+    uses: location.uses.map(sentenceCase),
     useOptions: USES,
     timezone: timezone ? `Brewery default · ${timezone}` : "Brewery default",
     bins: bins.map((b) => b.name).join(" · ") || "none",

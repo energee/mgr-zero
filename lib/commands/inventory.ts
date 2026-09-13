@@ -241,16 +241,15 @@ defineQuery({
   handler: async (ctx, i) => {
     // Postgres does the membership test (`uses @> {use}`): asking for taprooms
     // and scanning the answer would spend the row cap on locations the caller
-    // is about to throw away.
-    const scope = <T extends { contains: (column: string, value: string[]) => T }>(query: T) =>
-      i.use ? query.contains("uses", [i.use]) : query;
+    // is about to throw away. The count is filtered the same way, or the page
+    // loop would wait for rows the filter already removed.
     const rows = await completeRows("Location list", async afterId => {
-      let query = scope(ctx.db.from("locations").select("id, name, uses").eq("brewery_id", ctx.breweryId).order("id").limit(500));
+      let query = ctx.db.from("locations").select("id, name, uses").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (i.use) query = query.contains("uses", [i.use]);
       if (afterId) query = query.gt("id", afterId);
-      const [result, counted] = await Promise.all([
-        query,
-        scope(ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId)),
-      ]);
+      let count = ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+      if (i.use) count = count.contains("uses", [i.use]);
+      const [result, counted] = await Promise.all([query, count]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     });
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
