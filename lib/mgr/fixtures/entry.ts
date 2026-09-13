@@ -1,5 +1,6 @@
 // lib/mgr/fixtures/entry.ts — Sign in, reset, set-password, no-membership.
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
+export { expiredInviteModel as expiredInvite } from "@/lib/mgr/entry-view";
 
 export const signIn: EntryViewModel = {
   title: "Sign in",
@@ -57,10 +58,4 @@ export const expiredReset: EntryViewModel = {
   inputs: [],
   note: "This reset link is no longer valid.",
   primary: "Request a new link",
-};
-
-export const expiredInvite: EntryViewModel = {
-  title: "Invite expired", inputs: [], primary: "Reset password", secondary: "Back to sign in",
-  note: "This invite is no longer valid.",
-  info: "Sign in or reset your password. Contact the brewery if access is still missing.",
 };

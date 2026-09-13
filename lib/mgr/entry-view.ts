@@ -18,3 +18,9 @@ export function toEntryViewProps(s: EntryViewModel): EntryViewModel {
 export function toAcceptInviteViewProps(breweryName: string, role: string): EntryViewModel {
   return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: role }, primary: `Join ${breweryName}` };
 }
+
+export const expiredInviteModel: EntryViewModel = {
+  title: "Invite expired", inputs: [], primary: "Reset password", secondary: "Back to sign in",
+  note: "This invite is no longer valid.",
+  info: "Sign in or reset your password. Contact the brewery if access is still missing.",
+};
