@@ -12,7 +12,8 @@ import { toQuotedReviewOrderViewProps, type PortalQuote } from "@/lib/mgr/review
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
-import { cartActionsDisabled, canRetirePortalFailure, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
 export type ShipToOption = { id: string; label: string; is_default?: boolean };
@@ -79,7 +80,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
     } catch (err) {
       // Only a definitive first refusal can unlock edits; a later refusal
       // cannot disprove an earlier uncertain success.
-      if (err instanceof CommandResponseError && canRetirePortalFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
+      if (err instanceof CommandResponseError && canRetireCommandFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
         try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); }
         catch { /* Keep the exact attempt if storage cannot retire it. */ }
       }

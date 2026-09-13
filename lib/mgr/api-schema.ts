@@ -27,23 +27,11 @@ const unwrapOptional = (node: any) => {
   return inner;
 };
 
-/** True when the field may be left out: some wrapper omits it or supplies a value. */
-export function isOptional(node: any): boolean {
-  for (let n = node; n?.def && WRAPPERS.has(n.def.type); n = n.def.innerType) {
-    if (n.def.type === "optional" || n.def.type === "default" || n.def.type === "prefault") return true;
-    if (!n.def.innerType) break;
-  }
-  return false;
-}
+/** True when the field may be left out or supplies its own value. */
+export const isOptional = (node: ZodType) => node.safeParse(undefined).success;
 
 /** True when `null` is an accepted value, at any depth of the wrapper chain. */
-export function isNullable(node: any): boolean {
-  for (let n = node; n?.def && WRAPPERS.has(n.def.type); n = n.def.innerType) {
-    if (n.def.type === "nullable") return true;
-    if (!n.def.innerType) break;
-  }
-  return false;
-}
+export const isNullable = (node: ZodType) => node.safeParse(null).success;
 
 /** A human type label for one schema node, e.g. `uuid`, `integer`, `keg or can`.
  * Members join with " or ", not "|" — the label lands inside a Markdown table

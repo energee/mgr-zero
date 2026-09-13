@@ -38,6 +38,7 @@ describe("Orders list view loop", () => {
   });
 
   it("the inventory list still offers New order and the next-action verbs", () => {
+    expect(readFileSync("components/mgr/views/orders-list.tsx", "utf8")).toMatch(/import \{ WORK_CHIPS, WORK_TABS \} from "@\/lib\/mgr\/work-view"/);
     expect(html("Orders")).toMatch(/>Orders</);
     expect(html("Orders")).toMatch(/>New order</);
     expect(html("Orders")).toMatch(/>Confirm</);

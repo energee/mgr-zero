@@ -59,13 +59,13 @@ it("reload retries the identical create and never sends when persistence fails",
   await expect(executePortalAttempt(attempt as never, { ...storage, setItem() { throw new Error("quota"); } }, async () => { sent = true; }, () => {})).rejects.toThrow(/recovery/);
   expect(sent).toBe(false);
 });
-import { canRetirePortalFailure } from "@/lib/portal-cart";
+import { canRetireCommandFailure } from "@/lib/commands/failure";
 it("keeps identity when an uncertain create retry is rate-limited or loses access", () => {
-  for (const status of [400, 403, 408, 429, 500]) expect(canRetirePortalFailure(status, true)).toBe(false);
-  for (const status of [401, 408, 429, 500]) expect(canRetirePortalFailure(status, false)).toBe(false);
-  expect(canRetirePortalFailure(409, false, "context_changed")).toBe(false);
-  expect(canRetirePortalFailure(409, false, "conflict")).toBe(true);
-  expect(canRetirePortalFailure(400, false)).toBe(true);
+  for (const status of [400, 403, 408, 429, 500]) expect(canRetireCommandFailure(status, true)).toBe(false);
+  for (const status of [401, 408, 429, 500]) expect(canRetireCommandFailure(status, false)).toBe(false);
+  expect(canRetireCommandFailure(409, false, "context_changed")).toBe(false);
+  expect(canRetireCommandFailure(409, false, "conflict")).toBe(true);
+  expect(canRetireCommandFailure(400, false)).toBe(true);
 });
 it("restores an exact quoted submit without rebuilding the reviewed fields", () => {
   const quoted = { ...attempt, command: "portal_submit_quote", input: { quoteId: id, expectedIdentity: { actorId: id, customerId: id } } };
