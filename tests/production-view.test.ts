@@ -200,6 +200,8 @@ describe("Close packaging run view", () => {
   it("the live packaging run page mounts ClosePackagingRunView and RunClosedView", () => {
     const page = src("app/(app)/packaging/[id]/page.tsx");
     expect(page).toMatch(/<ClosePackagingRunView\b/);
+    expect(page).not.toMatch(/\blead=/);
+    expect(page).not.toMatch(/\breview=/);
     expect(page).toMatch(/<RunClosedView\b/);
     expect(page).toMatch(/<CloseRunForm\b/);
   });

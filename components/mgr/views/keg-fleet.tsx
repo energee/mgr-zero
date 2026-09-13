@@ -1,6 +1,6 @@
-// components/mgr/views/keg-fleet.tsx — Keg fleet. Live slots PoolForm,
-// KegEventForm, and customer/history navs; inventory draws the selected pool
-// and return-empty preview.
+// components/mgr/views/keg-fleet.tsx — shared fleet rows and navigation;
+// live supplies only pool and event command forms.
+import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { KegFleetViewModel } from "@/lib/mgr/keg-fleet-view";
@@ -10,22 +10,23 @@ export type { KegFleetViewModel };
 export function KegFleetView({
   model,
   createAction,
-  list,
-  navs,
+  poolActions,
   eventForm,
   note,
 }: {
   model: KegFleetViewModel;
   createAction?: ReactNode;
-  list?: ReactNode;
-  navs?: ReactNode;
+  poolActions?: Record<string, ReactNode>;
   eventForm?: ReactNode;
   note?: ReactNode;
 }) {
   return (
     <>
       {E.back("Beer", "Keg fleet", createAction, model.backHref)}
-      {list !== undefined ? list : (
+      {model.pools ? (model.pools.length ? model.pools.map((pool) => <div key={pool.key}>
+        {E.row(pool.title, pool.detail, poolActions?.[pool.key])}
+        {pool.bins.map((row) => <div key={row.key}>{E.row(row.title, row.detail, row.qty)}</div>)}
+      </div>) : E.blank(model.empty ?? "No keg pools yet")) : (
         <>
           {E.fld("Selected pool", model.pool ?? "")}
           {E.pick("Kind", model.kind ?? "", model.kindOptions ?? [])}
@@ -37,7 +38,7 @@ export function KegFleetView({
           ))}
         </>
       )}
-      {navs !== undefined ? navs : (
+      {model.navRows ? model.navRows.map((row) => <Link key={row.key} href={row.href}>{E.nav(row.title, row.detail)}</Link>) : (
         <>
           {E.nav("Customer keg balance", model.customerBalance ?? "")}
           {E.nav("Keg report", model.report ?? "")}
