@@ -19,14 +19,17 @@ export const routesDriver: RoutesSnapshot = {
 export const routeAPlan: RouteViewModel = {
   title: "Route A · 2026-09-10",
   date: "2026-09-10",
-  driver: "driver 7f3a21c0 · warehouse",
-  driverOptions: ["driver 7f3a21c0 · warehouse", "driver 2b9e44d1 · admin"],
+  driverId: "7f3a21c0",
+  driverOptions: [{ id: "7f3a21c0", label: "driver 7f3a21c0 · warehouse" }, { id: "2b9e44d1", label: "driver 2b9e44d1 · admin" }],
+  saved: true,
+  savedDriverId: "7f3a21c0",
+  selection: { s1: 1, s2: 2, s3: 3 },
   vehicle: "Box truck 2",
   name: "Route A",
   stops: [
-    { key: "s1", title: "ORD-0231 · Ridgeline · Tap Room", detail: "stop 1", trailing: "1" },
-    { key: "s2", title: "ORD-0233 · Al’s Bar · Dock", detail: "stop 2", trailing: "2" },
-    { key: "s3", title: "TRF-0004 · Storage", detail: "stop 3", trailing: "3" },
+    { key: "s1", title: "ORD-0231 · Ridgeline · Tap Room", detail: "stop 1" },
+    { key: "s2", title: "ORD-0233 · Al’s Bar · Dock", detail: "stop 2" },
+    { key: "s3", title: "TRF-0004 · Storage", detail: "stop 3" },
     { key: "s4", title: "ORD-0236 · Teresa’s · Dock", detail: "shipped · no route", warning: true },
   ],
 };

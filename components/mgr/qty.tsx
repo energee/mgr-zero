@@ -83,7 +83,7 @@ export function TabBar({
   hrefs?: Record<string, string>;
 }) {
   return (
-    <Tabs value={onChange ? names[on] : undefined} defaultValue={onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
+    <Tabs value={hrefs || onChange ? names[on] : undefined} defaultValue={hrefs || onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
       <TabsList variant="solid" className={cls}>
         {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
       </TabsList>

@@ -5,13 +5,11 @@
 import { E } from "@/components/mgr/e";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
-import { RouteView } from "@/components/mgr/views/route";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toReturnRouteViewProps } from "@/lib/mgr/return-route-view";
-import { toRouteViewProps } from "@/lib/mgr/route-view";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/time-window";
@@ -32,12 +30,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
       ...route.stops.map((s) => ({ id: (s.shipment_id ?? s.stock_transfer_id)!, label: s.label, kind: s.shipment_id ? "shipment" as const : "transfer" as const })),
       ...list.unassigned,
     ];
-    return (
-      <RouteView
-        model={toRouteViewProps({ title, backTo: "Deliveries", backHref: "/routes" })}
-        form={<RouteForm route={route} candidates={candidates} drivers={list.drivers} today={list.today} />}
-      />
-    );
+    return <RouteForm key={route.id} route={route} candidates={candidates} drivers={list.drivers} today={list.today} />;
   }
   const openStops = route.stops.filter((s) => !s.delivered_at);
   const next = openStops[0];

@@ -125,6 +125,8 @@ export function ScreenExplorer() {
   // docs page and the Me control's own sheet never opens outside the box.
   const onTap = (e: React.MouseEvent) => {
     if (!current) return;
+    // Native fields and their labels edit the shared form, never navigate its row.
+    if ((e.target as HTMLElement).closest("input, select, textarea, label")) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
     // Provider previews own their picker; their illustrative actions never navigate.

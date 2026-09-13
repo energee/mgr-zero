@@ -4,8 +4,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow, type BatchVessel } from "@/lib/mgr/batches-view";
-import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
-import { WORK_CHIPS } from "@/components/mgr/work-tabs";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 import "@/lib/commands/all";
 import { NewBatchForm } from "./new-batch-form";
 
@@ -21,11 +20,9 @@ export default async function BatchesPage() {
   ])) as [BatchListRow[], Brand[], Recipe[], BatchVessel[]];
   const recipeVersions = recipes.flatMap(recipe =>
     recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version }] : []);
-  const work = navFor(STAFF_NAV, brewery.role).find(item => item.href === "/work");
-  const allowed = new Set([work?.href, ...work?.children?.map(item => item.href) ?? []]);
   return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }))}
     createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} />}
-    workHrefs={Object.fromEntries(WORK_CHIPS.filter(([, href]) => allowed.has(href)))}
+    workHrefs={workHrefsFor(brewery.role)}
     newVesselHref="/cellar/vessels/new"
   />;
 }

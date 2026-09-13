@@ -3,7 +3,7 @@ export type RouteStopView = {
   key: string;
   title: string;
   detail: string;
-  trailing?: string;
+  locked?: boolean;
   warning?: boolean;
 };
 
@@ -12,13 +12,22 @@ export type RouteViewModel = {
   backTo?: string;
   title: string;
   date?: string;
-  driver?: string;
-  driverOptions?: string[];
+  driverId?: string;
+  driverOptions?: { id: string; label: string }[];
   vehicle?: string;
   name?: string;
   stops?: RouteStopView[];
+  selection: Record<string, number>;
+  saved?: boolean;
+  savedDriverId?: string | null;
 };
 
 export function toRouteViewProps(s: RouteViewModel): RouteViewModel {
   return s;
+}
+
+export function toggleRouteStop(selection: Record<string, number>, id: string, on: boolean) {
+  const next = { ...selection };
+  if (on) next[id] = Math.max(0, ...Object.values(next)) + 1; else delete next[id];
+  return next;
 }
