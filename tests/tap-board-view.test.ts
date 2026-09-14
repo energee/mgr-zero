@@ -1,4 +1,5 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { E } from "../components/mgr/e";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TapBoardView, TapKegView } from "../components/mgr/views/tap-board";
@@ -31,9 +32,11 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
 });
 
 it("keeps the outgoing captured SKU selectable for an atomic same-SKU swap", () => {
+  const pick = vi.spyOn(E, "pick");
   const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: [] }));
-  expect(html).toContain(swapKeg.interval!.sku_id);
-  expect(html).toContain("Same own SKU");
+  expect(pick).toHaveBeenCalledWith("Packaged keg SKU", swapKeg.interval!.sku_id, expect.arrayContaining([expect.objectContaining({ value: swapKeg.interval!.sku_id })]), expect.anything());
+  expect(pick).toHaveBeenCalledWith("Identity", "same", expect.arrayContaining([{ value: "same", label: "Same own SKU", disabled: false }]), expect.anything());
+  pick.mockRestore();
   expect(html).toContain('data-variant="irreversible"');
 });
 

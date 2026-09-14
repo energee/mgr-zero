@@ -1,14 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ReturnCreditViewModel } from "@/lib/mgr/return-credit-view";
+import type { ReactNode } from "react";
+import { Fragment } from "react";
 
 export type { ReturnCreditViewModel };
 
@@ -20,12 +18,7 @@ export function ReturnSourcesView({ groups, quantities = {}, onQuantity }: {
     {E.ttl("Original shipped source")}
     {groups.map(group => <div key={group.key} className="flex flex-col gap-2">
       {E.ttl(group.name)}
-      {group.sources.map(source => <Field key={source.id}>
-        <FieldLabel>{source.label} ({source.shipped} originally shipped)</FieldLabel>
-        <Input aria-label={`${group.name} · ${source.label} return quantity`} type="number" min="0" step="0.01" max={source.shipped} placeholder="Quantity from this source"
-          value={onQuantity ? quantities[source.id] ?? "" : undefined} defaultValue={onQuantity ? undefined : quantities[source.id] ?? ""}
-          onChange={event => onQuantity?.(source.id, event.target.value)} />
-      </Field>)}
+      {group.sources.map(source => <Fragment key={source.id}>{E.edit(source.label + " (" + source.shipped + " originally shipped)", quantities[source.id], "number", undefined, { onChange: onQuantity ? (nextValue: string) => onQuantity?.(source.id, nextValue) : undefined, min: "0", max: source.shipped, step: "0.01", placeholder: "Quantity from this source", "aria-label": `${group.name} · ${source.label} return quantity` })}</Fragment>)}
     </div>)}
   </>;
 }
@@ -49,17 +42,8 @@ export function ReturnCreditView({ model, sources, footer, tape, reason, quantit
       onValueChange={value => { if (value !== "") onReason?.(Number(value)); }}>
       {model.reasons.map((label, index) => <ToggleGroupItem key={label} value={String(index)}>{label}</ToggleGroupItem>)}
     </ToggleGroup>
-    <Field><FieldLabel>Return to</FieldLabel>
-      <Select value={onReturnTo ? model.returnToId : undefined} defaultValue={onReturnTo ? undefined : model.returnToId} onValueChange={onReturnTo}>
-        <SelectTrigger aria-label="Return to"><SelectValue placeholder="Select location" /></SelectTrigger>
-        <SelectContent>{model.returnToOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>)}</SelectContent>
-      </Select>
-    </Field>
-    {bins !== undefined && <Field><FieldLabel>Return to bin</FieldLabel>
-      <select aria-label="Return to bin" className="min-w-0 rounded border p-2" required value={onBin ? binId : undefined} defaultValue={onBin ? undefined : binId} onChange={event => onBin?.(event.target.value)}>
-        <option value="">Choose bin</option>{bins.map(bin => <option key={bin.id} value={bin.id}>{bin.name}</option>)}
-      </select>
-    </Field>}
+    {E.pick("Return to", model.returnToId, model.returnToOptions.map(option => ({ value: option.id, label: option.label })), { onChange: onReturnTo, placeholder: "Select location" })}
+    {bins !== undefined && E.pick("Return to bin", binId, [{ value: "", label: "Choose bin" }, ...(bins.map(bin => ({ value: bin.id, label: bin.name })))], { onChange: onBin, required: true })}
     {model.depositLabel && model.depositAmount ? <>{E.row("Deposit refund · unavailable", model.depositLabel, model.depositAmount)}{E.info("Deposit refunds are not included in this beer return.")}</> : null}
     {E.info(model.creditInfo)}
     {E.tape(tape ?? model.tape)}

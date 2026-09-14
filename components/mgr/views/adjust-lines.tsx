@@ -3,8 +3,6 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { OrderQuantity, OrderSkuPicker } from "./new-order";
 import type { AdjustLinesViewModel } from "@/lib/mgr/adjust-lines-view";
 
@@ -31,7 +29,7 @@ export function AdjustLinesView({ model, footer, reason = "", onReason, onQuanti
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => onRemove?.(index)}>Remove</Button>}
     </div>)}
     <Button type="button" variant="ghost" className="w-fit" onClick={onAdd}>Add line</Button>
-    <Field><FieldLabel>Reason</FieldLabel><Input aria-label="Reason" required value={onReason ? reason : undefined} defaultValue={onReason ? undefined : reason} onChange={event => onReason?.(event.target.value)} /></Field>
+    {E.edit("Reason", reason, "text", undefined, { onChange: onReason, required: true })}
     {messages}
     {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting}>{submitting ? "Saving…" : "Save lines"}</Button>}
   </>;

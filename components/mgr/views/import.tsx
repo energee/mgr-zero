@@ -5,7 +5,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 
@@ -49,11 +48,8 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     {step === 1 && <>
       <p>Map CSV columns to fields. Required fields are marked *. References use IDs from the lists below.</p>
       {fields.map(field => <Field key={field.name}>
-        <FieldLabel>{field.name}{field.required ? " *" : ""}</FieldLabel>
-        <Select value={onMapping ? String(mapping[field.name] ?? -1) : undefined} defaultValue={onMapping ? undefined : String(mapping[field.name] ?? -1)} onValueChange={value => onMapping?.(field.name, Number(value))}>
-          <SelectTrigger className="w-full" aria-label={field.name}><SelectValue /></SelectTrigger>
-          <SelectContent><SelectGroup><SelectItem value="-1">Not mapped</SelectItem>{model.headers?.map((header, index) => <SelectItem key={header} value={String(index)}>{header}</SelectItem>)}</SelectGroup></SelectContent>
-        </Select>
+
+        {E.pick(field.name + (field.required ? " *" : ""), String(mapping[field.name]), [{ value: "-1", label: "Not mapped" }, ...(model.headers?.map((header, index) => ({ value: String(index), label: header })) ?? [])], { onChange: onMapping ? value => onMapping?.(field.name, Number(value)) : undefined })}
         {field.values && <span className="text-sm text-muted-foreground">{field.values.join(", ")}</span>}
       </Field>)}
       <Button onClick={() => onStep?.(2)}>Preview {rows.length} rows</Button><Button variant="outline" onClick={() => onStep?.(0)}>Back to upload</Button>
@@ -68,8 +64,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       <div className="[&_td]:whitespace-normal [&_td]:[overflow-wrap:anywhere] [&_th:first-child]:w-10 [&_th:last-child]:w-20 [&_table]:table-fixed [&_table]:min-w-0 [&_table]:w-full">{E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]))}</div>
       {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name ?? row.product ?? row.label ?? kind.replaceAll("_", " ")}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
-          <FieldLabel>{field.name}{field.required ? " *" : ""}</FieldLabel>
-          <input aria-label={`Row ${index + 1} ${field.name}`} className="min-w-0 rounded-md border border-input bg-background p-2 text-sm" value={row[field.name] ?? ""} onChange={event => edit(index, field.name, event.target.value)} />
+          {E.edit(`${field.name}${field.required ? " *" : ""}`, row[field.name], "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${field.name}` })}
         </Field>)}</div>
       </details>)}
       <Button disabled={!ready || busy} onClick={onCommit}>{kind === "opening_balances" ? "Post opening balances" : `Import ${ready} ready rows`}</Button>

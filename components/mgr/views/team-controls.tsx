@@ -1,10 +1,7 @@
 "use client";
 import { useId, useState, type FormEventHandler } from "react";
 import { E } from "@/components/mgr/e";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 
 const ROLES = [
@@ -14,12 +11,8 @@ const ROLES = [
 ];
 
 function StaffRoleField({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
-  const id = useId();
   const selected = ROLES.find(([role]) => role === value);
-  return <div className="flex flex-col gap-2"><Label htmlFor={id}>Role</Label><Select value={value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger id={id}><SelectValue>{selected?.[1] ?? value}</SelectValue></SelectTrigger>
-    <SelectContent><SelectGroup>{ROLES.map(([role, label]) => <SelectItem key={role} value={role}>{label}</SelectItem>)}</SelectGroup></SelectContent>
-  </Select><p className="text-sm text-muted-foreground">{selected?.[2]}</p></div>;
+  return <div className="flex flex-col gap-2">{E.pick("Role", value, (ROLES.map(([role, label]) => ({ value: role, label }))), { onChange, disabled })}<p className="text-sm text-muted-foreground">{selected?.[2]}</p></div>;
 }
 
 export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChange, onRoleChange, onSubmit, busy = false, error }: {
@@ -28,7 +21,7 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
 }) {
   const id = useId(), [draftEmail, setEmail] = useState(defaultEmail), [draftRole, setRole] = useState("warehouse");
   return <form onSubmit={event => { event.preventDefault(); if (!busy) onSubmit?.(event); }} className="flex flex-col gap-4">
-    <Label htmlFor={id}>Email</Label><Input id={id} type="email" required value={email ?? draftEmail} disabled={busy} onChange={event => { setEmail(event.target.value); onEmailChange?.(event.target.value); }} />
+    {E.edit("Email", email ?? draftEmail, "email", undefined, { onChange: (nextValue: string) => { setEmail(nextValue); onEmailChange?.(nextValue); }, id, disabled: busy, required: true })}
     {buyer ? E.fld("Role", "Buyer") : <StaffRoleField value={role ?? draftRole} onChange={value => { setRole(value); onRoleChange?.(value); }} disabled={busy} />}
     {E.note("Sending an invite emails the recipient and cannot be recalled. Existing accounts cannot be attached with this form. Keep this page open to retry unchanged details after an error.")}
     <CommandFormMessage error={error} />

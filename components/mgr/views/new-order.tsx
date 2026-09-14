@@ -3,14 +3,11 @@
 import { useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
+import { Fragment } from "react";
 
 export type { NewOrderViewModel };
 export type NewOrderControls = {
@@ -24,15 +21,7 @@ export type NewOrderControls = {
 };
 
 function OrderPick({ label, value, options, onChange }: { label: string; value: string; options: OrderOption[]; onChange?: (value: string) => void }) {
-  return <Field><FieldLabel>{label}</FieldLabel>
-    <Select value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onValueChange={onChange}>
-      <SelectTrigger aria-label={label}><SelectValue placeholder={label} /></SelectTrigger>
-      <SelectContent>{options.map(option => {
-        const id = typeof option === "string" ? option : option.id;
-        return <SelectItem key={id} value={id}>{typeof option === "string" ? option : option.label}</SelectItem>;
-      })}</SelectContent>
-    </Select>
-  </Field>;
+  return E.pick(label, value, options.map(option => typeof option === "string" ? option : { value: option.id, label: option.label }), { onChange, placeholder: label });
 }
 
 // Options are already loaded and permission-filtered by the route. Search the
@@ -48,14 +37,7 @@ export function OrderSkuPicker({ value, label, options, onChange }: { value: str
 }
 
 export function OrderQuantity({ value, label, onChange, contextualLabels = false, max, step = "any", required = false, invalid = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean }) {
-  const [internal, setInternal] = useState(String(value));
-  const current = onChange ? String(value) : internal;
-  const change = (next: string) => { setInternal(next); onChange?.(next); };
-  return <ButtonGroup>
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} onClick={() => change(String(Math.max(0, Number(current) - 1)))}>−</Button>
-    <Input type="number" min="0" max={max} step={step} required={required} aria-invalid={invalid || undefined} inputMode="decimal" value={current} onChange={event => change(event.target.value)} aria-label={label} className="w-14 text-center" />
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} onClick={() => change(String(Math.min(max ?? Infinity, Number(current) + 1)))}>+</Button>
-  </ButtonGroup>;
+  return E.edit(label, String(value), "number", undefined, { onChange, min: 0, max, step, required, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
 }
 
 export function NewOrderView({ model, controls = {}, messages, feedback, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
@@ -71,18 +53,11 @@ export function NewOrderView({ model, controls = {}, messages, feedback, footer,
         ? <OrderPick key="destination" label="To location" value={model.destination ?? ""} options={model.sources} onChange={controls.destination} />
         : <OrderPick key="customer" label="Customer" value={model.customer} options={model.customers} onChange={controls.customer} />,
       model.kind === "taproom_transfer" ? null :
-        <Field key="ship-to"><FieldLabel>Ship-to</FieldLabel>
-          <select aria-label="Ship-to" className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
-            value={controls.shipTo ? model.shipTo : undefined} defaultValue={controls.shipTo ? undefined : model.shipTo}
-            onChange={event => controls.shipTo?.(event.target.value)} disabled={!model.customer}>
-            <option value="">{model.customer ? "Select ship-to" : "Select a customer first"}</option>
-            {model.shipTos.map(option => <option key={typeof option === "string" ? option : option.id} value={typeof option === "string" ? option : option.id}>{typeof option === "string" ? option : option.label}</option>)}
-          </select>
-        </Field>,
+        <Fragment key={"ship-to"}>{E.pick("Ship-to", model.shipTo, [{ value: "", label: (model.customer ? "Select ship-to" : "Select a customer first") }, ...(model.shipTos.map(option => ({ value: typeof option === "string" ? option : option.id, label: (typeof option === "string" ? option : option.label) })))], { onChange: controls.shipTo, disabled: !model.customer })}</Fragment>,
       <OrderPick key="source" label="Source location" value={model.source} options={model.sources} onChange={controls.source} />,
       <DatePicker key="date" label="Requested ship" value={controls.requestedShip ? model.requestedShip : undefined} defaultValue={model.requestedShip} onChange={controls.requestedShip} />,
     )}
-    <Field><FieldLabel>Customer PO</FieldLabel><Input aria-label="Customer PO" value={controls.po ? model.po : undefined} defaultValue={controls.po ? undefined : model.po} onChange={event => controls.po?.(event.target.value)} /></Field>
+    {E.edit("Customer PO", model.po, "text", undefined, { onChange: controls.po })}
     {model.lines.map((line, index) => <div key={index}>
       {E.row(
         <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,

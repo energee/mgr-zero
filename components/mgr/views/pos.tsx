@@ -5,15 +5,11 @@ import { SquareMark } from "@/components/mgr/brand-icons";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { reconcileBooleanChange, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 const SelectField = ({ id, label, value, options, onChange }: {
   id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void;
-}) => <div className="flex flex-col gap-2"><Label htmlFor={id}>{label}</Label><select role="combobox" id={id} value={value} onChange={event => onChange(event.target.value)} className="h-9 rounded-md border bg-transparent px-3 text-sm">
-  <option value="">Select {label.toLowerCase()}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-</select></div>;
+}) => E.pick(label, value, [{ value: "", label: "Select " + (label.toLowerCase()) }, ...(options.map(option => ({ value: option.value, label: option.label })))], { onChange: (nextValue: string) => onChange(nextValue), id });
 
 export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalogLabel = "Sync Square catalog", salesLabel = "Sync Square sales", feedback, onCatalog, onSales }: {
   catalogBusy?: boolean; salesBusy?: boolean; catalogLabel?: string; salesLabel?: string; feedback?: ReactNode;
@@ -195,7 +191,7 @@ export function PosItemView({ item, price, busy, error, notice, onSave, onWebsit
     {E.fld("Brand", item.brand)}{E.fld("Format", item.format)}{E.fld("Pours from", item.sources || "No stocked keg in this menu bin")}
     {E.fld("Serving", item.serving)}{E.fld("Format price", item.price)}{E.fld("Availability", item.available ? "In the selected bin" : "Off register · no selected-bin stock")}
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); onSave?.(value); }}>
-      <Label htmlFor="pos-price-override">Price override</Label><Input id="pos-price-override" type="number" min="0" step="0.01" value={value} onChange={event => setValue(event.target.value)} placeholder="Follow format price" />
+      {E.edit("Price override", value, "number", undefined, { onChange: (nextValue: string) => setValue(nextValue), id: "pos-price-override", min: "0", step: "0.01", placeholder: "Follow format price" })}
       <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setValue("")}>Reset to format price</Button><Button disabled={busy}>{busy ? "Saving…" : "Save override"}</Button></div>
     </form>
     <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Publish on website<input type="checkbox" className="size-5" checked={website} onChange={event => { if (onWebsite) void reconcileBooleanChange(website, event.target.checked, onWebsite, setWebsite); }} disabled={!onWebsite || busy || !item.available} /></label>

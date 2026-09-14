@@ -58,12 +58,15 @@ describe("Purchase orders", () => {
   });
 
   it("shares decimal counts, untracked lot omission, errors and disabled saving", () => {
+    const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(NewPoView, {
       model: { vendor: "vendor-id", vendors: [{ id: "vendor-id", name: "Actual vendor" }], expected: "", lines: [
         { key: "line", title: "Actual material", detail: "each", qty: "1.5", cost: "" },
       ] }, submitting: true, messages: "Request failed",
     }));
-    expect(html).toContain('value="vendor-id"');
+    // Radix mounts option DOM after hydration; assert the shared pick's identity contract.
+    expect(pick).toHaveBeenCalledWith("Vendor", "vendor-id", expect.arrayContaining([{ value: "vendor-id", label: "Actual vendor" }]), expect.anything());
+    pick.mockRestore();
     expect(html).toContain('value="1.5"');
     expect(html).toContain('step="any"');
     expect(html).toContain("Request failed");
@@ -157,11 +160,13 @@ describe("Materials", () => {
   });
 
   it("count keeps real bin identities, decimal input, unavailable allocation and nullable footer", () => {
+    const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
       model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }], lotPreviewUnavailable: true },
       submitting: true, messages: "Count failed", footer: null,
     }));
-    expect(html).toContain('value="bin-id"');
+    expect(pick).toHaveBeenCalledWith("Bin", "bin-id", expect.arrayContaining([{ value: "bin-id", label: "Actual bin" }]), expect.anything());
+    pick.mockRestore();
     expect(html).toContain('value="0.5"');
     expect(html).toContain('step="any"');
     expect(html).toContain("Count failed");

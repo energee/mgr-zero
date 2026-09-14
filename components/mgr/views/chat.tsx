@@ -2,10 +2,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { ChatHealth, ChatLinkIntent, ChatLinkedPerson, ChatPreferences } from "@/lib/commands/chat";
@@ -73,15 +70,13 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
     {preferences.preferences.map(preference => <div key={preference.reason}>
       {E.row(preference.reason.replaceAll("_", " "), "Personal reminders", <Switch aria-label={preference.reason.replaceAll("_", " ")} checked={onPreference ? preference.enabled : undefined} defaultChecked={onPreference ? undefined : preference.enabled} disabled={busy} onCheckedChange={enabled => onPreference?.(preference.reason, enabled)} />)}
       {Boolean(preferences.destinations?.length) && <label className="flex items-center justify-between gap-3 py-3 text-sm">{preference.reason.replaceAll("_", " ")} destination
-        <select aria-label={`${preference.reason.replaceAll("_", " ")} destination`} value={onDestination ? preference.personalDestinationId ?? "" : undefined} defaultValue={onDestination ? undefined : preference.personalDestinationId ?? ""} disabled={busy} onChange={event => onDestination?.(preference.reason, event.target.value)}>
-          <option value="" disabled>Default delivery</option>{preferences.destinations!.map(destination => <option key={destination.id} value={destination.id}>{destination.external_destination_id}</option>)}
-        </select>
+        {E.pick(`${preference.reason.replaceAll("_", " ")} destination`, preference.personalDestinationId ?? "", [{ value: "", label: "Default delivery", disabled: true }, ...(preferences.destinations!.map(destination => ({ value: destination.id, label: destination.external_destination_id })))], { onChange: onDestination ? (nextValue: string) => onDestination?.(preference.reason, nextValue) : undefined, disabled: busy, hideLabel: true })}
       </label>}
     </div>)}
     {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(start) === Boolean(end)) onSaveQuiet?.(start, end, timezone); }}>
-      <Label htmlFor={`${id}-start`}>My quiet hours start</Label><Input id={`${id}-start`} type="time" value={start} disabled={busy} onChange={event => setStart(event.target.value)} />
-      <Label htmlFor={`${id}-end`}>My quiet hours end</Label><Input id={`${id}-end`} type="time" value={end} disabled={busy} onChange={event => setEnd(event.target.value)} />
-      <Label htmlFor={`${id}-timezone`}>My timezone</Label><Input id={`${id}-timezone`} value={timezone} disabled={busy} onChange={event => setTimezone(event.target.value)} required />
+      {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy })}
+      {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy })}
+      {E.edit("My timezone", timezone, "text", undefined, { onChange: (nextValue: string) => setTimezone(nextValue), id: `${id}-timezone`, disabled: busy, required: true })}
       <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours.</p><Button disabled={busy || Boolean(start) !== Boolean(end)}>Save my quiet hours</Button>
     </form>}
     <CommandFormMessage error={error} />
@@ -95,8 +90,8 @@ export function ChatQuietHoursView({ start, end, timezone, busy = false, onChang
   return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(value.start) === Boolean(value.end)) onSave?.(value.start, value.end); }}>
     {value.start && value.end ? <TimeWindowField key={version} label="Quiet hours" start={value.start} end={value.end} step={1} disabled={busy} onChange={change} /> : E.fld("Quiet hours", value.start || value.end ? "Set both times" : "Off")}
     <details><summary>Exact times · {timezone}</summary><div className="flex flex-col gap-3 pt-3">
-      <Label htmlFor={`${id}-start`}>Brewery quiet hours start</Label><Input id={`${id}-start`} type="time" value={value.start} disabled={busy} onChange={event => { change(event.target.value, value.end); setVersion(version + 1); }} />
-      <Label htmlFor={`${id}-end`}>Brewery quiet hours end</Label><Input id={`${id}-end`} type="time" value={value.end} disabled={busy} onChange={event => { change(value.start, event.target.value); setVersion(version + 1); }} />
+      {E.edit("Brewery quiet hours start", value.start, "time", undefined, { onChange: (nextValue: string) => { change(nextValue, value.end); setVersion(version + 1); }, id: `${id}-start`, disabled: busy })}
+      {E.edit("Brewery quiet hours end", value.end, "time", undefined, { onChange: (nextValue: string) => { change(value.start, nextValue); setVersion(version + 1); }, id: `${id}-end`, disabled: busy })}
       <p className="text-sm text-muted-foreground">Clear both times to turn off brewery quiet hours.</p>
     </div></details>
     <Button disabled={busy || Boolean(value.start) !== Boolean(value.end)}>Save brewery quiet hours</Button>
@@ -114,17 +109,14 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, start, e
     {installation.state === "active" && <section className="flex flex-col gap-3" aria-label="Operations channel">
       <Button variant="outline" disabled={busy || !configured} onClick={onLoadChannels}>Load private channels</Button>
       {channels && (channels.length ? <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && channel) onSaveChannel?.(); }}>
-        <Label htmlFor={`${id}-channel`}>Operations channel</Label>
-        <Select value={onChannel ? channel : undefined} defaultValue={onChannel ? undefined : channel} onValueChange={onChannel} disabled={busy} required>
-          <SelectTrigger id={`${id}-channel`} className="w-full"><SelectValue placeholder="Choose a private channel" /></SelectTrigger>
-          <SelectContent><SelectGroup>{channels.map(option => <SelectItem key={option.id} value={option.id}>#{option.name} · private</SelectItem>)}</SelectGroup></SelectContent>
-        </Select><Button disabled={busy || !channel}>Save operations channel</Button>
+
+        {E.pick("Operations channel", channel, channels.map(option => ({ value: option.id, label: `#${option.name} · private` })), { onChange: onChannel, disabled: busy, required: true, placeholder: "Choose a private channel", id: `${id}-channel` })}<Button disabled={busy || !channel}>Save operations channel</Button>
       </form> : E.note("No eligible private channels. Add MGR to a private channel with sharing turned off, then load again."))}
       {E.note("Only active private channels with MGR added and sharing turned off are eligible. MGR checks again when you save and before delivery.")}
     </section>}
     <ChatQuietHoursView start={start} end={end} timezone={timezone} busy={busy} onChange={onQuietChange} onSave={onSaveQuiet} />
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy) onSaveHours?.(); }}>
-      <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label><Input id={`${id}-hours`} type="number" min={1} max={168} required value={onHours ? hours : undefined} defaultValue={onHours ? undefined : hours} onChange={event => onHours?.(event.target.value)} disabled={busy} />
+      {E.edit("Reading overdue after (hours)", hours, "number", undefined, { onChange: onHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168 })}
       <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p><Button disabled={busy}>Save reading cadence</Button>
     </form>
     {delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />}

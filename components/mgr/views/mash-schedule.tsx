@@ -4,8 +4,6 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { MASH_STEP_KINDS } from "@/lib/commands/production";
 import { mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
 
@@ -31,13 +29,12 @@ export function MashScheduleView({ title = "Mash schedule", steps, createAction,
 
 
 export function MashStepView({ fields, onChange, footer }: { fields: MashStepFields; onChange?: (patch: Partial<MashStepFields>) => void; footer?: ReactNode }) {
-  const bind = (key: keyof MashStepFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };
   return <>
-    <Field><FieldLabel>Step name</FieldLabel><Input aria-label="Step name" required {...bind("name")} onChange={(e) => onChange?.({ name: e.target.value })} /></Field>
-    <Field><FieldLabel>Type</FieldLabel><select aria-label="Type" className={E.select} {...bind("kind")} onChange={(e) => onChange?.({ kind: e.target.value })}>{MASH_STEP_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></Field>
+    {E.edit("Step name", fields.name, "text", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ name: nextValue }) : undefined, required: true })}
+    {E.pick("Type", fields.kind, (MASH_STEP_KINDS.map(k => ({ value: k, label: k }))), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
     {E.cols(
-      <Field><FieldLabel>Temp °F</FieldLabel><Input aria-label="Temp °F" type="number" step="any" required {...bind("tempF")} onChange={(e) => onChange?.({ tempF: e.target.value })} /></Field>,
-      <Field><FieldLabel>Duration min</FieldLabel><Input aria-label="Duration min" type="number" min="1" step="1" required {...bind("minutes")} onChange={(e) => onChange?.({ minutes: e.target.value })} /></Field>,
+      E.edit("Temp °F", fields.tempF, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ tempF: nextValue }) : undefined, required: true, step: "any" }),
+      E.edit("Duration min", fields.minutes, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ minutes: nextValue }) : undefined, required: true, min: "1", step: "1" }),
     )}
     {footer !== undefined ? footer : E.btns([["Delete step", "g"], "Save step"])}
   </>;

@@ -1,8 +1,6 @@
 "use client";
 import { useId, useState, type FormEventHandler, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 
@@ -38,8 +36,8 @@ export function QboMappingView({ kind, label, value, defaultValue = "", onChange
   return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && remoteId.trim()) onSubmit?.(event); }}>
     {label && E.fld("Mapping", label)}
     {E.note("Verify the intended record in the connected QuickBooks company and enter its exact ID. MGR never chooses automatically from a matching name.")}
-    <Label htmlFor={id}>QuickBooks {kind === "customer" ? "customer" : "item"} ID</Label>
-    <Input id={id} value={remoteId} onChange={event => { setDraft(event.target.value); onChange?.(event.target.value); }} required disabled={busy} />
+
+    {E.edit("QuickBooks " + (kind === "customer" ? "customer" : "item") + " ID", remoteId, "text", undefined, { onChange: (nextValue: string) => { setDraft(nextValue); onChange?.(nextValue); }, id, disabled: busy, required: true })}
     <CommandFormMessage error={error} />
     <CommandFormFooter><Button disabled={busy || !remoteId.trim()}>{busy ? "Saving…" : "Save mapping"}</Button></CommandFormFooter>
     {companyConflict && E.info("If this QuickBooks company belongs to another MGR brewery, disconnect it there first.")}

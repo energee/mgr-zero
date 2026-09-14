@@ -8,7 +8,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { Qty } from "@/components/mgr/qty";
-import { Field, FieldLabel } from "@/components/ui/field";
 import type { RepackOption, RepackViewModel } from "@/lib/mgr/repack-view";
 
 type FooterProps = { formId?: string; submitting?: boolean; disabled?: boolean };
@@ -19,9 +18,7 @@ export function repackFooter(model: RepackViewModel, props: FooterProps = {}) {
 }
 
 const pick = (label: string, value: string | undefined, options: RepackOption[], onChange?: (id: string) => void, disabled = false) => (
-  <Field><FieldLabel>{label}</FieldLabel><select aria-label={label} required disabled={disabled} className={E.select} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onChange={(event) => onChange?.(event.target.value)}>
-    <option value="">Select {label.toLowerCase()}</option>{options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-  </select></Field>
+  E.pick(label, String(value ?? ""), [{ value: "", label: "Select " + (label.toLowerCase()) }, ...(options.map((o) => ({ value: o.id, label: o.name })))], { onChange, disabled, required: true, "aria-label": label })
 );
 
 export function RepackView({ model, footer, messages, onParent, onLocation, onBin, onQuantity, submitting = false, disabled = false }: {

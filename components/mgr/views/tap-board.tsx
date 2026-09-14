@@ -4,8 +4,6 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { LinkTabs } from "@/components/mgr/work-tabs";
@@ -32,23 +30,19 @@ export function TapKegView({ sheet: controlledSheet, skus, onEdit, closedFact, o
     <fieldset disabled={locked} className="flex flex-col gap-3">
       {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? `Kick tap ${sheet.interval.tap_number ?? "unnumbered"}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : `Tap ${sheet.interval.tap_number ?? "unnumbered"}`, `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${formatDateTime(sheet.interval.opened_at)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
       {sheet.kind !== "tap" && <>
-        <Field><FieldLabel>Reason</FieldLabel><select aria-label="Reason" className="min-w-0 rounded border bg-background p-2" value={sheet.fields.reason} onChange={e => edit({ reason: e.target.value })}>{["Kicked empty", "Flavor change", "Quality hold"].map(reason => <option key={reason}>{reason}</option>)}</select></Field>
+        {E.pick("Reason", sheet.fields.reason, (["Kicked empty", "Flavor change", "Quality hold"].map(reason => ({ value: reason, label: reason }))), { onChange: (nextValue: string) => edit({ reason: nextValue }) })}
         {E.ttl("Remaining")}
         <FillChips values={closingFills} value={sheet.fields.closeFill} onChange={value => edit({ closeFill: value as 0 | .25 | .5 })} />
       </>}
       {sheet.kind !== "kick" && <>
         {E.ttl("Going on")}
-        {sheet.fields.identity !== "guest" && <Field><FieldLabel>Packaged keg SKU</FieldLabel><select aria-label="Packaged keg SKU" required className="min-w-0 rounded border bg-background p-2" value={sheet.fields.identity === "same" ? sheet.interval?.sku_id ?? "" : sheet.fields.skuId} onChange={e => edit({ identity: "own", skuId: e.target.value })}>
-          <option value="">Choose a keg</option>{sheet.fields.identity === "same" && sheet.interval?.sku_id && !skus.some(sku => sku.id === sheet.interval?.sku_id) && <option value={sheet.interval.sku_id}>{tapLabel(sheet.interval)} · {volume(sheet.interval.nominal_bbl)}</option>}{skus.map(sku => <option key={sku.id} value={sku.id}>{sku.name} · {volume(sku.nominalBbl)}</option>)}
-        </select></Field>}
-        <Field><FieldLabel>Identity</FieldLabel><select aria-label="Identity" className="min-w-0 rounded border bg-background p-2" value={sheet.fields.identity} onChange={e => edit({ identity: e.target.value as TapSheetFields["identity"] })}>
-          {sheet.kind === "swap" && <option value="same" disabled={!sheet.interval?.sku_id}>Same own SKU</option>}<option value="own">Own keg</option><option value="guest">Guest keg</option>
-        </select></Field>
+        {sheet.fields.identity !== "guest" && E.pick("Packaged keg SKU", sheet.fields.identity === "same" ? sheet.interval?.sku_id ?? "" : sheet.fields.skuId, [{ value: "", label: "Choose a keg" }, ...(sheet.fields.identity === "same" && sheet.interval?.sku_id && !skus.some(sku => sku.id === sheet.interval?.sku_id) ? [{ value: sheet.interval.sku_id, label: `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)}` }] : []), ...(skus.map(sku => ({ value: sku.id, label: sku.name + " · " + (volume(sku.nominalBbl)) })))], { onChange: (nextValue: string) => edit({ identity: "own", skuId: nextValue }), required: true })}
+        {E.pick("Identity", String(sheet.fields.identity), [...(sheet.kind === "swap" ? [{ value: "same", label: "Same own SKU", disabled: !sheet.interval?.sku_id }] : []), { value: "own", label: "Own keg" }, { value: "guest", label: "Guest keg" }], { onChange: (nextValue: string) => edit({ identity: nextValue as TapSheetFields["identity"] }) })}
         {sheet.fields.identity === "guest" && <>
-          <Field><FieldLabel>Guest keg label</FieldLabel><Input aria-label="Guest keg label" maxLength={200} required value={sheet.fields.guestLabel} onChange={e => edit({ guestLabel: e.target.value })} /></Field>
-          <Field><FieldLabel>Guest nominal BBL</FieldLabel><Input aria-label="Guest nominal BBL" type="number" min="0" step="any" required value={sheet.fields.guestNominalBbl} onChange={e => edit({ guestNominalBbl: e.target.value })} /></Field>
+          {E.edit("Guest keg label", sheet.fields.guestLabel, "text", undefined, { onChange: (nextValue: string) => edit({ guestLabel: nextValue }), required: true, maxLength: 200 })}
+          {E.edit("Guest nominal BBL", sheet.fields.guestNominalBbl, "number", undefined, { onChange: (nextValue: string) => edit({ guestNominalBbl: nextValue }), required: true, min: "0", step: "any" })}
         </>}
-        <Field><FieldLabel>Tap number · optional and may repeat</FieldLabel><Input aria-label="Tap number · optional and may repeat" maxLength={80} value={sheet.fields.tapNumber} onChange={e => edit({ tapNumber: e.target.value })} /></Field>
+        {E.edit("Tap number · optional and may repeat", sheet.fields.tapNumber, "text", undefined, { onChange: (nextValue: string) => edit({ tapNumber: nextValue }), maxLength: 80 })}
         {E.ttl("Opening fill")}<FillChips values={fills} value={sheet.fields.openingFill} onChange={value => edit({ openingFill: value as .25 | .5 | .6 | 1 })} />
       </>}
     </fieldset>

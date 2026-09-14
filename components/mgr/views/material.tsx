@@ -1,13 +1,10 @@
 // components/mgr/views/material.tsx — shared Material sheet body.
-import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NONE } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
+import type { ReactNode } from "react";
+import { Fragment } from "react";
 
 export type { MaterialViewModel };
 
@@ -22,21 +19,9 @@ const pick = (
   options: { value: string; label: string }[],
   change?: (value: string) => void,
 ) => (
-  <Field key={label}>
-    <FieldLabel>{label}</FieldLabel>
-    <Select
-      value={change ? value : undefined}
-      defaultValue={change ? undefined : value}
-      onValueChange={change}
-    >
-      <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </Field>
+  <Fragment key={label}>{E.pick(label, value, (options.map(option => (
+          { value: option.value, label: option.label }
+        ))), { onChange: change })}</Fragment>
 );
 
 export function MaterialView({ model, controls = {}, messages, footer }: {
@@ -45,10 +30,9 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
   messages?: ReactNode;
   footer?: ReactNode;
 }) {
-  const factor = Number(model.baseUnits) || 0;
-  const kindOptions = model.kindOptions.map((value) => ({ value, label: value }));
-  const purchaseUnitOptions = model.purchaseUnitOptions.map((value) => ({ value, label: value }));
-  const unitOptions = model.unitOptions.map((value) => ({ value, label: value }));
+  const kindOptions = model.kindOptions.map(value => ({ value, label: value }));
+  const purchaseUnitOptions = model.purchaseUnitOptions.map(value => ({ value, label: value }));
+  const unitOptions = model.unitOptions.map(value => ({ value, label: value }));
   const defaultVendorOptions = [
     { value: NONE, label: "None" },
     ...model.defaultVendorOptions.map(({ id, label }) => ({ value: id, label })),
@@ -59,52 +43,10 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
 
   return (
     <>
-      <Field>
-        <FieldLabel>Material name</FieldLabel>
-        <Input
-          aria-label="Material name"
-          value={controls.name ? model.name : undefined}
-          defaultValue={controls.name ? undefined : model.name}
-          onChange={(event) => controls.name?.(event.target.value)}
-          required={Boolean(controls.name)}
-        />
-      </Field>
+      {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
       {pick("Kind", model.kind, kindOptions, controls.kind)}
       {E.inline(
-        <Field key="factor">
-          <FieldLabel>Base units</FieldLabel>
-          <ButtonGroup>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Decrease"
-              onClick={() => controls.baseUnits?.(String(Math.max(0, factor - 1)))}
-            >
-              −
-            </Button>
-            <Input
-              aria-label="Base units"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              value={controls.baseUnits ? model.baseUnits : undefined}
-              defaultValue={controls.baseUnits ? undefined : model.baseUnits}
-              onChange={(event) => controls.baseUnits?.(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Increase"
-              onClick={() => controls.baseUnits?.(String(factor + 1))}
-            >
-              +
-            </Button>
-          </ButtonGroup>
-        </Field>,
+        <Fragment key={"factor"}>{E.edit("Base units", model.baseUnits, "number", undefined, { onChange: controls.baseUnits, min: 0, step: "any", inputMode: "decimal" })}</Fragment>,
         pick("Purchase unit", model.purchaseUnit, purchaseUnitOptions, controls.purchaseUnit),
         pick("Unit", model.unit, unitOptions, controls.unit),
       )}

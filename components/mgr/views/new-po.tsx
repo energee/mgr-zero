@@ -2,8 +2,6 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
 import type { NewPoViewModel } from "@/lib/mgr/new-po-view";
@@ -27,24 +25,16 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
   return <>
     {E.back("Purchase orders", "New PO", undefined, model.backHref)}
     <fieldset disabled={submitting} className="flex flex-col gap-3">
-      <Field><FieldLabel>Vendor</FieldLabel>
-        <select aria-label="Vendor" required className="min-h-9 w-full rounded border bg-background p-2" value={controls.vendor ? model.vendor : undefined} defaultValue={controls.vendor ? undefined : model.vendor} onChange={event => controls.vendor?.(event.target.value)}>
-          <option value="">Select vendor</option>
-          {(model.vendors ?? [{ id: model.vendor, name: model.vendor }]).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}
-        </select>
-      </Field>
+      {E.pick("Vendor", model.vendor, [{ value: "", label: "Select vendor" }, ...((model.vendors ?? [{ id: model.vendor, name: model.vendor }]).map(vendor => ({ value: vendor.id, label: vendor.name })))], { onChange: controls.vendor, required: true })}
       <DatePicker label="Expected" value={controls.expected ? model.expected : undefined} defaultValue={model.expected} onChange={controls.expected} />
       {model.lines.map((line, index) => <Fragment key={line.key}>
         {E.line(
-          <select aria-label={`Line ${index + 1} material`} required={started(line)} className="min-h-9 w-full min-w-0 rounded border bg-background p-2" value={controls.material ? line.materialId ?? "" : undefined} defaultValue={controls.material ? undefined : line.materialId ?? line.key} onChange={event => controls.material?.(index, event.target.value)}>
-            <option value="">Select material</option>
-            {(model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "", lot_tracked: line.lot !== undefined }]).map(material => <option key={material.id} value={material.id}>{material.name}{material.purchase_uom ? ` · ${material.purchase_uom}` : ""}</option>)}
-          </select>,
+          E.pick(`Line ${index + 1} material`, controls.material ? line.materialId ?? "" : line.materialId ?? line.key, [{ value: "", label: "Select material" }, ...((model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "", lot_tracked: line.lot !== undefined }]).map(material => ({ value: material.id, label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : "") })))], { onChange: controls.material ? (nextValue: string) => controls.material?.(index, nextValue) : undefined, required: started(line), hideLabel: true }),
           line.detail,
           <OrderQuantity label={`Line ${index + 1} quantity`} required={started(line)} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(index, value))} />,
           "", <>
-            <Field><FieldLabel>Unit cost</FieldLabel><Input aria-label={`Line ${index + 1} unit cost`} type="number" min="0" step="0.01" placeholder="Unit cost ($)" value={controls.cost ? line.cost : undefined} defaultValue={controls.cost ? undefined : line.cost.replace(/^\$/, "")} onChange={event => controls.cost?.(index, event.target.value)} /></Field>
-            {line.lot !== undefined && <Field><FieldLabel>Expected lot</FieldLabel><Input aria-label={`Line ${index + 1} expected lot`} value={controls.lot ? line.lot : undefined} defaultValue={controls.lot ? undefined : line.lot} onChange={event => controls.lot?.(index, event.target.value)} /></Field>}
+            {E.edit("Unit cost", controls.cost ? line.cost : line.cost.replace(/^\$/, ""), "number", undefined, { onChange: controls.cost ? (nextValue: string) => controls.cost?.(index, nextValue) : undefined, min: "0", step: "0.01", placeholder: "Unit cost ($)", "aria-label": `Line ${index + 1} unit cost` })}
+            {line.lot !== undefined && E.edit("Expected lot", line.lot, "text", undefined, { onChange: controls.lot ? (nextValue: string) => controls.lot?.(index, nextValue) : undefined, "aria-label": `Line ${index + 1} expected lot` })}
           </>
         )}
       </Fragment>)}
