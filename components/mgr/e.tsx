@@ -92,6 +92,11 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
   </div>
 );
 
+/** What a live adapter passes to make a field its own: an onChange, or none
+ *  with `disabled` for a read-out that must not look editable. Fixtures pass
+ *  nothing and draw a default value. */
+export type FieldControls = { onChange?: (value: string) => void; disabled?: boolean };
+
 export const E = {
   palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
   /** Page title. `action` is a list-create button (New order, Add customer):
@@ -224,8 +229,8 @@ export const E = {
    *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
    *  hugged with "w-fit"). The field's clipping and addon padding live in
    *  components/mgr/qty.tsx, shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, onChange?: (value: string) => void) => (
-    <Qty value={value} unit={unit} label={label} id={id} onChange={onChange} />
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => (
+    <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} />
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
@@ -281,8 +286,7 @@ export const E = {
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
    *  (DatePicker). */
-  /** `controls` makes the field controlled for a live adapter; fixtures leave it out and draw a default value. */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: { onChange: (value: string) => void; required?: boolean; step?: number | "any"; max?: number; disabled?: boolean }) => {
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
@@ -290,7 +294,7 @@ export const E = {
       return (
         <Field>
           <FieldLabel>{label}</FieldLabel>
-          {E.stq(Number(value) || 0, label, controls && { value, onChange: controls.onChange, min: 0, max: controls.max ?? 100000, step: controls.step ?? "any", required: controls.required ?? false, disabled: controls.disabled })}
+          {E.stq(Number(value) || 0, label, controls && { value, onChange: controls.onChange ?? (() => {}), min: 0, max: 100000, step: "any", required: false, disabled: controls.disabled })}
         </Field>
       );
     }
@@ -302,7 +306,7 @@ export const E = {
     return (
       <Field>
         <FieldLabel>{label}</FieldLabel>
-        <Input type={type} {...(controls ? { value, onChange: (event) => controls.onChange(event.target.value), required: controls.required, disabled: controls.disabled } : { defaultValue: value })} aria-label={label} list={listId} />
+        <Input type={type} {...(controls ? { value, onChange: (event) => controls.onChange?.(event.target.value), disabled: controls.disabled } : { defaultValue: value })} aria-label={label} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
       </Field>
     );
@@ -333,7 +337,7 @@ export const E = {
     </Field>
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
-  pick: (label: string, value: string, options: (string | { value: string; label: string })[], controls?: { onChange: (value: string) => void; disabled?: boolean }) => (
+  pick: (label: string, value: string, options: (string | { value: string; label: string })[], controls?: FieldControls) => (
     <Field>
       <FieldLabel>{label}</FieldLabel>
       <Select {...(controls ? { value, onValueChange: controls.onChange, disabled: controls.disabled } : { defaultValue: value })}>

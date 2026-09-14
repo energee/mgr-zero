@@ -238,10 +238,9 @@ describe("Recipes view", () => {
     expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
   });
 
-  it("the live recipe page mounts RecipeView and opens RecipeEditor for a draft", () => {
-    const page = src("app/(app)/recipes/[id]/page.tsx");
-    expect(page).toMatch(/<RecipeView\b/);
-    expect(page).toMatch(/<RecipeEditor\b/);
+  it("the live recipe page mounts RecipeView; its next version is RecipeEditor on ./new", () => {
+    expect(src("app/(app)/recipes/[id]/page.tsx")).toMatch(/<RecipeView\b/);
+    expect(src("app/(app)/recipes/[id]/new/page.tsx")).toMatch(/<RecipeEditor\b/);
   });
 });
 

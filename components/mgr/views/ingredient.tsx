@@ -8,9 +8,9 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
+import { INGREDIENT_STAGES, type IngredientLine } from "@/lib/mgr/recipe-process-view";
 
-export type IngredientFields = { material: string; stage: string; perBbl: string; timing: string };
+export type IngredientFields = IngredientLine;
 /** `unit` is the material's base unit as the command returns it; absent until a material is picked. */
 export type IngredientMaterial = { id: string; name: string; unit?: string };
 export const INGREDIENT_STAGE_OPTIONS = INGREDIENT_STAGES.map((s) => ({ value: s, label: s.replace("_", " ") }));
@@ -18,17 +18,17 @@ export const INGREDIENT_STAGE_OPTIONS = INGREDIENT_STAGES.map((s) => ({ value: s
 export function IngredientView({ fields, materials, onChange, footer }: {
   fields: IngredientFields; materials: IngredientMaterial[]; onChange?: (patch: Partial<IngredientFields>) => void; footer?: ReactNode;
 }) {
-  const bind = <K extends keyof IngredientFields>(key: K) => onChange && { onChange: (value: string) => onChange({ [key]: value } as Partial<IngredientFields>) };
-  const unit = materials.find((m) => m.id === fields.material)?.unit;
+  const bind = (key: keyof IngredientFields) => onChange && { onChange: (value: string) => onChange({ [key]: value } as Partial<IngredientFields>) };
+  const unit = materials.find((m) => m.id === fields.materialId)?.unit;
   return <>
-    {E.pick("Material", fields.material, materials.map((m) => ({ value: m.id, label: m.name })), bind("material"))}
+    {E.pick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.name })), bind("materialId"))}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
       <Field>
         <FieldLabel>Quantity per bbl</FieldLabel>
-        {E.qty(fields.perBbl, unit ? `${unit} / bbl` : "/ bbl", "Quantity per bbl", undefined, onChange && ((value) => onChange({ perBbl: value })))}
+        {E.qty(fields.perBblQty, unit ? `${unit} / bbl` : "/ bbl", "Quantity per bbl", undefined, bind("perBblQty"))}
       </Field>,
-      E.edit("Timing min · optional", fields.timing, "number", undefined, bind("timing")),
+      E.edit("Timing min · optional", fields.timingMinutes, "number", undefined, bind("timingMinutes")),
     )}
     {footer !== undefined ? footer : E.btns([["Delete ingredient", "g"], "Save ingredient"])}
   </>;

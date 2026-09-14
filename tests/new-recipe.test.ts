@@ -59,18 +59,18 @@ describe("Recipe creation", () => {
     // No scale chips: they previewed a batch size nothing supplies.
     expect(fixture).not.toMatch(/15 bbl|30 bbl/);
     // No version yet: no number is invented.
-    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: "No version yet: create the first one", createHref: "/recipes/x?draft" } }));
+    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: "No version yet: create the first one", createHref: "/recipes/x/new" } }));
     expect(none).toMatch(/No version yet/);
     expect(none).not.toMatch(/Pre-boil volume/);
-    expect(none).toMatch(/href="\/recipes\/x\?draft"/);
+    expect(none).toMatch(/href="\/recipes\/x\/new"/);
   });
 
   it("/recipes/new and /recipes/[id] draw the editor through RecipeView, never a detail override", () => {
     expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
     const detail = src("app/(app)/recipes/[id]/page.tsx");
     expect(detail).toMatch(/<RecipeView\b/);
-    expect(detail).toMatch(/<RecipeEditor\b/);
-    expect(detail).not.toMatch(/detail=/);
+    expect(detail).not.toMatch(/detail=|searchParams/);
+    expect(src("app/(app)/recipes/[id]/new/page.tsx")).toMatch(/<RecipeEditor\b/);
     const form = src("app/(app)/recipes/[id]/recipe-version-form.tsx");
     expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
@@ -82,13 +82,14 @@ describe("Recipe creation", () => {
     expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
     expect(sheets).toMatch(/<IngredientView\b/);
     // Quantity is per barrel in the picked material's own unit, never a retyped one.
-    const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { material: "citra", stage: "dry_hop", perBbl: "1.2", timing: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
+    const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
     expect(ing).toMatch(/Quantity per bbl/);
     expect(ing).toMatch(/lb \/ bbl/);
     expect(ing).not.toMatch(/Per bbl</);
     expect(sheets).not.toMatch(/<select\b/);
     // Edit is already a Button: it must be the trigger itself, never wrapped in a second button.
-    expect(sheets).toMatch(/node\.type === Button \? node/);
+    expect(src("components/mgr/command-form.tsx")).toMatch(/node\.type === Button \? node/);
+    expect(sheets).toMatch(/asTrigger\(trigger\)/);
     // Stages come from the view-model module, not the command registry.
     expect(src("components/mgr/views/ingredient.tsx")).not.toMatch(/lib\/commands/);
     expect(sheets).not.toMatch(/from "@\/lib\/commands\/production"/);

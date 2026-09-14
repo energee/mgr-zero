@@ -25,18 +25,14 @@ export type RecipeControls = {
 /** Rows that open a sheet on the live draft; each replaces the fixture's static row with the same row as trigger. */
 export type RecipeSlots = { addIngredient?: ReactNode; mash?: ReactNode; fermentation?: ReactNode; water?: ReactNode };
 
-const noop = () => {};
-
 export function RecipeView({
   model,
-  createAction,
   parentForm,
   controls,
   readOnly = false,
   slots = {},
 }: {
   model: RecipeViewModel;
-  createAction?: ReactNode;
   parentForm?: ReactNode;
   controls?: RecipeControls;
   /** A cut version: the same fields, disabled, so nothing looks editable that cannot be saved. */
@@ -44,11 +40,14 @@ export function RecipeView({
   slots?: RecipeSlots;
 }) {
   const bind = (key: RecipeNumberKey | "notes") =>
-    controls ? { onChange: (value: string) => controls.set(key, value) } : readOnly ? { onChange: noop, disabled: true } : undefined;
-  const schedule = (s: RecipeScheduleView | undefined, slot: ReactNode) =>
-    slot ?? (s ? s.rows
-      ? <>{E.row(s.title, s.detail)}{s.rows.map((r, i) => <Fragment key={`${s.title}-${i}`}>{E.row(r.title, r.detail)}</Fragment>)}</>
-      : E.nav(s.title, s.detail) : null);
+    controls ? { onChange: (value: string) => controls.set(key, value) } : readOnly ? { disabled: true } : undefined;
+  // A schedule row: the live draft's sheet trigger, else a read-out of its rows on a cut version, else the row that opens its screen.
+  const schedule = (s: RecipeScheduleView | undefined, slot: ReactNode) => {
+    if (slot) return slot;
+    if (!s) return null;
+    if (!s.rows) return E.nav(s.title, s.detail);
+    return <>{E.row(s.title, s.detail)}{s.rows.map((r, i) => <Fragment key={`${s.title}-${i}`}>{E.row(r.title, r.detail)}</Fragment>)}</>;
+  };
   const head = (
     <>
       {parentForm ?? (model.parent ? E.row(model.parent.title, model.parent.detail) : null)}
@@ -91,7 +90,7 @@ export function RecipeView({
   );
   return (
     <>
-      {E.back(model.backLabel ?? "Recipes", model.title, createAction, model.backHref)}
+      {E.back(model.backLabel ?? "Recipes", model.title, undefined, model.backHref)}
       {controls
         ? <form className="contents" onSubmit={(event) => { event.preventDefault(); if (!controls.busy && controls.ready !== false) controls.onSubmit(); }}>{body}</form>
         : body}

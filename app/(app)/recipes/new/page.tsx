@@ -7,22 +7,21 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
-import { RecipeEditor } from "../[id]/recipe-version-form";
+import { RecipeEditor, toRecipeMaterial, type RecipeMaterial } from "../[id]/recipe-version-form";
 
 type Named = { id: string; name: string };
-type Material = Named & { category: string; base_uom: string; extract_potential: number | null };
 
 export default async function NewRecipePage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [brands, materials, gravityUnit, profiles] = (await Promise.all([
     runCommand("list_brands", {}, ctx), runCommand("list_materials", {}, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_water_profiles", {}, ctx),
-  ])) as [Named[], Material[], { effective: GravityUnit }, Named[]];
+  ])) as [Named[], RecipeMaterial[], { effective: GravityUnit }, Named[]];
   return (
     <RecipeEditor
       title="New recipe" backHref="/recipes"
       brands={brands.map(({ id, name }) => ({ id, name }))}
-      materials={materials.map(({ id, name, category, base_uom, extract_potential }) => ({ id, name, category, base_uom, extract_potential }))}
+      materials={materials.map(toRecipeMaterial)}
       profiles={profiles} unit={gravityUnit.effective}
     />
   );

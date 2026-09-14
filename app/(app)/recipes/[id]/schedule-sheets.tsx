@@ -6,17 +6,14 @@
 // the draft looks like the inventory drawing. They edit the editor's draft;
 // nothing is written until Create recipe version.
 "use client";
-import { isValidElement, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { asTrigger, CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
-import { IngredientView, type IngredientFields, type IngredientMaterial } from "@/components/mgr/views/ingredient";
+import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
-import { additionReady, INGREDIENT_STAGES, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
-
-/** A row is not focusable, so it gets a button around it; a Button (E.act) is already one and nesting would be invalid. */
-const asTrigger = (node: ReactNode) => isValidElement(node) && node.type === Button ? node : <button type="button" className="block w-full text-left">{node}</button>;
+import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -69,27 +66,16 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
 }
 
-/** One ingredient line of a draft version: strings until the version is built. */
-export type IngredientLine = { materialId: string; perBblQty: string; stage: (typeof INGREDIENT_STAGES)[number]; timingMinutes: string };
-export const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
-export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
-export const lineDetail = (l: IngredientLine, unit?: string) => `${l.stage.replace("_", " ")}${l.timingMinutes ? ` · ${l.timingMinutes} min` : ""} · ${l.perBblQty} ${unit ?? ""}/ bbl`.replace("  /", " /");
+const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 
 /** One ingredient, edited in place: "+ add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
 export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState<IngredientLine>(line ?? emptyLine());
-  const fields: IngredientFields = { material: f.materialId, stage: f.stage, perBbl: f.perBblQty, timing: f.timingMinutes };
-  const patch = (p: Partial<IngredientFields>) => setF((c) => ({
-    ...c,
-    ...(p.material !== undefined ? { materialId: p.material } : {}),
-    ...(p.stage !== undefined ? { stage: p.stage as IngredientLine["stage"] } : {}),
-    ...(p.perBbl !== undefined ? { perBblQty: p.perBbl } : {}),
-    ...(p.timing !== undefined ? { timingMinutes: p.timing } : {}),
-  }));
+  const patch = (p: Partial<IngredientLine>) => setF((c) => ({ ...c, ...p }));
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(line ?? emptyLine()); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
     <div className="flex flex-col gap-4">
-      <IngredientView fields={fields} materials={materials} onChange={patch} footer={
+      <IngredientView fields={f} materials={materials} onChange={patch} footer={
         <CommandFormFooter>
           {onDelete && <Button type="button" variant="outline" onClick={() => { onDelete(); setOpen(false); }}>Delete ingredient</Button>}
           <Button type="button" disabled={!lineReady(f)} onClick={() => { onSave(f); setOpen(false); }}>Save ingredient</Button>

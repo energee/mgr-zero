@@ -1,8 +1,8 @@
 // app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView exactly
 // as the inventory draws it: its latest version's process numbers,
 // ingredients, schedules and the OG/FG/ABV get_recipe predicts (never
-// stored). Create recipe version opens the same page with ?draft, where
-// recipe-version-form.tsx makes every field live for create_recipe_version.
+// stored). Create recipe version opens ./new, where recipe-version-form.tsx
+// makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -10,8 +10,8 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { RecipeEditor } from "./recipe-version-form";
-import { fermentationSummary, mashSummary, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
+import type { RecipeMaterial } from "./recipe-version-form";
+import { fermentationSummary, ingredientDetail, mashSummary, materialLookup, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
 type Version = ProcessColumns & {
@@ -23,13 +23,12 @@ type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage:
 type Profile = { id: string; name: string };
 type Ingredient = { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null };
 type GetRecipe = { recipe: Recipe; version: Version | null; ingredients: Ingredient[]; waterAdditions: WaterAdditionRow[]; ogPlato: number | null; fgPlato: number | null; abv: number | null };
-type Material = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
 
 const pct = (n: number) => String(Math.round(n * 100));
 const str = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
 
-export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ draft?: string }> }) {
-  const [{ id }, { draft }] = await Promise.all([params, searchParams]);
+export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ recipe, version, ingredients, waterAdditions, ogPlato, fgPlato, abv }, materials, gravityUnit, profiles] = (await Promise.all([
@@ -37,18 +36,9 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
-  ])) as [GetRecipe, Material[], { effective: GravityUnit }, Profile[]];
-  const names = new Map(materials.map((m) => [m.id, m.name]));
-  const materialName = (mid: string) => names.get(mid) ?? mid.slice(0, 8);
-  const materialUnit = (mid: string) => materials.find((m) => m.id === mid)?.base_uom ?? "";
+  ])) as [GetRecipe, RecipeMaterial[], { effective: GravityUnit }, Profile[]];
+  const material = materialLookup(materials);
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
-  // The form is a client component: hand it the fields it reads, not the whole materials row.
-  const formMaterials = materials.map(({ id, name, category, base_uom, extract_potential }) => ({ id, name, category, base_uom, extract_potential }));
-  const backHref = `/recipes/${recipe.id}`;
-
-  if (draft !== undefined) {
-    return <RecipeEditor recipeId={recipe.id} title={`${recipe.name} · new version`} backHref={backHref} backLabel={recipe.name} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />;
-  }
 
   const target = profileName(version?.target_water_profile_id ?? null);
   const water = version ? processReadout(version, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k)) : [];
@@ -58,12 +48,12 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
       model={{
         title: version ? `${recipe.name} v${version.version}` : recipe.name,
         backHref: "/recipes",
-        createHref: `${backHref}?draft`,
+        createHref: `/recipes/${recipe.id}/new`,
         empty: version ? undefined : "No version yet: create the first one",
         parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" },
         ingredients: ingredients.map((i) => ({
-          key: i.id, title: materialName(i.material_id),
-          detail: `${i.stage.replace("_", " ")}${i.timing_minutes !== null ? ` · ${i.timing_minutes} min` : ""} · ${Number(i.per_bbl_qty)} ${materialUnit(i.material_id)} / bbl`,
+          key: i.id, title: material.name(i.material_id),
+          detail: ingredientDetail(i.stage, i.timing_minutes, Number(i.per_bbl_qty), material.unit(i.material_id)),
           qty: "",
         })),
         preBoil: str(version?.pre_boil_bbl), boilMin: str(version?.boil_minutes),
@@ -73,7 +63,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule), rows: version.fermentation_schedule.map((s) => ({ title: s.name, detail: `${s.tempF} °F · ${s.days} days` })) } : undefined,
         water: version ? {
           title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${waterAdditions.length} additions`,
-          rows: [...water.map(([k, v]) => ({ title: k, detail: v })), ...waterAdditions.map((a) => ({ title: materialName(a.material_id), detail: `${a.qty} ${a.unit} · ${a.stage}` }))],
+          rows: [...water.map(([k, v]) => ({ title: k, detail: v })), ...waterAdditions.map((a) => ({ title: material.name(a.material_id), detail: `${a.qty} ${a.unit} · ${a.stage}` }))],
         } : undefined,
         notes: version?.note ?? "",
         predicted: ogPlato !== null && fgPlato !== null && abv !== null

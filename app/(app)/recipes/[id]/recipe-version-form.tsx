@@ -18,19 +18,22 @@ import type { NamedOption } from "@/components/mgr/views/water";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
-import type { RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, mashSummary, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
-import { FermentationScheduleSheet, IngredientSheet, lineDetail, lineReady, MashScheduleSheet, WaterSheet, type IngredientLine } from "./schedule-sheets";
+import { RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
-type Material = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
+/** The material fields the editor reads; both recipe pages project list_materials to this. */
+export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
+export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential });
 type Numbers = Record<RecipeNumberKey, string>;
 
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
-const BLANK_NUMBERS: Numbers = { preBoil: "", boilMin: "", whirlpoolMin: "", whirlpoolTemp: "", whirlpoolRest: "", knockoutTemp: "", efficiency: "75", attenuation: "78" };
+const DEFAULTS: Partial<Numbers> = { efficiency: "75", attenuation: "78" };
+const BLANK_NUMBERS = Object.fromEntries(RECIPE_NUMBERS.map(([k]) => [k, DEFAULTS[k] ?? ""])) as Numbers;
 const pctToFraction = (s: string) => Number(s) / 100;
 
 export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = [], materials, profiles, unit }: {
-  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit;
+  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: RecipeMaterial[]; profiles: NamedOption[]; unit: GravityUnit;
 }) {
   const router = useRouter();
   const action = useCommandAction();
@@ -56,7 +59,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   // Recomputed every render: a handful of numbers. A material with no
   // extract_potential contributes nothing rather than a made-up default.
   const preview = eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0
-    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: materials.find((m) => m.id === l.materialId)?.extract_potential ?? null, stage: l.stage })) })
+    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage })) })
     : null;
 
   const creating = recipeId === undefined;
@@ -78,8 +81,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   }
   const ready = mashSchedule.length > 0 && eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0 && (!creating || parent.name.trim() !== "");
   const parentLocked = creating && createdId !== "";
-  const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id.slice(0, 8);
-  const uom = (id: string) => materials.find((m) => m.id === id)?.base_uom;
+  // Plain values: the React Compiler memoizes these on `materials` itself.
+  const material = materialLookup(materials);
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${mashSchedule.length} steps`, detail: mashSummary(mashSchedule) };
@@ -91,7 +94,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       model={{
         title, backHref, backLabel, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
-          key: `${i}-${l.materialId}`, title: name(l.materialId), detail: lineDetail(l, uom(l.materialId)), qty: "",
+          key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
           action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => setLines((prev) => upsertAt(prev, i, f))} onDelete={() => setLines((prev) => removeAt(prev, i))} trigger={E.act("Edit")} />,
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
