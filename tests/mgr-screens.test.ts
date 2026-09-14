@@ -593,6 +593,8 @@ describe("SCREENS", () => {
     expect(transferHtml).not.toMatch(/border-l-2/);
     // record_cellar_transfer is live (#278 slice 2): the tag no longer says design.
     expect(transfer.writes).not.toMatch(/\[design/);
+    // record_repack is live (#278 slice 6): the child leg is derived, so the gate is lifted.
+    expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
   });
 
   it("puts the commit on the row, not a second copy at the top", () => {

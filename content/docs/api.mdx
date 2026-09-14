@@ -371,6 +371,7 @@ omitted. They have no roles until they are built.
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
 | `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |  |
+| `list_repack_parents` | Packaging | ✓ |  | ✓ |  |  |  |
 | `list_routes` | Delivery & routes | ✓ | ✓ | ✓ |  |  |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -3775,6 +3776,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_packaging_runs", "input": {} }'
+```
+
+#### list_repack_parents [#list_repack_parents]
+
+`query` · admin, warehouse
+
+Composed SKUs a repack can break, each with the one component SKU (same brand, the format's single component row) it breaks into and how many per unit; child is null when the composition has no single row
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_repack_parents", "input": {} }'
 ```
 
 #### record_repack [#record_repack]
