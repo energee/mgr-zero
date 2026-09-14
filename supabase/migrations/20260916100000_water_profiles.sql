@@ -14,9 +14,8 @@ create table public.water_profiles (
   bicarbonate_ppm numeric(7,1) not null check (bicarbonate_ppm >= 0),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (brewery_id, name)
+  unique (brewery_id, name)   -- also the brewery index: every read filters brewery_id and sorts by name
 );
-create index water_profiles_brewery_idx on public.water_profiles (brewery_id);
 alter table public.water_profiles enable row level security;
 create policy staff_read on public.water_profiles for select using (public.is_staff_of(brewery_id));
 grant select on public.water_profiles to authenticated;

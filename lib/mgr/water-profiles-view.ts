@@ -3,9 +3,10 @@
 // list_water_profiles returns them and upsert_water_profile takes them.
 import type { EmptyState } from "./empty-state";
 
+/** Column name, label, and the upsert_water_profile input key — one row per ion, one place to add a seventh. */
 export const IONS = [
-  ["calcium_ppm", "Calcium"], ["magnesium_ppm", "Magnesium"], ["sodium_ppm", "Sodium"],
-  ["sulfate_ppm", "Sulfate"], ["chloride_ppm", "Chloride"], ["bicarbonate_ppm", "Bicarbonate"],
+  ["calcium_ppm", "Calcium", "calciumPpm"], ["magnesium_ppm", "Magnesium", "magnesiumPpm"], ["sodium_ppm", "Sodium", "sodiumPpm"],
+  ["sulfate_ppm", "Sulfate", "sulfatePpm"], ["chloride_ppm", "Chloride", "chloridePpm"], ["bicarbonate_ppm", "Bicarbonate", "bicarbonatePpm"],
 ] as const;
 export type Ion = (typeof IONS)[number][0];
 export type WaterProfile = { id: string; name: string } & Record<Ion, number>;
@@ -28,5 +29,8 @@ export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; backHref
   };
 }
 
-export const toWaterProfileFields = (p?: WaterProfile): WaterProfileFields =>
-  ({ name: p?.name ?? "", ...Object.fromEntries(IONS.map(([key]) => [key, p ? String(p[key]) : ""])) }) as WaterProfileFields;
+export function toWaterProfileFields(p?: WaterProfile): WaterProfileFields {
+  const fields: WaterProfileFields = { name: p?.name ?? "", calcium_ppm: "", magnesium_ppm: "", sodium_ppm: "", sulfate_ppm: "", chloride_ppm: "", bicarbonate_ppm: "" };
+  if (p) for (const [key] of IONS) fields[key] = String(p[key]);
+  return fields;
+}

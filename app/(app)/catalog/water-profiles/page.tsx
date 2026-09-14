@@ -17,7 +17,7 @@ export default async function WaterProfilesPage() {
     <WaterProfilesView
       model={toWaterProfilesViewProps({ profiles, backHref: "/catalog" })}
       createAction={<WaterProfileForm />}
-      rowAction={(key) => { const p = profiles.find((x) => x.id === key)!; return <WaterProfileForm key={`${p.id}-${p.name}-${p.calcium_ppm}-${p.magnesium_ppm}-${p.sodium_ppm}-${p.sulfate_ppm}-${p.chloride_ppm}-${p.bicarbonate_ppm}`} profile={p} />; }}
+      profileActions={Object.fromEntries(profiles.map((p) => [p.id, <WaterProfileForm key={JSON.stringify(p)} profile={p} />]))}
     />
   );
 }
