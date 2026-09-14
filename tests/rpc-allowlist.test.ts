@@ -68,7 +68,7 @@ const AUTHENTICATED_RPCS = [
   "create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid)",
   "create_purchase_order(uuid,uuid,date,text,jsonb,uuid)",
   "create_recipe(uuid,uuid,text,text,uuid)",
-  "create_recipe_version(uuid,uuid,numeric,numeric,numeric,integer,numeric,text,jsonb,uuid)",
+  "create_recipe_version(uuid,uuid,jsonb,jsonb,jsonb,numeric,numeric,integer,numeric,text,jsonb,uuid)",
   "create_replenishment_order(uuid,uuid,jsonb,uuid)",
   "create_sku(uuid,uuid,uuid,text,text,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",

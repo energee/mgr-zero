@@ -36,7 +36,7 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
   const validLines = lines.filter((l) => l.materialId && Number(l.perBblQty) > 0);
   const form = useCommandForm("create_recipe_version", {
     build: () => ({
-      recipeId, mashTempF: Number(mashTempF), brewhouseEfficiency: Number(brewhouseEfficiency), yeastAttenuation: Number(yeastAttenuation),
+      recipeId, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: Number(mashTempF), minutes: 60 }], brewhouseEfficiency: Number(brewhouseEfficiency), yeastAttenuation: Number(yeastAttenuation),
       boilMinutes: boilMinutes ? Number(boilMinutes) : undefined, targetIbu: targetIbu ? Number(targetIbu) : undefined, note: note || undefined,
       ingredients: validLines.map((l) => ({
         materialId: l.materialId, perBblQty: Number(l.perBblQty), stage: l.stage,
