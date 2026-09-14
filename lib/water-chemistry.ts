@@ -51,6 +51,26 @@ export function waterChemistry({ source, target, mashGal, spargeGal, additions }
   });
 }
 
-export function suggestSalts(_input: { source: Ions; target: Ions; totalGal: number; salts: Salt[] }): { salt: Salt; grams: number }[] {
-  return [];
+/** Grams of each stocked salt that bring source closest to target over total brewing water:
+ *  least squares on all six ions with every amount ≥ 0. Projected gradient descent with a
+ *  fixed cap is enough for seven unknowns; no dependency. */
+export function suggestSalts({ source, target, totalGal, salts }: { source: Ions; target: Ions; totalGal: number; salts: Salt[] }): { salt: Salt; grams: number }[] {
+  const L = liters(totalGal, 0);
+  if (L === 0 || salts.length === 0) return [];
+  const want = IONS.map((ion) => target[ion] - source[ion]);            // ppm still needed, per ion
+  const a = salts.map((s) => IONS.map((ion) => (SALT_PPM_PER_G_PER_L[s][ion] ?? 0) / L)); // ppm per gram, [salt][ion]
+  const step = 1 / a.reduce((sum, row) => sum + row.reduce((q, v) => q + v * v, 0), 0);  // 1 / ||A||²_F keeps the descent stable
+  const x = salts.map(() => 0);
+  for (let iter = 0; iter < 5000; iter++) {
+    const residual = IONS.map((_, i) => a.reduce((sum, row, j) => sum + row[i] * x[j], 0) - want[i]);
+    let moved = 0;
+    for (let j = 0; j < x.length; j++) {
+      const grad = a[j].reduce((sum, v, i) => sum + v * residual[i], 0);
+      const next = Math.max(0, x[j] - step * grad);
+      moved += Math.abs(next - x[j]);
+      x[j] = next;
+    }
+    if (moved < 1e-6) break;
+  }
+  return salts.map((salt, j) => ({ salt, grams: Math.round(x[j] * 10) / 10 })).filter((s) => s.grams > 0);
 }
