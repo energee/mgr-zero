@@ -879,8 +879,8 @@ export const SCREENS: Screen[] = [
     job: "Find every order by state and take its next valid action",
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
-    states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
-    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
+    states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"], ["loading", "inline status on first visit; cached rows remain during refresh"], ["error", "inline error and Try again; existing rows remain"]],
+    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use the shared QueryFeedback for first-load and retry states, without skeleton rows.",
     body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} />,
   },
   {
