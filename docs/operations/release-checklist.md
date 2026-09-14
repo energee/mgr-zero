@@ -3,6 +3,10 @@
 Owner: Ted. Record the date, commit SHA, project names, regions, and evidence
 links in the release PR. Never paste keys or tokens into the PR.
 
+Latest recorded review: [2026-09-14 readiness evidence](release-readiness-2026-09-14.md).
+A successful deployment is not release sign-off; retain the evidence boundaries
+and unresolved connected-job gates in that record.
+
 ## Stop gates
 
 - `main` CI is green on the release SHA.
