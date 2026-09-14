@@ -2,8 +2,7 @@
 // is a promise: every ungated MGR screen has a live page. Program 10's
 // definition of done (TODO.md). Red until each program lands its pages and
 // adds their public route entries to lib/mgr/screen-routes.ts.
-import { existsSync, readFileSync } from "node:fs";
-import { globSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
@@ -28,8 +27,9 @@ describe("explorer parity", () => {
       "app/(app)/search/page.tsx",
     ];
     const mapped = new Set(SCREEN_ROUTES.map((route) => route.file));
-    const pages = ["app/(app)/**/page.tsx", "app/(auth)/**/page.tsx", "app/(portal)/**/page.tsx"]
-      .flatMap((pattern) => globSync(pattern))
+    const pages = readdirSync("app", { recursive: true })
+      .map((file) => `app/${file}`)
+      .filter((file) => /^app\/\((app|auth|portal)\)\/.+\/page\.tsx$/.test(file))
       .sort();
 
     expect(pages.filter((page) => !mapped.has(page))).toEqual(knownRouteDebt);
