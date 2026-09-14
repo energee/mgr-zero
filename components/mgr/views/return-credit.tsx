@@ -18,7 +18,7 @@ export function ReturnSourcesView({ groups, quantities = {}, onQuantity }: {
     {E.ttl("Original shipped source")}
     {groups.map(group => <div key={group.key} className="flex flex-col gap-2">
       {E.ttl(group.name)}
-      {group.sources.map(source => <Fragment key={source.id}>{E.edit(source.label + " (" + source.shipped + " originally shipped)", quantities[source.id], "number", undefined, { onChange: onQuantity ? (nextValue: string) => onQuantity?.(source.id, nextValue) : undefined, min: "0", max: source.shipped, step: "0.01", placeholder: "Quantity from this source", "aria-label": `${group.name} · ${source.label} return quantity` })}</Fragment>)}
+      {group.sources.map(source => <Fragment key={source.id}>{E.edit(source.label + " (" + source.shipped + " originally shipped)", quantities[source.id] ?? "", "number", undefined, { onChange: onQuantity ? (nextValue: string) => onQuantity?.(source.id, nextValue) : undefined, min: "0", max: source.shipped, step: "0.01", placeholder: "Quantity from this source", "aria-label": `${group.name} · ${source.label} return quantity` })}</Fragment>)}
     </div>)}
   </>;
 }

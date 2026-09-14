@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { AdjustLinesView } from "../components/mgr/views/adjust-lines";
 import { PickView } from "../components/mgr/views/pick";
-import { ReturnCreditView } from "../components/mgr/views/return-credit";
+import { ReturnCreditView, ReturnSourcesView } from "../components/mgr/views/return-credit";
 import { ShipView } from "../components/mgr/views/ship";
 import { ShipmentDoneView } from "../components/mgr/views/shipment-done";
 import { ShortPickView } from "../components/mgr/views/short-pick";
@@ -29,6 +29,12 @@ import { toShortPickViewProps } from "../lib/mgr/short-pick-view";
 
 const html = (node: ReturnType<typeof createElement>) => renderToStaticMarkup(node);
 const SOURCES = ["Warehouse", "Taproom"];
+
+it("leaves unspecified return-source quantities blank", () => {
+  const markup = html(createElement(ReturnSourcesView, { groups: [{ key: "sku", name: "Pils", sources: [{ id: "source", label: "Shelf", shipped: 5 }] }] }));
+  expect(markup).toContain('value=""');
+  expect(markup).not.toContain('value="0"');
+});
 
 describe("Adjust lines view", () => {
   it("maps picked-below-ordered as a warning stepper", () => {
