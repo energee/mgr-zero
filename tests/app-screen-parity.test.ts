@@ -1,12 +1,25 @@
 // tests/app-screen-parity.test.ts — the inventory (components/mgr/screens.tsx)
 // is a promise: every ungated MGR screen has a live page. Program 10's
 // definition of done (TODO.md). Red until each program lands its pages and
-// adds their rows to lib/mgr/screen-routes.ts.
+// adds their public route entries to lib/mgr/screen-routes.ts.
 import { existsSync, readFileSync } from "node:fs";
 import { globSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES, ungatedMgrScreens } from "@/lib/mgr/screen-routes";
+
+function usesMgrDrawing(file: string, seen = new Set<string>()): boolean {
+  if (seen.has(file)) return false;
+  seen.add(file);
+  const source = readFileSync(file, "utf8");
+  if (/from "@\/components\/mgr\/(e|command-form|views\/[^\"]+)"/.test(source)) return true;
+  return [...source.matchAll(/from "([^\"]+)"/g)].some(([, specifier]) => {
+    const base = specifier.startsWith("@/") ? specifier.slice(2) : specifier.startsWith(".") ? resolve(dirname(file), specifier) : "";
+    const dependency = [base, `${base}.tsx`, `${base}.ts`, resolve(base, "index.tsx"), resolve(base, "index.ts")].find(existsSync);
+    return dependency ? usesMgrDrawing(dependency, seen) : false;
+  });
+}
 
 describe("explorer parity", () => {
   it("maps every live product page unless its route has recorded parity debt", () => {
@@ -43,9 +56,9 @@ describe("explorer parity", () => {
   });
 
   it("every live page draws in the E vocabulary, not raw markup", () => {
-    // Shell chrome (components/) and the sign-in cards (app/(auth)) draw with the ui kit; every page under a shell draws with E, CommandForm, or a shared screen view.
+    // Shell chrome (components/) and sign-in cards (app/(auth)) draw with the ui kit; routed screens follow thin adapters until they reach E, CommandForm, or a shared view.
     const files = [...new Set(SCREEN_ROUTES.map((r) => r.file))].filter((f) => existsSync(f) && !f.startsWith("components/") && !f.startsWith("app/(auth)/"));
-    const raw = files.filter((f) => !/from "@\/components\/mgr\/(e|command-form|views\/[^"]+)"/.test(readFileSync(f, "utf8")));
+    const raw = files.filter((file) => !usesMgrDrawing(file));
     expect(raw, "rewrite the page with E.*, CommandForm, or a screen view (Program 10 task 7)").toEqual([]);
   });
 
