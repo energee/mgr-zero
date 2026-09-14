@@ -24,8 +24,8 @@ export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: 
   busy?: boolean;
 }) {
   const id = useId();
-  const [draft, setDraft] = useState(BLANK_RECIPE);
-  const v = values ?? draft;
+  const [draft, setDraft] = useState(values ?? BLANK_RECIPE);
+  const v = onChange ? (values ?? draft) : draft;
   const set = (patch: Partial<NewRecipeValues>) => { const next = { ...v, ...patch }; setDraft(next); onChange?.(next); };
   return (
     <>

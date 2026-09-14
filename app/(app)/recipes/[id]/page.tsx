@@ -11,12 +11,12 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { RecipeEditor } from "./recipe-version-form";
-import { fermentationSummary, mashSummary, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, mashSummary, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
 type Version = ProcessColumns & {
   id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number; yeast_attenuation: number;
-  boil_minutes: number | null; target_ibu: number | null; note: string | null;
+  boil_minutes: number | null; note: string | null;
   mash_schedule: MashStep[]; fermentation_schedule: FermentationStage[];
 };
 type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage: string };
@@ -46,17 +46,20 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   const backHref = `/recipes/${recipe.id}`;
 
   if (draft !== undefined) {
-    return <RecipeEditor recipeId={recipe.id} title={`${recipe.name} · new version`} backHref={backHref} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />;
+    return <RecipeEditor recipeId={recipe.id} title={`${recipe.name} · new version`} backHref={backHref} backLabel={recipe.name} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />;
   }
 
   const target = profileName(version?.target_water_profile_id ?? null);
+  const water = version ? processReadout(version, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k)) : [];
   return (
     <RecipeView
+      readOnly
       model={{
         title: version ? `${recipe.name} v${version.version}` : recipe.name,
         backHref: "/recipes",
         createHref: `${backHref}?draft`,
-        parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "name and brand" },
+        empty: version ? undefined : "No version yet: create the first one",
+        parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" },
         ingredients: ingredients.map((i) => ({
           key: i.id, title: materialName(i.material_id),
           detail: `${i.stage.replace("_", " ")}${i.timing_minutes !== null ? ` · ${i.timing_minutes} min` : ""} · ${Number(i.per_bbl_qty)} / bbl`,
@@ -65,9 +68,12 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         preBoil: str(version?.pre_boil_bbl), boilMin: str(version?.boil_minutes),
         whirlpoolMin: str(version?.whirlpool_minutes), whirlpoolTemp: str(version?.whirlpool_temp_f), whirlpoolRest: str(version?.whirlpool_rest_minutes), knockoutTemp: str(version?.knockout_temp_f),
         efficiency: version ? pct(version.brewhouse_efficiency) : "", attenuation: version ? pct(version.yeast_attenuation) : "",
-        mash: version ? { title: `Mash schedule · ${version.mash_schedule.length} steps`, detail: mashSummary(version.mash_schedule) } : undefined,
-        fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule) } : undefined,
-        water: version ? { title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${waterAdditions.length} additions` } : undefined,
+        mash: version ? { title: `Mash schedule · ${version.mash_schedule.length} steps`, detail: mashSummary(version.mash_schedule), rows: version.mash_schedule.map((s) => ({ title: s.name, detail: `${s.kind} · ${s.tempF} °F · ${s.minutes} min` })) } : undefined,
+        fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule), rows: version.fermentation_schedule.map((s) => ({ title: s.name, detail: `${s.tempF} °F · ${s.days} days` })) } : undefined,
+        water: version ? {
+          title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${waterAdditions.length} additions`,
+          rows: [...water.map(([k, v]) => ({ title: k, detail: v })), ...waterAdditions.map((a) => ({ title: materialName(a.material_id), detail: `${a.qty} ${a.unit} · ${a.stage}` }))],
+        } : undefined,
         notes: version?.note ?? "",
         predicted: ogPlato !== null && fgPlato !== null && abv !== null
           ? `Predicted: OG ${formatGravity(ogPlato, gravityUnit.effective)} · FG ${formatGravity(fgPlato, gravityUnit.effective)} · ABV ${abv.toFixed(1)}%`

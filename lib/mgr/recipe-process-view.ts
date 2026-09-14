@@ -6,6 +6,8 @@
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 
 export type { MashStep };
+/** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
+export const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
 export type WaterAddition = { materialId: string; qty: number; unit: string; stage: string };
 export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mashGal: string; spargeGal: string; targetMashPh: string; additions: WaterAddition[] };

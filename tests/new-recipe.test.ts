@@ -4,6 +4,7 @@
 // in RecipeView's parentForm slot and by the live version form when it has
 // no recipe yet. /recipes/new is that editor; one save writes create_recipe
 // then create_recipe_version and lands on the recipe.
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -49,6 +50,16 @@ describe("Recipe creation", () => {
     expect(live).toMatch(/grid-cols-2 md:grid-cols-4/);
     expect(live).toMatch(/data-gated[^>]*>[\s\S]*Default price group/);
     expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
+    // A cut version is the same drawing with every field disabled and its schedules read out as rows.
+    const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy v1", preBoil: "16.8", mash: { title: "Mash schedule · 1 steps", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
+    expect(cut).toMatch(/<input[^>]*disabled[^>]*value="16.8"/);
+    expect(cut).toMatch(/Sacch/);
+    expect(cut).not.toMatch(/<form\b|\+ add ingredient|Open/);
+    // No version yet: no number is invented.
+    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: "No version yet: create the first one", createHref: "/recipes/x?draft" } }));
+    expect(none).toMatch(/No version yet/);
+    expect(none).not.toMatch(/Pre-boil volume/);
+    expect(none).toMatch(/href="\/recipes\/x\?draft"/);
   });
 
   it("/recipes/new and /recipes/[id] draw the editor through RecipeView, never a detail override", () => {
@@ -68,6 +79,13 @@ describe("Recipe creation", () => {
     expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
     expect(sheets).toMatch(/<IngredientView\b/);
     expect(sheets).not.toMatch(/<select\b/);
+    // Edit is already a Button: it must be the trigger itself, never wrapped in a second button.
+    expect(sheets).toMatch(/node\.type === Button \? node/);
+    // Stages come from the view-model module, not the command registry.
+    expect(src("components/mgr/views/ingredient.tsx")).not.toMatch(/lib\/commands/);
+    expect(sheets).not.toMatch(/from "@\/lib\/commands\/production"/);
+    // Leftovers from earlier iterations are gone: the explorer and tap rules match main.
+    expect(execSync("git diff --quiet origin/main -- components/mgr/screen-explorer.tsx lib/mgr/screen-links.ts; echo $?").toString().trim()).toBe("0");
     expect(screen("Ingredient").body).toBeTruthy();
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);

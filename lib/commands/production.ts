@@ -7,12 +7,12 @@
 // material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
+import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 import { defineCommand, defineQuery, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 
-export const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
 // The process spec (recipe-builder spec D2, D6, D7): ordered mash steps and
 // fermentation stages, each with a type and a name, and water additions
 // carrying one stage. Stored as given; the RPC derives mash_temp_f.

@@ -29,8 +29,8 @@ const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", 
 const BLANK_NUMBERS: Numbers = { preBoil: "", boilMin: "", whirlpoolMin: "", whirlpoolTemp: "", whirlpoolRest: "", knockoutTemp: "", efficiency: "75", attenuation: "78" };
 const pctToFraction = (s: string) => Number(s) / 100;
 
-export function RecipeEditor({ recipeId, title, backHref, brands = [], materials, profiles, unit }: {
-  recipeId?: string; title: string; backHref: string; brands?: NewRecipeBrand[]; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit;
+export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = [], materials, profiles, unit }: {
+  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit;
 }) {
   const router = useRouter();
   const action = useCommandAction();
@@ -61,14 +61,23 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], materials
 
   const creating = recipeId === undefined;
   // A parent that saved before the version failed is kept, so a retry writes
-  // only the version instead of a second recipe.
+  // only the version instead of a second recipe; the parent fields lock at
+  // that point, since there is no update_recipe to carry a later edit.
   const [createdId, setCreatedId] = useState(recipeId ?? "");
   async function submit() {
     let id = createdId;
-    if (!id && !(await action.run("create_recipe", { name: parent.name, brandId: parent.brandId || undefined, note: parent.note || undefined }, (d) => { id = (d as { id: string }).id; setCreatedId(id); }))) return;
+    if (!id) {
+      const ok = await action.run("create_recipe", { name: parent.name, brandId: parent.brandId || undefined, note: parent.note || undefined }, (d) => {
+        const got = (d as { id?: unknown } | null)?.id;
+        if (typeof got === "string") { id = got; setCreatedId(got); }
+      });
+      if (!ok) return;
+      if (!id) { action.setError("The recipe was created but its id did not come back; open it from Recipes to add the version."); return; }
+    }
     await action.run("create_recipe_version", build(id), () => router.push(`/recipes/${id}`));
   }
   const ready = mashSchedule.length > 0 && eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0 && (!creating || parent.name.trim() !== "");
+  const parentLocked = creating && createdId !== "";
   const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id.slice(0, 8);
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${mashSchedule.length} steps`, detail: mashSummary(mashSchedule) };
@@ -78,22 +87,25 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], materials
   return (
     <RecipeView
       model={{
-        title, backHref, ...numbers, notes,
+        title, backHref, backLabel, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: name(l.materialId), detail: lineDetail(l), qty: "",
-          action: <IngredientSheet line={l} materials={materials} onSave={(f) => setLines(upsertAt(lines, i, f))} onDelete={() => setLines(removeAt(lines, i))} trigger={E.act("Edit")} />,
+          action: <IngredientSheet line={l} materials={materials} onSave={(f) => setLines((prev) => upsertAt(prev, i, f))} onDelete={() => setLines((prev) => removeAt(prev, i))} trigger={E.act("Edit")} />,
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
         predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : undefined,
       }}
-      parentForm={creating ? <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy} /> : undefined}
+      parentForm={creating ? <>
+        <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />
+        {parentLocked ? E.info("The recipe is saved under this name; only the version is still to write.") : null}
+      </> : undefined}
       controls={{
         set: (key, value) => key === "notes" ? setNotes(value) : setNumbers((n) => ({ ...n, [key]: value })),
         onSubmit: () => void submit(), busy: action.busy, ready, error: action.error,
-        submitLabel: creating ? "Create recipe" : "Create recipe version",
+        submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={materials} onSave={(f) => setLines([...lines, f])} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
+        addIngredient: <IngredientSheet materials={materials} onSave={(f) => setLines((prev) => [...prev, f])} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={setWater} trigger={E.nav(waterRow.title, waterRow.detail)} />,

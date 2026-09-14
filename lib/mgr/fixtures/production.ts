@@ -131,7 +131,6 @@ export const recipesList: RecipesSnapshot = {
 
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
-  parent: { title: "Recipe parent · Hazy IPA · IPA", detail: "name and style only" },
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   scaleIndex: 1,

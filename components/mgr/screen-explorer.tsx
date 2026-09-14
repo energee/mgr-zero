@@ -142,10 +142,7 @@ export function ScreenExplorer() {
     if (link?.matches('[href^="https://"]')) return;
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
     const to = el.getAttribute("data-to");
-    // An inert tap acts in place. On a sheet trigger that means opening the
-    // sheet, which Radix skips once the click is default-prevented, so only
-    // plain inert taps are cancelled.
-    if (isInertOn(current[1], label, to)) return el.matches("[data-slot=dialog-trigger], [data-slot=sheet-trigger]") ? undefined : e.preventDefault();
+    if (isInertOn(current[1], label, to)) return e.preventDefault();
     const group = el.closest("[data-slot=sidebar-group-label]") && screenByName(label.trim());
     const name = group ? label.trim() : resolveTap(current[1], label, link?.getAttribute("href"), to);
     if (el.matches("[role=tab]") && (!name || name === current[1].name)) return filterRows(el);

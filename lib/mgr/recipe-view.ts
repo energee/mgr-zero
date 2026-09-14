@@ -11,10 +11,16 @@ export const RECIPE_NUMBERS = [
 ] as const;
 export type RecipeNumberKey = (typeof RECIPE_NUMBERS)[number][0];
 
+export type RecipeScheduleView = { title: string; detail: string; rows?: { title: string; detail: string }[] };
+
 export type RecipeViewModel = {
   backHref?: string;
+  /** The back link's text; "Recipes" unless the page sits under a recipe (the draft). */
+  backLabel?: string;
   /** Where Create recipe version goes on a cut version; the draft editor submits instead. */
   createHref?: string;
+  /** A recipe with no version yet: drawn instead of the editor, so no number is invented. */
+  empty?: string;
   title: string;
   parent?: { title: string; detail: string };
   priceGroup?: string;
@@ -29,9 +35,10 @@ export type RecipeViewModel = {
   knockoutTemp?: string;
   efficiency?: string;
   attenuation?: string;
-  mash?: { title: string; detail: string };
-  fermentation?: { title: string; detail: string };
-  water?: { title: string; detail: string };
+  /** A schedule row; `rows` present means it is read out inline (a cut version) instead of opening. */
+  mash?: RecipeScheduleView;
+  fermentation?: RecipeScheduleView;
+  water?: RecipeScheduleView;
   notes?: string;
   predicted?: string;
   tape?: [string, string][];
