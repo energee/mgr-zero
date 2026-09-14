@@ -325,7 +325,7 @@ describe("SCREENS", () => {
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
-      "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
+      "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Suggest additions", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
@@ -931,5 +931,16 @@ describe("SCREENS", () => {
     }
     expect(String(SCREENS.find((s) => s.name === "Transfers")!.writes)).toContain("create_stock_transfer");
     expect(String(SCREENS.find((s) => s.name === "Complete transfer")!.writes)).toContain("ship_order");
+  });
+
+  it("suggests salts on Water and shows every ion against target, one row warned", () => {
+    const html = body("Water");
+    expect(html).toMatch(/Suggest additions/);
+    expect(html).toMatch(/Against target/);
+    for (const ion of ["Calcium", "Magnesium", "Sodium", "Sulfate", "Chloride", "Bicarbonate"]) expect(html).toContain(ion);
+    expect(html).not.toContain("data-gated");
+    const water = SCREENS.find((s) => s.name === "Water")!;
+    expect(String(water.spec)).toMatch(/waterChemistry|same formula/i);
+    expect(String(water.spec)).not.toMatch(/does not build/);
   });
 });

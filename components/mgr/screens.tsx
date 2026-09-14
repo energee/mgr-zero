@@ -278,11 +278,11 @@ import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
-import type { FermentationStage, MashStep, WaterDraft } from "@/lib/mgr/recipe-process-view";
+import type { FermentationStage, MashStep, SaltMaterial, WaterDraft, WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { toAdditionFields, toMashStepFields, toStageFields } from "@/lib/mgr/recipe-process-view";
+import { profileIons, toAdditionFields, toMashStepFields, toStageFields } from "@/lib/mgr/recipe-process-view";
 
 /** The drawn mash schedule, in the shape create_recipe_version stores. Rows and
  *  footer both read it, so the total and the conversion rest never disagree. */
@@ -300,11 +300,14 @@ const FERM_STAGES: FermentationStage[] = [
   { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
 ];
 
-const WATER_PROFILE_OPTIONS = [{ id: "hazy", name: "Hazy target" }, { id: "burton", name: "Burton" }, { id: "denver", name: "Municipal · Denver" }];
-const SALT_OPTIONS = [{ id: "gypsum", name: "Gypsum" }, { id: "cacl", name: "Calcium chloride" }, { id: "epsom", name: "Epsom salt" }, { id: "lactic", name: "Lactic acid" }, { id: "phos", name: "Phosphoric acid" }];
-/** The drawn water: a target, the brewery's default source, and three additions. */
+const WATER_PROFILE_OPTIONS: WaterProfileIons[] = waterProfiles.map((p) => ({ id: p.id, name: p.name, ions: profileIons(p) }));
+const SALT_OPTIONS: SaltMaterial[] = [
+  { id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "epsom", name: "Epsom salt", salt: "epsom_salt" },
+  { id: "lactic", name: "Lactic acid", salt: null }, { id: "phos", name: "Phosphoric acid", salt: null },
+];
+/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed (calcium chloride short of target, so Chloride warns). */
 const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
+  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
@@ -1971,12 +1974,12 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Water",
-    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
+    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition", "Suggest additions": "Water", Calcium: "Water", Magnesium: "Water", Sodium: "Water", Sulfate: "Water", Chloride: "Water", Bicarbonate: "Water" },
     job: "State the water a version starts from, aims at, and what goes in it",
     reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
     writes: "create_recipe_version [water values and the water additions are written with the version]",
-    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1]],
-    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. The sulfate to chloride line is example text; ion deltas, salt contribution and pH prediction are calculations this slice does not build, and if they arrive they go through the same shared formula rule Recipe sets for gravity and strength.",
+    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggested", "Suggest additions fills the salts from the solver; acids stay; every row is still editable"], ["off target", "an ion more than 20 ppm from target warns", 1]],
+    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Suggest additions runs the one shared water formula over total brewing water, mash plus sparge, and replaces only the salts; the six rows under Against target read the same formula back, so the preview and any server read agree. pH prediction is still not built.",
     body: (<>
       <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
     </>),
