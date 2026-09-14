@@ -19,8 +19,11 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; sent?: string }>
 }) {
   const { error, sent } = await searchParams
-  if (error === "expired") return <CommandForm open title="Session expired">
-    <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
-  </CommandForm>
+  if (error === "expired") return <>
+    <CommandForm open title="Session expired">
+      <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
+    </CommandForm>
+    <noscript><LoginForm error="Your session expired. Sign in again." /></noscript>
+  </>
   return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
 }
