@@ -6,7 +6,7 @@
 // the only ratio the RPC accepts as volume-neutral.
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { repackFooter, RepackView } from "@/components/mgr/views/repack";
@@ -18,7 +18,7 @@ type Bin = { id: string; location_id: string; name: string };
 /** One list_repack_parents row: a composed SKU and the child it breaks into, or null when composition has no single row. */
 export type RepackParent = { id: string; label: string; unit: string; bblPerUnit: number; child: { skuId: string; unit: string; quantity: number } | null };
 
-export function RepackForm({ locations, bins, parents }: { locations: Location[]; bins: Bin[]; parents: RepackParent[] }) {
+export function RepackForm({ locations, bins, parents, autoOpen = false }: { autoOpen?: boolean; locations: Location[]; bins: Bin[]; parents: RepackParent[] }) {
   const formId = useId();
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState("");
@@ -30,6 +30,14 @@ export function RepackForm({ locations, bins, parents }: { locations: Location[]
     build: () => ({ locationId, binId, parentSkuId, parentQty: Number(qty), childSkuId: child?.skuId ?? "", childQty: Number(qty) * (child?.quantity ?? 0) }),
     reset: () => { setLocationId(""); setBinId(""); setParentSkuId(""); setQty(""); },
   });
+  const { setOpen } = form;
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpen && !autoOpened.current) {
+      autoOpened.current = true;
+      setOpen(true);
+    }
+  }, [autoOpen, setOpen]);
   const model = {
     ...toRepackView({
       parent: parent?.label ?? "", unit: parent?.unit ?? "", qty,

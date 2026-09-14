@@ -27,7 +27,8 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = { id: string; name: string; brands: { name: string } | null };
 
-export default async function PackagingPage() {
+export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string }> }) {
+  const { repack } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canRepack = brewery.role === "admin" || brewery.role === "warehouse";
@@ -43,6 +44,6 @@ export default async function PackagingPage() {
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.role)}
-    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} parents={parents} /> : null}</div>}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
   />;
 }

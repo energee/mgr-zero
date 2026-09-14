@@ -60,3 +60,13 @@ describe("explorer parity", () => {
     expect(reading).toContain("openByDefault");
   });
 });
+
+
+it("redirects the Repack bookmark to its Packaging dialog", async () => {
+  const config = (await import("@/next.config")).default;
+  expect(await config.redirects!()).toContainEqual({
+    source: "/packaging/repack", destination: "/packaging?repack=1", permanent: false,
+  });
+  const page = readFileSync("app/(app)/packaging/page.tsx", "utf8");
+  expect(page).toContain('autoOpen={repack === "1"}');
+});
