@@ -1917,9 +1917,9 @@ export const SCREENS: Screen[] = [
     reads: "list_materials · none [draft: the version form’s state]",
     writes: "create_recipe_version [written with the version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
-    spec: "The add-ingredient row on Recipe opens this sheet straight into the fields; there is no list to pass through because the recipe page is the list. Quantity is per barrel so the batch size scales it; timing is optional and in minutes, since a dry hop’s day is a fermentation stage, not an ingredient fact.",
+    spec: "The add-ingredient row on Recipe opens this sheet straight into the fields; there is no list to pass through because the recipe page is the list. Quantity is per barrel in the material's own base unit so the batch size scales it and no unit is retyped; timing is optional and in minutes, since a dry hop’s day is a fermentation stage, not an ingredient fact.",
     body: (<>
-      <IngredientView fields={{ material: "citra", stage: "dry_hop", perBbl: "1.2", timing: "" }} materials={[{ id: "2row", name: "2-row" }, { id: "citra", name: "Citra" }, { id: "cans", name: "Cans · 16 oz" }]} />
+      <IngredientView fields={{ material: "citra", stage: "dry_hop", perBbl: "1.2", timing: "" }} materials={[{ id: "2row", name: "2-row", unit: "lb" }, { id: "citra", name: "Citra", unit: "lb" }, { id: "cans", name: "Cans · 16 oz", unit: "each" }]} />
     </>),
   },
   {

@@ -10,7 +10,7 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { RecipeEditor } from "../[id]/recipe-version-form";
 
 type Named = { id: string; name: string };
-type Material = Named & { category: string; extract_potential: number | null };
+type Material = Named & { category: string; base_uom: string; extract_potential: number | null };
 
 export default async function NewRecipePage() {
   const brewery = await getActiveBrewery();
@@ -22,7 +22,7 @@ export default async function NewRecipePage() {
     <RecipeEditor
       title="New recipe" backHref="/recipes"
       brands={brands.map(({ id, name }) => ({ id, name }))}
-      materials={materials.map(({ id, name, category, extract_potential }) => ({ id, name, category, extract_potential }))}
+      materials={materials.map(({ id, name, category, base_uom, extract_potential }) => ({ id, name, category, base_uom, extract_potential }))}
       profiles={profiles} unit={gravityUnit.effective}
     />
   );

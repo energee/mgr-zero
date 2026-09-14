@@ -224,8 +224,8 @@ export const E = {
    *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
    *  hugged with "w-fit"). The field's clipping and addon padding live in
    *  components/mgr/qty.tsx, shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
-    <Qty value={value} unit={unit} label={label} id={id} />
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, onChange?: (value: string) => void) => (
+    <Qty value={value} unit={unit} label={label} id={id} onChange={onChange} />
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,

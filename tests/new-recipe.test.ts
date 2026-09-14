@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { NewRecipeFieldsView } from "../components/mgr/views/new-recipe";
+import { IngredientView } from "../components/mgr/views/ingredient";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
@@ -78,6 +79,11 @@ describe("Recipe creation", () => {
     expect(sheets).toMatch(/title=\{line \? "Edit ingredient" : "Add ingredient"\}/);
     expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
     expect(sheets).toMatch(/<IngredientView\b/);
+    // Quantity is per barrel in the picked material's own unit, never a retyped one.
+    const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { material: "citra", stage: "dry_hop", perBbl: "1.2", timing: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
+    expect(ing).toMatch(/Quantity per bbl/);
+    expect(ing).toMatch(/lb \/ bbl/);
+    expect(ing).not.toMatch(/Per bbl</);
     expect(sheets).not.toMatch(/<select\b/);
     // Edit is already a Button: it must be the trigger itself, never wrapped in a second button.
     expect(sheets).toMatch(/node\.type === Button \? node/);

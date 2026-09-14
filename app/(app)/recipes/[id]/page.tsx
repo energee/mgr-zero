@@ -23,7 +23,7 @@ type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage:
 type Profile = { id: string; name: string };
 type Ingredient = { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null };
 type GetRecipe = { recipe: Recipe; version: Version | null; ingredients: Ingredient[]; waterAdditions: WaterAdditionRow[]; ogPlato: number | null; fgPlato: number | null; abv: number | null };
-type Material = { id: string; name: string; category: string; extract_potential: number | null };
+type Material = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
 
 const pct = (n: number) => String(Math.round(n * 100));
 const str = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
@@ -40,9 +40,10 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
   ])) as [GetRecipe, Material[], { effective: GravityUnit }, Profile[]];
   const names = new Map(materials.map((m) => [m.id, m.name]));
   const materialName = (mid: string) => names.get(mid) ?? mid.slice(0, 8);
+  const materialUnit = (mid: string) => materials.find((m) => m.id === mid)?.base_uom ?? "";
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
   // The form is a client component: hand it the fields it reads, not the whole materials row.
-  const formMaterials = materials.map(({ id, name, category, extract_potential }) => ({ id, name, category, extract_potential }));
+  const formMaterials = materials.map(({ id, name, category, base_uom, extract_potential }) => ({ id, name, category, base_uom, extract_potential }));
   const backHref = `/recipes/${recipe.id}`;
 
   if (draft !== undefined) {
@@ -62,7 +63,7 @@ export default async function RecipePage({ params, searchParams }: { params: Pro
         parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" },
         ingredients: ingredients.map((i) => ({
           key: i.id, title: materialName(i.material_id),
-          detail: `${i.stage.replace("_", " ")}${i.timing_minutes !== null ? ` · ${i.timing_minutes} min` : ""} · ${Number(i.per_bbl_qty)} / bbl`,
+          detail: `${i.stage.replace("_", " ")}${i.timing_minutes !== null ? ` · ${i.timing_minutes} min` : ""} · ${Number(i.per_bbl_qty)} ${materialUnit(i.material_id)} / bbl`,
           qty: "",
         })),
         preBoil: str(version?.pre_boil_bbl), boilMin: str(version?.boil_minutes),

@@ -10,7 +10,7 @@ import { isValidElement, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
-import { IngredientView, type IngredientFields } from "@/components/mgr/views/ingredient";
+import { IngredientView, type IngredientFields, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
 import { additionReady, INGREDIENT_STAGES, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
@@ -73,10 +73,10 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
 export type IngredientLine = { materialId: string; perBblQty: string; stage: (typeof INGREDIENT_STAGES)[number]; timingMinutes: string };
 export const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
-export const lineDetail = (l: IngredientLine) => `${l.stage.replace("_", " ")}${l.timingMinutes ? ` · ${l.timingMinutes} min` : ""} · ${l.perBblQty} / bbl`;
+export const lineDetail = (l: IngredientLine, unit?: string) => `${l.stage.replace("_", " ")}${l.timingMinutes ? ` · ${l.timingMinutes} min` : ""} · ${l.perBblQty} ${unit ?? ""}/ bbl`.replace("  /", " /");
 
 /** One ingredient, edited in place: "+ add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
-export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: NamedOption[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
+export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState<IngredientLine>(line ?? emptyLine());
   const fields: IngredientFields = { material: f.materialId, stage: f.stage, perBbl: f.perBblQty, timing: f.timingMinutes };
