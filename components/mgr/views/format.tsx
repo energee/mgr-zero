@@ -70,7 +70,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
         <div className="pt-3">{E.edit("Format name", model.name, "text", undefined, { onChange: controls.name, required: model.composed, placeholder: sizing.valid ? sizing.name : "Name this format", "aria-label": "Format name" })}</div>
       </details>
       {!model.name && sizing.valid && <p className="text-sm text-muted-foreground">Saves as <strong className="font-medium text-foreground">{sizing.name}</strong></p>}
-      {canCompose && <details className="pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={model.composed} onChange={event => controls.composed?.(event.target.checked)} />Calculate volume from smaller packages.</label></details>}
+      {canCompose && <details className="pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-center gap-2 text-sm">{E.sw(model.composed, "Calculate volume from smaller packages", controls.composed)}Calculate volume from smaller packages.</label></details>}
       {model.composed && !editing && <section className="flex flex-col gap-3 pt-3" aria-label="Package contents">
         <h3 className="text-sm font-medium">Package contents</h3>
         <FormatRowsView kind="components" rows={componentRows ?? localComponents} options={componentOptions} onChange={onComponentRowsChange ?? setLocalComponents} confirmClear={false} onConfirmClear={() => {}} />
