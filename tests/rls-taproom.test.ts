@@ -15,7 +15,7 @@ const matrix = {
   styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
-  taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny",
+  taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
@@ -86,6 +86,7 @@ async function fixtures() {
   const recipe = await put("recipes", { name: "IPA" });
   const version = await put("recipe_versions", { recipe_id: recipe.id, version: 1, created_by: owner.id });
   await put("recipe_ingredients", { recipe_version_id: version.id, material_id: material.id, per_bbl_qty: 1, stage: "mash" });
+  await put("recipe_water_additions", { recipe_version_id: version.id, material_id: material.id, qty: 1, unit: "g", stage: "mash" });
   const vessel = await put("vessels", { name: "FV1", kind: "fermenter", capacity_bbl: 10 });
   const vessel2 = await put("vessels", { name: "FV2", kind: "fermenter", capacity_bbl: 10 });
   const batch = await put("batches", { planned_on: day, planned_bbl: 10, intended_brand_id: cat.brandId, created_by: owner.id });
@@ -308,7 +309,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     complete_batch: [B,f.batch.id,R()],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
-    create_recipe_version: [B,f.recipe.id,152,0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
+    create_recipe_version: [B,f.recipe.id,[{name:"Sacc",kind:"infusion",tempF:152,minutes:60}],[],{},0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
     delete_bin: [B,emptyBin,R()], disable_chat_installation: [B,I,R()], disconnect_chat_installation: [B,I,R()], draft_purchase_order_from_requirements: [B,[MAT],R()],
     portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
     portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],

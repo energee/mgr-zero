@@ -28,7 +28,7 @@ describe("recipes and immutable versions", () => {
     expect(recipe.id).toBeTruthy();
 
     const v1 = (await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, boilMinutes: 60,
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, boilMinutes: 60,
       ingredients: [
         { materialId: malt, perBblQty: 60, stage: "mash" },
         { materialId: hop, perBblQty: 1.5, stage: "boil", timingMinutes: 60 },
@@ -40,7 +40,7 @@ describe("recipes and immutable versions", () => {
     await admin.from("materials").update({ extract_potential: 1.02 }).eq("id", malt);
 
     const v2 = (await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 150, brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 150, minutes: 60 }], brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
       ingredients: [{ materialId: malt, perBblQty: 70, stage: "mash" }],
     }, ctx)) as { id: string; version: number };
     expect(v2.version).toBe(2);
@@ -88,7 +88,7 @@ describe("recipes and immutable versions", () => {
   it("refuses an efficiency or attenuation outside (0,1]", async () => {
     const recipe = (await runCommand("create_recipe", { name: "Fraction check" }, ctx)) as { id: string };
     const bad = (v: Record<string, number>) => runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
       ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }], ...v,
     }, ctx);
     await expect(bad({ brewhouseEfficiency: 75 })).rejects.toThrow(/validation failed/);
@@ -211,7 +211,7 @@ describe("vessels and batches refuse other tenants and other roles", () => {
     const m = { id: await seedMaterial(other.id, { name: "Their Malt", category: "malt", extractPotential: 1.037 }) };
     const recipe = (await runCommand("create_recipe", { name: "Their Recipe" }, otherCtx)) as { id: string };
     otherRecipeVersion = ((await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
       ingredients: [{ materialId: m.id as string, perBblQty: 60, stage: "mash" }],
     }, otherCtx)) as { id: string }).id;
   });

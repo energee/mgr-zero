@@ -218,7 +218,7 @@ describe("planning: draft purchase orders from material gaps", () => {
     // A 10 bbl unbrewed batch needs 600 lb pale, 100 lb wheat, 2 yeast; 130 lb pale is on hand.
     const recipe = (await runCommand("create_recipe", { name: "Wheat Ale" }, brewer)) as { id: string };
     const version = (await runCommand("create_recipe_version", {
-      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
       ingredients: [
         { materialId: pale.id, perBblQty: 60, stage: "mash" },
         { materialId: wheat.id, perBblQty: 10, stage: "mash" },
