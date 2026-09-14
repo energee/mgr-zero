@@ -172,9 +172,10 @@ Without `.env.test.local`, local vitest refuses to run. CI keeps its separately 
 
 ## Deployment
 
-**Not yet provisioned.** No hosted Supabase project or Vercel project exists
-for this repo yet. When that is set up, create the hosted Supabase and Vercel
-projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
+Hosted deployments exist; this does not establish release readiness. See the
+[2026-09-14 release evidence](docs/operations/release-readiness-2026-09-14.md)
+for the observed revision and outstanding gates. Before creating or changing
+hosted projects, obtain the approvals in the release checklist. Configure `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel.
 Then run `bunx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
