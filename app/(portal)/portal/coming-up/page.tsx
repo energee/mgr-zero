@@ -12,8 +12,6 @@ import "@/lib/commands/all";
 export default async function ComingUpPage() {
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  const [rows, catalog, brewery] = (await Promise.all([
-    runCommand("portal_schedule", {}, ctx), runCommand("portal_catalog", {}, ctx), ctx.db.from("breweries").select("name").eq("id", customer.breweryId).single(),
-  ])) as [ScheduleRow[], { product: string }[], { data: { name: string } | null }];
-  return <ComingUpView model={toComingUpViewProps({ brewery: brewery.data?.name ?? "the brewery", rows, listed: new Set(catalog.map((c) => c.product)) })} linkRows />;
+  const [rows, catalog] = (await Promise.all([runCommand("portal_schedule", {}, ctx), runCommand("portal_catalog", {}, ctx)])) as [ScheduleRow[], { product: string }[]];
+  return <ComingUpView model={toComingUpViewProps({ brewery: customer.breweryName, rows, listed: new Set(catalog.map((c) => c.product)) })} linkRows />;
 }
