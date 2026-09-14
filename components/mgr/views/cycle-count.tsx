@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import type { CycleCountViewModel } from "@/lib/mgr/cycle-count-view";
 
 export type { CycleCountViewModel };
 
-export function CycleCountFooter({ formId, submitting = false, disabled = false }: { formId?: string; submitting?: boolean; disabled?: boolean }) {
-  return <Button form={formId} type="submit" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={submitting || disabled}>{submitting ? "Recording…" : "Record count"}</Button>;
+export function CycleCountFooter(props: { formId?: string; submitting?: boolean; disabled?: boolean }) {
+  return <IrreversibleSubmit label="Record count" busy="Recording…" {...props} />;
 }
 
 export function CycleCountView({ model, footer, onQuantity, onLocation, onBin, messages, submitting = false, disabled = false }: {

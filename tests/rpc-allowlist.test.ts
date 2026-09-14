@@ -94,6 +94,7 @@ const AUTHENTICATED_RPCS = [
   "portal_submit_quote(uuid,uuid,uuid,uuid,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
+  "record_batch_addition(uuid,uuid,uuid,ingredient_stage,uuid,numeric,text,uuid)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
   "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
   "record_fermentation_reading(uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",

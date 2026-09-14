@@ -314,6 +314,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R()], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
+    record_batch_addition: [B,f.occupancy.id,MAT,"dry_hop",null,1,null,R()],
     record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R()],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R()], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
     schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()],

@@ -53,6 +53,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Outbox", "Offline outbox"],
   ["Start", "Brew day"],
   ["Transfer", "Cellar transfer"],
+  ["Addition", "Cellar addition"],
   [/^Stop \d+ ·/, "Confirm delivery"],
   [/^Resume · Stop/, "Confirm delivery"],
   ["Swap", "Swap keg"],

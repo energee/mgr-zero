@@ -2,16 +2,14 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Qty } from "@/components/mgr/qty";
-import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { transferPreview, type CellarTransferViewModel, type TransferOccupancy } from "@/lib/mgr/cellar-transfer-view";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
+import { occupancyIdentity as identity, transferPreview, type CellarTransferViewModel } from "@/lib/mgr/cellar-transfer-view";
 
-const identity = (o: TransferOccupancy) => [o.brand_name, o.batch_no == null ? null : `B-${String(o.batch_no).padStart(4, "0")}`].filter(Boolean).join(" · ");
-
-export function CellarTransferFooter({ formId, submitting = false, disabled = false }: { formId?: string; submitting?: boolean; disabled?: boolean }) {
-  return <Button form={formId} type="submit" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={submitting || disabled}>{submitting ? "Saving…" : "Record transfer"}</Button>;
+export function CellarTransferFooter(props: { formId?: string; submitting?: boolean; disabled?: boolean }) {
+  return <IrreversibleSubmit label="Record transfer" {...props} />;
 }
 
 export function CellarTransferView({ model, onChange, messages, footer, submitting = false }: {

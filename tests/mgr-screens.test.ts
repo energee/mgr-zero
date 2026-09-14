@@ -402,7 +402,7 @@ describe("SCREENS", () => {
 
   it("marks pickable fields and never pins Required on a filled one", () => {
     const chevrons = new Map([
-      ["Record movement", 1], ["Composer proposal", 1], ["Cellar addition", 1],
+      ["Record movement", 1], ["Composer proposal", 1],
       ["Brew day", 3], ["Schedule packaging run", 1], ["Cycle count", 1],
       ["Chat settings", 2], ["Package BOM", 1],
     ]);
@@ -592,6 +592,8 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+    // record_cellar_transfer is live (#278 slice 2): the tag no longer says design.
+    expect(transfer.writes).not.toMatch(/\[design/);
   });
 
   it("puts the commit on the row, not a second copy at the top", () => {
