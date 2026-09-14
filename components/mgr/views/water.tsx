@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/commands/production";
-import { isPositive, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { type WaterAdditionFields, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
@@ -36,9 +36,6 @@ export function WaterView({ title = "Water", water, profiles, materials, onChang
   </>;
 }
 
-export type WaterAdditionFields = { materialId: string; qty: string; unit: string; stage: string };
-export const toAdditionFields = (a?: WaterAddition): WaterAdditionFields => ({ materialId: a?.materialId ?? "", qty: a ? String(a.qty) : "", unit: a?.unit ?? "g", stage: a?.stage ?? "mash" });
-export const additionReady = (f: WaterAdditionFields) => f.materialId !== "" && isPositive(f.qty);
 
 export function WaterAdditionView({ fields, materials, onChange, footer }: { fields: WaterAdditionFields; materials: NamedOption[]; onChange?: (patch: Partial<WaterAdditionFields>) => void; footer?: ReactNode }) {
   const bind = (key: keyof WaterAdditionFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };

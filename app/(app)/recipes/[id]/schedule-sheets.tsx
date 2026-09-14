@@ -7,10 +7,10 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
-import { FermentationScheduleView, FermentationStageView, stageReady, toStageFields } from "@/components/mgr/views/fermentation-schedule";
-import { MashScheduleView, MashStepView, mashStepReady, toMashStepFields } from "@/components/mgr/views/mash-schedule";
-import { WaterAdditionView, WaterView, additionReady, toAdditionFields, type NamedOption } from "@/components/mgr/views/water";
-import { moveItem, removeAt, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
+import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
+import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
+import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };

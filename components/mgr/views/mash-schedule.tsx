@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MASH_STEP_KINDS } from "@/lib/commands/production";
-import { isNumber, isPositive, mashSummary, type MashStep } from "@/lib/mgr/recipe-process-view";
+import { mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
 
 /** The verbs every ordered-list row carries: Edit, and move up or down while a draft is open. */
 export type ListRowProps = { onEdit?: (index: number) => void; onMove?: (index: number, by: -1 | 1) => void };
@@ -29,9 +29,6 @@ export function MashScheduleView({ title = "Mash schedule", steps, createAction,
   </>;
 }
 
-export type MashStepFields = { name: string; kind: string; tempF: string; minutes: string };
-export const toMashStepFields = (s?: MashStep): MashStepFields => ({ name: s?.name ?? "", kind: s?.kind ?? "infusion", tempF: s ? String(s.tempF) : "", minutes: s ? String(s.minutes) : "" });
-export const mashStepReady = (f: MashStepFields) => f.name.trim() !== "" && isNumber(f.tempF) && isPositive(f.minutes);
 
 export function MashStepView({ fields, onChange, footer }: { fields: MashStepFields; onChange?: (patch: Partial<MashStepFields>) => void; footer?: ReactNode }) {
   const bind = (key: keyof MashStepFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };

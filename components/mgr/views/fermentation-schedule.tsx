@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FERMENTATION_STAGE_KINDS } from "@/lib/commands/production";
-import { fermentationSummary, isNumber, isPositive, type FermentationStage } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
 
 export function FermentationScheduleView({ title = "Fermentation schedule", stages, dryHopDay, createAction, ...verbs }: { title?: string; stages: readonly FermentationStage[]; dryHopDay?: number; createAction?: ReactNode } & ListRowProps) {
@@ -19,9 +19,6 @@ export function FermentationScheduleView({ title = "Fermentation schedule", stag
   </>;
 }
 
-export type FermentationStageFields = { name: string; kind: string; tempF: string; days: string };
-export const toStageFields = (s?: FermentationStage): FermentationStageFields => ({ name: s?.name ?? "", kind: s?.kind ?? "primary", tempF: s ? String(s.tempF) : "", days: s ? String(s.days) : "" });
-export const stageReady = (f: FermentationStageFields) => f.name.trim() !== "" && isNumber(f.tempF) && isPositive(f.days);
 
 export function FermentationStageView({ fields, onChange, footer }: { fields: FermentationStageFields; onChange?: (patch: Partial<FermentationStageFields>) => void; footer?: ReactNode }) {
   const bind = (key: keyof FermentationStageFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };

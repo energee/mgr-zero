@@ -278,9 +278,10 @@ import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import type { FermentationStage, MashStep, WaterDraft } from "@/lib/mgr/recipe-process-view";
-import { MashScheduleView, MashStepView, toMashStepFields } from "@/components/mgr/views/mash-schedule";
-import { FermentationScheduleView, FermentationStageView, toStageFields } from "@/components/mgr/views/fermentation-schedule";
-import { WaterAdditionView, WaterView, toAdditionFields } from "@/components/mgr/views/water";
+import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
+import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
+import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
+import { toAdditionFields, toMashStepFields, toStageFields } from "@/lib/mgr/recipe-process-view";
 
 /** The drawn mash schedule, in the shape create_recipe_version stores. Rows and
  *  footer both read it, so the total and the conversion rest never disagree. */
