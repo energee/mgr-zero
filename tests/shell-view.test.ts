@@ -2,7 +2,7 @@
 // Team, Permission denied, First-run, and entry inventory adapters plus HTML.
 // Views own no sample data. Live CommandForm / MeSheet / LoginForm / Entry
 // cards stay wrappers.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -319,8 +319,8 @@ describe("Search view", () => {
   });
 
   it("the live Search adapters delegate their controls and results to SearchView", () => {
-    const page = src("app/(app)/search/page.tsx");
-    expect(page).toMatch(/<SearchPalette\b/);
+    expect(existsSync("app/(app)/search/page.tsx")).toBe(false);
+    expect(src("app/(app)/layout.tsx")).toMatch(/<SearchSheet\b/);
     const palette = src("components/mgr/search-palette.tsx");
     expect(palette).toMatch(/<SearchView\b/);
     expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
