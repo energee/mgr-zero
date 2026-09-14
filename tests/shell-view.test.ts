@@ -464,5 +464,6 @@ describe("Entry views", () => {
     expect(page).toMatch(/<CommandForm open/);
     expect(page).toMatch(/<SessionExpiredView/);
     expect(page).toContain('signInHref="/login"');
+    expect(page).toMatch(/<noscript>\s*<LoginForm/);
   });
 });
