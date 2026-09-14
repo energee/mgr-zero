@@ -13,13 +13,13 @@ import type { RepackOption, RepackViewModel } from "@/lib/mgr/repack-view";
 
 type FooterProps = { formId?: string; submitting?: boolean; disabled?: boolean };
 
-/** The pinned commit: withheld with the reason once a parent is picked that has no single composition row. */
+/** The pinned commit: withheld with the reason when the picked parent has no single composition row. */
 export function repackFooter(model: RepackViewModel, props: FooterProps = {}) {
-  return E.pin(model.unavailable && model.parentSkuId ? E.gated("Confirm repack", model.unavailable) : <IrreversibleSubmit label="Confirm repack" busy="Recording…" {...props} />);
+  return E.pin(model.unavailable ? E.gated("Confirm repack", model.unavailable) : <IrreversibleSubmit label="Confirm repack" busy="Recording…" {...props} />);
 }
 
 const pick = (label: string, value: string | undefined, options: RepackOption[], onChange?: (id: string) => void, disabled = false) => (
-  <Field><FieldLabel>{label}</FieldLabel><select aria-label={label} required disabled={disabled} className="min-w-0 rounded border bg-background p-2" value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onChange={(event) => onChange?.(event.target.value)}>
+  <Field><FieldLabel>{label}</FieldLabel><select aria-label={label} required disabled={disabled} className={E.select} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onChange={(event) => onChange?.(event.target.value)}>
     <option value="">Select {label.toLowerCase()}</option>{options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
   </select></Field>
 );

@@ -533,11 +533,11 @@ describe("list_repack_parents", () => {
   it("returns each composed SKU with the one child it breaks into, and nothing atomic", async () => {
     const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
     const rows = (await runCommand("list_repack_parents", {}, warehouseCtx)) as {
-      id: string; name: string; brand: string; unit: string; bblPerUnit: number;
+      id: string; label: string; unit: string; bblPerUnit: number;
       child: { skuId: string; unit: string; quantity: number } | null;
     }[];
     expect(rows.map((r) => r.id)).toEqual([caseSkuId]);
-    expect(rows[0]).toMatchObject({ name: "Repack IPA case", brand: "Repack IPA", unit: "case of 6 4-packs" });
+    expect(rows[0]).toMatchObject({ label: "Repack IPA — Repack IPA case", unit: "case of 6 4-packs" });
     expect(rows[0].bblPerUnit).toBeCloseTo(FOUR_PACK_BBL * PER_CASE, 6);
     expect(rows[0].child).toEqual({ skuId: fourPackSkuId, unit: "4-pack 16oz", quantity: PER_CASE });
   });

@@ -24,10 +24,13 @@ export const REPACK_UNAVAILABLE = "isn’t available yet: breaking a case has no
 /** One parent format's single component row: what it breaks into, how many per parent unit, and the parent's bbl per unit. */
 export type RepackComposition = { childLabel: string; quantity: number; parentBbl: number };
 
-export function toRepackView(input: { parent: string; unit: string; location: string; qty: string; composition: RepackComposition | null }): RepackViewModel {
-  const { composition, ...base } = input;
+export function toRepackView(input: { parent: string; unit: string; location?: string; qty: string; composition: RepackComposition | null }): RepackViewModel {
+  const { composition, location = "", ...rest } = input;
+  const base = { ...rest, location };
   const n = Number(base.qty) || 0;
   const out = `−${n} ${base.unit} · repack`;
+  // No parent yet: nothing to derive and nothing to refuse; the pickers say what to do.
+  if (!base.parent) return { ...base, tape: [], preview: "Pick a composed SKU, the bin it sits in, and how many to break", damaged: "not recorded" };
   if (!composition) {
     return { ...base, tape: [[out, "no composition"]], preview: "Preview: nothing to derive · the parent format has no single component row", damaged: "not recorded", unavailable: REPACK_UNAVAILABLE };
   }
