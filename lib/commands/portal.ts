@@ -137,6 +137,14 @@ defineQuery({
   },
 });
 
+// Coming up: planned batches as brand + expected week (Monday), soonest
+// first. The portal_schedule view exposes nothing else about a batch.
+defineQuery({
+  name: "portal_schedule", description: "Portal: what the brewery plans to brew next, as brand and expected week only",
+  roles: "customer", input: z.object({}),
+  handler: (ctx) => { requireCustomer(ctx); return unwrap(ctx.db.from("portal_schedule").select("brand_id, brand_name, planned_week").eq("brewery_id", ctx.breweryId).order("planned_week").order("brand_name")); },
+});
+
 defineQuery({
   name: "portal_orders", description: "Portal: the caller's orders, newest first",
   roles: "customer",

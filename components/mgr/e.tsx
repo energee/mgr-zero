@@ -129,7 +129,7 @@ export const E = {
       </div>
     );
   },
-  ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
+  ttl: (t: React.ReactNode, id?: string) => <h2 id={id} className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
   /** foot: fields that belong to this row, drawn inside its card on their own

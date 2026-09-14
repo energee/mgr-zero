@@ -53,3 +53,13 @@ export const ridgelineReviewOrder: ReviewOrderSnapshot = {
     deposits: [{ name: "Hazy IPA", kegSize: "half_bbl", qty: 4, unitPriceCents: 3000, amountCents: 12000 }],
   },
 };
+
+export const ridgelineComingUp = {
+  brewery: "Demo Brewing",
+  rows: [
+    { brand_id: "hazy", brand_name: "Hazy IPA", planned_week: "2026-09-14" },
+    { brand_id: "pils", brand_name: "Pils", planned_week: "2026-09-21" },
+    { brand_id: "saison", brand_name: "Saison", planned_week: "2026-10-05" },
+  ],
+  listed: new Set(["Hazy IPA", "Pils"]),
+};

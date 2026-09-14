@@ -391,6 +391,7 @@ omitted. They have no roles until they are built.
 | `portal_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_orders` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_quote_order` | Customer portal |  |  |  |  |  | ✓ |
+| `portal_schedule` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_submit_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_submit_quote` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
@@ -5169,6 +5170,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_quote_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+#### portal_schedule [#portal_schedule]
+
+`query` · customer
+
+Portal: what the brewery plans to brew next, as brand and expected week only
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_schedule", "input": {} }'
 ```
 
 #### portal_submit_order [#portal_submit_order]
