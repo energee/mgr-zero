@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
-import type { ShopViewModel } from "@/lib/mgr/shop-view";
+import { brandAnchor, type ShopViewModel } from "@/lib/mgr/shop-view";
 
 export type { ShopViewModel };
 export type ShopControls = {
@@ -28,7 +28,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
     {E.hd("Order", model.customer)}
     <fieldset disabled={locked} className="contents">
       {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
-        {E.ttl(group.product)}
+        {E.ttl(group.product, brandAnchor(group.product))}
         {group.items.map(item => <Fragment key={item.key}>
           {E.row(item.name, item.price, <OrderQuantity label={item.name} value={quantities?.[item.key] ?? item.qty} step="1" onChange={controls.quantity && (value => controls.quantity?.(item.key, value))} />)}
         </Fragment>)}

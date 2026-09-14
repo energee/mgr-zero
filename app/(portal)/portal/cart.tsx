@@ -111,7 +111,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`;
   return <>
-    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy}
+    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up", "what the brewery plans to brew next")}</Link>}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),

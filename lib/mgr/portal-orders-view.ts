@@ -32,7 +32,7 @@ export type PortalOrdersLineSnapshot = {
 
 export type PortalOrdersSnapshot = {
   customerName: string;
-  breweryName?: string;
+  breweryName: string;
   orders: {
     id: string;
     order_no: number | null;
@@ -60,7 +60,7 @@ export function toPortalOrdersViewProps({ customerName, breweryName, orders }: P
   return {
     subtitle: customerName,
     empty: orders.length === 0 ? { title: "No orders yet", description: "Start one from Order." } : undefined,
-    info: `Need a change? Call ${breweryName ?? "the brewery"}. Orders can’t be edited here after they’re placed.`,
+    info: `Need a change? Call ${breweryName}. Orders can’t be edited here after they’re placed.`,
     rows: orders.map((o) => {
       const adjusted = shortCopy(o.order_lines);
       const status = adjusted ?? buyerStatus(o.status, o.requested_ship_date);
