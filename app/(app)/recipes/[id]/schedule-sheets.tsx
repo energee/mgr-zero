@@ -34,9 +34,11 @@ function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onCh
     <Button type="button" disabled={!ready(fields)} onClick={() => { onChange(upsertAt(items, editing.index, toItem(fields))); setEditing(null); }}>{saveLabel}</Button>
   </CommandFormFooter>;
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }} title={sheetTitle} trigger={typeof trigger === "string" ? <Button type="button" variant="outline" className="justify-start">{trigger}</Button> : <button type="button" className="block w-full text-left">{trigger}</button>}>
-    {editing === null
-      ? list({ items, onEdit: begin, onMove: (i, by) => onChange(moveItem(items, i, by)), onAdd: () => begin(), add: <Button type="button" size="sm" onClick={() => begin()}>{addLabel}</Button> })
-      : item({ fields, onChange: (patch) => setFields((f) => ({ ...f, ...patch })), footer })}
+    <div className="flex flex-col gap-4">
+      {editing === null
+        ? list({ items, onEdit: begin, onMove: (i, by) => onChange(moveItem(items, i, by)), onAdd: () => begin(), add: <Button type="button" size="sm" onClick={() => begin()}>{addLabel}</Button> })
+        : item({ fields, onChange: (patch) => setFields((f) => ({ ...f, ...patch })), footer })}
+    </div>
   </CommandForm>;
 }
 
@@ -86,11 +88,13 @@ export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: 
     ...(p.timing !== undefined ? { timingMinutes: p.timing } : {}),
   }));
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(line ?? emptyLine()); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={<button type="button" className="block w-full text-left">{trigger}</button>}>
-    <IngredientView fields={fields} materials={materials.map((m) => m.name)} onChange={patch} footer={
-      <CommandFormFooter>
-        {onDelete && <Button type="button" variant="outline" onClick={() => { onDelete(); setOpen(false); }}>Delete ingredient</Button>}
-        <Button type="button" disabled={!lineReady(f)} onClick={() => { onSave(f); setOpen(false); }}>Save ingredient</Button>
-      </CommandFormFooter>
-    } />
+    <div className="flex flex-col gap-4">
+      <IngredientView fields={fields} materials={materials.map((m) => m.name)} onChange={patch} footer={
+        <CommandFormFooter>
+          {onDelete && <Button type="button" variant="outline" onClick={() => { onDelete(); setOpen(false); }}>Delete ingredient</Button>}
+          <Button type="button" disabled={!lineReady(f)} onClick={() => { onSave(f); setOpen(false); }}>Save ingredient</Button>
+        </CommandFormFooter>
+      } />
+    </div>
   </CommandForm>;
 }
