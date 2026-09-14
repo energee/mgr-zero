@@ -118,6 +118,9 @@ export const runClosedHazy: RunClosedViewModel = {
   yield: "97.9% · 0.30 bbl loss",
 };
 
+/** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
+export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
+
 export const recipesList: RecipesSnapshot = {
   rows: [
     { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28", verb: "Review", tone: "primary" },
@@ -128,14 +131,12 @@ export const recipesList: RecipesSnapshot = {
 
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
-  parent: { title: "Recipe parent · Hazy IPA · IPA", detail: "name and style only" },
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
-  scaleIndex: 1,
   ingredients: [
-    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "660 lb" },
-    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "6 lb" },
-    { key: "dh", title: "Citra", detail: "dry hop · day 4 · 1.2 lb / bbl", qty: "18 lb" },
+    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "" },
+    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "" },
+    { key: "dh", title: "Citra", detail: "dry hop · day 4 · 1.2 lb / bbl", qty: "" },
   ],
   preBoil: "16.8",
   boilMin: "60",

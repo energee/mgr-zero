@@ -6,6 +6,20 @@
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 
 export type { MashStep };
+/** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
+export const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
+export type IngredientStage = (typeof INGREDIENT_STAGES)[number];
+/** One ingredient line as the editor holds it: strings until the version is built. */
+export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
+export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
+/** "dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
+export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
+  `${stage.replace("_", " ")}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+/** Name and base unit by material id, for rows that name a material the command returned. */
+export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
+  const byId = new Map(materials.map((m) => [m.id, m]));
+  return { name: (id: string) => byId.get(id)?.name ?? id.slice(0, 8), unit: (id: string) => byId.get(id)?.base_uom, get: (id: string) => byId.get(id) };
+}
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
 export type WaterAddition = { materialId: string; qty: number; unit: string; stage: string };
 export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mashGal: string; spargeGal: string; targetMashPh: string; additions: WaterAddition[] };

@@ -11,6 +11,7 @@
 
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { XIcon } from "lucide-react";
+import { isValidElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -106,6 +107,12 @@ export function CommandForm({
 }
 
 /** Action row at the bottom of a CommandForm body: stacked on phone, right-aligned on desk. */
+/** A drawn row (E.row, E.nav) as a sheet trigger: it is not focusable, so it
+ *  gets a button around it; a Button (E.act, E.btn) is one already and nesting
+ *  would be invalid. */
+export const asTrigger = (node: React.ReactNode) =>
+  isValidElement(node) && node.type === Button ? node : <button type="button" className="block w-full text-left">{node}</button>;
+
 /** The row-or-add trigger every registry sheet shares: ghost Edit on a row, outline add beside the list. */
 export function sheetTrigger(edit: boolean, add: string) {
   return edit ? <Button variant="ghost" size="sm">Edit</Button> : <Button variant="outline" size="sm">{add}</Button>;

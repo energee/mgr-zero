@@ -56,7 +56,7 @@ describe("SCREENS", () => {
     expect(recipe).toMatch(/Water · /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
-    // Spec D3: the scale chips already state the batch size.
+    // Spec D3: quantities are per barrel; the batch names its size on Brew day.
     expect(recipe).not.toMatch(/Batch size|Knockout volume/);
     // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
@@ -215,7 +215,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(189);
+    expect(SCREENS).toHaveLength(190);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
