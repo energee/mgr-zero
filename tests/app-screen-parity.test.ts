@@ -3,11 +3,25 @@
 // definition of done (TODO.md). Red until each program lands its pages and
 // adds their rows to lib/mgr/screen-routes.ts.
 import { existsSync, readFileSync } from "node:fs";
+import { globSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES, ungatedMgrScreens } from "@/lib/mgr/screen-routes";
 
 describe("explorer parity", () => {
+  it("maps every live product page unless its route has recorded parity debt", () => {
+    const knownRouteDebt = [
+      "app/(app)/cellar/[occupancyId]/reading/page.tsx",
+      "app/(app)/search/page.tsx",
+    ];
+    const mapped = new Set(SCREEN_ROUTES.map((route) => route.file));
+    const pages = ["app/(app)/**/page.tsx", "app/(auth)/**/page.tsx", "app/(portal)/**/page.tsx"]
+      .flatMap((pattern) => globSync(pattern))
+      .sort();
+
+    expect(pages.filter((page) => !mapped.has(page))).toEqual(knownRouteDebt);
+  });
+
   it("keeps TODO's screen totals aligned with the executable parity inventory", () => {
     const todo = readFileSync("TODO.md", "utf8");
     const mgr = SCREENS.filter((screen) => !screen.venue);
