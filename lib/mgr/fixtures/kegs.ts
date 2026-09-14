@@ -2,6 +2,7 @@
 import type { KegBalanceSnapshot } from "@/lib/mgr/keg-balance-view";
 import type { KegFleetViewModel } from "@/lib/mgr/keg-fleet-view";
 import type { KegHistorySnapshot } from "@/lib/mgr/keg-history-view";
+import type { KegReport } from "@/lib/mgr/keg-report-view";
 
 export const kegFleetMicrostar: KegFleetViewModel = {
   pool: "Microstar ⅙ bbl · 76 kegs · pay per fill",
@@ -49,4 +50,11 @@ export const kegHistoryLedger: KegHistorySnapshot = {
     { key: "r4", title: "Acquired", detail: "8/28 · 12 × Owned ⅙ bbl", who: "Avery" },
     { key: "r5", title: "Retired", detail: "8/22 · 2 × Owned ½ bbl", who: "Avery" },
   ],
+};
+
+export const kegReportOwned: KegReport = {
+  fleet: { out: 142, total: 203, utilization: 142 / 203 },
+  bySize: [{ pool_id: "owned", pool_name: "Owned", keg_size: "half_bbl", out: 124, total: 167 }, { pool_id: "owned", pool_name: "Owned", keg_size: "sixth_bbl", out: 18, total: 36 }],
+  aging: [{ bucket: "0-30", kegs: 96, deposit_cents: 288000 }, { bucket: "31-60", kegs: 25, deposit_cents: 75000 }, { bucket: "61-90", kegs: 12, deposit_cents: 36000 }, { bucket: "90+", kegs: 9, deposit_cents: 27000 }],
+  customers: [{ customer_id: "ridgeline", name: "Ridgeline Tap Room", over_90: 9, oldest_at: "2026-05-12T00:00:00+00:00" }],
 };

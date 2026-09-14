@@ -157,6 +157,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "License", file: "app/(app)/compliance/licenses/license-form.tsx" },
   { name: "Keg fleet", file: "app/(app)/kegs/page.tsx" },
   { name: "Customer keg balance", file: "app/(app)/kegs/customers/[customerId]/page.tsx" },
+  { name: "Keg report", file: "app/(app)/kegs/report/page.tsx" },
   { name: "Keg event history", file: "app/(app)/kegs/history/page.tsx" },
   { name: "Routes", file: "app/(app)/routes/page.tsx" },
   { name: "Route", file: "app/(app)/routes/[id]/page.tsx" },
