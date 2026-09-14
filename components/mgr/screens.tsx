@@ -77,6 +77,7 @@ import { FormatsView } from "@/components/mgr/views/formats";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
+import { KegReportView } from "@/components/mgr/views/keg-report";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LicenseView } from "@/components/mgr/views/license";
@@ -188,7 +189,7 @@ import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
-import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
+import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAugust } from "@/lib/mgr/fixtures/monthly-compliance";
@@ -216,6 +217,7 @@ import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
@@ -2174,17 +2176,11 @@ export const SCREENS: Screen[] = [
     name: "Keg report",
     to: { "Ridgeline Tap Room": "Customer keg balance" },
     job: "Review unreturned aging and utilization across the keg fleet",
-    reads: "get_keg_report [view]",
+    reads: "get_keg_report [utilization from keg_fleet_totals; aging is FIFO over keg_events, returns retire the oldest shipment first]",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["aging", "customer balances grouped by age"], ["utilization", "out divided by active fleet"], ["empty", "no owned keg pools"]],
-    spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting.",
-    body: (<>
-      {E.back("Keg fleet", "Keg report")}
-      {E.num("70%", "142 of 203 owned half bbl kegs out")}
-      {E.tbl(["Age", "Kegs", "Deposits"], [["0–30 days", "96", "$2,880"], ["31–60 days", "25", "$750"], ["61–90 days", "12", "$360"], ["Over 90 days", "9", "$270"]])}
-      {E.row("Ridgeline Tap Room", "9 over 90 days · oldest 5/12", E.act("Open balance"), "w")}
-      {E.row("Owned ⅙ bbl", "18 of 36 out", "50% utilized")}
-    </>),
+    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
+    spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment.",
+    body: <KegReportView model={toKegReportViewProps(kegReportOwned)} />,
   },
   {
     step: 7,
