@@ -1,6 +1,6 @@
 // tests/recipe-process-view.test.ts — draft helpers for the schedule sheets (issue #278).
 import { describe, expect, it } from "vitest";
-import { fermentationSummary, mashSummary, moveItem, processReadout, upsertAt, type FermentationStage, type MashStep } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ionReadout, mashSummary, moveItem, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -34,5 +34,38 @@ describe("schedule drafts", () => {
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
     expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");
+  });
+});
+
+const denverRow = { calcium_ppm: 42, magnesium_ppm: 8, sodium_ppm: 22, sulfate_ppm: 65, chloride_ppm: 30, bicarbonate_ppm: 110 };
+const hazyRow = { calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40 };
+const salts: SaltMaterial[] = [{ id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "lactic", name: "Lactic acid", salt: null }];
+const draft: WaterDraft = { targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12", targetMashPh: "", additions: [
+  { materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" },
+] };
+
+describe("water suggestions", () => {
+  it("maps a profile row to ions", () => {
+    expect(profileIons(denverRow)).toEqual({ calcium: 42, magnesium: 8, sodium: 22, sulfate: 65, chloride: 30, bicarbonate: 110 });
+  });
+  it("splits grams by volume and folds a stage that rounds to zero into the other", () => {
+    expect(splitByStage(10, 9.5, 12)).toEqual({ mash: 4.4, sparge: 5.6 });
+    expect(splitByStage(0.1, 9.5, 12)).toEqual({ mash: 0, sparge: 0.1 });
+    expect(splitByStage(5, 10, 0)).toEqual({ mash: 5, sparge: 0 });
+  });
+  it("replaces salt additions with the suggestion and keeps acids where they were", () => {
+    const out = suggestAdditions(draft, profileIons(denverRow), profileIons(hazyRow), salts);
+    expect(out.filter((a) => a.materialId === "lactic")).toEqual([{ materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }]);
+    expect(out.some((a) => a.materialId === "cacl" && a.stage === "mash")).toBe(true);
+    expect(out.some((a) => a.materialId === "cacl" && a.stage === "sparge")).toBe(true);
+    expect(out.every((a) => a.unit === "g" || a.materialId === "lactic")).toBe(true);
+  });
+  it("reads out six ions against target and flags a miss over 20 ppm", () => {
+    const rows = ionReadout(draft, profileIons(denverRow), profileIons(hazyRow), salts);
+    expect(rows.map((r) => r.ion)).toEqual(["Calcium", "Magnesium", "Sodium", "Sulfate", "Chloride", "Bicarbonate"]);
+    const cl = rows.find((r) => r.ion === "Chloride")!;
+    expect(cl.detail).toMatch(/^30 of 180 ppm · −150$/);
+    expect(cl.warning).toBe(true);
+    expect(ionReadout(draft, profileIons(denverRow), undefined, salts)).toEqual([]);
   });
 });
