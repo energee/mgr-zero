@@ -126,6 +126,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Vessel detail", file: "app/(app)/batches/vessel-form.tsx" },
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
   { name: "Cellar transfer", file: "app/(app)/cellar/cellar-transfer-form.tsx" },
+  { name: "Cellar addition", file: "app/(app)/cellar/cellar-addition-form.tsx" },
   { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/reading-form.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
   { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },

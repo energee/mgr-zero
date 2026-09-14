@@ -56,6 +56,7 @@ import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
 import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
+import { CellarAdditionView, CellarAdditionFooter } from "@/components/mgr/views/cellar-addition";
 import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
@@ -63,7 +64,7 @@ import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
 import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
 import { accountingExpired } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
-import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
+import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -1578,22 +1579,13 @@ export const SCREENS: Screen[] = [
     group: "Global",
     surface: "sheet",
     name: "Cellar addition",
-    to: { Material: "Entity picker", "Record addition": "Cellar map" },
+    to: { "Record addition": "Cellar map" },
     job: "Post-knockout dry hop, fruit or adjunct against an occupancy",
-    reads: "get_cellar_map [view; open occupancies] · get_recipe [design; the version’s post-knockout stages]",
-    writes: "record_batch_addition [design; one RPC: batch_additions row (stage, occupancy) + material consumption movement; lot required when the material is lot-tracked]",
-    states: [["permission", "brewer or admin required", 1], ["no lot", "Choose a lot · Citra is lot-tracked", 1], ["recipe hint", "planned dry hop 1.2 lb/bbl · 18 lb"], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
-    spec: "Not Record movement (that is finished goods) and not Brew day (that is knockout). The consumption movement carries the lot; the addition row carries stage and occupancy so loss accounting stays anchored to the batch.",
-    body: (<>
-      {E.pick("Occupancy", "FV2 · B-0416 · Hazy IPA", ["FV2 · B-0416 · Hazy IPA", "FV1 · B-0409 · Pils"])}
-      {E.nav("Material", "Citra · hop")}
-      {E.chips(["dry hop", "fermentation", "other"], 0)}
-      {E.qty("18", E.tabs(["lb", "oz", "kg"], 0, "w-fit"))}
-      {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry hop · B-0416")}
-      {E.pin(<>
-        {E.btn("Record addition", "irr")}
-      </>)}
-    </>),
+    reads: "list_occupancies · list_materials · list_material_lots",
+    writes: "record_batch_addition [one RPC: batch_additions row (stage, occupancy) + material consumption movement from the bin holding the most of it; lot required when the material is lot-tracked]",
+    states: [["permission", "brewer or admin required", 1], ["no lot", "Choose a lot · Citra is lot-tracked", 1], ["short", "only what the bin holds can be consumed", 1], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
+    spec: "Not Record movement (that is finished goods) and not Brew day (that is knockout). The consumption movement carries the lot; the addition row carries stage and occupancy so loss accounting stays anchored to the batch. The bin is not picked: the RPC drains the bin holding the most of that material and lot.",
+    body: <><CellarAdditionView model={cellarAdditionCitra} footer={null} />{E.pin(<CellarAdditionFooter />)}</>,
   },
   {
     step: 7,

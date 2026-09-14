@@ -165,3 +165,13 @@ export const cellarTransferPils = {
   ],
   vessels: [{ id: "bt1", name: "BT1", capacity_bbl: 10 }, { id: "bt2", name: "BT2", capacity_bbl: 10 }],
 };
+
+export const cellarAdditionCitra = {
+  occupancyId: "fv2-occupancy", materialId: "citra", lotId: "l-0790", stage: "dry_hop" as const, qty: "18",
+  occupancies: cellarTransferPils.occupancies,
+  materials: [
+    { id: "citra", name: "Citra", category: "hop", base_uom: "lb", lot_tracked: true },
+    { id: "raspberry", name: "Raspberry purée", category: "other", base_uom: "lb", lot_tracked: false },
+  ],
+  lotsByMaterial: { citra: [{ lot_id: "l-0790", lot_code: "L-0790", qty: 40, received_on: "2026-08-20" }] },
+};
