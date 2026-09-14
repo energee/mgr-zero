@@ -4,25 +4,18 @@
 // color only where it carries meaning (a status dot, not a filled row).
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
-import { Palette, type PaletteGroup } from "@/components/mgr/palette";
-import * as React from "react";
-import Link from "next/link";
-import { Children, Fragment, isValidElement, type ReactNode } from "react";
-import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
+import { Palette, type PaletteGroup } from "@/components/mgr/palette";
+import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
-import { VolumeField } from "@/components/mgr/volume-field";
-import { ComposerDrawerView, ComposerStripView } from "@/components/mgr/views/composer";
-import type { StaffRole } from "@/lib/commands/registry";
-import { Qty, TabBar } from "@/components/mgr/qty";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
+import { ComposerDrawerView, ComposerStripView } from "@/components/mgr/views/composer";
+import { VolumeField } from "@/components/mgr/volume-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import type { EmptyState } from "@/lib/mgr/empty-state";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -31,7 +24,13 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { StaffRole } from "@/lib/commands/registry";
+import type { EmptyState } from "@/lib/mgr/empty-state";
 import { cn } from "@/lib/utils";
+import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
+import Link from "next/link";
+import * as React from "react";
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
@@ -91,6 +90,16 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
     {fields.map((field, i) => <Fragment key={i}>{field}</Fragment>)}
   </div>
 );
+
+/** What a live adapter passes to make a field its own: an onChange, or none
+ *  with `disabled` for a read-out that must not look editable. Fixtures pass
+ *  nothing and draw a default value. */
+export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby"> & {
+  onChange?: (value: string) => void;
+  /** Inline row controls already have visible context. */
+  hideLabel?: boolean;
+  contextualLabels?: boolean;
+};
 
 export const E = {
   palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
@@ -164,8 +173,6 @@ export const E = {
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
-  /** The native select the live sheets draw; the Select primitive is uncontrolled and fixture-only (E.pick). */
-  select: "min-w-0 rounded border bg-background p-2",
   /** A status word. Never clickable. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
     <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">
@@ -224,8 +231,8 @@ export const E = {
    *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
    *  hugged with "w-fit"). The field's clipping and addon padding live in
    *  components/mgr/qty.tsx, shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
-    <Qty value={value} unit={unit} label={label} id={id} />
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => (
+    <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} />
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
@@ -281,15 +288,16 @@ export const E = {
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
    *  (DatePicker). */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
-    if (type === "date") return <DatePicker label={label} defaultValue={value} />;
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
+    const { onChange, hideLabel, contextualLabels, ...attributes } = controls ?? {};
+    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
       return (
-        <Field>
-          <FieldLabel>{label}</FieldLabel>
-          {E.stq(Number(value), label)}
+        <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
+          {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
+          {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, step: controls?.step ?? "any", required: controls?.required ?? false })}
         </Field>
       );
     }
@@ -299,9 +307,9 @@ export const E = {
     // share one list. A caller cannot forget to disambiguate.
     const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
     return (
-      <Field>
-        <FieldLabel>{label}</FieldLabel>
-        <Input type={type} defaultValue={value} aria-label={label} list={listId} />
+      <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
+        {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
+        <Input type={type} aria-label={label} {...attributes} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
       </Field>
     );
@@ -332,12 +340,12 @@ export const E = {
     </Field>
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
-  pick: (label: string, value: string, options: string[]) => (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <Select defaultValue={value}>
-        <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
-        <SelectContent><SelectGroup>{options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectGroup></SelectContent>
+  pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode }) => (
+    <Field data-disabled={controls?.disabled}>
+      {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
+      <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name}>
+        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
+        <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Field>
   ),
@@ -435,16 +443,7 @@ export const E = {
   ),
   /** A search box: the one input whose placeholder is its whole label. */
   search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
-  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string }) => {
-    const step = (delta: number) => controls?.onChange(String(Math.max(controls.min, Math.min(controls.max, v + delta))));
-    return (
-    <ButtonGroup>
-      <Button type="button" variant="outline" size="icon" aria-label="Decrease" disabled={controls && v <= controls.min} onClick={controls ? () => step(-1) : undefined}>−</Button>
-      <Input id={controls?.id} type="number" inputMode="numeric" min={controls?.min ?? 0} max={controls?.max} step={1} required={!!controls} value={controls?.value} defaultValue={controls ? undefined : v} onChange={controls ? (event) => controls.onChange(event.target.value) : undefined} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-      <Button type="button" variant="outline" size="icon" aria-label="Increase" disabled={controls && v >= controls.max} onClick={controls ? () => step(1) : undefined}>+</Button>
-    </ButtonGroup>
-    );
-  },
+  stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
    *  and E.btn already do; fixtures leave it out and the explorer resolves the

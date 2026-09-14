@@ -8,10 +8,32 @@
 // cannot simply live in e.tsx either — SCREENS is a module-level const, built at
 // import time, where VolumeField's React.useId() could never run. Screen authors
 // never import this directly; they use E.qty, E.tabs and E.volume.
-import type { ReactNode } from "react";
-import Link from "next/link";
+"use client";
+import type { FieldControls } from "@/components/mgr/e";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
+import { useRef, type ReactNode } from "react";
+
+/** The same stepper for controlled forms and uncontrolled inventory fields. */
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
+  const input = useRef<HTMLInputElement>(null);
+  const step = (direction: number) => {
+    const field = input.current;
+    if (!field || field.matches(":disabled") || field.readOnly) return;
+    const next = String(Math.max(attributes.min === undefined ? -Infinity : Number(attributes.min), Math.min(attributes.max === undefined ? Infinity : Number(attributes.max), (Number(field.value) || 0) + direction)));
+    if (onChange) onChange(next);
+    else field.value = next;
+  };
+  return <ButtonGroup>
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+    <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue} onChange={onChange ? event => onChange(event.target.value) : undefined} className="w-14 [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
+  </ButtonGroup>;
+}
 
 /** A typed quantity: the OS keyboard is the keypad, so nothing here draws one.
  *  Defaults live in `E.qty`/`E.tabs`, the vocabulary screen authors call; every
@@ -45,7 +67,7 @@ export function Qty({
         defaultValue={onChange ? undefined : value}
         onChange={(event) => onChange?.(event.target.value)}
         aria-label={label}
-        className="text-2xl font-semibold"
+        className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
           addon's default inline-end pr-2 would only double up as dead space past

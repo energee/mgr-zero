@@ -2,13 +2,13 @@
 // E.edit(label, value, "date"). Popover + shadcn Calendar; value is ISO yyyy-mm-dd.
 "use client";
 
-import * as React from "react";
-import { Calendar03Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/mgr/icon";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar03Icon } from "@hugeicons/core-free-icons";
+import * as React from "react";
 
 // Pinned, not the ambient locale: the server formats during SSR and the browser
 // on hydration, so an implicit locale renders two different strings and React
@@ -26,7 +26,7 @@ function formatISODate(date: Date) {
   return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
 }
 
-export function DatePicker({ label, defaultValue = "", value, onChange }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void }) {
+export function DatePicker({ label, defaultValue = "", value, onChange, disabled, required, name }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean; name?: string }) {
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
   const controlled = value !== undefined;
   const date = controlled ? parseISODate(value) : internalDate;
@@ -45,6 +45,8 @@ export function DatePicker({ label, defaultValue = "", value, onChange }: { labe
       <Popover>
         <PopoverTrigger asChild>
           <Button
+            type="button"
+            disabled={disabled}
             id={triggerId}
             aria-labelledby={`${labelId} ${triggerId}`}
             variant="outline"
@@ -58,6 +60,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange }: { labe
           <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} />
         </PopoverContent>
       </Popover>
+      {(required || name) && <input type="date" aria-label={label} className="sr-only" tabIndex={-1} name={name} required={required} disabled={disabled} value={date ? formatISODate(date) : ""} onChange={event => selectDate(parseISODate(event.target.value))} />}
     </Field>
   );
 }

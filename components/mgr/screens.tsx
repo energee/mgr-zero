@@ -123,6 +123,8 @@ import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
+import { NewRecipeFieldsView } from "@/components/mgr/views/new-recipe";
+import { IngredientView } from "@/components/mgr/views/ingredient";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
@@ -178,7 +180,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -307,7 +309,7 @@ const SALT_OPTIONS: SaltMaterial[] = [
 ];
 /** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
 const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
+  targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
@@ -1886,12 +1888,12 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipes",
-    to: { Review: "Recipe", Finish: "Recipe" },
+    to: { Review: "Recipe", Finish: "Recipe", "Create recipe": "Recipe" },
     job: "Find recipe versions and create the next recipe",
     reads: "list_recipes [design]",
     writes: "none [creation and versioning happen on Recipe]",
     states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
-    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens the same surface with only name and style.",
+    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens Recipe with no version yet: the parent fields above the first version's editor, one save.",
     body: <RecipesView model={toRecipesViewProps(recipesList)} />,
   },
   {
@@ -1899,13 +1901,29 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
+    to: { Style: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
-    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
-    body: <RecipeView model={recipeHazyV4} />,
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["style", "drawn gated: recipes has no style column and the create command takes none; the brand names the style today", 0], ["no price group", "the live page draws Default price group gated until a recipe can carry one", 0]],
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; Create recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
+    body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Ingredient",
+    to: { "Save ingredient": "Recipe", "Delete ingredient": "Recipe" },
+    job: "One line of the bill: which material, where it enters, how much per barrel",
+    reads: "list_materials · none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with the version, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "The add-ingredient row on Recipe opens this sheet straight into the fields; there is no list to pass through because the recipe page is the list. Quantity is per barrel in the material's own base unit so the batch size scales it and no unit is retyped; timing is optional and in minutes, since a dry hop’s day is a fermentation stage, not an ingredient fact.",
+    body: (<>
+      <IngredientView fields={{ materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }} materials={[{ id: "2row", name: "2-row", unit: "lb" }, { id: "citra", name: "Citra", unit: "lb" }, { id: "cans", name: "Cans · 16 oz", unit: "each" }]} />
+    </>),
   },
   {
     step: 7,
@@ -1981,7 +1999,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggested", "Suggest additions fills the salts from the solver; acids stay; every row is still editable"], ["off target", "an ion more than 20 ppm from target warns", 1]],
     spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Suggest additions runs the one shared water formula over total brewing water, mash plus sparge, and replaces only the salts; the six rows under Against target read the same formula back, so the preview and any server read agree. pH prediction is still not built.",
     body: (<>
-      <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
+      <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} sourceDefault={WATER_PROFILE_OPTIONS.find((p) => p.id === "denver")!.ions} />
     </>),
   },
   {

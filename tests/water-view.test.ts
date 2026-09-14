@@ -47,5 +47,5 @@ it("the live sheet mounts WaterView with profile ions and no salt identity yet, 
   const sheets = readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8");
   expect(sheets).toMatch(/<WaterView\b/);
   expect(sheets).not.toMatch(/Suggest additions|Against target|salt:/);
-  expect(readFileSync("app/(app)/recipes/[id]/page.tsx", "utf8")).toMatch(/profileIons/);
+  for (const page of ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"]) expect(readFileSync(page, "utf8")).toMatch(/profileIons/);
 });

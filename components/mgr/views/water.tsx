@@ -4,8 +4,6 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/commands/production";
 import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import type { Ions } from "@/lib/water-chemistry";
@@ -17,7 +15,6 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
   title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
   onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
 } & ListRowProps) {
-  const bind = (key: "targetProfileId" | "sourceProfileId" | "mashGal" | "spargeGal" | "targetMashPh") => onChange ? { value: water[key] } : { defaultValue: water[key] };
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
   // Chemistry needs a salt identity on materials; until the schema carries one the verb and read-out draw gated, never guessed from a name.
   const chemistryKnown = materials.some((m) => m.salt !== undefined);
@@ -28,17 +25,13 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
   const readout = target && source ? ionReadout(water, source, target, materials) : [];
   return <>
     {E.back("Recipe", title)}
-    <Field><FieldLabel>Source profile</FieldLabel><select aria-label="Source profile" className={E.select} {...bind("sourceProfileId")} onChange={(e) => onChange?.({ sourceProfileId: e.target.value })}>
-      <option value="">brewery default</option>{profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-    </select></Field>
-    <Field><FieldLabel>Target profile</FieldLabel><select aria-label="Target profile" className={E.select} {...bind("targetProfileId")} onChange={(e) => onChange?.({ targetProfileId: e.target.value })}>
-      <option value="">No target</option>{profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-    </select></Field>
+    {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "brewery default" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
+    {E.pick("Target profile", water.targetProfileId, [{ value: "", label: "No target" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ targetProfileId: nextValue }) : undefined })}
     {E.cols(
-      <Field><FieldLabel>Mash water gal</FieldLabel><Input aria-label="Mash water gal" type="number" min="0" step="any" {...bind("mashGal")} onChange={(e) => onChange?.({ mashGal: e.target.value })} /></Field>,
-      <Field><FieldLabel>Sparge water gal</FieldLabel><Input aria-label="Sparge water gal" type="number" min="0" step="any" {...bind("spargeGal")} onChange={(e) => onChange?.({ spargeGal: e.target.value })} /></Field>,
+      E.edit("Mash water gal", water.mashGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ mashGal: nextValue }) : undefined, min: "0", step: "any" }),
+      E.edit("Sparge water gal", water.spargeGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ spargeGal: nextValue }) : undefined, min: "0", step: "any" }),
     )}
-    <Field><FieldLabel>Target mash pH</FieldLabel><Input aria-label="Target mash pH" type="number" min="4" max="7" step="0.01" {...bind("targetMashPh")} onChange={(e) => onChange?.({ targetMashPh: e.target.value })} /></Field>
+    {E.edit("Target mash pH", water.targetMashPh, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ targetMashPh: nextValue }) : undefined, min: "4", max: "7", step: "0.01" })}
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
@@ -57,16 +50,13 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
 
 
 export function WaterAdditionView({ fields, materials, onChange, footer }: { fields: WaterAdditionFields; materials: NamedOption[]; onChange?: (patch: Partial<WaterAdditionFields>) => void; footer?: ReactNode }) {
-  const bind = (key: keyof WaterAdditionFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };
   return <>
-    <Field><FieldLabel>Material</FieldLabel><select aria-label="Material" required className={E.select} {...bind("materialId")} onChange={(e) => onChange?.({ materialId: e.target.value })}>
-      <option value="">Salt or acid</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-    </select></Field>
+    {E.pick("Material", fields.materialId, [{ value: "", label: "Salt or acid" }, ...(materials.map((m) => ({ value: m.id, label: m.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue }) : undefined, required: true })}
     {E.inline(
-      <Field><FieldLabel>Amount</FieldLabel><Input aria-label="Amount" type="number" min="0" step="any" required {...bind("qty")} onChange={(e) => onChange?.({ qty: e.target.value })} /></Field>,
-      <Field><FieldLabel>Unit</FieldLabel><select aria-label="Unit" className={E.select} {...bind("unit")} onChange={(e) => onChange?.({ unit: e.target.value })}>{WATER_ADDITION_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select></Field>,
+      E.edit("Amount", fields.qty, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ qty: nextValue }) : undefined, required: true, min: "0", step: "any" }),
+      E.pick("Unit", fields.unit, (WATER_ADDITION_UNITS.map(u => ({ value: u, label: u }))), { onChange: onChange ? (nextValue: string) => onChange?.({ unit: nextValue }) : undefined }),
     )}
-    <Field><FieldLabel>Stage</FieldLabel><select aria-label="Stage" className={E.select} {...bind("stage")} onChange={(e) => onChange?.({ stage: e.target.value })}>{WATER_ADDITION_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>
+    {E.pick("Stage", fields.stage, (WATER_ADDITION_STAGES.map(s => ({ value: s, label: s }))), { onChange: onChange ? (nextValue: string) => onChange?.({ stage: nextValue }) : undefined })}
     {footer !== undefined ? footer : E.btns([["Delete addition", "g"], "Save addition"])}
   </>;
 }

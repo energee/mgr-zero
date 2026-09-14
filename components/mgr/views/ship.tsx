@@ -3,9 +3,6 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ShipViewModel } from "@/lib/mgr/ship-view";
@@ -23,20 +20,15 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   const timing = invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
-    <Field><FieldLabel>Fulfillment source</FieldLabel>
-      <Select value={model.fulfillmentSource} disabled>
-        <SelectTrigger aria-label="Fulfillment source"><SelectValue /></SelectTrigger>
-        <SelectContent>{(fulfillmentOptions ?? [model.fulfillmentSource]).map(source => <SelectItem key={source} value={source}>{source}</SelectItem>)}</SelectContent>
-      </Select>
-    </Field>
+    {E.pick("Fulfillment source", model.fulfillmentSource, ((fulfillmentOptions ?? [model.fulfillmentSource]).map(source => ({ value: source, label: source }))), { disabled: true })}
     {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
       <OrderQuantity label={`${line.name} shipped quantity`} value={quantities?.[line.key] ?? line.qty} max={line.picked} step="0.01" required onChange={onQuantity && (value => onQuantity(line.key, value))} />, line.tone ?? "")}</div>)}
     {model.shortNote && <>
-      <Field><FieldLabel>Reason · required</FieldLabel><Input aria-label="Reason" disabled placeholder="Shortage reason recording is not available yet" /></Field>
+      {E.edit("Reason · required", "", "text", undefined, { disabled: true, placeholder: "Shortage reason recording is not available yet", "aria-label": "Reason" })}
       {E.info(model.shortNote)}
     </>}
-    <Field><FieldLabel>Carrier</FieldLabel><Input aria-label="Carrier" placeholder="optional" value={onCarrier ? carrier : undefined} defaultValue={onCarrier ? undefined : carrier} onChange={event => onCarrier?.(event.target.value)} /></Field>
-    <Field><FieldLabel>Tracking</FieldLabel><Input aria-label="Tracking" placeholder="optional" value={onTracking ? tracking : undefined} defaultValue={onTracking ? undefined : tracking} onChange={event => onTracking?.(event.target.value)} /></Field>
+    {E.edit("Carrier", carrier, "text", undefined, { onChange: onCarrier, placeholder: "optional" })}
+    {E.edit("Tracking", tracking, "text", undefined, { onChange: onTracking, placeholder: "optional" })}
     <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" value={onInvoiceTiming ? String(timing) : undefined} defaultValue={onInvoiceTiming ? undefined : String(timing)}
       onValueChange={value => { if (value !== "") onInvoiceTiming?.(value === "1" ? "on_delivery" : "now"); }}>
       <ToggleGroupItem value="0">Invoice now</ToggleGroupItem><ToggleGroupItem value="1">On delivery</ToggleGroupItem>
