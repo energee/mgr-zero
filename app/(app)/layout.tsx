@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           composer={<Composer key={`${identity!.userId}:${brewery.id}:${brewery.role}`} role={brewery.role} />}
           headerRight={
             <>
-              {brewery.role !== "taproom" && <SearchSheet />}
+              {brewery.role !== "taproom" && <SearchSheet role={brewery.role} />}
               <MeSheet>
                 <MeView
                   model={{

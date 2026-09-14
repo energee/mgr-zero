@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchCacheKey, searchLoading, restrictToOptions, excludeSeen } from "@/lib/mgr/search-palette-state";
+import { searchCacheKey, searchLoading, restrictToOptions, excludeSeen, searchDestinations } from "@/lib/mgr/search-palette-state";
 
 describe("search palette state", () => {
   it("scopes cached matches to brewery, kinds, and term", () => {
@@ -20,4 +20,14 @@ describe("search palette state", () => {
     expect(excludeSeen(restrictToOptions([hit], [hit]), [hit])).toEqual([]);
     expect(restrictToOptions([hit, removed])).toEqual([hit, removed]);
   });
+});
+
+
+it("finds role-visible pages independently of record matches", () => {
+  expect(searchDestinations("admin", " invoice ").map(page => page.href)).toEqual(["/invoices"]);
+  expect(searchDestinations("sales", "CATALOG").map(page => page.href)).toEqual(["/catalog"]);
+  expect(searchDestinations("brewer", "catalog")).toEqual([]);
+  expect(searchDestinations("sales", "locations")).toEqual([]);
+  expect(searchDestinations("admin", "")).toEqual([]);
+  expect(searchDestinations("admin", "nothing matches")).toEqual([]);
 });
