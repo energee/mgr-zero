@@ -281,7 +281,8 @@ export const E = {
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
    *  (DatePicker). */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
+  /** `controls` makes the field controlled for a live adapter; fixtures leave it out and draw a default value. */
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: { onChange: (value: string) => void; required?: boolean; step?: number | "any"; max?: number }) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
@@ -289,7 +290,7 @@ export const E = {
       return (
         <Field>
           <FieldLabel>{label}</FieldLabel>
-          {E.stq(Number(value), label)}
+          {E.stq(Number(value) || 0, label, controls && { value, onChange: controls.onChange, min: 0, max: controls.max ?? 100000, step: controls.step ?? "any", required: controls.required ?? false })}
         </Field>
       );
     }
@@ -301,7 +302,7 @@ export const E = {
     return (
       <Field>
         <FieldLabel>{label}</FieldLabel>
-        <Input type={type} defaultValue={value} aria-label={label} list={listId} />
+        <Input type={type} {...(controls ? { value, onChange: (event) => controls.onChange(event.target.value), required: controls.required } : { defaultValue: value })} aria-label={label} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
       </Field>
     );
@@ -435,12 +436,12 @@ export const E = {
   ),
   /** A search box: the one input whose placeholder is its whole label. */
   search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
-  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string }) => {
+  stq: (v: number, label = "Quantity", controls?: { value: string; onChange: (value: string) => void; min: number; max: number; id?: string; step?: number | "any"; required?: boolean }) => {
     const step = (delta: number) => controls?.onChange(String(Math.max(controls.min, Math.min(controls.max, v + delta))));
     return (
     <ButtonGroup>
       <Button type="button" variant="outline" size="icon" aria-label="Decrease" disabled={controls && v <= controls.min} onClick={controls ? () => step(-1) : undefined}>−</Button>
-      <Input id={controls?.id} type="number" inputMode="numeric" min={controls?.min ?? 0} max={controls?.max} step={1} required={!!controls} value={controls?.value} defaultValue={controls ? undefined : v} onChange={controls ? (event) => controls.onChange(event.target.value) : undefined} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+      <Input id={controls?.id} type="number" inputMode="numeric" min={controls?.min ?? 0} max={controls?.max} step={controls?.step ?? 1} required={controls ? controls.required !== false : false} value={controls?.value} defaultValue={controls ? undefined : v} onChange={controls ? (event) => controls.onChange(event.target.value) : undefined} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
       <Button type="button" variant="outline" size="icon" aria-label="Increase" disabled={controls && v >= controls.max} onClick={controls ? () => step(1) : undefined}>+</Button>
     </ButtonGroup>
     );

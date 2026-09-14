@@ -1,6 +1,6 @@
 // tests/production-view.test.ts — Batches, Brew day, packaging close, and
 // recipe adapters plus HTML. Views own no sample data. Live NewBatchForm /
-// RecordBrewDayForm / CloseRunForm / NewRecipeForm stay wrappers.
+// RecordBrewDayForm / CloseRunForm / RecipeEditor stay wrappers.
 import { readFileSync } from "node:fs";
 import { isValidElement, type ReactNode } from "react";
 import { createElement } from "react";
@@ -219,7 +219,7 @@ describe("Recipes view", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
     expect(page).toMatch(/\/recipes\/new/);
-    expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<NewVersionForm\b/);
+    expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
   });
 
   it("the Recipe inventory record is RecipeView", () => {
@@ -238,10 +238,10 @@ describe("Recipes view", () => {
     expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
   });
 
-  it("the live recipe page mounts RecipeView and slots NewVersionForm", () => {
+  it("the live recipe page mounts RecipeView and opens RecipeEditor for a draft", () => {
     const page = src("app/(app)/recipes/[id]/page.tsx");
     expect(page).toMatch(/<RecipeView\b/);
-    expect(page).toMatch(/<NewVersionForm\b/);
+    expect(page).toMatch(/<RecipeEditor\b/);
   });
 });
 

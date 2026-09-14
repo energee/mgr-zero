@@ -1,11 +1,8 @@
-// app/(app)/recipes/[id]/page.tsx — one recipe: its latest version's
-// assumptions, ingredients, and the OG/FG/ABV get_recipe predicts from them
-// (lib/recipe-gravity.ts — never stored). New version opens
-// recipe-version-form.tsx → create_recipe_version, whose live preview calls
-// the same pure function. Predictions are computed in degrees Plato and
-// printed in whatever unit the reader chose (get_gravity_unit, resolved once
-// here and handed to the form too).
-import { E } from "@/components/mgr/e";
+// app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView exactly
+// as the inventory draws it: its latest version's process numbers,
+// ingredients, schedules and the OG/FG/ABV get_recipe predicts (never
+// stored). Create recipe version opens the same page with ?draft, where
+// recipe-version-form.tsx makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -13,8 +10,8 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { NewVersionForm } from "./recipe-version-form";
-import { fermentationSummary, mashSummary, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
+import { RecipeEditor } from "./recipe-version-form";
+import { fermentationSummary, mashSummary, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
 type Version = ProcessColumns & {
@@ -28,10 +25,11 @@ type Ingredient = { id: string; material_id: string; per_bbl_qty: number; stage:
 type GetRecipe = { recipe: Recipe; version: Version | null; ingredients: Ingredient[]; waterAdditions: WaterAdditionRow[]; ogPlato: number | null; fgPlato: number | null; abv: number | null };
 type Material = { id: string; name: string; category: string; extract_potential: number | null };
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
+const pct = (n: number) => String(Math.round(n * 100));
+const str = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function RecipePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ draft?: string }> }) {
+  const [{ id }, { draft }] = await Promise.all([params, searchParams]);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ recipe, version, ingredients, waterAdditions, ogPlato, fgPlato, abv }, materials, gravityUnit, profiles] = (await Promise.all([
@@ -45,45 +43,36 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
   // The form is a client component: hand it the fields it reads, not the whole materials row.
   const formMaterials = materials.map(({ id, name, category, extract_potential }) => ({ id, name, category, extract_potential }));
+  const backHref = `/recipes/${recipe.id}`;
 
+  if (draft !== undefined) {
+    return <RecipeEditor recipeId={recipe.id} title={`${recipe.name} · new version`} backHref={backHref} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />;
+  }
+
+  const target = profileName(version?.target_water_profile_id ?? null);
   return (
     <RecipeView
-      model={{ title: recipe.name, backHref: "/recipes" }}
-      createAction={<NewVersionForm recipeId={recipe.id} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />}
-      detail={
-        <>
-          {recipe.note ? E.fld("Note", recipe.note) : null}
-          {version === null ? (
-            E.blank("No version yet — create the first one")
-          ) : (
-            <>
-              {E.fld("Version", `v${version.version}`)}
-              {E.fld("Brewhouse efficiency", pct(version.brewhouse_efficiency))}
-              {E.fld("Yeast attenuation", pct(version.yeast_attenuation))}
-              {version.boil_minutes !== null ? E.fld("Boil", `${version.boil_minutes} min`) : null}
-              {version.target_ibu !== null ? E.fld("Target IBU", version.target_ibu) : null}
-              {version.note ? E.fld("Note", version.note) : null}
-              {ogPlato !== null && fgPlato !== null && abv !== null
-                ? E.fld("Predicted OG / FG / ABV", `${formatGravity(ogPlato, gravityUnit.effective)} / ${formatGravity(fgPlato, gravityUnit.effective)} / ${abv.toFixed(1)}%`)
-                : null}
-              {processReadout(version, profileName).slice(0, 3).map(([k, v]) => <div key={k}>{E.fld(k, v)}</div>)}
-              {E.ttl(`Mash schedule · ${version.mash_schedule.length} steps`)}
-              {version.mash_schedule.map((s, i) => <div key={i}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.minutes} min`)}</div>)}
-              {E.info(mashSummary(version.mash_schedule))}
-              {E.ttl(`Fermentation schedule · ${version.fermentation_schedule.length} stages`)}
-              {version.fermentation_schedule.map((s, i) => <div key={i}>{E.row(s.name, `${s.tempF} °F · ${s.days} days`)}</div>)}
-              {E.info(fermentationSummary(version.fermentation_schedule))}
-              {E.ttl("Water")}
-              {processReadout(version, profileName).slice(3).map(([k, v]) => <div key={k}>{E.fld(k, v)}</div>)}
-              {waterAdditions.map((a, i) => <div key={i}>{E.row(materialName(a.material_id), `${a.qty} ${a.unit} · ${a.stage}`)}</div>)}
-              {E.ttl("Ingredients")}
-              {E.tbl(["material", "per bbl", "stage", "timing"], ingredients.map((i) => [
-                materialName(i.material_id), Number(i.per_bbl_qty), i.stage.replace("_", " "), i.timing_minutes ?? "—",
-              ]))}
-            </>
-          )}
-        </>
-      }
+      model={{
+        title: version ? `${recipe.name} v${version.version}` : recipe.name,
+        backHref: "/recipes",
+        createHref: `${backHref}?draft`,
+        parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "name and brand" },
+        ingredients: ingredients.map((i) => ({
+          key: i.id, title: materialName(i.material_id),
+          detail: `${i.stage.replace("_", " ")}${i.timing_minutes !== null ? ` · ${i.timing_minutes} min` : ""} · ${Number(i.per_bbl_qty)} / bbl`,
+          qty: "",
+        })),
+        preBoil: str(version?.pre_boil_bbl), boilMin: str(version?.boil_minutes),
+        whirlpoolMin: str(version?.whirlpool_minutes), whirlpoolTemp: str(version?.whirlpool_temp_f), whirlpoolRest: str(version?.whirlpool_rest_minutes), knockoutTemp: str(version?.knockout_temp_f),
+        efficiency: version ? pct(version.brewhouse_efficiency) : "", attenuation: version ? pct(version.yeast_attenuation) : "",
+        mash: version ? { title: `Mash schedule · ${version.mash_schedule.length} steps`, detail: mashSummary(version.mash_schedule) } : undefined,
+        fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule) } : undefined,
+        water: version ? { title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${waterAdditions.length} additions` } : undefined,
+        notes: version?.note ?? "",
+        predicted: ogPlato !== null && fgPlato !== null && abv !== null
+          ? `Predicted: OG ${formatGravity(ogPlato, gravityUnit.effective)} · FG ${formatGravity(fgPlato, gravityUnit.effective)} · ABV ${abv.toFixed(1)}%`
+          : undefined,
+      }}
     />
   );
 }

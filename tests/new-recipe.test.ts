@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { NewRecipeFieldsView } from "../components/mgr/views/new-recipe";
 import { RecipeView } from "../components/mgr/views/recipe";
+import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
 import { resolveTap } from "../lib/mgr/screen-links";
 
@@ -37,12 +38,30 @@ describe("Recipe creation", () => {
     expect(resolveTap(screen("Recipes"), "Create recipe")).toBe("Recipe");
   });
 
-  it("/recipes/new is the Recipe editor: the version form draws the parent fields and creates both in one save", () => {
-    const page = src("app/(app)/recipes/new/page.tsx");
-    expect(page).toMatch(/<RecipeView\b/);
-    expect(page).toMatch(/<NewVersionForm\b/);
+  it("RecipeView is the one editor: controlled when given controls, static for the fixture", () => {
+    const fixture = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
+    expect(fixture).not.toMatch(/<form\b/);
+    expect(fixture).toMatch(/Create recipe version/);
+    const set = vi.fn();
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, submitLabel: "Create recipe" } }));
+    expect(live).toMatch(/<form\b/);
+    expect(live).toMatch(/value="16.8"/);
+    expect(live).toMatch(/grid-cols-2 md:grid-cols-4/);
+    expect(live).toMatch(/data-gated[^>]*>[\s\S]*Default price group/);
+    expect(live).toMatch(/<button[^>]*type="submit"[^>]*>Create recipe</);
+  });
+
+  it("/recipes/new and /recipes/[id] draw the editor through RecipeView, never a detail override", () => {
+    expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
+    const detail = src("app/(app)/recipes/[id]/page.tsx");
+    expect(detail).toMatch(/<RecipeView\b/);
+    expect(detail).toMatch(/<RecipeEditor\b/);
+    expect(detail).not.toMatch(/detail=/);
     const form = src("app/(app)/recipes/[id]/recipe-version-form.tsx");
+    expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
+    expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
+    expect(src("components/mgr/views/recipe.tsx")).not.toMatch(/detail\?:/);
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
     expect(src("app/(app)/recipes/page.tsx")).toMatch(/E\.btn\("Create recipe", "p", "\/recipes\/new"\)/);
