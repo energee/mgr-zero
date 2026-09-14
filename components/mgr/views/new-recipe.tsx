@@ -9,9 +9,7 @@
 
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NONE } from "@/components/ui/select";
 
 export type NewRecipeValues = { name: string; brandId: string; note: string };
 export type NewRecipeBrand = { id: string; name: string };
@@ -29,25 +27,10 @@ export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: 
   const set = (patch: Partial<NewRecipeValues>) => { const next = { ...v, ...patch }; setDraft(next); onChange?.(next); };
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-name`}>Name</Label>
-        <Input id={`${id}-name`} value={v.name} onChange={(e) => set({ name: e.target.value })} required disabled={busy} />
-      </div>
+      {E.edit("Name", v.name, "text", undefined, { onChange: (nextValue: string) => set({ name: nextValue }), id: `${id}-name`, disabled: busy, required: true })}
       {E.gated("Style", "arrives with the recipe style column; the brand carries style today")}
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-brand`}>Brand · optional</Label>
-        <Select value={v.brandId || NONE} onValueChange={(x) => set({ brandId: x === NONE ? "" : x })} disabled={busy}>
-          <SelectTrigger id={`${id}-brand`}><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>Not decided</SelectItem>
-            {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-note`}>Note · optional</Label>
-        <Input id={`${id}-note`} value={v.note} onChange={(e) => set({ note: e.target.value })} disabled={busy} />
-      </div>
+      {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: b.name })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
+      {E.edit("Note · optional", v.note, "text", undefined, { onChange: (nextValue: string) => set({ note: nextValue }), id: `${id}-note`, disabled: busy })}
       {E.info("The brand is intent only; identity is required at packaging.")}
     </>
   );

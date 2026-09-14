@@ -23,8 +23,9 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   expect(adapter).toContain('"import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext');
   expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
   const source = readFileSync("components/mgr/views/import.tsx", "utf8");
-  expect(source).toMatch(/from "@\/components\/ui\/select"/);
-  expect(source).toMatch(/<SelectGroup>/);
+  expect(source).toMatch(/from "@\/components\/mgr\/e"/);
+  expect(source).toContain("E.pick(field.name");
+  expect(readFileSync("components/mgr/e.tsx", "utf8")).toContain("<SelectGroup>");
   expect(source).toMatch(/from "@\/components\/ui\/attachment"/);
   expect(source).toMatch(/<Attachment\b/);
   expect(source).toContain("E.stp");

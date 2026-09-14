@@ -3,8 +3,6 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
@@ -41,14 +39,10 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
         <CommandForm title="Delivery details" open={deliveryOpen} onOpenChange={setDeliveryOpen}
           trigger={<Button type="button" variant="ghost" disabled={locked} aria-label="Change delivery details">Change</Button>}>
           <fieldset disabled={locked} className="flex flex-col gap-2">
-            <Field><FieldLabel>Ship to</FieldLabel>
-              <select aria-label="Ship to" className="min-w-0 rounded border p-2" value={controls.shipTo ? model.shipToId : undefined} defaultValue={controls.shipTo ? undefined : model.shipToId} onChange={event => controls.shipTo?.(event.target.value)}>
-                <option value="">Select a ship-to</option>{model.shipTos.map(shipTo => <option key={shipTo.id} value={shipTo.id}>{shipTo.label}</option>)}
-              </select>
-            </Field>
+            {E.pick("Ship to", model.shipToId, [{ value: "", label: "Select a ship-to" }, ...(model.shipTos.map(shipTo => ({ value: shipTo.id, label: shipTo.label })))], { onChange: controls.shipTo })}
             <DatePicker label="Requested date (optional)" value={controls.requestedDate ? model.requestedDate : undefined} defaultValue={model.requestedDate} onChange={controls.requestedDate} />
-            <Field><FieldLabel>PO number</FieldLabel><Input aria-label="PO number" value={controls.po ? model.po : undefined} defaultValue={controls.po ? undefined : model.po} onChange={event => controls.po?.(event.target.value)} /></Field>
-            <Field><FieldLabel>Note</FieldLabel><Input aria-label="Note" value={controls.note ? model.note : undefined} defaultValue={controls.note ? undefined : model.note} onChange={event => controls.note?.(event.target.value)} /></Field>
+            {E.edit("PO number", model.po, "text", undefined, { onChange: controls.po })}
+            {E.edit("Note", model.note, "text", undefined, { onChange: controls.note })}
             <Button type="button" onClick={() => setDeliveryOpen(false)}>Done</Button>
           </fieldset>
         </CommandForm>)}

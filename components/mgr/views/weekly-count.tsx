@@ -5,14 +5,13 @@ import { E } from "@/components/mgr/e";
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
 import { countBrandComparison, projectionExpectedText, projectionMatchesCountDraft, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
+import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
 export function WeeklyCountPrintAction({ busy = false, empty = false, error, onPrint }: { busy?: boolean; empty?: boolean; error?: string | null; onPrint?: () => void }) {
@@ -135,10 +134,7 @@ export function WeeklyCountCorrectionView({ state: controlledState, open: contro
           <p className="font-medium">{line.sku_name ?? "Saved SKU"}</p>
           <p className="text-sm text-muted-foreground">{line.bin_name ?? "Saved bin"} · saved row {index + 1} · {line.lot_id ? `tracked lot ${line.lot_id}` : "untracked stock"} · counted {line.qty_counted} · recorded before {line.qty_before}</p>
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`correction-${state.countId}-${index}`}>Corrected units</Label>
-          <Input id={`correction-${state.countId}-${index}`} inputMode="numeric" type="number" min={line.qty_counted} max={line.qty_before} step="1" value={line.quantity} disabled={locked || line.qty_counted === line.qty_before} onChange={event => { const value = event.target.value; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }} />
-        </div>
+        {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.qty_counted === line.qty_before, min: line.qty_counted, max: line.qty_before, step: "1", inputMode: "numeric" })}
       </div>)}
       <div className="flex flex-col gap-1">
         <Label htmlFor={`correction-reason-${state.countId}`}>Reason</Label>

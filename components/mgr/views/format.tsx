@@ -3,9 +3,6 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { VolumeField } from "@/components/mgr/volume-field";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FormatViewModel } from "@/lib/mgr/format-view";
 
 export type { FormatViewModel };
@@ -15,11 +12,11 @@ type Controls = Partial<Record<"name" | "packageType" | "kegSize" | "unitsPerCas
 };
 
 function FormatInput({ label, value, onChange, number }: { label: string; value: string; onChange?: (value: string) => void; number?: boolean }) {
-  return <Field><FieldLabel>{label}</FieldLabel><Input aria-label={label} type={number ? "number" : "text"} min={number ? 1 : undefined} step={number ? 1 : undefined} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onChange={(event) => onChange?.(event.target.value)} /></Field>;
+  return E.edit(label, value, number ? "number" : "text", undefined, { onChange, min: number ? 1 : undefined, step: number ? 1 : undefined, "aria-label": label });
 }
 
 function FormatSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange?: (value: string) => void }) {
-  return <Field><FieldLabel>{label}</FieldLabel><Select value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{options.map((option) => <SelectItem key={option} value={option}>{option.replaceAll("_", " ")}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>;
+  return E.pick(label, value, (options.map(option => ({ value: option, label: (option.replaceAll("_", " ")) }))), { onChange });
 }
 
 export function FormatView({

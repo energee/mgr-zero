@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { NewTransferViewModel } from "@/lib/mgr/new-transfer-view";
 
 export type { NewTransferViewModel };
@@ -21,10 +19,7 @@ export type NewTransferControls = {
 };
 
 function Pick({ label, value, options, onChange, disabled }: { label: string; value: string; options: string[]; onChange?: (value: string) => void; disabled?: boolean }) {
-  return <Field><FieldLabel>{label}</FieldLabel><Select value={onChange ? value : undefined} defaultValue={onChange ? undefined : value} onValueChange={onChange} disabled={disabled}>
-    <SelectTrigger aria-label={label}><SelectValue placeholder={label}>{value || undefined}</SelectValue></SelectTrigger>
-    <SelectContent>{options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
-  </Select></Field>;
+  return E.pick(label, value, options, { onChange, disabled, placeholder: label, displayValue: value || undefined });
 }
 
 export function NewTransferView({
@@ -48,11 +43,8 @@ export function NewTransferView({
       <Field><FieldLabel>Lines</FieldLabel>
       {model.lines.map((line, index) => (
         <div key={`${line.title}:${index}`} className="flex gap-2">
-          <Select value={controls.lineSku ? line.title : undefined} defaultValue={controls.lineSku ? undefined : line.title} onValueChange={value => controls.lineSku?.(index, value)}>
-            <SelectTrigger aria-label={`Line ${index + 1} SKU`}><SelectValue placeholder="SKU">{line.title || undefined}</SelectValue></SelectTrigger>
-            <SelectContent>{model.skuOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
-          </Select>
-          <Input aria-label={`Line ${index + 1} qty`} type="number" min="0" step="any" className="w-24" value={controls.lineQty ? String(line.qty) : undefined} defaultValue={controls.lineQty ? undefined : line.qty} onChange={event => controls.lineQty?.(index, event.target.value)} />
+          {E.pick(`Line ${index + 1} SKU`, line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true })}
+          {E.edit(`Line ${index + 1} qty`, String(controls.lineQty ? String(line.qty) : line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, min: "0", step: "any", hideLabel: true })}
           {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => controls.removeLine?.(index)}>Remove</Button> : null}
         </div>
       ))}

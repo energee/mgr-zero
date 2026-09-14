@@ -3,9 +3,6 @@ import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { toggleRouteStop, type RouteViewModel } from "@/lib/mgr/route-view";
 
@@ -28,13 +25,10 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
     {E.back(model.backTo ?? "Routes", model.title, undefined, model.backHref)}
     <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onSave?.(); }}>
       <fieldset disabled={busy}><DatePicker label="Delivery date" value={value.date ?? ""} onChange={date => change({ date })} /></fieldset>
-      <Label htmlFor={id + "-driver"}>Driver</Label>
-      <Select value={value.driverId ?? ""} onValueChange={driverId => change({ driverId })} disabled={busy}>
-        <SelectTrigger id={id + "-driver"} className="w-full"><SelectValue placeholder="Not assigned" /></SelectTrigger>
-        <SelectContent>{(model.driverOptions ?? []).map(driver => <SelectItem key={driver.id} value={driver.id}>{driver.label}</SelectItem>)}</SelectContent>
-      </Select>
-      <Label htmlFor={id + "-vehicle"}>Vehicle</Label><Input id={id + "-vehicle"} value={value.vehicle ?? ""} disabled={busy} onChange={event => change({ vehicle: event.target.value })} />
-      <Label htmlFor={id + "-name"}>Route name</Label><Input id={id + "-name"} value={value.name ?? ""} disabled={busy} onChange={event => change({ name: event.target.value })} placeholder="Route A" />
+
+      {E.pick("Driver", value.driverId ?? "", (model.driverOptions ?? []).map(driver => ({ value: driver.id, label: driver.label })), { onChange: driverId => change({ driverId }), disabled: busy, placeholder: "Not assigned", id: id + "-driver" })}
+      {E.edit("Vehicle", value.vehicle ?? "", "text", undefined, { onChange: (nextValue: string) => change({ vehicle: nextValue }), id: id + "-vehicle", disabled: busy })}
+      {E.edit("Route name", value.name ?? "", "text", undefined, { onChange: (nextValue: string) => change({ name: nextValue }), id: id + "-name", disabled: busy, placeholder: "Route A" })}
       {E.ttl("Stops")}
       {!model.stops?.length && E.blank("Nothing shipped is waiting for a route.")}
       {(model.stops ?? []).map(row => {
@@ -42,7 +36,7 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
         return <div key={row.key}>{E.row(
           <label className="flex items-center gap-3"><input type="checkbox" className="size-4 shrink-0 accent-primary" aria-label={row.title} checked={selected} disabled={busy || row.locked} onChange={event => change({ selection: toggleRouteStop(value.selection, row.key, event.target.checked) })} />{row.title}</label>,
           selected ? "stop " + value.selection[row.key] + (row.locked ? " · delivered" : "") : row.detail,
-          selected ? <Input aria-label={"Stop number for " + row.title} type="number" min="1" step="1" required className="w-16" value={value.selection[row.key]} disabled={busy || row.locked} onChange={event => change({ selection: { ...value.selection, [row.key]: Number(event.target.value) } })} /> : "",
+          selected ? E.edit("Stop number for " + row.title, String(value.selection[row.key]), "number", undefined, { onChange: (nextValue: string) => change({ selection: { ...value.selection, [row.key]: Number(nextValue) } }), disabled: busy || row.locked, required: true, min: "1", step: "1", hideLabel: true }) : "",
           row.warning && !selected ? "w" : "",
         )}</div>;
       })}

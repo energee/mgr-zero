@@ -3,8 +3,6 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ShortPickViewModel } from "@/lib/mgr/short-pick-view";
@@ -22,7 +20,7 @@ export function ShortPickView({ model, footer, reason, reasonValue = "", onReaso
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.fld("Order · source", model.source)}
     {E.row(model.lineName, model.orderedLabel, <OrderQuantity label="Counted" value={countedValue ?? model.counted} onChange={onCounted} />, "w")}
-    {reason !== undefined ? reason : <Field><FieldLabel>Reason · required</FieldLabel><Input aria-label="Reason" required value={onReason ? reasonValue : undefined} defaultValue={onReason ? undefined : reasonValue} onChange={event => onReason?.(event.target.value)} /></Field>}
+    {reason !== undefined ? reason : E.edit("Reason · required", reasonValue, "text", undefined, { onChange: onReason, required: true, "aria-label": "Reason" })}
     {E.ttl(model.resolveTitle)}
     <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start"
       value={onResolution ? String(resolution) : undefined} defaultValue={onResolution ? undefined : String(resolution)}

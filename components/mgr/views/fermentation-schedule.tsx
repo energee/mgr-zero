@@ -4,8 +4,6 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { FERMENTATION_STAGE_KINDS } from "@/lib/commands/production";
 import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
@@ -21,13 +19,12 @@ export function FermentationScheduleView({ title = "Fermentation schedule", stag
 
 
 export function FermentationStageView({ fields, onChange, footer }: { fields: FermentationStageFields; onChange?: (patch: Partial<FermentationStageFields>) => void; footer?: ReactNode }) {
-  const bind = (key: keyof FermentationStageFields) => onChange ? { value: fields[key] } : { defaultValue: fields[key] };
   return <>
-    <Field><FieldLabel>Stage name</FieldLabel><Input aria-label="Stage name" required {...bind("name")} onChange={(e) => onChange?.({ name: e.target.value })} /></Field>
-    <Field><FieldLabel>Stage</FieldLabel><select aria-label="Stage" className={E.select} {...bind("kind")} onChange={(e) => onChange?.({ kind: e.target.value })}>{FERMENTATION_STAGE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></Field>
+    {E.edit("Stage name", fields.name, "text", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ name: nextValue }) : undefined, required: true })}
+    {E.pick("Stage", fields.kind, (FERMENTATION_STAGE_KINDS.map(k => ({ value: k, label: k }))), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
     {E.cols(
-      <Field><FieldLabel>Temp °F</FieldLabel><Input aria-label="Temp °F" type="number" step="any" required {...bind("tempF")} onChange={(e) => onChange?.({ tempF: e.target.value })} /></Field>,
-      <Field><FieldLabel>Duration days</FieldLabel><Input aria-label="Duration days" type="number" min="0" step="any" required {...bind("days")} onChange={(e) => onChange?.({ days: e.target.value })} /></Field>,
+      E.edit("Temp °F", fields.tempF, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ tempF: nextValue }) : undefined, required: true, step: "any" }),
+      E.edit("Duration days", fields.days, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ days: nextValue }) : undefined, required: true, min: "0", step: "any" }),
     )}
     {footer !== undefined ? footer : E.btns([["Delete stage", "g"], "Save stage"])}
   </>;

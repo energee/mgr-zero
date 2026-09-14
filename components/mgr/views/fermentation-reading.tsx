@@ -1,9 +1,8 @@
 import type { FormEventHandler } from "react";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { gravityPlaceholder, gravityUnitShort, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { E } from "@/components/mgr/e";
 
 export type FermentationReadingValues = {
   observedAt: string;
@@ -44,29 +43,21 @@ export function FermentationReadingView({
   onSubmit?: FormEventHandler<HTMLFormElement>;
 }) {
   const field = (name: keyof FermentationReadingValues) => ({
-    value: values[name],
     readOnly: !onChange,
-    onChange: onChange ? (event: React.ChangeEvent<HTMLInputElement>) => onChange(name, event.target.value) : undefined,
+    onChange: onChange ? (value: string) => onChange(name, value) : undefined,
   });
   return (
     <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-4">
       <fieldset disabled={locked || busy} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-observed">Observed at</Label>
-          <Input id="fr-observed" type="datetime-local" step="1" {...field("observedAt")} required />
+          {E.edit("Observed at", values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-temp">Temperature (°F)</Label>
-          <Input id="fr-temp" type="number" step="any" {...field("tempF")} required />
+          {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true })}
           {prior?.tempF && <p className="text-xs text-muted-foreground">Prior {prior.tempF} °F</p>}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-gravity">Gravity ({gravityUnitShort(unit)}) · optional</Label>
-          <Input
-            id="fr-gravity" type="text" inputMode="decimal" placeholder={gravityPlaceholder(unit)}
-            {...field("gravity")}
-            aria-invalid={gravityInvalid} aria-describedby={gravityInvalid ? "fr-gravity-error" : undefined}
-          />
+          {E.edit(`Gravity (${gravityUnitShort(unit)}) · optional`, values.gravity, "text", undefined, { ...field("gravity"), id: "fr-gravity", inputMode: "decimal", placeholder: gravityPlaceholder(unit), "aria-invalid": gravityInvalid, "aria-describedby": gravityInvalid ? "fr-gravity-error" : undefined })}
           {gravityInvalid ? (
             <p id="fr-gravity-error" role="alert" className="text-sm text-destructive">
               {unit === "sg"
@@ -76,14 +67,12 @@ export function FermentationReadingView({
           ) : prior?.gravity ? <p className="text-xs text-muted-foreground">Prior {prior.gravity}</p> : null}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-ph">pH · optional</Label>
-          <Input id="fr-ph" type="number" step="any" {...field("ph")} />
+          {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph" })}
           {prior?.ph && <p className="text-xs text-muted-foreground">Prior {prior.ph}</p>}
         </div>
         <p className="text-sm text-muted-foreground">Enter only values taken now; blanks are not rewritten.</p>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-note">Note · optional</Label>
-          <Input id="fr-note" {...field("note")} />
+          {E.edit("Note · optional", values.note, "text", undefined, { ...field("note"), id: "fr-note" })}
         </div>
       </fieldset>
       {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}

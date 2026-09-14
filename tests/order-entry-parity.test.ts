@@ -2,6 +2,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from "rea
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { Select, SelectItem } from "@/components/ui/select";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { SCREENS } from "@/components/mgr/screens";
@@ -69,9 +70,10 @@ describe("shared order-entry controls", () => {
       }, controls: { shipTo: change, lineQty: (_index, value) => change(value) }, footer: null,
     });
     const nodes = elements(node);
-    const shipTo = nodes.find(element => element.type === "select")!;
+    const shipTo = nodes.find(element => element.type === Select)!;
     expect(shipTo.props.value).toBe("s2");
-    shipTo.props.onChange({ target: { value: "s3" } });
+    expect(nodes.find(element => element.type === SelectItem && element.props.value === "s2")?.props.children).toBe("Dock");
+    shipTo.props.onValueChange("s3");
     expect(change).toHaveBeenCalledWith("s3");
     const quantity = nodes.find(element => element.props.label === "Line 1 quantity")!;
     expect(quantity.props.value).toBe("1.5");

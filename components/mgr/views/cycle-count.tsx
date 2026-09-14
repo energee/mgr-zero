@@ -2,7 +2,6 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Qty, TabBar } from "@/components/mgr/qty";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import type { CycleCountViewModel } from "@/lib/mgr/cycle-count-view";
 
@@ -21,12 +20,8 @@ export function CycleCountView({ model, footer, onQuantity, onLocation, onBin, m
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {E.nav("Material", model.material)}
       {model.locations && <div className="grid grid-cols-2 gap-2">
-        <Field><FieldLabel>Location</FieldLabel><select aria-label="Location" required className="min-w-0 rounded border bg-background p-2" value={onLocation ? model.locationId : undefined} defaultValue={onLocation ? undefined : model.locationId} onChange={event => onLocation?.(event.target.value)}>
-          <option value="">Select location</option>{model.locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
-        </select></Field>
-        <Field><FieldLabel>Bin</FieldLabel><select aria-label="Bin" required className="min-w-0 rounded border bg-background p-2" value={onBin ? model.binId : undefined} defaultValue={onBin ? undefined : model.binId} onChange={event => onBin?.(event.target.value)}>
-          <option value="">Select bin</option>{model.bins?.map(bin => <option key={bin.id} value={bin.id}>{bin.name}</option>)}
-        </select></Field>
+        {E.pick("Location", String(model.locationId ?? ""), [{ value: "", label: "Select location" }, ...(model.locations.map(location => ({ value: location.id, label: location.name })))], { onChange: onLocation, required: true })}
+        {E.pick("Bin", String(model.binId ?? ""), [{ value: "", label: "Select bin" }, ...(model.bins?.map(bin => ({ value: bin.id, label: bin.name })) ?? [])], { onChange: onBin, required: true })}
       </div>}
       <Qty label={`Counted (${model.units[model.unitIndex] ?? ""})`} value={model.qty} onChange={onQuantity} unit={model.units.length === 1 ? model.units[0] : <TabBar names={model.units} on={model.unitIndex} cls="w-fit" />} />
       {E.info(model.preview)}

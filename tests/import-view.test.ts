@@ -1,8 +1,25 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
 import { importPreview } from "../lib/mgr/fixtures/import";
+
+it("keeps missing mappings and preview cells empty rather than undefined", () => {
+  const pick = vi.spyOn(E, "pick");
+  const edit = vi.spyOn(E, "edit");
+  try {
+    renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step: 1, mapping: {} } }));
+    expect(pick.mock.calls.length).toBeGreaterThan(0);
+    expect(pick.mock.calls.every(call => call[1] === "-1")).toBe(true);
+    renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, rows: [{}], validation: [[]] } }));
+    expect(edit.mock.calls.length).toBeGreaterThan(0);
+    expect(edit.mock.calls.every(call => call[1] === "")).toBe(true);
+  } finally {
+    pick.mockRestore();
+    edit.mockRestore();
+  }
+});
 
 it("shares an editable mixed preview and prevents all-invalid batches from committing", () => {
   const html = renderToStaticMarkup(createElement(ImportView, { model: importPreview }));
