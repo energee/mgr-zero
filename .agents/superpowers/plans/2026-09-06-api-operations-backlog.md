@@ -10,7 +10,7 @@ This is the backend push, scoped. Each row names the operation a screen asked fo
 
 Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.
 
-## Production: 3 to build, 17 built
+## Production: 3 to build, 16 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
