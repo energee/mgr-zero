@@ -74,6 +74,8 @@ import { FermentationReadingActionsView, FermentationReadingView } from "@/compo
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
+import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
+import { WaterProfileView } from "@/components/mgr/views/water-profile";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
@@ -154,7 +156,7 @@ import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
-import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
+import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
 import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
@@ -214,6 +216,7 @@ import { toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
+import { toWaterProfileFields, toWaterProfilesViewProps } from "@/lib/mgr/water-profiles-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
@@ -2575,19 +2578,14 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Water profiles", gatedBy: "water profiles",
+    name: "Water profiles",
     to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
     job: "Keep the water a brewery starts from and the waters it aims at",
-    reads: "list_water_profiles [design]",
+    reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["permission", "brewer or admin required", 1], ["source", "the brewery’s own supply · set once in Settings"], ["empty", "no profiles yet: Add profile is the only action"]],
     spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog, Add profile is already one tap away.",
-    body: (<>
-      {E.back("Catalog", "Water profiles", E.btn("Add profile"))}
-      {E.row("Municipal · Denver", "Calcium 42 · Magnesium 8 · Sodium 22 · Sulfate 65 · Chloride 30 · Bicarbonate 110", E.act("Edit"))}
-      {E.row("Burton", "Calcium 275 · Magnesium 40 · Sodium 25 · Sulfate 610 · Chloride 35 · Bicarbonate 270", E.act("Edit"))}
-      {E.row("Hazy target", "Calcium 110 · Magnesium 10 · Sodium 15 · Sulfate 90 · Chloride 180 · Bicarbonate 40", E.act("Edit"))}
-    </>),
+    body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: waterProfiles })} />,
   },
   {
     step: 5,
@@ -2597,26 +2595,11 @@ export const SCREENS: Screen[] = [
     name: "Water profile",
     to: { "Save profile": "Water profiles" },
     job: "Name a water and its six ions",
-    reads: "list_water_profiles [design]",
-    writes: "upsert_water_profile [design; SCHEMA-GATE: a water profiles table]",
+    reads: "list_water_profiles",
+    writes: "upsert_water_profile [one RPC; insert when profileId is empty, else edit]",
     states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
     spec: "Six ions in parts per million, the set every brewing water calculation reads. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
-    body: (<>
-      {E.edit("Profile name", "Hazy target")}
-      {E.cols(
-        E.edit("Calcium ppm", "110", "number"),
-        E.edit("Magnesium ppm", "10", "number"),
-      )}
-      {E.cols(
-        E.edit("Sodium ppm", "15", "number"),
-        E.edit("Sulfate ppm", "90", "number"),
-      )}
-      {E.cols(
-        E.edit("Chloride ppm", "180", "number"),
-        E.edit("Bicarbonate ppm", "40", "number"),
-      )}
-      {E.btn("Save profile")}
-    </>),
+    body: <WaterProfileView fields={toWaterProfileFields(waterProfiles[2])} />,
   },
   {
     step: 8,

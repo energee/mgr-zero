@@ -43,7 +43,8 @@ export default async function CatalogPage() {
           </>
         );
       }}
-      footer={
+      footer={<>
+        {E.nav("Water profiles", "the water you start from and the waters you aim at", "", undefined, "/catalog/water-profiles")}
         <FormatsView
           model={toFormatsViewProps({
             formats,
@@ -51,7 +52,7 @@ export default async function CatalogPage() {
           })}
           header={E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
         />
-      }
+      </>}
     />
   );
 }
