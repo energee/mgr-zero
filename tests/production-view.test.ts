@@ -215,11 +215,11 @@ describe("Recipes view", () => {
     expect(htmlOf(createElement(RecipesView, { model }))).toContain('href="/recipes/r1"');
   });
 
-  it("the live Recipes page mounts RecipesView and slots NewRecipeForm", () => {
+  it("the live Recipes page mounts RecipesView and links Create recipe to New recipe", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
-    expect(page).toMatch(/<NewRecipeForm\b/);
-    expect(src("app/(app)/recipes/new-recipe-form.tsx")).not.toMatch(/New recipe/);
+    expect(page).toMatch(/\/recipes\/new/);
+    expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<NewRecipeForm\b/);
   });
 
   it("the Recipe inventory record is RecipeView", () => {

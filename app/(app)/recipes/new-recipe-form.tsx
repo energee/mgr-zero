@@ -1,21 +1,21 @@
-// app/(app)/recipes/new-recipe-form.tsx — binds the shared Create recipe
-// sheet (components/mgr/views/new-recipe-form.tsx) to create_recipe: a name,
-// the brand it is meant to brew (optional — identity is required at
-// packaging, not here), and a note. Versions are authored on the recipe's
-// own page once it exists.
+// app/(app)/recipes/new-recipe-form.tsx — binds the shared New recipe form
+// (components/mgr/views/new-recipe.tsx) to create_recipe and lands on the
+// new recipe's page, where its first version is written.
 "use client";
 
 import { useState } from "react";
-import { NewRecipeFormView, type NewRecipeBrand, type NewRecipeValues } from "@/components/mgr/views/new-recipe-form";
-import { useCommandForm } from "@/lib/commands/use-command-form";
-
-const BLANK: NewRecipeValues = { name: "", brandId: "", note: "" };
+import { useRouter } from "next/navigation";
+import { BLANK_RECIPE, NewRecipeFormView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 
 export function NewRecipeForm({ brands }: { brands: NewRecipeBrand[] }) {
-  const [values, setValues] = useState(BLANK);
-  const form = useCommandForm("create_recipe", {
-    build: () => ({ name: values.name, brandId: values.brandId || undefined, note: values.note || undefined }),
-    reset: () => setValues(BLANK),
-  });
-  return <NewRecipeFormView open={form.open} onOpenChange={form.setOpen} brands={brands} values={values} onChange={setValues} onSubmit={form.submit} busy={form.submitting} error={form.error} />;
+  const router = useRouter();
+  const [values, setValues] = useState(BLANK_RECIPE);
+  const action = useCommandAction();
+  const submit = () => void action.run(
+    "create_recipe",
+    { name: values.name, brandId: values.brandId || undefined, note: values.note || undefined },
+    (data) => router.push(`/recipes/${(data as { id: string }).id}`),
+  );
+  return <NewRecipeFormView brands={brands} values={values} onChange={setValues} onSubmit={submit} busy={action.busy} error={action.error} />;
 }

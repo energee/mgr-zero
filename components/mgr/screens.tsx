@@ -123,7 +123,7 @@ import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
-import { NewRecipeFormView } from "@/components/mgr/views/new-recipe-form";
+import { NewRecipeFormView } from "@/components/mgr/views/new-recipe";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
@@ -1884,13 +1884,26 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipes",
-    to: { Review: "Recipe", Finish: "Recipe" },
+    to: { Review: "Recipe", Finish: "Recipe", "Create recipe": "New recipe" },
     job: "Find recipe versions and create the next recipe",
-    reads: "list_recipes [design] · list_brands",
-    writes: "create_recipe [name, optional brand, optional note; versioning happens on Recipe]",
-    states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"], ["style", "drawn gated until recipes carries a style column; the brand names the style today", 0]],
-    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action. Create recipe opens one shared sheet in place, the same component the live page binds to its command: a name, the brand it is meant to brew, and a note. Style is drawn gated: a recipe has no style of its own until a migration adds one and the create command takes it, so neither the inventory nor the live page invents it.",
-    body: <RecipesView model={toRecipesViewProps(recipesList)} createAction={<NewRecipeFormView brands={recipeBrandOptions} />} />,
+    reads: "list_recipes [design]",
+    writes: "none [creation happens on New recipe, versioning on Recipe]",
+    states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
+    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens New recipe, the Recipe surface before it has a version.",
+    body: <RecipesView model={toRecipesViewProps(recipesList)} />,
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "New recipe",
+    to: { "Create recipe": "Recipe", Style: "New recipe" },
+    job: "Name the recipe so its first version has somewhere to live",
+    reads: "list_brands",
+    writes: "create_recipe [name, optional brand, optional note; the first version is written on Recipe]",
+    states: [...permitted("brewer or admin required"), ["style", "drawn gated until recipes carries a style column; the brand names the style today", 0], ["saved", "lands on Recipe for its first version"]],
+    spec: "The same Recipe surface with the parent form in place of the editor, so a brewer who taps Create recipe is already on the page where the version goes. A parent is a name, the brand it is meant to brew (intent only; identity is required at packaging), and a note. Style is drawn gated: a recipe has no style of its own until a migration adds one and the create command takes it, so neither the inventory nor the live page invents it. Saving opens the recipe, where Create recipe version writes the first version.",
+    body: <RecipeView model={{ title: "New recipe" }} detail={<NewRecipeFormView brands={recipeBrandOptions} />} />,
   },
   {
     step: 7,
