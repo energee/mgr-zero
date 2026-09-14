@@ -56,7 +56,7 @@ describe("SCREENS", () => {
     expect(recipe).toMatch(/Water · /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
-    // Spec D3: the scale chips already state the batch size.
+    // Spec D3: quantities are per barrel; the batch names its size on Brew day.
     expect(recipe).not.toMatch(/Batch size|Knockout volume/);
     // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);

@@ -25,7 +25,6 @@ export type RecipeViewModel = {
   parent?: { title: string; detail: string };
   priceGroup?: string;
   priceGroupOptions?: string[];
-  scaleIndex?: number;
   ingredients?: RecipeIngredientView[];
   preBoil?: string;
   boilMin?: string;

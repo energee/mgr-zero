@@ -69,7 +69,6 @@ export function RecipeView({
   ) : (
     <>
       {head}
-      {E.chips(["per bbl", "15 bbl", "30 bbl"], model.scaleIndex ?? 0)}
       {(model.ingredients ?? []).map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty)}</Fragment>
       ))}

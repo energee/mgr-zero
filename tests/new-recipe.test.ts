@@ -56,6 +56,8 @@ describe("Recipe creation", () => {
     expect(cut).toMatch(/<input[^>]*disabled[^>]*value="16.8"/);
     expect(cut).toMatch(/Sacch/);
     expect(cut).not.toMatch(/<form\b|\+ add ingredient|Open/);
+    // No scale chips: they previewed a batch size nothing supplies.
+    expect(fixture).not.toMatch(/15 bbl|30 bbl/);
     // No version yet: no number is invented.
     const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: "No version yet: create the first one", createHref: "/recipes/x?draft" } }));
     expect(none).toMatch(/No version yet/);
