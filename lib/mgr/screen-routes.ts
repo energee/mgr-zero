@@ -66,7 +66,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Finished goods", file: "app/(app)/inventory/page.tsx" },
   { name: "Record movement", file: "app/(app)/inventory/page.tsx" },
   { name: "Movement recorded", file: "app/(app)/inventory/page.tsx" },
-  { name: "Orders", file: "app/(app)/orders/page.tsx" },
+  { name: "Orders", file: "app/(app)/orders/orders-client.tsx" },
   { name: "New order", file: "app/(app)/orders/order-form.tsx" },
   { name: "Confirm order", file: "app/(app)/orders/[id]/confirm/page.tsx" },
   { name: "Complete transfer", file: "app/(app)/orders/[id]/ship-form.tsx" },

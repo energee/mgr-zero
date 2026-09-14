@@ -3,7 +3,15 @@
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: "sales" }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "sales" }) }));
+vi.mock("@/lib/commands/all", () => ({}));
+vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn() }));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: ordersWorkList.orders, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
+import OrdersPage from "@/app/(app)/orders/page";
+import { OrdersClient } from "@/app/(app)/orders/orders-client";
+import { QueryFeedback } from "@/components/mgr/query-feedback";
 import { SCREENS } from "../components/mgr/screens";
 import { NewOrderView } from "../components/mgr/views/new-order";
 import { OrdersView } from "../components/mgr/views/orders-list";
@@ -47,12 +55,16 @@ describe("Orders list view loop", () => {
     expect(html("Orders")).toMatch(/>Finish</);
   });
 
-  it("the live Orders page mounts OrdersView with no second E.* tree", () => {
-    const src = readFileSync("app/(app)/orders/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/orders-list"/);
-    expect(src).toMatch(/<OrdersView\b/);
-    expect(src).toContain('href="/orders/new"');
-    expect(src).not.toMatch(/NewOrderView/);
+  it("the live Orders page delegates to the shared view and freshness component", async () => {
+    const page = await OrdersPage({ searchParams: Promise.resolve({}) });
+    expect(page.type).toBe(OrdersClient);
+    const list = OrdersClient(page.props);
+    expect(list.type).toBe(OrdersView);
+    expect(list.props.model).toEqual(toOrdersListViewProps(ordersWorkList));
+    expect(renderToStaticMarkup(list.props.createAction)).toContain('href="/orders/new"');
+    expect(list.props.feedback.type).toBe(QueryFeedback);
+    const inventory = screen("Orders").body as typeof list;
+    expect(inventory.props.feedback.type).toBe(QueryFeedback);
   });
 });
 
@@ -74,5 +86,6 @@ describe("New order view loop", () => {
     expect(html("New order")).toContain('data-slot="popover-trigger"');
     expect(html("New order")).toMatch(/>Save draft</);
     expect(html("New order")).toMatch(/>Add line</);
+    expect(html("New order")).toContain("Last checked");
   });
 });

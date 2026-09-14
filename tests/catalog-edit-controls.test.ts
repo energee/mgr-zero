@@ -97,7 +97,7 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   const skuList = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
   expect(skuList).toContain('brewery.role === "admin" || brewery.role === "sales"');
   expect(skuList).toMatch(/canWrite \? <SkuForm/);
-  // New order is its own route; the picker options are built there. Without
-  // this the test name's inactive-SKU promise has nothing asserting it.
-  expect(readFileSync("app/(app)/orders/new/page.tsx", "utf8")).toContain("skus.filter(sku => sku.active)");
+  // The cached client adapter builds the picker options; cached-order-pages
+  // additionally executes that adapter with active and inactive SKU payloads.
+  expect(readFileSync("app/(app)/orders/new/new-order-client.tsx", "utf8")).toContain("skus.data.filter(sku => sku.active)");
 });
