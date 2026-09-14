@@ -16,7 +16,7 @@ import { toRepackView } from "@/lib/mgr/repack-view";
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 /** One list_repack_parents row: a composed SKU and the child it breaks into, or null when composition has no single row. */
-export type RepackParent = { id: string; name: string; brand: string | null; unit: string; bblPerUnit: number; child: { skuId: string; unit: string; quantity: number } | null };
+export type RepackParent = { id: string; label: string; unit: string; bblPerUnit: number; child: { skuId: string; unit: string; quantity: number } | null };
 
 export function RepackForm({ locations, bins, parents }: { locations: Location[]; bins: Bin[]; parents: RepackParent[] }) {
   const formId = useId();
@@ -32,11 +32,10 @@ export function RepackForm({ locations, bins, parents }: { locations: Location[]
   });
   const model = {
     ...toRepackView({
-      parent: parent?.name ?? "", unit: parent?.unit ?? "", qty,
-      location: [locations.find((l) => l.id === locationId)?.name, bins.find((b) => b.id === binId)?.name].filter(Boolean).join(" · "),
+      parent: parent?.label ?? "", unit: parent?.unit ?? "", qty,
       composition: child && parent ? { childLabel: child.unit, quantity: child.quantity, parentBbl: parent.bblPerUnit } : null,
     }),
-    parents: parents.map((p) => ({ id: p.id, name: p.brand ? `${p.brand} — ${p.name}` : p.name })),
+    parents: parents.map((p) => ({ id: p.id, name: p.label })),
     locations, bins: bins.filter((b) => b.location_id === locationId),
     parentSkuId, locationId, binId,
   };
