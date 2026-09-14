@@ -184,7 +184,7 @@ For packaging materials, quantities use the material’s displayed base unit. Ch
 <Screen name="Water profiles" />
 <Screen name="Water profile" />
 
-**Water profiles** (from Catalog; Brewer and Admin) keeps the water you start from and the waters you aim at: a name and six ions in parts per million (calcium, magnesium, sodium, sulfate, chloride, bicarbonate). **Add profile** and **Edit** open the same sheet; every ion is required and cannot be negative, and two profiles cannot share a name. Nothing is calculated here: the page records a water report or a target, not the salts between them.
+**Water profiles** (from Catalog; Brewer and Admin) keeps the water you start from and the waters you aim at: a name and six ions in parts per million (calcium, magnesium, sodium, sulfate, chloride, bicarbonate). **Add profile** and **Edit** open the same sheet; every ion is required and cannot be negative, and two profiles cannot share a name. Nothing is calculated here: the page records a water report or a target; the salts between them are suggested on a recipe's Water sheet.
 
 ### Create a SKU
 
@@ -557,7 +557,7 @@ The page says **No taprooms yet: add one under Locations** when none exist, or *
 <Screen name="Water" />
 <Screen name="Water addition" />
 
-A version is the brew sheet. **New version** opens three draft sheets beside the assumptions: **Mash schedule** (ordered rests, each a type, a name, a temperature and minutes; the longest rest between 144 and 162 °F is the mash temperature the prediction reads, so a schedule with no rest in that range predicts no gravity change from mash temperature), **Fermentation schedule** (stages with a temperature and days), and **Water** (the source profile, a target profile from Water profiles, mash and sparge volumes, target mash pH, and salts or acids each with an amount, a unit and one stage: mash, sparge or kettle). Steps, stages and additions add, edit, move and delete on the draft; **Pre-boil volume**, **Whirlpool** minutes, temperature and rest, and **Knockout temp** sit inline. Nothing is written until **Save version**, and a saved version reads only: change it by cutting the next one.
+A version is the brew sheet. **New version** opens three draft sheets beside the assumptions: **Mash schedule** (ordered rests, each a type, a name, a temperature and minutes; the longest rest between 144 and 162 °F is the mash temperature the prediction reads, so a schedule with no rest in that range predicts no gravity change from mash temperature), **Fermentation schedule** (stages with a temperature and days), and **Water** (the source profile, a target profile from Water profiles, mash and sparge volumes, target mash pH, and salts or acids each with an amount, a unit and one stage: mash, sparge or kettle); **Suggest additions** fills the salts that bring the source closest to the target over the mash and sparge water together, you can change any amount, and **Against target** shows where each of the six ions lands, warning when one is more than 20 ppm off. Until a material says which salt it is, both are shown locked. Steps, stages and additions add, edit, move and delete on the draft; **Pre-boil volume**, **Whirlpool** minutes, temperature and rest, and **Knockout temp** sit inline. Nothing is written until **Save version**, and a saved version reads only: change it by cutting the next one.
 
 *Admin and Brewer.*
 
