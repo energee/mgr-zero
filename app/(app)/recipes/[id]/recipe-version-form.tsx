@@ -14,12 +14,11 @@ import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
-import type { NamedOption } from "@/components/mgr/views/water";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
 /** The material fields the editor reads; both recipe pages project list_materials to this. */
@@ -33,7 +32,7 @@ const BLANK_NUMBERS = Object.fromEntries(RECIPE_NUMBERS.map(([k]) => [k, DEFAULT
 const pctToFraction = (s: string) => Number(s) / 100;
 
 export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = [], materials, profiles, unit }: {
-  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: RecipeMaterial[]; profiles: NamedOption[]; unit: GravityUnit;
+  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: RecipeMaterial[]; profiles: WaterProfileIons[]; unit: GravityUnit;
 }) {
   const router = useRouter();
   const action = useCommandAction();

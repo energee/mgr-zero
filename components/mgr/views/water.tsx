@@ -5,15 +5,27 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/commands/production";
-import { type WaterAdditionFields, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import type { Ions } from "@/lib/water-chemistry";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
 
-export function WaterView({ title = "Water", water, profiles, materials, onChange, onAdd, ...verbs }: {
-  title?: string; water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
+export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, chemistryKnown = false, onChange, onAdd, ...verbs }: {
+  title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
+  /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
+  chemistryKnown?: boolean;
+  onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
 } & ListRowProps) {
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
+  const target = profiles.find((p) => p.id === water.targetProfileId)?.ions;
+  const source = water.sourceProfileId ? profiles.find((p) => p.id === water.sourceProfileId)?.ions : sourceDefault;
+  const mashGal = Number(water.mashGal) || 0, spargeGal = Number(water.spargeGal) || 0;
+  // A typed negative volume must never reach the formula (it throws by contract); the verb waits until the entry is corrected.
+  const volumesOk = mashGal >= 0 && spargeGal >= 0 && mashGal + spargeGal > 0;
+  // gated: no salt identity yet · waiting: nothing valid to compute against · ready: suggest and read out.
+  const chemistry = !chemistryKnown ? "gated" : target && source && volumesOk ? "ready" : "waiting";
+  const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
     {E.back("Recipe", title)}
     {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "brewery default" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
@@ -26,6 +38,14 @@ export function WaterView({ title = "Water", water, profiles, materials, onChang
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
+    {chemistry === "gated"
+      ? E.gated("Suggest additions", "arrives with the material salt field")
+      : E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}
+    {chemistry === "ready" && <>
+      {E.ttl("Against target")}
+      {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
+    </>}
+    {chemistry === "gated" && target && source && E.gated("Ion read-out", "arrives with the material salt field")}
   </>;
 }
 

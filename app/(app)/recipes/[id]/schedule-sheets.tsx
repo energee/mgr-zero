@@ -12,8 +12,8 @@ import { asTrigger, CommandForm, CommandFormFooter } from "@/components/mgr/comm
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
-import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
-import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
+import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -57,12 +57,12 @@ export function FermentationScheduleSheet({ stages, onChange, trigger }: { stage
     item={(p) => <FermentationStageView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
 }
 
-export function WaterSheet({ water, profiles, materials, onChange, trigger }: { water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange: (water: WaterDraft) => void; trigger?: ReactNode }) {
+export function WaterSheet({ water, profiles, materials, onChange, trigger }: { water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; onChange: (water: WaterDraft) => void; trigger?: ReactNode }) {
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
-    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
+    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} chemistryKnown={false /* until materials carry a salt identity (PR B) */} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
 }
 

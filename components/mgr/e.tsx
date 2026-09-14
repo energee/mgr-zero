@@ -184,12 +184,14 @@ export const E = {
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string) => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
+        type={onClick ? "button" : undefined}
+        onClick={onClick}
         asChild={Boolean(href) && !disabled}
         className={cn(
           // A lone verb sits where a group would end: right, on the desk.

@@ -4,6 +4,7 @@
 // a surface), pure list helpers, the summary lines the schedule screens print,
 // and the labelled read-out of a cut version's process scalars and water.
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
+import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 
 export type { MashStep };
 /** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
@@ -95,3 +96,62 @@ export const stageReady = (f: FermentationStageFields) => f.name.trim() !== "" &
 export type WaterAdditionFields = { materialId: string; qty: string; unit: string; stage: string };
 export const toAdditionFields = (a?: WaterAddition): WaterAdditionFields => ({ materialId: a?.materialId ?? "", qty: a ? String(a.qty) : "", unit: a?.unit ?? "g", stage: a?.stage ?? "mash" });
 export const additionReady = (f: WaterAdditionFields) => f.materialId !== "" && isPositive(f.qty);
+
+/** A profile option the Water screen can compute from. */
+export type WaterProfileIons = { id: string; name: string; ions: Ions };
+/** A material as the Water screen sees it: `salt` undefined means the schema carries none yet, null means not a salt. */
+export type SaltMaterial = { id: string; name: string; salt?: Salt | null };
+
+/** A list_water_profiles row (and the catalog fixture): a name and six ions in ppm columns. */
+export type WaterProfileRow = { id: string; name: string } & Record<`${keyof Ions}_ppm`, number>;
+export const profileIons = (p: Omit<WaterProfileRow, "id" | "name">): Ions =>
+  Object.fromEntries(IONS.map((ion) => [ion, p[`${ion}_ppm`]])) as Ions;
+/** The option the Water screen computes from; both live pages and the inventory map rows through this. */
+export const toWaterProfileOption = (p: WaterProfileRow): WaterProfileIons => ({ id: p.id, name: p.name, ions: profileIons(p) });
+
+const tenth = (n: number) => Math.round(n * 10) / 10;
+/** Grams split into mash and sparge by volume; a stage that rounds to nothing folds into the other. */
+export function splitByStage(grams: number, mashGal: number, spargeGal: number): { mash: number; sparge: number } {
+  // A negative stage volume counts as empty, so its share goes to the other stage rather than vanishing.
+  mashGal = Math.max(0, mashGal); spargeGal = Math.max(0, spargeGal);
+  const total = mashGal + spargeGal;
+  if (total <= 0) return { mash: tenth(grams), sparge: 0 };
+  const mash = tenth(grams * mashGal / total), sparge = tenth(grams - mash);
+  if (mash === 0) return { mash: 0, sparge: tenth(grams) };
+  if (sparge === 0) return { mash: tenth(grams), sparge: 0 };
+  return { mash, sparge };
+}
+
+const saltOf = (materials: SaltMaterial[], id: string) => materials.find((m) => m.id === id)?.salt;
+const asSaltAdditions = (draft: WaterDraft, materials: SaltMaterial[]) =>
+  draft.additions.map((a) => ({ salt: saltOf(materials, a.materialId), grams: gramsOf(a.qty, a.unit) }));
+
+const hasSalt = (m: SaltMaterial): m is SaltMaterial & { salt: Salt } => Boolean(m.salt);
+
+/** The solver's additions in place of the draft's salts; acids and unknown materials stay where they were.
+ *  Two stocked materials carrying the same salt collapse to one suggestion, mapped to the first such material. */
+export function suggestAdditions(draft: WaterDraft, source: Ions, target: Ions, materials: SaltMaterial[]): WaterAddition[] {
+  const mashGal = Number(draft.mashGal) || 0, spargeGal = Number(draft.spargeGal) || 0;
+  const stocked = materials.filter(hasSalt);
+  const bySalt = new Map<Salt, string>();
+  for (const m of stocked) if (!bySalt.has(m.salt)) bySalt.set(m.salt, m.id);
+  const kept = draft.additions.filter((a) => !saltOf(materials, a.materialId));
+  const suggested = suggestSalts({ source, target, totalGal: mashGal + spargeGal, salts: [...bySalt.keys()] }).flatMap(({ salt, grams }) => {
+    const materialId = bySalt.get(salt)!;
+    const { mash, sparge } = splitByStage(grams, mashGal, spargeGal);
+    return [mash > 0 ? { materialId, qty: mash, unit: "g", stage: "mash" } : null, sparge > 0 ? { materialId, qty: sparge, unit: "g", stage: "sparge" } : null].filter((a): a is WaterAddition => a !== null);
+  });
+  return [...suggested, ...kept];
+}
+
+export const WARN_PPM = 20;
+export type IonReadoutRow = { ion: string; detail: string; warning: boolean };
+const ppm = (n: number) => String(Math.round(n));
+/** Round before choosing the sign, so a delta like −0.4 renders "+0" and never "−0". */
+const signed = (n: number) => { const r = Math.round(n); return r < 0 ? `−${-r}` : `+${r}`; };
+/** Six rows, one per ion: "180 of 200 ppm · −20"; empty without a target. */
+export function ionReadout(draft: WaterDraft, source: Ions, target: Ions | undefined, materials: SaltMaterial[]): IonReadoutRow[] {
+  if (!target) return [];
+  const rows = waterChemistry({ source, target, mashGal: Number(draft.mashGal) || 0, spargeGal: Number(draft.spargeGal) || 0, additions: asSaltAdditions(draft, materials) });
+  return rows.map((r) => ({ ion: ION_LABELS[r.ion], detail: `${ppm(r.result)} of ${ppm(r.target!)} ppm · ${signed(r.delta!)}`, warning: Math.abs(r.delta!) > WARN_PPM }));
+}

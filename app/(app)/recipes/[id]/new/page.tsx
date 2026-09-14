@@ -4,6 +4,7 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toWaterProfileOption, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -17,11 +18,11 @@ export default async function NewVersionPage({ params }: { params: Promise<{ id:
   const ctx = await buildContext(brewery.id);
   const [{ recipe }, materials, gravityUnit, profiles] = (await Promise.all([
     orNotFound(runCommand("get_recipe", { recipeId: id }, ctx)), runCommand("list_materials", {}, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_water_profiles", {}, ctx),
-  ])) as [{ recipe: Named }, RecipeMaterial[], { effective: GravityUnit }, Named[]];
+  ])) as [{ recipe: Named }, RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[]];
   return (
     <RecipeEditor
       recipeId={recipe.id} title={`${recipe.name} · new version`} backHref={`/recipes/${recipe.id}`} backLabel={recipe.name}
-      materials={materials.map(toRecipeMaterial)} profiles={profiles} unit={gravityUnit.effective}
+      materials={materials.map(toRecipeMaterial)} profiles={profiles.map(toWaterProfileOption)} unit={gravityUnit.effective}
     />
   );
 }
