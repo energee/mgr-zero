@@ -12,7 +12,7 @@ const ROLES = [
 
 function StaffRoleField({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
   const selected = ROLES.find(([role]) => role === value);
-  return <div className="flex flex-col gap-2">{E.pick("Role", value, (ROLES.map(([role, label]) => ({ value: role, label }))), { onChange, disabled })}<p className="text-sm text-muted-foreground">{selected?.[2]}</p></div>;
+  return <div className="flex flex-col gap-2">{E.pick("Role", value, (ROLES.map(([role, label]) => ({ value: role, label }))), { onChange, disabled, displayValue: selected?.[1] ?? value })}<p className="text-sm text-muted-foreground">{selected?.[2]}</p></div>;
 }
 
 export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChange, onRoleChange, onSubmit, busy = false, error }: {
