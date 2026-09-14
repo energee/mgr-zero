@@ -17,6 +17,7 @@ Join through an invitation, then sign in with your email and the password you ch
 Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, **Session expired** confirms that eligible queued readings remain on this device; select **Sign in to retry** as the original user and brewery. Without JavaScript, that URL shows the sign-in card directly. Open **Me** in the header when you want **Sign out**.
 
 <Screen name="Reset password" />
+<Screen name="Set new password" />
 
 **Forgot password?** on the sign-in card opens **Reset password**. Enter your **Email** and select **Send reset link**; the page always says a link is on its way if that email is on an account, so it never confirms whether one is. The link in the email opens **Set new password**, which shows the account and asks you to **Choose a password** and **Save password**; a used or timed-out link lands back on Reset password saying so. Signed in already? **Change password** in **Me** opens the same page.
 
@@ -440,6 +441,8 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
 
 ## Stock transfers [#transfers]
+
+<Screen name="Transfers" />
 
 **Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: open **Locations → Location bins → Move stock** instead. Admin and Warehouse choose stock and its source bin, a different destination bin, and a positive quantity. Materials use base units; empty kegs require whole units. Each finished-goods or material lot is listed separately from **Untracked stock**; choose the identity actually being moved. The selected lot is preserved on both entries. A bin move writes paired rows without a document.
 
