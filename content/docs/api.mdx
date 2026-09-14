@@ -531,12 +531,13 @@ reload or reconnect retries that same envelope. `record_movement`,
 `record_pick`, and stock transfers require current server state and are never
 queued; a stable request ID alone does not make an operation safe offline.
 
-This holds beyond the ledger RPCs too. `set_notification_preference`,
+This is not special to the ledger. `set_notification_preference`,
 `set_brewery_quiet_hours`, `set_notification_destination`,
-`consume_chat_link_proof`, and `unlink_chat_user` dedupe the same way through
-a separate request-claim table keyed on the caller and `requestId`: a reused
-id with a matching payload replays the original result, and a reused id with
-a different payload is `409 conflict`.
+`consume_chat_link_proof`, and `unlink_chat_user` claim their `requestId`
+against the same caller-and-`requestId`-keyed table every ledger and order RPC
+does — there is no separate mechanism: a reused id with a matching payload
+replays the original result, and a reused id with a different payload is
+`409 conflict`.
 
 ### Where to generate it [#where]
 
@@ -2079,7 +2080,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 ### Catalog & pricing [#catalog]
 
-A brand is the beer's sellable identity — name, style, ABV, tax class. A
+A brand is the beer's sellable identity — name, style, ABV. A
 format is the physical package (keg, can, bottle); it owns `unitsPerCase` and
 `bblPerUnit`. A poured format (a pint, a taster) never holds stock: it is a
 ratio back to the keg it pours from, and never becomes a SKU. A SKU is one
@@ -2512,7 +2513,7 @@ Physical counts are available to Admin, Warehouse, and Taproom through the comma
 
 `get_taproom_print_labels` accepts the exact prepared revision and returns only current positive Taproom stock, retaining each bucket's row number from the complete count worksheet. It supplies safe bin, SKU, brand and package labels plus a tracked lot UUID and code, or untracked, and quantity. A changed revision is refused. Full lot history remains outside this projection, and the query neither posts inventory nor claims a command request.
 
-Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. `correct_taproom_count` lets Admin replace only the latest uncorrected root count when at least one submitted line was counted too low. Every changed quantity must be a whole increase no greater than its frozen quantity before the count, and a reason is required. The correction preserves the root observation time, appends exact frozen compensation and smaller replacement legs in the correction's audit period, supplies one effective receipt and next-count baseline, and leaves original and filed records unchanged. Warehouse and Taproom may read the effective receipt and correction audit but cannot run the correction. An uncertain response keeps the exact request frozen for replay. Generic inventory adjustments do not reverse count depletion. Direct raw lot history remains unavailable; use the checked current-stock print projection to match a physical tracked lot without guessing.
+Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. `correct_taproom_count` lets Admin replace only the latest uncorrected root count, and refuses outright unless every submitted line was counted too low. Every changed quantity must be a whole increase no greater than its frozen quantity before the count, and a reason is required. The correction preserves the root observation time, appends exact frozen compensation and smaller replacement legs in the correction's audit period, supplies one effective receipt and next-count baseline, and leaves original and filed records unchanged. Warehouse and Taproom may read the effective receipt and correction audit but cannot run the correction. An uncertain response keeps the exact request frozen for replay. Generic inventory adjustments do not reverse count depletion. Direct raw lot history remains unavailable; use the checked current-stock print projection to match a physical tracked lot without guessing.
 
 `get_taproom_draft_projection` compares an unsaved recount with expected consumption from the latest effective saved count's observation time through the response's server `as_of`. It identifies that baseline and both bounds, groups expected BBL by brand, and reports coverage-source bounds and completeness, unmapped and ignored lines, excluded shares, and unattributed poured volume. No saved baseline or usable POS observation leaves expected null; a complete empty observation may return zero. This live read never posts inventory, allocates lots, freezes a POS snapshot, or replaces the count snapshot revision, and late reconciled facts may change a later response.
 
@@ -3669,8 +3670,8 @@ line, so a partially edited BOM never exists.
 
 A packaging run is scheduled, then closed with what it actually produced and
 consumed. Closing is the step that moves beer out of a vessel and finished goods
-into inventory, which is why a run's material shortfalls are worth reading
-before it is scheduled rather than after.
+into inventory. No operation here previews a run's material shortfalls before
+scheduling — that read belongs to the Packaging screen, not this reference.
 
 {/* ops:packaging */}
 
@@ -3922,11 +3923,10 @@ curl -X POST "$MGR_URL/api/command" \
 
 ### Delivery & routes [#delivery]
 
-A route groups picked orders into one driver's run. It is built, saved,
-departed, and returned. A stop is confirmed as delivered on the way. What does
-not get delivered comes back on the same route, which is why the return step
-exists separately from delivery confirmation: the stock has to land somewhere
-before the route can close.
+A route groups a driver's shipped orders and picked stock transfers into one
+run. It is built, saved, departed, and returned. Each stop is confirmed as
+delivered along the way, and `return_route` refuses until every stop on the
+route has been confirmed delivered.
 
 {/* ops:delivery */}
 
@@ -4080,9 +4080,10 @@ classification without changing total volume. `bbl` is positive, finite, and
 limited to eight fractional digits. `destinationState` is required for
 `sample` and must be omitted for `taproom` and `destruction`. Direct cellar
 Taproom volume freezes the system Taproom channel tax treatment; generated
-reports name the outstanding external mapping and filing refuses until that
-mapping is separately approved. The cellar breakdown is explanatory and must
-not be added to `figures.removals`.
+reports name the outstanding external mapping, and filing any period with
+direct cellar Taproom volume is refused outright — there is currently no
+operation that approves the mapping and clears the block. The cellar
+breakdown is explanatory and must not be added to `figures.removals`.
 
 {/* ops:compliance */}
 
@@ -4340,7 +4341,7 @@ Unknown row fields are rejected. References use explicit UUIDs; create missing
 formats before importing. Product imports reuse an existing brand without
 changing its metadata and create the SKU in the same row transaction. Duplicate
 customer/SKU creation is blocked; channel-price rows set the existing grid cell.
-Opening quantities are positive SKU-unit counts with a bin belonging to the
+Opening quantities are positive SKU-unit quantities with a bin belonging to the
 location. Prices are nonnegative integer cents, at most 2147483647.
 
 {/* ops:team */}
