@@ -7,13 +7,14 @@ const scope = { actorId: "actor", breweryId: "brewery", role: "admin" };
 afterEach(() => vi.unstubAllGlobals());
 
 it("deduplicates concurrent reads and reuses fresh data without another request", async () => {
-  const fetch = vi.fn(async (_url: string, _options: RequestInit) => new Response(JSON.stringify({ ok: true, data: [{ id: "order" }] })));
+  const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ ok: true, data: [{ id: "order" }] })));
   vi.stubGlobal("fetch", fetch);
   const cache = createQueryClient();
   const options = commandQueryOptions(scope, "list_orders", {});
   await Promise.all([cache.fetchQuery(options), cache.fetchQuery(options)]);
   await cache.fetchQuery(options);
   expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal);
   expect(JSON.parse(fetch.mock.calls[0]![1]!.body as string).expectedContext).toEqual({ actorId: "actor", breweryId: "brewery" });
   cache.clear();
 });
@@ -80,5 +81,60 @@ it("invalidates on an uncertain write failure without retrying the write", async
   await expect(command("brewery", "create_order", {})).rejects.toThrow("connection lost");
   await vi.waitFor(() => expect(cache.getQueryState(key)?.isInvalidated).toBe(true));
   expect(fetch).toHaveBeenCalledTimes(1);
+  stop(); cache.clear();
+});
+
+it("keeps stale data visible during background refresh, then replaces it", async () => {
+  let finish!: (response: Response) => void;
+  vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+  const cache = createQueryClient();
+  const options = commandQueryOptions<string[]>(scope, "list_orders", {});
+  cache.setQueryData(options.queryKey, ["old"], { updatedAt: Date.now() - 31_000 });
+  const observer = new QueryObserver(cache, options);
+  const stop = observer.subscribe(() => undefined);
+  expect(observer.getCurrentResult()).toMatchObject({ data: ["old"], isFetching: true, isPending: false });
+  finish(new Response(JSON.stringify({ ok: true, data: ["new"] })));
+  await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual(["new"]));
+  stop(); cache.clear();
+});
+
+it("does not turn a failed cached query into an invalidation/refetch loop", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: false, error: { message: "denied" } }), { status: 403 }));
+  vi.stubGlobal("fetch", fetch);
+  const cache = createQueryClient();
+  const invalidate = vi.spyOn(cache, "invalidateQueries");
+  const stop = subscribeToCommandChanges(cache, scope);
+  await expect(cache.fetchQuery(commandQueryOptions(scope, "list_orders", {}))).rejects.toThrow("denied");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(invalidate).not.toHaveBeenCalled();
+  stop(); cache.clear();
+});
+
+it("creates independent caches rather than sharing data between server renders", () => {
+  const first = createQueryClient();
+  const second = createQueryClient();
+  const key = commandQueryOptions(scope, "list_orders", {}).queryKey;
+  first.setQueryData(key, ["private"]);
+  expect(second.getQueryData(key)).toBeUndefined();
+  first.clear(); second.clear();
+});
+
+it("cancels an in-flight read before write invalidation can accept its old response", async () => {
+  vi.stubGlobal("window", new EventTarget());
+  let signal!: AbortSignal;
+  vi.stubGlobal("fetch", vi.fn((_url, options: RequestInit) => {
+    signal = options.signal as AbortSignal;
+    return new Promise<Response>((_resolve, reject) => signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+  }));
+  const cache = createQueryClient();
+  const options = commandQueryOptions(scope, "list_orders", {});
+  const stop = subscribeToCommandChanges(cache, scope);
+  const read = cache.fetchQuery(options).catch(() => undefined);
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, data: {}, requestId: "write" }))));
+  await command("brewery", "create_order", {});
+  await read;
+  expect(signal.aborted).toBe(true);
+  expect(cache.getQueryData(options.queryKey)).toBeUndefined();
   stop(); cache.clear();
 });
