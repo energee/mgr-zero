@@ -1,5 +1,7 @@
 // app/(app)/recipes/[id]/recipe-version-form.tsx — CommandForm for
-// create_recipe_version: the assumption scalars (mash temp, brewhouse
+// create_recipe_version: the process spec (mash and fermentation schedules
+// and water, each on its own draft sheet in schedule-sheets.tsx; pre-boil,
+// whirlpool and knockout inline), the assumption scalars (brewhouse
 // efficiency, yeast attenuation, optional boil/IBU) and ingredient lines
 // (material, per-bbl quantity, stage, optional timing). The OG/FG/ABV
 // preview below the ingredient table calls the same pure recipeGravity the
@@ -16,6 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
+import { EMPTY_WATER, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { FermentationScheduleSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
+import type { NamedOption } from "@/components/mgr/views/water";
 
 const STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
 
@@ -24,8 +29,14 @@ type Line = { materialId: string; perBblQty: string; stage: (typeof STAGES)[numb
 
 const emptyLine = (): Line => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 
-export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string; materials: Material[]; unit: GravityUnit }) {
-  const [mashTempF, setMashTempF] = useState("152");
+const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
+const EMPTY_PROCESS = { preBoilBbl: "", whirlpoolMinutes: "", whirlpoolTempF: "", whirlpoolRestMinutes: "", knockoutTempF: "" };
+
+export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipeId: string; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
+  const [mashSchedule, setMashSchedule] = useState<MashStep[]>(DEFAULT_MASH);
+  const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
+  const [process, setProcess] = useState(EMPTY_PROCESS);
+  const [water, setWater] = useState<WaterDraft>(EMPTY_WATER);
   const [brewhouseEfficiency, setBrewhouseEfficiency] = useState("0.75");
   const [yeastAttenuation, setYeastAttenuation] = useState("0.78");
   const [boilMinutes, setBoilMinutes] = useState("");
@@ -36,15 +47,18 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
   const validLines = lines.filter((l) => l.materialId && Number(l.perBblQty) > 0);
   const form = useCommandForm("create_recipe_version", {
     build: () => ({
-      recipeId, mashTempF: Number(mashTempF), brewhouseEfficiency: Number(brewhouseEfficiency), yeastAttenuation: Number(yeastAttenuation),
-      boilMinutes: boilMinutes ? Number(boilMinutes) : undefined, targetIbu: targetIbu ? Number(targetIbu) : undefined, note: note || undefined,
+      recipeId, mashSchedule, fermentationSchedule,
+      process: { preBoilBbl: num(process.preBoilBbl), whirlpoolMinutes: num(process.whirlpoolMinutes), whirlpoolTempF: num(process.whirlpoolTempF), whirlpoolRestMinutes: num(process.whirlpoolRestMinutes), knockoutTempF: num(process.knockoutTempF) },
+      water: { targetProfileId: water.targetProfileId || undefined, sourceProfileId: water.sourceProfileId || undefined, mashGal: num(water.mashGal), spargeGal: num(water.spargeGal), targetMashPh: num(water.targetMashPh), additions: water.additions },
+      brewhouseEfficiency: Number(brewhouseEfficiency), yeastAttenuation: Number(yeastAttenuation),
+      boilMinutes: num(boilMinutes), targetIbu: num(targetIbu), note: note || undefined,
       ingredients: validLines.map((l) => ({
         materialId: l.materialId, perBblQty: Number(l.perBblQty), stage: l.stage,
         timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : undefined,
       })),
     }),
     reset: () => {
-      setMashTempF("152"); setBrewhouseEfficiency("0.75"); setYeastAttenuation("0.78");
+      setMashSchedule(DEFAULT_MASH); setFermentationSchedule([]); setProcess(EMPTY_PROCESS); setWater(EMPTY_WATER); setBrewhouseEfficiency("0.75"); setYeastAttenuation("0.78");
       setBoilMinutes(""); setTargetIbu(""); setNote(""); setLines([emptyLine()]);
     },
   });
@@ -66,15 +80,21 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
   })();
 
   const setLine = (i: number, patch: Partial<Line>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const ready = mashTempF && brewhouseEfficiency && yeastAttenuation && validLines.length > 0;
+  const ready = mashSchedule.length > 0 && brewhouseEfficiency && yeastAttenuation && validLines.length > 0;
+  const setP = (key: keyof typeof EMPTY_PROCESS, value: string) => setProcess((p) => ({ ...p, [key]: value }));
 
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New version" trigger={<Button size="sm">New version</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} />
+          <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} />
+          <WaterSheet water={water} profiles={profiles} materials={materials} onChange={setWater} />
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="rv-mash">Mash temp (°F)</Label>
-            <Input id="rv-mash" type="number" value={mashTempF} onChange={(e) => setMashTempF(e.target.value)} required />
+            <Label htmlFor="rv-preboil">Pre-boil volume (bbl) · optional</Label>
+            <Input id="rv-preboil" type="number" min="0" step="any" value={process.preBoilBbl} onChange={(e) => setP("preBoilBbl", e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-boil">Boil minutes · optional</Label>
@@ -91,6 +111,22 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-ibu">Target IBU · optional</Label>
             <Input id="rv-ibu" type="number" min="0" step="any" value={targetIbu} onChange={(e) => setTargetIbu(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="rv-wp-min">Whirlpool min · optional</Label>
+            <Input id="rv-wp-min" type="number" min="0" step="1" value={process.whirlpoolMinutes} onChange={(e) => setP("whirlpoolMinutes", e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="rv-wp-temp">Whirlpool temp °F · optional</Label>
+            <Input id="rv-wp-temp" type="number" step="any" value={process.whirlpoolTempF} onChange={(e) => setP("whirlpoolTempF", e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="rv-wp-rest">Whirlpool rest min · optional</Label>
+            <Input id="rv-wp-rest" type="number" min="0" step="1" value={process.whirlpoolRestMinutes} onChange={(e) => setP("whirlpoolRestMinutes", e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="rv-ko">Knockout temp °F · optional</Label>
+            <Input id="rv-ko" type="number" step="any" value={process.knockoutTempF} onChange={(e) => setP("knockoutTempF", e.target.value)} />
           </div>
         </div>
         <div className="flex flex-col gap-2">

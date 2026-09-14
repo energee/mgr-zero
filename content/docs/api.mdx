@@ -3344,15 +3344,18 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Add the next version of a recipe with its ingredients; versions are immutable and snapshot each material's extract potential
+Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `recipeId` | uuid | yes |
-| `mashTempF` | number | yes |
+| `mashSchedule` | array of object | yes |
 | `brewhouseEfficiency` | number | yes |
 | `yeastAttenuation` | number | yes |
 | `ingredients` | array of object | yes |
+| `fermentationSchedule` | array of object | no |
+| `process` | object | no |
+| `water` | object | no |
 | `boilMinutes` | integer | no |
 | `targetIbu` | number | no |
 | `note` | string | no |
@@ -3361,7 +3364,7 @@ Add the next version of a recipe with its ingredients; versions are immutable an
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashTempF": 1, "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashSchedule": [ { "name": "string", "kind": "infusion", "tempF": 1, "minutes": 1 } ], "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
 ```
 
 #### get_batch_completion_preview [#get_batch_completion_preview]
