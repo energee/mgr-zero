@@ -13,7 +13,7 @@ async function query(name: string, input: unknown) {
   switch (name) {
     case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
     case "list_orders": return [];
-    case "list_customers": return [{ id: "buyer", name: "Buyer" }];
+    case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
     case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
@@ -30,6 +30,12 @@ import OrdersPage from "@/app/(app)/orders/page";
 import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
+
+it("does not fetch customer options when Orders has no customer filter", async () => {
+  state.calls = [];
+  await OrdersPage({ searchParams: Promise.resolve({}) });
+  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined }]]);
+});
 
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];

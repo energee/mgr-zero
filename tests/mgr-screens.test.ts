@@ -192,7 +192,7 @@ describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
-      "Today", "Sales", "Brewer", "Driver", "Taproom",
+      "Today", "Page loading", "Sales", "Brewer", "Driver", "Taproom",
       "Beer", "Work", "More", "Search", "Me", "Settings", "Permission denied",
     ]);
     for (const s of SCREENS) {
@@ -216,7 +216,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(189);
+    expect(SCREENS).toHaveLength(190);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });

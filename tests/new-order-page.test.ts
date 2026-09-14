@@ -17,17 +17,17 @@ it("guards new-order deep links before loading customer and catalog data", async
 
 it("binds the full-page form to live IDs and active SKUs without fixture availability", async () => {
   query.mockImplementation(async (name, input) => {
-    if (name === "list_customers") return [{ id: "c1", name: "Same" }, { id: "c2", name: "Same" }];
+    if (name === "list_customers" && input.includeShipTos) return ["c1", "c2"].map(id => ({ id, name: "Same", shipTos: [{ id: `${id}-dock`, label: "Dock", is_default: true }] }));
     if (name === "list_locations") return [{ id: "l1", name: "Warehouse", uses: ["warehouse"] }];
     if (name === "list_skus") return [
       { id: "sku1", name: "Case", active: true, brands: { name: "Brand" } },
       { id: "sku2", name: "Old", active: false, brands: null },
     ];
-    if (name === "get_customer") return { shipTos: [{ id: `${input.customerId}-dock`, label: "Dock", is_default: true }] };
     throw new Error(name);
   });
   const page = await NewOrderPage();
   expect(page.type).toBe(OrderForm);
   expect(page.props.customers.map((customer: CustomerOption) => [customer.id, customer.shipTos[0].id])).toEqual([["c1", "c1-dock"], ["c2", "c2-dock"]]);
   expect(page.props.skus).toEqual([{ id: "sku1", label: "Brand — Case" }]);
+  expect(query).toHaveBeenCalledTimes(3);
 });
