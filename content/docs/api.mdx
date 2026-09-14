@@ -3116,17 +3116,17 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer, warehouse
 
-Lots of one material with quantity on hand, oldest received first
+Lots with quantity on hand, oldest received first, for one material or all of them
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `materialId` | uuid | yes |
+| `materialId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_material_lots", "input": { "materialId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_material_lots", "input": {} }'
 ```
 
 #### list_materials [#list_materials]

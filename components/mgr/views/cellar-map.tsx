@@ -6,7 +6,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
   return <>
     {E.back("Beer", "Cellar", E.btn("Add vessel", "g", model.addHref), model.backHref)}
     {model.tiles.length ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2") : E.blank("No vessels yet")}
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       {E.btn("Reading", model.readingHref === null ? "p disabled" : "p", model.readingHref ?? undefined)}
       {transfer !== undefined ? transfer : E.btn("Transfer", "g")}
       {addition !== undefined ? addition : E.btn("Addition", "g")}

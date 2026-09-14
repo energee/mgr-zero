@@ -7,6 +7,14 @@
 -- ponytail: the bin is derived — the bin holding the most of that material
 -- (and lot) at any location — rather than picked on the sheet; add p_bin when
 -- a brewery keeps the same hop in two cold rooms and cares which one drains.
+
+-- material × lot × bin grain, the one the three existing on-hand views lack
+-- (material_bin_on_hand drops lot, material_lot_on_hand drops bin). Read only
+-- by the RPC below, so it needs no grant.
+create view public.material_lot_bin_on_hand as
+  select brewery_id, material_id, lot_id, location_id, bin_id, sum(qty) as qty
+  from public.material_movements group by 1,2,3,4,5;
+
 create function public.record_batch_addition(
   p_brewery uuid, p_occupancy uuid, p_material uuid, p_stage public.ingredient_stage,
   p_lot uuid, p_qty numeric, p_note text, p_request_id uuid
@@ -29,15 +37,14 @@ begin
 
   select * into v_mat from public.materials where id = p_material and brewery_id = p_brewery;
   if v_mat.id is null then raise exception 'material not found'; end if;
+  -- enforce_material_lot on the movement also refuses this; the message here is the one the sheet shows.
   if v_mat.lot_tracked and p_lot is null then raise exception 'choose a lot: % is lot-tracked', v_mat.name; end if;
-  if not v_mat.lot_tracked and p_lot is not null then raise exception '% is not lot-tracked', v_mat.name; end if;
 
   -- The bin with the most of this material (and lot) on hand; refuse to drain
   -- more than it holds so a typo never drives a bin negative.
-  select m.location_id, m.bin_id, sum(m.qty) as qty into v_bin
-  from public.material_movements m
-  where m.brewery_id = p_brewery and m.material_id = p_material and (p_lot is null or m.lot_id = p_lot)
-  group by m.location_id, m.bin_id order by sum(m.qty) desc limit 1;
+  select location_id, bin_id, qty into v_bin from public.material_lot_bin_on_hand
+  where brewery_id = p_brewery and material_id = p_material and (p_lot is null or lot_id = p_lot)
+  order by qty desc limit 1;
   if v_bin.bin_id is null or v_bin.qty < p_qty then
     raise exception 'only % % of % on hand', coalesce(v_bin.qty, 0), v_mat.base_uom, v_mat.name;
   end if;

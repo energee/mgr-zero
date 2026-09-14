@@ -76,19 +76,20 @@ defineCommand({
   })),
 });
 
-// Lots of one material with stock left, oldest received first: the Cellar
-// addition sheet's lot picker. material_lot_on_hand carries staff_read via
-// its base tables, so PostgREST scopes it to the caller's brewery.
+// Lots with stock left, oldest received first: the Cellar addition sheet's lot
+// picker. One call covers every lot-tracked material (the sheet groups by
+// material_id); pass materialId to narrow. material_lot_on_hand carries
+// staff_read via its base tables, so PostgREST scopes it to the brewery.
 defineQuery({
-  name: "list_material_lots", description: "Lots of one material with quantity on hand, oldest received first",
-  input: z.object({ materialId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
+  name: "list_material_lots", description: "Lots with quantity on hand, oldest received first, for one material or all of them",
+  input: z.object({ materialId: z.string().uuid().optional() }), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx, i) => {
-    const [onHand, lots] = await Promise.all([
-      unwrap(ctx.db.from("material_lot_on_hand").select("lot_id, received_on, qty").eq("brewery_id", ctx.breweryId).eq("material_id", i.materialId).gt("qty", 0)),
-      unwrap(ctx.db.from("material_lots").select("id, lot_code").eq("brewery_id", ctx.breweryId).eq("material_id", i.materialId)),
-    ]);
-    return (onHand ?? []).map((l) => ({ lot_id: l.lot_id as string, lot_code: lots?.find((x) => x.id === l.lot_id)?.lot_code ?? "", qty: Number(l.qty), received_on: l.received_on as string | null }))
-      .sort((a, b) => (a.received_on ?? "").localeCompare(b.received_on ?? "") || a.lot_code.localeCompare(b.lot_code));
+    let onHandQ = ctx.db.from("material_lot_on_hand").select("material_id, lot_id, received_on, qty").eq("brewery_id", ctx.breweryId).gt("qty", 0).order("received_on", { nullsFirst: false });
+    let lotsQ = ctx.db.from("material_lots").select("id, lot_code").eq("brewery_id", ctx.breweryId);
+    if (i.materialId) { onHandQ = onHandQ.eq("material_id", i.materialId); lotsQ = lotsQ.eq("material_id", i.materialId); }
+    const [onHand, lots] = await Promise.all([unwrap(onHandQ), unwrap(lotsQ)]);
+    const code = new Map((lots ?? []).map((x) => [x.id as string, x.lot_code as string]));
+    return (onHand ?? []).map((l) => ({ material_id: l.material_id as string, lot_id: l.lot_id as string, lot_code: code.get(l.lot_id as string) ?? "", qty: Number(l.qty), received_on: l.received_on as string | null }));
   },
 });
 

@@ -54,7 +54,9 @@ describe("record_batch_addition", () => {
 
   it("lists lots with on hand for the sheet's lot picker", async () => {
     const lots = (await runCommand("list_material_lots", { materialId: citra }, ctx)) as { lot_id: string; lot_code: string; qty: number }[];
-    expect(lots).toEqual([{ lot_id: lotId, lot_code: "L-0790", qty: 22, received_on: null }]);
+    expect(lots).toEqual([{ material_id: citra, lot_id: lotId, lot_code: "L-0790", qty: 22, received_on: null }]);
+    const all = (await runCommand("list_material_lots", {}, ctx)) as { lot_id: string }[];
+    expect(all.map((l) => l.lot_id)).toEqual([lotId]);
   });
 
   it("refuses a closed occupancy", async () => {
