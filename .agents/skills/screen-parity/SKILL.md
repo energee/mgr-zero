@@ -136,11 +136,11 @@ output; different customer data or permission states are not visual defects.
 Exercise shared form state and error handling through controlled inputs and
 callbacks without a database where possible.
 
-The existing `tests/app-screen-parity.test.ts` file-existence and permissive
-`E | CommandForm | views/*` import checks are discovery checks, not proof of
-component parity. A screen-route map must identify the corresponding public page
-and follow it to the screen implementation; header/dialog-only screens may start
-at their mounted component. Do not weaken assertions
+The `tests/app-screen-parity.test.ts` route-existence checks are discovery, not
+proof of component parity; `tests/screen-view-composition.test.ts` follows the
+mounted TypeScript component chain. A screen-route map must identify the
+corresponding public page and follow it to the screen implementation;
+header/dialog-only screens may start at their mounted component. Do not weaken assertions
 or add blanket exceptions to make existing bypasses pass. Report existing debt
 explicitly; do not claim global enforcement from checks covering only one flow.
 
