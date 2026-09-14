@@ -20,7 +20,6 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
   { name: "Expired reset", file: "app/(auth)/reset/page.tsx" },
   { name: "Today", file: "app/(app)/page.tsx" },
-  { name: "Page loading", file: "app/(app)/loading.tsx" },
   { name: "First-run checklist", file: "app/(app)/page.tsx" },
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
   { name: "Weekly count", file: "app/(app)/taproom/page.tsx" },
