@@ -14,15 +14,13 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { NewVersionForm } from "./recipe-version-form";
-import { fermentationSummary, mashSummary, type FermentationStage, type MashStep } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, mashSummary, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
-type Version = {
+type Version = ProcessColumns & {
   id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number; yeast_attenuation: number;
   boil_minutes: number | null; target_ibu: number | null; note: string | null;
   mash_schedule: MashStep[]; fermentation_schedule: FermentationStage[];
-  pre_boil_bbl: number | null; whirlpool_minutes: number | null; whirlpool_temp_f: number | null; whirlpool_rest_minutes: number | null; knockout_temp_f: number | null;
-  target_water_profile_id: string | null; source_water_profile_id: string | null; mash_water_gal: number | null; sparge_water_gal: number | null; target_mash_ph: number | null;
 };
 type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage: string };
 type Profile = { id: string; name: string };
@@ -42,13 +40,16 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
   ])) as [GetRecipe, Material[], { effective: GravityUnit }, Profile[]];
-  const materialName = (mid: string) => materials.find((m) => m.id === mid)?.name ?? mid.slice(0, 8);
+  const names = new Map(materials.map((m) => [m.id, m.name]));
+  const materialName = (mid: string) => names.get(mid) ?? mid.slice(0, 8);
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
+  // The form is a client component: hand it the fields it reads, not the whole materials row.
+  const formMaterials = materials.map(({ id, name, category, extract_potential }) => ({ id, name, category, extract_potential }));
 
   return (
     <RecipeView
       model={{ title: recipe.name, backHref: "/recipes" }}
-      createAction={<NewVersionForm recipeId={recipe.id} recipeName={recipe.name} materials={materials} profiles={profiles} unit={gravityUnit.effective} />}
+      createAction={<NewVersionForm recipeId={recipe.id} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />}
       detail={
         <>
           {recipe.note ? E.fld("Note", recipe.note) : null}
@@ -65,9 +66,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
               {ogPlato !== null && fgPlato !== null && abv !== null
                 ? E.fld("Predicted OG / FG / ABV", `${formatGravity(ogPlato, gravityUnit.effective)} / ${formatGravity(fgPlato, gravityUnit.effective)} / ${abv.toFixed(1)}%`)
                 : null}
-              {version.pre_boil_bbl !== null ? E.fld("Pre-boil volume", `${version.pre_boil_bbl} bbl`) : null}
-              {version.whirlpool_minutes !== null ? E.fld("Whirlpool", `${version.whirlpool_minutes} min${version.whirlpool_temp_f !== null ? ` at ${version.whirlpool_temp_f} °F` : ""}${version.whirlpool_rest_minutes !== null ? ` · ${version.whirlpool_rest_minutes} min rest` : ""}`) : null}
-              {version.knockout_temp_f !== null ? E.fld("Knockout temp", `${version.knockout_temp_f} °F`) : null}
+              {processReadout(version, profileName).slice(0, 3).map(([k, v]) => <div key={k}>{E.fld(k, v)}</div>)}
               {E.ttl(`Mash schedule · ${version.mash_schedule.length} steps`)}
               {version.mash_schedule.map((s, i) => <div key={i}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.minutes} min`)}</div>)}
               {E.info(mashSummary(version.mash_schedule))}
@@ -75,11 +74,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
               {version.fermentation_schedule.map((s, i) => <div key={i}>{E.row(s.name, `${s.tempF} °F · ${s.days} days`)}</div>)}
               {E.info(fermentationSummary(version.fermentation_schedule))}
               {E.ttl("Water")}
-              {E.fld("Source profile", profileName(version.source_water_profile_id) ?? "Brewery default")}
-              {E.fld("Target profile", profileName(version.target_water_profile_id) ?? "No target")}
-              {version.mash_water_gal !== null ? E.fld("Mash water", `${version.mash_water_gal} gal`) : null}
-              {version.sparge_water_gal !== null ? E.fld("Sparge water", `${version.sparge_water_gal} gal`) : null}
-              {version.target_mash_ph !== null ? E.fld("Target mash pH", String(version.target_mash_ph)) : null}
+              {processReadout(version, profileName).slice(3).map(([k, v]) => <div key={k}>{E.fld(k, v)}</div>)}
               {waterAdditions.map((a, i) => <div key={i}>{E.row(materialName(a.material_id), `${a.qty} ${a.unit} · ${a.stage}`)}</div>)}
               {E.ttl("Ingredients")}
               {E.tbl(["material", "per bbl", "stage", "timing"], ingredients.map((i) => [

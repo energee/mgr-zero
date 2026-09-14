@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
-import { EMPTY_WATER, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 import type { NamedOption } from "@/components/mgr/views/water";
 
@@ -31,9 +31,8 @@ const emptyLine = (): Line => ({ materialId: "", perBblQty: "", stage: "mash", t
 
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
 const EMPTY_PROCESS = { preBoilBbl: "", whirlpoolMinutes: "", whirlpoolTempF: "", whirlpoolRestMinutes: "", knockoutTempF: "" };
-const num = (v: string) => (v === "" ? undefined : Number(v));
 
-export function NewVersionForm({ recipeId, recipeName, materials, profiles, unit }: { recipeId: string; recipeName: string; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
+export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipeId: string; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
   const [mashSchedule, setMashSchedule] = useState<MashStep[]>(DEFAULT_MASH);
   const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
   const [process, setProcess] = useState(EMPTY_PROCESS);
@@ -52,7 +51,7 @@ export function NewVersionForm({ recipeId, recipeName, materials, profiles, unit
       process: { preBoilBbl: num(process.preBoilBbl), whirlpoolMinutes: num(process.whirlpoolMinutes), whirlpoolTempF: num(process.whirlpoolTempF), whirlpoolRestMinutes: num(process.whirlpoolRestMinutes), knockoutTempF: num(process.knockoutTempF) },
       water: { targetProfileId: water.targetProfileId || undefined, sourceProfileId: water.sourceProfileId || undefined, mashGal: num(water.mashGal), spargeGal: num(water.spargeGal), targetMashPh: num(water.targetMashPh), additions: water.additions },
       brewhouseEfficiency: Number(brewhouseEfficiency), yeastAttenuation: Number(yeastAttenuation),
-      boilMinutes: boilMinutes ? Number(boilMinutes) : undefined, targetIbu: targetIbu ? Number(targetIbu) : undefined, note: note || undefined,
+      boilMinutes: num(boilMinutes), targetIbu: num(targetIbu), note: note || undefined,
       ingredients: validLines.map((l) => ({
         materialId: l.materialId, perBblQty: Number(l.perBblQty), stage: l.stage,
         timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : undefined,
@@ -82,20 +81,20 @@ export function NewVersionForm({ recipeId, recipeName, materials, profiles, unit
 
   const setLine = (i: number, patch: Partial<Line>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const ready = mashSchedule.length > 0 && brewhouseEfficiency && yeastAttenuation && validLines.length > 0;
-  const setP = (key: keyof typeof EMPTY_PROCESS) => (e: React.ChangeEvent<HTMLInputElement>) => setProcess((p) => ({ ...p, [key]: e.target.value }));
+  const setP = (key: keyof typeof EMPTY_PROCESS, value: string) => setProcess((p) => ({ ...p, [key]: value }));
 
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New version" trigger={<Button size="sm">New version</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <MashScheduleSheet title={`${recipeName} · Mash schedule`} steps={mashSchedule} onChange={setMashSchedule} />
-          <FermentationScheduleSheet title={`${recipeName} · Fermentation`} stages={fermentationSchedule} onChange={setFermentationSchedule} />
-          <WaterSheet title={`${recipeName} · Water`} water={water} profiles={profiles} materials={materials} onChange={setWater} />
+          <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} />
+          <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} />
+          <WaterSheet water={water} profiles={profiles} materials={materials} onChange={setWater} />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-preboil">Pre-boil volume (bbl) · optional</Label>
-            <Input id="rv-preboil" type="number" min="0" step="any" value={process.preBoilBbl} onChange={setP("preBoilBbl")} />
+            <Input id="rv-preboil" type="number" min="0" step="any" value={process.preBoilBbl} onChange={(e) => setP("preBoilBbl", e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-boil">Boil minutes · optional</Label>
@@ -115,19 +114,19 @@ export function NewVersionForm({ recipeId, recipeName, materials, profiles, unit
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-wp-min">Whirlpool min · optional</Label>
-            <Input id="rv-wp-min" type="number" min="0" step="1" value={process.whirlpoolMinutes} onChange={setP("whirlpoolMinutes")} />
+            <Input id="rv-wp-min" type="number" min="0" step="1" value={process.whirlpoolMinutes} onChange={(e) => setP("whirlpoolMinutes", e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-wp-temp">Whirlpool temp °F · optional</Label>
-            <Input id="rv-wp-temp" type="number" step="any" value={process.whirlpoolTempF} onChange={setP("whirlpoolTempF")} />
+            <Input id="rv-wp-temp" type="number" step="any" value={process.whirlpoolTempF} onChange={(e) => setP("whirlpoolTempF", e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-wp-rest">Whirlpool rest min · optional</Label>
-            <Input id="rv-wp-rest" type="number" min="0" step="1" value={process.whirlpoolRestMinutes} onChange={setP("whirlpoolRestMinutes")} />
+            <Input id="rv-wp-rest" type="number" min="0" step="1" value={process.whirlpoolRestMinutes} onChange={(e) => setP("whirlpoolRestMinutes", e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rv-ko">Knockout temp °F · optional</Label>
-            <Input id="rv-ko" type="number" step="any" value={process.knockoutTempF} onChange={setP("knockoutTempF")} />
+            <Input id="rv-ko" type="number" step="any" value={process.knockoutTempF} onChange={(e) => setP("knockoutTempF", e.target.value)} />
           </div>
         </div>
         <div className="flex flex-col gap-2">

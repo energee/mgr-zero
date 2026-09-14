@@ -153,9 +153,9 @@ export const E = {
     </Item>
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status.
-   *  `href` makes it a link on a live page; fixtures leave it out. */
-  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string) => (
-    <Button variant="ghost" size="sm" data-row-action data-tap asChild={Boolean(href)} className={cn(
+   *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out. */
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void) => (
+    <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
@@ -163,6 +163,8 @@ export const E = {
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
+  /** The native select the live sheets draw; the Select primitive is uncontrolled and fixture-only (E.pick). */
+  select: "min-w-0 rounded border bg-background p-2",
   /** A status word. Never clickable. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
     <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">

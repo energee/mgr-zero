@@ -71,11 +71,12 @@ defineCommand({
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_recipe_version", {
     p_brewery: ctx.breweryId, p_recipe: i.recipeId, p_mash_schedule: i.mashSchedule, p_fermentation_schedule: i.fermentationSchedule,
+    // Absent keys read as NULL through `p_process ->> key`, so undefined is left as is.
     p_process: {
-      pre_boil_bbl: i.process?.preBoilBbl ?? null, whirlpool_minutes: i.process?.whirlpoolMinutes ?? null, whirlpool_temp_f: i.process?.whirlpoolTempF ?? null,
-      whirlpool_rest_minutes: i.process?.whirlpoolRestMinutes ?? null, knockout_temp_f: i.process?.knockoutTempF ?? null,
-      target_water_profile_id: i.water?.targetProfileId ?? null, source_water_profile_id: i.water?.sourceProfileId ?? null,
-      mash_water_gal: i.water?.mashGal ?? null, sparge_water_gal: i.water?.spargeGal ?? null, target_mash_ph: i.water?.targetMashPh ?? null,
+      pre_boil_bbl: i.process?.preBoilBbl, whirlpool_minutes: i.process?.whirlpoolMinutes, whirlpool_temp_f: i.process?.whirlpoolTempF,
+      whirlpool_rest_minutes: i.process?.whirlpoolRestMinutes, knockout_temp_f: i.process?.knockoutTempF,
+      target_water_profile_id: i.water?.targetProfileId, source_water_profile_id: i.water?.sourceProfileId,
+      mash_water_gal: i.water?.mashGal, sparge_water_gal: i.water?.spargeGal, target_mash_ph: i.water?.targetMashPh,
       water_additions: (i.water?.additions ?? []).map((a) => ({ material_id: a.materialId, qty: a.qty, unit: a.unit, stage: a.stage })),
     },
     p_brewhouse_efficiency: i.brewhouseEfficiency, p_yeast_attenuation: i.yeastAttenuation,
@@ -179,9 +180,9 @@ defineQuery({
     const [recipe, version] = await Promise.all([
       unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
         .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
-      latestOf<{ id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number | null; yeast_attenuation: number | null; boil_minutes: number | null; target_ibu: number | null; note: string | null; created_at: string }>(
-        ctx.db.from("recipe_versions")
-          .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at, mash_schedule, fermentation_schedule, pre_boil_bbl, whirlpool_minutes, whirlpool_temp_f, whirlpool_rest_minutes, knockout_temp_f, target_water_profile_id, source_water_profile_id, mash_water_gal, sparge_water_gal, target_mash_ph")
+      // The whole version row: assumptions, schedules and process columns are all read as one unit.
+      latestOf<{ id: string; version: number; brewhouse_efficiency: number | null; yeast_attenuation: number | null }>(
+        ctx.db.from("recipe_versions").select("*")
           .eq("recipe_id", i.recipeId), "version"),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");

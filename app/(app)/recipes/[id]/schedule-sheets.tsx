@@ -1,8 +1,8 @@
 // app/(app)/recipes/[id]/schedule-sheets.tsx — the three draft sheets the
-// New version form opens: Mash schedule, Fermentation schedule and Water,
-// each listing its items with add, edit, move and delete, and swapping to the
-// item editor (Mash step, Fermentation stage, Water addition) in place. They
-// edit the form's draft; nothing is written until Save version.
+// New version form opens: Mash schedule, Fermentation schedule and Water.
+// One ListSheet owns the open/close, the list-or-editor swap and the save and
+// delete verbs; each sheet supplies its list view, item editor and field
+// shape. They edit the form's draft; nothing is written until Save version.
 "use client";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,56 +12,51 @@ import { MashScheduleView, MashStepView, mashStepReady, toMashStepFields } from 
 import { WaterAdditionView, WaterView, additionReady, toAdditionFields, type NamedOption } from "@/components/mgr/views/water";
 import { moveItem, removeAt, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
-/** One list sheet: `editing` is the index being edited, null for a new item, undefined for the list. */
-function useEditor() {
-  const [editing, setEditing] = useState<number | null | undefined>(undefined);
-  return { editing, open: (i: number | null) => setEditing(i), close: () => setEditing(undefined) };
-}
+type Editing = { index?: number } | null;
+type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
+type ItemProps<F> = { fields: F; onChange: (patch: Partial<F>) => void; footer: ReactNode };
 
-function ItemFooter({ onDelete, onSave, ready, label }: { onDelete?: () => void; onSave: () => void; ready: boolean; label: string }) {
-  return <CommandFormFooter>
-    {onDelete && <Button type="button" variant="outline" onClick={onDelete}>Delete</Button>}
-    <Button type="button" disabled={!ready} onClick={onSave}>{label}</Button>
+/** An ordered list edited in a sheet: the list until a row is picked or added, then that item's editor in place. */
+function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onChange, toFields, ready, toItem, list, item }: {
+  sheetTitle: string; trigger: string; addLabel: string; saveLabel: string; items: T[]; onChange: (items: T[]) => void;
+  toFields: (item?: T) => F; ready: (fields: F) => boolean; toItem: (fields: F) => T; list: (p: ListProps<T>) => ReactNode; item: (p: ItemProps<F>) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Editing>(null);
+  const [fields, setFields] = useState<F>(() => toFields());
+  const begin = (index?: number) => { setFields(toFields(index === undefined ? undefined : items[index])); setEditing({ index }); };
+  const footer = editing && <CommandFormFooter>
+    {editing.index !== undefined && <Button type="button" variant="outline" onClick={() => { onChange(removeAt(items, editing.index!)); setEditing(null); }}>Delete</Button>}
+    <Button type="button" disabled={!ready(fields)} onClick={() => { onChange(upsertAt(items, editing.index, toItem(fields))); setEditing(null); }}>{saveLabel}</Button>
   </CommandFormFooter>;
-}
-
-export function MashScheduleSheet({ title, steps, onChange }: { title: string; steps: MashStep[]; onChange: (steps: MashStep[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const ed = useEditor();
-  const [fields, setFields] = useState(toMashStepFields());
-  const begin = (i: number | null) => { setFields(toMashStepFields(i === null ? undefined : steps[i])); ed.open(i); };
-  const save = () => { onChange(upsertAt(steps, ed.editing ?? undefined, { name: fields.name.trim(), kind: fields.kind, tempF: Number(fields.tempF), minutes: Number(fields.minutes) })); ed.close(); };
-  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) ed.close(); }} title="Mash schedule" trigger={<Button type="button" variant="outline" className="justify-start">Mash schedule · {steps.length} steps</Button>}>
-    {ed.editing === undefined
-      ? <MashScheduleView title={title} steps={steps} onEdit={begin} onMove={(i, by) => onChange(moveItem(steps, i, by))} createAction={<Button type="button" size="sm" onClick={() => begin(null)}>Add step</Button>} />
-      : <MashStepView fields={fields} onChange={(p) => setFields((f) => ({ ...f, ...p }))} footer={<ItemFooter label="Save step" ready={mashStepReady(fields)} onSave={save} onDelete={ed.editing === null ? undefined : () => { onChange(removeAt(steps, ed.editing!)); ed.close(); }} />} />}
+  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }} title={sheetTitle} trigger={<Button type="button" variant="outline" className="justify-start">{trigger}</Button>}>
+    {editing === null
+      ? list({ items, onEdit: begin, onMove: (i, by) => onChange(moveItem(items, i, by)), onAdd: () => begin(), add: <Button type="button" size="sm" onClick={() => begin()}>{addLabel}</Button> })
+      : item({ fields, onChange: (patch) => setFields((f) => ({ ...f, ...patch })), footer })}
   </CommandForm>;
 }
 
-export function FermentationScheduleSheet({ title, stages, onChange }: { title: string; stages: FermentationStage[]; onChange: (stages: FermentationStage[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const ed = useEditor();
-  const [fields, setFields] = useState(toStageFields());
-  const begin = (i: number | null) => { setFields(toStageFields(i === null ? undefined : stages[i])); ed.open(i); };
-  const save = () => { onChange(upsertAt(stages, ed.editing ?? undefined, { name: fields.name.trim(), kind: fields.kind, tempF: Number(fields.tempF), days: Number(fields.days) })); ed.close(); };
-  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) ed.close(); }} title="Fermentation schedule" trigger={<Button type="button" variant="outline" className="justify-start">Fermentation schedule · {stages.length} stages</Button>}>
-    {ed.editing === undefined
-      ? <FermentationScheduleView title={title} stages={stages} onEdit={begin} onMove={(i, by) => onChange(moveItem(stages, i, by))} createAction={<Button type="button" size="sm" onClick={() => begin(null)}>Add stage</Button>} />
-      : <FermentationStageView fields={fields} onChange={(p) => setFields((f) => ({ ...f, ...p }))} footer={<ItemFooter label="Save stage" ready={stageReady(fields)} onSave={save} onDelete={ed.editing === null ? undefined : () => { onChange(removeAt(stages, ed.editing!)); ed.close(); }} />} />}
-  </CommandForm>;
+export function MashScheduleSheet({ steps, onChange }: { steps: MashStep[]; onChange: (steps: MashStep[]) => void }) {
+  return <ListSheet sheetTitle="Mash schedule" trigger={`Mash schedule · ${steps.length} steps`} addLabel="Add step" saveLabel="Save step"
+    items={steps} onChange={onChange} toFields={toMashStepFields} ready={mashStepReady}
+    toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), minutes: Number(f.minutes) })}
+    list={(p) => <MashScheduleView steps={p.items} onEdit={p.onEdit} onMove={p.onMove} createAction={p.add} />}
+    item={(p) => <MashStepView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
 }
 
-export function WaterSheet({ title, water, profiles, materials, onChange }: { title: string; water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange: (water: WaterDraft) => void }) {
-  const [open, setOpen] = useState(false);
-  const ed = useEditor();
-  const [fields, setFields] = useState(toAdditionFields());
-  const begin = (i: number | null) => { setFields(toAdditionFields(i === null ? undefined : water.additions[i])); ed.open(i); };
-  const setAdditions = (additions: WaterAddition[]) => onChange({ ...water, additions });
-  const save = () => { setAdditions(upsertAt(water.additions, ed.editing ?? undefined, { materialId: fields.materialId, qty: Number(fields.qty), unit: fields.unit, stage: fields.stage })); ed.close(); };
-  const summary: ReactNode = water.targetProfileId ? `target ${profiles.find((p) => p.id === water.targetProfileId)?.name ?? ""}` : "no target";
-  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) ed.close(); }} title="Water" trigger={<Button type="button" variant="outline" className="justify-start">Water · {summary} · {water.additions.length} additions</Button>}>
-    {ed.editing === undefined
-      ? <WaterView title={title} water={water} profiles={profiles} materials={materials} onChange={(p) => onChange({ ...water, ...p })} onEdit={begin} onAdd={() => begin(null)} onMove={(i, by) => setAdditions(moveItem(water.additions, i, by))} />
-      : <WaterAdditionView fields={fields} materials={materials} onChange={(p) => setFields((f) => ({ ...f, ...p }))} footer={<ItemFooter label="Save addition" ready={additionReady(fields)} onSave={save} onDelete={ed.editing === null ? undefined : () => { setAdditions(removeAt(water.additions, ed.editing!)); ed.close(); }} />} />}
-  </CommandForm>;
+export function FermentationScheduleSheet({ stages, onChange }: { stages: FermentationStage[]; onChange: (stages: FermentationStage[]) => void }) {
+  return <ListSheet sheetTitle="Fermentation schedule" trigger={`Fermentation schedule · ${stages.length} stages`} addLabel="Add stage" saveLabel="Save stage"
+    items={stages} onChange={onChange} toFields={toStageFields} ready={stageReady}
+    toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), days: Number(f.days) })}
+    list={(p) => <FermentationScheduleView stages={p.items} onEdit={p.onEdit} onMove={p.onMove} createAction={p.add} />}
+    item={(p) => <FermentationStageView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
+}
+
+export function WaterSheet({ water, profiles, materials, onChange }: { water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange: (water: WaterDraft) => void }) {
+  const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
+  return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={`Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
+    items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
+    toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
+    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
+    item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
 }
