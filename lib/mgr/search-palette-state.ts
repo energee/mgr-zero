@@ -1,3 +1,5 @@
+import { STAFF_NAV, navFor, shippedNav } from "@/lib/mgr/nav";
+import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
 
 export function searchCacheKey(breweryId: string, kinds: SearchKind[] | undefined, term: string) {
@@ -14,4 +16,13 @@ export function restrictToOptions(hits: SearchHit[], options?: SearchHit[]) {
 
 export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
   return hits.filter((hit) => !recent.some((item) => item.kind === hit.kind && item.id === hit.id));
+}
+
+
+export function searchDestinations(role: StaffRole, term: string) {
+  const query = term.trim().toLowerCase();
+  if (!query) return [];
+  return navFor(shippedNav(STAFF_NAV), role)
+    .flatMap(item => [item, ...(item.children ?? [])])
+    .filter(item => item.label.toLowerCase().includes(query));
 }

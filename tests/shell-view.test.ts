@@ -324,8 +324,8 @@ describe("Search view", () => {
     const palette = src("components/mgr/search-palette.tsx");
     expect(palette).toMatch(/<SearchView\b/);
     expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toContain("No records found · Search matches record names and numbers, not app pages.");
-    expect(screen("Search").states).toContainEqual(["empty", "No records found · Search matches record names and numbers, not app pages."]);
+    expect(palette).toContain("No pages or records found · Try a page name, record name, or document number.");
+    expect(screen("Search").states).toContainEqual(["empty", "No pages or records found · Try a page name, record name, or document number."]);
   });
 });
 
