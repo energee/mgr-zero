@@ -33,5 +33,5 @@ export const repackCase: RepackViewModel = {
   unit: "case",
   tape: [["−1 case · repack", "0.096774 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]],
   preview: "Preview: conserves 0.096774 bbl · same location and bin · not a TTB removal",
-  damaged: "0 four-pack · records as loss",
+  damaged: "0 four-pack · the child count is pinned to composition",
 };
