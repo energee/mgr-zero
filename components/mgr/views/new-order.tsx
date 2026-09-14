@@ -58,12 +58,13 @@ export function OrderQuantity({ value, label, onChange, contextualLabels = false
   </ButtonGroup>;
 }
 
-export function NewOrderView({ model, controls = {}, messages, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
+export function NewOrderView({ model, controls = {}, messages, feedback, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
   const skus = model.skus ?? model.lines.map(line => ({ id: line.name, label: line.name }));
   const source = model.sources.find(option => typeof option !== "string" && option.id === model.source);
   const sourceLabel = typeof source === "object" ? source.label : model.source;
   return <>
     {E.back("Orders", "New order", undefined, model.backHref)}
+    {feedback}
     <OrderPick label="Kind" value={model.kind ?? "wholesale"} options={[{ id: "wholesale", label: "Wholesale" }, { id: "taproom_transfer", label: "Taproom transfer" }]} onChange={controls.kind && (value => controls.kind?.(value as "wholesale" | "taproom_transfer"))} />
     {E.cols(
       model.kind === "taproom_transfer"

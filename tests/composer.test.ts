@@ -20,6 +20,12 @@ const ids = {
 };
 
 describe("AI composer", () => {
+  it("defers conversation setup until the drawer first opens", () => {
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toMatch(/useEffect\(\(\) => \{\s*if \(!open \|\| setupRun\.current > 0\) return;\s*const issued/);
+    expect(live).toContain("[open, breweryId, expectedContext.actorId]");
+  });
+
   it("ignores keydown-like events without a key", () => {
     expect(isComposerShortcut({ metaKey: true })).toBe(false);
     expect(isComposerShortcut({ key: "K", ctrlKey: true })).toBe(true);

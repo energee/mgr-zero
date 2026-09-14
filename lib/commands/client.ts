@@ -3,6 +3,11 @@
 // three-argument calls still generate one UUID per invocation.
 import type { CommandContextExpectation, CommandOrigin } from "./registry";
 
+export const COMMAND_DATA_CHANGED = "mgr-command-data-changed";
+function notifyDataChanged(breweryId: string) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(COMMAND_DATA_CHANGED, { detail: { breweryId } }));
+}
+
 export class CommandResponseError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
 }
@@ -26,13 +31,20 @@ export function classifyCommandFailure(error: unknown): CommandFailureDetail {
 export type CommandProvenance = { origin: Exclude<CommandOrigin, "chat"> }
   | { origin: "chat"; conversationId: string; previewToken: string };
 
-export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID(), expectedContext?: CommandContextExpectation, provenance?: CommandProvenance) {
+export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID(), expectedContext?: CommandContextExpectation, provenance?: CommandProvenance, signal?: AbortSignal) {
   const res = await fetch("/api/command", {
     method: "POST",
+    signal,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ breweryId, name, input, requestId, ...(expectedContext ? { expectedContext } : {}), ...provenance }),
+  }).catch(error => {
+    if (!signal) notifyDataChanged(breweryId);
+    throw error;
   });
-  const json = await res.json().catch(() => null) as { ok?: boolean; data?: unknown; error?: { message?: string; code?: string } } | null;
+  const json = await res.json().catch(() => null) as { ok?: boolean; data?: unknown; requestId?: string; error?: { message?: string; code?: string } } | null;
+  // Successful query envelopes omit requestId. Unknown outcomes may have
+  // committed, so invalidate on failures too; never automatically retry writes.
+  if ((!signal && !json?.ok) || (json?.ok && json.requestId)) notifyDataChanged(breweryId);
   // Proxies and gateways can answer with HTML or an empty body; only trust the envelope.
   // A lapsed session answers 401: the Session expired screen (login) takes over; queued writes are Program 15.
   // ponytail: the transport navigates because no shell-level session handler exists yet; a typed
