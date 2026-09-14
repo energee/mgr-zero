@@ -135,6 +135,7 @@ describe("production-readiness workflow contract", () => {
 
   it("reclaims stale test stacks before startup and always stops its own stack", () => {
     expect(ci.match(/supabase stop --workdir tests\/supabase --no-backup/g)).toHaveLength(2);
+    expect(ci).toMatch(/supabase stop --workdir tests\/supabase --no-backup[^\n]*\n\s*- run: supabase start/);
     expect(ci).toMatch(/if: always\(\)\s+run: supabase stop --workdir tests\/supabase --no-backup/);
   });
 
