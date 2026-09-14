@@ -1,6 +1,7 @@
 // Shared live/explorer conversation surface and its interaction affordances.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ComposerConversationView, ComposerStripView } from "@/components/mgr/views/composer";
 
@@ -26,4 +27,15 @@ describe("composer conversation surface", () => {
     expect(html).toContain('maxLength="4000"');
     expect(html).toContain("Shift + Enter");
   });
+});
+
+
+it("explains pending setup and offers setup recovery before a conversation exists", () => {
+  const html = renderToStaticMarkup(createElement(ComposerConversationView, {
+    messages: [], activity: "Opening your conversation…", onSetupRetry: () => undefined,
+  }));
+  expect(html).toContain("Opening your conversation");
+  expect(html).toContain("Retry setup");
+  const live = readFileSync("components/mgr/composer.tsx", "utf8");
+  expect(live).toContain('onSetupRetry={!conversationId ? reloadSetup : undefined}');
 });

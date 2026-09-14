@@ -39,6 +39,7 @@ export function Composer({ role }: { role: StaffRole }) {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   // Identifies the current setup load; a superseded run drops its response.
   const setupRun = useRef(0);
+  const setupConversationRequest = useRef<string>(undefined);
   const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) => command(breweryId, name, input, requestId, expectedContext, provenance);
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/chat",
@@ -48,12 +49,14 @@ export function Composer({ role }: { role: StaffRole }) {
   }), [breweryId, expectedContext.actorId]);
   const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
-  async function newChat(openDrawer = true) {
+  async function newChat(openDrawer = true, live = () => true) {
     clearError(); setFailure(undefined); setReceipt(undefined);
     try {
-      const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, crypto.randomUUID()) as { id: string };
+      const requestId = openDrawer ? crypto.randomUUID() : (setupConversationRequest.current ??= crypto.randomUUID());
+      const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, requestId) as { id: string };
+      if (!live()) return;
       setInitialMessages([]); setConversationId(conversation.id); setMessages([]); if (openDrawer) setOpen(true);
-    } catch (cause) { failed(cause, "Composer unavailable", () => void newChat()); }
+    } catch (cause) { if (live()) failed(cause, "Composer unavailable", openDrawer ? () => void newChat() : reloadSetup); }
   }
 
   // Restores the server-owned conversation for this actor/brewery scope. Named
@@ -67,7 +70,7 @@ export function Composer({ role }: { role: StaffRole }) {
       ]);
       if (!live()) return;
       setModel(ai.model);
-      if (!conversations[0]) { await newChat(false); return; }
+      if (!conversations[0]) { await newChat(false, live); return; }
       const id = conversations[0].id;
       const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
       if (!live()) return;
@@ -140,7 +143,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

@@ -178,7 +178,8 @@ describe("AI composer", () => {
     expect(drawer).toContain("snapPoint={snapPoint}");
     expect(drawer).toContain("onSnapPointChange={setSnapPoint}");
     expect(drawer).toContain("handle={<div");
-    expect(drawer).toContain("pointer-events-none");
+    expect(drawer).not.toContain("pointer-events-none");
+    expect(drawer).toContain("event.detail === 0");
     expect(drawer).toContain('addEventListener("pointerup"');
     expect(drawer).not.toContain("handleOnly");
     expect(drawer).not.toContain("DrawerTrigger");
