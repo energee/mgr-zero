@@ -12,6 +12,7 @@ export async function getActiveCustomer() {
   return {
     customerId: membership.customerId,
     breweryId: membership.breweryId,
+    breweryName: membership.breweryName,
     customerName: membership.customerName,
   };
 }

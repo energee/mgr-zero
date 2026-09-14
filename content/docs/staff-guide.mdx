@@ -60,6 +60,8 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 
 ## Taproom variance [#taproom-variance]
 
+<Screen name="Variance by brand" />
+
 Admin, Warehouse, and Taproom open **Variance by brand** from Taproom, Beer, or Taproom Today. Choose an owned taproom location and 4 or 12 weeks. The report compares whole completed count periods whose ending dates fall in that brewery-local window, with exact exclusive starting and inclusive ending times shown. The first count has no starting observation, so its actual depletion is shown without a comparison. A period may begin before the selected window.
 
 Actual is the saved count's depletion. Expected is reconciled POS quantity times its frozen serving size; editing today's pour or package size never changes an existing expectation. A later reconciled sale can update a closed period's expected amount and variance, but cannot change counts or stock. Variance is expected minus actual.
@@ -69,6 +71,8 @@ The shared **Variance by brand** screen puts the brand totals first, followed by
 Without usable POS observations, comparison rows are empty and expected stays blank. A dash means a value is unavailable; read zero alongside coverage and excluded consumption. Mapped lines still contribute when other items need mapping, with coverage and mapping gaps shown. Overlapping taps split each sale equally as an estimate; shares assigned to kegs outside inventory are excluded while count-derived actual stays intact. Sales without a matching open interval remain explicitly unattributed. Guest names do not identify POS sales, so guest yield is unavailable. POS connection and synchronization are not available yet.
 
 ## Taproom physical counts [#taproom-counts]
+
+<Screen name="Weekly count" />
 
 **Weekly count** uses the shared explorer layout: expected consumption first, then the checked print action and one remaining-package stepper per stock bucket, followed by the saved receipt and recent counts. Type a whole quantity or use minus/plus; blank remains uncounted, and zero must be explicit. **Correct count** opens the same correction sheet from an eligible Admin receipt; its reason and quantities lock during an uncertain retry.
 
@@ -89,6 +93,10 @@ Admin can select **Correct count** on the latest saved count when one or more qu
 The original header, observations, and ledger rows remain unchanged. MGR appends an exact compensation for each changed depletion and, when the corrected amount still falls below recorded stock, a smaller replacement depletion using the original package volume, channel, tax treatment, state, bin, SKU, and lot. The corrected count keeps the original observation time, appears as one logical occurrence in history, becomes the next count's baseline, and updates variance without counting unchanged lines twice. Its signed ledger entries belong to the time when Admin made the correction; an earlier filed compliance snapshot stays byte-for-byte unchanged. If the response is uncertain, **Retry unchanged correction** reuses the frozen reason, quantities, payload, and request ID.
 
 ## Tap intervals [#tap-intervals]
+
+<Screen name="Tap board" />
+<Screen name="Kick keg" />
+<Screen name="Swap keg" />
 
 **Tap board** uses the shared vessel-style tiles for owned kegs and a separate guest-keg row, with **Swap** and **Kick** on each. **Tap keg** opens the same entry sheet in the explorer and application. Closing fill is **Empty**, **About ¼ left**, or **About ½ left**; opening fill remains a separate coarse observation. **Swap keg** keeps the outgoing captured SKU available for **Same own SKU**, even if it is no longer in the active SKU chooser. The recent-activity rows show the two most recently opened current intervals; closed intervals remain in recent history. These actions never post finished-goods depletion.
 
@@ -758,7 +766,7 @@ In Chat settings, **Load private channels**, choose a channel, then **Save opera
 
 Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.
 
-Admins can inspect the workspace, granted permissions, destination, queue state, recent callback/delivery times, and a safe error code on **Chat health**. **Disable** stops delivery but keeps the connection for later. **Disconnect** stops delivery and unlinks people immediately, then removes the stored Slack credential; if that cleanup fails, the page offers **Retry cleanup**. Reauthorization and cleanup are serialized so an old cleanup cannot remove replacement credentials. A rejected connection to an already-owned workspace preserves its existing connection; if saving new credentials fails, reauthorize from Chat settings. Staff can unlink their own account; an admin can unlink any linked person.
+Admins can inspect the workspace, granted permissions, destination, queue state, recent callback/delivery times, and a safe error code on **Health**, opened from Chat settings. **Disable** stops delivery but keeps the connection for later. **Disconnect** stops delivery and unlinks people immediately, then removes the stored Slack credential; if that cleanup fails, the page offers **Retry cleanup**. Reauthorization and cleanup are serialized so an old cleanup cannot remove replacement credentials. A rejected connection to an already-owned workspace preserves its existing connection; if saving new credentials fails, reauthorize from Chat settings. Staff can unlink their own account; an admin can unlink any linked person.
 
 ## Errors and corrections [#errors-corrections]
 

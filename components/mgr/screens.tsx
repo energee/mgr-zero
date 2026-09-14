@@ -110,6 +110,7 @@ import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
 import { PortalOrderView } from "@/components/mgr/views/portal-order";
+import { ComingUpView } from "@/components/mgr/views/coming-up";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
@@ -180,7 +181,7 @@ import {
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
-import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
+import { ridgelineComingUp, ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
 import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
@@ -244,6 +245,7 @@ import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
 import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
 import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
+import { toComingUpViewProps } from "@/lib/mgr/coming-up-view";
 import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
@@ -1402,17 +1404,11 @@ export const SCREENS: Screen[] = [
     name: "Coming up",
     to: { "Hazy IPA": "Shop", "Pils": "Shop", "Saison": "Shop" },
     job: "See what the brewery plans to brew next and jump to that brand on Shop",
-    reads: "portal_schedule [view; SCHEMA/RLS-GATE: planned batches exposing brand + planned week only; no customer policy on batches]",
+    reads: "portal_schedule [planned batches as brand + expected week and whether the brand is on the buyer's list; a definer view scoped to the buyer's brewery, no customer policy on batches]",
     writes: "none",
     states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
     spec: "Planned batches (not yet brewed) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
-    body: (<>
-      {E.hd("Coming up", "Ridgeline")}
-      {E.nav("Hazy IPA", "week of Sep 14")}
-      {E.nav("Pils", "week of Sep 21")}
-      {E.nav("Saison", "week of Oct 5 · not yet listed", "w")}
-      {E.info("Dates are the brewery’s plan and can move. Ask Demo Brewing to be notified when a batch is packaged.")}
-    </>),
+    body: <ComingUpView model={toComingUpViewProps(ridgelineComingUp)} />,
   },
   {
     step: 6,

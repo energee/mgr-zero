@@ -72,6 +72,16 @@ describe("HTTP API reference", () => {
     expect(block).toContain('"requestId"');
   });
 
+  it("homes integration and cost operations by their owning area, not their nouns", () => {
+    // PR #374: each of these matches an earlier area's noun regex (recipe,
+    // price, location, customer) but belongs to the area that owns the flow.
+    expect(areaOf("get_brand_recipe_cost")).toBe("catalog");
+    expect(areaOf("set_pos_price_override")).toBe("team");
+    expect(areaOf("list_pos_locations")).toBe("team");
+    expect(areaOf("set_pos_location_mapping")).toBe("team");
+    expect(areaOf("set_qbo_customer_mapping")).toBe("team");
+  });
+
   it("gives every registered operation an area and marks it available", () => {
     const operations = apiOperations();
     for (const { name } of listTools()) {

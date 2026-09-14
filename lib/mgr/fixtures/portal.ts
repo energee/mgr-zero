@@ -2,6 +2,7 @@
 // for Shop and Review order. Identities come from demo.ts; prices are the
 // inventory literals ($150.00, $38.00, $42.00, $18.00, $62.00). Cart: 4 Hazy
 // kegs + 6 Pils cases = $828.00 merchandise; 4 × $30.00 = $120.00 deposit.
+import type { ComingUpSnapshot } from "@/lib/mgr/coming-up-view";
 import { LOC_WAREHOUSE, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { ShopSnapshot } from "@/lib/mgr/shop-view";
 import type { ReviewOrderSnapshot } from "@/lib/mgr/review-order-view";
@@ -52,4 +53,13 @@ export const ridgelineReviewOrder: ReviewOrderSnapshot = {
     lines: ridgelineShop.catalog.filter(item => item.qty > 0).map(item => ({ ...item, amountCents: item.qty * item.unitPriceCents })),
     deposits: [{ name: "Hazy IPA", kegSize: "half_bbl", qty: 4, unitPriceCents: 3000, amountCents: 12000 }],
   },
+};
+
+export const ridgelineComingUp: ComingUpSnapshot = {
+  brewery: "Demo Brewing",
+  rows: [
+    { brand_id: "hazy", brand_name: "Hazy IPA", planned_week: "2026-09-14", listed: true },
+    { brand_id: "pils", brand_name: "Pils", planned_week: "2026-09-21", listed: true },
+    { brand_id: "saison", brand_name: "Saison", planned_week: "2026-10-05", listed: false },
+  ],
 };

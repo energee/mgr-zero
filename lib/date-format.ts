@@ -1,6 +1,9 @@
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const dayHeader = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" });
 
+const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+/** "Sep 14" for a date-only ISO string; the week a batch is planned, the day a lot is due. */
+export const formatMonthDay = (value: string) => monthDay.format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 export const formatDate = (value: string | Date) => date.format(typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00Z`) : value);
 export const formatDayHeader = (value: string | Date) => dayHeader.format(new Date(value));
 // Formatter construction costs far more than formatting, and these render per
