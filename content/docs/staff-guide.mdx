@@ -112,6 +112,8 @@ Guest labels are never matched to POS items, so a guest row never shows numeric 
 
 ## Navigate MGR [#navigation]
 
+Orders and New Order reuse data already loaded in this tab. While visible, Orders checks for changes every five seconds; New Order checks its customer, location and SKU options every 30 seconds. Checks pause in hidden tabs and resume immediately when you return or reconnect. **Last checked** shows the most recent successful check (the oldest option-list check on New Order); **Updating** keeps existing data and your typed draft visible. A connection pause or failed refresh identifies **last-known data** rather than claiming it is current; failed reads offer **Try again**. Slow or interrupted connections can delay updates beyond the normal interval. Saving changes marks cached data for refresh. Switching brewery or signing out discards that cache. The first visit fetches data on demand with a short loading message, not placeholder rows. Ask MGR loads its conversation and history when you first open the drawer, rather than when you enter the site.
+
 <Screen name="Today" />
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail; the toggle beside the brewery name collapses it to a narrow strip of icons, each naming itself when you point at it, and the page widens to fill the space.
@@ -548,6 +550,14 @@ The page says **No taprooms yet: add one under Locations** when none exist, or *
 <Screen name="Recipes" />
 
 <Screen name="Recipe" />
+<Screen name="Mash schedule" />
+<Screen name="Mash step" />
+<Screen name="Fermentation schedule" />
+<Screen name="Fermentation stage" />
+<Screen name="Water" />
+<Screen name="Water addition" />
+
+A version is the brew sheet. **New version** opens three draft sheets beside the assumptions: **Mash schedule** (ordered rests, each a type, a name, a temperature and minutes; the longest rest between 144 and 162 °F is the mash temperature the prediction reads, so a schedule with no rest in that range predicts no gravity change from mash temperature), **Fermentation schedule** (stages with a temperature and days), and **Water** (the source profile, a target profile from Water profiles, mash and sparge volumes, target mash pH, and salts or acids each with an amount, a unit and one stage: mash, sparge or kettle). Steps, stages and additions add, edit, move and delete on the draft; **Pre-boil volume**, **Whirlpool** minutes, temperature and rest, and **Knockout temp** sit inline. Nothing is written until **Save version**, and a saved version reads only: change it by cutting the next one.
 
 *Admin and Brewer.*
 
@@ -609,7 +619,7 @@ Open **Packaging** from the **Work** navigation to see every run by planned date
 
 A run without a tank shows **Pick source** on its page: choose a **Source tank** and confirm. Once it has a tank, **Start** stamps it started — both picking the tank and starting require one, so an unsourced run can never begin. A started run's page becomes the close form: **Barrels drawn**, the **Actual outputs** for each planned SKU (defaulting to the planned quantity), a **Lot code**, **Packaged on** and an optional **Best by** date, and the **Finished goods location** and bin the packaged units land in — all four of the last group are required, because a vessel has no location of its own for the goods to appear at. Select **Close packaging run** to write the lot, the finished-goods stock, and the packaging materials consumed in one step. The tank itself stays open afterward; emptying it is a separate Cellar transfer.
 
-**Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the **Location** and **Bin**, the SKU you are **Breaking** and its quantity, and the SKU you are packing it **Into** and its quantity. It is refused unless the two SKUs share a brand and their formats are joined by exactly one composition record, and unless the volumes on both sides match exactly.
+**Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the SKU to **Break** (only composed SKUs are offered), the **Location** and **Bin**, and how many. The "into" side is not typed: the component SKU and its count are derived from the case format's composition, and the tape shows both legs and the barrels they conserve before you **Confirm repack**. A composed SKU whose format has no single component record cannot be broken and says so in place of the button.
 
 ## Purchasing: vendors, materials, and purchase orders [#purchasing]
 

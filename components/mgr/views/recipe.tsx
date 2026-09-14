@@ -1,5 +1,5 @@
 // components/mgr/views/recipe.tsx — Recipe. Live slots read-only facts and
-// NewVersionForm; inventory draws the gated editor.
+// NewVersionForm; inventory draws the editor.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
@@ -45,7 +45,7 @@ export function RecipeView({
           {model.predicted ? E.info(model.predicted) : null}
           {E.tape(model.tape ?? [])}
           {model.actualsNote ? E.note(model.actualsNote) : null}
-          {E.gated("Create recipe version", "isn’t available yet: assumptions have no columns to live in. A brewery with no version cannot schedule a batch, so brew day waits on this too")}
+          {E.btn("Create recipe version")}
         </>
       )}
     </>

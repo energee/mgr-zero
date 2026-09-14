@@ -4,6 +4,8 @@
 // schedule_packaging_run; Repack is repack-form.tsx → record_repack, a
 // shape change unrelated to any one run — admin/warehouse only (record_repack's
 // own roles), so it is hidden from a brewer rather than offered and refused.
+// Repack's parents come from list_repack_parents: each composed SKU with the
+// child it breaks into, so the sheet derives the outbound leg.
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -12,7 +14,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { ScheduleRunForm } from "./schedule-run-form";
-import { RepackForm } from "./repack-form";
+import { RepackForm, type RepackParent } from "./repack-form";
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
@@ -29,17 +31,18 @@ export default async function PackagingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canRepack = brewery.role === "admin" || brewery.role === "warehouse";
-  const [runs, brands, occupancies, skus, locations, bins] = (await Promise.all([
+  const [runs, brands, occupancies, skus, locations, bins, parents] = (await Promise.all([
     runCommand("list_packaging_runs", {}, ctx), runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
     runCommand("list_skus", {}, ctx),
     // Only the repack form needs these; a brewer never sees it.
     canRepack ? runCommand("list_locations", {}, ctx) : [], canRepack ? runCommand("list_bins", {}, ctx) : [],
-  ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[]];
+    canRepack ? runCommand("list_repack_parents", {}, ctx) : [],
+  ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[], RepackParent[]];
   const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.role)}
-    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : null}</div>}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} parents={parents} /> : null}</div>}
   />;
 }

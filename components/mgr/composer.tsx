@@ -48,11 +48,11 @@ export function Composer({ role }: { role: StaffRole }) {
   }), [breweryId, expectedContext.actorId]);
   const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
-  async function newChat() {
+  async function newChat(openDrawer = true) {
     clearError(); setFailure(undefined); setReceipt(undefined);
     try {
       const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, crypto.randomUUID()) as { id: string };
-      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); setOpen(true);
+      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); if (openDrawer) setOpen(true);
     } catch (cause) { failed(cause, "Composer unavailable", () => void newChat()); }
   }
 
@@ -67,7 +67,7 @@ export function Composer({ role }: { role: StaffRole }) {
       ]);
       if (!live()) return;
       setModel(ai.model);
-      if (!conversations[0]) { await newChat(); return; }
+      if (!conversations[0]) { await newChat(false); return; }
       const id = conversations[0].id;
       const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
       if (!live()) return;
@@ -92,11 +92,12 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   useEffect(() => {
+    if (!open || setupRun.current > 0) return;
     const issued = ++setupRun.current;
     void (async () => { await loadSetup(() => issued === setupRun.current); })();
-    // One server-owned restore per actor/brewery scope.
+    // One restore per actor/brewery scope, only when the drawer is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breweryId, expectedContext.actorId]);
+  }, [open, breweryId, expectedContext.actorId]);
 
   useEffect(() => {
     const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };

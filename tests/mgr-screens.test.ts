@@ -58,11 +58,10 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: the scale chips already state the batch size.
     expect(recipe).not.toMatch(/Batch size|Knockout volume/);
-    // The process-spec scalars are drawn but have no columns yet, so the
-    // record's own SCHEMA-GATE has to name them.
+    // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
-    expect(gate).toMatch(/SCHEMA-GATE:[^\]]*process-spec columns/);
-    expect(gate).toMatch(/whirlpool/i);
+    expect(gate).not.toMatch(/SCHEMA-GATE/);
+    expect(gate).toMatch(/schedules/);
   });
 
   it("keeps water profiles in the catalog, with their ion values", () => {
@@ -594,6 +593,8 @@ describe("SCREENS", () => {
     expect(transferHtml).not.toMatch(/border-l-2/);
     // record_cellar_transfer is live (#278 slice 2): the tag no longer says design.
     expect(transfer.writes).not.toMatch(/\[design/);
+    // record_repack is live (#278 slice 6): the child leg is derived, so the gate is lifted.
+    expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
   });
 
   it("puts the commit on the row, not a second copy at the top", () => {

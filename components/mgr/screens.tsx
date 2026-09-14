@@ -94,6 +94,7 @@ import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { QueryFeedback } from "@/components/mgr/query-feedback";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
@@ -277,23 +278,35 @@ import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
-import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
+import type { FermentationStage, MashStep, WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
+import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
+import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
+import { toAdditionFields, toMashStepFields, toStageFields } from "@/lib/mgr/recipe-process-view";
 
-/** The drawn mash schedule. Rows and footer both read it, so the total and the
- *  conversion rest can never disagree with the steps above them. */
-const MASH_STEPS: Step[] = [
-  { name: "Mash-in", kind: "infusion", tempF: 104, duration: 15 },
-  { name: "Saccharification", kind: "infusion", tempF: 152, duration: 60 },
-  { name: "Mash-out", kind: "direct heat", tempF: 168, duration: 10 },
+/** The drawn mash schedule, in the shape create_recipe_version stores. Rows and
+ *  footer both read it, so the total and the conversion rest never disagree. */
+const MASH_STEPS: MashStep[] = [
+  { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
+  { name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 },
+  { name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 },
 ];
 
-/** The drawn fermentation schedule; `duration` is days. Same rule as MASH_STEPS. */
-const FERM_STAGES: Step[] = [
-  { name: "Primary", kind: "primary", tempF: 68, duration: 4 },
-  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, duration: 2 },
-  { name: "Cold crash", kind: "cold crash", tempF: 34, duration: 2 },
-  { name: "Conditioning", kind: "conditioning", tempF: 34, duration: 10 },
+/** The drawn fermentation schedule. Same rule as MASH_STEPS. */
+const FERM_STAGES: FermentationStage[] = [
+  { name: "Primary", kind: "primary", tempF: 68, days: 4 },
+  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, days: 2 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 },
+  { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
 ];
+
+const WATER_PROFILE_OPTIONS = [{ id: "hazy", name: "Hazy target" }, { id: "burton", name: "Burton" }, { id: "denver", name: "Municipal · Denver" }];
+const SALT_OPTIONS = [{ id: "gypsum", name: "Gypsum" }, { id: "cacl", name: "Calcium chloride" }, { id: "epsom", name: "Epsom salt" }, { id: "lactic", name: "Lactic acid" }, { id: "phos", name: "Phosphoric acid" }];
+/** The drawn water: a target, the brewery's default source, and three additions. */
+const WATER_HAZY: WaterDraft = {
+  targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
+  additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
+};
 
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
@@ -884,9 +897,9 @@ export const SCREENS: Screen[] = [
     job: "Find every order by state and take its next valid action",
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
-    states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
-    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
-    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} />,
+    states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"], ["loading", "inline status on first visit; cached rows remain during refresh"], ["error", "inline error and Try again; existing rows remain"]],
+    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use shared QueryFeedback: first-load text without skeletons, Last checked with Updating during refresh, and last-known data with connection or retry feedback. The visible list checks every five seconds and on tab return or reconnect; hidden and unmounted lists do not poll.",
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,
@@ -1131,8 +1144,8 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order",
     states: permitted("sales or admin required"),
-    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
-    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} />,
+    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Last checked uses the oldest option-list check, Updating preserves inputs, and connection or retry feedback identifies last-known data. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft.",
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,
@@ -1885,8 +1898,8 @@ export const SCREENS: Screen[] = [
     name: "Recipe",
     to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
-    reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients, with assumption columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients; SCHEMA-GATE: process-spec columns (pre-boil volume, whirlpool min/temp/rest, knockout temp) remain unbuilt]",
+    reads: "list_recipes · get_recipe · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} />,
@@ -1898,16 +1911,12 @@ export const SCREENS: Screen[] = [
     name: "Mash schedule",
     to: { Edit: "Mash step", "Add step": "Mash step", "Mash-in": "Mash step", Saccharification: "Mash step", "Mash-out": "Mash step" },
     job: "Order the rests a brewer actually holds on the day",
-    reads: "get_recipe [design; the version’s mash schedule]",
-    writes: "create_recipe_version [design; the steps are written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    reads: "get_recipe [a cut version’s mash schedule] · none [draft: the version form’s state]",
+    writes: "create_recipe_version [the steps are written with their version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "steps add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no steps yet: Add step is the only action"]],
     spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
     body: (<>
-      {E.back("Recipe", "Hazy IPA v4 · Mash schedule", E.btn("Add step"))}
-      {MASH_STEPS.map((s) => (
-        <Fragment key={s.name}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.duration} min`, E.act("Edit"))}</Fragment>
-      ))}
-      {E.info(`Total ${totalDuration(MASH_STEPS)} min · the ${saccharificationRest(MASH_STEPS)!.tempF} °F rest feeds the prediction.`)}
+      <MashScheduleView title="Hazy IPA v4 · Mash schedule" steps={MASH_STEPS} />
     </>),
   },
   {
@@ -1918,19 +1927,12 @@ export const SCREENS: Screen[] = [
     name: "Mash step",
     to: { "Save step": "Mash schedule", "Delete step": "Mash schedule" },
     job: "One rest: what the brewer does, at what temperature, for how long",
-    reads: "get_recipe [design]",
-    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    reads: "none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with the version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
     spec: "Type and name both stay: they look redundant until a recipe has two infusion steps, where the type says what the brewer does and the name says which one it is. Position comes from list order, never a typed number.",
     body: (<>
-      {E.edit("Step name", "Saccharification")}
-      {E.pick("Type", "infusion", ["infusion", "decoction", "direct heat", "rest"])}
-      {E.cols(
-        E.edit("Temp °F", "152", "number"),
-        E.edit("Duration min", "60", "number"),
-      )}
-      {E.edit("Notes · optional", "")}
-      {E.btns([["Delete step", "g"], "Save step"])}
+      <MashStepView fields={toMashStepFields(MASH_STEPS[1])} />
     </>),
   },
   {
@@ -1940,16 +1942,12 @@ export const SCREENS: Screen[] = [
     name: "Fermentation schedule",
     to: { Edit: "Fermentation stage", "Add stage": "Fermentation stage", Primary: "Fermentation stage", "Diacetyl rest": "Fermentation stage", "Cold crash": "Fermentation stage", Conditioning: "Fermentation stage" },
     job: "State the temperatures and days a batch is meant to hold",
-    reads: "get_recipe [design; the version’s fermentation schedule]",
-    writes: "create_recipe_version [design; written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    reads: "get_recipe [a cut version’s fermentation schedule] · none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with their version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
     spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
     body: (<>
-      {E.back("Recipe", "Hazy IPA v4 · Fermentation", E.btn("Add stage"))}
-      {FERM_STAGES.map((s) => (
-        <Fragment key={s.name}>{E.row(s.name, `${s.tempF} °F · ${s.duration} days`, E.act("Edit"))}</Fragment>
-      ))}
-      {E.info(`Total ${totalDuration(FERM_STAGES)} days · dry hop day 4 falls in Primary.`)}
+      <FermentationScheduleView title="Hazy IPA v4 · Fermentation" stages={FERM_STAGES} dryHopDay={4} />
     </>),
   },
   {
@@ -1960,19 +1958,12 @@ export const SCREENS: Screen[] = [
     name: "Fermentation stage",
     to: { "Save stage": "Fermentation schedule", "Delete stage": "Fermentation schedule" },
     job: "One stage: a temperature held for a number of days",
-    reads: "get_recipe [design]",
-    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    reads: "none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with the version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
     spec: "Stage type and name both stay, as on Mash step: two custom stages need the type to say what happens and the name to say which one. Position comes from list order.",
     body: (<>
-      {E.edit("Stage name", "Diacetyl rest")}
-      {E.pick("Stage", "diacetyl rest", ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"])}
-      {E.cols(
-        E.edit("Temp °F", "72", "number"),
-        E.edit("Duration days", "2", "number"),
-      )}
-      {E.edit("Notes · optional", "")}
-      {E.btns([["Delete stage", "g"], "Save stage"])}
+      <FermentationStageView fields={toStageFields(FERM_STAGES[1])} />
     </>),
   },
   {
@@ -1982,25 +1973,12 @@ export const SCREENS: Screen[] = [
     name: "Water",
     to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
     job: "State the water a version starts from, aims at, and what goes in it",
-    reads: "get_recipe [design] · list_water_profiles",
-    writes: "create_recipe_version [design; water values and the water additions are written with the version; SCHEMA-GATE: recipe process spec]",
+    reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
+    writes: "create_recipe_version [water values and the water additions are written with the version]",
     states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1]],
     spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. The sulfate to chloride line is example text; ion deltas, salt contribution and pH prediction are calculations this slice does not build, and if they arrive they go through the same shared formula rule Recipe sets for gravity and strength.",
     body: (<>
-      {E.back("Recipe", "Hazy IPA v4 · Water")}
-      {E.fld("Source profile", "Municipal · Denver · brewery default")}
-      {E.pick("Target profile", "Hazy target", ["Hazy target", "Burton", "Municipal · Denver"])}
-      {E.cols(
-        E.edit("Mash water gal", "9.5", "number"),
-        E.edit("Sparge water gal", "12.0", "number"),
-      )}
-      {E.edit("Target mash pH", "5.35")}
-      {E.ttl("Salts and acids")}
-      {E.row("Gypsum", "4.0 g · mash", E.act("Edit"))}
-      {E.row("Calcium chloride", "6.0 g · mash", E.act("Edit"))}
-      {E.row("Lactic acid", "3.0 mL · sparge", E.act("Edit"))}
-      {E.row("Add addition", "material · amount · stage", E.act("Add"))}
-      {E.info("Sulfate to chloride 0.9 · chloride forward, as the target says.")}
+      <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
     </>),
   },
   {
@@ -2011,18 +1989,12 @@ export const SCREENS: Screen[] = [
     name: "Water addition",
     to: { "Save addition": "Water", "Delete addition": "Water" },
     job: "One salt or acid, its amount, and where it goes",
-    reads: "get_recipe [design] · list_materials",
-    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    reads: "list_materials · none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with the version, never alone]",
     states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
     spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
     body: (<>
-      {E.pick("Material", "Gypsum", ["Gypsum", "Calcium chloride", "Epsom salt", "Lactic acid", "Phosphoric acid"])}
-      {E.inline(
-        E.edit("Amount", "4.0", "number"),
-        E.pick("Unit", "g", ["g", "mL", "oz"]),
-      )}
-      {E.pick("Stage", "mash", ["mash", "sparge", "kettle"])}
-      {E.btns([["Delete addition", "g"], "Save addition"])}
+      <WaterAdditionView fields={toAdditionFields(WATER_HAZY.additions[0])} materials={SALT_OPTIONS} />
     </>),
   },
   {
@@ -2657,11 +2629,11 @@ export const SCREENS: Screen[] = [
     name: "Repack",
     to: { "Record repack": "SKU detail" },
     job: "Break bulk as a paired, bbl-conserving pair of legs, never a loss and a gain",
-    reads: "get_format_composition · get_material_on_hand",
-    writes: "record_repack [SCHEMA-GATE: revision 2 §16.10: repack movement type, shared ref, abs(sum(bbl)) < 0.000001 over the ref]",
-    states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +5 four-packs · +1 loss keeps the invariant absolute", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"]],
+    reads: "list_repack_parents",
+    writes: "record_repack [one RPC; the outbound leg's qty is derived from format composition, abs(sum(bbl)) < 0.000001 over the shared ref]",
+    states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +6 four-packs always · a damaged four-pack is written off afterwards as its own adjustment", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"]],
     spec: "An adjustment cannot express a break: it has no way to pair the two halves, so the break reads as an unexplained loss beside an unexplained gain. The outbound leg's bbl is derived from the inbound leg's frozen total rather than recomputed from barrels per unit (rounding each leg independently leaves −0.00000001 on a 24×16oz case), and the constraint carries a tolerance to catch a hand-entered repack without rejecting a legitimate one. Build-direction repack is out of scope; the whole repack is one RPC sharing one ref so beer and materials cannot disagree.",
-    body: <><RepackView model={repackCase} footer={null} />{E.pin(E.gated("Record repack", repackCase.unavailable!))}</>,
+    body: <><RepackView model={repackCase} footer={null} />{E.pin(E.btn("Record repack"))}</>,
   },
   // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack
   // show when MGR writes into them, drawn in each product's own design language

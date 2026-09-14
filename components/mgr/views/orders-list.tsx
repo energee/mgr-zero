@@ -15,12 +15,16 @@ export function OrdersView({
   createAction,
   filters,
   linkRows,
+  listStatus,
+  feedback,
 }: {
   model: OrdersListViewModel;
   createAction?: ReactNode;
   filters?: ReactNode;
   /** Live list: row verbs are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
+  listStatus?: ReactNode;
+  feedback?: ReactNode;
 }) {
   return (
     <>
@@ -31,13 +35,14 @@ export function OrdersView({
           {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
         </div>
       )}
-      {model.empty
+      {feedback}
+      {listStatus ?? (model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
             {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
           </Fragment>
-        ))}
+        )))}
     </>
   );
 }

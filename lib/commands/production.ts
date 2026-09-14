@@ -13,6 +13,24 @@ import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 
 const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
+// The process spec (recipe-builder spec D2, D6, D7): ordered mash steps and
+// fermentation stages, each with a type and a name, and water additions
+// carrying one stage. Stored as given; the RPC derives mash_temp_f.
+export const MASH_STEP_KINDS = ["infusion", "decoction", "direct heat", "rest"] as const;
+export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"] as const;
+export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
+export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
+const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: z.number(), minutes: z.number().int().positive() });
+const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: z.number(), days: z.number().positive() });
+const processInput = z.object({
+  preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: z.number().optional(),
+  whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: z.number().optional(),
+});
+const waterInput = z.object({
+  targetProfileId: z.string().uuid().optional(), sourceProfileId: z.string().uuid().optional(),
+  mashGal: z.number().positive().optional(), spargeGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
+  additions: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().positive(), unit: z.enum(WATER_ADDITION_UNITS), stage: z.enum(WATER_ADDITION_STAGES) })).default([]),
+});
 
 // Efficiency and attenuation are fractions (0.75), never percents: the column
 // comment says so and recipeGravity multiplies by them directly, so a 75 here
@@ -31,10 +49,13 @@ defineCommand({
 
 defineCommand({
   name: "create_recipe_version",
-  description: "Add the next version of a recipe with its ingredients; versions are immutable and snapshot each material's extract potential",
+  description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential",
   input: z.object({
     recipeId: z.string().uuid(),
-    mashTempF: z.number(),
+    mashSchedule: z.array(mashStep).min(1),
+    fermentationSchedule: z.array(fermentationStage).default([]),
+    process: processInput.optional(),
+    water: waterInput.optional(),
     brewhouseEfficiency: fraction,
     yeastAttenuation: fraction,
     boilMinutes: z.number().int().positive().optional(),
@@ -49,7 +70,15 @@ defineCommand({
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_recipe_version", {
-    p_brewery: ctx.breweryId, p_recipe: i.recipeId, p_mash_temp_f: i.mashTempF,
+    p_brewery: ctx.breweryId, p_recipe: i.recipeId, p_mash_schedule: i.mashSchedule, p_fermentation_schedule: i.fermentationSchedule,
+    // Absent keys read as NULL through `p_process ->> key`, so undefined is left as is.
+    p_process: {
+      pre_boil_bbl: i.process?.preBoilBbl, whirlpool_minutes: i.process?.whirlpoolMinutes, whirlpool_temp_f: i.process?.whirlpoolTempF,
+      whirlpool_rest_minutes: i.process?.whirlpoolRestMinutes, knockout_temp_f: i.process?.knockoutTempF,
+      target_water_profile_id: i.water?.targetProfileId, source_water_profile_id: i.water?.sourceProfileId,
+      mash_water_gal: i.water?.mashGal, sparge_water_gal: i.water?.spargeGal, target_mash_ph: i.water?.targetMashPh,
+      water_additions: (i.water?.additions ?? []).map((a) => ({ material_id: a.materialId, qty: a.qty, unit: a.unit, stage: a.stage })),
+    },
     p_brewhouse_efficiency: i.brewhouseEfficiency, p_yeast_attenuation: i.yeastAttenuation,
     p_boil_minutes: i.boilMinutes ?? null, p_target_ibu: i.targetIbu ?? null, p_note: i.note ?? null,
     p_ingredients: i.ingredients.map((l) => ({
@@ -151,20 +180,23 @@ defineQuery({
     const [recipe, version] = await Promise.all([
       unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
         .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
-      latestOf<{ id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number | null; yeast_attenuation: number | null; boil_minutes: number | null; target_ibu: number | null; note: string | null; created_at: string }>(
-        ctx.db.from("recipe_versions")
-          .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at")
+      // The whole version row: assumptions, schedules and process columns are all read as one unit.
+      latestOf<{ id: string; version: number; brewhouse_efficiency: number | null; yeast_attenuation: number | null }>(
+        ctx.db.from("recipe_versions").select("*")
           .eq("recipe_id", i.recipeId), "version"),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
-    if (!version) return { recipe, version: null, ingredients: [], ogPlato: null, fgPlato: null, abv: null };
+    if (!version) return { recipe, version: null, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
 
-    const ingredients = await unwrap(ctx.db.from("recipe_ingredients")
-      .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot")
-      .eq("recipe_version_id", version.id).order("sort")) ?? [];
+    const [ingredients, waterAdditions] = await Promise.all([
+      unwrap(ctx.db.from("recipe_ingredients")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot")
+        .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
+      unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
+    ]);
 
     return {
-      recipe, version, ingredients,
+      recipe, version, ingredients, waterAdditions,
       ...recipeGravity({
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
