@@ -46,6 +46,7 @@ export default async function KegsPage() {
           };
         }),
         navRows: [
+          { key: "report", href: "/kegs/report", title: "Keg report", detail: "utilization and unreturned kegs by age" },
           { key: "history", href: "/kegs/history", title: "Keg event history", detail: "acquired, shipped, returned, lost, found, retired" },
           ...fleet.customers.map((c) => ({ key: c.customer_id, href: `/kegs/customers/${c.customer_id}`, title: "Customer keg balance", detail: `${c.name} · ${c.kegs_out} out` })),
         ],

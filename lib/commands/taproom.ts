@@ -9,6 +9,7 @@
 // and durable physical counts are implemented below.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
 
 export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
@@ -127,6 +128,49 @@ defineQuery({
       deposit_cents: Number(deposits?.find((d) => d.keg_pool_id === k.pool_id && d.keg_size === k.keg_size)?.deposit_cents ?? 0),
     })).sort((a, b) => a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size));
     return { rows, kegs_out: rows.reduce((n, r) => n + r.kegs_out, 0), deposit_cents: rows.reduce((n, r) => n + r.deposit_cents, 0) };
+  },
+});
+
+// The Keg report (issue #278): utilization per pool × size — kegs at
+// customers over the fleet from keg_fleet_totals — and FIFO aging of what
+// customers still hold (lib/keg-aging.ts). Deposits are the pool's deposit per
+// unreturned keg, not what was invoiced; the balance page has that.
+const AGE_BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
+const bucketOf = (days: number) => days <= 30 ? AGE_BUCKETS[0] : days <= 60 ? AGE_BUCKETS[1] : days <= 90 ? AGE_BUCKETS[2] : AGE_BUCKETS[3];
+defineQuery({
+  name: "get_keg_report", description: "Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, and the customers holding kegs over 90 days",
+  input: z.object({}), roles: ROLES,
+  handler: async (ctx) => {
+    const [pools, totals, events, customers] = await Promise.all([
+      listPools(ctx),
+      unwrap(ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at").eq("brewery_id", ctx.breweryId).not("customer_id", "is", null)),
+      unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
+    ]);
+    const aged = kegAging((events ?? []) as KegLedgerEvent[], new Date());
+    const pool = (id: string) => pools?.find((p) => p.id === id);
+    const sum = (rows: { qty: number }[]) => rows.reduce((n, r) => n + r.qty, 0);
+    const bySize = (totals ?? []).map((t) => ({
+      pool_id: t.pool_id as string, pool_name: pool(t.pool_id as string)?.name ?? "", keg_size: t.keg_size as string,
+      out: sum(aged.filter((a) => a.pool_id === t.pool_id && a.keg_size === t.keg_size)), total: Number(t.qty),
+    })).sort((a, b) => a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size));
+    const out = sum(bySize.map((r) => ({ qty: r.out }))), total = sum(bySize.map((r) => ({ qty: r.total })));
+    const aging = AGE_BUCKETS.map((bucket) => {
+      const rows = aged.filter((a) => bucketOf(a.days) === bucket);
+      return { bucket, kegs: sum(rows), deposit_cents: rows.reduce((n, a) => n + a.qty * Number(pool(a.pool_id)?.deposit_cents ?? 0), 0) };
+    });
+    const byCustomer = new Map<string, { over_90: number; oldest_at: string | null }>();
+    for (const a of aged) {
+      const c = byCustomer.get(a.customer_id) ?? { over_90: 0, oldest_at: null };
+      if (a.days > 90) c.over_90 += a.qty;
+      if (!c.oldest_at || a.shipped_at < c.oldest_at) c.oldest_at = a.shipped_at;
+      byCustomer.set(a.customer_id, c);
+    }
+    return {
+      fleet: { out, total, utilization: total ? out / total : null }, bySize, aging,
+      customers: [...byCustomer].map(([customer_id, c]) => ({ customer_id, name: customers?.find((x) => x.id === customer_id)?.name ?? "", ...c }))
+        .sort((a, b) => b.over_90 - a.over_90 || a.name.localeCompare(b.name)),
+    };
   },
 });
 

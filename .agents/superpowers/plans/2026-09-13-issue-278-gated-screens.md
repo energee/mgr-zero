@@ -16,7 +16,7 @@
 - Never edit a committed migration. New file `supabase/migrations/2026MMDDHHMMSS_<name>.sql`, then `bun run migrations:lock`.
 - Every new SQL function signature goes into `AUTHENTICATED_RPCS` in `tests/rpc-allowlist.test.ts`; revoke from `public, anon, authenticated` then grant to `authenticated`.
 - Every new command name must match an `API_AREAS` regex in `lib/mgr/api-operations.ts`; run `bun run docs:api` and commit `content/docs/api.mdx`.
-- A `[view]` read stays tagged `[view]` in `screens.tsx` (it is deliberately unpublished) but must be registered; drop `SCHEMA-GATE`, `SCHEMA/RLS-GATE`, `[design]` tags only when the command exists.
+- A `[view]` read loses its `[view]` tag the moment it is registered: `tests/api-docs.test.ts` keeps `[view]` names out of the reference, and `lib/mgr/api-operations.ts` never hides a registered operation, so a registered view is published as an ordinary query (slice 1 set this). Drop `SCHEMA-GATE`, `SCHEMA/RLS-GATE`, `[design]` tags only when the command exists.
 - Customer-visible change → update `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
 - Proof per slice: `bunx tsc --noEmit && bun run lint`, pure vitest (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts tests/screen-command-gates.test.ts tests/app-screen-parity.test.ts tests/api-docs.test.ts tests/rpc-allowlist.test.ts tests/migrations-applied.test.ts`), the slice's DB test on the test stack, and a `browse` screenshot of the rendered page.
 - Ponytail: shortest diff that works. No new abstractions; aggregate in TypeScript like `get_keg_fleet` does, SQL views only where RLS needs them.
@@ -168,7 +168,7 @@ Verify `keg_fleet_totals` columns at `00001_baseline.sql:2477` first; adjust the
 
 **Files:**
 - Create: `lib/mgr/keg-report-view.ts` (adapter: command result → `KegReportViewModel`), `components/mgr/views/keg-report.tsx`, `app/(app)/kegs/report/page.tsx`
-- Modify: `components/mgr/screens.tsx:2182-2195` (body → `<KegReportView model={kegReportFixture} />`, `reads` unchanged `get_keg_report [view]`), `lib/mgr/fixtures/*` (add `kegReportFixture` reproducing 70% / 142 of 203 / buckets / Ridgeline row), `lib/mgr/screen-routes.ts` (add `{ name: "Keg report", file: "app/(app)/kegs/report/page.tsx" }`), `app/(app)/kegs/page.tsx` (link "Keg report"), `lib/mgr/screen-links.ts` if "Keg report" label routing is needed
+- Modify: `components/mgr/screens.tsx:2182-2195` (body → `<KegReportView model={kegReportFixture} />`, `reads` becomes `get_keg_report [utilization …; aging is FIFO …]` (tag dropped, see Global Constraints)), `lib/mgr/fixtures/*` (add `kegReportFixture` reproducing 70% / 142 of 203 / buckets / Ridgeline row), `lib/mgr/screen-routes.ts` (add `{ name: "Keg report", file: "app/(app)/kegs/report/page.tsx" }`), `app/(app)/kegs/page.tsx` (link "Keg report"), `lib/mgr/screen-links.ts` if "Keg report" label routing is needed
 - Test: `tests/keg-report-view.test.ts` (pure adapter)
 
 - [ ] **Step 1: Adapter test**
@@ -295,7 +295,7 @@ Check `aiExposed` is the field name the other portal queries use (grep `aiExpose
 
 ### Task 3.2: Coming up page
 
-**Files:** Create `components/mgr/views/coming-up.tsx`, `lib/mgr/coming-up-view.ts`, `app/(portal)/portal/coming-up/page.tsx`. Modify `screens.tsx:1385-1400` (`reads: "portal_schedule [view]"`, body → view + fixture), `screen-routes.ts` (`{ name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" }`), Shop (`app/(portal)/portal/cart.tsx`) adds a "Coming up" link, `content/docs/portal-guide.mdx:41` (replace "not available yet" with what it shows).
+**Files:** Create `components/mgr/views/coming-up.tsx`, `lib/mgr/coming-up-view.ts`, `app/(portal)/portal/coming-up/page.tsx`. Modify `screens.tsx:1385-1400` (`reads: "portal_schedule [planned batches as brand + week; nothing else]"`, body → view + fixture), `screen-routes.ts` (`{ name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" }`), Shop (`app/(portal)/portal/cart.tsx`) adds a "Coming up" link, `content/docs/portal-guide.mdx:41` (replace "not available yet" with what it shows).
 
 - [ ] Pure adapter test: rows `[{ brand_id: "b1", brand_name: "Hazy IPA", planned_week: "2026-09-14" }]` → `[{ title: "Hazy IPA", detail: "Week of Sep 14", href: "/portal#brand-b1" }]`; empty → `empty: true` with copy "Nothing planned yet · check back".
 - [ ] Page: `getActiveCustomer()` → `buildContext` → `runCommand("portal_schedule")` → view. Brand row links to Shop anchored at the brand (add `id={`brand-${id}`}` on Shop's brand heading if missing).

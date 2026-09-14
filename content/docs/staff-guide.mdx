@@ -496,6 +496,12 @@ The quantity is always positive; the reason is the direction. Retired, shipped, 
 
 Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 40 in storage read as two rows; kegs out at customers have left their bin and are listed under **Customer keg balance** for each customer holding some.
 
+### Keg report
+
+<Screen name="Keg report" />
+
+**Keg report** (from Keg fleet; Warehouse and Admin) shows whether the fleet is working or sitting and who to chase. The headline is kegs out at customers over the fleet (acquired minus retired), then the same split per pool and size. The age table groups unreturned kegs into 0–30, 31–60, 61–90, and over 90 days with the deposit at the pool's rate for each bucket. The ledger counts kegs rather than serials, so a return or a loss closes the oldest open shipment first; a keg's age is the shipment it is still attributed to. Each customer holding kegs is listed with how many are over 90 days and their oldest open shipment; **Open balance** goes to that customer's keg balance. With no keg pools the page says **No owned keg pools**.
+
 <Screen name="Customer keg balance" />
 
 **Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit invoiced for them (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost. It shows **No kegs currently out** once everything is back.

@@ -312,6 +312,7 @@ omitted. They have no roles until they are built.
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
+| `get_keg_report` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
 | `get_loss_review` | Compliance | ✓ | ✓ |  |  |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
@@ -2673,6 +2674,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_keg_fleet", "input": {} }'
+```
+
+#### get_keg_report [#get_keg_report]
+
+`query` · admin, warehouse
+
+Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, and the customers holding kegs over 90 days
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_keg_report", "input": {} }'
 ```
 
 #### get_taproom_count [#get_taproom_count]
