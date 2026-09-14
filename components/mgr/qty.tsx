@@ -10,6 +10,7 @@
 // never import this directly; they use E.qty, E.tabs and E.volume.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
+import { stepQuantity } from "@/lib/mgr/quantity-input";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
@@ -21,10 +22,10 @@ import { useRef, type ReactNode } from "react";
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
 export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
-  const step = (direction: number) => {
+  const step = (direction: -1 | 1) => {
     const field = input.current;
     if (!field || field.matches(":disabled") || field.readOnly) return;
-    const next = String(Math.max(attributes.min === undefined ? -Infinity : Number(attributes.min), Math.min(attributes.max === undefined ? Infinity : Number(attributes.max), (Number(field.value) || 0) + direction)));
+    const next = stepQuantity(field.value, direction, attributes.min === undefined ? undefined : Number(attributes.min), attributes.max === undefined ? undefined : Number(attributes.max));
     if (onChange) onChange(next);
     else field.value = next;
   };
