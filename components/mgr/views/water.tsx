@@ -7,16 +7,25 @@ import { E } from "@/components/mgr/e";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/commands/production";
-import { type WaterAdditionFields, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import type { Ions } from "@/lib/water-chemistry";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
 
-export function WaterView({ title = "Water", water, profiles, materials, onChange, onAdd, ...verbs }: {
-  title?: string; water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
+export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, onChange, onAdd, ...verbs }: {
+  title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
+  onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
 } & ListRowProps) {
   const bind = (key: "targetProfileId" | "sourceProfileId" | "mashGal" | "spargeGal" | "targetMashPh") => onChange ? { value: water[key] } : { defaultValue: water[key] };
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
+  // Chemistry needs a salt identity on materials; until the schema carries one the verb and read-out draw gated, never guessed from a name.
+  const chemistryKnown = materials.some((m) => m.salt !== undefined);
+  const target = profiles.find((p) => p.id === water.targetProfileId)?.ions;
+  const source = water.sourceProfileId ? profiles.find((p) => p.id === water.sourceProfileId)?.ions : sourceDefault;
+  const totalGal = (Number(water.mashGal) || 0) + (Number(water.spargeGal) || 0);
+  const canSuggest = Boolean(target && source && totalGal > 0);
+  const readout = target && source ? ionReadout(water, source, target, materials) : [];
   return <>
     {E.back("Recipe", title)}
     <Field><FieldLabel>Source profile</FieldLabel><select aria-label="Source profile" className={E.select} {...bind("sourceProfileId")} onChange={(e) => onChange?.({ sourceProfileId: e.target.value })}>
@@ -33,6 +42,16 @@ export function WaterView({ title = "Water", water, profiles, materials, onChang
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
+    {chemistryKnown
+      ? canSuggest
+        ? E.act("Suggest additions", "primary", undefined, () => target && source && onChange?.({ additions: suggestAdditions(water, source, target, materials) }))
+        : E.btn("Suggest additions", "g disabled")
+      : E.gated("Suggest additions", "arrives with the material salt field")}
+    {chemistryKnown && readout.length > 0 && <>
+      {E.ttl("Against target")}
+      {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
+    </>}
+    {!chemistryKnown && E.gated("Ion read-out", "arrives with the material salt field")}
   </>;
 }
 
