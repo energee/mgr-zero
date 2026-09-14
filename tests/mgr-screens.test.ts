@@ -58,11 +58,10 @@ describe("SCREENS", () => {
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: the scale chips already state the batch size.
     expect(recipe).not.toMatch(/Batch size|Knockout volume/);
-    // The process-spec scalars are drawn but have no columns yet, so the
-    // record's own SCHEMA-GATE has to name them.
+    // The process-spec columns landed (#278 slice 5): no gate on the record.
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
-    expect(gate).toMatch(/SCHEMA-GATE:[^\]]*process-spec columns/);
-    expect(gate).toMatch(/whirlpool/i);
+    expect(gate).not.toMatch(/SCHEMA-GATE/);
+    expect(gate).toMatch(/schedules/);
   });
 
   it("keeps water profiles in the catalog, with their ion values", () => {
