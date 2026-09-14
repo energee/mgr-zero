@@ -112,6 +112,8 @@ export const toWaterProfileOption = (p: WaterProfileRow): WaterProfileIons => ({
 const tenth = (n: number) => Math.round(n * 10) / 10;
 /** Grams split into mash and sparge by volume; a stage that rounds to nothing folds into the other. */
 export function splitByStage(grams: number, mashGal: number, spargeGal: number): { mash: number; sparge: number } {
+  // A negative stage volume counts as empty, so its share goes to the other stage rather than vanishing.
+  mashGal = Math.max(0, mashGal); spargeGal = Math.max(0, spargeGal);
   const total = mashGal + spargeGal;
   if (total <= 0) return { mash: tenth(grams), sparge: 0 };
   const mash = tenth(grams * mashGal / total), sparge = tenth(grams - mash);

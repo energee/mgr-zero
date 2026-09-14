@@ -20,9 +20,11 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
   const target = profiles.find((p) => p.id === water.targetProfileId)?.ions;
   const source = water.sourceProfileId ? profiles.find((p) => p.id === water.sourceProfileId)?.ions : sourceDefault;
-  const totalGal = (Number(water.mashGal) || 0) + (Number(water.spargeGal) || 0);
-  // gated: no salt identity yet · waiting: nothing to compute against · ready: suggest and read out.
-  const chemistry = !chemistryKnown ? "gated" : target && source && totalGal > 0 ? "ready" : "waiting";
+  const mashGal = Number(water.mashGal) || 0, spargeGal = Number(water.spargeGal) || 0;
+  // A typed negative volume must never reach the formula (it throws by contract); the verb waits until the entry is corrected.
+  const volumesOk = mashGal >= 0 && spargeGal >= 0 && mashGal + spargeGal > 0;
+  // gated: no salt identity yet · waiting: nothing valid to compute against · ready: suggest and read out.
+  const chemistry = !chemistryKnown ? "gated" : target && source && volumesOk ? "ready" : "waiting";
   const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
     {E.back("Recipe", title)}

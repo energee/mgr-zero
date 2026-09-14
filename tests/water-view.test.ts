@@ -37,6 +37,12 @@ describe("WaterView", () => {
     expect(out).not.toMatch(/Against target/);
     expect(out).toMatch(/<button[^>]*disabled[^>]*>[^<]*Suggest additions/);
   });
+  it("survives a negative volume: no crash, verb disabled, no read-out", () => {
+    let out = "";
+    expect(() => { out = html({ water: { ...draft, mashGal: "-1" } }); }).not.toThrow();
+    expect(out).toMatch(/<button[^>]* disabled=""[^>]*>Suggest additions/);
+    expect(out).not.toMatch(/Against target/);
+  });
   it("the enabled verb is a clickable action, the disabled one a plain disabled button", () => {
     expect(html({})).toMatch(/<button[^>]*>Suggest additions/);
     expect(html({})).not.toMatch(/<button[^>]* disabled=""[^>]*>Suggest additions/);

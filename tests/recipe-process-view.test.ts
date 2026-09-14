@@ -53,6 +53,10 @@ describe("water suggestions", () => {
     expect(splitByStage(0.1, 9.5, 12)).toEqual({ mash: 0, sparge: 0.1 });
     expect(splitByStage(5, 10, 0)).toEqual({ mash: 5, sparge: 0 });
   });
+  it("treats a negative stage volume as empty when splitting", () => {
+    expect(splitByStage(10, -3, 12)).toEqual({ mash: 0, sparge: 10 });
+    expect(splitByStage(10, 9.5, -1)).toEqual({ mash: 10, sparge: 0 });
+  });
   it("replaces salt additions with the suggestion and keeps acids where they were", () => {
     const out = suggestAdditions(draft, profileIons(denverRow), profileIons(hazyRow), salts);
     expect(out.filter((a) => a.materialId === "lactic")).toEqual([{ materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }]);
