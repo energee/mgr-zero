@@ -116,7 +116,7 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, start, e
     </section>}
     <ChatQuietHoursView start={start} end={end} timezone={timezone} busy={busy} onChange={onQuietChange} onSave={onSaveQuiet} />
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy) onSaveHours?.(); }}>
-      {E.edit("Reading overdue after (hours)", hours, "number", undefined, { onChange: onHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168 })}
+      {E.edit("Reading overdue after (hours)", hours, "number", undefined, { onChange: onHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168, step: 1 })}
       <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p><Button disabled={busy}>Save reading cadence</Button>
     </form>
     {delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />}
