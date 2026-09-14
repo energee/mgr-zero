@@ -178,7 +178,8 @@ describe("AI composer", () => {
     expect(drawer).toContain("snapPoint={snapPoint}");
     expect(drawer).toContain("onSnapPointChange={setSnapPoint}");
     expect(drawer).toContain("handle={<div");
-    expect(drawer).not.toContain("pointer-events-none");
+    // Base UI ignores mouse drags starting on buttons; the surrounding handle must receive them.
+    expect(drawer).toMatch(/<Button[^>]*className="pointer-events-none h-11 w-full rounded-none"/);
     expect(drawer).toContain("event.detail === 0");
     expect(drawer).toContain('addEventListener("pointerup"');
     expect(drawer).not.toContain("handleOnly");

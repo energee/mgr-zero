@@ -55,7 +55,8 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
             }, { once: true });
           }}
         >
-          <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="h-11 w-full rounded-none" onClick={(event) => { if (event.detail === 0) setSnapPoint(nextSnapPoint); }}>
+          {/* Base UI ignores mouse drags on buttons. The handle owns pointer gestures; the button owns keyboard activation. */}
+          <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="pointer-events-none h-11 w-full rounded-none" onClick={(event) => { if (event.detail === 0) setSnapPoint(nextSnapPoint); }}>
             <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
           </Button>
         </div>}
