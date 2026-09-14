@@ -7,7 +7,7 @@ const scope = { actorId: "actor", breweryId: "brewery", role: "admin" };
 afterEach(() => vi.unstubAllGlobals());
 
 it("deduplicates concurrent reads and reuses fresh data without another request", async () => {
-  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: [{ id: "order" }] })));
+  const fetch = vi.fn(async (_url: string, _options: RequestInit) => new Response(JSON.stringify({ ok: true, data: [{ id: "order" }] })));
   vi.stubGlobal("fetch", fetch);
   const cache = createQueryClient();
   const options = commandQueryOptions(scope, "list_orders", {});
@@ -50,7 +50,7 @@ it("invalidates cached reads after a successful write but not a successful query
   expect(cache.getQueryState(key)?.isInvalidated).toBe(false);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, data: {}, requestId: "write" }))));
   await command("brewery", "create_order", {});
-  expect(cache.getQueryState(key)?.isInvalidated).toBe(true);
+  await vi.waitFor(() => expect(cache.getQueryState(key)?.isInvalidated).toBe(true));
   stop(); cache.clear();
 });
 
@@ -78,7 +78,7 @@ it("invalidates on an uncertain write failure without retrying the write", async
   const fetch = vi.fn(async () => { throw new Error("connection lost"); });
   vi.stubGlobal("fetch", fetch);
   await expect(command("brewery", "create_order", {})).rejects.toThrow("connection lost");
-  expect(cache.getQueryState(key)?.isInvalidated).toBe(true);
+  await vi.waitFor(() => expect(cache.getQueryState(key)?.isInvalidated).toBe(true));
   expect(fetch).toHaveBeenCalledTimes(1);
   stop(); cache.clear();
 });
