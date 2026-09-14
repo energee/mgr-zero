@@ -1,4 +1,5 @@
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
+import { PageLoadingView } from "@/components/mgr/views/page-loading";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
 // for what each MGR screen shows (plan §4, §7); /docs/screens renders it. Every
@@ -385,6 +386,14 @@ export const SCREENS: Screen[] = [
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
     spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: <TodayView model={toTodayViewProps(todayWarehouse)} footer={E.gated("Weekly count")} />,
+  },
+  {
+    step: 1, slice: "all", tab: "Today", name: "Page loading",
+    job: "Show that navigation is progressing while a staff page loads",
+    reads: "none", writes: "none",
+    states: [["loading", "row-shaped placeholders; navigation stays available"]],
+    spec: "Shared staff route fallback inside the existing shell. Announces loading once, hides decorative rows from assistive technology, and respects reduced motion. The requested screen replaces it when ready.",
+    body: <PageLoadingView />,
   },
   {
     step: 4, slice: "all", tab: "Today", name: "Today empty",

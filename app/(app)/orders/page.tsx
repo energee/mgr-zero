@@ -25,7 +25,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const canWrite = brewery.role === "admin" || brewery.role === "sales";
   const [orders, customerRows] = await Promise.all([
     runCommand("list_orders", { status, customerId }, ctx) as Promise<Order[]>,
-    runCommand("list_customers", {}, ctx) as Promise<CustomerRow[]>,
+    customerId ? runCommand("list_customers", {}, ctx) as Promise<CustomerRow[]> : [],
   ]);
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
