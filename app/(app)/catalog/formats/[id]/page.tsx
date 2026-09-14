@@ -48,7 +48,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
       canCompose={components.length === 0 && canComposeFormat(data.format, data.usedAsChild)}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
-      contents={canComposeFormat(data.format, data.usedAsChild) ? <details className="border-t pt-3"><summary className="cursor-pointer text-sm font-medium">Package contents</summary><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></details> : undefined}
+      contents={canComposeFormat(data.format, data.usedAsChild) ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}
     /> : undefined, "/catalog")}
     <p className="text-sm text-muted-foreground">Shared format · {data.format.bbl_per_unit === null ? "Beer volume calculated from package contents" : `${formatVolume(data.format.bbl_per_unit)} of beer per package`}</p>
     {canComposeFormat(data.format, data.usedAsChild) || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">

@@ -18,7 +18,7 @@ export function FormatRowsView({ kind, rows, options, onChange, confirmClear, on
   return <>
     {options.length === 0 ? <p className="text-sm text-muted-foreground">{bom ? "No materials have been added yet. " : "No eligible smaller packages exist yet. "}<a className="underline" href={addHref ?? "#"}>{bom ? "Add a material" : "Create a package format"}</a>, then return here.</p> : <p className="text-sm text-muted-foreground">{bom ? "Materials used for each complete package. Save materials separately from sizing." : "Smaller packages inside this one. Save contents to calculate its volume."}</p>}
     <fieldset disabled={disabled} className="flex flex-col gap-4">
-      {rows.map((row, index) => <div key={index} className="flex flex-col gap-2 border-b pb-3">
+      {rows.map((row, index) => <div key={index} className="flex flex-col gap-2 pb-3">
         <label className="flex flex-col gap-1">{bom ? "Material" : "Package"} {index + 1}
           <select className="rounded border bg-background p-2" required value={row.id} onChange={event => update(index, { id: event.target.value })}>
             <option value="">Choose {bom ? "material" : "package"}</option>

@@ -31,7 +31,7 @@ export default async function CatalogPage() {
       createAction={canWrite ? E.btn("New Brand", "p", "/catalog/brands/new") : null}
       linkRows
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
-      formatAction={canWrite ? <FormatForm /> : null}
+      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}
       footer={<>
         {E.nav("Water profiles", "the water you start from and the waters you aim at", "", undefined, "/catalog/water-profiles")}
       </>}

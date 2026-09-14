@@ -2563,7 +2563,7 @@ export const SCREENS: Screen[] = [
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components · replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
-    body: <FormatView model={toFormatViewProps(formatCan)} />,
+    body: <FormatView model={toFormatViewProps(formatCan)} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} />,
   },
   {
     step: 5,

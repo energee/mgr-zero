@@ -474,4 +474,12 @@ describe('format editing clarity', () => {
     expect(html).toContain('Calculated from package contents');
     expect(html).not.toContain('aria-label="Volume"');
   });
+  it('offers smaller packages and quantities before a composed format is saved', () => {
+    const model = toFormatViewProps({format:{id:'new',name:'Case',basis:'packaged',package_type:'can',bbl_per_unit:null,composed:true}});
+    const html = htmlOf(createElement(FormatView, { model, componentOptions: [{ id: 'can', name: '16 oz can' }] }));
+    expect(html).toContain('Choose package');
+    expect(html).toContain('16 oz can');
+    expect(html).toContain('Quantity 1');
+    expect(html).not.toContain('Save this format, then add its contents');
+  });
 });
