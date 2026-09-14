@@ -25,6 +25,7 @@
     "@lobehub/icons": "^5.18.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "@tanstack/react-query": "5.102.8",
     "ai": "7.0.97",
     "chat": "^4.39.0",
     "class-variance-authority": "^0.7.1",
