@@ -11,12 +11,12 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
 import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { OrderForm } from "@/app/(app)/orders/order-form";
+import { QueryFeedback } from "@/components/mgr/query-feedback";
 
 beforeEach(() => { state.pending = false; state.fetching = false; state.paused = false; state.error = null; state.calls = []; });
 
 it("feeds the existing order form cached live IDs, default ship-to and active SKUs", () => {
-  const node = NewOrderClient();
-  const form = node.props.children[1];
+  const form = NewOrderClient();
   expect(form.type).toBe(OrderForm);
   expect(form.props.customers[0].shipTos[0]).toMatchObject({ id: "dock", is_default: true });
   expect(form.props.skus).toEqual([{ id: "sku", label: "Brand — Keg" }]);
@@ -25,7 +25,20 @@ it("feeds the existing order form cached live IDs, default ship-to and active SK
 
 it("keeps cached form data mounted when a background refresh fails", () => {
   state.error = new Error("Could not refresh");
-  expect(NewOrderClient().props.children[1].type).toBe(OrderForm);
+  expect(NewOrderClient().type).toBe(OrderForm);
+});
+
+it("feeds the existing form shared freshness feedback without replacing the form during refresh", () => {
+  state.fetching = true;
+  const form = NewOrderClient();
+  expect(form.type).toBe(OrderForm);
+  expect(form.props.feedback.type).toBe(QueryFeedback);
+  const feedback = renderToStaticMarkup(form.props.feedback);
+  expect(feedback).toContain("Updating");
+  expect(feedback).toContain("Last checked");
+  expect(feedback).not.toContain('role="status"');
+  state.paused = true;
+  expect(renderToStaticMarkup(NewOrderClient().props.feedback)).toContain("Showing last-known data");
 });
 
 it("does not describe a cold cache as empty data or render skeletons", () => {

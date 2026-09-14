@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import Link from "next/link";
@@ -24,10 +24,12 @@ export function OrderForm({
   customers,
   locations,
   skus,
+  feedback,
 }: {
   customers: CustomerOption[];
   locations: LocationOption[];
   skus: SkuOption[];
+  feedback?: ReactNode;
 }) {
   const router = useRouter();
   const [kind, setKind] = useState<OrderKind>("wholesale");
@@ -85,7 +87,7 @@ export function OrderForm({
 
   return (
     <form onSubmit={form.submit} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
-      <NewOrderView model={{
+      <NewOrderView feedback={feedback} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus,

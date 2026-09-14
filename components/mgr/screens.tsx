@@ -92,6 +92,7 @@ import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { QueryFeedback } from "@/components/mgr/query-feedback";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
@@ -880,8 +881,8 @@ export const SCREENS: Screen[] = [
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"], ["loading", "inline status on first visit; cached rows remain during refresh"], ["error", "inline error and Try again; existing rows remain"]],
-    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use the shared QueryFeedback for first-load and retry states, without skeleton rows.",
-    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} />,
+    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use shared QueryFeedback: first-load text without skeletons, Last checked with Updating during refresh, and last-known data with connection or retry feedback. The visible list checks every five seconds and on tab return or reconnect; hidden and unmounted lists do not poll.",
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,
@@ -1126,8 +1127,8 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order",
     states: permitted("sales or admin required"),
-    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
-    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} />,
+    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Last checked uses the oldest option-list check, Updating preserves inputs, and connection or retry feedback identifies last-known data. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft.",
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,

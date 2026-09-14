@@ -61,7 +61,7 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   state.calls = []; state.gates = [];
   const page = await NewOrderPage();
   expect(page.type).toBe(NewOrderClient);
-  const form = NewOrderClient().props.children[1];
+  const form = NewOrderClient();
   expect(state.gates).toContainEqual(["create_order", "New order"]);
   expect(form.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
   expect(form.props.customers[0].shipTos[0].is_default).toBe(true);

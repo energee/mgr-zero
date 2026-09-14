@@ -29,8 +29,8 @@ export function OrdersClient({ role, status, customerId }: { role: StaffRole; st
     <OrdersView
       model={toOrdersListViewProps({ role, status, orders })}
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
-      listStatus={!result.data ? <QueryFeedback error={result.error} loading="Loading orders" retry={() => void result.refetch()} /> : undefined}
-      feedback={result.data && result.error ? <QueryFeedback error={result.error} retry={() => void result.refetch()} /> : undefined}
+      listStatus={!result.data ? <QueryFeedback error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
+      feedback={result.data ? <QueryFeedback error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       linkRows
       filters={(
         <>
