@@ -11,18 +11,19 @@ import { rowVerbs, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
 
-export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, onChange, onAdd, ...verbs }: {
+export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, chemistryKnown = false, onChange, onAdd, ...verbs }: {
   title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
+  /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
+  chemistryKnown?: boolean;
   onChange?: (patch: Partial<WaterDraft>) => void; onAdd?: () => void;
 } & ListRowProps) {
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
-  // Chemistry needs a salt identity on materials; until the schema carries one the verb and read-out draw gated, never guessed from a name.
-  const chemistryKnown = materials.some((m) => m.salt !== undefined);
   const target = profiles.find((p) => p.id === water.targetProfileId)?.ions;
   const source = water.sourceProfileId ? profiles.find((p) => p.id === water.sourceProfileId)?.ions : sourceDefault;
   const totalGal = (Number(water.mashGal) || 0) + (Number(water.spargeGal) || 0);
-  const canSuggest = Boolean(target && source && totalGal > 0);
-  const readout = target && source ? ionReadout(water, source, target, materials) : [];
+  // gated: no salt identity yet · waiting: nothing to compute against · ready: suggest and read out.
+  const chemistry = !chemistryKnown ? "gated" : target && source && totalGal > 0 ? "ready" : "waiting";
+  const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
     {E.back("Recipe", title)}
     {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "brewery default" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
@@ -35,16 +36,14 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
-    {chemistryKnown
-      ? canSuggest
-        ? E.act("Suggest additions", "primary", undefined, () => target && source && onChange?.({ additions: suggestAdditions(water, source, target, materials) }))
-        : E.btn("Suggest additions", "g disabled")
-      : E.gated("Suggest additions", "arrives with the material salt field")}
-    {chemistryKnown && readout.length > 0 && <>
+    {chemistry === "gated"
+      ? E.gated("Suggest additions", "arrives with the material salt field")
+      : E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}
+    {chemistry === "ready" && <>
       {E.ttl("Against target")}
       {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
     </>}
-    {!chemistryKnown && target && source && E.gated("Ion read-out", "arrives with the material salt field")}
+    {chemistry === "gated" && target && source && E.gated("Ion read-out", "arrives with the material salt field")}
   </>;
 }
 

@@ -12,7 +12,7 @@ const profiles = [
 ];
 const salts = [{ id: "gypsum", name: "Gypsum", salt: "gypsum" as const }, { id: "lactic", name: "Lactic acid", salt: null }];
 const draft: WaterDraft = { targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12", targetMashPh: "", additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }] };
-const html = (props: Partial<Parameters<typeof WaterView>[0]>) => renderToStaticMarkup(createElement(WaterView, { water: draft, profiles, materials: salts, ...props }));
+const html = (props: Partial<Parameters<typeof WaterView>[0]>) => renderToStaticMarkup(createElement(WaterView, { water: draft, profiles, materials: salts, chemistryKnown: true, ...props }));
 
 describe("WaterView", () => {
   it("draws the suggestion verb and six ion rows against the target", () => {
@@ -23,12 +23,12 @@ describe("WaterView", () => {
     expect(out).toMatch(/30 of 180 ppm · −150/);
   });
   it("draws both gated when no material carries a salt yet", () => {
-    const out = html({ materials: [{ id: "gypsum", name: "Gypsum" }, { id: "lactic", name: "Lactic acid" }] });
+    const out = html({ chemistryKnown: false });
     expect(out.match(/data-gated/g)).toHaveLength(2);
     expect(out).not.toMatch(/Against target/);
   });
   it("draws only the verb gated when no salt is known and no target is picked either", () => {
-    const out = html({ materials: [{ id: "gypsum", name: "Gypsum" }, { id: "lactic", name: "Lactic acid" }], water: { ...draft, targetProfileId: "" } });
+    const out = html({ chemistryKnown: false, water: { ...draft, targetProfileId: "" } });
     expect(out.match(/data-gated/g)).toHaveLength(1);
     expect(out).not.toMatch(/Against target/);
   });
@@ -38,7 +38,8 @@ describe("WaterView", () => {
     expect(out).toMatch(/<button[^>]*disabled[^>]*>[^<]*Suggest additions/);
   });
   it("the enabled verb is a clickable action, the disabled one a plain disabled button", () => {
-    expect(html({})).toMatch(/data-row-action[^>]*>[^<]*Suggest additions/);
+    expect(html({})).toMatch(/<button[^>]*>Suggest additions/);
+    expect(html({})).not.toMatch(/<button[^>]* disabled=""[^>]*>Suggest additions/);
     expect(html({ water: { ...draft, mashGal: "0", spargeGal: "0" } })).toMatch(/<button[^>]*disabled/);
   });
 });
@@ -47,5 +48,5 @@ it("the live sheet mounts WaterView with profile ions and no salt identity yet, 
   const sheets = readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8");
   expect(sheets).toMatch(/<WaterView\b/);
   expect(sheets).not.toMatch(/Suggest additions|Against target|salt:/);
-  for (const page of ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"]) expect(readFileSync(page, "utf8")).toMatch(/profileIons/);
+  for (const page of ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"]) expect(readFileSync(page, "utf8")).toMatch(/toWaterProfileOption/);
 });

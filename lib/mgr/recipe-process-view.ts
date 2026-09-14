@@ -4,7 +4,7 @@
 // a surface), pure list helpers, the summary lines the schedule screens print,
 // and the labelled read-out of a cut version's process scalars and water.
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
-import { gramsOf, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
+import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 
 export type { MashStep };
 /** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
@@ -102,8 +102,12 @@ export type WaterProfileIons = { id: string; name: string; ions: Ions };
 /** A material as the Water screen sees it: `salt` undefined means the schema carries none yet, null means not a salt. */
 export type SaltMaterial = { id: string; name: string; salt?: Salt | null };
 
-export const profileIons = (p: { calcium_ppm: number; magnesium_ppm: number; sodium_ppm: number; sulfate_ppm: number; chloride_ppm: number; bicarbonate_ppm: number }): Ions =>
-  ({ calcium: p.calcium_ppm, magnesium: p.magnesium_ppm, sodium: p.sodium_ppm, sulfate: p.sulfate_ppm, chloride: p.chloride_ppm, bicarbonate: p.bicarbonate_ppm });
+/** A list_water_profiles row (and the catalog fixture): a name and six ions in ppm columns. */
+export type WaterProfileRow = { id: string; name: string } & Record<`${keyof Ions}_ppm`, number>;
+export const profileIons = (p: Omit<WaterProfileRow, "id" | "name">): Ions =>
+  Object.fromEntries(IONS.map((ion) => [ion, p[`${ion}_ppm`]])) as Ions;
+/** The option the Water screen computes from; both live pages and the inventory map rows through this. */
+export const toWaterProfileOption = (p: WaterProfileRow): WaterProfileIons => ({ id: p.id, name: p.name, ions: profileIons(p) });
 
 const tenth = (n: number) => Math.round(n * 10) / 10;
 /** Grams split into mash and sparge by volume; a stage that rounds to nothing folds into the other. */

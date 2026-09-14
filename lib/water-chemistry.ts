@@ -10,11 +10,6 @@ export const IONS = ["calcium", "magnesium", "sodium", "sulfate", "chloride", "b
 export const ION_LABELS: Record<keyof Ions, string> = { calcium: "Calcium", magnesium: "Magnesium", sodium: "Sodium", sulfate: "Sulfate", chloride: "Chloride", bicarbonate: "Bicarbonate" };
 
 export type Salt = "gypsum" | "calcium_chloride" | "epsom_salt" | "baking_soda" | "chalk" | "table_salt" | "magnesium_chloride";
-export const SALTS: Salt[] = ["gypsum", "calcium_chloride", "epsom_salt", "baking_soda", "chalk", "table_salt", "magnesium_chloride"];
-export const SALT_LABELS: Record<Salt, string> = {
-  gypsum: "Gypsum", calcium_chloride: "Calcium chloride", epsom_salt: "Epsom salt", baking_soda: "Baking soda",
-  chalk: "Chalk", table_salt: "Table salt", magnesium_chloride: "Magnesium chloride",
-};
 /** ppm added per gram of salt per liter of water. One place; correct it here only. */
 export const SALT_PPM_PER_G_PER_L: Record<Salt, Partial<Ions>> = {
   gypsum: { calcium: 232.8, sulfate: 557.7 },
@@ -26,8 +21,8 @@ export const SALT_PPM_PER_G_PER_L: Record<Salt, Partial<Ions>> = {
   magnesium_chloride: { magnesium: 119.5, chloride: 348.7 },
 };
 
-export const GAL_TO_L = 3.78541;
-export const OZ_TO_G = 28.3495;
+const GAL_TO_L = 3.78541;
+const OZ_TO_G = 28.3495;
 /** Grams from an addition's qty and unit; mL is treated as grams (acids, which the solver never touches). */
 export const gramsOf = (qty: number, unit: string) => (unit === "oz" ? qty * OZ_TO_G : qty);
 

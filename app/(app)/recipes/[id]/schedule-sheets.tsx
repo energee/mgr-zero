@@ -62,7 +62,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
   return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
-    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
+    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} chemistryKnown={false /* until materials carry a salt identity (PR B) */} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
 }
 
