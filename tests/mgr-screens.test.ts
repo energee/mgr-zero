@@ -592,6 +592,8 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+    // record_cellar_transfer is live (#278 slice 2): the tag no longer says design.
+    expect(transfer.writes).not.toMatch(/\[design/);
   });
 
   it("puts the commit on the row, not a second copy at the top", () => {

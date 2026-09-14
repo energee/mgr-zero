@@ -1642,7 +1642,7 @@ export const SCREENS: Screen[] = [
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
     reads: "list_occupancies · list_vessels",
-    writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
+    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
     body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
