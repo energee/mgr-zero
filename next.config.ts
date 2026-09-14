@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   // explicitly — a permanent redirect is browser-cached, so an open :guide
   // would cache /docs/anything.html onto a 404.
   redirects: async () => [
+    { source: "/packaging/repack", destination: "/packaging?repack=1", permanent: false },
     { source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true },
     { source: "/docs/:guide(staff-guide|portal-guide).html", destination: "/docs/:guide", permanent: true },
     // #325 split the compliance registry: brewery licenses stand alone, brand
