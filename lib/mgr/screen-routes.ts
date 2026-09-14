@@ -162,7 +162,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Contracts", file: "app/(app)/vendors/page.tsx" },
   { name: "Contract", file: "app/(app)/vendors/page.tsx" },
   { name: "Recipes", file: "app/(app)/recipes/page.tsx" },
-  { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx" },
+  { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx", additionalFiles: ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"] },
   { name: "Compliance months", file: "app/(app)/compliance/page.tsx" },
   { name: "Monthly compliance", file: "app/(app)/compliance/[month]/page.tsx" },
   { name: "Licenses", file: "app/(app)/compliance/licenses/page.tsx" },
