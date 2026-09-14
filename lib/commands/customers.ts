@@ -55,8 +55,13 @@ defineCommand({
 defineQuery({
   name: "list_customers", description: "Customers alphabetical with sale channel name",
   roles: ["admin", "sales", "warehouse"],
-  input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("customers").select("*, sale_channels(name)").eq("brewery_id", ctx.breweryId).order("name")),
+  input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer") }),
+  handler: (ctx, i) => {
+    const query = ctx.db.from("customers")
+      .select(i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)")
+      .eq("brewery_id", ctx.breweryId).order("name");
+    return unwrap(i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query);
+  },
 });
 
 defineQuery({

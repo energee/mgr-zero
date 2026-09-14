@@ -15,6 +15,7 @@ import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SearchCacheProvider, SearchSheet } from "@/components/mgr/search-palette";
 import { switchBrewery } from "@/app/(auth)/actions";
 import { Composer } from "@/components/mgr/composer";
+import { CommandQueryProvider } from "@/components/mgr/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SearchCacheProvider key={`${identity?.userId}:${brewery.id}:${brewery.role}`}>
       <BreweryProvider id={brewery.id} actorId={identity!.userId}>
+        <CommandQueryProvider key={`${identity!.userId}:${brewery.id}:${brewery.role}`} scope={{ actorId: identity!.userId, breweryId: brewery.id, role: brewery.role }}>
         <AppShell
           brand={brewery.name}
           items={navFor(shippedNav(STAFF_NAV), brewery.role)}
@@ -47,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </AppShell>
         <Toaster />
+        </CommandQueryProvider>
       </BreweryProvider>
     </SearchCacheProvider>
   );

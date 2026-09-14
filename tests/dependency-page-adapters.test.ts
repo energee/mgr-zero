@@ -5,6 +5,11 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
 vi.mock("@/lib/commands/all", () => ({}));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: string, input: unknown) => {
+  state.calls.push([name, input]);
+  return { data: name === "list_customers" ? [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }]
+    : name === "list_skus" ? [{ id: "active", name: "Keg", active: true }, { id: "inactive", active: false }] : [], error: null, refetch() {} };
+} }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermission: (_ctx: unknown, name: string, resource?: string) => { state.gates.push([name, resource]); } }));
@@ -13,7 +18,7 @@ async function query(name: string, input: unknown) {
   switch (name) {
     case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
     case "list_orders": return [];
-    case "list_customers": return [{ id: "buyer", name: "Buyer" }];
+    case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
     case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
@@ -27,24 +32,36 @@ async function query(name: string, input: unknown) {
 }
 import PickPage from "@/app/(app)/pick/page";
 import OrdersPage from "@/app/(app)/orders/page";
+import { OrdersClient } from "@/app/(app)/orders/orders-client";
+import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
 
+it("does not fetch customer options when Orders has no customer filter", async () => {
+  state.calls = [];
+  const page = await OrdersPage({ searchParams: Promise.resolve({}) });
+  expect(state.calls).toEqual([]);
+  OrdersClient(page.props);
+  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined }]]);
+});
+
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];
-  const readonly = await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) });
+  const readonly = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) })).props);
   expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft" }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
   // New order is its own route now; the list only links to it, and the route
   // itself carries the create_order gate and the picker options.
-  const writable = await OrdersPage({ searchParams: Promise.resolve({}) });
+  const writable = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({}) })).props);
   expect(renderToStaticMarkup(writable.props.createAction)).toContain('href="/orders/new"');
   // New order is its own page now; it owns the option lists and its own gate.
   state.calls = []; state.gates = [];
-  const form = await NewOrderPage();
+  const page = await NewOrderPage();
+  expect(page.type).toBe(NewOrderClient);
+  const form = NewOrderClient();
   expect(state.gates).toContainEqual(["create_order", "New order"]);
   expect(form.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
   expect(form.props.customers[0].shipTos[0].is_default).toBe(true);

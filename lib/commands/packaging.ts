@@ -135,21 +135,22 @@ defineQuery({
   description: "Composed SKUs a repack can break, each with the one component SKU (same brand, the format's single component row) it breaks into and how many per unit; child is null when the composition has no single row",
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {
-    const [components, skus] = await Promise.all([
-      unwrap(ctx.db.from("format_components").select("parent_format_id, child_format_id, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("skus").select("id, name, brand_id, format_id, brands(name), formats(name), format_volume:format_volumes(bbl_per_unit)")
-        .eq("brewery_id", ctx.breweryId).eq("active", true).order("name")),
-    ]) as unknown as [
-      { parent_format_id: string; child_format_id: string; qty: number }[],
-      { id: string; name: string; brand_id: string; format_id: string; brands: { name: string } | null; formats: { name: string } | null; format_volume: { bbl_per_unit: number | null } | null }[],
-    ];
-    const byParent = new Map<string, typeof components>();
+    type Component = { parent_format_id: string; child_format_id: string; qty: number };
+    type Sku = { id: string; name: string; brand_id: string; format_id: string; brands: { name: string } | null; formats: { name: string } | null; format_volume: { bbl_per_unit: number | null } | null };
+    // ponytail: capped, not paged — a brewery's composed formats are a handful; page like list_skus if a catalog ever nears 1000 component rows.
+    const components = (await unwrap(ctx.db.from("format_components").select("parent_format_id, child_format_id, qty").eq("brewery_id", ctx.breweryId).limit(1000)) ?? []) as Component[];
+    if (components.length === 0) return [];
+    const byParent = new Map<string, Component[]>();
     for (const c of components) byParent.set(c.parent_format_id, [...(byParent.get(c.parent_format_id) ?? []), c]);
+    const formatIds = [...new Set(components.flatMap((c) => [c.parent_format_id, c.child_format_id]))];
+    const skus = (await unwrap(ctx.db.from("skus").select("id, name, brand_id, format_id, brands(name), formats(name), format_volume:format_volumes(bbl_per_unit)")
+      .eq("brewery_id", ctx.breweryId).eq("active", true).in("format_id", formatIds).order("name").limit(1000)) ?? []) as unknown as Sku[];
+    const byBrandFormat = new Map(skus.map((s) => [`${s.brand_id}:${s.format_id}`, s]));
     return skus.filter((s) => byParent.has(s.format_id)).map((s) => {
       const rows = byParent.get(s.format_id)!;
-      const child = rows.length === 1 ? skus.find((c) => c.brand_id === s.brand_id && c.format_id === rows[0].child_format_id) : undefined;
+      const child = rows.length === 1 ? byBrandFormat.get(`${s.brand_id}:${rows[0].child_format_id}`) : undefined;
       return {
-        id: s.id, name: s.name, brand: s.brands?.name ?? null, unit: s.formats?.name ?? "", bblPerUnit: Number(s.format_volume?.bbl_per_unit ?? 0),
+        id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name, unit: s.formats?.name ?? "", bblPerUnit: Number(s.format_volume?.bbl_per_unit ?? 0),
         child: child ? { skuId: child.id, unit: child.formats?.name ?? child.name, quantity: Number(rows[0].qty) } : null,
       };
     });

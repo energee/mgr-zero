@@ -29,6 +29,12 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("Green Bar");
     expect(got.customer.sale_channels.name).toBe("Wholesale");
     expect(got.shipTos.length).toBe(1);
+    const options = await runCommand("list_customers", { includeShipTos: true }, ctx) as { id: string; shipTos: { id: string; label: string; is_default: boolean }[] }[];
+    expect(options.find(row => row.id === cust.id)?.shipTos).toEqual([
+      expect.objectContaining({ label: "Main", id: expect.any(String), is_default: expect.any(Boolean) }),
+    ]);
+    const plain = await runCommand("list_customers", {}, ctx) as Record<string, unknown>[];
+    expect(plain.every(row => !("shipTos" in row))).toBe(true);
   });
   it("replays one customer mutation without creating a duplicate", async () => {
     const execution = {

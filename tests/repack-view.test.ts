@@ -13,6 +13,12 @@ describe("toRepackView", () => {
     expect(model.unavailable).toBeUndefined();
   });
 
+  it("shows nothing to derive, and no refusal, before a parent is picked", () => {
+    const model = toRepackView({ parent: "", unit: "", location: "", qty: "", composition: null });
+    expect(model.tape).toEqual([]);
+    expect(model.unavailable).toBeUndefined();
+  });
+
   it("is unavailable when the parent has no single composition row", () => {
     const model = toRepackView({ ...base, composition: null });
     expect(model.unavailable).toBe(REPACK_UNAVAILABLE);

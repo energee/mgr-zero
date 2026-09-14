@@ -58,6 +58,10 @@ limiting on `/api/command`: not yet implemented (authz audit A1).
 `development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
 it is normally absent.
 
+`vercel.json` pins functions to `iad1` (Virginia), alongside the production
+Supabase project `uogrvqmrbmolvtftotsf` in `us-east-1`. Recheck this pairing if the database moves:
+sequential Auth and Data API requests otherwise pay cross-region latency.
+
 QuickBooks setup uses server-only `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`,
 `QBO_REDIRECT_URI`, and `QBO_API_BASE`. The example API base is Intuit sandbox;
 production must use `https://quickbooks.api.intuit.com`. The redirect must

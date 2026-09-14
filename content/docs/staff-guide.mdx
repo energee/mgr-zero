@@ -112,6 +112,8 @@ Guest labels are never matched to POS items, so a guest row never shows numeric 
 
 ## Navigate MGR [#navigation]
 
+Orders and New Order reuse data already loaded in this tab. While visible, Orders checks for changes every five seconds; New Order checks its customer, location and SKU options every 30 seconds. Checks pause in hidden tabs and resume immediately when you return or reconnect. **Last checked** shows the most recent successful check (the oldest option-list check on New Order); **Updating** keeps existing data and your typed draft visible. A connection pause or failed refresh identifies **last-known data** rather than claiming it is current; failed reads offer **Try again**. Slow or interrupted connections can delay updates beyond the normal interval. Saving changes marks cached data for refresh. Switching brewery or signing out discards that cache. The first visit fetches data on demand with a short loading message, not placeholder rows. Ask MGR loads its conversation and history when you first open the drawer, rather than when you enter the site.
+
 <Screen name="Today" />
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail; the toggle beside the brewery name collapses it to a narrow strip of icons, each naming itself when you point at it, and the page widens to fill the space.
