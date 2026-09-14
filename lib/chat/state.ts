@@ -20,15 +20,28 @@ export function chatStateUrl(): string {
 let pool: pg.Pool | undefined;
 let state: ReturnType<typeof createPostgresState> | undefined;
 
+function chatConnectionConfig(): pg.ClientConfig {
+  const url = new URL(chatStateUrl());
+  const ca = process.env.CHAT_STATE_DATABASE_CA;
+  if (ca) {
+    // pg lets URL SSL options override the explicit CA configuration.
+    for (const key of ["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert", "uselibpqcompat"]) url.searchParams.delete(key);
+  }
+  return {
+    connectionString: url.toString(), options: "-c search_path=chat_sdk", connectionTimeoutMillis: 5000,
+    ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {}),
+  };
+}
+
 export function chatStatePool(): pg.Pool {
-  pool ??= new pg.Pool({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", max: 5, connectionTimeoutMillis: 5000 });
+  pool ??= new pg.Pool({ ...chatConnectionConfig(), max: 5 });
   return pool;
 }
 
 // Advisory-lock holders must not reserve an SDK pool slot while their work
 // waits for another slot to read/write credentials.
 export function chatLifecycleClient() {
-  return new pg.Client({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", connectionTimeoutMillis: 5000 });
+  return new pg.Client(chatConnectionConfig());
 }
 
 export function chatState() {
