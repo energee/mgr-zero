@@ -73,6 +73,7 @@ import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
+import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
@@ -2559,11 +2560,11 @@ export const SCREENS: Screen[] = [
     name: "Format",
     to: { "Save format": "Formats", "Save materials": "Package BOM" },
     job: "Create or edit one shared package format",
-    spec: "New and Edit use the same form. Presets fill common keg and case sizes; standard kegs derive volume, cans and bottles multiply container size by count. Names are suggested with optional rename. Custom size preserves nonstandard volumes. Composition and packaging materials are optional disclosures; saved material lists have their own save action in the same editor. Format changes affect every linked SKU, never recorded movement volumes.",
+    spec: "New and Edit use the same form. Choose a container and size; standard kegs derive volume, cans and bottles multiply container size by count. Names are suggested with optional rename. Custom size preserves nonstandard volumes. Create saves a composed parent and its child quantities in one transaction; the parent volume is always derived. Packaging materials have their own save action. Admin can confirm Delete format for an unused packaged format; SKUs, other packages, prices and history block deletion. Format changes affect every linked SKU, never recorded movement volumes.",
     reads: "list_formats · get_format_composition",
-    writes: "upsert_format · replace_format_components · replace_format_bom",
+    writes: "upsert_format · create_composed_format · replace_format_components · replace_format_bom · delete_format [admin]",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
-    body: <FormatView model={toFormatViewProps(formatCan)} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} />,
+    body: <FormatView model={toFormatViewProps(formatCan)} deleteAction={<DeleteFormatControl name={formatCan.format.name} />} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} />,
   },
   {
     step: 5,

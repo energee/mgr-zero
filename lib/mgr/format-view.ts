@@ -118,12 +118,6 @@ export function formatSizing(model: FormatViewModel) {
   return { name, bbl, volumeLabel, valid: error === undefined, error };
 }
 
-export function formatPreset(preset: string): Partial<FormatViewModel> {
-  return preset === "case"
-    ? { name: "", packageType: "can", unitsPerCase: "24", volumeValue: "16", volumeUnitIndex: 0, composed: false }
-    : { name: "", packageType: "keg", kegSize: preset, composed: false };
-}
-
 /** Field changes are identical in the live form and the interactive preview. */
 export function formatControls(model: FormatViewModel, patch: (next: Partial<FormatViewModel>) => void) {
   return {
@@ -134,7 +128,6 @@ export function formatControls(model: FormatViewModel, patch: (next: Partial<For
     volumeValue: (volumeValue: string) => patch({ volumeValue }),
     volumeUnit: (unit: string) => patch({ volumeUnitIndex: model.volumeUnits.indexOf(unit as FormatViewModel["volumeUnits"][number]) }),
     composed: (composed: boolean) => patch({ composed }),
-    preset: (preset: string) => patch(formatPreset(preset)),
   };
 }
 

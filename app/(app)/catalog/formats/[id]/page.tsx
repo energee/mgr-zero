@@ -12,6 +12,7 @@ import { formatVolume } from "@/lib/volume";
 import type { FormatSnapshot } from "@/lib/mgr/format-view";
 import { PourForm } from "../../pour-form";
 import { FormatRowsForm } from "./rows-form";
+import { DeleteFormatButton } from "../../delete-format-button";
 
 type Detail = {
   format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
@@ -47,6 +48,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   });
   return <>
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
+      deleteAction={ctx.role === "admin" ? <DeleteFormatButton formatId={id} name={data.format.name} /> : null}
       canCompose={components.length === 0 && canComposeFormat(data.format, data.usedAsChild)}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
       contents={canComposeFormat(data.format, data.usedAsChild) ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}

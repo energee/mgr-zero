@@ -489,7 +489,8 @@ describe('format editing clarity', () => {
     const model = toFormatViewProps({format:{id:'new',name:'Case',basis:'packaged',package_type:'can',bbl_per_unit:null,composed:true}});
     const html = htmlOf(createElement(FormatView, { model, componentOptions: [{ id: 'can', name: '16 oz can' }] }));
     expect(html).toContain('Choose package');
-    expect(html).toContain('16 oz can');
+    const selected = htmlOf(createElement(FormatView, { model, componentOptions: [{ id: 'can', name: '16 oz can' }], componentRows: [{ id: 'can', qty: '24' }] }));
+    expect(selected).toContain('16 oz can');
     expect(html).toContain('Quantity 1');
     expect(html).not.toContain('Save this format, then add its contents');
   });

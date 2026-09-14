@@ -6,8 +6,8 @@ import { FormatRowsView, type FormatRow as Row } from "@/components/mgr/views/fo
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { validFormatRows } from "@/lib/format-edit-rules";
 
-export function FormatRowsForm({ formatId, kind, initial, options, triggerLabel, embedded = false, onSaved }: {
-  formatId: string; kind: "components" | "bom"; initial: Row[]; options: { id: string; name: string }[]; triggerLabel?: string; embedded?: boolean; onSaved?: () => void;
+export function FormatRowsForm({ formatId, kind, initial, options, triggerLabel, embedded = false }: {
+  formatId: string; kind: "components" | "bom"; initial: Row[]; options: { id: string; name: string }[]; triggerLabel?: string; embedded?: boolean;
 }) {
   const [rows, setRows] = useState(initial);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -18,7 +18,6 @@ export function FormatRowsForm({ formatId, kind, initial, options, triggerLabel,
     build: () => bom ? { formatId, lines: rows.map((r) => ({ materialId: r.id, qtyPerUnit: Number(r.qty), onBreak: r.onBreak ?? "consumed" })) }
       : { formatId, components: rows.map((r) => ({ childFormatId: r.id, qty: Number(r.qty) })) },
     reset: () => { setRows(initial); setConfirmClear(false); },
-    onSuccess: onSaved,
   });
   const body = <form className="flex flex-col gap-4" onSubmit={(event) => { if (!valid) { event.preventDefault(); return; } void form.submit(event); }}>
       <FormatRowsView kind={kind} rows={rows} options={options} onChange={setRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} disabled={form.submitting} addHref={bom ? "/materials" : "/catalog"} />

@@ -17,7 +17,7 @@ function FormatSelect({ label, value, options, onChange }: { label: string; valu
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({ model: supplied, createAction, controls: suppliedControls, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows, onComponentRowsChange, contentsOnly = false, formId }: {
+export function FormatView({ model: supplied, createAction, controls: suppliedControls, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows, onComponentRowsChange, deleteAction, formId }: {
   model: FormatViewModel;
   createAction?: ReactNode;
   controls?: Controls;
@@ -31,7 +31,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
   componentOptions?: { id: string; name: string }[];
   componentRows?: FormatRow[];
   onComponentRowsChange?: (rows: FormatRow[]) => void;
-  contentsOnly?: boolean;
+  deleteAction?: ReactNode;
   formId?: string;
 }) {
   const generatedFormId = useId();
@@ -45,17 +45,9 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
   const controls: Controls = suppliedControls ?? formatControls(model, patch);
   const sizing = formatSizing(model);
   const keg = model.packageType === "keg";
-  if (contentsOnly) return <div className="flex flex-col gap-4">
-    {E.fld("Format", model.name)}
-    <p className="text-sm text-muted-foreground">Format created. Review the selected packages and save contents to finish. Closing now keeps the format available to finish later.</p>
-    {contents}
-  </div>;
   return <>
     {createAction}
     <form id={id} onSubmit={onSubmit ?? (event => event.preventDefault())} className="flex flex-col gap-4">
-      {!editing && <div className="flex flex-wrap gap-2" aria-label="Common formats">
-        {[["half_bbl", "½ bbl keg"], ["sixth_bbl", "⅙ bbl keg"], ["case", "24 × 16 oz cans"]].map(([value, label]) => <button key={value} type="button" data-preview-action className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent" onClick={() => controls.preset?.(value)}>{label}</button>)}
-      </div>}
       <FormatSelect label="Container" value={model.packageType} options={model.packageOptions} onChange={controls.packageType} />
       {model.composed ? E.fld("Total beer volume", "Calculated from package contents") : <>
         {keg && <FormatSelect label="Keg size" value={model.kegSize} options={model.kegSizeOptions} onChange={controls.kegSize} />}
@@ -74,7 +66,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
       {model.composed && !editing && <section className="flex flex-col gap-3 pt-3" aria-label="Package contents">
         <h3 className="text-sm font-medium">Package contents</h3>
         <FormatRowsView kind="components" rows={componentRows ?? localComponents} options={componentOptions} onChange={onComponentRowsChange ?? setLocalComponents} confirmClear={false} onConfirmClear={() => {}} />
-        <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create the format, then save these contents in the next step.</p>
+        <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
       {sizing.error && E.info(sizing.error)}
@@ -88,5 +80,6 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
       </div>
     </details>
     {footer !== undefined ? footer : <Button type="submit" form={id} className="w-full md:w-fit md:self-end">Save format</Button>}
+    {deleteAction}
   </>;
 }

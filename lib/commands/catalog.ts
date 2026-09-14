@@ -40,6 +40,22 @@ defineCommand({
 // typed. A poured format holds no stock and carries no package facts.
 const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 defineCommand({
+  name: "create_composed_format", description: "Create a packaged format and its atomic child quantities together; volume is always derived, never stored on the parent",
+  input: z.object({ name: z.string().trim().min(1), packageType: z.enum(["keg", "can", "bottle"]), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().finite().positive() })).min(1) }).strict(),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_composed_format", {
+    p_brewery: ctx.breweryId, p_name: i.name, p_package_type: i.packageType,
+    p_components: i.components.map(c => ({ child_format_id: c.childFormatId, qty: c.qty })), p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "delete_format", description: "Delete an unused packaged format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history",
+  input: z.object({ formatId: z.string().uuid() }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_format", { p_brewery: ctx.breweryId, p_id: i.formatId, p_request_id: execution.requestId })),
+});
+
+defineCommand({
   name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
