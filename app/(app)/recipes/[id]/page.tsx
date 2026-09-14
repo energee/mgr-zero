@@ -14,7 +14,7 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { NewVersionForm } from "./recipe-version-form";
-import { fermentationSummary, mashSummary, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, mashSummary, processReadout, profileIons, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
 type Version = ProcessColumns & {
@@ -23,7 +23,7 @@ type Version = ProcessColumns & {
   mash_schedule: MashStep[]; fermentation_schedule: FermentationStage[];
 };
 type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage: string };
-type Profile = { id: string; name: string };
+type Profile = { id: string; name: string; calcium_ppm: number; magnesium_ppm: number; sodium_ppm: number; sulfate_ppm: number; chloride_ppm: number; bicarbonate_ppm: number };
 type Ingredient = { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null };
 type GetRecipe = { recipe: Recipe; version: Version | null; ingredients: Ingredient[]; waterAdditions: WaterAdditionRow[]; ogPlato: number | null; fgPlato: number | null; abv: number | null };
 type Material = { id: string; name: string; category: string; extract_potential: number | null };
@@ -45,11 +45,12 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
   // The form is a client component: hand it the fields it reads, not the whole materials row.
   const formMaterials = materials.map(({ id, name, category, extract_potential }) => ({ id, name, category, extract_potential }));
+  const profileOptions = profiles.map((p) => ({ id: p.id, name: p.name, ions: profileIons(p) }));
 
   return (
     <RecipeView
       model={{ title: recipe.name, backHref: "/recipes" }}
-      createAction={<NewVersionForm recipeId={recipe.id} materials={formMaterials} profiles={profiles} unit={gravityUnit.effective} />}
+      createAction={<NewVersionForm recipeId={recipe.id} materials={formMaterials} profiles={profileOptions} unit={gravityUnit.effective} />}
       detail={
         <>
           {recipe.note ? E.fld("Note", recipe.note) : null}

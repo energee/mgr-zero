@@ -18,9 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
-import { EMPTY_WATER, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
-import type { NamedOption } from "@/components/mgr/views/water";
 
 const STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
 
@@ -32,7 +31,7 @@ const emptyLine = (): Line => ({ materialId: "", perBblQty: "", stage: "mash", t
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
 const EMPTY_PROCESS = { preBoilBbl: "", whirlpoolMinutes: "", whirlpoolTempF: "", whirlpoolRestMinutes: "", knockoutTempF: "" };
 
-export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipeId: string; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
+export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipeId: string; materials: Material[]; profiles: WaterProfileIons[]; unit: GravityUnit }) {
   const [mashSchedule, setMashSchedule] = useState<MashStep[]>(DEFAULT_MASH);
   const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
   const [process, setProcess] = useState(EMPTY_PROCESS);

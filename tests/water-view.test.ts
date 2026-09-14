@@ -1,4 +1,5 @@
 // tests/water-view.test.ts — the Water screen's suggestion verb and ion read-out (spec 2026-09-14).
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -35,4 +36,11 @@ describe("WaterView", () => {
     expect(html({})).toMatch(/data-row-action[^>]*>[^<]*Suggest additions/);
     expect(html({ water: { ...draft, mashGal: "0", spargeGal: "0" } })).toMatch(/<button[^>]*disabled/);
   });
+});
+
+it("the live sheet mounts WaterView with profile ions and no salt identity yet, so it draws gated", () => {
+  const sheets = readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8");
+  expect(sheets).toMatch(/<WaterView\b/);
+  expect(sheets).not.toMatch(/Suggest additions|Against target|salt:/);
+  expect(readFileSync("app/(app)/recipes/[id]/page.tsx", "utf8")).toMatch(/profileIons/);
 });

@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
-import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
-import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
+import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -52,7 +52,7 @@ export function FermentationScheduleSheet({ stages, onChange }: { stages: Fermen
     item={(p) => <FermentationStageView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
 }
 
-export function WaterSheet({ water, profiles, materials, onChange }: { water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange: (water: WaterDraft) => void }) {
+export function WaterSheet({ water, profiles, materials, onChange }: { water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; onChange: (water: WaterDraft) => void }) {
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={`Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
