@@ -110,6 +110,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
     catalog: items.map(item => ({ ...item, qty: Number(qty[item.skuId] ?? 0) })),
   });
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`;
+  shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
   return <>
     <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up", "what the brewery plans to brew next")}</Link>}
       controls={{

@@ -39,7 +39,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   const ctx = await buildContext(brewery.id);
   const po = await orNotFound(runCommand("get_purchase_order", { poId: id }, ctx)) as Po;
   if (receipt) {
-    const model = toPostedReceiptViewProps(po, receipt, "/purchase-orders");
+    const model = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`);
     if (!model) notFound();
     return <ReceiptView model={model} />;
   }
