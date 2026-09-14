@@ -111,6 +111,8 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Formats", file: "app/(app)/catalog/page.tsx" },
   { name: "Format", file: "app/(app)/catalog/format-form.tsx" },
   { name: "Package BOM", file: "app/(app)/catalog/formats/[id]/page.tsx" },
+  { name: "Water profiles", file: "app/(app)/catalog/water-profiles/page.tsx" },
+  { name: "Water profile", file: "app/(app)/catalog/water-profiles/water-profile-form.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/cart.tsx" },
   { name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" },
