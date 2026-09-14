@@ -408,7 +408,7 @@ Claude-Session: https://claude.ai/code/session_01W3iwFZVppJtk5cEvdUbnsF"
 // tests/water-view.test.ts — the Water screen's suggestion verb and ion read-out (spec 2026-09-14).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { WaterView } from "@/components/mgr/views/water";
 import type { WaterDraft } from "@/lib/mgr/recipe-process-view";
 
@@ -436,15 +436,11 @@ describe("WaterView", () => {
   it("hides the read-out and disables the verb without a target", () => {
     const out = html({ water: { ...draft, targetProfileId: "" } });
     expect(out).not.toMatch(/Against target/);
-    expect(out).toMatch(/<button[^>]*disabled[^>]*>Suggest additions/);
+    expect(out).toMatch(/<button[^>]*disabled[^>]*>[^<]*Suggest additions/);
   });
-  it("hands the suggestion to onChange as the new additions list", () => {
-    const onChange = vi.fn();
-    // Rendered markup cannot click; call the same helper the view calls and check the contract the view relies on.
-    const { suggestAdditions } = require("@/lib/mgr/recipe-process-view");
-    const next = suggestAdditions(draft, profiles[0].ions, profiles[1].ions, salts);
-    onChange({ additions: next });
-    expect(onChange).toHaveBeenCalledWith({ additions: expect.arrayContaining([expect.objectContaining({ materialId: "gypsum", unit: "g" })]) });
+  it("the enabled verb is a clickable action, the disabled one a plain disabled button", () => {
+    expect(html({})).toMatch(/data-row-action[^>]*>[^<]*Suggest additions/);
+    expect(html({ water: { ...draft, mashGal: "0", spargeGal: "0" } })).toMatch(/<button[^>]*disabled/);
   });
 });
 ```
@@ -488,7 +484,9 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
     {/* … source profile, target profile, volumes, mash pH and the additions list stay exactly as they are … */}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
     {chemistryKnown
-      ? <button type="button" disabled={!canSuggest} onClick={() => target && source && onChange?.({ additions: suggestAdditions(water, source, target, materials) })} className="contents">{E.btn("Suggest additions", canSuggest ? "g" : "g disabled")}</button>
+      ? canSuggest
+        ? E.act("Suggest additions", "primary", undefined, () => target && source && onChange?.({ additions: suggestAdditions(water, source, target, materials) }))
+        : E.btn("Suggest additions", "g disabled")
       : E.gated("Suggest additions", "arrives with the material salt field")}
     {chemistryKnown && readout.length > 0 && <>
       {E.ttl("Against target")}
@@ -499,7 +497,7 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
 }
 ```
 
-Keep the existing source/target/volume/pH/addition markup in place of the comment line; only the tail changes. `E.btn` with `" disabled"` suffix draws a disabled button, so the wrapping `<button>` must not nest a button: use `E.btn` directly with an onClick via `E.act` instead if `E.btn` cannot take one. Check `E.btn`'s signature in `components/mgr/e.tsx:180`; if it has no onClick, draw the verb as `E.act("Suggest additions", "primary", undefined, handler)` and disable by rendering `E.btn("Suggest additions", "g disabled")` when `!canSuggest`.
+Keep the existing source/target/volume/pH/addition markup in place of the comment line; only the tail changes. `E.btn(label, kind, href)` takes no click handler, which is why the enabled verb is `E.act` (a Button with `onClick`) and the disabled state is `E.btn` with the `" disabled"` suffix; both render one `<button>`, never nested.
 
 - [ ] **Step 4: Run the tests**
 
