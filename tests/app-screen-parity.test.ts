@@ -9,9 +9,7 @@ import { SCREEN_ROUTES, ungatedMgrScreens } from "@/lib/mgr/screen-routes";
 
 describe("explorer parity", () => {
   it("maps every live product page unless its route has recorded parity debt", () => {
-    const knownRouteDebt = [
-      "app/(app)/cellar/[occupancyId]/reading/page.tsx",
-    ];
+    const knownRouteDebt: string[] = [];
     const mapped = new Set(SCREEN_ROUTES.flatMap((route) => [route.file, ...(route.additionalFiles ?? [])]));
     const pages = readdirSync("app", { recursive: true })
       .map((file) => `app/${file}`)
@@ -56,5 +54,9 @@ describe("explorer parity", () => {
     expect(routes.get("Packaging runs")).toBe("app/(app)/packaging/page.tsx");
     expect(routes.get("Planning")).toBe("app/(app)/planning/page.tsx");
     expect(routes.get("Route")).toBe("app/(app)/routes/[id]/page.tsx");
+    expect(routes.get("Fermentation reading")).toBe("app/(app)/cellar/[occupancyId]/reading/page.tsx");
+    const reading = readFileSync("app/(app)/cellar/[occupancyId]/reading/page.tsx", "utf8");
+    expect(reading).not.toContain('from "@/components/mgr/e"');
+    expect(reading).toContain("openByDefault");
   });
 });
