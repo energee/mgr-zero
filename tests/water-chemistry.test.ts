@@ -39,14 +39,19 @@ describe("waterChemistry", () => {
 });
 
 describe("suggestSalts", () => {
-  it("reproduces a hand-worked two-salt fit within 0.1 g and never goes negative", () => {
-    // 10 L; need +40 Ca, +25 SO4, +100 Cl over source: gypsum for sulfate, calcium chloride for chloride.
-    const target: Ions = { ...denver, calcium: denver.calcium + 40, sulfate: denver.sulfate + 25, chloride: denver.chloride + 100 };
-    const out = suggestSalts({ source: denver, target, totalGal: 10 / 3.78541, salts: ["gypsum", "calcium_chloride"] });
+  it("recovers the grams that produced an achievable target within 0.1 g and never goes negative", () => {
+    // 10 L; a target built from 2 g calcium chloride and 0.5 g gypsum on top of source is reachable exactly.
+    const L = 10;
+    const target: Ions = {
+      ...denver,
+      calcium: denver.calcium + (2 * 272.6 + 0.5 * 232.8) / L,
+      chloride: denver.chloride + (2 * 482.3) / L,
+      sulfate: denver.sulfate + (0.5 * 557.7) / L,
+    };
+    const out = suggestSalts({ source: denver, target, totalGal: L / 3.78541, salts: ["gypsum", "calcium_chloride"] });
     const grams = Object.fromEntries(out.map((s) => [s.salt, s.grams]));
-    // Cl comes only from CaCl2: 100 ppm × 10 L / 482.3 = 2.07 g; SO4 only from gypsum: 25 × 10 / 557.7 = 0.45 g.
-    expect(grams.calcium_chloride).toBeCloseTo(2.1, 1);
-    expect(grams.gypsum).toBeCloseTo(0.4, 1);
+    expect(grams.calcium_chloride).toBeCloseTo(2.0, 1);
+    expect(grams.gypsum).toBeCloseTo(0.5, 1);
     expect(out.every((s) => s.grams >= 0)).toBe(true);
   });
   it("returns nothing when the target is already met or no salts are stocked", () => {
