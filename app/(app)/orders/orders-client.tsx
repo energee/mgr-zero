@@ -8,15 +8,13 @@ import { OrdersView } from "@/components/mgr/views/orders-list";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
-import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
+import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
 import { type OrderStatus } from "@/lib/mgr/order-status";
-
-type Order = { id: string; order_no: number | null; status: OrderStatus; requested_ship_date: string | null; needs_restock: boolean; customers: { name: string } | null };
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
 export function OrdersClient({ role, status, customerId }: { role: StaffRole; status?: string; customerId?: string }) {
-  const result = useCommandQuery<Order[]>("list_orders", { status, customerId });
+  const result = useCommandQuery<OrdersListSnapshot["orders"]>("list_orders", { status, customerId });
   const orders = result.data ?? [];
   const canWrite = role === "admin" || role === "sales";
   const orderHref = (nextStatus?: string) => {
