@@ -164,6 +164,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_state_registration(uuid,uuid,text,text,date,date,uuid)",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
   "upsert_vessel(uuid,uuid,text,vessel_kind,numeric,uuid)",
+  "upsert_water_profile(uuid,uuid,text,numeric,numeric,numeric,numeric,numeric,numeric,uuid)",
 ];
 
 describe("authenticated RPC allowlist", () => {

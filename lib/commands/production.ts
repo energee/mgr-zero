@@ -93,6 +93,29 @@ defineQuery({
   },
 });
 
+// Water profiles: a catalog entity of six ions in ppm (Water profiles /
+// Water profile screens). One upsert creates (no profileId) or edits.
+const ppm = z.number().nonnegative();
+defineQuery({
+  name: "list_water_profiles", description: "Water profiles, alphabetical: a name and six ions in ppm",
+  input: z.object({}), roles: ["admin", "brewer"],
+  handler: (ctx) => unwrap(ctx.db.from("water_profiles")
+    .select("id, name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm")
+    .eq("brewery_id", ctx.breweryId).order("name")),
+});
+defineCommand({
+  name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name and six ions in ppm",
+  input: z.object({
+    profileId: z.string().uuid().optional(), name: z.string().trim().min(1),
+    calciumPpm: ppm, magnesiumPpm: ppm, sodiumPpm: ppm, sulfatePpm: ppm, chloridePpm: ppm, bicarbonatePpm: ppm,
+  }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_water_profile", {
+    p_brewery: ctx.breweryId, p_profile: i.profileId ?? null, p_name: i.name, p_calcium: i.calciumPpm, p_magnesium: i.magnesiumPpm,
+    p_sodium: i.sodiumPpm, p_sulfate: i.sulfatePpm, p_chloride: i.chloridePpm, p_bicarbonate: i.bicarbonatePpm, p_request_id: execution.requestId,
+  })),
+});
+
 // Each recipe carries its latest version (id and number): schedule_batch names
 // a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({

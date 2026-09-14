@@ -12,7 +12,7 @@ import { admin, asUser, ins, makeBrewery, makeStaff, seedCatalog, seedCustomer, 
 const matrix = {
   breweries: "deny", brewery_users: "self", brewery_counters: "deny", customer_users: "deny",
   customers: "deny", ship_tos: "deny", vendors: "deny", materials: "deny", material_lots: "deny",
-  styles: "deny", price_groups: "deny", brands: "tenant", formats: "tenant", format_components: "tenant",
+  styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny",
@@ -62,6 +62,7 @@ async function fixtures() {
   const material = await put("materials", { name: "Malt", category: "malt", base_uom: "lb", purchase_uom: "lb" });
   await put("material_lots", { material_id: material.id, lot_code: "M1" });
   await put("styles", { name: "IPA" });
+  await put("water_profiles", { name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 });
   const group = await put("price_groups", { name: "Standard", position: 1 });
   const composed = await put("formats", { name: "Six cases", basis: "packaged", package_type: "can" });
   await put("format_components", { parent_format_id: composed.id, child_format_id: cat.formatId, qty: 6 });
@@ -327,6 +328,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,["warehouse"],R()], update_sku: [B,SKU,true,null,R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
     update_packaging_run: [B,readyRun.id,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],now,R()], upsert_material: [B,MAT,"Malt","malt","lb","lb",1,false,VENDOR,0,true,R()],
     upsert_material_contract: [B,contract,VENDOR,MAT,100,100,day,null,name,R()], upsert_vendor: [B,VENDOR,"Vendor",null,null,1,"net30",true,R()], upsert_vessel: [B,emptyVessel.id,name,"fermenter",10,R()],
+    upsert_water_profile: [B,null,name,1,1,1,1,1,1,R()],
   };
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
