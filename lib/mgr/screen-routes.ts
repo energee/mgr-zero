@@ -138,7 +138,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
   { name: "Cellar transfer", file: "app/(app)/cellar/cellar-transfer-form.tsx" },
   { name: "Cellar addition", file: "app/(app)/cellar/cellar-addition-form.tsx" },
-  { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/reading-form.tsx" },
+  { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/page.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
   { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },
   { name: "Brew day", file: "app/(app)/batches/[id]/page.tsx" },
