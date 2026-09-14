@@ -43,7 +43,7 @@ describe("Catalog view", () => {
       brandOf(SKU_PILS),
       brandOf(SKU_STOUT),
     ]);
-    expect(model.brands[0]?.detail).toBe("IPA · 6.8% · 3 SKUs");
+    expect(model.brands[0]?.detail).toBe("IPA · 6.8% · 4 SKUs");
     // The row is the link to that brand's page; Catalog draws no Edit brand button.
     expect(model.brands[0]?.href).toBe(`/catalog/brands/${model.brands[0]!.key}`);
     expect(model.brands[1]?.detail).toBe("Lager · 4.9% · 2 SKUs");
@@ -69,7 +69,7 @@ describe("Catalog view", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
     expect(html).toMatch(/>Add brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
-    expect(html).toMatch(/IPA · 6\.8% · 3 SKUs/);
+    expect(html).toMatch(/IPA · 6\.8% · 4 SKUs/);
     expect(html).toMatch(/Price groups/);
     expect(html).toMatch(/3 channels · 8 groups/);
     expect(html).toMatch(/Water profiles/);
@@ -91,25 +91,23 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_HAZY));
   });
 
-  it("draws every brand row itself; rowExtra only adds beside one", () => {
+  it("draws one entry per brand without separate pour rows", () => {
     const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
       model,
       linkRows: true,
-      rowExtra: (row: { key: string }) => (row.key === model.brands[0]!.key ? "POUR SLOT" : null),
     }));
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).toContain(brandOf(SKU_PILS));
-    expect(html).toMatch(/IPA · 6\.8% · 3 SKUs/);
-    expect(html).toMatch(/POUR SLOT/);
+    expect(html).toMatch(/IPA · 6\.8% · 4 SKUs/);
+    expect(html).not.toMatch(/New pour|never a SKU/);
     expect(html).toMatch(/href="\/catalog\/brands\//);
   });
 
   it("still blanks an empty catalog", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps({ brands: [], priceGroups: catalogBrands.priceGroups }),
-      rowExtra: () => "POUR SLOT",
     }));
     expect(html).toMatch(/No brands yet/);
     // The blank carries a title plus a sentence saying what to do next.
@@ -122,6 +120,10 @@ describe("Catalog view", () => {
     expect(isValidElement(screen("Catalog").body)).toBe(true);
     expect(body.type).toBe(CatalogView);
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
+    const html = htmlOf(screen("Catalog").body);
+    expect(html).toContain("Shared sizes and packaging for every brand");
+    expect(html).toContain("Open format");
+    expect(html).toContain("½ bbl keg");
   });
 
   it("the live Catalog page mounts CatalogView and the shared FormatsView", () => {
@@ -131,8 +133,10 @@ describe("Catalog view", () => {
     // Brand is a page, not a dialog: New Brand links to it, as does each row.
     expect(src).not.toMatch(/<BrandForm\b/);
     expect(src).toMatch(/"\/catalog\/brands\/new"/);
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
-    expect(src).toMatch(/<FormatsView\b/);
+    expect(src).toContain("formats={toFormatsViewProps(");
+    const shared = readFileSync("components/mgr/views/catalog.tsx", "utf8");
+    expect(shared).toMatch(/from "@\/components\/mgr\/views\/formats"/);
+    expect(shared).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
     expect(src).toMatch(/backHref: "\/more"/);
     // The page no longer redraws the brand rows or nests packages in them.
@@ -153,7 +157,7 @@ describe("Brand view", () => {
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");
-    expect(model.skuList).toBe("3 active packages");
+    expect(model.skuList).toBe("3 active packages · 1 pour");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
     expect(model.compliance.map((row) => row.title)).toEqual(["COLA serial 260135", "OH registration"]);
     expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15", verb: "Edit" });
@@ -288,6 +292,7 @@ describe("SKU list view", () => {
       ["½ bbl keg", `${formatVolume("0.50000000")} · active`],
       ["⅙ bbl keg", `${formatVolume("0.16666667")} · active`],
       ["case · 24×16 oz", `${formatVolume("0.09677419")} · active`],
+      ["Pint", "16 oz · pour · drawn from keg"],
     ]);
   });
 
@@ -383,12 +388,12 @@ describe("Format view", () => {
     ]);
   });
 
-  it("renders Save format, Packaging BOM, and packaged/poured", () => {
+  it("keeps basic fields prominent and materials in an optional section", () => {
     const html = htmlOf(createElement(FormatView, { model: toFormatViewProps(formatCan) }));
     expect(html).toMatch(/>Save format</);
-    expect(html).toMatch(/Packaging BOM/);
-    expect(html).toMatch(/packaged/);
-    expect(html).toMatch(/New pour beside its brand/);
+    expect(html).toMatch(/Packaging materials · optional/);
+    expect(html).toMatch(/Container/);
+    expect(html).not.toMatch(/Basis|New SKU, then Pour,/);
     expect(html).toMatch(/Can body/);
     expect(html).not.toMatch(/→/);
   });
@@ -448,5 +453,25 @@ describe("Package BOM view", () => {
     const page = readFileSync("app/(app)/catalog/formats/[id]/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/package-bom"/);
     expect(page).toMatch(/<PackageBomView\b/);
+  });
+});
+
+describe('format editing clarity', () => {
+  it('shows saved keg volume in barrels and leaves out case-only fields', () => {
+    const model = toFormatViewProps({format:{id:'half',name:'Half keg',basis:'packaged',package_type:'keg',keg_size:'half_bbl',bbl_per_unit:'0.50000000'}});
+    expect(model.volumeValue).toBe('0.5');
+    expect(model.volumeUnits[model.volumeUnitIndex]).toBe('bbl');
+    const html = htmlOf(createElement(FormatView,{model}));
+    expect(html).toContain('Half keg');
+    expect(html).not.toContain('Containers per case');
+    expect(html).toContain('½ bbl');
+    expect(html).not.toContain('aria-label="Volume"');
+    expect(html).not.toContain('aria-label="Custom keg volume"');
+  });
+  it('does not offer direct volume editing on a format built from contents', () => {
+    const model = toFormatViewProps({format:{id:'case',name:'Case',basis:'packaged',package_type:'can',bbl_per_unit:null,composed:true}});
+    const html = htmlOf(createElement(FormatView,{model}));
+    expect(html).toContain('Calculated from package contents');
+    expect(html).not.toContain('aria-label="Volume"');
   });
 });

@@ -45,6 +45,7 @@ export type BrandSnapshot = {
     price_group_id: string | null;
     styles: { name: string } | null;
     skus: { id: string; active: boolean }[];
+    pours?: { id: string }[];
   };
   /** Brewery styles list; may include an inventory "Add …" option. */
   styles: string[];
@@ -105,7 +106,7 @@ export function toBrandViewProps({
     suggestion: cost ? suggestPriceGroup({ ...cost, groups: priceGroups }) : null,
     description: brand.description ?? "",
     hops: brand.hops ?? "",
-    skuList: plural(active, "active package"),
+    skuList: `${plural(active, "active package")}${brand.pours?.length ? ` · ${plural(brand.pours.length, "pour")}` : ""}`,
     skuListHref: brand.id ? `/catalog/brands/${brand.id}/skus` : "/catalog",
     compliance: brandComplianceRows(compliance),
   };

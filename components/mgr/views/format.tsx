@@ -1,56 +1,72 @@
-// components/mgr/views/format.tsx — Format sheet drawing (inventory). Live
-// create stays format-form.tsx: E.edit is not a controlled CommandForm.
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type FormEventHandler, type ReactNode } from "react";
+import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { E } from "@/components/mgr/e";
+import { FormatRowsView, type FormatRow } from "@/components/mgr/views/format-rows";
 import { VolumeField } from "@/components/mgr/volume-field";
-import type { FormatViewModel } from "@/lib/mgr/format-view";
+import { formatControls, formatSizing, type FormatViewModel } from "@/lib/mgr/format-view";
 
 export type { FormatViewModel };
 
-type Controls = Partial<Record<"name" | "packageType" | "kegSize" | "unitsPerCase" | "volumeValue", (value: string) => void>> & {
-  volumeUnit?: (unit: string) => void;
-};
-
-function FormatInput({ label, value, onChange, number }: { label: string; value: string; onChange?: (value: string) => void; number?: boolean }) {
-  return E.edit(label, value, number ? "number" : "text", undefined, { onChange, min: number ? 1 : undefined, step: number ? 1 : undefined, "aria-label": label });
-}
+type Controls = Partial<ReturnType<typeof formatControls>>;
 
 function FormatSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange?: (value: string) => void }) {
-  return E.pick(label, value, (options.map(option => ({ value: option, label: (option.replaceAll("_", " ")) }))), { onChange });
+  const choices = options.map(option => ({ value: option, label: SIZE_LABEL[option] ?? (option === "custom" ? "Custom size" : option.charAt(0).toUpperCase() + option.slice(1).replaceAll("_", " ")) }));
+  return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({
-  model,
-  createAction,
-  controls = {},
-  messages,
-  footer,
-}: {
+export function FormatView({ model: supplied, createAction, controls: suppliedControls, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing }: {
   model: FormatViewModel;
   createAction?: ReactNode;
   controls?: Controls;
   messages?: ReactNode;
   footer?: ReactNode;
+  onSubmit?: FormEventHandler<HTMLFormElement>;
+  materials?: ReactNode;
+  contents?: ReactNode;
+  editing?: boolean;
+  canCompose?: boolean;
 }) {
-  return (
-    <>
-      {createAction}
-      <FormatInput label="Format name" value={model.name} onChange={controls.name} />
-      {E.fld("Basis", model.basis)}
-      {E.info("Create a brand-owned glass using New pour beside its brand in Catalog.")}
-      <FormatSelect label="Package" value={model.packageType} options={model.packageOptions} onChange={controls.packageType} />
-      {model.packageType === "keg" ? <FormatSelect label="Keg size" value={model.kegSize} options={model.kegSizeOptions} onChange={controls.kegSize} /> : null}
-      <FormatInput label="Units per case · optional" value={model.unitsPerCase} onChange={controls.unitsPerCase} number />
-      <VolumeField value={model.volumeValue} units={model.volumeUnits} on={model.volumeUnitIndex} onValueChange={controls.volumeValue} onUnitChange={controls.volumeUnit} />
-      {E.info(model.composedInfo)}
-      {E.ttl("Packaging BOM")}
-      {E.tbl(
-        ["Material", "Qty", "On break"],
-        model.bom.map((line) => [line.material, line.qty, line.onBreak]),
-      )}
-      {E.info(model.bomInfo)}
+  const [bomRows, setBomRows] = useState<FormatRow[]>(() => supplied.bom.map(line => ({ id: line.material, qty: line.qty, onBreak: line.onBreak === "consumed" ? "consumed" : "return_to_stock" })));
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [local, setLocal] = useState(supplied);
+  const model = suppliedControls ? supplied : local;
+  const patch = (next: Partial<FormatViewModel>) => setLocal(previous => ({ ...previous, ...next }));
+  const controls: Controls = suppliedControls ?? formatControls(model, patch);
+  const sizing = formatSizing(model);
+  const keg = model.packageType === "keg";
+  return <>
+    {createAction}
+    <form onSubmit={onSubmit ?? (event => event.preventDefault())} className="flex flex-col gap-4">
+      {!editing && <div className="flex flex-wrap gap-2" aria-label="Common formats">
+        {[["half_bbl", "½ bbl keg"], ["sixth_bbl", "⅙ bbl keg"], ["case", "24 × 16 oz cans"]].map(([value, label]) => <button key={value} type="button" data-preview-action className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent" onClick={() => controls.preset?.(value)}>{label}</button>)}
+      </div>}
+      <FormatSelect label="Container" value={model.packageType} options={model.packageOptions} onChange={controls.packageType} />
+      {model.composed ? E.fld("Total beer volume", "Calculated from package contents") : <>
+        {keg && <FormatSelect label="Keg size" value={model.kegSize} options={model.kegSizeOptions} onChange={controls.kegSize} />}
+        {(!keg || model.kegSize === "custom") && <div className="flex flex-col gap-4">
+          <VolumeField label={keg ? "Custom keg volume" : "Size of one container"} value={model.volumeValue} units={model.volumeUnits} on={model.volumeUnitIndex} onValueChange={controls.volumeValue} onUnitChange={controls.volumeUnit} />
+          {!keg && E.edit("Containers per package", model.unitsPerCase, "number", undefined, { onChange: controls.unitsPerCase, min: 1, step: 1, required: true, "aria-label": "Containers per package" })}
+        </div>}
+        <div className="border-y py-3" aria-live="polite"><p className="text-xs text-muted-foreground">Beer per package</p><p className="text-lg font-medium tabular-nums">{sizing.valid && sizing.bbl != null ? sizing.volumeLabel : "Enter a size and count"}</p></div>
+      </>}
+      <details open={model.name ? true : undefined}>
+        <summary className="cursor-pointer text-sm font-medium">{model.name ? "Format name" : "Rename · optional"}</summary>
+        <div className="pt-3">{E.edit("Format name", model.name, "text", undefined, { onChange: controls.name, placeholder: sizing.valid ? sizing.name : "Name this format", "aria-label": "Format name" })}</div>
+      </details>
+      {!model.name && sizing.valid && <p className="text-sm text-muted-foreground">Saves as <strong className="font-medium text-foreground">{sizing.name}</strong></p>}
+      {canCompose && <details className="border-t pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={model.composed} onChange={event => controls.composed?.(event.target.checked)} />Calculate volume from smaller packages. Save this format, then add its contents.</label></details>}
+      {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
       {messages}
       {footer !== undefined ? footer : E.btn("Save format")}
-    </>
-  );
+    </form>
+    {model.composed && contents}
+    <details className="border-t pt-3">
+      <summary className="cursor-pointer text-sm font-medium">Packaging materials · optional</summary>
+      <div className="mt-3 flex flex-col gap-3 text-sm">
+        {materials !== undefined ? materials : model.bom.length ? <><FormatRowsView kind="bom" rows={bomRows} options={model.bom.map(line => ({ id: line.material, name: line.material }))} onChange={setBomRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} />{E.btn("Save materials")}</> : <p className="text-muted-foreground">Save the format first, then add trays, labels, or other materials here. Materials are optional.</p>}
+      </div>
+    </details>
+  </>;
 }

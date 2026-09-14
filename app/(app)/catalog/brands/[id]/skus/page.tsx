@@ -1,8 +1,5 @@
-// app/(app)/catalog/brands/[id]/skus/page.tsx — SKU list (screen record): every
-// package sold under one brand. Catalog links here from the brand row instead of
-// nesting the packages inline. list_brands already nests each brand's SKUs, so
-// the only other read is the packaged formats, which name them and back New SKU.
-// New SKU and Edit SKU are the sku-form.tsx sheets, Admin and Sales only.
+// One brand’s sellable SKUs: stocked packages and non-stock pours.
+// Existing serving identities remain the boundary for poured POS activity.
 import { notFound } from "next/navigation";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
@@ -10,10 +7,11 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
+import { PourForm } from "../../../pour-form";
 import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
-type Brand = { id: string; name: string; skus: Sku[] };
+type Brand = { id: string; name: string; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
 type Format = { id: string; name: string; bbl_per_unit: string | null };
 
 export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +31,13 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const options: FormatOption[] = formats.map((f) => ({ id: f.id, name: f.name }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, backHref: `/catalog/brands/${id}` })}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, backHref: `/catalog/brands/${id}` })}
       createAction={canWrite ? <SkuForm brandId={id} formats={options} /> : null}
       rowAction={canWrite ? (row) => {
+        if (row.kind === "poured") {
+          const pour = brand.pours.find(p => `pour:${p.id}` === row.key)!;
+          return <PourForm key={`${pour.id}-${pour.name}-${pour.ounces}`} brand={brand} pour={pour} />;
+        }
         const sku = skus.find((s) => s.id === row.key)!;
         return <SkuEditForm sku={sku} formatName={sku.formats?.name ?? "—"} />;
       } : undefined}

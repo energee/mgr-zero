@@ -25,7 +25,7 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost }: {
   });
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const model = toBrandViewProps({
-    brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [] },
+    brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
     styles, priceGroups, compliance, cost, backHref: "/catalog",
   });
   // Sheets need a saved brand.

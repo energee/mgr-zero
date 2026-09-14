@@ -150,7 +150,7 @@ On the **Work** landing itself, chips filter the rows in place. **all** restores
 
 <Screen name="Catalog" />
 
-*A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in one packaged format, the thing inventory, pricing, and orders refer to. Admin and Sales can create brands, formats, and SKUs. Warehouse opens **Menu** under More and reads Catalog at its address without catalog mutation controls. Catalog is not reachable by Brewer.*
+*A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in a packaged or poured format. Packaged SKUs hold inventory and appear on wholesale orders; poured SKUs describe a serving drawn from keg stock. Admin and Sales can create brands, formats, and SKUs. Warehouse opens **Menu** under More and reads Catalog at its address without catalog mutation controls. Catalog is not reachable by Brewer.*
 
 ### Create a brand
 
@@ -169,18 +169,18 @@ Under the sell sheet, **Compliance** lists what this brand holds: its COLA or fo
 <Screen name="Formats" />
 <Screen name="Format" />
 
-1. Under **Formats**, select **New Format**.
-2. Enter **Name**. This form creates a packaged format that holds stock.
-3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case**. Enter **Volume** in ounces, gallons, or barrels; MGR stores its canonical barrel value.
-4. Select **Create**. Packaged format names must be unique within the brewery.
+1. In **Catalog**, scroll below the brand list and pricing links to **Formats**, then select **New Format**. The Catalog screen preview shows the same section. Formats are shared across brands; each packaged SKU selects one.
+2. Pick a preset (**½ bbl keg**, **⅙ bbl keg**, or **24 × 16 oz cans**) or choose a **Container**.
+3. For kegs, choose **Keg size**. Standard sizes calculate beer volume automatically. **Custom size** accepts a volume. For cans and bottles, enter **Size of one container** and **Containers per package**; MGR calculates the total. A single can uses a count of 1.
+4. Review **Beer per package** and the suggested name. Expand **Rename · optional** to use your own name. Select **Create format** to save and open its detail page. Packaged format names must be unique within the brewery.
 
-For a glass served at the taproom, select **New pour** beside its brand in **Catalog**. Enter a **Name** (such as Pint or Taster) and a positive size in **Ounces**, then **Create pour**. Each brand owns its pours: two brands can both have a Pint with different sizes, but names must be unique within each brand. The saved row shows the brand, name and ounces. **Edit pour** starts with the saved values; select **Save pour** after changing the name or size. Admin and Sales can create and edit pours. Pours never hold stock and cannot be SKUs, components or packaging BOMs.
+Catalog shows one entry per brand. Open its **SKU list** and choose **New SKU**. Choose **Packaged** to select a shared format, or **Pour** to enter **Serving size · oz** (positive and less than 1,000). Pours suggest a name such as “16 oz pour”; expand **Rename · optional** for Pint, Taster, or another name. Existing custom names stay unchanged when sizing changes. **Edit SKU** uses the same fields. Admin and Sales can create and edit both kinds. Pours are not individually stocked, cannot enter wholesale orders or packaging materials, and retain their existing POS serving identity.
 
-Select **Open format** on a format row to see its components and **Package BOM**. Each BOM row also shows whether that material is **consumed** or **returned to stock** when the package is broken. Admin and Sales can **Replace components** or **Replace BOM**; Warehouse can read them. Each save replaces that entire list. Add rows, choose distinct items, enter positive quantities, and remove rows you no longer need. An empty list requires checking the explicit clear confirmation before saving.
+Select **Open format**, then **Edit format**. The same sizing fields are prefilled; existing names and custom volumes are preserved. Adjusting a legacy keg's custom volume keeps its existing fleet-size classification. Changes affect every SKU using that shared format, future calculations, and open plans. Recorded movement volumes, closed packaging yield, and consumed material quantities stay as recorded. Create a different format when another package needs a different definition.
 
-Components must be other atomic packaged formats with a typed volume. To create a composed format, leave **BBL per unit** blank when creating it, then open it and add components. A format with a typed volume, a poured format, or a format already used as a child cannot have its components replaced here. Clearing components leaves no volume, so the format cannot hold stock until components are added again.
+**Packaging materials · optional** is in the format editor. After the format exists, expand it to add trays, labels, or other materials. If none exist, follow **Add a material** and return. Choose distinct materials, enter positive quantities per complete package in each material’s base unit, and select **Used up** or **Return to stock** under **When unpacked**. **Save materials** saves the complete material list separately from **Save format**. Removing every row requires the explicit clear confirmation. Materials are optional and do not block creating formats or preparing imports. Warehouse can view definitions; Admin and Sales can edit them.
 
-For packaging materials, quantities use the material’s displayed base unit. Choose **Consumed** or **Return to stock** for what happens when the package is broken open. Existing inactive materials remain visible. Changes apply to this format’s complete list; if a different package needs its own list, create a separate format. Correcting an existing definition affects future calculations and open plans. Recorded movement volumes, closed packaging yield, and consumed material quantities stay as recorded.
+For packages built from smaller packages, expand **Build from other packages**, enable calculated volume, give the format a name, and save it. Open **Edit format → Package contents** to add eligible atomic packages and quantities, then **Save contents**. Total volume is calculated and read-only. A format with a typed volume, a poured format, or a format already used as a child cannot have its components replaced here. Clearing contents leaves no volume, so the format cannot hold stock until contents are added again.
 
 ### Water profiles
 
@@ -292,6 +292,14 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 7. Select **Create** or **Save**.
 
 Customer detail shows **Tax treatment**. Choose **Inherit sale channel** to use the channel default, or select a customer override; editing another field preserves the selected treatment. **Orders** opens only this customer’s orders, and status filters keep that customer selected. **Clear** returns to all customers.
+
+On desktop, **Account details**, **Ship-tos**, and **Portal users** sit together, with **Trading terms** and **Customer activity** alongside them. **Edit** stays beside the customer name. **New Ship-To** belongs to the Ship-tos section; **Delete customer** is separated below the account sections. The same sections stack on smaller screens.
+
+### Delete an unused customer
+
+Admin can open a customer and select **Delete customer**. The confirmation names the customer and explains that its ship-to addresses will also be deleted. **Cancel** keeps everything. Confirming returns to Customers after deletion.
+
+Customers with orders, invoices, keg records, portal access, invitations, or a QuickBooks link cannot be deleted. MGR shows the reason and preserves the customer and its addresses. This does not merge customers or remove their history. Sales and Warehouse cannot delete customers.
 
 ### Create or edit a ship-to
 

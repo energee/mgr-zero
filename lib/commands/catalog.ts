@@ -255,7 +255,7 @@ defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc), pours:formats(id, name, ounces)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 // Replacement inputs must include the entire set, even beyond PostgREST's row cap.

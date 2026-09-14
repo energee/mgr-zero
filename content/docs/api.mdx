@@ -277,6 +277,7 @@ omitted. They have no roles until they are built.
 | `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `delete_customer` | Customers | ✓ |  |  |  |  |  |
 | `delete_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `delete_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |  |
 | `depart_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
@@ -2386,6 +2387,23 @@ reuses the saved user identity. Replaying a completed invite never restores
 revoked membership.
 
 {/* ops:customers */}
+
+#### delete_customer [#delete_customer]
+
+`command` · admin
+
+Delete an unused customer and its ship-to addresses; preserve linked history, portal access, invitations and QuickBooks customers
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
 
 #### get_customer [#get_customer]
 

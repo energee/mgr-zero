@@ -11,7 +11,8 @@ import * as React from "react";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { Field, FieldLabel } from "@/components/ui/field";
 
-export function VolumeField({ value, units, on, onValueChange, onUnitChange }: {
+export function VolumeField({ value, units, on, onValueChange, onUnitChange, label = "Volume" }: {
+  label?: string;
   value: string;
   units: string[];
   on: number;
@@ -22,12 +23,12 @@ export function VolumeField({ value, units, on, onValueChange, onUnitChange }: {
   return (
     <Field>
       {/* htmlFor, so the visible label focuses the input and names it once. */}
-      <FieldLabel htmlFor={id}>Volume</FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Qty
         value={value}
         onChange={onValueChange}
         unit={<TabBar names={units} on={on} cls="w-fit" onChange={onUnitChange} />}
-        label="Volume"
+        label={label}
         id={id}
       />
     </Field>

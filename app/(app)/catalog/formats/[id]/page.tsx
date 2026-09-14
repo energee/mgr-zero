@@ -7,11 +7,14 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { toPackageBomViewProps } from "@/lib/mgr/package-bom-view";
 import { canComposeFormat, eligibleChildren } from "@/lib/format-edit-rules";
 import "@/lib/commands/all";
+import { FormatForm } from "../../format-form";
+import { formatVolume } from "@/lib/volume";
+import type { FormatSnapshot } from "@/lib/mgr/format-view";
 import { PourForm } from "../../pour-form";
 import { FormatRowsForm } from "./rows-form";
 
 type Detail = {
-  format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: string; bbl_per_unit: string | null };
+  format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
   components: { child_format_id: string; qty: number }[];
   lines: { material_id: string; qty_per_unit: number; on_break: "consumed" | "return_to_stock" }[];
   formats: { id: string; name: string; basis: string; bbl_per_unit: string | null; composed: boolean }[];
@@ -32,6 +35,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const children = eligibleChildren(id, data.formats);
   const components = data.components.map((c) => ({ id: c.child_format_id, qty: String(c.qty) }));
   const lines = data.lines.map((l) => ({ id: l.material_id, qty: String(l.qty_per_unit), onBreak: l.on_break }));
+  const materialOptions = data.materials.map(m => ({ id: m.id, name: `${m.name} (${m.base_uom})${m.active ? "" : " · inactive"}` }));
   const bomModel = toPackageBomViewProps({
     format: data.format,
     lines: data.lines.map((line) => ({
@@ -41,14 +45,20 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     })),
   });
   return <>
-    {E.back("Catalog", data.format.name, undefined, "/catalog")}
-    {E.info(`${data.format.basis} · ${data.format.bbl_per_unit === null ? "Volume derives from components; without components this format cannot hold stock." : `${data.format.bbl_per_unit} bbl per unit`}`)}
-    {E.hd("Components", "One level of atomic packaged formats", writable && canComposeFormat(data.format, data.usedAsChild) ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
-    {components.length ? E.tbl(["Child format", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("No components")}
-    {!canComposeFormat(data.format, data.usedAsChild) ? E.info("Components require a packaged format without a typed volume that is not already used as another format's child. Create a separate format with BBL per unit blank to compose it.") : null}
+    {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
+      canCompose={components.length === 0 && canComposeFormat(data.format, data.usedAsChild)}
+      materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
+      contents={canComposeFormat(data.format, data.usedAsChild) ? <details className="border-t pt-3"><summary className="cursor-pointer text-sm font-medium">Package contents</summary><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></details> : undefined}
+    /> : undefined, "/catalog")}
+    <p className="text-sm text-muted-foreground">Shared format · {data.format.bbl_per_unit === null ? "Beer volume calculated from package contents" : `${formatVolume(data.format.bbl_per_unit)} of beer per package`}</p>
+    {canComposeFormat(data.format, data.usedAsChild) || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
+      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case", writable && canComposeFormat(data.format, data.usedAsChild) ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
+      {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("Add the packages inside to calculate the total volume")}
+    </section> : null}
     <PackageBomView
       model={bomModel}
-      createAction={E.hd("Package BOM", "Material quantities are in their base units", writable ? <FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={data.materials.map((m) => ({ id: m.id, name: `${m.name} (${m.base_uom})${m.active ? "" : " · inactive"}` }))} /> : undefined)}
+      createAction={E.hd("Packaging materials", "Optional · managed in Edit format")}
+      rowAction={null}
       footer={null}
     />
     {!writable ? E.info("Admin or Sales can replace components and packaging materials.") : null}

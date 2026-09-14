@@ -7,6 +7,15 @@ import { defineCommand, defineQuery, stateCode, unwrap } from "./registry";
 const roles = ["admin", "sales"] as const;
 
 defineCommand({
+  name: "delete_customer", description: "Delete an unused customer and its ship-to addresses; preserve linked history, portal access, invitations and QuickBooks customers",
+  roles: ["admin"],
+  input: z.object({ customerId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_customer", {
+    p_brewery: ctx.breweryId, p_id: i.customerId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "upsert_customer", description: "Create or update a customer account: its sale channel decides its prices and where its removals post; tax treatment may override the channel default",
   roles: [...roles],
   input: z.object({

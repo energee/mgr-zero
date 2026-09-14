@@ -11,12 +11,14 @@ export function PackageBomView({
   createAction,
   footer,
   linkRows,
+  rowAction,
 }: {
   model: PackageBomViewModel;
   createAction?: ReactNode;
   footer?: ReactNode;
   /** Live: Edit is a link. Inventory leaves it an unlabeled tap. */
   linkRows?: boolean;
+  rowAction?: ReactNode;
 }) {
   return (
     <>
@@ -26,7 +28,7 @@ export function PackageBomView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act("Edit", "primary", linkRows ? row.href : undefined))}
+            {E.row(row.title, row.detail, rowAction !== undefined ? rowAction : E.act("Edit", "primary", linkRows ? row.href : undefined))}
           </Fragment>
         ))}
       {footer !== undefined ? footer : E.btn("Replace BOM")}
