@@ -27,6 +27,11 @@ describe("WaterView", () => {
     expect(out.match(/data-gated/g)).toHaveLength(2);
     expect(out).not.toMatch(/Against target/);
   });
+  it("draws only the verb gated when no salt is known and no target is picked either", () => {
+    const out = html({ materials: [{ id: "gypsum", name: "Gypsum" }, { id: "lactic", name: "Lactic acid" }], water: { ...draft, targetProfileId: "" } });
+    expect(out.match(/data-gated/g)).toHaveLength(1);
+    expect(out).not.toMatch(/Against target/);
+  });
   it("hides the read-out and disables the verb without a target", () => {
     const out = html({ water: { ...draft, targetProfileId: "" } });
     expect(out).not.toMatch(/Against target/);

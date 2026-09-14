@@ -83,8 +83,8 @@ export type WaterAdditionFields = { materialId: string; qty: string; unit: strin
 export const toAdditionFields = (a?: WaterAddition): WaterAdditionFields => ({ materialId: a?.materialId ?? "", qty: a ? String(a.qty) : "", unit: a?.unit ?? "g", stage: a?.stage ?? "mash" });
 export const additionReady = (f: WaterAdditionFields) => f.materialId !== "" && isPositive(f.qty);
 
-/** A profile option the Water screen can compute from; `ions` absent means only the name is known. */
-export type WaterProfileIons = { id: string; name: string; ions?: Ions };
+/** A profile option the Water screen can compute from. */
+export type WaterProfileIons = { id: string; name: string; ions: Ions };
 /** A material as the Water screen sees it: `salt` undefined means the schema carries none yet, null means not a salt. */
 export type SaltMaterial = { id: string; name: string; salt?: Salt | null };
 
@@ -106,13 +106,18 @@ const saltOf = (materials: SaltMaterial[], id: string) => materials.find((m) => 
 const asSaltAdditions = (draft: WaterDraft, materials: SaltMaterial[]) =>
   draft.additions.map((a) => ({ salt: saltOf(materials, a.materialId), grams: gramsOf(a.qty, a.unit) }));
 
-/** The solver's additions in place of the draft's salts; acids and unknown materials stay where they were. */
+const hasSalt = (m: SaltMaterial): m is SaltMaterial & { salt: Salt } => Boolean(m.salt);
+
+/** The solver's additions in place of the draft's salts; acids and unknown materials stay where they were.
+ *  Two stocked materials carrying the same salt collapse to one suggestion, mapped to the first such material. */
 export function suggestAdditions(draft: WaterDraft, source: Ions, target: Ions, materials: SaltMaterial[]): WaterAddition[] {
   const mashGal = Number(draft.mashGal) || 0, spargeGal = Number(draft.spargeGal) || 0;
-  const stocked = materials.filter((m) => m.salt);
+  const stocked = materials.filter(hasSalt);
+  const bySalt = new Map<Salt, string>();
+  for (const m of stocked) if (!bySalt.has(m.salt)) bySalt.set(m.salt, m.id);
   const kept = draft.additions.filter((a) => !saltOf(materials, a.materialId));
-  const suggested = suggestSalts({ source, target, totalGal: mashGal + spargeGal, salts: stocked.map((m) => m.salt as Salt) }).flatMap(({ salt, grams }) => {
-    const materialId = stocked.find((m) => m.salt === salt)!.id;
+  const suggested = suggestSalts({ source, target, totalGal: mashGal + spargeGal, salts: [...bySalt.keys()] }).flatMap(({ salt, grams }) => {
+    const materialId = bySalt.get(salt)!;
     const { mash, sparge } = splitByStage(grams, mashGal, spargeGal);
     return [mash > 0 ? { materialId, qty: mash, unit: "g", stage: "mash" } : null, sparge > 0 ? { materialId, qty: sparge, unit: "g", stage: "sparge" } : null].filter((a): a is WaterAddition => a !== null);
   });
@@ -122,7 +127,8 @@ export function suggestAdditions(draft: WaterDraft, source: Ions, target: Ions, 
 export const WARN_PPM = 20;
 export type IonReadoutRow = { ion: string; detail: string; warning: boolean };
 const ppm = (n: number) => String(Math.round(n));
-const signed = (n: number) => (n < 0 ? `−${ppm(-n)}` : `+${ppm(n)}`);
+/** Round before choosing the sign, so a delta like −0.4 renders "+0" and never "−0". */
+const signed = (n: number) => { const r = Math.round(n); return r < 0 ? `−${-r}` : `+${r}`; };
 /** Six rows, one per ion: "180 of 200 ppm · −20"; empty without a target. */
 export function ionReadout(draft: WaterDraft, source: Ions, target: Ions | undefined, materials: SaltMaterial[]): IonReadoutRow[] {
   if (!target) return [];

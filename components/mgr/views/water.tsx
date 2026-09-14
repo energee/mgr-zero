@@ -51,7 +51,7 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
       {E.ttl("Against target")}
       {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
     </>}
-    {!chemistryKnown && E.gated("Ion read-out", "arrives with the material salt field")}
+    {!chemistryKnown && target && source && E.gated("Ion read-out", "arrives with the material salt field")}
   </>;
 }
 

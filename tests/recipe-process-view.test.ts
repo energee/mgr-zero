@@ -60,6 +60,20 @@ describe("water suggestions", () => {
     expect(out.some((a) => a.materialId === "cacl" && a.stage === "sparge")).toBe(true);
     expect(out.every((a) => a.unit === "g" || a.materialId === "lactic")).toBe(true);
   });
+  it("dedupes stocked salts sharing a salt identity, naming each material id at most once per stage", () => {
+    const dupeSalts: SaltMaterial[] = [
+      { id: "gypsum-a", name: "Gypsum (bag 1)", salt: "gypsum" },
+      { id: "gypsum-b", name: "Gypsum (bag 2)", salt: "gypsum" },
+      { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" },
+    ];
+    const dupeDraft: WaterDraft = { targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12", targetMashPh: "", additions: [] };
+    const out = suggestAdditions(dupeDraft, profileIons(denverRow), profileIons(hazyRow), dupeSalts);
+    expect(out.some((a) => a.materialId === "gypsum-b")).toBe(false);
+    for (const stage of ["mash", "sparge"]) {
+      expect(out.filter((a) => a.materialId === "gypsum-a" && a.stage === stage).length).toBeLessThanOrEqual(1);
+      expect(out.filter((a) => a.materialId === "cacl" && a.stage === stage).length).toBeLessThanOrEqual(1);
+    }
+  });
   it("reads out six ions against target and flags a miss over 20 ppm", () => {
     const rows = ionReadout(draft, profileIons(denverRow), profileIons(hazyRow), salts);
     expect(rows.map((r) => r.ion)).toEqual(["Calcium", "Magnesium", "Sodium", "Sulfate", "Chloride", "Bicarbonate"]);
@@ -67,5 +81,12 @@ describe("water suggestions", () => {
     expect(cl.detail).toMatch(/^30 of 180 ppm · −150$/);
     expect(cl.warning).toBe(true);
     expect(ionReadout(draft, profileIons(denverRow), undefined, salts)).toEqual([]);
+  });
+  it("rounds the delta before choosing its sign, so −0.4 ppm off renders +0, never −0", () => {
+    const target = { ...profileIons(hazyRow), sodium: profileIons(denverRow).sodium + 0.4 };
+    const rows = ionReadout({ ...draft, additions: [] }, profileIons(denverRow), target, salts);
+    const na = rows.find((r) => r.ion === "Sodium")!;
+    expect(na.detail).toContain("+0");
+    expect(na.detail).not.toContain("−0");
   });
 });

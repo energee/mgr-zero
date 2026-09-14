@@ -933,12 +933,19 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Complete transfer")!.writes)).toContain("ship_order");
   });
 
-  it("suggests salts on Water and shows every ion against target, one row warned", () => {
+  it("suggests salts on Water and shows every ion against target, the ions off target warned", () => {
     const html = body("Water");
     expect(html).toMatch(/Suggest additions/);
     expect(html).toMatch(/Against target/);
     for (const ion of ["Calcium", "Magnesium", "Sodium", "Sulfate", "Chloride", "Bicarbonate"]) expect(html).toContain(ion);
     expect(html).not.toContain("data-gated");
+    // Each row's warning dot is drawn just before its own title text, so the
+    // segment between one ion's label and the next carries the *next* row's dot.
+    const against = html.slice(html.indexOf("Against target"));
+    const rowFor = (ion: string, next: string) => against.slice(against.indexOf(ion), against.indexOf(next));
+    expect(rowFor("Sodium", "Sulfate")).not.toContain("bg-dot-warning");
+    expect(rowFor("Sulfate", "Chloride")).toContain("bg-dot-warning");
+    expect(rowFor("Chloride", "Bicarbonate")).toContain("bg-dot-warning");
     const water = SCREENS.find((s) => s.name === "Water")!;
     expect(String(water.spec)).toMatch(/waterChemistry|same formula/i);
     expect(String(water.spec)).not.toMatch(/does not build/);

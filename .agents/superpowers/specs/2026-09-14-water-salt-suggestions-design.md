@@ -82,8 +82,9 @@ Below the additions list:
   does not build" with the shared-formula rule: the preview and the server
   call `waterChemistry`.
 
-Fixture: Municipal Denver → Hazy target, two salts stocked, one addition
-adjusted by hand so the read-out shows one warning row.
+Fixture: Municipal Denver → Hazy target, three salts stocked, additions
+trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since
+salts only add ions and Denver starts 70 ppm over the target.
 
 ## Live binding
 
@@ -93,6 +94,10 @@ read-out and the verb. Until `materials.salt` exists the view receives no
 salts and draws `E.gated("Suggest additions", …)` and
 `E.gated("Ion read-out", …)` in their places. Nothing invents a salt from a
 material's name.
+
+The brewery's default source water is a Settings value; PR B passes it
+through `sourceDefault` so a version that does not override its source still
+gets the verb and the read-out.
 
 ## Testing
 

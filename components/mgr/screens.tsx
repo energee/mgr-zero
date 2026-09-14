@@ -305,7 +305,7 @@ const SALT_OPTIONS: SaltMaterial[] = [
   { id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "epsom", name: "Epsom salt", salt: "epsom_salt" },
   { id: "lactic", name: "Lactic acid", salt: null }, { id: "phos", name: "Phosphoric acid", salt: null },
 ];
-/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed (calcium chloride short of target, so Chloride warns). */
+/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
 const WATER_HAZY: WaterDraft = {
   targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
