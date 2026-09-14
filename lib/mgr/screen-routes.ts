@@ -4,12 +4,13 @@
 // here to its public page entry. Rows are added as pages land; a screen with no
 // row is a missing page, not a typo. Header/dialog-only screens name their
 // mounted component because they have no page. The map therefore covers every
-// public product page without hiding route-level wrappers from parity checks.
+// public product page without hiding route-level wrappers from parity checks;
+// additionalFiles records another public route for the same screen contract.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-export const SCREEN_ROUTES: { name: string; file: string }[] = [
+export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: string[] }[] = [
   { name: "Reverse movement", file: "app/(app)/inventory/reversal-form.tsx" },
   { name: "SKU detail", file: "app/(app)/inventory/[id]/page.tsx" },
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
@@ -172,7 +173,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Keg report", file: "app/(app)/kegs/report/page.tsx" },
   { name: "Keg event history", file: "app/(app)/kegs/history/page.tsx" },
   { name: "Routes", file: "app/(app)/routes/page.tsx" },
-  { name: "Route", file: "app/(app)/routes/new/page.tsx" },
+  { name: "Route", file: "app/(app)/routes/[id]/page.tsx", additionalFiles: ["app/(app)/routes/new/page.tsx"] },
   { name: "Return route", file: "app/(app)/routes/[id]/page.tsx" },
   { name: "Driver route", file: "app/(app)/routes/[id]/page.tsx" },
   { name: "Confirm delivery", file: "app/(app)/work/deliveries/[id]/page.tsx" },

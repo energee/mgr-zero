@@ -13,7 +13,7 @@ describe("explorer parity", () => {
       "app/(app)/cellar/[occupancyId]/reading/page.tsx",
       "app/(app)/search/page.tsx",
     ];
-    const mapped = new Set(SCREEN_ROUTES.map((route) => route.file));
+    const mapped = new Set(SCREEN_ROUTES.flatMap((route) => [route.file, ...(route.additionalFiles ?? [])]));
     const pages = readdirSync("app", { recursive: true })
       .map((file) => `app/${file}`)
       .filter((file) => /^app\/\((app|auth|portal)\)\/.+\/page\.tsx$/.test(file))
@@ -44,7 +44,7 @@ describe("explorer parity", () => {
 
   it("every SCREEN_ROUTES row names an existing screen and file", () => {
     const names = new Set(ungatedMgrScreens().map((s) => s.name));
-    const bad = SCREEN_ROUTES.filter((r) => !names.has(r.name) || !existsSync(r.file)).map((r) => r.name);
+    const bad = SCREEN_ROUTES.filter((r) => !names.has(r.name) || [r.file, ...(r.additionalFiles ?? [])].some((file) => !existsSync(file))).map((r) => r.name);
     expect(bad).toEqual([]);
   });
 
