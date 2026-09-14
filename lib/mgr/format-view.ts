@@ -111,7 +111,11 @@ export function formatSizing(model: FormatViewModel) {
   const suggestion = model.composed ? "" : keg ? `${SIZE_LABEL[model.kegSize] ?? size} keg` : count === 1 ? `${size} ${model.packageType}` : `${count} × ${size} ${model.packageType}s`;
   const name = model.name.trim() || suggestion;
   const volumeLabel = bbl == null ? "—" : !keg && bbl * GALLONS_PER_BBL >= 1 ? `${Number((bbl * GALLONS_PER_BBL).toPrecision(8))} gal` : formatVolume(bbl);
-  return { name, bbl, volumeLabel, valid: Boolean(name) && (model.composed || (Number.isFinite(bbl) && bbl! > 0 && Number.isInteger(count) && count > 0)) };
+  const error = !name ? "Enter a format name to continue."
+    : !model.composed && (!Number.isInteger(count) || count <= 0) ? "Enter a whole number of containers per package, at least 1."
+    : !model.composed && (!Number.isFinite(bbl) || bbl! <= 0) ? keg ? "Enter a positive custom keg volume to continue." : "Enter the size of one container to continue."
+    : undefined;
+  return { name, bbl, volumeLabel, valid: error === undefined, error };
 }
 
 export function formatPreset(preset: string): Partial<FormatViewModel> {

@@ -63,7 +63,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
           <VolumeField label={keg ? "Custom keg volume" : "Size of one container"} value={model.volumeValue} units={model.volumeUnits} on={model.volumeUnitIndex} onValueChange={controls.volumeValue} onUnitChange={controls.volumeUnit} />
           {!keg && E.edit("Containers per package", model.unitsPerCase, "number", undefined, { onChange: controls.unitsPerCase, min: 1, step: 1, required: true, "aria-label": "Containers per package" })}
         </div>}
-        <div className="py-3" aria-live="polite"><p className="text-xs text-muted-foreground">Beer per package</p><p className="text-lg font-medium tabular-nums">{sizing.valid && sizing.bbl != null ? sizing.volumeLabel : "Enter a size and count"}</p></div>
+        {sizing.valid && <div className="py-3" aria-live="polite"><p className="text-xs text-muted-foreground">Beer per package</p><p className="text-lg font-medium tabular-nums">{sizing.volumeLabel}</p></div>}
       </>}
       <details open={model.name || model.composed ? true : undefined}>
         <summary className="cursor-pointer text-sm font-medium">{model.composed ? "Format name · required" : model.name ? "Format name" : "Rename · optional"}</summary>
@@ -77,6 +77,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create the format, then save these contents in the next step.</p>
       </section>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
+      {sizing.error && E.info(sizing.error)}
       {messages}
     </form>
     {model.composed && contents}

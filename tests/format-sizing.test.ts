@@ -4,6 +4,13 @@ import { formatCommandInput, formatSizing, toFormatViewProps } from "@/lib/mgr/f
 const format = (patch = {}) => toFormatViewProps({ format: { id: "f", name: "", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5, ...patch } });
 
 describe("package sizing", () => {
+  it("explains why a new can format cannot be created", () => {
+    const model = format({ package_type: "can", bbl_per_unit: null });
+    expect(formatSizing(model)).toMatchObject({ valid: false, error: "Enter the size of one container to continue." });
+    expect(formatSizing({ ...model, volumeValue: "16", unitsPerCase: "" })).toMatchObject({ valid: false, error: "Enter a whole number of containers per package, at least 1." });
+    expect(formatSizing({ ...model, composed: true })).toMatchObject({ valid: false, error: "Enter a format name to continue." });
+    expect(formatSizing({ ...model, volumeValue: "16", unitsPerCase: "24" })).toMatchObject({ valid: true, error: undefined });
+  });
   it("derives standard keg volume and name without a second input", () => {
     expect(formatSizing(format())).toMatchObject({ name: "½ bbl keg", bbl: 0.5, valid: true });
     expect(formatSizing({ ...format(), kegSize: "sixth_bbl" }).bbl).toBeCloseTo(1 / 6);
