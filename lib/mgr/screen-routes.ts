@@ -137,6 +137,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Close packaging run", file: "app/(app)/packaging/[id]/page.tsx" },
   { name: "Run closed", file: "app/(app)/packaging/[id]/page.tsx" },
   { name: "Packaging runs", file: "app/(app)/packaging/page.tsx" },
+  { name: "Repack", file: "app/(app)/packaging/repack-form.tsx" },
   { name: "Planning", file: "app/(app)/planning/page.tsx" },
   { name: "Lot trace", file: "app/(app)/compliance/lots/[id]/page.tsx" },
   { name: "Purchase orders", file: "app/(app)/purchase-orders/page.tsx" },

@@ -44,6 +44,10 @@ describe("packaging views", () => {
     const form = readFileSync("app/(app)/packaging/schedule-run-form.tsx", "utf8");
     expect(form).toMatch(/<SchedulePackagingRunView\b/);
     expect(page).toMatch(/<RepackForm\b/);
+    const repackForm = readFileSync("app/(app)/packaging/repack-form.tsx", "utf8");
+    expect(repackForm).toMatch(/<RepackView\b/);
+    expect(repackForm).toMatch(/toRepackView\(/);
+    expect(repackForm).not.toMatch(/Child qty|childSkuId, setChildSkuId/);
     expect(page).not.toMatch(/\bE\./);
   });
 });
