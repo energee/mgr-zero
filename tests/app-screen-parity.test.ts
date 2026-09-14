@@ -11,7 +11,6 @@ describe("explorer parity", () => {
   it("maps every live product page unless its route has recorded parity debt", () => {
     const knownRouteDebt = [
       "app/(app)/cellar/[occupancyId]/reading/page.tsx",
-      "app/(app)/search/page.tsx",
     ];
     const mapped = new Set(SCREEN_ROUTES.flatMap((route) => [route.file, ...(route.additionalFiles ?? [])]));
     const pages = readdirSync("app", { recursive: true })
