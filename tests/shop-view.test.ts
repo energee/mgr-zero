@@ -123,6 +123,7 @@ describe("inventory and live Shop", () => {
     const cart = readFileSync("app/(portal)/portal/cart.tsx", "utf8");
     expect(cart).toMatch(/<ShopView\b/);
     expect(cart).toMatch(/<ReviewOrderView\b/);
+    expect(cart).toContain("shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`");
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
   });
 });

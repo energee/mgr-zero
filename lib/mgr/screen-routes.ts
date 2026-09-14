@@ -1,20 +1,22 @@
 // lib/mgr/screen-routes.ts — which live page draws each ungated MGR screen
 // record. tests/app-screen-parity.test.ts fails when the inventory promises a
 // screen the app does not have: every name ungatedMgrScreens() returns must map
-// here to a page file that exists. Rows are added as pages land; a screen with
-// no row is a missing page, not a typo. Files are repo-relative paths under
-// app/, so the map doubles as the reader's index from screen to source.
+// here to its public page entry. Rows are added as pages land; a screen with no
+// row is a missing page, not a typo. Header/dialog-only screens name their
+// mounted component because they have no page. The map therefore covers every
+// public product page without hiding route-level wrappers from parity checks;
+// additionalFiles records another public route for the same screen contract.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-export const SCREEN_ROUTES: { name: string; file: string }[] = [
+export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: string[] }[] = [
   { name: "Reverse movement", file: "app/(app)/inventory/reversal-form.tsx" },
   { name: "SKU detail", file: "app/(app)/inventory/[id]/page.tsx" },
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
   { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
   { name: "Invite portal user", file: "app/(app)/customers/[id]/page.tsx" },
-  { name: "Import", file: "app/(app)/settings/import/import-wizard.tsx" },
+  { name: "Import", file: "app/(app)/settings/import/page.tsx" },
   { name: "Create brewery", file: "app/(auth)/create-brewery/page.tsx" },
   { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
@@ -38,8 +40,8 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Me", file: "app/(app)/layout.tsx" },
   { name: "Chat disconnected", file: "app/(app)/settings/chat/page.tsx" },
   { name: "Chat settings", file: "app/(app)/settings/chat/page.tsx" },
-  { name: "My notification preferences", file: "app/(app)/settings/chat/chat-settings-client.tsx" },
-  { name: "Linked people", file: "app/(app)/settings/chat/chat-settings-client.tsx" },
+  { name: "My notification preferences", file: "app/(app)/settings/chat/preferences/page.tsx" },
+  { name: "Linked people", file: "app/(app)/settings/chat/people/page.tsx" },
   { name: "Link your Slack", file: "app/(auth)/settings/chat/link/page.tsx" },
   { name: "Disconnect Slack", file: "app/(app)/settings/chat/disconnect/page.tsx" },
   { name: "Reauthorization", file: "app/(app)/settings/chat/health/page.tsx" },
@@ -66,18 +68,18 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Finished goods", file: "app/(app)/inventory/page.tsx" },
   { name: "Record movement", file: "app/(app)/inventory/page.tsx" },
   { name: "Movement recorded", file: "app/(app)/inventory/page.tsx" },
-  { name: "Orders", file: "app/(app)/orders/orders-client.tsx" },
-  { name: "New order", file: "app/(app)/orders/order-form.tsx" },
+  { name: "Orders", file: "app/(app)/orders/page.tsx" },
+  { name: "New order", file: "app/(app)/orders/new/page.tsx" },
   { name: "Confirm order", file: "app/(app)/orders/[id]/confirm/page.tsx" },
-  { name: "Complete transfer", file: "app/(app)/orders/[id]/ship-form.tsx" },
+  { name: "Complete transfer", file: "app/(app)/orders/[id]/complete/page.tsx" },
   { name: "Order", file: "app/(app)/orders/[id]/page.tsx" },
   { name: "Adjust lines", file: "app/(app)/orders/[id]/adjust-lines-form.tsx" },
-  { name: "Short pick", file: "app/(app)/orders/[id]/short-pick-form.tsx" },
-  { name: "Pick", file: "app/(app)/orders/[id]/pick-form.tsx" },
-  { name: "Ship and invoice", file: "app/(app)/orders/[id]/ship-form.tsx" },
-  { name: "Shipment done", file: "app/(app)/orders/[id]/ship-form.tsx" },
-  { name: "Ship on delivery", file: "app/(app)/orders/[id]/ship-form.tsx" },
-  { name: "Return and credit", file: "app/(app)/invoices/[id]/credit-memo-form.tsx" },
+  { name: "Short pick", file: "app/(app)/orders/[id]/short-pick/page.tsx" },
+  { name: "Pick", file: "app/(app)/orders/[id]/pick/page.tsx" },
+  { name: "Ship and invoice", file: "app/(app)/orders/[id]/ship/page.tsx" },
+  { name: "Shipment done", file: "app/(app)/orders/[id]/ship/page.tsx" },
+  { name: "Ship on delivery", file: "app/(app)/orders/[id]/ship/page.tsx" },
+  { name: "Return and credit", file: "app/(app)/invoices/[id]/return/page.tsx" },
   { name: "Put back", file: "app/(app)/orders/[id]/restock/page.tsx" },
   { name: "Transfers", file: "app/(app)/transfers/page.tsx" },
   { name: "New transfer", file: "app/(app)/transfers/page.tsx" },
@@ -106,7 +108,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Customer detail", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Ship-to form", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Catalog", file: "app/(app)/catalog/page.tsx" },
-  { name: "Brand", file: "app/(app)/catalog/brands/[id]/brand-page.tsx" },
+  { name: "Brand", file: "app/(app)/catalog/brands/[id]/page.tsx" },
   { name: "SKU", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
   { name: "Formats", file: "app/(app)/catalog/page.tsx" },
   { name: "Format", file: "app/(app)/catalog/format-form.tsx" },
@@ -121,7 +123,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Water profiles", file: "app/(app)/catalog/water-profiles/page.tsx" },
   { name: "Water profile", file: "app/(app)/catalog/water-profiles/water-profile-form.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
-  { name: "Shop", file: "app/(portal)/portal/cart.tsx" },
+  { name: "Shop", file: "app/(portal)/portal/page.tsx" },
   { name: "Coming up", file: "app/(portal)/portal/coming-up/page.tsx" },
   { name: "Review order", file: "app/(portal)/portal/cart.tsx" },
   { name: "Order history", file: "app/(portal)/portal/orders/page.tsx" },
@@ -133,11 +135,11 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Paid invoice", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
   { name: "Account", file: "app/(portal)/portal/account/page.tsx" },
   { name: "Portal Me", file: "app/(portal)/layout.tsx" },
-  { name: "Vessel detail", file: "app/(app)/batches/vessel-form.tsx" },
+  { name: "Vessel detail", file: "app/(app)/cellar/vessels/[id]/page.tsx" },
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
   { name: "Cellar transfer", file: "app/(app)/cellar/cellar-transfer-form.tsx" },
   { name: "Cellar addition", file: "app/(app)/cellar/cellar-addition-form.tsx" },
-  { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/reading-form.tsx" },
+  { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/page.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
   { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },
   { name: "Brew day", file: "app/(app)/batches/[id]/page.tsx" },
@@ -148,7 +150,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Planning", file: "app/(app)/planning/page.tsx" },
   { name: "Lot trace", file: "app/(app)/compliance/lots/[id]/page.tsx" },
   { name: "Purchase orders", file: "app/(app)/purchase-orders/page.tsx" },
-  { name: "New PO", file: "app/(app)/purchase-orders/new-po-form.tsx" },
+  { name: "New PO", file: "app/(app)/purchase-orders/new/page.tsx" },
   { name: "Receive PO", file: "app/(app)/purchase-orders/[id]/po-actions.tsx" },
   { name: "Receipt", file: "app/(app)/purchase-orders/[id]/page.tsx" },
   { name: "Materials on hand", file: "app/(app)/materials/page.tsx" },
@@ -172,7 +174,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Keg report", file: "app/(app)/kegs/report/page.tsx" },
   { name: "Keg event history", file: "app/(app)/kegs/history/page.tsx" },
   { name: "Routes", file: "app/(app)/routes/page.tsx" },
-  { name: "Route", file: "app/(app)/routes/[id]/page.tsx" },
+  { name: "Route", file: "app/(app)/routes/[id]/page.tsx", additionalFiles: ["app/(app)/routes/new/page.tsx"] },
   { name: "Return route", file: "app/(app)/routes/[id]/page.tsx" },
   { name: "Driver route", file: "app/(app)/routes/[id]/page.tsx" },
   { name: "Confirm delivery", file: "app/(app)/work/deliveries/[id]/page.tsx" },

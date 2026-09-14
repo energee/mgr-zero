@@ -112,6 +112,7 @@ describe("Purchase orders", () => {
     expect(page).toMatch(/<ReceiveForm\b/);
     expect(page).toMatch(/<ReceiptView\b/);
     expect(page).toContain("searchParams");
+    expect(page).toContain('toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`)');
     const form = src("app/(app)/purchase-orders/[id]/po-actions.tsx");
     expect(form).toMatch(/<ReceivePoView\b/);
     expect(form).not.toMatch(/<Input\b|<Label\b|<Select\b/);

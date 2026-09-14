@@ -34,17 +34,19 @@ function localObservationValue(iso = new Date().toISOString()) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior }: {
+export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior, openByDefault = false, returnHref }: {
   occupancyId: string;
   occupancyLabel: string;
   unit: GravityUnit;
   role: "admin" | "brewer";
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
+  openByDefault?: boolean;
+  returnHref?: string;
 }) {
   const router = useRouter();
   const expectedContext = useCommandContext();
   const scope = { actorId: expectedContext.actorId, breweryId: expectedContext.breweryId ?? "", role } as const;
-  const [open, setOpenState] = useState(false);
+  const [open, setOpenState] = useState(openByDefault);
   const [tempF, setTempF] = useState("");
   const [gravity, setGravity] = useState("");
   const [ph, setPh] = useState("");
@@ -58,6 +60,10 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior }: 
   // Save button and the value that is sent.
   const parsedGravity = useMemo(() => parseGravity(gravity, unit), [gravity, unit]);
   const gravityInvalid = parsedGravity === INVALID_GRAVITY;
+
+  useEffect(() => {
+    if (openByDefault && !observedAt) queueMicrotask(() => setObservedAt(localObservationValue()));
+  }, [openByDefault, observedAt]);
 
   useEffect(() => {
     const fixId = new URLSearchParams(location.search).get("fixReading");
@@ -90,7 +96,10 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior }: 
   function setOpen(next: boolean) {
     setOpenState(next);
     if (next && !observedAt) setObservedAt(localObservationValue());
-    if (!next) reset();
+    if (!next) {
+      reset();
+      if (returnHref) router.push(returnHref);
+    }
   }
 
   useEffect(() => {

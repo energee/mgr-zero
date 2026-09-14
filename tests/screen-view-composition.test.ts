@@ -131,11 +131,13 @@ describe("screen/live component parity", () => {
     const bypasses = mapped.flatMap((screen) => {
       const expected = inventoryViews(screen.body);
       if (!expected.size) return [];
-      const file = routes.get(screen.name)!;
-      const actual = mountedComponents(file);
-      return [...expected]
-        .filter((view) => !actual.has(view))
-        .map((view) => `${screen.name}: ${view} <- ${file}`);
+      const route = SCREEN_ROUTES.find((candidate) => candidate.name === screen.name)!;
+      return [route.file, ...(route.additionalFiles ?? [])].flatMap((file) => {
+        const actual = mountedComponents(file);
+        return [...expected]
+          .filter((view) => !actual.has(view))
+          .map((view) => `${screen.name}: ${view} <- ${file}`);
+      });
     });
     expect(bypasses).toEqual(KNOWN_VIEW_DEBT);
   });

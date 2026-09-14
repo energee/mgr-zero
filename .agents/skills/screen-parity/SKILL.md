@@ -82,7 +82,9 @@ explorer as a shortcut.
 
 ## Validate from source
 
-For each affected screen, record this chain with file and symbol references:
+For each affected screen, record this chain with file and symbol references. A
+routed screen starts at its public `page.tsx`; do not point the route map past a
+server adapter directly at a nested form or view merely to make composition pass:
 
 `inventory record → shared surface + view ← live route/trigger adapter`
 
@@ -134,10 +136,11 @@ output; different customer data or permission states are not visual defects.
 Exercise shared form state and error handling through controlled inputs and
 callbacks without a database where possible.
 
-The existing `tests/app-screen-parity.test.ts` file-existence and permissive
-`E | CommandForm | views/*` import checks are discovery checks, not proof of
-component parity. A screen-route map must identify the corresponding screen
-implementation, not merely a parent page that exists. Do not weaken assertions
+The `tests/app-screen-parity.test.ts` route-existence checks are discovery, not
+proof of component parity; `tests/screen-view-composition.test.ts` follows the
+mounted TypeScript component chain. A screen-route map must identify the
+corresponding public page or pages and follow each to the screen implementation;
+header/dialog-only screens may start at their mounted component. Do not weaken assertions
 or add blanket exceptions to make existing bypasses pass. Report existing debt
 explicitly; do not claim global enforcement from checks covering only one flow.
 
