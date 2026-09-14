@@ -133,6 +133,12 @@ describe("production-readiness workflow contract", () => {
     expect(ci.match(/supabase start/g)).toHaveLength(1);
   });
 
+  it("reclaims stale test stacks before startup and always stops its own stack", () => {
+    expect(ci.match(/supabase stop --workdir tests\/supabase --no-backup/g)).toHaveLength(2);
+    expect(ci).toMatch(/supabase stop --workdir tests\/supabase --no-backup[^\n]*\n\s*- run: supabase start/);
+    expect(ci).toMatch(/if: always\(\)\s+run: supabase stop --workdir tests\/supabase --no-backup/);
+  });
+
   it("installs and runs with bun, not npm", () => {
     expect(ci).toMatch(/^ {6}- uses: oven-sh\/setup-bun@v2(?:\s+#.*)?\s*$/m);
     expect(ci).toContain('bun-version-file: ".bun-version"');

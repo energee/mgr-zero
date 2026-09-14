@@ -94,6 +94,7 @@ jobs:
       # inviteUserByEmail fail with "Error sending invite email").
       # `start` on a fresh stack already applies supabase/migrations/*, so
       # there is no separate `db reset` step here.
+      - run: supabase stop --workdir tests/supabase --no-backup || true
       - run: supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
       - name: Env from local stack
         # The app accepts modern Supabase names only. The mapping script keeps
@@ -108,6 +109,8 @@ jobs:
           --exclude tests/screen-links.test.ts --exclude tests/theme-contrast.test.ts
           --exclude tests/screen-persona.test.ts --exclude tests/design-docs.test.ts
           --exclude tests/docs.test.ts
+      - if: always()
+        run: supabase stop --workdir tests/supabase --no-backup || true
 
   # Preserve the existing required-check name while the work runs in parallel.
   test:
