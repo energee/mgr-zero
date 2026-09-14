@@ -343,6 +343,17 @@ describe("SKU list view", () => {
 });
 
 describe("Formats view", () => {
+  it("shows the resolved volume and contents without treating a composed format as atomic", () => {
+    const formats = [
+      { id: "can", name: "16 oz can", basis: "packaged" as const, package_type: "can", bbl_per_unit: 16 / 3968 },
+      { id: "four", name: "Four Pack", basis: "packaged" as const, package_type: "can", bbl_per_unit: null, effective_bbl_per_unit: 64 / 3968, components: [{ parent_format_id: "four", child_format_id: "can", qty: 4 }] },
+      { id: "unfinished", name: "Unfinished", basis: "packaged" as const, package_type: "can", bbl_per_unit: null, effective_bbl_per_unit: null },
+    ];
+    const model = toFormatsViewProps({ formats });
+    expect(model.rows[1].cells.slice(2)).toEqual([formatVolume(64 / 3968), "4 × can"]);
+    expect(model.rows[2].cells[2]).toBe("—");
+    expect(formats[1].bbl_per_unit).toBeNull();
+  });
   it("maps list_formats plus components onto Basis / Volume / From", () => {
     const model = toFormatsViewProps(formatsInventory);
     expect(model.headers).toEqual(["Format", "Basis", "Volume", "From"]);

@@ -33,6 +33,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     return <>{E.back("Catalog", `${f.brands?.name} · ${f.name}`, writable ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={{ id: f.brand_id!, name: f.brands!.name }} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined, "/catalog")}{E.info(`${f.ounces} oz · poured · never held as stock`)}</>;
   }
   const children = eligibleChildren(id, data.formats);
+  const volume = data.formats.find(format => format.id === id)?.bbl_per_unit;
   const components = data.components.map((c) => ({ id: c.child_format_id, qty: String(c.qty) }));
   const lines = data.lines.map((l) => ({ id: l.material_id, qty: String(l.qty_per_unit), onBreak: l.on_break }));
   const materialOptions = data.materials.map(m => ({ id: m.id, name: `${m.name} (${m.base_uom})${m.active ? "" : " · inactive"}` }));
@@ -50,7 +51,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
       contents={canComposeFormat(data.format, data.usedAsChild) ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}
     /> : undefined, "/catalog")}
-    <p className="text-sm text-muted-foreground">Shared format · {data.format.bbl_per_unit === null ? "Beer volume calculated from package contents" : `${formatVolume(data.format.bbl_per_unit)} of beer per package`}</p>
+    <p className="text-sm text-muted-foreground">Shared format · {volume == null ? "No beer volume yet — add package contents" : `${formatVolume(volume)} of beer per package`}</p>
     {canComposeFormat(data.format, data.usedAsChild) || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
       {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case", writable && canComposeFormat(data.format, data.usedAsChild) ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
       {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("Add the packages inside to calculate the total volume")}

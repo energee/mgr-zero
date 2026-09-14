@@ -24,6 +24,8 @@ export type FormatsFormatRow = {
   brands?: { name: string } | null;
   ounces?: number | null;
   bbl_per_unit: string | number | null;
+  effective_bbl_per_unit?: string | number | null;
+  components?: FormatsComponentRow[];
 };
 
 export type FormatsComponentRow = {
@@ -63,20 +65,23 @@ function fromOf(
   return parts.join(" · ");
 }
 
-export function toFormatsViewProps({ formats, components = [], backHref, formatHref }: FormatsSnapshot): FormatsViewModel {
+export function toFormatsViewProps({ formats, components = formats.flatMap(format => format.components ?? []), backHref, formatHref }: FormatsSnapshot): FormatsViewModel {
   return {
     backHref,
     headers: ["Format", "Basis", "Volume", "From"],
     empty: formats.length === 0 ? { title: "No formats yet", description: "A format is a container a beer ships in: a 1/2 bbl keg, a 16 oz can." } : undefined,
-    rows: formats.map((f) => ({
-      key: f.id,
-      href: formatHref?.(f),
-      cells: [
-        f.brands ? `${f.brands.name} · ${f.name}` : f.name,
-        f.basis,
-        f.basis === "poured" ? (f.ounces != null ? `${f.ounces} oz` : "—") : f.bbl_per_unit != null ? formatVolume(f.bbl_per_unit) : "—",
-        fromOf(f, formats, components),
-      ],
-    })),
+    rows: formats.map((f) => {
+      const volume = f.effective_bbl_per_unit === undefined ? f.bbl_per_unit : f.effective_bbl_per_unit;
+      return {
+        key: f.id,
+        href: formatHref?.(f),
+        cells: [
+          f.brands ? `${f.brands.name} · ${f.name}` : f.name,
+          f.basis,
+          f.basis === "poured" ? (f.ounces != null ? `${f.ounces} oz` : "—") : volume != null ? formatVolume(volume) : "—",
+          fromOf(f, formats, components),
+        ],
+      };
+    }),
   };
 }

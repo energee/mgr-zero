@@ -79,13 +79,15 @@ defineCommand({
 defineQuery({
   name: "list_formats", description: "Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list",
   input: z.object({ basis: z.enum(["packaged", "poured"]).optional(), brandId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
-  handler: (ctx, i) => {
-    return completeFormatRows((start) => {
-      let q = ctx.db.from("formats").select("*, brands(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
+  handler: async (ctx, i) => {
+    const [formats, volumes] = await Promise.all([completeFormatRows((start) => {
+      let q = ctx.db.from("formats").select("*, brands(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
       if (i.brandId) q = q.eq("brand_id", i.brandId);
       return q.range(start, start + 499);
-    });
+    }), completeFormatRows((start) => ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id").range(start, start + 499))]);
+    const byId = new Map(volumes.map(volume => [volume.id, volume.bbl_per_unit]));
+    return formats.map(format => ({ ...format, effective_bbl_per_unit: byId.get(format.id) ?? null }));
   },
 });
 
