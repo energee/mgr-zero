@@ -613,13 +613,15 @@ Select **Reading** on a tank to open its reading log and record the next one: **
 
 <Screen name="Close packaging run" />
 
+<Screen name="Repack" />
+
 *Admin, Brewer, and Warehouse.*
 
 Open **Packaging** from the **Work** navigation to see every run by planned date, newest first, with its next action named on the row. Select **Schedule run** for a **Brand**, a **Planned date**, an optional **Source tank**, and planned output lines (a SKU and a quantity each) — a run is identified by the brand it packages from the moment it is planned; the tank can be picked later.
 
 A run without a tank shows **Pick source** on its page: choose a **Source tank** and confirm. Once it has a tank, **Start** stamps it started — both picking the tank and starting require one, so an unsourced run can never begin. A started run's page becomes the close form: **Barrels drawn**, the **Actual outputs** for each planned SKU (defaulting to the planned quantity), a **Lot code**, **Packaged on** and an optional **Best by** date, and the **Finished goods location** and bin the packaged units land in — all four of the last group are required, because a vessel has no location of its own for the goods to appear at. Select **Close packaging run** to write the lot, the finished-goods stock, and the packaging materials consumed in one step. The tank itself stays open afterward; emptying it is a separate Cellar transfer.
 
-**Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the SKU to **Break** (only composed SKUs are offered), the **Location** and **Bin**, and how many. The "into" side is not typed: the component SKU and its count are derived from the case format's composition, and the tape shows both legs and the barrels they conserve before you **Confirm repack**. A composed SKU whose format has no single component record cannot be broken and says so in place of the button.
+**Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the SKU to **Break** (only composed SKUs are offered), the **Location** and **Bin**, and how many. The "into" side is not typed: the component SKU and its count are derived from the case format's composition, and the tape shows both legs and the barrels they conserve before you **Confirm repack**. **Damaged on break** always reads zero: this form has no way to record breakage damage separately. A composed SKU whose format has no single component record cannot be broken and says so in place of the button.
 
 ## Purchasing: vendors, materials, and purchase orders [#purchasing]
 
