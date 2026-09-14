@@ -1,10 +1,16 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { QueryObserver } from "@tanstack/react-query";
+import { environmentManager, focusManager, isServer, onlineManager, QueryObserver } from "@tanstack/react-query";
 import { command } from "@/lib/commands/client";
 import { commandQueryOptions, createQueryClient, subscribeToCommandChanges } from "@/lib/commands/query-cache";
 
 const scope = { actorId: "actor", breweryId: "brewery", role: "admin" };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  environmentManager.setIsServer(() => isServer);
+  focusManager.setFocused(undefined);
+  onlineManager.setOnline(true);
+});
 
 it("deduplicates concurrent reads and reuses fresh data without another request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ ok: true, data: [{ id: "order" }] })));
@@ -137,4 +143,96 @@ it("cancels an in-flight read before write invalidation can accept its old respo
   expect(signal.aborted).toBe(true);
   expect(cache.getQueryData(options.queryKey)).toBeUndefined();
   stop(); cache.clear();
+});
+
+it("refreshes visible orders after five seconds, keeping cached rows until the response arrives", async () => {
+  vi.useFakeTimers();
+  environmentManager.setIsServer(() => false);
+  let finish!: (response: Response) => void;
+  const fetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+  vi.stubGlobal("fetch", fetch);
+  const cache = createQueryClient();
+  const options = commandQueryOptions<string[]>(scope, "list_orders", {});
+  cache.setQueryData(options.queryKey, ["old"]);
+  const observer = new QueryObserver(cache, options);
+  const stop = observer.subscribe(() => undefined);
+  try {
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(fetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(observer.getCurrentResult()).toMatchObject({ data: ["old"], isFetching: true, isPending: false });
+    finish(new Response(JSON.stringify({ ok: true, data: ["changed by another user"] })));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(observer.getCurrentResult().data).toEqual(["changed by another user"]);
+    stop();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally { stop(); cache.clear(); }
+});
+
+it("pauses hidden-tab polling and rechecks on return even when cached data is still fresh", async () => {
+  vi.useFakeTimers();
+  environmentManager.setIsServer(() => false);
+  focusManager.setFocused(false);
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: ["current"] })));
+  vi.stubGlobal("fetch", fetch);
+  const cache = createQueryClient();
+  cache.mount();
+  const options = commandQueryOptions<string[]>(scope, "list_orders", {});
+  cache.setQueryData(options.queryKey, ["old"]);
+  const observer = new QueryObserver(cache, options);
+  const stop = observer.subscribe(() => undefined);
+  try {
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetch).not.toHaveBeenCalled();
+    // Another same-tab read may have populated a fresh entry while this page was hidden.
+    cache.setQueryData(options.queryKey, ["recent"]);
+    focusManager.setFocused(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(observer.getCurrentResult().data).toEqual(["current"]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally { stop(); cache.unmount(); cache.clear(); }
+});
+
+it("keeps last-known rows while offline and reconciles on reconnect", async () => {
+  vi.useFakeTimers();
+  environmentManager.setIsServer(() => false);
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: ["current"] })));
+  vi.stubGlobal("fetch", fetch);
+  const cache = createQueryClient();
+  cache.mount();
+  const options = commandQueryOptions<string[]>(scope, "list_orders", {});
+  cache.setQueryData(options.queryKey, ["old"]);
+  const observer = new QueryObserver(cache, options);
+  const stop = observer.subscribe(() => undefined);
+  try {
+    onlineManager.setOnline(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(observer.getCurrentResult()).toMatchObject({ data: ["old"], isPaused: true });
+    onlineManager.setOnline(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(observer.getCurrentResult()).toMatchObject({ data: ["current"], isPaused: false });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally { stop(); cache.unmount(); cache.clear(); }
+});
+
+it("refreshes form lookups less often without keeping them indefinitely stale on an open page", async () => {
+  vi.useFakeTimers();
+  environmentManager.setIsServer(() => false);
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true, data: ["new customer"] })));
+  vi.stubGlobal("fetch", fetch);
+  const cache = createQueryClient();
+  const options = commandQueryOptions<string[]>(scope, "list_customers", { includeShipTos: true });
+  cache.setQueryData(options.queryKey, ["old customer"]);
+  const observer = new QueryObserver(cache, options);
+  const stop = observer.subscribe(() => undefined);
+  try {
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(fetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(observer.getCurrentResult().data).toEqual(["new customer"]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally { stop(); cache.clear(); }
 });
