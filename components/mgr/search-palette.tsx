@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Icon } from "@/components/mgr/icon";
-import { SearchView } from "@/components/mgr/views/search";
+import { SearchView, type SearchViewModel } from "@/components/mgr/views/search";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -36,6 +36,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
   const breweryId = useBrewery();
   const cache = useContext(SearchCache)!;
   const router = useRouter();
+  const navigate = onNavigate ?? router.push;
   const [q, setQ] = useState("");
   // Associate results with their term so an in-flight query cannot show old matches.
   const [res, setRes] = useState<{ term: string; hits: SearchHit[] }>({ term: "", hits: [] });
@@ -84,23 +85,31 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     cache.set(recentKey, next);
     setRecent(next);
     if (onPick) onPick(hit);
-    else (onNavigate ?? router.push)(hit.href);
+    else navigate(hit.href);
   };
   const pages = role ? searchDestinations(role, term) : [];
   const shown = !term ? visibleRecent : hits;
   const byKey = new Map(shown.map(hit => [`${hit.kind}:${hit.id}`, hit]));
   const groups = Map.groupBy(shown, hit => !term ? "recent" : hit.kind);
+  const viewGroups: SearchViewModel["groups"] = Array.from(groups, ([kind, items]) => ({
+    heading: kind === "recent" ? "Recent" : HEADING[kind],
+    items: items.map(hit => [hit.label, hit.detail, `${hit.kind}:${hit.id}`]),
+  }));
+  if (pages.length) viewGroups.unshift({
+    heading: "Pages",
+    items: pages.map(page => [page.label, page.about ?? "Open page", `page:${page.href}`]),
+  });
   const before = <>
     {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map(n => <Skeleton key={n} className="h-12" />)}</div>}
     {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
     {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
   </>;
-  return <SearchView model={{ placeholder, heading, sub, groups: [...(pages.length ? [{ heading: "Pages", items: pages.map(page => [page.label, page.about ?? "Open page", `page:${page.href}`] as [string, string, string]) }] : []), ...[...groups].map(([kind, items]) => ({ heading: kind === "recent" ? "Recent" : HEADING[kind], items: items.map(hit => [hit.label, hit.detail, `${hit.kind}:${hit.id}`] as [string, string, string]) }))] }}
+  return <SearchView model={{ placeholder, heading, sub, groups: viewGroups }}
     value={q} onValueChange={setQ} shouldFilter={false} before={before}
     emptyMessage={term && currentStatus === "ready" ? role ? "No pages or records found · Try a page name, record name, or document number." : "No records found · Try a record name or number." : ""}
     onSelect={key => {
       const page = pages.find(page => `page:${page.href}` === key);
-      if (page) { (onNavigate ?? router.push)(page.href); return; }
+      if (page) { navigate(page.href); return; }
       const hit = byKey.get(key); if (hit) open(hit);
     }} />;
 }
