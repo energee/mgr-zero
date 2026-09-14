@@ -159,7 +159,6 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Contracts", file: "app/(app)/vendors/page.tsx" },
   { name: "Contract", file: "app/(app)/vendors/page.tsx" },
   { name: "Recipes", file: "app/(app)/recipes/page.tsx" },
-  { name: "New recipe", file: "app/(app)/recipes/new/page.tsx" },
   { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx" },
   { name: "Compliance months", file: "app/(app)/compliance/page.tsx" },
   { name: "Monthly compliance", file: "app/(app)/compliance/[month]/page.tsx" },

@@ -1,5 +1,6 @@
 // components/mgr/views/recipe.tsx — Recipe. Live slots read-only facts and
-// NewVersionForm; inventory draws the editor.
+// NewVersionForm; inventory draws the editor. parentForm draws the recipe's
+// parent fields (name, style, brand, note) where the parent row sits.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
@@ -10,17 +11,19 @@ export function RecipeView({
   model,
   createAction,
   detail,
+  parentForm,
 }: {
   model: RecipeViewModel;
   createAction?: ReactNode;
   detail?: ReactNode;
+  parentForm?: ReactNode;
 }) {
   return (
     <>
       {E.back("Recipes", model.title, createAction, model.backHref)}
       {detail ?? (
         <>
-          {model.parent ? E.row(model.parent.title, model.parent.detail, E.act("Create")) : null}
+          {parentForm ?? (model.parent ? E.row(model.parent.title, model.parent.detail, E.act("Create")) : null)}
           {E.pick("Default price group · optional", model.priceGroup ?? "", model.priceGroupOptions ?? [])}
           {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
           {E.chips(["per bbl", "15 bbl", "30 bbl"], model.scaleIndex ?? 0)}

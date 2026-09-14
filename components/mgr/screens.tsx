@@ -123,7 +123,7 @@ import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
-import { NewRecipeFormView } from "@/components/mgr/views/new-recipe";
+import { NewRecipeFieldsView } from "@/components/mgr/views/new-recipe";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
@@ -1884,39 +1884,26 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipes",
-    to: { Review: "Recipe", Finish: "Recipe", "Create recipe": "New recipe" },
+    to: { Review: "Recipe", Finish: "Recipe", "Create recipe": "Recipe" },
     job: "Find recipe versions and create the next recipe",
     reads: "list_recipes [design]",
-    writes: "none [creation happens on New recipe, versioning on Recipe]",
+    writes: "none [creation and versioning happen on Recipe]",
     states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
-    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens New recipe, the Recipe surface before it has a version.",
+    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens Recipe with no version yet: the parent fields above the first version's editor, one save.",
     body: <RecipesView model={toRecipesViewProps(recipesList)} />,
   },
   {
     step: 7,
     slice: 3,
     tab: "More",
-    name: "New recipe",
-    to: { "Create recipe": "Recipe", Style: "New recipe" },
-    job: "Name the recipe so its first version has somewhere to live",
-    reads: "list_brands",
-    writes: "create_recipe [name, optional brand, optional note; the first version is written on Recipe]",
-    states: [...permitted("brewer or admin required"), ["style", "drawn gated until recipes carries a style column; the brand names the style today", 0], ["saved", "lands on Recipe for its first version"]],
-    spec: "The same Recipe surface with the parent form in place of the editor, so a brewer who taps Create recipe is already on the page where the version goes. A parent is a name, the brand it is meant to brew (intent only; identity is required at packaging), and a note. Style is drawn gated: a recipe has no style of its own until a migration adds one and the create command takes it, so neither the inventory nor the live page invents it. Saving opens the recipe, where Create recipe version writes the first version.",
-    body: <RecipeView model={{ title: "New recipe" }} detail={<NewRecipeFormView brands={recipeBrandOptions} />} />,
-  },
-  {
-    step: 7,
-    slice: 3,
-    tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
+    to: { Create: "Recipe", Style: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
-    body: <RecipeView model={recipeHazyV4} />,
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; Create recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
+    body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
   },
   {
     step: 7,

@@ -1,7 +1,7 @@
 # TODO — work still gated from `/docs/screens-explore`
 
 Refreshed 2026-09-11 against `main` at `9045bd4`. Counts are derived from
-`SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 173 MGR screens: 172 ungated and mapped, 1 gated, and 0 ungated without a live route.
+`SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 172 MGR screens: 171 ungated and mapped, 1 gated, and 0 ungated without a live route.
 
 Audit sources: `components/mgr/screens.tsx`, `lib/mgr/screen-routes.ts`,
 `tests/app-screen-parity.test.ts`, and `tests/screen-command-gates.test.ts`.

@@ -1,5 +1,9 @@
-// app/(app)/recipes/[id]/recipe-version-form.tsx — CommandForm for
-// create_recipe_version: the process spec (mash and fermentation schedules
+// app/(app)/recipes/[id]/recipe-version-form.tsx — the version editor. On a
+// recipe it is the New version sheet for create_recipe_version; without a
+// recipeId (app/(app)/recipes/new) it renders inline with the shared parent
+// fields (components/mgr/views/new-recipe.tsx) above, and one save runs
+// create_recipe then create_recipe_version and lands on the recipe. The
+// version is the process spec (mash and fermentation schedules
 // and water, each on its own draft sheet in schedule-sheets.tsx; pre-boil,
 // whirlpool and knockout inline), the assumption scalars (brewhouse
 // efficiency, yeast attenuation, optional boil/IBU) and ingredient lines
@@ -10,12 +14,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCommandForm } from "@/lib/commands/use-command-form";
+import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { EMPTY_WATER, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
@@ -32,7 +38,10 @@ const emptyLine = (): Line => ({ materialId: "", perBblQty: "", stage: "mash", t
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
 const EMPTY_PROCESS = { preBoilBbl: "", whirlpoolMinutes: "", whirlpoolTempF: "", whirlpoolRestMinutes: "", knockoutTempF: "" };
 
-export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipeId: string; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
+export function NewVersionForm({ recipeId, brands = [], materials, profiles, unit }: { recipeId?: string; brands?: NewRecipeBrand[]; materials: Material[]; profiles: NamedOption[]; unit: GravityUnit }) {
+  const router = useRouter();
+  const [parent, setParent] = useState(BLANK_RECIPE);
+  const create = useCommandAction();
   const [mashSchedule, setMashSchedule] = useState<MashStep[]>(DEFAULT_MASH);
   const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
   const [process, setProcess] = useState(EMPTY_PROCESS);
@@ -45,8 +54,7 @@ export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipe
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const validLines = lines.filter((l) => l.materialId && Number(l.perBblQty) > 0);
-  const form = useCommandForm("create_recipe_version", {
-    build: () => ({
+  const build = (recipeId: string) => ({
       recipeId, mashSchedule, fermentationSchedule,
       process: { preBoilBbl: num(process.preBoilBbl), whirlpoolMinutes: num(process.whirlpoolMinutes), whirlpoolTempF: num(process.whirlpoolTempF), whirlpoolRestMinutes: num(process.whirlpoolRestMinutes), knockoutTempF: num(process.knockoutTempF) },
       water: { targetProfileId: water.targetProfileId || undefined, sourceProfileId: water.sourceProfileId || undefined, mashGal: num(water.mashGal), spargeGal: num(water.spargeGal), targetMashPh: num(water.targetMashPh), additions: water.additions },
@@ -56,7 +64,9 @@ export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipe
         materialId: l.materialId, perBblQty: Number(l.perBblQty), stage: l.stage,
         timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : undefined,
       })),
-    }),
+  });
+  const form = useCommandForm("create_recipe_version", {
+    build: () => build(recipeId!),
     reset: () => {
       setMashSchedule(DEFAULT_MASH); setFermentationSchedule([]); setProcess(EMPTY_PROCESS); setWater(EMPTY_WATER); setBrewhouseEfficiency("0.75"); setYeastAttenuation("0.78");
       setBoilMinutes(""); setTargetIbu(""); setNote(""); setLines([emptyLine()]);
@@ -80,12 +90,25 @@ export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipe
   })();
 
   const setLine = (i: number, patch: Partial<Line>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const ready = mashSchedule.length > 0 && brewhouseEfficiency && yeastAttenuation && validLines.length > 0;
+  const ready = mashSchedule.length > 0 && brewhouseEfficiency && yeastAttenuation && validLines.length > 0 && (recipeId || parent.name.trim());
+  // No recipe yet: create the parent, then its first version, then open it.
+  // Two commands, not one RPC, so each keeps its own request id and replay;
+  // a parent that saved before the version failed is kept, so a retry writes
+  // only the version instead of a second recipe.
+  const [createdId, setCreatedId] = useState("");
+  async function submitNew(e: React.FormEvent) {
+    e.preventDefault();
+    let id = createdId;
+    if (!id && !(await create.run("create_recipe", { name: parent.name, brandId: parent.brandId || undefined, note: parent.note || undefined }, (d) => { id = (d as { id: string }).id; setCreatedId(id); }))) return;
+    await create.run("create_recipe_version", build(id), () => router.push(`/recipes/${id}`));
+  }
+  const creating = recipeId === undefined;
+  const busy = creating ? create.busy : form.submitting;
   const setP = (key: keyof typeof EMPTY_PROCESS, value: string) => setProcess((p) => ({ ...p, [key]: value }));
 
-  return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New version" trigger={<Button size="sm">New version</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+  const body = (
+      <form onSubmit={creating ? submitNew : form.submit} className="flex flex-col gap-4">
+        {creating ? <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={busy} /> : null}
         <div className="flex flex-col gap-2">
           <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} />
           <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} />
@@ -156,11 +179,16 @@ export function NewVersionForm({ recipeId, materials, profiles, unit }: { recipe
             Predicted: {formatGravity(preview.ogPlato, unit)} OG · {formatGravity(preview.fgPlato, unit)} FG · {preview.abv.toFixed(1)}% ABV
           </p>
         ) : null}
-        <CommandFormMessage error={form.error} />
+        <CommandFormMessage error={creating ? create.error : form.error} />
         <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save version"}</Button>
+          <Button type="submit" disabled={busy || !ready}>{busy ? "Saving…" : creating ? "Create recipe" : "Save version"}</Button>
         </CommandFormFooter>
       </form>
+  );
+  if (creating) return body;
+  return (
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New version" trigger={<Button size="sm">New version</Button>}>
+      {body}
     </CommandForm>
   );
 }
