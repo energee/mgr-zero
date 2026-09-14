@@ -56,5 +56,6 @@ describe("explorer parity", () => {
     ]);
     expect(routes.get("Packaging runs")).toBe("app/(app)/packaging/page.tsx");
     expect(routes.get("Planning")).toBe("app/(app)/planning/page.tsx");
+    expect(routes.get("Route")).toBe("app/(app)/routes/[id]/page.tsx");
   });
 });
