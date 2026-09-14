@@ -13,7 +13,7 @@ import { WaterAdditionView, WaterView, additionReady, toAdditionFields, type Nam
 import { moveItem, removeAt, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 /** One list sheet: `editing` is the index being edited, null for a new item, undefined for the list. */
-function useEditor<T>() {
+function useEditor() {
   const [editing, setEditing] = useState<number | null | undefined>(undefined);
   return { editing, open: (i: number | null) => setEditing(i), close: () => setEditing(undefined) };
 }
@@ -27,7 +27,7 @@ function ItemFooter({ onDelete, onSave, ready, label }: { onDelete?: () => void;
 
 export function MashScheduleSheet({ title, steps, onChange }: { title: string; steps: MashStep[]; onChange: (steps: MashStep[]) => void }) {
   const [open, setOpen] = useState(false);
-  const ed = useEditor<MashStep>();
+  const ed = useEditor();
   const [fields, setFields] = useState(toMashStepFields());
   const begin = (i: number | null) => { setFields(toMashStepFields(i === null ? undefined : steps[i])); ed.open(i); };
   const save = () => { onChange(upsertAt(steps, ed.editing ?? undefined, { name: fields.name.trim(), kind: fields.kind, tempF: Number(fields.tempF), minutes: Number(fields.minutes) })); ed.close(); };
@@ -40,7 +40,7 @@ export function MashScheduleSheet({ title, steps, onChange }: { title: string; s
 
 export function FermentationScheduleSheet({ title, stages, onChange }: { title: string; stages: FermentationStage[]; onChange: (stages: FermentationStage[]) => void }) {
   const [open, setOpen] = useState(false);
-  const ed = useEditor<FermentationStage>();
+  const ed = useEditor();
   const [fields, setFields] = useState(toStageFields());
   const begin = (i: number | null) => { setFields(toStageFields(i === null ? undefined : stages[i])); ed.open(i); };
   const save = () => { onChange(upsertAt(stages, ed.editing ?? undefined, { name: fields.name.trim(), kind: fields.kind, tempF: Number(fields.tempF), days: Number(fields.days) })); ed.close(); };
@@ -53,7 +53,7 @@ export function FermentationScheduleSheet({ title, stages, onChange }: { title: 
 
 export function WaterSheet({ title, water, profiles, materials, onChange }: { title: string; water: WaterDraft; profiles: NamedOption[]; materials: NamedOption[]; onChange: (water: WaterDraft) => void }) {
   const [open, setOpen] = useState(false);
-  const ed = useEditor<WaterAddition>();
+  const ed = useEditor();
   const [fields, setFields] = useState(toAdditionFields());
   const begin = (i: number | null) => { setFields(toAdditionFields(i === null ? undefined : water.additions[i])); ed.open(i); };
   const setAdditions = (additions: WaterAddition[]) => onChange({ ...water, additions });
