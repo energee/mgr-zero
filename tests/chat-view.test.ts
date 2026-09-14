@@ -2,6 +2,14 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
+import { SCREENS } from "../components/mgr/screens";
+
+it("keeps reading cadence restricted to whole hours", () => {
+  const markup = renderToStaticMarkup(SCREENS.find(screen => screen.name === "Chat settings")!.body);
+  const hours = markup.match(/<input\b[^>]*aria-label="Reading overdue after \(hours\)"[^>]*>/)?.[0];
+  expect(hours).toBeDefined();
+  expect(hours).toContain('step="1"');
+});
 
 it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
   const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null }, canSetQuietHours: false }));
