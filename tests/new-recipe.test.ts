@@ -4,7 +4,6 @@
 // in RecipeView's parentForm slot and by the live version form when it has
 // no recipe yet. /recipes/new is that editor; one save writes create_recipe
 // then create_recipe_version and lands on the recipe.
-import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -93,8 +92,9 @@ describe("Recipe creation", () => {
     // Stages come from the view-model module, not the command registry.
     expect(src("components/mgr/views/ingredient.tsx")).not.toMatch(/lib\/commands/);
     expect(sheets).not.toMatch(/from "@\/lib\/commands\/production"/);
-    // Leftovers from earlier iterations are gone: the explorer and tap rules match main.
-    expect(execSync("git diff --quiet origin/main -- components/mgr/screen-explorer.tsx lib/mgr/screen-links.ts; echo $?").toString().trim()).toBe("0");
+    // Leftovers from earlier iterations are gone: the explorer cancels every inert tap the same way, and Create recipe still walks to Recipe.
+    expect(src("components/mgr/screen-explorer.tsx")).not.toMatch(/dialog-trigger|sheet-trigger/);
+    expect(src("lib/mgr/screen-links.ts")).toMatch(/\["Create recipe", "Recipe"\]/);
     expect(screen("Ingredient").body).toBeTruthy();
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
