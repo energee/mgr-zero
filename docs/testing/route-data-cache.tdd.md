@@ -48,3 +48,9 @@ The user chose last-known values with subtle refresh feedback and a 5–10-secon
 - Typecheck, lint, and the production build passed. The public-menu unused-argument warning remains. The optional Vitest coverage provider is not installed; no percentage is claimed or dependency added.
 - Local production-mode browser observed Orders reads approximately 5.2 seconds apart, retained its cached content while offline with explicit last-known feedback, and resumed checks after reconnect. New Order retained the same form DOM through option refresh, and Orders stopped polling after navigating away. No domain writes were submitted.
 - Database-backed verification, including the catalog file's existing setup, stays on CI's fresh database. See the PR's checks for the pushed revision; local smoke tests do not establish hosted latency or multi-user transactional correctness.
+
+## Behavior-preserving simplify pass
+
+Reused the existing Orders payload type and removed two redundant async wrappers around chat setup. The 47 focused tests passed before cleanup; 171 tests across 11 pure files passed afterward, along with typecheck, lint (the same existing warning), and production build. No assertions or cache policies changed.
+
+The local production-mode browser rendered Orders with Last checked feedback. A simulated first-open chat setup failure showed Try again; retry repeated setup, restored history, cleared the error, and enabled the composer. Browser error output was empty. No domain writes were submitted, and the isolated browser session/server were closed afterward. Coverage and CodeScene limitations above still apply.

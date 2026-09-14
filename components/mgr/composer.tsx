@@ -83,7 +83,7 @@ export function Composer({ role }: { role: StaffRole }) {
   function reloadSetup() {
     const issued = ++setupRun.current;
     setFailure(undefined);
-    void (async () => { await loadSetup(() => issued === setupRun.current); })();
+    void loadSetup(() => issued === setupRun.current);
   }
 
   function retry() {
@@ -94,7 +94,7 @@ export function Composer({ role }: { role: StaffRole }) {
   useEffect(() => {
     if (!open || setupRun.current > 0) return;
     const issued = ++setupRun.current;
-    void (async () => { await loadSetup(() => issued === setupRun.current); })();
+    void loadSetup(() => issued === setupRun.current);
     // One restore per actor/brewery scope, only when the drawer is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, breweryId, expectedContext.actorId]);
