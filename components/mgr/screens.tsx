@@ -123,6 +123,7 @@ import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
+import { NewRecipeFormView } from "@/components/mgr/views/new-recipe-form";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
@@ -178,7 +179,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -1885,11 +1886,11 @@ export const SCREENS: Screen[] = [
     name: "Recipes",
     to: { Review: "Recipe", Finish: "Recipe" },
     job: "Find recipe versions and create the next recipe",
-    reads: "list_recipes [design]",
-    writes: "none [creation and versioning happen on Recipe]",
-    states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
-    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens the same surface with only name and style.",
-    body: <RecipesView model={toRecipesViewProps(recipesList)} />,
+    reads: "list_recipes [design] · list_brands",
+    writes: "create_recipe [name, optional brand, optional note; versioning happens on Recipe]",
+    states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"], ["style", "drawn gated until recipes carries a style column; the brand names the style today", 0]],
+    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action. Create recipe opens one shared sheet in place, the same component the live page binds to its command: a name, the brand it is meant to brew, and a note. Style is drawn gated: a recipe has no style of its own until a migration adds one and the create command takes it, so neither the inventory nor the live page invents it.",
+    body: <RecipesView model={toRecipesViewProps(recipesList)} createAction={<NewRecipeFormView brands={recipeBrandOptions} />} />,
   },
   {
     step: 7,

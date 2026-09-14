@@ -1,54 +1,21 @@
-// app/(app)/recipes/new-recipe-form.tsx — CommandForm for create_recipe: a
-// name, the brand it is meant to brew (optional — identity is required at
+// app/(app)/recipes/new-recipe-form.tsx — binds the shared Create recipe
+// sheet (components/mgr/views/new-recipe-form.tsx) to create_recipe: a name,
+// the brand it is meant to brew (optional — identity is required at
 // packaging, not here), and a note. Versions are authored on the recipe's
 // own page once it exists.
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NewRecipeFormView, type NewRecipeBrand, type NewRecipeValues } from "@/components/mgr/views/new-recipe-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
+const BLANK: NewRecipeValues = { name: "", brandId: "", note: "" };
 
-type Brand = { id: string; name: string };
-
-export function NewRecipeForm({ brands }: { brands: Brand[] }) {
-  const [name, setName] = useState("");
-  const [brandId, setBrandId] = useState("");
-  const [note, setNote] = useState("");
+export function NewRecipeForm({ brands }: { brands: NewRecipeBrand[] }) {
+  const [values, setValues] = useState(BLANK);
   const form = useCommandForm("create_recipe", {
-    build: () => ({ name, brandId: brandId || undefined, note: note || undefined }),
-    reset: () => { setName(""); setBrandId(""); setNote(""); },
+    build: () => ({ name: values.name, brandId: values.brandId || undefined, note: values.note || undefined }),
+    reset: () => setValues(BLANK),
   });
-  return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Create recipe" trigger={<Button size="sm">Create recipe</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="rec-name">Name</Label>
-          <Input id="rec-name" value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="rec-brand">Brand · optional</Label>
-          <Select value={brandId || NONE} onValueChange={(v) => setBrandId(v === NONE ? "" : v)}>
-            <SelectTrigger id="rec-brand"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Not decided</SelectItem>
-              {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="rec-note">Note · optional</Label>
-          <Input id="rec-note" value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : "Create recipe"}</Button>
-        </CommandFormFooter>
-      </form>
-    </CommandForm>
-  );
+  return <NewRecipeFormView open={form.open} onOpenChange={form.setOpen} brands={brands} values={values} onChange={setValues} onSubmit={form.submit} busy={form.submitting} error={form.error} />;
 }
