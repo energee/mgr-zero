@@ -5,6 +5,7 @@ import { E } from "@/components/mgr/e";
 
 // Exact control exceptions, never a whole-file exemption.
 const allowlist: { file: string; match: string; reason: string }[] = [
+{"file":"format-rows.tsx","match":"<input type=\"checkbox\" checked={confirmClear} onChange={event => onConfirmClear(event.target.checked)} />","reason":"Explicit confirmation of clearing all contents or materials, not a persistent on/off setting."},
 {"file":"me.tsx","match":"<input type=\"hidden\" name=\"breweryId\" value={brewery.id} />","reason":"Hidden brewery identity submitted by the switch form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"requestId\" value={requestId} />","reason":"Hidden actor/request identity submitted by the creation form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"actorId\" value={actorId} />","reason":"Hidden actor/request identity submitted by the creation form."},
@@ -26,14 +27,12 @@ const appDebt = [
   "app/(app)/settings/accounting/qbo-controls.tsx",
   "app/(app)/packaging/[id]/run-actions.tsx",
   "app/(app)/work/deliveries/[id]/delivered-form.tsx",
-  "app/(app)/transfers/[id]/transfer-actions.tsx",
   "app/(app)/pricing/group-form.tsx",
   "app/(app)/kegs/event-form.tsx",
   "app/(app)/replenishment/replenish-form.tsx",
   "app/(app)/kegs/pool-form.tsx",
   "app/(app)/replenishment/quantity-form.tsx",
   "app/(app)/locations/location-form.tsx",
-  "app/(app)/pricing/price-cell-form.tsx",
   "app/(app)/locations/move-stock-form.tsx",
   "app/(app)/orders/[id]/lifecycle-buttons.tsx",
   "app/(app)/orders/[id]/confirm/confirm-buttons.tsx",

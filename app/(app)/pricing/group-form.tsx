@@ -6,6 +6,7 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -61,14 +62,8 @@ export function GroupForm({ group, model, defaultPosition = 1 }: { group?: Price
           <Label htmlFor="group-name">Name</Label>
           <Input id="group-name" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="group-position">Position</Label>
-          <Input id="group-position" type="number" min="1" step="1" value={position} onChange={(e) => setPosition(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="group-ceiling">Cost ceiling ($/bbl, optional)</Label>
-          <Input id="group-ceiling" type="number" step="0.01" min="0" value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
-        </div>
+        {E.edit("Position", position, "number", undefined, { id: "group-position", min: 1, step: 1, onChange: setPosition, required: true })}
+        {E.edit("Cost ceiling ($/bbl, optional)", ceiling, "number", undefined, { id: "group-ceiling", min: 0, step: 0.01, onChange: setCeiling })}
         <p className="text-sm text-muted-foreground">
           Groups sort by position. A cost ceiling only suggests a group; nobody is moved automatically.
         </p>

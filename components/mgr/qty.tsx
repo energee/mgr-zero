@@ -31,6 +31,7 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
   };
   return <ButtonGroup>
     <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+    {/* eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden. */}
     <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue} onChange={onChange ? event => onChange(event.target.value) : undefined} className="w-14 [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
     <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
   </ButtonGroup>;
@@ -59,6 +60,7 @@ export function Qty({
     // the field's own border instead of letting it spill past. A clip, not a
     // scroll: a unit set that outgrows the field puts an option out of reach.
     <InputGroup className="overflow-hidden">
+      {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
       <InputGroupInput
         id={id}
         type="number"

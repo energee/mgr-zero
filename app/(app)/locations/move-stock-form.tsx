@@ -2,6 +2,7 @@
 
 import { binStockKey, selectedBinStock } from "@/lib/movement-form";
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +48,7 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
           <SelectContent>{bins.filter(b => b.id !== selected?.bin_id).map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="flex flex-col gap-2"><Label htmlFor="bin-qty">Quantity{selected ? ` (${selected.unit})` : ""}</Label><Input id="bin-qty" type="number" min={selected?.kind === "keg" ? "1" : "0.0001"} step={selected?.kind === "keg" ? "1" : "0.0001"} value={qty} onChange={e => setQty(e.target.value)} required /></div>
+      {E.edit(`Quantity${selected ? ` (${selected.unit})` : ""}`, qty, "number", undefined, { id: "bin-qty", min: selected?.kind === "keg" ? 1 : 0.0001, step: selected?.kind === "keg" ? 1 : 0.0001, onChange: setQty, required: true })}
       <div className="flex flex-col gap-2"><Label htmlFor="bin-note">Note</Label><Input id="bin-note" value={note} onChange={e => setNote(e.target.value)} /></div>
       {valid && <p className="text-sm text-muted-foreground" aria-live="polite">Move {amount} {selected.unit} from {binName(selected.bin_id)} to {binName(toBinId)}. The selected lot stays with the stock; location totals stay unchanged.</p>}
       <CommandFormMessage error={form.error} />

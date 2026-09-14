@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
+import { E } from "@/components/mgr/e";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -86,16 +86,7 @@ export function ReplenishForm({
                 <td className="py-1">{s.onHand}</td>
                 <td className="py-1">{s.suggested}</td>
                 <td className="py-1">
-                  <Input
-                    disabled={!canCreate}
-                    aria-label={`${s.sku} transfer quantity`}
-                    type="number"
-                    min="0"
-                    step="any"
-                    className="w-24"
-                    value={qtys[s.skuId] ?? ""}
-                    onChange={(e) => setQtys((prev) => ({ ...prev, [s.skuId]: e.target.value }))}
-                  />
+                  {E.edit(`${s.sku} transfer quantity`, qtys[s.skuId] ?? "", "number", undefined, { hideLabel: true, disabled: !canCreate, min: 0, step: "any", onChange: qty => setQtys(prev => ({ ...prev, [s.skuId]: qty })) })}
                 </td>
               </tr>
             ))}
