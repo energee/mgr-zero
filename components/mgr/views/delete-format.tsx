@@ -9,7 +9,7 @@ export function DeleteFormatControl({ name, busy = false, error, onDelete }: {
 }) {
   const [open, setOpen] = useState(false);
   return <CommandForm open={open} onOpenChange={next => { if (!busy) setOpen(next); }} title="Delete format"
-    trigger={<Button data-preview-action variant="destructive" size="sm">Delete format</Button>}>
+    trigger={<Button data-preview-action variant="destructive">Delete format</Button>}>
     <form className="flex flex-col gap-4" onSubmit={async event => {
       event.preventDefault();
       event.stopPropagation();

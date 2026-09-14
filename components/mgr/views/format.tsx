@@ -2,6 +2,7 @@
 
 import { useId, useState, type FormEventHandler, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { CommandFormFooter } from "@/components/mgr/command-form";
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { E } from "@/components/mgr/e";
 import { FormatRowsView, type FormatRow } from "@/components/mgr/views/format-rows";
@@ -79,7 +80,9 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
         {materials !== undefined ? materials : model.bom.length ? <><FormatRowsView kind="bom" rows={bomRows} options={model.bom.map(line => ({ id: line.material, name: line.material }))} onChange={setBomRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} />{E.btn("Save materials")}</> : <p className="text-muted-foreground">Save the format first, then add trays, labels, or other materials here. Materials are optional.</p>}
       </div>
     </details>
-    {footer !== undefined ? footer : <Button type="submit" form={id} className="w-full md:w-fit md:self-end">Save format</Button>}
-    {deleteAction}
+    <CommandFormFooter className="flex-row justify-end">
+      {deleteAction}
+      {footer !== undefined ? footer : <Button type="submit" form={id}>Save format</Button>}
+    </CommandFormFooter>
   </>;
 }

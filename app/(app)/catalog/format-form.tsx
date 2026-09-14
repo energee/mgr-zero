@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { FormatView } from "@/components/mgr/views/format";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { validFormatRows } from "@/lib/format-edit-rules";
@@ -30,7 +30,7 @@ export function FormatForm({ format, materials, contents, deleteAction, canCompo
       componentOptions={componentOptions} componentRows={components} onComponentRowsChange={setComponents}
       onSubmit={event => { if (!valid) { event.preventDefault(); return; } void form.submit(event); }}
       messages={<CommandFormMessage error={form.error} />}
-      footer={<CommandFormFooter><Button type="submit" form={formId} disabled={form.submitting || !valid}>{form.submitting ? "Saving…" : format ? "Save format" : "Create format"}</Button></CommandFormFooter>}
+      footer={<Button type="submit" form={formId} disabled={form.submitting || !valid}>{form.submitting ? "Saving…" : format ? "Save format" : "Create format"}</Button>}
     />
   </CommandForm>;
 }
