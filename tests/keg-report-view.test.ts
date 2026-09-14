@@ -13,8 +13,9 @@ describe("toKegReportViewProps", () => {
   it("prints utilization, buckets, customers and sizes the way the inventory draws them", () => {
     const m = toKegReportViewProps(report);
     expect(m.headline).toEqual(["70%", "142 of 203 kegs out"]);
-    expect(m.aging).toEqual([["0–30 days", "96", "$2,880"], ["Over 90 days", "9", "$270"]]);
-    expect(m.customers).toEqual([{ key: "c", href: "/kegs/customers/c", title: "Ridgeline Tap Room", detail: "9 over 90 days · oldest 5/12" }]);
+    expect(m.aging).toEqual([["0–30 days", "96", "$2,880.00"], ["Over 90 days", "9", "$270.00"]]);
+    expect(m.customers).toEqual([{ key: "c", href: undefined, title: "Ridgeline Tap Room", detail: "9 over 90 days · oldest shipped May 12, 2026", overdue: true }]);
+    expect(toKegReportViewProps(report, "/kegs").customers[0].href).toBe("/kegs/customers/c");
     expect(m.sizes).toEqual([{ key: "p-sixth_bbl", title: "Owned ⅙ bbl", detail: "18 of 36 out", trailing: "50% utilized" }]);
     expect(m.empty).toBeUndefined();
   });
@@ -25,6 +26,6 @@ describe("toKegReportViewProps", () => {
   });
   it("a customer with nothing over 90 days still lists with the oldest date", () => {
     const m = toKegReportViewProps({ ...report, customers: [{ customer_id: "c", name: "Al’s", over_90: 0, oldest_at: "2026-09-01T00:00:00+00:00" }] });
-    expect(m.customers[0].detail).toBe("none over 90 days · oldest 9/1");
+    expect(m.customers[0]).toMatchObject({ detail: "none over 90 days · oldest shipped Sep 1, 2026", overdue: false });
   });
 });

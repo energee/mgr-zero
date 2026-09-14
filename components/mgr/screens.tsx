@@ -216,6 +216,7 @@ import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
@@ -2187,7 +2188,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
     spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment.",
-    body: <KegReportView model={kegReportOwned} />,
+    body: <KegReportView model={toKegReportViewProps(kegReportOwned)} />,
   },
   {
     step: 7,

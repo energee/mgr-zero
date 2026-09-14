@@ -6,26 +6,22 @@ export type KegLedgerEvent = { customer_id: string | null; pool_id: string; keg_
 export type AgedKeg = { customer_id: string; pool_id: string; keg_size: string; qty: number; shipped_at: string; days: number };
 
 export function kegAging(events: KegLedgerEvent[], now: Date): AgedKeg[] {
-  const queues = new Map<string, { at: string; qty: number }[]>();
-  const sorted = events.filter((e) => e.customer_id).sort((a, b) => a.at.localeCompare(b.at));
-  for (const e of sorted) {
+  type Queue = { customer_id: string; pool_id: string; keg_size: string; open: { at: string; qty: number }[] };
+  const queues = new Map<string, Queue>();
+  for (const e of events.filter((e) => e.customer_id).sort((a, b) => a.at.localeCompare(b.at))) {
     const key = `${e.customer_id}|${e.pool_id}|${e.keg_size}`;
-    const q = queues.get(key) ?? [];
-    if (e.reason === "shipped") q.push({ at: e.at, qty: e.qty });
+    const q = queues.get(key) ?? { customer_id: e.customer_id!, pool_id: e.pool_id, keg_size: e.keg_size, open: [] };
+    if (e.reason === "shipped") q.open.push({ at: e.at, qty: e.qty });
     else if (e.reason === "returned" || e.reason === "lost") {
       let left = e.qty;
-      while (left > 0 && q.length) {
-        const take = Math.min(left, q[0].qty);
-        q[0].qty -= take; left -= take;
-        if (q[0].qty === 0) q.shift();
+      while (left > 0 && q.open.length) {
+        const take = Math.min(left, q.open[0].qty);
+        q.open[0].qty -= take; left -= take;
+        if (q.open[0].qty === 0) q.open.shift();
       }
     }
     queues.set(key, q);
   }
-  const out: AgedKeg[] = [];
-  for (const [key, q] of queues) {
-    const [customer_id, pool_id, keg_size] = key.split("|");
-    for (const s of q) out.push({ customer_id, pool_id, keg_size, qty: s.qty, shipped_at: s.at, days: Math.floor((now.getTime() - new Date(s.at).getTime()) / 86_400_000) });
-  }
-  return out;
+  return [...queues.values()].flatMap(({ open, ...who }) =>
+    open.map((s) => ({ ...who, qty: s.qty, shipped_at: s.at, days: Math.floor((now.getTime() - new Date(s.at).getTime()) / 86_400_000) })));
 }
