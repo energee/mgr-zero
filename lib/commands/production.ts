@@ -59,6 +59,39 @@ defineCommand({
   })),
 });
 
+// A post-knockout addition (dry hop, fruit, adjunct) against an open
+// occupancy: one RPC writes the batch_additions row and its consumption
+// movement. Not record_movement (finished goods) and not brew day (knockout).
+defineCommand({
+  name: "record_batch_addition",
+  description: "Add a post-knockout material (dry hop, fruit, adjunct) to an open occupancy: one batch_additions row plus its consumption movement from the bin holding the most of it; lot required when the material is lot-tracked",
+  input: z.object({
+    occupancyId: z.string().uuid(), materialId: z.string().uuid(), stage: z.enum(INGREDIENT_STAGES),
+    qty: z.number().positive(), lotId: z.string().uuid().optional(), note: z.string().optional(),
+  }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_batch_addition", {
+    p_brewery: ctx.breweryId, p_occupancy: i.occupancyId, p_material: i.materialId, p_stage: i.stage,
+    p_lot: i.lotId ?? null, p_qty: i.qty, p_note: i.note ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+// Lots of one material with stock left, oldest received first: the Cellar
+// addition sheet's lot picker. material_lot_on_hand carries staff_read via
+// its base tables, so PostgREST scopes it to the caller's brewery.
+defineQuery({
+  name: "list_material_lots", description: "Lots of one material with quantity on hand, oldest received first",
+  input: z.object({ materialId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
+  handler: async (ctx, i) => {
+    const [onHand, lots] = await Promise.all([
+      unwrap(ctx.db.from("material_lot_on_hand").select("lot_id, received_on, qty").eq("brewery_id", ctx.breweryId).eq("material_id", i.materialId).gt("qty", 0)),
+      unwrap(ctx.db.from("material_lots").select("id, lot_code").eq("brewery_id", ctx.breweryId).eq("material_id", i.materialId)),
+    ]);
+    return (onHand ?? []).map((l) => ({ lot_id: l.lot_id as string, lot_code: lots?.find((x) => x.id === l.lot_id)?.lot_code ?? "", qty: Number(l.qty), received_on: l.received_on as string | null }))
+      .sort((a, b) => (a.received_on ?? "").localeCompare(b.received_on ?? "") || a.lot_code.localeCompare(b.lot_code));
+  },
+});
+
 // Each recipe carries its latest version (id and number): schedule_batch names
 // a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({
