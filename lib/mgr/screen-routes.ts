@@ -112,6 +112,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Format", file: "app/(app)/catalog/format-form.tsx" },
   { name: "Package BOM", file: "app/(app)/catalog/formats/[id]/page.tsx" },
   { name: "Mash schedule", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
+  { name: "Ingredient", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
   { name: "Mash step", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
   { name: "Fermentation schedule", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
   { name: "Fermentation stage", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },

@@ -19,7 +19,7 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import type { RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, mashSummary, optionalNumber as num, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, fermentationSummary, mashSummary, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, lineDetail, lineReady, MashScheduleSheet, WaterSheet, type IngredientLine } from "./schedule-sheets";
 
 type Material = { id: string; name: string; category: string; extract_potential: number | null };
@@ -79,7 +79,10 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], materials
     <RecipeView
       model={{
         title, backHref, ...numbers, notes,
-        ingredients: lines.map((l, i) => ({ key: `${i}-${l.materialId}`, title: name(l.materialId), detail: lineDetail(l), qty: "" })),
+        ingredients: lines.map((l, i) => ({
+          key: `${i}-${l.materialId}`, title: name(l.materialId), detail: lineDetail(l), qty: "",
+          action: <IngredientSheet line={l} materials={materials} onSave={(f) => setLines(upsertAt(lines, i, f))} onDelete={() => setLines(removeAt(lines, i))} trigger={E.act("Edit")} />,
+        })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
         predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : undefined,
       }}
@@ -90,7 +93,7 @@ export function RecipeEditor({ recipeId, title, backHref, brands = [], materials
         submitLabel: creating ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet lines={lines} materials={materials} onChange={setLines} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
+        addIngredient: <IngredientSheet materials={materials} onSave={(f) => setLines([...lines, f])} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={setWater} trigger={E.nav(waterRow.title, waterRow.detail)} />,

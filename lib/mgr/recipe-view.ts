@@ -1,6 +1,8 @@
 // lib/mgr/recipe-view.ts — view-model for Recipe: the inventory editor and
 // the live page (read-out of a cut version, or the draft editor).
-export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string };
+import type { ReactNode } from "react";
+/** `action` (a live Edit) draws in place of `qty` when the page is a draft. */
+export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; action?: ReactNode };
 
 /** The eight process numbers drawn in one grid, in drawing order. */
 export const RECIPE_NUMBERS = [

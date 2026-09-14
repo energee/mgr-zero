@@ -50,7 +50,7 @@ export function RecipeView({
         : E.gated("Default price group · optional", "arrives with a recipe price group; the brand’s group prices its SKUs today")}
       {E.chips(["per bbl", "15 bbl", "30 bbl"], model.scaleIndex ?? 0)}
       {(model.ingredients ?? []).map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, row.detail, row.qty)}</Fragment>
+        <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty)}</Fragment>
       ))}
       {slots.addIngredient ?? E.row("+ add ingredient", "material · stage · timing", "")}
       {E.cols(...RECIPE_NUMBERS.map(([key, label]) => E.edit(label, model[key] ?? "", "number", undefined, bind(key))))}

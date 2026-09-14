@@ -333,10 +333,10 @@ export const E = {
     </Field>
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
-  pick: (label: string, value: string, options: string[]) => (
+  pick: (label: string, value: string, options: string[], controls?: { onChange: (value: string) => void }) => (
     <Field>
       <FieldLabel>{label}</FieldLabel>
-      <Select defaultValue={value}>
+      <Select {...(controls ? { value, onValueChange: controls.onChange } : { defaultValue: value })}>
         <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
         <SelectContent><SelectGroup>{options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>

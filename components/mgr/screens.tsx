@@ -124,6 +124,7 @@ import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
 import { NewRecipeFieldsView } from "@/components/mgr/views/new-recipe";
+import { IngredientView } from "@/components/mgr/views/ingredient";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
@@ -1897,13 +1898,29 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", Style: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
+    to: { Create: "Recipe", Style: "Recipe", "+ add ingredient": "Ingredient", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; Create recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Ingredient",
+    to: { "Save ingredient": "Recipe", "Delete ingredient": "Recipe" },
+    job: "One line of the bill: which material, where it enters, how much per barrel",
+    reads: "list_materials · none [draft: the version form’s state]",
+    writes: "create_recipe_version [written with the version, never alone]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "The add-ingredient row on Recipe opens this sheet straight into the fields; there is no list to pass through because the recipe page is the list. Quantity is per barrel so the batch size scales it; timing is optional and in minutes, since a dry hop’s day is a fermentation stage, not an ingredient fact.",
+    body: (<>
+      <IngredientView fields={{ material: "Citra", stage: "dry hop", perBbl: "1.2", timing: "" }} materials={["2-row", "Citra", "Cans · 16 oz"]} />
+    </>),
   },
   {
     step: 7,

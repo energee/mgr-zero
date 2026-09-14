@@ -196,7 +196,6 @@ export const INERT: (string | RegExp)[] = [
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",
-  "+ add ingredient",
   "1 \u00b7 Add locations",
   "1 \u00b7 Review auto-reconciled losses",
   "2 \u00b7 Review generated figures",

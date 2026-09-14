@@ -62,6 +62,13 @@ describe("Recipe creation", () => {
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
     expect(src("components/mgr/views/recipe.tsx")).not.toMatch(/detail\?:/);
+    // "+ add ingredient" is the add action: it opens the ingredient editor itself, not a list with a second header.
+    const sheets = src("app/(app)/recipes/[id]/schedule-sheets.tsx");
+    expect(sheets).toMatch(/title=\{line \? "Edit ingredient" : "Add ingredient"\}/);
+    expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
+    expect(sheets).toMatch(/<IngredientView\b/);
+    expect(sheets).not.toMatch(/<select\b/);
+    expect(screen("Ingredient").body).toBeTruthy();
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
     expect(src("app/(app)/recipes/page.tsx")).toMatch(/E\.btn\("Create recipe", "p", "\/recipes\/new"\)/);

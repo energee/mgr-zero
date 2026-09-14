@@ -10,10 +10,8 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
-import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { MashScheduleView, MashStepView, rowVerbs } from "@/components/mgr/views/mash-schedule";
+import { IngredientView, type IngredientFields } from "@/components/mgr/views/ingredient";
+import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { INGREDIENT_STAGES } from "@/lib/commands/production";
 import { WaterAdditionView, WaterView, type NamedOption } from "@/components/mgr/views/water";
 import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type MashStep, type WaterAddition, type WaterDraft } from "@/lib/mgr/recipe-process-view";
@@ -73,22 +71,26 @@ export const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "",
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0;
 export const lineDetail = (l: IngredientLine) => `${l.stage.replace("_", " ")}${l.timingMinutes ? ` · ${l.timingMinutes} min` : ""} · ${l.perBblQty} / bbl`;
 
-export function IngredientSheet({ lines, materials, onChange, trigger }: { lines: IngredientLine[]; materials: NamedOption[]; onChange: (lines: IngredientLine[]) => void; trigger: ReactNode }) {
-  const name = (id: string) => materials.find((m) => m.id === id)?.name ?? id.slice(0, 8);
-  return <ListSheet<IngredientLine, IngredientLine> sheetTitle="Ingredients" trigger={trigger} addLabel="Add ingredient" saveLabel="Save ingredient"
-    items={lines} onChange={onChange} toFields={(l) => l ?? emptyLine()} ready={lineReady} toItem={(f) => f}
-    list={(p) => <>
-      {E.back("Recipe", "Ingredients", p.add)}
-      {p.items.length === 0 ? E.blank({ title: "No ingredients yet", description: "Add ingredient is the only action." })
-        : p.items.map((l, i) => <div key={`${i}-${l.materialId}`}>{E.row(name(l.materialId), lineDetail(l), rowVerbs(i, p.items.length, p))}</div>)}
-    </>}
-    item={(p) => <>
-      <Field><FieldLabel>Material</FieldLabel><select aria-label="Material" className={E.select} value={p.fields.materialId} onChange={(e) => p.onChange({ materialId: e.target.value })}><option value="">Pick a material</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-      <Field><FieldLabel>Stage</FieldLabel><select aria-label="Stage" className={E.select} value={p.fields.stage} onChange={(e) => p.onChange({ stage: e.target.value as IngredientLine["stage"] })}>{INGREDIENT_STAGES.map((st) => <option key={st} value={st}>{st.replace("_", " ")}</option>)}</select></Field>
-      {E.cols(
-        <Field><FieldLabel>Per bbl</FieldLabel><Input aria-label="Per bbl" type="number" min="0" step="any" required value={p.fields.perBblQty} onChange={(e) => p.onChange({ perBblQty: e.target.value })} /></Field>,
-        <Field><FieldLabel>Timing min · optional</FieldLabel><Input aria-label="Timing min" type="number" min="0" step="1" value={p.fields.timingMinutes} onChange={(e) => p.onChange({ timingMinutes: e.target.value })} /></Field>,
-      )}
-      {p.footer}
-    </>} />;
+/** One ingredient, edited in place: "+ add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
+export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: NamedOption[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState<IngredientLine>(line ?? emptyLine());
+  const name = (id: string) => materials.find((m) => m.id === id)?.name ?? "";
+  const id = (n: string) => materials.find((m) => m.name === n)?.id ?? "";
+  const fields: IngredientFields = { material: name(f.materialId), stage: f.stage.replace("_", " "), perBbl: f.perBblQty, timing: f.timingMinutes };
+  const patch = (p: Partial<IngredientFields>) => setF((c) => ({
+    ...c,
+    ...(p.material !== undefined ? { materialId: id(p.material) } : {}),
+    ...(p.stage !== undefined ? { stage: p.stage.replace(" ", "_") as IngredientLine["stage"] } : {}),
+    ...(p.perBbl !== undefined ? { perBblQty: p.perBbl } : {}),
+    ...(p.timing !== undefined ? { timingMinutes: p.timing } : {}),
+  }));
+  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(line ?? emptyLine()); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={<button type="button" className="block w-full text-left">{trigger}</button>}>
+    <IngredientView fields={fields} materials={materials.map((m) => m.name)} onChange={patch} footer={
+      <CommandFormFooter>
+        {onDelete && <Button type="button" variant="outline" onClick={() => { onDelete(); setOpen(false); }}>Delete ingredient</Button>}
+        <Button type="button" disabled={!lineReady(f)} onClick={() => { onSave(f); setOpen(false); }}>Save ingredient</Button>
+      </CommandFormFooter>
+    } />
+  </CommandForm>;
 }
