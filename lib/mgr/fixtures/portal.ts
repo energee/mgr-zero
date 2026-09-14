@@ -2,6 +2,7 @@
 // for Shop and Review order. Identities come from demo.ts; prices are the
 // inventory literals ($150.00, $38.00, $42.00, $18.00, $62.00). Cart: 4 Hazy
 // kegs + 6 Pils cases = $828.00 merchandise; 4 × $30.00 = $120.00 deposit.
+import type { ComingUpSnapshot } from "@/lib/mgr/coming-up-view";
 import { LOC_WAREHOUSE, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { ShopSnapshot } from "@/lib/mgr/shop-view";
 import type { ReviewOrderSnapshot } from "@/lib/mgr/review-order-view";
@@ -54,12 +55,11 @@ export const ridgelineReviewOrder: ReviewOrderSnapshot = {
   },
 };
 
-export const ridgelineComingUp = {
+export const ridgelineComingUp: ComingUpSnapshot = {
   brewery: "Demo Brewing",
   rows: [
-    { brand_id: "hazy", brand_name: "Hazy IPA", planned_week: "2026-09-14" },
-    { brand_id: "pils", brand_name: "Pils", planned_week: "2026-09-21" },
-    { brand_id: "saison", brand_name: "Saison", planned_week: "2026-10-05" },
+    { brand_id: "hazy", brand_name: "Hazy IPA", planned_week: "2026-09-14", listed: true },
+    { brand_id: "pils", brand_name: "Pils", planned_week: "2026-09-21", listed: true },
+    { brand_id: "saison", brand_name: "Saison", planned_week: "2026-10-05", listed: false },
   ],
-  listed: new Set(["Hazy IPA", "Pils"]),
 };

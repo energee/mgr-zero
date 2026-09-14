@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CommandForm } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
-import type { ShopViewModel } from "@/lib/mgr/shop-view";
-import { brandAnchor } from "@/lib/mgr/coming-up-view";
+import { brandAnchor, type ShopViewModel } from "@/lib/mgr/shop-view";
 
 export type { ShopViewModel };
 export type ShopControls = {

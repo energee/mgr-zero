@@ -65,6 +65,9 @@ export type ShopViewModel = {
 };
 
 /** Package label under a brand title: strip a duplicated `Brand · ` prefix. */
+/** The id a Shop brand heading carries, so Coming up can link to it. Slugs the name because the catalog groups by brand name. */
+export const brandAnchor = (product: string) => `brand-${product.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+
 export function packageName(product: string, name: string): string {
   const prefix = `${product} · `;
   return name.startsWith(prefix) ? name.slice(prefix.length) : name;

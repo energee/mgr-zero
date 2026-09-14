@@ -89,6 +89,7 @@ const AUTHENTICATED_RPCS = [
   "my_customer_ids()",
   "portal_availability(uuid)",
   "portal_brewery_rows()",
+  "portal_schedule_rows()",
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid,date)",
   "portal_quote_order(uuid,uuid,uuid,date,text,text,jsonb,uuid)",
   "portal_submit_quote(uuid,uuid,uuid,uuid,uuid)",

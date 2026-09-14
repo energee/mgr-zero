@@ -22,7 +22,7 @@ export default async function PortalOrdersPage() {
   const orders = (await runCommand("portal_orders", {}, await buildContext(customer.breweryId))) as Order[];
   return (
     <PortalOrdersView
-      model={toPortalOrdersViewProps({ customerName: customer.customerName, orders })}
+      model={toPortalOrdersViewProps({ customerName: customer.customerName, breweryName: customer.breweryName, orders })}
       linkRows
     />
   );
