@@ -9,8 +9,7 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { E } from "@/components/mgr/e";
 import { dollarsInput } from "@/lib/mgr/money";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -37,10 +36,7 @@ export function PriceCellForm({
       trigger={<Button variant="ghost" size="sm" className="tabular-nums">{label}</Button>}
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cell-price">Price on {channelName} (USD)</Label>
-          <Input id="cell-price" type="number" step="0.01" min="0" value={dollars} onChange={(e) => setDollars(e.target.value)} required />
-        </div>
+        {E.edit(`Price on ${channelName} (USD)`, dollars, "number", undefined, { id: "cell-price", min: 0, step: 0.01, onChange: setDollars, required: true })}
         <p className="text-sm text-muted-foreground">
           Every SKU of a brand on group {groupName} sells at this price as {formatName} on {channelName}. An empty cell is unpriced: that package cannot sell on this channel.
         </p>

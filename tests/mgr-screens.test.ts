@@ -532,10 +532,11 @@ describe("SCREENS", () => {
     expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
 
     const format = body("Format");
-    expect(format).toContain('aria-label="Volume"');
-    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Volume"[\s\S]*role="tablist"/);
-    expect(format).toContain(">packaged</dd>");
-    expect(format).toContain("New pour beside its brand in Catalog");
+    expect(format).toContain('aria-label="Size of one container"');
+    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Size of one container"[\s\S]*role="tablist"/);
+    expect(format).toContain("Container");
+    expect(format).toContain("Beer per package");
+    expect(format).toContain("Containers per package");
     expect(format).toMatch(/role="tablist"[^>]*>[\s\S]*oz[\s\S]*gal[\s\S]*bbl/);
     for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
     for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);
@@ -901,9 +902,9 @@ describe("SCREENS", () => {
     }
   });
 
-  it("treats a poured format as never a SKU", () => {
+  it("treats a pour as a non-stock SKU", () => {
     const brand = SCREENS.find((s) => s.name === "Brand")!;
-    expect(JSON.stringify(brand.states)).toMatch(/never a SKU/);
+    expect(JSON.stringify(brand.states)).toMatch(/non-stock SKU/);
     expect(String(brand.spec)).not.toMatch(/draft pours are SKUs/i);
     expect(String(brand.spec)).not.toMatch(/SCHEMA-GATE:[^\]]*styles table/);
   });

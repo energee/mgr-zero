@@ -28,6 +28,7 @@ export type CatalogBrandRow = {
   abv: number | string | null;
   styles: { name: string } | null;
   skus: { id: string }[];
+  pours?: { id: string }[];
 };
 
 export type CatalogSnapshot = {
@@ -44,7 +45,7 @@ export type CatalogSnapshot = {
 function brandDetail(b: CatalogBrandRow): string {
   const parts = [b.styles?.name ?? "style not set"];
   if (b.abv != null && b.abv !== "") parts.push(`${Number(b.abv)}%`);
-  parts.push(plural(b.skus.length, "SKU"));
+  parts.push(plural(b.skus.length + (b.pours?.length ?? 0), "SKU"));
   return parts.join(" · ");
 }
 

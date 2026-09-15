@@ -40,6 +40,12 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": ["error", {
         selector: "CallExpression[arguments.length=0][callee.object.type='NewExpression'][callee.object.callee.name='Date'][callee.property.name=/^toLocale(Date|Time)?String$/]",
         message: "Use formatDate / formatDateTime / formatDayHeader from @/lib/date-format so every surface reads the same (#253).",
+      }, {
+        selector: "JSXOpeningElement[name.name='select']",
+        message: "Use E.pick from @/components/mgr/e instead of a native select.",
+      }, {
+        selector: "JSXOpeningElement:has(JSXAttribute[name.name='type'][value.value='number']), JSXOpeningElement:has(JSXAttribute[name.name='type'] > JSXExpressionContainer > Literal[value='number'])",
+        message: "Use E.edit(label, value, 'number') or E.volume from @/components/mgr/e instead of a standalone numeric input.",
       }],
     },
   },

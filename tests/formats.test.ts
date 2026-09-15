@@ -41,6 +41,11 @@ describe("format_components", () => {
     const derived = await runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: four.id, qty: 6 }] }, ctx) as { bbl_per_unit: string; composed: boolean };
     expect(Number(derived.bbl_per_unit)).toBeCloseTo(0.012, 6);
     expect(derived.composed).toBe(true);
+    const listed = await runCommand("list_formats", { basis: "packaged" }, ctx) as { id: string; bbl_per_unit: number | null; effective_bbl_per_unit: number | null; components: { child_format_id: string; qty: number }[] }[];
+    const composed = listed.find(format => format.id === caseFmt.id)!;
+    expect(composed.bbl_per_unit).toBeNull();
+    expect(Number(composed.effective_bbl_per_unit)).toBeCloseTo(0.012, 6);
+    expect(composed.components).toEqual([expect.objectContaining({ child_format_id: four.id, qty: 6 })]);
     const sku = await runCommand("create_sku", { brandId: brand!.id, formatId: caseFmt.id }, ctx) as { id: string };
     const { id: locId, binId } = await seedLocation(ctx.breweryId, { name: "Comp WH" });
     const [mv] = insertFixture<{ bbl: number }>("inventory_movements", { brewery_id: ctx.breweryId, sku_id: sku.id, location_id: locId, bin_id: binId, qty: 10, type: "opening_balance", created_by: ctx.userId });

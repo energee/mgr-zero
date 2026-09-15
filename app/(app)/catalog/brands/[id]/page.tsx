@@ -21,18 +21,20 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   const ctx = await buildContext(brewery.id);
   // The page edits; whoever may not save a brand is sent to No access, not shown a read-only form.
   requirePagePermission(ctx, "upsert_brand", "Brand");
-  const [brands, groups, registry, cost] = await Promise.all([
+  const [brands, groups, registry, cost, categories] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<BrandRow[]>,
     runCommand("list_price_groups", {}, ctx) as Promise<BrandSnapshot["priceGroups"]>,
     runCommand("get_compliance_registry", {}, ctx) as Promise<{ brands: RegistryBrand[] }>,
     // Enrichment: an unknown id fails validation and simply has no suggestion; the brand lookup below still 404s it.
     id === "new" ? undefined : optionalPageQuery<BrandSnapshot["cost"]>("get_brand_recipe_cost", { brandId: id }, ctx),
+    runCommand("list_catalog_categories", {}, ctx) as Promise<{ name: string }[]>,
   ]);
   const brand = id === "new" ? null : brands.find((b) => b.id === id) ?? notFound();
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
   return (
     <BrandPage
       brand={brand}
+      categories={categories.map(category => category.name)}
       styles={[...new Set(brands.map((b) => b.styles?.name).filter((s): s is string => !!s))]}
       priceGroups={groups}
       cost={cost}

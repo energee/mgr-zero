@@ -13,5 +13,5 @@ it("keeps replenishment controls and implicit form submission read-only for Ware
   const source = readFileSync(new URL("../app/(app)/replenishment/replenish-form.tsx", import.meta.url), "utf8");
   expect(source).toContain("if (!canCreate) { e.preventDefault(); return; }");
   expect(source).toMatch(/<Select\s[^>]*disabled=\{!canCreate\}/);
-  expect(source).toMatch(/<Input\s[^>]*disabled=\{!canCreate\}/);
+  expect(source).toMatch(/E\.edit\([^)]*disabled: !canCreate/);
 });

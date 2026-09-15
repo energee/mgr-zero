@@ -9,6 +9,7 @@
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
+import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
@@ -36,6 +37,7 @@ export function BrandView({
   linkRows,
   actions = {},
   addCompliance,
+  categoryAction,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
@@ -48,6 +50,7 @@ export function BrandView({
   actions?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
   addCompliance?: ReactNode;
+  categoryAction?: ReactNode;
 }) {
   return (
     <>
@@ -56,7 +59,10 @@ export function BrandView({
       {E.cols(
         <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
         <RegistryInput label="ABV" value={model.abv} onChange={controls.abv} />,
-        <RegistrySelect label="Category" value={model.category} options={asOptions(model.categoryOptions)} onChange={controls.category} placeholder="Category" />,
+        <div className="flex flex-col gap-2">
+          <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
+          {categoryAction !== undefined ? categoryAction : <CatalogCategoriesControl categories={model.categoryOptions} />}
+        </div>,
         <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />,
       )}
       {model.suggestion

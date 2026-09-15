@@ -58,6 +58,7 @@ export const catalogBrands: CatalogSnapshot = {
       abv: 6.8,
       styles: { name: "IPA" },
       skus: hazySkus,
+      pours: [{ id: FMT_PINT }],
     },
     {
       id: BRAND_PILS,
@@ -65,8 +66,8 @@ export const catalogBrands: CatalogSnapshot = {
       abv: 4.9,
       styles: { name: "Lager" },
       skus: [
-        { id: SKU_PILS.sku_id, name: SKU_PILS.name, format_id: FMT_CASE, active: true },
-        { id: SKU_PILS_BOTTLE, name: `${PILS} · 12 oz bottle`, format_id: FMT_CAN, active: true },
+        { id: SKU_PILS.sku_id },
+        { id: SKU_PILS_BOTTLE },
       ],
     },
     {
@@ -74,7 +75,7 @@ export const catalogBrands: CatalogSnapshot = {
       name: STOUT,
       abv: 7.2,
       styles: { name: "Stout" },
-      skus: [{ id: SKU_STOUT.sku_id, name: SKU_STOUT.name, format_id: FMT_SIXTH, active: true }],
+      skus: [{ id: SKU_STOUT.sku_id }],
     },
   ],
   priceGroups,
@@ -88,6 +89,7 @@ export const catalogBrands: CatalogSnapshot = {
 
 /** Hazy IPA brand sheet: Core, price group 3, 3 active packages. */
 export const brandHazy: BrandSnapshot = {
+  categories: ["Core", "Seasonal", "One-off", "Barrel-aged"],
   brand: {
     id: BRAND_HAZY,
     name: HAZY,
@@ -98,6 +100,7 @@ export const brandHazy: BrandSnapshot = {
     price_group_id: PG_3,
     styles: { name: HAZY },
     skus: hazySkus,
+    pours: [{ id: FMT_PINT }],
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,
@@ -124,6 +127,7 @@ export const skuHazyHalf: SkuSnapshot = {
 
 /** Hazy IPA SKUs: ½ bbl, ⅙ bbl, case. */
 export const skuListHazy: SkuListSnapshot = {
+  pours: [{ id: FMT_PINT, name: "Pint", ounces: 16 }],
   brand: { id: BRAND_HAZY, name: HAZY },
   skus: [
     {

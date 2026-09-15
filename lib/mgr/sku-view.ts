@@ -1,6 +1,9 @@
 // lib/mgr/sku-view.ts — view-model for the SKU sheet. create_sku / list_skus
 // plus list_formats (packaged) paint format, active, and optional UPC.
 export type SkuViewModel = {
+  kind?: "packaged" | "poured";
+  pourName?: string;
+  ounces?: string;
   format: string;
   formatOptions: string[];
   active: boolean;
@@ -35,3 +38,14 @@ export function toSkuViewProps({ sku, formats }: SkuSnapshot): SkuViewModel {
     volumeInfo: VOLUME_INFO,
   };
 }
+
+/** Sellable SKU creation preserves the existing stock/serving write boundaries. */
+export function skuCreateCommand(fields: {
+  kind: "packaged" | "poured"; brandId: string; formatId: string; name: string; upc: string; pourName: string; ounces: string;
+}) {
+  return fields.kind === "poured"
+    ? { name: "upsert_format", input: { brandId: fields.brandId, basis: "poured", name: pourSkuName(fields.pourName, fields.ounces), ounces: Number(fields.ounces) }, valid: Number(fields.ounces) > 0 && Number(fields.ounces) < 1000 }
+    : { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined }, valid: Boolean(fields.formatId) };
+}
+
+export const pourSkuName = (name: string, ounces: string) => name.trim() || `${Number(ounces)} oz pour`;

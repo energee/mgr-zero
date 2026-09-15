@@ -16,12 +16,12 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
 const customer = { id: "buyer", name: "Buyer", type: "retailer", state: "PA", sale_channel_id: "channel", license_no: "license", payment_terms: "Net 30", tax_treatment: "research", sale_channels: { name: "Wholesale" } };
 const shipTo = { id: "ship", label: "Dock", address1: "1 Main", address2: null, city: "Town", state: "PA", zip: "12345", is_default: true };
-async function query(name: string) {
+async function query(name: string, input?: { basis?: string }) {
   state.calls.push(name);
   switch (name) {
     case "list_brands": return [brand];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
-    case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: "brand", brands: { name: "Hazy" } }];
+    case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: "brand", brands: { name: "Hazy" } }].filter(f => !input?.basis || f.basis === input.basis);
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
@@ -47,13 +47,13 @@ import { CustomerView } from "@/components/mgr/views/customer";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 beforeEach(() => { state.role = "admin"; state.calls = []; });
-it("assembles shared Catalog with the brand link and its per-brand pour controls", async () => {
+it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
   const html = render(page);
-  // Packages are one tap further, on the brand's SKU list.
-  for (const text of ["/catalog/brands/brand", "New pour", "Edit pour", "/catalog/formats/keg"]) expect(html).toContain(text);
-  for (const text of ["Edit brand", "Edit SKU", "UPC 123456"]) expect(html).not.toContain(text);
+  // Packages and pours are one tap further, on the brand's SKU list.
+  for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);
+  for (const text of ["Edit brand", "Edit SKU", "UPC 123456", "New pour", "Edit pour"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
 });
 it("assembles the shared SKU list with the brand's packages and both SKU sheets", async () => {

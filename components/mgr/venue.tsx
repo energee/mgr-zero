@@ -48,6 +48,7 @@ export const S = {
     <div className="sk-control"><b>{label}</b><button type="button" role="switch" aria-checked={on}><i /></button></div>
   ),
   select: (label: string, value: string) => (
+    // eslint-disable-next-line no-restricted-syntax -- Slack replica uses Slack's visual controls, never MGR product forms.
     <label className="sk-control"><b>{label}</b><select defaultValue={value}><option>{value}</option></select></label>
   ),
   /** A Slack action MGR will not enable yet: disabled button plus the reason. */

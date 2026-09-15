@@ -9,17 +9,21 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { SkuView } from "@/components/mgr/views/sku";
 import { RegistryInput } from "@/components/mgr/views/registry-fields";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toSkuViewProps } from "@/lib/mgr/sku-view";
+import { toSkuViewProps, skuCreateCommand } from "@/lib/mgr/sku-view";
 
 export type FormatOption = { id: string; name: string };
 
 export function SkuForm({ brandId, formats }: { brandId: string; formats: FormatOption[] }) {
+  const [kind, setKind] = useState<"packaged" | "poured">("packaged");
+  const [pourName, setPourName] = useState("");
+  const [ounces, setOunces] = useState("");
   const [formatId, setFormatId] = useState(formats[0]?.id ?? "");
   const [name, setName] = useState("");
   const [upc, setUpc] = useState("");
-  const form = useCommandForm("create_sku", {
-    build: () => ({ brandId, formatId, name: name || undefined, upc: upc || undefined }),
-    reset: () => { setFormatId(formats[0]?.id ?? ""); setName(""); setUpc(""); },
+  const creation = skuCreateCommand({ kind, brandId, formatId, name, upc, pourName, ounces });
+  const form = useCommandForm(creation.name, {
+    build: () => creation.input,
+    reset: () => { setKind("packaged"); setPourName(""); setOunces(""); setFormatId(formats[0]?.id ?? ""); setName(""); setUpc(""); },
   });
   // The view picks by format name; ids stay here because create_sku takes one.
   const formatName = formats.find((f) => f.id === formatId)?.name ?? "";
@@ -28,13 +32,13 @@ export function SkuForm({ brandId, formats }: { brandId: string; formats: Format
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New SKU" trigger={<Button variant="outline" size="sm">New SKU</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <SkuView
-          model={{ ...toSkuViewProps({ formats }), format: formatName, upc }}
-          controls={{ format: (value) => setFormatId(formats.find((f) => f.name === value)?.id ?? ""), upc: setUpc }}
+          model={{ ...toSkuViewProps({ formats }), format: formatName, upc, kind, pourName, ounces }}
+          controls={{ kind: setKind, pourName: setPourName, ounces: setOunces, format: (value) => setFormatId(formats.find((f) => f.name === value)?.id ?? ""), upc: setUpc }}
           // create_sku has no active flag; a new SKU is active.
           activeRow={null}
           fields={<RegistryInput label="Name (optional)" value={name} onChange={setName} placeholder="Brand · Format" />}
           messages={<CommandFormMessage error={form.error} />}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !formatId}>{form.submitting ? "Creating…" : "Create"}</Button></CommandFormFooter>}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !creation.valid}>{form.submitting ? "Creating…" : "Create"}</Button></CommandFormFooter>}
         />
       </form>
     </CommandForm>

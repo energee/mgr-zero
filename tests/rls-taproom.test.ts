@@ -12,7 +12,7 @@ import { admin, asUser, ins, makeBrewery, makeStaff, seedCatalog, seedCustomer, 
 const matrix = {
   breweries: "deny", brewery_users: "self", brewery_counters: "deny", customer_users: "deny",
   customers: "deny", ship_tos: "deny", vendors: "deny", materials: "deny", material_lots: "deny",
-  styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", formats: "tenant", format_components: "tenant",
+  styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", catalog_categories: "deny", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
@@ -40,6 +40,7 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   pos_catalog_variations: ["connection_id", "external_item_id", "external_variation_id"], pos_sale_expectations: ["sale_id"],
   pos_catalog_items: ["connection_id", "brand_id", "catalog_group"],
   pos_catalog_ownership: ["connection_id", "format_id"],
+  catalog_categories: ["brewery_id", "name"],
 };
 const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
 // These tables intentionally have no authenticated SELECT privilege, in addition to RLS.
@@ -64,6 +65,7 @@ async function fixtures() {
   await put("styles", { name: "IPA" });
   await put("water_profiles", { name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 });
   const group = await put("price_groups", { name: "Standard", position: 1 });
+  await put("catalog_categories", { name: "Lager" });
   const composed = await put("formats", { name: "Six cases", basis: "packaged", package_type: "can" });
   await put("format_components", { parent_format_id: composed.id, child_format_id: cat.formatId, qty: 6 });
   await put("format_bom", { format_id: cat.formatId, material_id: material.id, qty_per_unit: 1 });
@@ -310,6 +312,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
     create_recipe_version: [B,f.recipe.id,[{name:"Sacc",kind:"infusion",tempF:152,minutes:60}],[],{},0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
+    create_composed_format: [B,name,"can",[{child_format_id:f.composed.id,qty:1}],R()], delete_catalog_category: [B,"Lager",R()], delete_customer: [B,f.customer.customerId,R()], delete_format: [B,f.composed.id,R()], save_catalog_category: [B,null,name,R()],
     delete_bin: [B,emptyBin,R()], disable_chat_installation: [B,I,R()], disconnect_chat_installation: [B,I,R()], draft_purchase_order_from_requirements: [B,[MAT],R()],
     portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
     portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],
