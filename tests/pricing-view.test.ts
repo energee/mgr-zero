@@ -19,18 +19,26 @@ describe("Price groups view", () => {
   it("maps the four list_* snapshots onto Wholesale and Taproom tables", () => {
     const model = toPriceGroupsViewProps(pricingGrid);
     expect(model.channels.map((c) => c.name)).toEqual(["Wholesale", "Taproom"]);
-    expect(model.channels[0]?.headers).toEqual(["Group", "½ bbl keg", "sixtel", "case · 24×16oz"]);
-    expect(model.channels[1]?.headers).toEqual(["Group", "pint", "crowler"]);
-    expect(model.channels[0]?.rows).toEqual([
-      ["1", "$132.00", "$53.00", "$46.00"],
-      ["2", money(15000), "$95.00", money(3800)],
-      ["3", "$240.00", "$140.00", "not priced"],
+    // Every format is a column on every channel, as the live grid draws it:
+    // an unpriced format still needs a cell to tap. null is unpriced.
+    expect(model.formats).toEqual(["½ bbl keg", "sixtel", "case · 24×16oz", "pint", "crowler"]);
+    const rows = (i: number) => model.channels[i]?.rows.map((r) => [r.name, ...r.cells]);
+    expect(rows(0)).toEqual([
+      ["1", "$132.00", "$53.00", "$46.00", null, null],
+      ["2", money(15000), "$95.00", money(3800), null, null],
+      ["3", "$240.00", "$140.00", null, null, null],
     ]);
-    expect(model.channels[1]?.rows).toEqual([
-      ["1", "$7.00", "$14.00"],
-      ["2", "$8.00", "$16.00"],
-      ["3", "$11.00", "not priced"],
+    expect(rows(1)).toEqual([
+      ["1", null, null, null, "$7.00", "$14.00"],
+      ["2", null, null, null, "$8.00", "$16.00"],
+      ["3", null, null, null, "$11.00", null],
     ]);
+    expect(model.channels[0]?.rows[1]?.id).toBe(pricingGrid.groups[1]?.id);
+  });
+
+  it("labels a brand's format with its brand", () => {
+    const model = toPriceGroupsViewProps({ ...pricingGrid, formats: [{ id: "f", name: "sixtel", brands: { name: "Hazy" } }] });
+    expect(model.formats).toEqual(["Hazy · sixtel"]);
   });
 
   it("renders Create price group, group links, and the Hazy / Pils cells", () => {
@@ -47,19 +55,51 @@ describe("Price groups view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction and tables replace the inventory button and both tables", () => {
+  it("createAction and the row slots replace the inventory button, links and cells inside the same table", () => {
     const html = htmlOf(createElement(PriceGroupsView, {
       model: toPriceGroupsViewProps(pricingGrid),
       createAction: "CREATE",
-      tables: "LIVE TABLES",
+      renderGroup: (row) => `G:${row.name}`,
+      renderCell: (channel, row, col, label) => createElement("b", null, `${channel.name}/${row.name}/${col}`, label),
     }));
     expect(html).toMatch(/CREATE/);
     expect(html).not.toMatch(/Create price group/);
-    expect(html).toMatch(/LIVE TABLES/);
-    expect(html).not.toContain(money(15000));
-    expect(html).not.toMatch(/not priced/);
+    expect(html).toMatch(/G:2/);
+    expect(html).not.toMatch(/data-to="Price group"/);
+    expect(html).toContain(`<b>Wholesale/2/0${money(15000)}</b>`);
+    expect(html).toMatch(/Taproom\/3\/4<span class="text-muted-foreground">not priced<\/span>/);
     expect(html).toMatch(/one table per sale channel/);
-    expect(html).toMatch(/empty cell is unpriced/);
+  });
+
+  it("draws one blank state: no groups first, then no channels", () => {
+    const none = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({ ...pricingGrid, groups: [], channels: [] }) }));
+    expect(none).toMatch(/Add a price group/);
+    expect(none).not.toMatch(/No sale channels/);
+    const noChannels = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({ ...pricingGrid, channels: [] }) }));
+    expect(noChannels).toMatch(/No sale channels yet/);
+  });
+
+  it("explains the grid once, above it, and recesses unpriced cells", () => {
+    const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
+    expect(html.match(/data-slot="alert"/g)?.length ?? 0).toBe(1);
+    expect(html).not.toMatch(/empty cell is unpriced/);
+    expect(html).toMatch(/<span class="text-muted-foreground">not priced<\/span>/);
+  });
+
+  it("the live page fills the shared table's slots and reuses the group view for create", () => {
+    const src = readFileSync("app/(app)/pricing/page.tsx", "utf8");
+    expect(src).not.toMatch(/E\.tbl|E\.blank/);
+    expect(src).toMatch(/renderGroup=/);
+    expect(src).toMatch(/renderCell=/);
+    expect(src).toMatch(/groupName=\{row\.name\}/);
+    expect(src).toMatch(/channelName=\{channel\.name\}/);
+    expect(src).toMatch(/createAction=\{<GroupForm model=\{toPriceGroupViewProps\(snapshot\)\}/);
+    const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
+    expect(form).not.toMatch(/<Input\b/);
+    expect(form.match(/<PriceGroupView\b/g)?.length).toBe(1);
+    const cell = readFileSync("app/(app)/pricing/price-cell-form.tsx", "utf8");
+    expect(cell).toMatch(/title=\{`\$\{groupName\} · \$\{formatName\}`\}/);
+    expect(cell).toMatch(/unpriced/);
   });
 
   it("the Price groups inventory record is PriceGroupsView", () => {
@@ -102,6 +142,26 @@ describe("Price group view", () => {
     expect(html).toMatch(/>Remove</);
     expect(html).toMatch(/refused while a brand sits on it/);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("a new group starts blank at the next position, under the last ceiling, with no Prices line", () => {
+    const model = toPriceGroupViewProps(pricingGrid);
+    expect(model.name).toBe("");
+    expect(model.position).toBe("4");
+    expect(model.costCeilingInput).toBe("");
+    expect(model.previousCeilingLabel).toBe("Cost ceiling · group 3");
+    expect(model.previousCeiling).toBe("none");
+    expect(model.prices).toBeUndefined();
+    expect(model.removeDetail).toBeUndefined();
+    const html = htmlOf(createElement(PriceGroupView, { model, footer: null }));
+    expect(html).not.toMatch(/Prices/);
+    expect(html).not.toMatch(/Remove/);
+  });
+
+  it("keeps the ceiling note to one sentence", () => {
+    const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(priceGroupTwo) }));
+    const note = html.match(/<div data-slot="alert-description"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
+    expect(note.split(/\. /).length).toBeLessThanOrEqual(2);
   });
 
   it("the Price group inventory record is PriceGroupView", () => {

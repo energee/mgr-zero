@@ -17,13 +17,13 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer }:
       {E.edit("Group name", model.name, "text", undefined, controls.name && { onChange: controls.name })}
       {E.edit("Position", model.position, "number", undefined, { onChange: controls.position, min: 0 })}
       {E.edit("Cost ceiling ($/bbl)", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { onChange: controls.costCeiling, min: 0 })}
-      {E.info("Ceilings are dollars per barrel of recipe cost. Groups sort by position, and the lower bound of a ceiling is the previous group’s. A brand whose recipe cost lands inside this band gets this group suggested on Brand; nobody is moved automatically. Leave it empty and it reads none.")}
+      {E.info("Dollars per barrel of recipe cost: a brand whose cost lands between the previous group’s ceiling and this one gets this group suggested on Brand, never moved.")}
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}
-      {E.fld("Prices", model.prices)}
+      {model.prices !== undefined ? E.fld("Prices", model.prices) : null}
       {messages}
-      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail, E.act("Remove", "destructive"), "w")}
+      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail ?? "", E.act("Remove", "destructive"), "w")}
     </>
   );
 }

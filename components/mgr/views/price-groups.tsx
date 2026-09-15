@@ -1,40 +1,48 @@
-// components/mgr/views/price-groups.tsx — Price groups grid. Live passes
-// GroupForm as createAction and its form tables as tables; inventory draws
-// E.tbl / E.link("1", "Price group") from the adapter.
+// components/mgr/views/price-groups.tsx — Price groups grid, one table per
+// sale channel, drawn once for both surfaces. Inventory draws E.link for the
+// group and the cell's label; live hands in GroupForm / PriceCellForm through
+// the renderGroup / renderCell slots and keeps the same table around them.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
+import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
 
 export type { PriceGroupsViewModel };
 
 export function PriceGroupsView({
   model,
   createAction,
-  tables,
+  renderGroup = (row) => E.link(row.name, "Price group"),
+  renderCell = (_channel, _row, _col, label) => label,
   backHref,
 }: {
   model: PriceGroupsViewModel;
   createAction?: ReactNode;
-  /** Live: E.tbl with GroupForm / PriceCellForm. Inventory omits this. */
-  tables?: ReactNode;
+  /** The row's first cell: the group's name, opening the group. */
+  renderGroup?: (row: PriceGroupsRowView) => ReactNode;
+  /** One price cell; `label` is the money string or the muted "not priced". */
+  renderCell?: (channel: PriceGroupsChannelView, row: PriceGroupsRowView, col: number, label: ReactNode) => ReactNode;
   backHref?: string;
 }) {
   return (
     <>
       {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("Create price group"), backHref)}
-      {E.info("Rows are price groups and columns are formats, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
-      {tables !== undefined ? tables : model.channels.map((channel) => (
-        <Fragment key={channel.name}>
+      {E.info("Price groups down, formats across, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
+      {model.groupCount === 0 ? E.blank("Add a price group, then put each brand on one from Catalog.")
+        : model.channels.length === 0 ? E.blank("No sale channels yet")
+        : model.channels.map((channel) => (
+        <Fragment key={channel.id}>
           {E.ttl(channel.name)}
           <div className="min-w-0 overflow-x-auto">
             {E.tbl(
-              channel.headers,
-              channel.rows.map((row) => [E.link(row[0], "Price group"), ...row.slice(1)]),
+              ["Group", ...model.formats],
+              channel.rows.map((row) => [
+                renderGroup(row),
+                ...row.cells.map((cell, col) => renderCell(channel, row, col, cell ?? <span className="text-muted-foreground">not priced</span>)),
+              ]),
             )}
           </div>
         </Fragment>
       ))}
-      {E.info("An empty cell is unpriced: that package cannot sell on this channel. Clear a cell to unprice it again.")}
     </>
   );
 }
