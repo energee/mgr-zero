@@ -3,7 +3,7 @@ import { assert } from "vitest";
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, seedPour, priceSku } from "./helpers";
 import { runCommand, type Ctx, type StaffRole } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -149,8 +149,7 @@ const nextPosition = async () => {
 async function posMenuFixture(role: StaffRole, configured = false) {
   const location = await seedLocation(brewery.id, { name: unique("matrix pos location", role), uses: ["taproom"] });
   const catalog = await seedCatalog(brewery.id, { product: unique("matrix pos brand", role), sku: unique("matrix pos keg", role), packageType: "keg", bblPerUnit: 0.5, format: unique("Half bbl", role) });
-  const { data: poured, error: pouredError } = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: catalog.brandId, name: unique("Pint", role), basis: "poured", ounces: 16 }).select("id").single();
-  if (pouredError) throw pouredError;
+  const poured = { id: await seedPour(brewery.id, { brandId: catalog.brandId, name: unique("Pint", role), ounces: 16 }) };
   const externalLocation = unique("L", role);
   const { error: locationError } = await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: posConnectionId, external_location_id: externalLocation, location_id: location.id, available: true });
   if (locationError) throw locationError;

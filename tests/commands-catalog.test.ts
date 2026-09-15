@@ -35,7 +35,8 @@ describe("catalog commands", () => {
     await expect(runCommand("create_location", { name: "Command Warehouse", uses: ["warehouse"] }, adminCtx))
       .rejects.toMatchObject({ status: 409, code: "conflict", message: "That already exists. Use a different name or value." });
     // a poured format is never a sku
-    const pour = await runCommand("upsert_format", { name: "pint", basis: "poured", brandId: brand.id, ounces: 16 }, salesCtx) as { id: string };
+    const group = await runCommand("upsert_price_group", { name: `g-${crypto.randomUUID().slice(0, 8)}`, position: 99 }, salesCtx) as { id: string };
+    const pour = await runCommand("upsert_format", { name: "pint", basis: "poured", priceGroupId: group.id, ounces: 16 }, salesCtx) as { id: string };
     await expect(runCommand("create_sku", { brandId: brand.id, formatId: pour.id }, salesCtx)).rejects.toThrow(/packaged/);
     // upsert by id renames; the same style name reuses the style row
     const again = await runCommand("upsert_brand", { id: brand.id, name: "Command Lager", style: "Lager", abv: 5.2 }, salesCtx) as { style_id: string };

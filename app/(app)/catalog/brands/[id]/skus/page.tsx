@@ -11,7 +11,7 @@ import { PourForm } from "../../../pour-form";
 import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
-type Brand = { id: string; name: string; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
+type Brand = { id: string; name: string; price_group_id: string | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
 type Format = { id: string; name: string; bbl_per_unit: string | null; effective_bbl_per_unit: string | number | null };
 
 export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,7 +36,9 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {
           const pour = brand.pours.find(p => `pour:${p.id}` === row.key)!;
-          return <PourForm key={`${pour.id}-${pour.name}-${pour.ounces}`} brand={brand} pour={pour} />;
+          return brand.price_group_id
+            ? <PourForm key={`${pour.id}-${pour.name}-${pour.ounces}`} priceGroupId={brand.price_group_id} groupName={brand.name} pour={pour} />
+            : null;
         }
         const sku = skus.find((s) => s.id === row.key)!;
         return <SkuEditForm sku={sku} formatName={sku.formats?.name ?? "—"} />;

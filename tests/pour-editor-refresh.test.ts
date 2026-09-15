@@ -10,7 +10,7 @@ import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 it("remounts a pour editor when refreshed name or serving size changes", async () => {
   async function editor(name: string, ounces: number) {
     query.mockImplementation(async (command: string) => command === "list_brands"
-      ? [{ id: "brand", name: "Beer", skus: [], pours: [{ id: "pour", name, ounces }] }]
+      ? [{ id: "brand", name: "Beer", price_group_id: "group", skus: [], pours: [{ id: "pour", name, ounces }] }]
       : []);
     const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });
     return page.props.rowAction(page.props.model.rows[0]);

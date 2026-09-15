@@ -41,10 +41,10 @@ export function toSkuViewProps({ sku, formats }: SkuSnapshot): SkuViewModel {
 
 /** Sellable SKU creation preserves the existing stock/serving write boundaries. */
 export function skuCreateCommand(fields: {
-  kind: "packaged" | "poured"; brandId: string; formatId: string; name: string; upc: string; pourName: string; ounces: string;
+  kind: "packaged" | "poured"; brandId: string; priceGroupId?: string; formatId: string; name: string; upc: string; pourName: string; ounces: string;
 }) {
   return fields.kind === "poured"
-    ? { name: "upsert_format", input: { brandId: fields.brandId, basis: "poured", name: pourSkuName(fields.pourName, fields.ounces), ounces: Number(fields.ounces) }, valid: Number(fields.ounces) > 0 && Number(fields.ounces) < 1000 }
+    ? { name: "upsert_format", input: { priceGroupId: fields.priceGroupId, basis: "poured", name: pourSkuName(fields.pourName, fields.ounces), ounces: Number(fields.ounces) }, valid: Boolean(fields.priceGroupId) && Number(fields.ounces) > 0 && Number(fields.ounces) < 1000 }
     : { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined }, valid: Boolean(fields.formatId) };
 }
 

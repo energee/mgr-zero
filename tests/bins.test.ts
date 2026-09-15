@@ -5,7 +5,7 @@ import { rawDatabase } from "./raw-database";
 // .agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md, Decision 1.
 import { describe, it, expect, beforeAll } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
+import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedPour } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -99,9 +99,8 @@ describe("bins", () => {
       posLocationId: "BIN-MENU", binId: bins[0].id, saleChannelId,
     }, ctx) as { menuId: string };
     const catalog = await seedCatalog(ctx.breweryId, { product: "Menu bin beer", sku: "Menu bin keg", packageType: "keg" });
-    const poured = await admin.from("formats").insert({ brewery_id: ctx.breweryId, brand_id: catalog.brandId,
-      name: "Menu bin pint", basis: "poured", ounces: 16 }).select("id").single();
-    insertFixture("pos_menu_lines", { menu_id: menu.menuId, brewery_id: ctx.breweryId, format_id: poured.data!.id,
+    const pouredId = await seedPour(ctx.breweryId, { brandId: catalog.brandId, name: "Menu bin pint", ounces: 16 });
+    insertFixture("pos_menu_lines", { menu_id: menu.menuId, brewery_id: ctx.breweryId, format_id: pouredId,
       price_override_cents: 700 });
 
     await expect(runCommand("delete_bin", { binId: bins[0].id }, ctx))

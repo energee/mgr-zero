@@ -1,7 +1,7 @@
 import { rawDatabase } from "./raw-database";
 // tests/formats.test.ts — a format is the physical shape and the only place
 // bbl_per_unit is typed (schema §16.2); packaged formats hold stock, poured
-// ones belong to a brand, carry ounces, and hold none.
+// ones belong to a price group, carry ounces, and hold none.
 import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, DB } from "./helpers";
@@ -18,24 +18,24 @@ describe("formats", () => {
       name: "½ bbl keg", basis: "packaged", packageType: "keg", kegSize: "half_bbl", bblPerUnit: 0.5,
     }, ctx) as { id: string; bbl_per_unit: string };
     expect(Number(half.bbl_per_unit)).toBe(0.5);
-    const brand = await runCommand("upsert_brand", { name: "Pour brand" }, ctx) as { id: string };
-    const pint = await runCommand("upsert_format", { name: "16 oz pour", basis: "poured", brandId: brand.id, ounces: 16 }, ctx) as { id: string; bbl_per_unit: string | null };
+    const group = await runCommand("upsert_price_group", { name: "1", position: 1 }, ctx) as { id: string };
+    const pint = await runCommand("upsert_format", { name: "16 oz pour", basis: "poured", priceGroupId: group.id, ounces: 16 }, ctx) as { id: string; bbl_per_unit: string | null };
     expect(pint.bbl_per_unit).toBeNull();
     // packaged with a typed volume must be positive; poured must not carry one
-    await expect(runCommand("upsert_format", { name: "bad", basis: "poured", brandId: brand.id, ounces: 16, bblPerUnit: 0.01 }, ctx)).rejects.toBeTruthy();
+    await expect(runCommand("upsert_format", { name: "bad", basis: "poured", priceGroupId: group.id, ounces: 16, bblPerUnit: 0.01 }, ctx)).rejects.toBeTruthy();
     // upsert by id renames in place
     const renamed = await runCommand("upsert_format", { id: half.id, name: "½ bbl", basis: "packaged", packageType: "keg", kegSize: "half_bbl", bblPerUnit: 0.5 }, ctx) as { id: string; name: string };
     expect(renamed).toMatchObject({ id: half.id, name: "½ bbl" });
     const list = await runCommand("list_formats", {}, ctx) as { name: string; basis: string }[];
     expect(list.map((f) => f.name).sort()).toEqual(["16 oz pour", "½ bbl"].sort());
     const sales = await makeStaffCtx(ctx.breweryId, "warehouse");
-    await expect(runCommand("upsert_format", { name: "x", basis: "poured", brandId: brand.id, ounces: 16 }, sales)).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("upsert_format", { name: "x", basis: "poured", priceGroupId: group.id, ounces: 16 }, sales)).rejects.toMatchObject({ code: "permission_denied" });
   });
 
   // #470: packaged → poured was guarded; poured → packaged orphaned POS rows.
   it("a poured format mapped to a POS item stays poured; an unused one may switch", async () => {
-    const brand = await runCommand("upsert_brand", { name: "Mapped pour brand" }, ctx) as { id: string };
-    const mapped = await runCommand("upsert_format", { name: "Mapped pint", basis: "poured", brandId: brand.id, ounces: 16 }, ctx) as { id: string };
+    const group = await runCommand("upsert_price_group", { name: "Mapped pour group", position: 2 }, ctx) as { id: string };
+    const mapped = await runCommand("upsert_format", { name: "Mapped pint", basis: "poured", priceGroupId: group.id, ounces: 16 }, ctx) as { id: string };
     const connection = await admin.from("pos_connections").insert({
       brewery_id: ctx.breweryId, merchant_id: `merchant-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
     }).select("id").single();
@@ -45,7 +45,7 @@ describe("formats", () => {
     })).error).toBeNull();
     await expect(runCommand("upsert_format", { id: mapped.id, name: "Mapped pint", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, ctx))
       .rejects.toThrow(/must stay poured/);
-    const unused = await runCommand("upsert_format", { name: "Unused pint", basis: "poured", brandId: brand.id, ounces: 16 }, ctx) as { id: string };
+    const unused = await runCommand("upsert_format", { name: "Unused pint", basis: "poured", priceGroupId: group.id, ounces: 16 }, ctx) as { id: string };
     const switched = await runCommand("upsert_format", { id: unused.id, name: "Unused can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, ctx) as { basis: string };
     expect(switched.basis).toBe("packaged");
   });

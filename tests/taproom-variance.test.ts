@@ -14,7 +14,7 @@ it("no POS or completed baseline means absent comparison, never fabricated zero"
   expect(await runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx)).toMatchObject({ rows: [] });
 });
 
-import { admin, ins, seedCatalog, sql, channelId } from "./helpers";
+import { admin, ins, seedCatalog, seedPour, sql, channelId } from "./helpers";
 
 type Row = { brand_id: string; expected_bbl: number | null; actual_bbl: number; variance_bbl: number | null; excluded_bbl: number; unattributed_bbl: number; split: boolean };
 type Report = { rows: Row[]; periods: { count_id: string; prior_count_id: string | null; starts_at: string | null; ends_at: string; starts_before_window: boolean; coverage_complete: boolean; unmapped_lines: number; expected_bbl: number | null; actual_bbl: number; reason: string | null }[]; reason: string | null };
@@ -40,7 +40,7 @@ async function fixture() {
   const ctx = await makeStaffCtx(brewery.id, "taproom");
   const location = await seedLocation(brewery.id, { uses: ["taproom"] });
   const cat = await seedCatalog(brewery.id, { product: "Hazy", packageType: "keg", bblPerUnit: .5 });
-  const pour = await ins("formats", { brewery_id: brewery.id, name: "Pint", basis: "poured", brand_id: cat.brandId, ounces: 16 });
+  const pour = { id: await seedPour(brewery.id, { brandId: cat.brandId, name: "Pint", ounces: 16 }) };
   const connection = await ins("pos_connections", { brewery_id: brewery.id, merchant_id: crypto.randomUUID() });
   await ins("pos_locations", { brewery_id: brewery.id, connection_id: connection.id, external_location_id: "L", location_id: location.id });
   await ins("pos_item_mappings", { brewery_id: brewery.id, connection_id: connection.id, external_item_id: "pint", format_id: pour.id });
@@ -124,7 +124,7 @@ it("freezes poured and packaged volume, replays once, and late reconciled facts 
   expect((await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId)).error).toBeNull();
   expect(reconcile(f, s.id)).toBe("true"); expect(reconcile(f, p.id)).toBe("true");
   expect((await report(f)).rows[0].expected_bbl).toBe(2);
-  const replacement = await ins("formats", { brewery_id: f.brewery.id, name: "Taster", basis: "poured", brand_id: f.cat.brandId, ounces: 4 });
+  const replacement = { id: await seedPour(f.brewery.id, { brandId: f.cat.brandId, name: "Taster", ounces: 4 }) };
   expect((await admin.from("pos_item_mappings").update({ format_id: replacement.id }).eq("connection_id", f.connection.id).eq("external_item_id", "pint")).error).toBeNull();
   reconcile(f, s.id); expect((await report(f)).rows[0].expected_bbl).toBe(2);
   expect((await admin.from("pos_item_mappings").update({ format_id: f.pour.id }).eq("connection_id", f.connection.id).eq("external_item_id", "pint")).error).toBeNull();

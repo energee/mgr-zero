@@ -1,6 +1,6 @@
 // components/mgr/views/price-group.tsx — one price-group row. Inventory
 // draws name / position / ceiling edits; live keeps GroupForm as the wrapper.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PriceGroupViewModel } from "@/lib/mgr/price-group-view";
 
@@ -8,8 +8,9 @@ export type { PriceGroupViewModel };
 
 type Controls = Partial<Record<"name" | "position" | "costCeiling", (value: string) => void>>;
 
-export function PriceGroupView({ model, controls = {}, back, messages, footer }: {
-  model: PriceGroupViewModel; controls?: Controls; back?: ReactNode; messages?: ReactNode; footer?: ReactNode;
+export function PriceGroupView({ model, controls = {}, back, messages, footer, addPour, renderPour }: {
+  model: PriceGroupViewModel; controls?: Controls; back?: ReactNode; messages?: ReactNode; footer?: ReactNode; addPour?: ReactNode;
+  renderPour?: (pour: { id: string; name: string; ounces: string }) => ReactNode;
 }) {
   return (
     <>
@@ -22,6 +23,19 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer }:
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}
       {model.prices !== undefined ? E.fld("Prices", model.prices) : null}
+      {model.pours && (
+        <>
+          {E.ttl("Pours")}
+          {model.pours.length === 0
+            ? E.info("Add a pour size this group sells by the glass. Every beer on the group uses it.")
+            : model.pours.map((pour) => (
+              <Fragment key={pour.id}>
+                {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : E.act("Remove", "destructive"))}
+              </Fragment>
+            ))}
+          {addPour !== undefined ? addPour : null}
+        </>
+      )}
       {messages}
       {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail ?? "", E.act("Remove", "destructive"), "w")}
     </>
