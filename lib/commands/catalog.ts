@@ -66,27 +66,27 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_format", description: "Delete an unused packaged format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history",
-  input: z.object({ formatId: z.string().uuid() }), roles: ["admin"],
+  name: "delete_format", description: "Delete an unused format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history. Sales may delete an unused pour; packaged formats stay admin.",
+  input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_format", { p_brewery: ctx.breweryId, p_id: i.formatId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
-  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)",
+  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock)",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
     packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
     unitsPerCase: z.number().int().positive().optional(), bblPerUnit: z.number().positive().optional(),
-    brandId: z.string().uuid().optional(), ounces: z.number().finite().positive().optional(),
+    priceGroupId: z.string().uuid().optional(), ounces: z.number().finite().positive().optional(),
   }).refine((i) => i.basis === "poured"
-    ? i.brandId !== undefined && i.ounces !== undefined && [i.packageType, i.kegSize, i.unitsPerCase, i.bblPerUnit].every((v) => v === undefined)
-    : i.brandId === undefined && i.ounces === undefined,
-  { message: "Pours require a brand and positive ounces, with no package facts; packaged formats cannot have a brand or ounces" }),
+    ? i.priceGroupId !== undefined && i.ounces !== undefined && [i.packageType, i.kegSize, i.unitsPerCase, i.bblPerUnit].every((v) => v === undefined)
+    : i.priceGroupId === undefined && i.ounces === undefined,
+  { message: "Pours require a price group and positive ounces, with no package facts; packaged formats cannot have a price group or ounces" }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_format", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_basis: i.basis, p_package_type: i.packageType ?? null,
     p_keg_size: i.kegSize ?? null, p_units_per_case: i.unitsPerCase ?? null, p_bbl_per_unit: i.bblPerUnit ?? null, p_request_id: execution.requestId,
-    ...(i.basis === "poured" ? { p_brand: i.brandId, p_ounces: i.ounces } : {}),
+    ...(i.basis === "poured" ? { p_price_group: i.priceGroupId, p_ounces: i.ounces } : {}),
   })),
 });
 
@@ -109,13 +109,16 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_formats", description: "Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list",
+  name: "list_formats", description: "Formats alphabetical; brandId filters pours on that brand's price group",
   input: z.object({ basis: z.enum(["packaged", "poured"]).optional(), brandId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
   handler: async (ctx, i) => {
+    const groupId = i.brandId
+      ? ((await unwrap(ctx.db.from("brands").select("price_group_id").eq("id", i.brandId).maybeSingle())) as { price_group_id: string | null } | null)?.price_group_id
+      : undefined;
     const [formats, volumes] = await Promise.all([completeFormatRows((start) => {
-      let q = ctx.db.from("formats").select("*, brands(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
+      let q = ctx.db.from("formats").select("*, price_groups(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
-      if (i.brandId) q = q.eq("brand_id", i.brandId);
+      if (i.brandId) q = q.eq("price_group_id", groupId ?? "00000000-0000-4000-8000-000000000000");
       return q.range(start, start + 499);
     }), completeFormatRows((start) => {
       let q = ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id");
@@ -293,7 +296,19 @@ defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc), pours:formats(id, name, ounces)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: async (ctx) => {
+    const [brands, pours] = await Promise.all([
+      unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("formats").select("id, name, ounces, price_group_id").eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name")),
+    ]);
+    const byGroup = new Map<string, unknown[]>();
+    for (const pour of pours as { price_group_id: string }[]) {
+      const list = byGroup.get(pour.price_group_id) ?? [];
+      list.push(pour);
+      byGroup.set(pour.price_group_id, list);
+    }
+    return (brands as { price_group_id: string | null }[]).map((b) => ({ ...b, pours: b.price_group_id ? byGroup.get(b.price_group_id) ?? [] : [] }));
+  },
 });
 
 // Replacement inputs must include the entire set, even beyond PostgREST's row cap.
@@ -320,7 +335,7 @@ defineQuery({
   name: "get_format_composition", description: "One format with its components, packaging BOM, atomic child options, and material names and base units",
   input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx, i) => {
-    const format = await unwrap(ctx.db.from("formats").select("*, brands(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
+    const format = await unwrap(ctx.db.from("formats").select("*, price_groups(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
     if (!format) throw new CommandError("Format not found", 404, "not_found");
     const [components, lines, formats, materials, parents] = await Promise.all([
       completeFormatRows((start) => ctx.db.from("format_components").select("child_format_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id").range(start, start + 499)),

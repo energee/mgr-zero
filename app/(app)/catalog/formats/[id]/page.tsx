@@ -16,7 +16,7 @@ import { DeleteCommandButton } from "../../../delete-command-button";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 
 type Detail = {
-  format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
+  format: { price_group_id: string | null; price_groups: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
   components: { child_format_id: string; qty: number }[];
   lines: { material_id: string; qty_per_unit: number; on_break: "consumed" | "return_to_stock" }[];
   formats: { id: string; name: string; basis: string; bbl_per_unit: string | null; composed: boolean }[];
@@ -32,7 +32,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const writable = ctx.role === "admin" || ctx.role === "sales";
   if (data.format.basis === "poured") {
     const f = data.format;
-    return <>{E.back("Catalog", `${f.brands?.name} · ${f.name}`, writable ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={{ id: f.brand_id!, name: f.brands!.name }} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined, "/catalog")}{E.info(`${f.ounces} oz · poured · never held as stock`)}</>;
+    return <>{E.back("Catalog", `${f.price_groups?.name ?? "Price group"} · ${f.name}`, writable && f.price_group_id ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} priceGroupId={f.price_group_id} groupName={f.price_groups?.name} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined, "/catalog")}{E.info(`${f.ounces} oz · poured · never held as stock`)}</>;
   }
   const children = eligibleChildren(id, data.formats);
   const volume = data.formats.find(format => format.id === id)?.bbl_per_unit;

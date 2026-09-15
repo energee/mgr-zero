@@ -9,13 +9,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
+import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
   const [draft, setDraft] = useState(model);
   const edit = (key: "name" | "position" | "costCeilingInput") => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
   const remove = useCommandAction();
+  const removePour = useCommandAction();
   const form = useCommandForm("upsert_price_group", {
     build: () => ({
       ...(groupId ? { id: groupId } : {}),
@@ -40,7 +43,9 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           model={draft}
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
-          messages={<><CommandFormMessage error={form.error} /><CommandFormMessage error={remove.error} /></>}
+          addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
+          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void removePour.run("delete_format", { formatId: pour.id }); })}
+          messages={<><CommandFormMessage error={form.error} /><CommandFormMessage error={remove.error} /><CommandFormMessage error={removePour.error} /></>}
           footer={<CommandFormFooter>
             {groupId && (
               <Button type="button" variant="ghost" disabled={remove.busy} onClick={() => remove.run("delete_price_group", { priceGroupId: groupId })}>Delete</Button>

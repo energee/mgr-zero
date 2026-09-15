@@ -65,6 +65,7 @@ async function fixtures() {
   await put("styles", { name: "IPA" });
   await put("water_profiles", { name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 });
   const group = await put("price_groups", { name: "Standard", position: 1 });
+  await admin.from("brands").update({ price_group_id: group.id }).eq("id", cat.brandId);
   await put("catalog_categories", { name: "Lager" });
   const composed = await put("formats", { name: "Six cases", basis: "packaged", package_type: "can" });
   await put("format_components", { parent_format_id: composed.id, child_format_id: cat.formatId, qty: 6 });

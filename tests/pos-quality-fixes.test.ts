@@ -4,7 +4,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { beginSquareOAuth, completeSquareOAuth, SquareClient } from "@/lib/pos";
 import { disconnectSquare, failSquareOAuth } from "@/lib/supabase/integration-tokens";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
@@ -217,9 +217,7 @@ describe("Square quality-review lifecycle fences", () => {
     const connection = await connected(brewery.id);
     const location = await seedLocation(brewery.id, { name: "Concurrent taproom", uses: ["taproom"] });
     const catalog = await seedCatalog(brewery.id, { product: "Concurrent", sku: "Concurrent keg", packageType: "keg", bblPerUnit: 0.5 });
-    const poured = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: catalog.brandId,
-      name: "Concurrent pint", basis: "poured", ounces: 16 }).select("id").single();
-    expect(poured.error).toBeNull();
+    const poured = { data: { id: await seedPour(brewery.id, { brandId: catalog.brandId, name: "Concurrent pint", ounces: 16 }) } };
     expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connection.connectionId,
       external_location_id: "CONCURRENT-L", external_name: "Unmapped" })).error).toBeNull();
     expect((await admin.from("pos_catalog_variations").insert({ brewery_id: brewery.id, connection_id: connection.connectionId,

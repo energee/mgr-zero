@@ -37,7 +37,9 @@ export function PriceGroupsView({
               ["Group", ...model.formats],
               channel.rows.map((row) => [
                 renderGroup(row),
-                ...row.cells.map((cell, col) => renderCell(channel, row, col, cell ?? <span className="text-muted-foreground">not priced</span>)),
+                ...row.cells.map((cell, col) => row.formatIds[col]
+                  ? renderCell(channel, row, col, cell ?? <span className="text-muted-foreground">not priced</span>)
+                  : null),
               ]),
             )}
           </div>

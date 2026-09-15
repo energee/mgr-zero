@@ -36,6 +36,27 @@ describe("Price groups view", () => {
     expect(model.channels[0]?.rows[1]?.id).toBe(pricingGrid.groups[1]?.id);
   });
 
+  it("collapses group-owned pours of the same name into one column", () => {
+    const pg1 = pricingGrid.groups[0]!.id;
+    const pg2 = pricingGrid.groups[1]!.id;
+    const model = toPriceGroupsViewProps({
+      ...pricingGrid,
+      formats: [
+        { id: "half", name: "½ Keg", basis: "packaged" },
+        { id: "p1", name: "14 oz pour", basis: "poured", price_group_id: pg1, ounces: 14 },
+        { id: "p2", name: "14 oz pour", basis: "poured", price_group_id: pg2, ounces: 14 },
+      ],
+      cells: [
+        { sale_channel_id: pricingGrid.channels[1]!.id, price_group_id: pg1, format_id: "p1", unit_price_cents: 700 },
+      ],
+    });
+    expect(model.formats).toEqual(["½ Keg", "14 oz pour"]);
+    expect(model.channels[1]?.rows[0]?.formatIds).toEqual(["half", "p1"]);
+    expect(model.channels[1]?.rows[0]?.cells[1]).toBe("$7.00");
+    expect(model.channels[1]?.rows[1]?.formatIds).toEqual(["half", "p2"]);
+    expect(model.channels[1]?.rows[2]?.formatIds[1]).toBeNull();
+  });
+
   it("labels a brand's format with its brand", () => {
     const model = toPriceGroupsViewProps({ ...pricingGrid, formats: [{ id: "f", name: "sixtel", brands: { name: "Hazy" } }] });
     expect(model.formats).toEqual(["Hazy · sixtel"]);
@@ -128,6 +149,17 @@ describe("Price group view", () => {
     expect(model.previousCeiling).toBe("none");
     expect(model.prices).toBe(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);
     expect(model.removeDetail).toMatch(/refused/);
+  });
+
+  it("keys each pour row so a group with two pours does not warn", () => {
+    const src = readFileSync("components/mgr/views/price-group.tsx", "utf8");
+    expect(src).toMatch(/<Fragment key=\{pour\.id\}>/);
+    const html = htmlOf(createElement(PriceGroupView, {
+      model: { ...toPriceGroupViewProps(priceGroupTwo), pours: [{ id: "p1", name: "14 oz pour", ounces: "14" }, { id: "p2", name: "taster", ounces: "5" }] },
+    }));
+    expect(html).toMatch(/14 oz pour/);
+    expect(html).toMatch(/taster/);
+    expect(html.match(/>Remove</g)?.length).toBe(3);
   });
 
   it("renders the inventory edits, Prices line, and refused Remove", () => {

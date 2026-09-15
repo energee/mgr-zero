@@ -19,6 +19,8 @@ export type PriceGroupViewModel = {
   prices?: string;
   /** Absent on the create form, which has nothing to remove. */
   removeDetail?: string;
+  /** Pours this group owns. Absent on the create form. */
+  pours?: { id: string; name: string; ounces: string }[];
 };
 
 export type PriceGroupSnapshot = PriceGroupsSnapshot & { groupId?: string };
@@ -51,7 +53,10 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
     previousCeiling: previous && (previous.cost_ceiling_cents == null ? "none" : money(previous.cost_ceiling_cents)),
     ...(group && {
       prices: pricesSummary(snapshot, group.id),
-      removeDetail: "refused while a brand sits on it or a cell prices it",
+      removeDetail: "refused while a brand sits on it, a cell prices it, or it owns a pour",
+      pours: snapshot.formats.filter((f) => f.basis === "poured" && f.price_group_id === group.id).map((f) => ({
+        id: f.id, name: f.name, ounces: f.ounces != null ? String(f.ounces) : "",
+      })),
     }),
   };
 }

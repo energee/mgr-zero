@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareSquareCatalogPublication, publishSquareCatalogItem, SquareClient } from "@/lib/pos";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { beginSquareMenuPublication, beginSquarePublication, leaseSquarePublication } from "@/lib/supabase/integration-tokens";
 import "@/lib/commands/all";
@@ -23,14 +23,12 @@ async function publicationFixture() {
     external_location_id: "L1", external_name: "Square Taproom", external_status: "ACTIVE", location_id: location.id })).error).toBeNull();
   const channel = await channelId(brewery.id, "Taproom");
   const keg = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5 });
-  const poured = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: keg.brandId,
-    name: "Pint", basis: "poured", ounces: 16 }).select("id").single();
-  expect(poured.error).toBeNull();
-  await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: poured.data!.id, cents: 700 });
+  const formatId = await seedPour(brewery.id, { brandId: keg.brandId, name: "Pint", ounces: 16 });
+  await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId, cents: 700 });
   await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId,
     qty: 1, type: "opening_balance" }, ctx, execution());
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
-  return { brewery, ctx, location, connectionId: connection.data!.id, channel, keg, brandId: keg.brandId, formatId: poured.data!.id };
+  return { brewery, ctx, location, connectionId: connection.data!.id, channel, keg, brandId: keg.brandId, formatId };
 }
 
 describe("Square durable catalog publication", () => {

@@ -11,6 +11,8 @@ import {
   priceSku,
   seedCatalog,
   seedLocation,
+  seedPour,
+  seedPriceGroup,
   sql,
 } from "./helpers";
 
@@ -35,15 +37,7 @@ async function connectedLocation(breweryId: string, externalLocationId: string, 
 }
 
 async function pouredFormat(breweryId: string, brandId: string, name = "Pint", ounces = 16) {
-  const row = await admin.from("formats").insert({
-    brewery_id: breweryId,
-    brand_id: brandId,
-    name,
-    basis: "poured",
-    ounces,
-  }).select("id").single();
-  expect(row.error).toBeNull();
-  return row.data!.id as string;
+  return seedPour(breweryId, { brandId, name, ounces });
 }
 
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
@@ -157,8 +151,10 @@ describe("derived POS menus", () => {
     const connectionId = await connectedLocation(brewery.id, "L1", location.id);
     const channel = await channelId(brewery.id, "Taproom");
     const keg = await seedCatalog(brewery.id, { product: "Many", sku: "Many half", packageType: "keg", bblPerUnit: 0.5, format: "Half" });
+    const groupId = await seedPriceGroup(brewery.id);
+    await admin.from("brands").update({ price_group_id: groupId }).eq("id", keg.brandId);
     const rows = Array.from({ length: 1001 }, (_, index) => ({
-      brewery_id: brewery.id, brand_id: keg.brandId, name: `Pour ${String(index).padStart(4, "0")}`, basis: "poured", ounces: 4 + index / 100,
+      brewery_id: brewery.id, price_group_id: groupId, name: `Pour ${String(index).padStart(4, "0")}`, basis: "poured", ounces: 4 + index / 100,
     }));
     expect((await admin.from("formats").insert(rows)).error).toBeNull();
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId, qty: 1, type: "opening_balance" }, adminCtx, execution());

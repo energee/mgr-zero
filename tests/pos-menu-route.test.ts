@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { GET, OPTIONS } from "@/app/api/public/menus/[publicId]/route";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, seedPour } from "./helpers";
 
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 
@@ -24,13 +24,8 @@ describe("GET /api/public/menus/[publicId]", () => {
     })).error).toBeNull();
     const channel = await channelId(brewery.id, "Taproom");
     const keg = await seedCatalog(brewery.id, { product: "Website Hazy", sku: "Private keg label", packageType: "keg", bblPerUnit: 0.5, format: "Half bbl" });
-    const formats = await admin.from("formats").insert([
-      { brewery_id: brewery.id, brand_id: keg.brandId, name: "Pint", basis: "poured", ounces: 16 },
-      { brewery_id: brewery.id, brand_id: keg.brandId, name: "Half pint", basis: "poured", ounces: 8 },
-    ]).select("id,name");
-    expect(formats.error).toBeNull();
-    const pintId = formats.data!.find((row) => row.name === "Pint")!.id;
-    const halfPintId = formats.data!.find((row) => row.name === "Half pint")!.id;
+    const pintId = await seedPour(brewery.id, { brandId: keg.brandId, name: "Pint", ounces: 16 });
+    const halfPintId = await seedPour(brewery.id, { brandId: keg.brandId, name: "Half pint", ounces: 8 });
     await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: pintId, cents: 700 });
     await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: halfPintId, cents: 400 });
     await runCommand("record_movement", {

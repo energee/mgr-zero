@@ -1390,7 +1390,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus",
     writes: "none [creation and editing happen on SKU detail]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
-    spec: "Brand links here to one list of packaged and poured SKUs. New SKU offers Packaged or Pour; pours require a name and serving ounces. Edit uses the same fields.",
+    spec: "Brand links here to packaged SKUs and the pours its price group owns. New SKU adds a packaged format. Glass sizes are added on the price group.",
     body: <SkuListView model={toSkuListViewProps(skuListHazy)} />,
   },
   {
@@ -2603,7 +2603,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
     states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: Create price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
-    spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are formats, and each sale channel gets its own table. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Nothing else prices anything: no per-customer list, no per-SKU exception (the barrel-aged one is simply a higher group), no brewery default. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position and cost ceiling live.",
+    spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. A group with no pour of that name has no cell. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },
   {
@@ -2614,9 +2614,9 @@ export const SCREENS: Screen[] = [
     to: { Remove: "Price groups", "Remove price group": "Price groups" },
     job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
     reads: "list_price_groups",
-    writes: "upsert_price_group · delete_price_group",
+    writes: "upsert_price_group · delete_price_group · upsert_format",
     states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group on Brand · a person confirms"], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
-    spec: "A price group is one row of the grid and holds no prices of its own: the prices are the cells on Price groups. What lives here is the row itself: its name, its position in the sheet, and the optional cost ceiling that sorts the rows and suggests a group for a beer whose cost lands in the band. Ceilings are dollars per barrel of recipe cost, the unit the recipe cost view already derives from last receipt costs. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group or any cell prices it, in product words rather than a foreign-key error.",
+    spec: "A price group is one row of the grid: its name, position, optional cost ceiling, and the pours it owns. Glass sizes are added here (name and ounces), not on a brand. Every beer on the group uses those pours. Remove on a pour deletes it unless a cell still prices it. Prices are the cells on Price groups. Ceilings are dollars per barrel of recipe cost. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group, a cell prices it, or the group owns a pour.",
     body: <PriceGroupView model={toPriceGroupViewProps(priceGroupTwo)} />,
   },
   {

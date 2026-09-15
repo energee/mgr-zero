@@ -19,15 +19,15 @@ describe('pours in the sellable SKU catalog', () => {
 
 import { skuCreateCommand } from '../lib/mgr/sku-view';
 it('routes pour creation to the serving command and excludes stock fields', () => {
-  const fields = { brandId:'brand', kind:'poured' as const, pourName:'Pint', ounces:'16', formatId:'case', name:'Case', upc:'123' };
-  expect(skuCreateCommand(fields)).toEqual({ name:'upsert_format', input:{brandId:'brand',basis:'poured',name:'Pint',ounces:16}, valid:true });
+  const fields = { brandId:'brand', priceGroupId:'group', kind:'poured' as const, pourName:'Pint', ounces:'16', formatId:'case', name:'Case', upc:'123' };
+  expect(skuCreateCommand(fields)).toEqual({ name:'upsert_format', input:{priceGroupId:'group',basis:'poured',name:'Pint',ounces:16}, valid:true });
   expect(skuCreateCommand({...fields, ounces:'0'}).valid).toBe(false);
   expect(skuCreateCommand({...fields, ounces:'1000'}).valid).toBe(false);
   expect(skuCreateCommand({...fields, ounces:'Infinity'}).valid).toBe(false);
   expect(skuCreateCommand({...fields, kind:'packaged'}).input).toEqual({brandId:'brand',formatId:'case',name:'Case',upc:'123'});
 });
 it('suggests a pour name from serving size when no custom name is supplied', () => {
-  const result = skuCreateCommand({ brandId:'brand', kind:'poured', pourName:'', ounces:'16', formatId:'', name:'', upc:'' });
+  const result = skuCreateCommand({ brandId:'brand', priceGroupId:'group', kind:'poured', pourName:'', ounces:'16', formatId:'', name:'', upc:'' });
   expect(result.input).toMatchObject({name:'16 oz pour',ounces:16});
   expect(result.valid).toBe(true);
 });

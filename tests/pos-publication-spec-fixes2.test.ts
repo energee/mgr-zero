@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { beginSquareOAuth, publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { beginSquareCatalogSync, beginSquarePublication, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
@@ -29,11 +29,8 @@ async function fixture(role: "admin" | "warehouse" = "admin") {
     const keg = await seedCatalog(brewery.id, { product: name, sku: `${name} half`, packageType: "keg", bblPerUnit: 0.5 });
     let formatId: string | null = null;
     if (poured) {
-      const format = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: keg.brandId,
-        name: `${name} Pint`, basis: "poured", ounces: 16 }).select("id").single();
-      expect(format.error).toBeNull();
-      formatId = format.data!.id;
-      await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: format.data!.id, cents: 700 });
+      formatId = await seedPour(brewery.id, { brandId: keg.brandId, name: `${name} Pint`, ounces: 16 });
+      await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId, cents: 700 });
     }
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId,
       qty: 1, type: "opening_balance" }, ctx, execution());

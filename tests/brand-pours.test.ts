@@ -5,15 +5,18 @@ import "@/lib/commands/all";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let brandId: string;
+let groupId: string;
 beforeAll(async () => {
   ctx = await makeStaffCtx((await makeBrewery()).id, "sales");
   brandId = (await runCommand("upsert_brand", { name: "Lager" }, ctx) as { id: string }).id;
+  groupId = (await runCommand("upsert_price_group", { name: "1", position: 1 }, ctx) as { id: string }).id;
+  await runCommand("upsert_brand", { id: brandId, name: "Lager", priceGroupId: groupId }, ctx);
 });
-const input = () => ({ name: "Pint", basis: "poured", brandId, ounces: 16 });
+const input = () => ({ name: "Pint", basis: "poured" as const, priceGroupId: groupId, ounces: 16 });
 const rpc = (extra = {}) => ctx.db.rpc("upsert_format", {
   p_brewery: ctx.breweryId, p_id: null, p_name: crypto.randomUUID(), p_basis: "poured",
   p_package_type: null, p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: null,
-  p_brand: brandId, p_ounces: 16, p_request_id: crypto.randomUUID(), ...extra,
+  p_price_group: groupId, p_ounces: 16, p_request_id: crypto.randomUUID(), ...extra,
 });
 
 it("rejects trimmed-name collisions and ounces at or above 1000", async () => {
@@ -23,31 +26,31 @@ it("rejects trimmed-name collisions and ounces at or above 1000", async () => {
   expect((await rpc({ p_ounces: 1000 })).error).not.toBeNull();
 });
 
-it("requires brand and positive finite ounces in registry and SQL, and rejects incompatible facts", async () => {
-  for (const invalid of [{ name: " " }, { brandId: undefined }, { ounces: undefined }, { ounces: 0 }, { ounces: -1 }, { ounces: Infinity }, { ounces: NaN }, { packageType: "can" }, { kegSize: "half_bbl" }, { unitsPerCase: 6 }, { bblPerUnit: 0.1 }, { basis: "packaged" }]) {
+it("requires a price group and positive finite ounces in registry and SQL, and rejects incompatible facts", async () => {
+  for (const invalid of [{ name: " " }, { priceGroupId: undefined }, { ounces: undefined }, { ounces: 0 }, { ounces: -1 }, { ounces: Infinity }, { ounces: NaN }, { packageType: "can" }, { kegSize: "half_bbl" }, { unitsPerCase: 6 }, { bblPerUnit: 0.1 }, { basis: "packaged" }]) {
     await expect(runCommand("upsert_format", { ...input(), ...invalid }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
   }
-  for (const invalid of [{ p_name: " " }, { p_brand: null }, { p_ounces: null }, { p_ounces: 0 }, { p_ounces: -1 }, { p_ounces: "Infinity" }, { p_ounces: "-Infinity" }, { p_ounces: "NaN" }, { p_package_type: "can" }, { p_keg_size: "half_bbl" }, { p_units_per_case: 6 }, { p_bbl_per_unit: 0.1 }, { p_basis: "packaged" }]) {
+  for (const invalid of [{ p_name: " " }, { p_price_group: null }, { p_ounces: null }, { p_ounces: 0 }, { p_ounces: -1 }, { p_ounces: "Infinity" }, { p_ounces: "-Infinity" }, { p_ounces: "NaN" }, { p_package_type: "can" }, { p_keg_size: "half_bbl" }, { p_units_per_case: 6 }, { p_bbl_per_unit: 0.1 }, { p_basis: "packaged" }]) {
     expect((await rpc(invalid)).error).not.toBeNull();
   }
 });
 
-it("allows each brand its own Pint, edits ounces, and binds replay to brand and size", async () => {
-  const other = await runCommand("upsert_brand", { name: "IPA" }, ctx) as { id: string };
+it("allows each price group its own Pint, edits ounces, and binds replay to group and size", async () => {
+  const otherGroup = await runCommand("upsert_price_group", { name: "2", position: 2 }, ctx) as { id: string };
   const request = crypto.randomUUID();
   const first = await rpc({ p_name: "Pint", p_request_id: request });
   expect(first.error).toBeNull();
-  expect(first.data).toMatchObject({ brand_id: brandId, ounces: 16, bbl_per_unit: null });
+  expect(first.data).toMatchObject({ price_group_id: groupId, brand_id: null, ounces: 16, bbl_per_unit: null });
   expect((await rpc({ p_name: "Pint", p_request_id: request })).data).toEqual(first.data);
   expect((await rpc({ p_name: "Pint", p_request_id: request, p_ounces: 12 })).error?.message).toMatch(/request|payload/i);
-  expect((await rpc({ p_name: "Pint", p_request_id: request, p_brand: other.id })).error).not.toBeNull();
+  expect((await rpc({ p_name: "Pint", p_request_id: request, p_price_group: otherGroup.id })).error).not.toBeNull();
   await expect(runCommand("upsert_format", input(), ctx)).rejects.toThrow();
-  await expect(runCommand("upsert_format", { ...input(), brandId: other.id, ounces: 12 }, ctx)).resolves.toMatchObject({ brand_id: other.id, ounces: 12 });
+  await expect(runCommand("upsert_format", { ...input(), priceGroupId: otherGroup.id, ounces: 12 }, ctx)).resolves.toMatchObject({ price_group_id: otherGroup.id, ounces: 12 });
   await expect(runCommand("upsert_format", { ...input(), id: first.data.id, ounces: 14 }, ctx)).resolves.toMatchObject({ id: first.data.id, ounces: 14 });
   const foreign = await makeStaffCtx((await makeBrewery()).id);
-  const foreignBrand = await runCommand("upsert_brand", { name: "Foreign" }, foreign) as { id: string };
-  expect((await rpc({ p_brand: foreignBrand.id })).error).not.toBeNull();
-  const foreignPour = await runCommand("upsert_format", { ...input(), brandId: foreignBrand.id }, foreign) as { id: string };
+  const foreignGroup = await runCommand("upsert_price_group", { name: "1", position: 1 }, foreign) as { id: string };
+  expect((await rpc({ p_price_group: foreignGroup.id })).error).not.toBeNull();
+  const foreignPour = await runCommand("upsert_format", { ...input(), priceGroupId: foreignGroup.id }, foreign) as { id: string };
   expect((await ctx.db.from("formats").select("id").eq("id", foreignPour.id)).data).toEqual([]);
   const packaged = { name: "Pint", basis: "packaged", bblPerUnit: 0.1 };
   await expect(runCommand("upsert_format", packaged, ctx)).resolves.toMatchObject({ brand_id: null, ounces: null });
@@ -55,9 +58,10 @@ it("allows each brand its own Pint, edits ounces, and binds replay to brand and 
   expect((await rpc({ p_name: "Pint", p_request_id: request })).data).toEqual(first.data);
   const taproom = await makeStaffCtx(ctx.breweryId, "taproom");
   await expect(runCommand("list_formats", { brandId }, taproom)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ id: first.data.id, ounces: 14 })]));
+  const foreignBrand = await runCommand("upsert_brand", { name: "Foreign" }, foreign) as { id: string };
   await expect(runCommand("list_formats", { brandId: foreignBrand.id }, taproom)).resolves.toEqual([]);
   await expect(runCommand("upsert_format", input(), taproom)).rejects.toMatchObject({ code: "permission_denied" });
-  expect((await taproom.db.rpc("upsert_format", { p_brewery: ctx.breweryId, p_id: null, p_name: "Taster", p_basis: "poured", p_package_type: null, p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: null, p_brand: brandId, p_ounces: 4, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+  expect((await taproom.db.rpc("upsert_format", { p_brewery: ctx.breweryId, p_id: null, p_name: "Taster", p_basis: "poured", p_package_type: null, p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: null, p_price_group: groupId, p_ounces: 4, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
 });
 
 it("keeps pours out of SKUs, components and BOM, including direct rows and conversions", async () => {
@@ -80,12 +84,24 @@ it("keeps pours out of SKUs, components and BOM, including direct rows and conve
   await runCommand("create_sku", { brandId, formatId: atomic.id }, ctx);
   await expect(runCommand("upsert_format", { ...input(), id: atomic.id, name: "Converted SKU" }, ctx)).rejects.toThrow(/packaged|use/i);
   await runCommand("replace_format_components", { formatId: pack.id, components: [{ childFormatId: atomic.id, qty: 6 }] }, ctx);
-  expect((await admin.from("formats").update({ basis: "poured", brand_id: brandId, ounces: 16 }).eq("id", pack.id)).error).not.toBeNull();
+  expect((await admin.from("formats").update({ basis: "poured", price_group_id: groupId, ounces: 16 }).eq("id", pack.id)).error).not.toBeNull();
 });
 
-it("returns a complete brand pour vocabulary beyond the API cap", async () => {
-  const brand = await runCommand("upsert_brand", { name: "Large menu" }, ctx) as { id: string };
-  expect((await admin.from("formats").insert(Array.from({ length: 1001 }, (_, i) => ({ brewery_id: ctx.breweryId, brand_id: brand.id, basis: "poured", ounces: 4, name: `Taster ${i}` })))).error).toBeNull();
+it("deletes an unused pour and refuses one a cell prices", async () => {
+  const adminCtx = await makeStaffCtx(ctx.breweryId, "admin");
+  const unused = await runCommand("upsert_format", { name: `Drop ${crypto.randomUUID()}`, basis: "poured", priceGroupId: groupId, ounces: 10 }, ctx) as { id: string };
+  expect(await runCommand("delete_format", { formatId: unused.id }, ctx)).toMatchObject({ id: unused.id });
+  const priced = await runCommand("upsert_format", { name: `Keep ${crypto.randomUUID()}`, basis: "poured", priceGroupId: groupId, ounces: 12 }, ctx) as { id: string };
+  const channel = (await runCommand("list_sale_channels", {}, ctx) as { id: string }[])[0]!;
+  await runCommand("set_channel_price", { saleChannelId: channel.id, priceGroupId: groupId, formatId: priced.id, unitPriceCents: 700 }, ctx);
+  await expect(runCommand("delete_format", { formatId: priced.id }, ctx)).rejects.toThrow(/in use/);
+  await expect(runCommand("delete_format", { formatId: (await runCommand("upsert_format", { name: "Can pack", basis: "packaged", bblPerUnit: 0.01 }, adminCtx) as { id: string }).id }, ctx)).rejects.toMatchObject({ code: "permission_denied" });
+});
+
+it("returns a complete group pour vocabulary beyond the API cap", async () => {
+  const group = await runCommand("upsert_price_group", { name: "large", position: 9 }, ctx) as { id: string };
+  const brand = await runCommand("upsert_brand", { name: "Large menu", priceGroupId: group.id }, ctx) as { id: string };
+  expect((await admin.from("formats").insert(Array.from({ length: 1001 }, (_, i) => ({ brewery_id: ctx.breweryId, price_group_id: group.id, basis: "poured", ounces: 4, name: `Taster ${i}` })))).error).toBeNull();
   const result = await runCommand("list_formats", { brandId: brand.id }, ctx) as unknown[];
   expect(result).toHaveLength(1001);
 });

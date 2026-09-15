@@ -4,7 +4,7 @@ import { runCommand } from "@/lib/commands/registry";
 import { publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { advanceSquareCatalogSync, beginSquareCatalogSync, beginSquareMenuPublication, beginSquarePublication,
   compareAndSwapSquareTokens, readVersionedIntegrationTokens, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
-import { admin, channelId, DB, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, DB, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 import "@/lib/commands/all";
 
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
@@ -31,14 +31,12 @@ async function fixture(brandCount = 1) {
   for (let index = 0; index < brandCount; index += 1) {
     const keg = await seedCatalog(brewery.id, { product: `Brand ${index}`, sku: `Brand ${index} half`,
       packageType: "keg", bblPerUnit: 0.5 });
-    const format = await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: keg.brandId,
-      name: `Brand ${index} Pint`, basis: "poured", ounces: 16 }).select("id").single();
-    expect(format.error).toBeNull();
-    await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId: format.data!.id, cents: 700 });
+    const formatId = await seedPour(brewery.id, { brandId: keg.brandId, name: `Brand ${index} Pint`, ounces: 16 });
+    await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId, cents: 700 });
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId,
       qty: 1, type: "opening_balance" }, ctx, execution());
     brandIds.push(keg.brandId);
-    brands.push({ brandId: keg.brandId, skuId: keg.skuId, formatId: format.data!.id });
+    brands.push({ brandId: keg.brandId, skuId: keg.skuId, formatId });
   }
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
   return { brewery, ctx, connectionId: connection.data!.id as string, brandIds, brands, location, channel };
@@ -160,10 +158,8 @@ describe("Square publication final orchestration fences", () => {
 
       const late = await seedCatalog(f.brewery.id, { product: "Late brand", sku: "Late brand half",
         packageType: "keg", bblPerUnit: 0.5 });
-      const format = await admin.from("formats").insert({ brewery_id: f.brewery.id, brand_id: late.brandId,
-        name: "Late brand Pint", basis: "poured", ounces: 16 }).select("id").single();
-      expect(format.error).toBeNull();
-      await priceSku(f.brewery.id, { saleChannelId: f.channel, brandId: late.brandId, formatId: format.data!.id, cents: 800 });
+      const formatId = await seedPour(f.brewery.id, { brandId: late.brandId, name: "Late brand Pint", ounces: 16 });
+      await priceSku(f.brewery.id, { saleChannelId: f.channel, brandId: late.brandId, formatId, cents: 800 });
       await runCommand("record_movement", { skuId: late.skuId, locationId: f.location.id, binId: f.location.binId,
         qty: 1, type: "opening_balance" }, f.ctx, execution());
 
