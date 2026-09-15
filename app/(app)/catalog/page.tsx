@@ -16,7 +16,7 @@ import { FormatForm } from "./format-form";
 type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
 type Brand = { id: string; name: string; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[] };
-type Format = { brand_id: string | null; ounces: number | null; brands: { name: string } | null; id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
+type Format = { id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
 
 export default async function CatalogPage() {
   const brewery = await getActiveBrewery();

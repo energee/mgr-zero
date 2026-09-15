@@ -4,10 +4,16 @@ import { GALLONS_PER_BBL, OUNCES_PER_BBL, parseVolumeToBbl, formatVolume } from 
 
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 
+const LITERS_PER_BBL = GALLONS_PER_BBL * 3.785411784;
 export const KEG_BBL: Record<string, number> = {
   half_bbl: 0.5, quarter_bbl: 0.25, sixth_bbl: 1 / 6,
-  fifty_l: 50 / (31 * 3.785411784), thirty_l: 30 / (31 * 3.785411784), twenty_l: 20 / (31 * 3.785411784),
+  fifty_l: 50 / LITERS_PER_BBL, thirty_l: 30 / LITERS_PER_BBL, twenty_l: 20 / LITERS_PER_BBL,
 };
+
+/** list_formats attaches the format_volumes read as effective_bbl_per_unit;
+ *  rows from other queries carry only the stored column. */
+export const effectiveBbl = (f: { bbl_per_unit: string | number | null; effective_bbl_per_unit?: string | number | null }) =>
+  f.effective_bbl_per_unit === undefined ? f.bbl_per_unit : f.effective_bbl_per_unit;
 
 export type FormatBomRowView = {
   material: string;
@@ -18,7 +24,6 @@ export type FormatBomRowView = {
 export type FormatViewModel = {
   name: string;
   basis: "packaged" | "poured";
-  basisOptions: string[];
   packageType: string;
   packageOptions: string[];
   kegSize: string;
@@ -28,15 +33,11 @@ export type FormatViewModel = {
   volumeUnits: Array<"oz" | "gal" | "bbl">;
   volumeUnitIndex: number;
   composed: boolean;
-  composedInfo: string;
   bom: FormatBomRowView[];
-  bomInfo: string;
 };
 
 const PACKAGES = ["can", "bottle", "keg"];
 const UNITS: Array<"oz" | "gal" | "bbl"> = ["oz", "gal", "bbl"];
-const COMPOSED_INFO = "Composed formats show a derived, read-only Volume instead.";
-const BOM_INFO = "If the volume or BOM differs, create another Format.";
 
 export type FormatSnapshot = {
   format: {
@@ -81,7 +82,6 @@ export function toFormatViewProps({
   return {
     name: format.name,
     basis: format.basis,
-    basisOptions: ["packaged", "poured"],
     packageType: format.package_type ?? "",
     packageOptions,
     kegSize: custom ? "custom" : format.keg_size ?? "half_bbl",
@@ -91,13 +91,11 @@ export function toFormatViewProps({
     volumeUnits: UNITS,
     volumeUnitIndex: volume.index,
     composed: Boolean(format.composed),
-    composedInfo: COMPOSED_INFO,
     bom: bom.map((line) => ({
       material: line.material,
       qty: String(line.qty),
       onBreak: line.onBreak,
     })),
-    bomInfo: BOM_INFO,
   };
 }
 

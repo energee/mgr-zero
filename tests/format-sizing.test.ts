@@ -33,8 +33,7 @@ describe("package sizing", () => {
     expect(formatSizing({ ...format(), kegSize: "custom", volumeValue: "" }).valid).toBe(false);
   });
 });
-it("a rename alone preserves legacy keg metadata and exact stored sizing", async () => {
-  const { formatCommandInput } = await import("@/lib/mgr/format-view");
+it("a rename alone preserves legacy keg metadata and exact stored sizing", () => {
   const saved = { id: "legacy", name: "⅙ Keg", basis: "packaged" as const, package_type: "keg", keg_size: "sixth_bbl", units_per_case: null, bbl_per_unit: "0.16633065" };
   const model = toFormatViewProps({ format: saved });
   expect(formatCommandInput({ ...model, name: "Renamed" }, saved)).toMatchObject({ id: "legacy", name: "Renamed", kegSize: "sixth_bbl", bblPerUnit: 0.16633065 });

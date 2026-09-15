@@ -12,7 +12,8 @@ import { formatVolume } from "@/lib/volume";
 import type { FormatSnapshot } from "@/lib/mgr/format-view";
 import { PourForm } from "../../pour-form";
 import { FormatRowsForm } from "./rows-form";
-import { DeleteFormatButton } from "../../delete-format-button";
+import { DeleteCommandButton } from "../../../delete-command-button";
+import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 
 type Detail = {
   format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
@@ -46,16 +47,17 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
       on_break: line.on_break,
     })),
   });
+  const composable = canComposeFormat(data.format, data.usedAsChild);
   return <>
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
-      deleteAction={ctx.role === "admin" ? <DeleteFormatButton formatId={id} name={data.format.name} /> : null}
-      canCompose={components.length === 0 && canComposeFormat(data.format, data.usedAsChild)}
+      deleteAction={ctx.role === "admin" ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
+      canCompose={components.length === 0 && composable}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
-      contents={canComposeFormat(data.format, data.usedAsChild) ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}
+      contents={composable ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}
     /> : undefined, "/catalog")}
     <p className="text-sm text-muted-foreground">Shared format · {volume == null ? "No beer volume yet — add package contents" : `${formatVolume(volume)} of beer per package`}</p>
-    {canComposeFormat(data.format, data.usedAsChild) || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
-      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case", writable && canComposeFormat(data.format, data.usedAsChild) ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
+    {composable || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
+      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case", writable && composable ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
       {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("Add the packages inside to calculate the total volume")}
     </section> : null}
     <PackageBomView

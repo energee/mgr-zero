@@ -117,7 +117,11 @@ defineQuery({
       if (i.basis) q = q.eq("basis", i.basis);
       if (i.brandId) q = q.eq("brand_id", i.brandId);
       return q.range(start, start + 499);
-    }), completeFormatRows((start) => ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id").range(start, start + 499))]);
+    }), completeFormatRows((start) => {
+      let q = ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id");
+      if (i.basis) q = q.eq("basis", i.basis);
+      return q.range(start, start + 499);
+    })]);
     const byId = new Map(volumes.map(volume => [volume.id, volume.bbl_per_unit]));
     return formats.map(format => ({ ...format, effective_bbl_per_unit: byId.get(format.id) ?? null }));
   },

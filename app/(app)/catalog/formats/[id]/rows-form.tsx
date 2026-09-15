@@ -6,8 +6,8 @@ import { FormatRowsView, type FormatRow as Row } from "@/components/mgr/views/fo
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { validFormatRows } from "@/lib/format-edit-rules";
 
-export function FormatRowsForm({ formatId, kind, initial, options, triggerLabel, embedded = false }: {
-  formatId: string; kind: "components" | "bom"; initial: Row[]; options: { id: string; name: string }[]; triggerLabel?: string; embedded?: boolean;
+export function FormatRowsForm({ formatId, kind, initial, options, embedded = false }: {
+  formatId: string; kind: "components" | "bom"; initial: Row[]; options: { id: string; name: string }[]; embedded?: boolean;
 }) {
   const [rows, setRows] = useState(initial);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -20,9 +20,9 @@ export function FormatRowsForm({ formatId, kind, initial, options, triggerLabel,
     reset: () => { setRows(initial); setConfirmClear(false); },
   });
   const body = <form className="flex flex-col gap-4" onSubmit={(event) => { if (!valid) { event.preventDefault(); return; } void form.submit(event); }}>
-      <FormatRowsView kind={kind} rows={rows} options={options} onChange={setRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} disabled={form.submitting} addHref={bom ? "/materials" : "/catalog"} />
+      <FormatRowsView kind={kind} rows={rows} options={options} valid={valid} onChange={setRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} disabled={form.submitting} addHref={bom ? "/materials" : "/catalog"} />
       <CommandFormMessage error={form.error} />
       <CommandFormFooter><button className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50" type="submit" disabled={form.submitting || !valid}>{form.submitting ? "Saving…" : bom ? "Save materials" : "Save contents"}</button></CommandFormFooter>
     </form>;
-  return embedded ? body : <CommandForm open={form.open} onOpenChange={form.setOpen} title={title} trigger={<button className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50" type="button">{triggerLabel ?? title}</button>}>{body}</CommandForm>;
+  return embedded ? body : <CommandForm open={form.open} onOpenChange={form.setOpen} title={title} trigger={<button className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50" type="button">{title}</button>}>{body}</CommandForm>;
 }

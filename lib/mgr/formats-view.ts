@@ -2,6 +2,7 @@
 // plus optional format_components paint Basis / Volume / From.
 import type { EmptyState } from "./empty-state";
 import { formatVolume } from "@/lib/volume";
+import { effectiveBbl } from "./format-view";
 
 export type FormatsRowView = {
   key: string;
@@ -71,7 +72,7 @@ export function toFormatsViewProps({ formats, components = formats.flatMap(forma
     headers: ["Format", "Basis", "Volume", "From"],
     empty: formats.length === 0 ? { title: "No formats yet", description: "A format is a container a beer ships in: a 1/2 bbl keg, a 16 oz can." } : undefined,
     rows: formats.map((f) => {
-      const volume = f.effective_bbl_per_unit === undefined ? f.bbl_per_unit : f.effective_bbl_per_unit;
+      const volume = effectiveBbl(f);
       return {
         key: f.id,
         href: formatHref?.(f),

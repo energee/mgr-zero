@@ -1,6 +1,7 @@
 // Catalog projection of stocked package SKUs and brand-owned serving identities.
 import type { EmptyState } from "./empty-state";
 import { formatVolume } from "@/lib/volume";
+import { effectiveBbl } from "./format-view";
 
 export type SkuListRowView = {
   key: string;
@@ -36,7 +37,7 @@ export function toSkuListViewProps({ brand, skus, pours = [], backHref }: SkuLis
     title: `${brand.name} · SKUs`,
     empty: skus.length + pours.length === 0 ? { title: "No SKUs yet", description: "A SKU pairs a brand with a format, and is what a customer orders." } : undefined,
     rows: [...skus.map((s) => {
-      const bbl = s.formats?.effective_bbl_per_unit === undefined ? s.formats?.bbl_per_unit : s.formats.effective_bbl_per_unit;
+      const bbl = s.formats ? effectiveBbl(s.formats) : null;
       const volume = bbl != null ? formatVolume(bbl) : "—";
       return {
         key: s.id,

@@ -41,10 +41,10 @@ export function SkuView({
   footer?: ReactNode;
 }) {
   const [localKind, setLocalKind] = useState(model.kind ?? "packaged");
-  const kind = controls.kind ? model.kind ?? "packaged" : localKind;
+  const kind = controls.kind ? model.kind ?? "packaged" : localKind; // ponytail: preview-only state; live passes controls.kind
   return (
     <>
-      {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : <RegistrySelect label="Type" value={kind} options={[{ value: "packaged", label: "Packaged" }, { value: "poured", label: "Pour" }]} onChange={(value) => { const next = value === "poured" ? "poured" : "packaged"; setLocalKind(next); controls.kind?.(next); }} />}
+      {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : <RegistrySelect label="Type" value={kind} options={[{ value: "packaged", label: "Packaged" }, { value: "poured", label: "Pour" }]} onChange={(value) => (controls.kind ?? setLocalKind)(value === "poured" ? "poured" : "packaged")} />}
       {kind === "poured" ? <>
         {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { onChange: controls.ounces, inputMode: "decimal", required: Boolean(controls.ounces) })}
         <details open={model.pourName ? true : undefined}><summary className="cursor-pointer text-sm font-medium">Rename · optional</summary><div className="pt-3"><RegistryInput label="Name" value={model.pourName ?? ""} onChange={controls.pourName} placeholder={Number(model.ounces) > 0 ? `${Number(model.ounces)} oz pour` : "Pint"} /></div></details>

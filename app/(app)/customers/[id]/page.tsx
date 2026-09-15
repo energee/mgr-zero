@@ -8,7 +8,8 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { InviteForm } from "../../settings/team/invite-form";
 import { CustomerForm, type TaxTreatment } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
-import { DeleteCustomerButton } from "../delete-customer-button";
+import { DeleteCommandButton } from "../../delete-command-button";
+import { DeleteCustomerControl } from "@/components/mgr/views/delete-customer";
 
 type CustomerType = "distributor" | "retailer" | "brewery" | "other";
 type Customer = { id: string; name: string; type: CustomerType; state: string; sale_channel_id: string; license_no: string | null; payment_terms: string; tax_treatment: TaxTreatment | null; sale_channels: { name: string } };
@@ -30,7 +31,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   return <CustomerView
     model={toCustomerViewProps({ customer, shipTos, backHref: "/customers" })}
     headerAction={edit}
-    deleteAction={brewery.role === "admin" ? <DeleteCustomerButton customerId={customer.id} name={customer.name} /> : null}
+    deleteAction={brewery.role === "admin" ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} name={customer.name} redirect="/customers" /> : null}
     detail={{
       shipTos: shipTos.map(s => ({
         key: s.id,

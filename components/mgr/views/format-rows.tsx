@@ -3,10 +3,12 @@
 import { E } from "@/components/mgr/e";
 
 export type FormatRow = { id: string; qty: string; onBreak?: "consumed" | "return_to_stock" };
-export function FormatRowsView({ kind, rows, options, onChange, confirmClear, onConfirmClear, disabled, addHref }: {
+export function FormatRowsView({ kind, rows, options, valid, onChange, confirmClear, onConfirmClear, disabled, addHref }: {
   kind: "bom" | "components";
   rows: FormatRow[];
   options: { id: string; name: string }[];
+  /** validFormatRows(rows, options, confirmClear), computed by the owner of Save. */
+  valid: boolean;
   onChange: (rows: FormatRow[]) => void;
   confirmClear: boolean;
   onConfirmClear: (value: boolean) => void;
@@ -32,6 +34,6 @@ export function FormatRowsView({ kind, rows, options, onChange, confirmClear, on
       <button type="button" data-preview-action className="rounded-md border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50" disabled={options.length === 0} onClick={() => { onChange([...rows, { id: "", qty: "", onBreak: "consumed" }]); onConfirmClear(false); }}>Add {bom ? "material" : "component"}</button>
       {rows.length === 0 && options.length > 0 && <label className="flex items-start gap-2"><input type="checkbox" checked={confirmClear} onChange={event => onConfirmClear(event.target.checked)} />{bom ? "Clear all tracked packaging materials for this format." : "Clear all components. This format will have no volume and cannot hold stock."}</label>}
     </fieldset>
-    {rows.some(row => !row.id || !(Number(row.qty) > 0)) && E.info("Choose a different item for each row and enter a positive quantity.")}
+    {!valid && E.info("Choose a different item for each row and enter a positive quantity.")}
   </>;
 }

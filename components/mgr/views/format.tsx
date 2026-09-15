@@ -4,17 +4,19 @@ import { useId, useState, type FormEventHandler, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormFooter } from "@/components/mgr/command-form";
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { E } from "@/components/mgr/e";
 import { FormatRowsView, type FormatRow } from "@/components/mgr/views/format-rows";
 import { VolumeField } from "@/components/mgr/volume-field";
 import { formatControls, formatSizing, type FormatViewModel } from "@/lib/mgr/format-view";
+import { validFormatRows } from "@/lib/format-edit-rules";
 
 export type { FormatViewModel };
 
 type Controls = Partial<ReturnType<typeof formatControls>>;
 
 function FormatSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange?: (value: string) => void }) {
-  const choices = options.map(option => ({ value: option, label: SIZE_LABEL[option] ?? (option === "custom" ? "Custom size" : option.charAt(0).toUpperCase() + option.slice(1).replaceAll("_", " ")) }));
+  const choices = options.map(option => ({ value: option, label: SIZE_LABEL[option] ?? (option === "custom" ? "Custom size" : sentenceCase(option)) }));
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
@@ -66,7 +68,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
       {canCompose && <details className="pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-center gap-2 text-sm">{E.sw(model.composed, "Calculate volume from smaller packages", controls.composed)}Calculate volume from smaller packages.</label></details>}
       {model.composed && !editing && <section className="flex flex-col gap-3 pt-3" aria-label="Package contents">
         <h3 className="text-sm font-medium">Package contents</h3>
-        <FormatRowsView kind="components" rows={componentRows ?? localComponents} options={componentOptions} onChange={onComponentRowsChange ?? setLocalComponents} confirmClear={false} onConfirmClear={() => {}} />
+        <FormatRowsView kind="components" rows={componentRows ?? localComponents} options={componentOptions} valid={validFormatRows(componentRows ?? localComponents, componentOptions.map(o => o.id), false)} onChange={onComponentRowsChange ?? setLocalComponents} confirmClear={false} onConfirmClear={() => {}} />
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
@@ -77,7 +79,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
     <details className="pt-3">
       <summary className="cursor-pointer text-sm font-medium">Packaging materials · optional</summary>
       <div className="mt-3 flex flex-col gap-3 text-sm">
-        {materials !== undefined ? materials : model.bom.length ? <><FormatRowsView kind="bom" rows={bomRows} options={model.bom.map(line => ({ id: line.material, name: line.material }))} onChange={setBomRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} />{E.btn("Save materials")}</> : <p className="text-muted-foreground">Save the format first, then add trays, labels, or other materials here. Materials are optional.</p>}
+        {materials !== undefined ? materials : model.bom.length ? <><FormatRowsView kind="bom" rows={bomRows} options={model.bom.map(line => ({ id: line.material, name: line.material }))} valid={validFormatRows(bomRows, model.bom.map(line => line.material), confirmClear)} onChange={setBomRows} confirmClear={confirmClear} onConfirmClear={setConfirmClear} />{E.btn("Save materials")}</> : <p className="text-muted-foreground">Save the format first, then add trays, labels, or other materials here. Materials are optional.</p>}
       </div>
     </details>
     <CommandFormFooter className="flex-row justify-end">
