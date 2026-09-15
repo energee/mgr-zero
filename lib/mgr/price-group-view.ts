@@ -1,9 +1,10 @@
 // lib/mgr/price-group-view.ts — view-model for one Price group row. Name,
 // position and cost ceiling come from list_price_groups; the Prices line
-// summarises list_channel_prices for that group.
+// summarises list_channel_prices for that group. toNewPriceGroupViewProps is
+// the same row before it exists: blank name, next position, no Prices line.
 import { money } from "./money";
 import { plural } from "./plural";
-import { byPosition, type PriceGroupsSnapshot } from "./price-groups-view";
+import { byPosition, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
   backHref?: string;
@@ -13,9 +14,27 @@ export type PriceGroupViewModel = {
   costCeilingInput: string;
   previousCeilingLabel?: string;
   previousCeiling?: string;
-  prices: string;
+  /** Absent on a group that does not exist yet (the create form). */
+  prices?: string;
   removeDetail: string;
 };
+
+const ceilingLabel = (g: PriceGroupRow) => `Cost ceiling · group ${g.name}`;
+const ceilingText = (g: PriceGroupRow) => g.cost_ceiling_cents == null ? "none" : money(g.cost_ceiling_cents);
+
+/** The create form: a blank row placed after the last group, under its ceiling. */
+export function toNewPriceGroupViewProps(snapshot: PriceGroupsSnapshot): PriceGroupViewModel {
+  const previous = [...snapshot.groups].sort(byPosition).at(-1);
+  return {
+    name: "",
+    position: String(snapshot.groups.length + 1),
+    costCeiling: "",
+    costCeilingInput: "",
+    previousCeilingLabel: previous && ceilingLabel(previous),
+    previousCeiling: previous && ceilingText(previous),
+    removeDetail: "",
+  };
+}
 
 export type PriceGroupSnapshot = PriceGroupsSnapshot & { groupId: string };
 
@@ -53,10 +72,8 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
     position: String(group.position),
     costCeiling: group.cost_ceiling_cents == null ? "" : money(group.cost_ceiling_cents),
     costCeilingInput: group.cost_ceiling_cents == null ? "" : (group.cost_ceiling_cents / 100).toFixed(2),
-    previousCeilingLabel: previous ? `Cost ceiling · group ${previous.name}` : undefined,
-    previousCeiling: previous
-      ? previous.cost_ceiling_cents == null ? "none" : money(previous.cost_ceiling_cents)
-      : undefined,
+    previousCeilingLabel: previous && ceilingLabel(previous),
+    previousCeiling: previous && ceilingText(previous),
     prices: pricesSummary(snapshot, group.id),
     removeDetail: "refused while a brand sits on it or a cell prices it",
   };

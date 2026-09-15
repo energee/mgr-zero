@@ -309,8 +309,8 @@ Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete 
 
 Price groups are the rows of one grid per [sale channel](#channels), with formats across the top. Put each brand on a group (**Catalog** → **Brand** → **Price group**) and fill the cells; every SKU of that brand then sells at its format's cell on the customer's channel. An empty cell means unpriced, and an order for that SKU is refused. Clear a cell to unprice it. A group a brand sits on, or a cell is filled for, cannot be deleted.
 
-1. Open **Price groups** and select **Create price group**. Enter a required name and a **Position** (where the row sits in the grid), optionally a **Cost ceiling ($/bbl)**, and **Save price group**. Name and position must each be unique within the brewery.
-2. Select a cell in a channel's table, enter the price in dollars (stored as whole cents), and **Save price**. Every SKU of every brand on that group sells at that price, in that format, on that channel.
+1. Open **Price groups** and select **Create price group**. The sheet is the same one a group's name opens: enter a required **Group name** and a **Position** (pre-filled after the last row), optionally a **Cost ceiling ($/bbl)** shown under the previous group's ceiling, and **Save price group**. Name and position must each be unique within the brewery.
+2. Select a cell in a channel's table. The sheet is titled with the group and format and names the channel; enter the price in dollars (stored as whole cents) and **Save price**. Every SKU of every brand on that group sells at that price, in that format, on that channel. Unpriced cells read *not priced* in grey.
 3. **Clear** on a filled cell empties it again.
 
 A cost ceiling is dollars per barrel of recipe cost. It sorts the rows and lets a brand’s page suggest a group (see [Catalog](#catalog)); nobody is moved automatically. A brewery with no groups yet says **Add a price group, then put each brand on one from Catalog.**

@@ -1,7 +1,8 @@
 // lib/mgr/price-groups-view.ts — view-model for the Price groups grid.
 // list_sale_channels × list_price_groups × list_formats, filled from
-// list_channel_prices. A format is a column on a channel when at least one
-// cell there is filled; empty cells still read "not priced".
+// list_channel_prices. Every format is a column on every channel, as the live
+// grid draws it: an unpriced format still needs a cell to tap. Empty cells
+// read "not priced".
 import { money } from "./money";
 
 export type PriceGroupsChannelView = {
@@ -45,16 +46,12 @@ export function toPriceGroupsViewProps({
   const byKey = new Map(cells.map((c) => [cellKey(c.sale_channel_id, c.price_group_id, c.format_id), c]));
   return {
     channels: channels.map((channel) => {
-      const used = new Set(
-        cells.filter((c) => c.sale_channel_id === channel.id).map((c) => c.format_id),
-      );
-      const cols = formats.filter((f) => used.has(f.id));
       return {
         name: channel.name,
-        headers: ["Group", ...cols.map((f) => f.name)],
+        headers: ["Group", ...formats.map((f) => f.name)],
         rows: groups.map((group) => [
           group.name,
-          ...cols.map((format) => {
+          ...formats.map((format) => {
             const cell = byKey.get(cellKey(channel.id, group.id, format.id));
             return cell ? money(cell.unit_price_cents) : "not priced";
           }),
