@@ -75,3 +75,24 @@ decision, not a repair.
   `Review order · $X`, so the button contradicts the line above it.
 - [ ] Point the posted-receipt back link at the PO just received against.
   `app/(app)/purchase-orders/[id]/page.tsx` returns to the list instead.
+
+## Cleanup follow-ups from the PR #404 review
+
+- [ ] Move fixture-only state out of the shared views. `FormatView`,
+  `SkuView`, and `CatalogCategoriesControl` each carry a second, preview-only
+  implementation selected by a missing control; the preview wrapper in
+  `screens.tsx` should own that state and the views take controls as props.
+- [ ] Add a flat variant to `E.row` so `components/mgr/views/customer.tsx`
+  stops restyling E internals with descendant selectors.
+- [ ] Replace the `data-chat-preview`, `data-work-filter`, and
+  `data-preview-action` explorer markers with one attribute stamped by
+  `CommandForm`, and treat everything inside a dialog or sheet as in-place.
+- [ ] Scope the raw-control lint to `app/**` and `components/mgr/views/**`
+  so `qty.tsx` and `venue.tsx` need no inline disables, then retire the
+  overlapping half of `tests/field-primitives.test.ts`.
+- [ ] Merge `pour-form.tsx` into `SkuForm` so pour create and edit share one
+  command choice and one validation path.
+- [ ] Widen `format_volumes` (or add a catalog view) so `list_formats` is one
+  read and `effective_bbl_per_unit` goes away. Waits for the backend push.
+- [ ] Let `PackageBomView` render without a row verb by default so the format
+  page drops `rowAction={null}`.
