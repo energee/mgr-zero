@@ -12,7 +12,7 @@ import { admin, asUser, ins, makeBrewery, makeStaff, seedCatalog, seedCustomer, 
 const matrix = {
   breweries: "deny", brewery_users: "self", brewery_counters: "deny", customer_users: "deny",
   customers: "deny", ship_tos: "deny", vendors: "deny", materials: "deny", material_lots: "deny",
-  styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", catalog_categories: "tenant", formats: "tenant", format_components: "tenant",
+  styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", catalog_categories: "deny", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
