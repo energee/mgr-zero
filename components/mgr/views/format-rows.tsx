@@ -34,6 +34,6 @@ export function FormatRowsView({ kind, rows, options, valid, onChange, confirmCl
       {E.btn(`Add ${bom ? "material" : "component"}`, options.length === 0 ? "g disabled" : "g", undefined, () => { onChange([...rows, { id: "", qty: "", onBreak: "consumed" }]); onConfirmClear(false); })}
       {rows.length === 0 && options.length > 0 && <label className="flex items-start gap-2"><input type="checkbox" checked={confirmClear} onChange={event => onConfirmClear(event.target.checked)} />{bom ? "Clear all tracked packaging materials for this format." : "Clear all components. This format will have no volume and cannot hold stock."}</label>}
     </fieldset>
-    {!valid && E.info("Choose a different item for each row and enter a positive quantity.")}
+    {!valid && rows.length > 0 && E.info("Choose a different item for each row and enter a positive quantity.")}
   </>;
 }
