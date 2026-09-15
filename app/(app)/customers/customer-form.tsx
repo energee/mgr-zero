@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -124,13 +125,7 @@ export function CustomerForm({
             <Label htmlFor="customer-terms">Payment terms</Label>
             <Input id="customer-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="net30" />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-tax">Tax treatment</Label>
-            <select id="customer-tax" className="rounded-md border p-2" value={taxTreatment} onChange={(e) => setTaxTreatment(e.target.value as TaxTreatment | "")}>
-              <option value="">Inherit sale channel</option>
-              {TAX_TREATMENTS.map((t) => <option key={t} value={t}>{treatmentLabel(t)}</option>)}
-            </select>
-          </div>
+          {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: treatmentLabel(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? treatmentLabel(taxTreatment) : "Inherit sale channel" })}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>

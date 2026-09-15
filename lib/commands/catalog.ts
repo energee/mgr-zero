@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
+defineQuery({
+  name: "list_catalog_categories", description: "List this brewery's catalog categories",
+  input: z.object({}), roles: STAFF_ROLES,
+  handler: ctx => unwrap(ctx.db.from("catalog_categories").select("name").eq("brewery_id", ctx.breweryId).order("name")),
+});
+defineCommand({
+  name: "save_catalog_category", description: "Add a category or rename it across every brand in this brewery",
+  input: z.object({ name: z.string().trim().min(1), previousName: z.string().min(1).optional() }), roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_catalog_category", { p_brewery: ctx.breweryId, p_previous_name: i.previousName ?? null, p_name: i.name, p_request_id: execution.requestId })),
+});
+defineCommand({
+  name: "delete_catalog_category", description: "Delete an unused category; brands using it block deletion",
+  input: z.object({ name: z.string().min(1) }), roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_catalog_category", { p_brewery: ctx.breweryId, p_name: i.name, p_request_id: execution.requestId })),
+});
+
 // Brands (§16.1): the sellable identity. Style is found or created in the
 // brewery's own styles list; description, category, price group and hops are
 // the optional Brand-screen facts.
@@ -39,6 +55,22 @@ defineCommand({
 // Formats (§16.2): the physical shape, and the only place bbl_per_unit is
 // typed. A poured format holds no stock and carries no package facts.
 const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
+defineCommand({
+  name: "create_composed_format", description: "Create a packaged format and its atomic child quantities together; volume is always derived, never stored on the parent",
+  input: z.object({ name: z.string().trim().min(1), packageType: z.enum(["keg", "can", "bottle"]), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().finite().positive() })).min(1) }).strict(),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_composed_format", {
+    p_brewery: ctx.breweryId, p_name: i.name, p_package_type: i.packageType,
+    p_components: i.components.map(c => ({ child_format_id: c.childFormatId, qty: c.qty })), p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "delete_format", description: "Delete an unused packaged format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history",
+  input: z.object({ formatId: z.string().uuid() }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_format", { p_brewery: ctx.breweryId, p_id: i.formatId, p_request_id: execution.requestId })),
+});
+
 defineCommand({
   name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)",
   input: z.object({
@@ -79,13 +111,19 @@ defineCommand({
 defineQuery({
   name: "list_formats", description: "Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list",
   input: z.object({ basis: z.enum(["packaged", "poured"]).optional(), brandId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
-  handler: (ctx, i) => {
-    return completeFormatRows((start) => {
-      let q = ctx.db.from("formats").select("*, brands(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
+  handler: async (ctx, i) => {
+    const [formats, volumes] = await Promise.all([completeFormatRows((start) => {
+      let q = ctx.db.from("formats").select("*, brands(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
       if (i.brandId) q = q.eq("brand_id", i.brandId);
       return q.range(start, start + 499);
-    });
+    }), completeFormatRows((start) => {
+      let q = ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id");
+      if (i.basis) q = q.eq("basis", i.basis);
+      return q.range(start, start + 499);
+    })]);
+    const byId = new Map(volumes.map(volume => [volume.id, volume.bbl_per_unit]));
+    return formats.map(format => ({ ...format, effective_bbl_per_unit: byId.get(format.id) ?? null }));
   },
 });
 
@@ -255,7 +293,7 @@ defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc), pours:formats(id, name, ounces)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 // Replacement inputs must include the entire set, even beyond PostgREST's row cap.

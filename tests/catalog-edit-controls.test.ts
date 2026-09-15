@@ -87,7 +87,7 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
 it("gates catalog mutators and excludes inactive SKUs from New Order picker options", () => {
   const page = readFileSync("app/(app)/catalog/page.tsx", "utf8");
   expect(page).toContain('brewery.role === "admin" || brewery.role === "sales"');
-  for (const component of ["FormatForm", "PourForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
+  for (const component of ["FormatForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
   // New Brand is a link to the Brand page; the brand row itself opens it, so
   // there is no Edit brand button to gate.
   expect(page).toMatch(/canWrite[^\n]*E\.btn\("New Brand"/);
@@ -97,6 +97,9 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   const skuList = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
   expect(skuList).toContain('brewery.role === "admin" || brewery.role === "sales"');
   expect(skuList).toMatch(/canWrite \? <SkuForm/);
+  expect(skuList).toContain("rowAction={canWrite ?");
+  expect(skuList).toContain("<PourForm");
+  expect(page).not.toContain("<PourForm");
   // The cached client adapter builds the picker options; cached-order-pages
   // additionally executes that adapter with active and inactive SKU payloads.
   expect(readFileSync("app/(app)/orders/new/new-order-client.tsx", "utf8")).toContain("skus.data.filter(sku => sku.active)");

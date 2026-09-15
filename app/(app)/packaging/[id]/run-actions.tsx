@@ -6,6 +6,7 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -58,17 +59,13 @@ export function CloseRunForm({ runId, outputs, locations, bins }: { runId: strin
   const ready = Number(bblDrawn) >= 0 && lotCode.trim() && packagedOn && locationId && binId;
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cr-drawn">Barrels drawn</Label>
-        <Input id="cr-drawn" type="number" min="0" step="any" value={bblDrawn} onChange={(e) => setBblDrawn(e.target.value)} />
-      </div>
+      {E.edit("Barrels drawn", bblDrawn, "number", undefined, { id: "cr-drawn", min: 0, step: "any", onChange: setBblDrawn })}
       <div className="flex flex-col gap-2">
         <Label>Actual outputs</Label>
         {outputs.map((o) => (
           <div key={o.id} className="flex items-center justify-between gap-2">
             <span className="text-sm">{o.sku_name ?? o.sku_id.slice(0, 8)}</span>
-            <Input aria-label={`${o.sku_name ?? o.sku_id} actual`} type="number" min="0" step="any" className="w-24"
-              value={actuals[o.sku_id] ?? ""} onChange={(e) => setActuals((prev) => ({ ...prev, [o.sku_id]: e.target.value }))} />
+            <div className="w-36">{E.edit(`${o.sku_name ?? o.sku_id} actual`, actuals[o.sku_id] ?? "", "number", undefined, { hideLabel: true, min: 0, step: "any", onChange: qty => setActuals(prev => ({ ...prev, [o.sku_id]: qty })) })}</div>
           </div>
         ))}
       </div>

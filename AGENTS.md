@@ -22,6 +22,22 @@ share the same views, controls, and surface wrappers; fixtures versus
 database-backed data/actions are the boundary. The screen explorer is the
 interface source of truth. Validate this in code.
 
+### UI controls: reuse E first
+
+Before creating or changing an interface, read `components/mgr/e.tsx` and reuse
+its controls inside the shared view: `E.pick` for selects, `E.edit` for fields
+(including the numeric stepper), `E.sw` for on/off settings, and `E.volume`
+for beer volume. Use existing E layouts and actions too. If a control needs
+controlled state or a missing option, extend the shared primitive rather than
+drawing a local replacement. Preserve labels, bounds, required/disabled state,
+and callbacks.
+
+Do not add native `<select>`, standalone `<input type="number">`, or
+`<Input type="number">` to product screens. Lint rejects these. Numeric inputs
+belong only inside the shared quantity implementation, where native spinners
+are hidden. The Slack venue replica has a documented native-select exception;
+it is not a pattern for MGR interfaces. Do not suppress the rule for new forms.
+
 Decided 2026-09-06. `components/mgr/screens.tsx` and the pages that render it
 are the work. Schema, migrations, RPCs, and the database-backed test suites
 wait for the backend push; when that starts, tests get their own throwaway

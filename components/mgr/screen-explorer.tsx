@@ -130,7 +130,8 @@ export function ScreenExplorer() {
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
     // Shared previews and Work filters own their controls, not explorer navigation.
-    if (el.closest("[data-chat-preview], [data-work-filter]")) return;
+    if (el.closest("[data-chat-preview], [data-work-filter], [data-preview-action]")
+      || el.closest("[data-slot=dialog-content], [data-slot=sheet-content]")?.querySelector("form[data-preview-action]")) return;
     // A unit switcher (E.qty's addon) is a tab bar by markup only: it chooses
     // the unit of one number, so it must never filter the rows below it the way
     // a view switcher does. Harmless today only because every screen using one

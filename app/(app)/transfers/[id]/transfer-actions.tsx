@@ -5,8 +5,7 @@
 
 import { useState } from "react";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
@@ -23,7 +22,7 @@ export function TransferActions({ transferId, status, lines, stock }: { stock: B
     <div className="flex flex-col gap-2">
       {status === "draft" && <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("submit_stock_transfer", { transferId })}>Submit</Button>}
       {status === "submitted" && <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("record_stock_transfer_pick", { transferId, picks: lines.map((l) => ({ lineId: l.id, qty: l.qty })) })}>Record pick</Button>}
-      {(status === "picked" || status === "in_transit") && <>{lines.filter(l => l.skuId || l.materialId).map(l => <div key={l.id} className="flex flex-col gap-2 border-b pb-3"><p>Choose sources totaling {l.qtyPicked ?? l.qty} units</p>{sources(l).map(s => <Label key={key(l.id, s.lot_id)} className="flex flex-col gap-2">{s.name} · {s.lot_code ?? "Untracked / legacy stock"} · {s.qty} available<Input type="number" min="0" step={l.skuId ? "0.01" : "0.0001"} value={quantities[key(l.id,s.lot_id)] ?? ""} onChange={e => setQuantities(prev => ({ ...prev, [key(l.id,s.lot_id)]: e.target.value }))} /></Label>)}</div>)}</>}
+      {(status === "picked" || status === "in_transit") && <>{lines.filter(l => l.skuId || l.materialId).map(l => <div key={l.id} className="flex flex-col gap-2 border-b pb-3"><p>Choose sources totaling {l.qtyPicked ?? l.qty} units</p>{sources(l).map(s => <div key={key(l.id, s.lot_id)}>{E.edit(`${s.name} · ${s.lot_code ?? "Untracked / legacy stock"} · ${s.qty} available`, quantities[key(l.id,s.lot_id)] ?? "", "number", undefined, { min: 0, step: l.skuId ? 0.01 : 0.0001, onChange: qty => setQuantities(prev => ({ ...prev, [key(l.id,s.lot_id)]: qty })) })}</div>)}</div>)}</>}
       {(status === "picked" || status === "in_transit") && (
         <Button data-variant="irreversible" className={irreversible} disabled={busy} onClick={() => run("receive_stock_transfer", { transferId, lines: lines.map((l) => ({ lineId: l.id, qty: l.qtyPicked ?? l.qty, ...(l.skuId || l.materialId ? { sources: sources(l).filter(s => Number(quantities[key(l.id,s.lot_id)]) > 0).map(s => ({ lotId: s.lot_id, qty: Number(quantities[key(l.id,s.lot_id)]) })) } : {}) })) })}>Receive</Button>
       )}

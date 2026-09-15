@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -69,10 +70,7 @@ export function KegEventForm({ pools, locations, bins, customers }: {
           <Pick id="keg-customer" label={needsCustomer(reason) ? "Customer" : "Customer (optional)"} value={customerId} onChange={setCustomerId}
             options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder="Select a customer" />
         )}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="keg-qty">Kegs</Label>
-          <Input id="keg-qty" type="number" min="1" step="1" value={qty} onChange={(e) => setQty(e.target.value)} required />
-        </div>
+        {E.edit("Kegs", qty, "number", undefined, { id: "keg-qty", min: 1, step: 1, onChange: setQty, required: true })}
         <div className="flex flex-col gap-2">
           <Label htmlFor="keg-note">Note</Label>
           <Input id="keg-note" value={note} onChange={(e) => setNote(e.target.value)} />

@@ -7,8 +7,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { E } from "@/components/mgr/e";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
 export function PriceCellForm({
@@ -33,10 +32,7 @@ export function PriceCellForm({
       trigger={<Button variant="ghost" size="sm">{label}</Button>}
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cell-price">Price (USD)</Label>
-          <Input id="cell-price" type="number" step="0.01" min="0" value={dollars} onChange={(e) => setDollars(e.target.value)} required />
-        </div>
+        {E.edit("Price (USD)", dollars, "number", undefined, { id: "cell-price", min: 0, step: 0.01, onChange: setDollars, required: true })}
         <p className="text-sm text-muted-foreground">
           Every SKU of a brand on this price group sells at this price, in this format, on this sale channel.
         </p>

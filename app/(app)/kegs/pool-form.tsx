@@ -5,6 +5,7 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -60,14 +61,8 @@ export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string 
             </Select>
           </div>
         )}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="pool-per-fill">Per-fill cost ($)</Label>
-          <Input id="pool-per-fill" type="number" min="0" step="0.01" value={perFill} onChange={(e) => setPerFill(e.target.value)} required={kind === "pay_per_fill"} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="pool-deposit">Deposit per keg ($)</Label>
-          <Input id="pool-deposit" type="number" min="0" step="0.01" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
-        </div>
+        {E.edit("Per-fill cost ($)", perFill, "number", undefined, { id: "pool-per-fill", min: 0, step: 0.01, onChange: setPerFill, required: kind === "pay_per_fill" })}
+        {E.edit("Deposit per keg ($)", deposit, "number", undefined, { id: "pool-deposit", min: 0, step: 0.01, onChange: setDeposit })}
         {pool && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> In service

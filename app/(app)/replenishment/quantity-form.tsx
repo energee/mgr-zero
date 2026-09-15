@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { E } from "@/components/mgr/e";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -58,10 +58,7 @@ export function QuantityForm({ locationId, skus, kind, values }: {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-qty`}>{spec.qtyLabel}</Label>
-        <Input id={`${id}-qty`} type="number" min="0" step="any" required value={qty} onChange={(e) => setQty(e.target.value)} />
-      </div>
+      {E.edit(spec.qtyLabel, qty, "number", undefined, { id: `${id}-qty`, min: 0, step: "any", onChange: setQty, required: true })}
       <p className="text-sm text-muted-foreground">{spec.help}</p>
       <CommandFormMessage error={form.error} />
       <CommandFormFooter><Button type="submit" disabled={form.submitting || !replenishmentQuantityReady(skuId, qty)}>{form.submitting ? "Saving…" : spec.title}</Button></CommandFormFooter>

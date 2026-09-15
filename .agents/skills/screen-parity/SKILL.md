@@ -39,6 +39,12 @@ rewrite. Read the installed Next.js guides before changing framework code.
 
 ## Required code patterns
 
+Use the `AGENTS.md` **UI controls: reuse E first** rule when drawing controls.
+Inspect `components/mgr/e.tsx` before composing a form; extend its controlled
+props when needed. Native selects and standalone numeric inputs are forbidden
+in product screens and enforced by lint. Shared E controls complement the
+shared-view requirement below; they do not replace it.
+
 1. Both paths mount the same exported presentation component. Resolve the
    symbol through aliases, barrel exports, and intermediate components: an
    import string alone is not proof. A thin live adapter may mount the view
