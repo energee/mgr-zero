@@ -5,6 +5,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
@@ -51,7 +52,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
       id: brand?.id, name: f.name, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined, priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
     });
-    if (ok) router.push("/catalog");
+    if (ok) { toast.success("Brand saved"); router.push("/catalog"); }
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">

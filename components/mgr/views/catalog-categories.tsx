@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
@@ -42,15 +43,21 @@ export function CatalogCategoriesControl({ categories, busy = false, error, onSa
   const [localError, setLocalError] = useState<string | null>(null);
   const names = onSave ? categories : local;
   async function save(next: string, previous?: string) {
-    if (onSave) return onSave(next, previous);
-    if (names.includes(next)) { setLocalError("A category with this name already exists"); return false; }
-    setLocalError(null);
-    setLocal(previous ? names.map(value => value === previous ? next : value) : [...names, next]);
+    if (onSave) {
+      if (!await onSave(next, previous)) return false;
+    } else {
+      if (names.includes(next)) { setLocalError("A category with this name already exists"); return false; }
+      setLocalError(null);
+      setLocal(previous ? names.map(value => value === previous ? next : value) : [...names, next]);
+    }
+    toast.success(previous ? "Category updated" : "Category added");
     return true;
   }
   async function remove(value: string) {
-    if (onDelete) return onDelete(value);
-    setLocal(names.filter(name => name !== value));
+    if (onDelete) {
+      if (!await onDelete(value)) return false;
+    } else setLocal(names.filter(name => name !== value));
+    toast.success("Category deleted");
     return true;
   }
   return <CommandForm title="Manage categories" open={open} onOpenChange={next => { if (!busy) { setOpen(next); setName(""); setLocalError(null); } }}
