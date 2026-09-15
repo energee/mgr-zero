@@ -6,21 +6,21 @@
 // leaves those SKUs unpriced on that channel.
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { dollarsInput } from "@/lib/mgr/money";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
 export function PriceCellForm({
   saleChannelId, priceGroupId, formatId, cents, label, groupName, formatName, channelName,
 }: {
-  saleChannelId: string; priceGroupId: string; formatId: string; cents: number | null; label: string;
+  saleChannelId: string; priceGroupId: string; formatId: string; cents: number | null; label: ReactNode;
   groupName: string; formatName: string; channelName: string;
 }) {
-  const initial = cents === null ? "" : (cents / 100).toFixed(2);
+  const initial = dollarsInput(cents);
   // The page keys this form on `cents`, so a save or clear remounts it fresh.
   const [dollars, setDollars] = useState(initial);
   const clear = useCommandAction();
@@ -34,7 +34,7 @@ export function PriceCellForm({
       open={form.open}
       onOpenChange={form.setOpen}
       title={`${groupName} · ${formatName}`}
-      trigger={<Button variant="ghost" size="sm" className={cn("tabular-nums", cents === null && "text-muted-foreground")}>{label}</Button>}
+      trigger={<Button variant="ghost" size="sm" className="tabular-nums">{label}</Button>}
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">

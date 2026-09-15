@@ -21,9 +21,9 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer }:
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}
-      {model.prices !== undefined && E.fld("Prices", model.prices)}
+      {model.prices !== undefined ? E.fld("Prices", model.prices) : null}
       {messages}
-      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail, E.act("Remove", "destructive"), "w")}
+      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail ?? "", E.act("Remove", "destructive"), "w")}
     </>
   );
 }

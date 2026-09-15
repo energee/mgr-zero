@@ -1,8 +1,7 @@
 // app/(app)/pricing/group-form.tsx — a price group: one row of the price grid.
-// CommandForm over upsert_price_group, doubling as create (no `group` prop,
-// `model` from toNewPriceGroupViewProps) and edit (`group` pre-fills and the
-// input carries `id`). Both branches draw the same PriceGroupView, so the
-// dialog reads the same whether the row exists yet. Delete calls
+// CommandForm over upsert_price_group, doubling as create (no `groupId`) and
+// edit (`groupId` rides in the input). Both draw the same PriceGroupView from
+// the same adapter, so the dialog reads the same whether the row exists yet. Delete calls
 // delete_price_group and shows its refusal ("price group is in use") inline,
 // the way delete-channel-button.tsx does.
 "use client";
@@ -13,41 +12,38 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
-export type PriceGroupEditData = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
-
-export function GroupForm({ group, model }: { group?: PriceGroupEditData; model: PriceGroupViewModel }) {
-  const [name, setName] = useState(model.name);
-  const [position, setPosition] = useState(model.position);
-  const [ceiling, setCeiling] = useState(model.costCeilingInput);
+export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
+  const [draft, setDraft] = useState(model);
+  const edit = (key: "name" | "position" | "costCeilingInput") => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
   const remove = useCommandAction();
   const form = useCommandForm("upsert_price_group", {
     build: () => ({
-      ...(group ? { id: group.id } : {}),
-      name,
-      position: Number(position),
-      costCeilingCents: ceiling === "" ? undefined : Math.round(Number(ceiling) * 100),
+      ...(groupId ? { id: groupId } : {}),
+      name: draft.name,
+      position: Number(draft.position),
+      costCeilingCents: draft.costCeilingInput === "" ? undefined : Math.round(Number(draft.costCeilingInput) * 100),
     }),
-    reset: () => { setName(model.name); setPosition(model.position); setCeiling(model.costCeilingInput); },
+    reset: () => setDraft(model),
   });
 
   return (
     <CommandForm
       open={form.open}
       onOpenChange={form.setOpen}
-      title={group ? "Edit price group" : "New price group"}
-      trigger={group
-        ? <Button variant="link" size="sm" className="px-0 font-medium">{group.name}</Button>
+      title={groupId ? "Edit price group" : "New price group"}
+      trigger={groupId
+        ? <Button variant="link" size="sm" className="px-0 font-medium">{model.name}</Button>
         : <Button>Create price group</Button>}
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <PriceGroupView
-          model={{ ...model, name, position, costCeilingInput: ceiling }}
-          controls={{ name: setName, position: setPosition, costCeiling: setCeiling }}
+          model={draft}
+          controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           messages={<><CommandFormMessage error={form.error} /><CommandFormMessage error={remove.error} /></>}
           footer={<CommandFormFooter>
-            {group && (
-              <Button type="button" variant="ghost" disabled={remove.busy} onClick={() => remove.run("delete_price_group", { priceGroupId: group.id })}>Delete</Button>
+            {groupId && (
+              <Button type="button" variant="ghost" disabled={remove.busy} onClick={() => remove.run("delete_price_group", { priceGroupId: groupId })}>Delete</Button>
             )}
             <Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save price group"}</Button>
           </CommandFormFooter>}
