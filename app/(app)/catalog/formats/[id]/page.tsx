@@ -52,12 +52,12 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
       deleteAction={ctx.role === "admin" ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
       canCompose={components.length === 0 && composable}
-      materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} embedded />}
-      contents={composable ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} embedded /></div></section> : undefined}
+      materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} />}
+      contents={composable ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /></div></section> : undefined}
     /> : undefined, "/catalog")}
     <p className="text-sm text-muted-foreground">Shared format · {volume == null ? "No beer volume yet — add package contents" : `${formatVolume(volume)} of beer per package`}</p>
     {composable || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
-      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case", writable && composable ? <FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /> : undefined)}
+      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case · managed in Edit format")}
       {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("Add the packages inside to calculate the total volume")}
     </section> : null}
     <PackageBomView
