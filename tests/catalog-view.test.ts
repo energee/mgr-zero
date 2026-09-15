@@ -290,6 +290,14 @@ describe("SKU view", () => {
 });
 
 describe("SKU list view", () => {
+  it("shows derived package volume and preserves unknown totals", () => {
+    const base = skuListHazy.skus[0];
+    const model = toSkuListViewProps({ ...skuListHazy, pours: [], skus: [
+      { ...base, formats: { name: "Case", bbl_per_unit: null, effective_bbl_per_unit: 384 / 3968 } },
+      { ...base, formats: { name: "Unfinished", bbl_per_unit: "0.5", effective_bbl_per_unit: null } },
+    ] });
+    expect(model.rows.map(row => row.detail)).toEqual(["3 gal · active", "— · active"]);
+  });
   it("maps list_skus through formatVolume of ½ / ⅙ / case", () => {
     const model = toSkuListViewProps(skuListHazy);
     expect(model.title).toBe(`${brandOf(SKU_HAZY)} · SKUs`);

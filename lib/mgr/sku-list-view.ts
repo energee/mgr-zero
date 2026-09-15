@@ -24,7 +24,7 @@ export type SkuListSnapshot = {
     name: string;
     active: boolean;
     format_id: string;
-    formats: { name: string; bbl_per_unit: string | number | null } | null;
+    formats: { name: string; bbl_per_unit: string | number | null; effective_bbl_per_unit?: string | number | null } | null;
   }[];
   pours?: { id: string; name: string; ounces: number | string }[];
   backHref?: string;
@@ -36,7 +36,8 @@ export function toSkuListViewProps({ brand, skus, pours = [], backHref }: SkuLis
     title: `${brand.name} · SKUs`,
     empty: skus.length + pours.length === 0 ? { title: "No SKUs yet", description: "A SKU pairs a brand with a format, and is what a customer orders." } : undefined,
     rows: [...skus.map((s) => {
-      const volume = s.formats?.bbl_per_unit != null ? formatVolume(s.formats.bbl_per_unit) : "—";
+      const bbl = s.formats?.effective_bbl_per_unit === undefined ? s.formats?.bbl_per_unit : s.formats.effective_bbl_per_unit;
+      const volume = bbl != null ? formatVolume(bbl) : "—";
       return {
         key: s.id,
         title: s.formats?.name ?? s.name,

@@ -12,7 +12,7 @@ import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
 type Brand = { id: string; name: string; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
-type Format = { id: string; name: string; bbl_per_unit: string | null };
+type Format = { id: string; name: string; bbl_per_unit: string | null; effective_bbl_per_unit: string | number | null };
 
 export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
