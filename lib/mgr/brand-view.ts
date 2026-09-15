@@ -30,7 +30,6 @@ export type BrandViewModel = {
   compliance: RegistryRowView[];
 };
 
-const CATEGORIES = ["Core", "Seasonal", "One-off", "Barrel-aged"];
 /** The select value for "no price group": the Select kit's own sentinel, never a name a real group could carry. */
 export const UNPRICED: string = NONE;
 
@@ -82,7 +81,7 @@ export function brandComplianceRows({ approvals, registrations }: NonNullable<Br
 export function toBrandViewProps({
   brand,
   styles,
-  categories = CATEGORIES,
+  categories = [],
   priceGroups,
   compliance = { approvals: [], registrations: [] },
   cost,

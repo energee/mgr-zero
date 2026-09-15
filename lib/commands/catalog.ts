@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
+defineQuery({
+  name: "list_catalog_categories", description: "List this brewery's catalog categories",
+  input: z.object({}), roles: STAFF_ROLES,
+  handler: ctx => unwrap(ctx.db.from("catalog_categories").select("name").eq("brewery_id", ctx.breweryId).order("name")),
+});
+defineCommand({
+  name: "save_catalog_category", description: "Add a category or rename it across every brand in this brewery",
+  input: z.object({ name: z.string().trim().min(1), previousName: z.string().min(1).optional() }), roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_catalog_category", { p_brewery: ctx.breweryId, p_previous_name: i.previousName ?? null, p_name: i.name, p_request_id: execution.requestId })),
+});
+defineCommand({
+  name: "delete_catalog_category", description: "Delete an unused category; brands using it block deletion",
+  input: z.object({ name: z.string().min(1) }), roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_catalog_category", { p_brewery: ctx.breweryId, p_name: i.name, p_request_id: execution.requestId })),
+});
+
 // Brands (§16.1): the sellable identity. Style is found or created in the
 // brewery's own styles list; description, category, price group and hops are
 // the optional Brand-screen facts.

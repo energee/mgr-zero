@@ -8,17 +8,19 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
+import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { useCommandAction, useFields } from "@/lib/commands/use-command-form";
 import { toBrandViewProps, UNPRICED, type BrandSnapshot } from "@/lib/mgr/brand-view";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 
 export type BrandRow = BrandSnapshot["brand"];
 
-export function BrandPage({ brand, styles, priceGroups, compliance, cost }: {
-  brand: BrandRow | null; styles: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost }: {
+  brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
+  const categoryAction = useCommandAction();
   const { v: f, set } = useFields({
     name: brand?.name ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
     description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.price_group_id ?? "", hops: brand?.hops ?? "",
@@ -26,7 +28,7 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost }: {
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const model = toBrandViewProps({
     brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
-    styles, priceGroups, compliance, cost, backHref: "/catalog",
+    styles, categories, priceGroups, compliance, cost, backHref: "/catalog",
   });
   // Sheets need a saved brand.
   const subject = brand ? { id: brand.id, name: brand.name } : null;
@@ -56,6 +58,14 @@ export function BrandPage({ brand, styles, priceGroups, compliance, cost }: {
       <BrandView
         model={model}
         controls={controls}
+        categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
+          onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
+            if (!previousName || f.category === previousName) set("category")(name);
+          })}
+          onDelete={name => categoryAction.run("delete_catalog_category", { name }, () => {
+            if (f.category === name) set("category")("");
+          })}
+        />}
         linkRows
         messages={<CommandFormMessage error={error} />}
         footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}

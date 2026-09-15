@@ -89,6 +89,7 @@ export const catalogBrands: CatalogSnapshot = {
 
 /** Hazy IPA brand sheet: Core, price group 3, 3 active packages. */
 export const brandHazy: BrandSnapshot = {
+  categories: ["Core", "Seasonal", "One-off", "Barrel-aged"],
   brand: {
     id: BRAND_HAZY,
     name: HAZY,

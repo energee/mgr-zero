@@ -278,6 +278,7 @@ omitted. They have no roles until they are built.
 | `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `delete_catalog_category` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `delete_customer` | Customers | ✓ |  |  |  |  |  |
 | `delete_format` | Packaging | ✓ |  |  |  |  |  |
 | `delete_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
@@ -347,6 +348,7 @@ omitted. They have no roles until they are built.
 | `list_batches` | Production | ✓ |  |  | ✓ |  |  |
 | `list_bins` | Inventory & locations | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
+| `list_catalog_categories` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `list_chat_channels` | Today & notifications | ✓ |  |  |  |  |  |
 | `list_chat_conversations` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -430,6 +432,7 @@ omitted. They have no roles until they are built.
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |  |
 | `reverse_inventory_movement` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `revoke_staff` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `save_catalog_category` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `save_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |  |
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
@@ -2137,6 +2140,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### delete_catalog_category [#delete_catalog_category]
+
+`command` · admin, sales
+
+Delete an unused category; brands using it block deletion
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_catalog_category", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
 #### delete_price_group [#delete_price_group]
 
 `command` · admin, sales
@@ -2203,6 +2223,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_brands", "input": {} }'
 ```
 
+#### list_catalog_categories [#list_catalog_categories]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+List this brewery's catalog categories
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_catalog_categories", "input": {} }'
+```
+
 #### list_channel_prices [#list_channel_prices]
 
 `query` · admin, sales
@@ -2263,6 +2298,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_skus", "input": {} }'
+```
+
+#### save_catalog_category [#save_catalog_category]
+
+`command` · admin, sales
+
+Add a category or rename it across every brand in this brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `previousName` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "save_catalog_category", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
 ```
 
 #### set_channel_price [#set_channel_price]

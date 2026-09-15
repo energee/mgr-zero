@@ -146,6 +146,11 @@ describe("Catalog view", () => {
 });
 
 describe("Brand view", () => {
+  it("uses brewery categories without supplying hardcoded choices", () => {
+    expect(toBrandViewProps({ ...brandHazy, categories: ["Taproom only"] }).categoryOptions).toEqual(["Taproom only"]);
+    expect(toBrandViewProps({ ...brandHazy, categories: undefined }).categoryOptions).toEqual([]);
+    expect(htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }))).toContain("Manage categories");
+  });
   it("maps list_brands onto style, ABV, category, price group, and SKU list", () => {
     const model = toBrandViewProps(brandHazy);
     expect(model.name).toBe(brandOf(SKU_HAZY));
