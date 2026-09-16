@@ -12,6 +12,7 @@ import { toQuotedReviewOrderViewProps, type PortalQuote } from "@/lib/mgr/review
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
+import { money } from "@/lib/mgr/money";
 import { cartActionsDisabled, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
@@ -109,7 +110,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
     source: { name: fulfillmentSource?.name ?? "Not configured" },
     catalog: items.map(item => ({ ...item, qty: Number(qty[item.skuId] ?? 0) })),
   });
-  shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`;
+  shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
   return <>
     <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up", "what the brewery plans to brew next")}</Link>}

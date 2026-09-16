@@ -35,11 +35,20 @@ const eslintConfig = defineConfig([
     // the QA sweep kept finding. Calls that pass explicit options (a weekday,
     // a number's fraction digits) are deliberate and unaffected.
     files: ["app/**", "lib/**", "components/**"],
-    ignores: ["components/ui/**"],
+    // lib/mgr/money.ts is the owner of the money rule; lib/qbo.ts sends a
+    // decimal string to QuickBooks rather than drawing one for an operator.
+    ignores: ["components/ui/**", "lib/mgr/money.ts", "lib/qbo.ts"],
     rules: {
       "no-restricted-syntax": ["error", {
         selector: "CallExpression[arguments.length=0][callee.object.type='NewExpression'][callee.object.callee.name='Date'][callee.property.name=/^toLocale(Date|Time)?String$/]",
         message: "Use formatDate / formatDateTime / formatDayHeader from @/lib/date-format so every surface reads the same (#253).",
+      }, {
+        // Money reads the same everywhere only if one module draws it:
+        // lib/mgr/money.ts (`money` for display, `dollarsInput` for a field's
+        // text). A local `(cents / 100).toFixed(2)` silently drops the
+        // thousands separator and the credit memo's minus sign.
+        selector: "CallExpression[callee.property.name='toFixed'][arguments.0.value=2][callee.object.type='BinaryExpression'][callee.object.operator='/'][callee.object.right.value=100]",
+        message: "Use money() / dollarsInput() from @/lib/mgr/money so every surface reads the same.",
       }, {
         selector: "JSXOpeningElement[name.name='select']",
         message: "Use E.pick from @/components/mgr/e instead of a native select.",

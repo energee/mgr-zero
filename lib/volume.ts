@@ -11,6 +11,15 @@ export function parseVolumeToBbl(value: string, unit: "oz" | "gal" | "bbl") {
   return amount;
 }
 
+/** A sale removal's volume: qty of a packaged unit times its barrels per unit.
+ *  Sale-removal totals in the inventory are two-decimal bbl (2.00 / 0.87 / 0.97);
+ *  formatVolume would drop the trailing zeros and turn a half-keg total into a
+ *  glyph. An unknown barrels-per-unit has no volume to state, so it states none.
+ */
+export function saleVolume(qty: number, bblPerUnit: number | undefined) {
+  return bblPerUnit === undefined ? "" : `${(qty * bblPerUnit).toFixed(2)} bbl`;
+}
+
 /** Keg fractions shown as glyphs, by denominator. */
 const FRACTIONS = [[2, "½"], [4, "¼"], [6, "⅙"], [8, "⅛"]] as const;
 const closeTo = (value: number, target: number) => Math.abs(value - target) < 0.0001;

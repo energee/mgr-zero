@@ -10,7 +10,8 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { ChannelView } from "@/components/mgr/views/channel";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
-import { TAX_TREATMENTS, treatmentLabel } from "./tax-treatments";
+import { sentenceCase } from "@/lib/mgr/labels";
+import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 
 export type SaleChannelEditData = { id: string; name: string; taxTreatment: string };
 
@@ -39,7 +40,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
           model={toChannelViewProps({ id: channel?.id ?? "", name, tax_treatment: taxTreatment })}
           controls={{
             name: setName,
-            taxTreatment: (label) => setTaxTreatment(TAX_TREATMENTS.find((value) => treatmentLabel(value) === label) ?? "taxable"),
+            taxTreatment: (label) => setTaxTreatment(TAX_TREATMENTS.find((value) => sentenceCase(value) === label) ?? "taxable"),
           }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>

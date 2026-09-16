@@ -18,11 +18,15 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const shortfalls = await runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Shortfall[];
-  // Both subsets plus a name for any location a reservation points at, so this
-  // page reads the whole list once instead of asking three times.
-  const locationRows = (await runCommand("list_locations", {}, ctx)) as LocationRow[];
-  const taprooms = locationRows.filter((l) => l.uses.includes("taproom"));
-  const warehouses = locationRows.filter((l) => l.uses.includes("warehouse"));
+  // list_locations filters by use in Postgres, so ask it for the two subsets
+  // this page draws rather than reading every location and discarding most of
+  // them here. A standing allocation's `ref` is a taproom, so the two subsets
+  // together still name every location a reservation points at.
+  const [taprooms, warehouses] = await Promise.all([
+    runCommand("list_locations", { use: "taproom" }, ctx) as Promise<LocationRow[]>,
+    runCommand("list_locations", { use: "warehouse" }, ctx) as Promise<LocationRow[]>,
+  ]);
+  const locationRows = [...taprooms, ...warehouses];
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
   const [skus, allocations, suggestions] = await Promise.all([

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { dollarsInput } from "@/lib/mgr/money";
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
   starts_on: string | null; ends_on: string | null; qty_committed: number;
@@ -17,7 +18,7 @@ export type Contract = {
 type Option = { id: string; name: string };
 
 export function ContractForm({ contract, vendors, materials }: { contract?: Contract; vendors: Option[]; materials: Option[] }) {
-  const initialCost = contract?.unit_cost_cents == null ? "" : (contract.unit_cost_cents / 100).toFixed(2);
+  const initialCost = dollarsInput(contract?.unit_cost_cents);
   const [vendorId, setVendorId] = useState(contract?.vendor_id ?? "");
   const [materialId, setMaterialId] = useState(contract?.material_id ?? "");
   const [qty, setQty] = useState(contract?.qty_committed?.toString() ?? "");
