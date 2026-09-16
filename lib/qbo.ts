@@ -54,7 +54,7 @@ export type QboOAuthStore = {
   fail(intentId: string, actorId: string): Promise<void>;
 };
 
-type QboPushStart = {
+export type QboPushStart = {
   pushId?: string;
   providerRequestId?: string;
   finishRequestId?: string;
@@ -418,7 +418,7 @@ export class QboOAuthClient {
       redirect: "error",
     });
     if (!response.ok) return { ok: false as const, definitive: response.status === 400 || response.status === 422, status: response.status };
-    const payload = await response.json();
+    const payload: unknown = await response.json();
     if (!payload || typeof payload !== "object") throw new Error("QuickBooks response was invalid");
     const entity = (payload as Record<string, unknown>)[entityType];
     if (!entity || typeof entity !== "object" || typeof (entity as Record<string, unknown>).Id !== "string"
@@ -582,7 +582,7 @@ export class QboOAuthClient {
       }),
     });
     if (!response.ok) throw new Error("QuickBooks tax calculation unavailable");
-    const payload = await response.json().catch(() => null);
+    const payload: unknown = await response.json().catch(() => null);
     if (!payload || typeof payload !== "object") throw new Error("QuickBooks tax calculation unavailable");
     const root = payload as Record<string, unknown>;
     if (Array.isArray(root.errors) && root.errors.length) throw new Error("QuickBooks tax calculation unavailable");
@@ -665,8 +665,9 @@ function meaningfulInvoiceContent(invoice: Record<string, unknown>) {
   return result;
 }
 
-function meaningfulInvoiceContentMatches(expectedInvoice: Record<string, unknown>, actual: Record<string, unknown>) {
-  const expected = meaningfulInvoiceContent(expectedInvoice);
+function meaningfulInvoiceContentMatches(expectedInvoice: unknown, actual: Record<string, unknown>) {
+  if (!expectedInvoice || typeof expectedInvoice !== "object" || Array.isArray(expectedInvoice)) return false;
+  const expected = meaningfulInvoiceContent(expectedInvoice as Record<string, unknown>);
   return Object.entries(expected).every(([key, value]) => JSON.stringify(actual[key]) === JSON.stringify(value));
 }
 

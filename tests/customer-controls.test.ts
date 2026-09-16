@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { admin, asUser, channelId, makeBrewery, makeCustomerUser, makeStaffCtx } from "./helpers";
@@ -34,6 +35,7 @@ describe("customer controls", () => {
       p_zip: address.zip, p_request_id: crypto.randomUUID(),
     });
     expect(legacyEdit.error).toBeNull();
+    assert(legacyEdit.data !== null);
     expect(legacyEdit.data.is_default).toBe(true);
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
     const input = { ...address, label: "Second", customerId: c.id, isDefault: true };
@@ -85,8 +87,9 @@ describe("customer controls", () => {
     const a = await customer(), b = await customer();
     const loc = await admin.from("locations").insert({ brewery_id: breweryId, name: "Warehouse", uses: ["warehouse"] }).select().single();
     expect(loc.error).toBeNull();
-    for (const [customerId, status] of [[a.id, "draft"], [a.id, "submitted"], [b.id, "draft"]]) {
+    for (const [customerId, status] of [[a.id, "draft"], [a.id, "submitted"], [b.id, "draft"]] as const) {
       const ship = await runCommand("upsert_ship_to", { ...address, customerId }, ctx) as { id: string };
+      assert(loc.data !== null);
       const row = await admin.from("orders").insert({ brewery_id: breweryId, kind: "wholesale", customer_id: customerId, ship_to_id: ship.id, from_location_id: loc.data.id, sale_channel_id: channel, created_by: ctx.userId, status });
       expect(row.error).toBeNull();
     }
@@ -100,6 +103,7 @@ it("Settings reads and preserves the configured portal warehouse across unrelate
   const adminCtx = await makeStaffCtx(breweryId, "admin");
   const warehouse = await admin.from("locations").insert({ brewery_id: breweryId, name: "Portal warehouse", uses: ["warehouse"] }).select().single();
   expect(warehouse.error).toBeNull();
+  assert(warehouse.data !== null);
   await runCommand("set_portal_fulfillment_source", { locationId: warehouse.data.id }, adminCtx);
   await runCommand("update_brewery", { name: "Renamed", timezone: "America/New_York", readingDueHours: 24 }, adminCtx);
   const row = await runCommand("get_brewery", {}, adminCtx) as { portal_fulfillment_location_id: string };

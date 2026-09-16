@@ -1,3 +1,5 @@
+import { squareSearchSchema } from "./provider-payloads";
+import { rawDatabase } from "./raw-database";
 import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { SquareClient, syncSquareCatalog, syncSquareSales } from "@/lib/pos";
@@ -209,7 +211,7 @@ describe("Square durable sales sync", () => {
     const foreignQueue = await foreignCtx.db.from("pos_unmapped_items").select("brewery_id").eq("brewery_id", f.brewery.id);
     expect(foreignQueue.error).toBeNull();
     expect(foreignQueue.data).toEqual([]);
-    const privateRead = await f.ctx.db.schema("private").from("square_order_snapshots").select("external_order_id");
+    const privateRead = await rawDatabase(f.ctx.db).schema("private").from("square_order_snapshots").select("external_order_id");
     expect(privateRead.error).not.toBeNull();
 
     const catalogFetch = vi.fn(async (input: string | URL | Request) => {
@@ -351,8 +353,8 @@ describe("Square durable sales sync", () => {
       });
     }
     expect((seenBodies[1] as { cursor?: string }).cursor).toBe("page-2");
-    expect((seenBodies[0] as any).query.filter.date_time_filter.updated_at)
-      .toEqual((seenBodies[1] as any).query.filter.date_time_filter.updated_at);
+    expect(squareSearchSchema.parse(seenBodies[0]).query.filter.date_time_filter.updated_at)
+      .toEqual(squareSearchSchema.parse(seenBodies[1]).query.filter.date_time_filter.updated_at);
 
     expect(sql(`select external_order_id||':'||external_line_id from public.pos_sales
       where brewery_id='${f.brewery.id}' and external_line_id='same' order by external_order_id`)).toEqual(["O1:same", "O2:same"]);
@@ -410,7 +412,7 @@ describe("Square durable sales sync", () => {
     const requestId = crypto.randomUUID();
     let firstWindow: unknown;
     const failing = squareFetch(f.merchantId, (body) => {
-      firstWindow ??= (body as any).query.filter.date_time_filter.updated_at;
+      firstWindow ??= squareSearchSchema.parse(body).query.filter.date_time_filter.updated_at;
       return body.cursor ? response({ errors: [{ category: "API_ERROR" }] }, 503) : response({ orders: [pageOne], cursor: "resume-here" });
     }, locations);
     await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, failing))).rejects.toThrow("Square is unavailable");
@@ -429,7 +431,7 @@ describe("Square durable sales sync", () => {
     expect(resumedBodies[0]).toMatchObject({ cursor: "resume-here" });
     expect((resumedBodies[0].location_ids as string[])).toHaveLength(10);
     expect((resumedBodies[1].location_ids as string[])).toHaveLength(1);
-    expect((resumedBodies[0] as any).query.filter.date_time_filter.updated_at).toEqual(firstWindow);
+    expect(squareSearchSchema.parse(resumedBodies[0]).query.filter.date_time_filter.updated_at).toEqual(firstWindow);
     expect(sql(`select external_location_id||':'||complete::text from public.pos_sales_coverage
       where brewery_id='${f.brewery.id}' and external_location_id in ('L1','L2') order by external_location_id`))
       .toEqual(["L1:true", "L2:true"]);
@@ -446,7 +448,7 @@ describe("Square durable sales sync", () => {
     const f = await fixture();
     const requestId = crypto.randomUUID();
     const fetcher = squareFetch(f.merchantId, (body) => {
-      const end = (body as any).query.filter.date_time_filter.updated_at.end_at as string;
+      const end = squareSearchSchema.parse(body).query.filter.date_time_filter.updated_at.end_at as string;
       return response({ orders: [saleOrder({ id: "OUTSIDE", updatedAt: new Date(Date.parse(end) + 1).toISOString(),
         lines: [line("outside", "V1", "1")] })] });
     });
@@ -492,7 +494,7 @@ describe("Square durable sales sync", () => {
     const draft = await f.ctx.db.rpc("get_taproom_draft_projection", { p_brewery: f.brewery.id, p_location: f.locations[0].id });
     const variance = await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location: f.locations[0].id, p_weeks: 4 });
     expect(draft.error ?? variance.error).toBeNull();
-    expect((variance.data as any).periods.at(-1)).toMatchObject({ count_id: secondCount.id, expected_bbl: 16 / 3968 });
+    expect((variance.data as { periods: unknown[] }).periods.at(-1)).toMatchObject({ count_id: secondCount.id, expected_bbl: 16 / 3968 });
     expect(draft.data).toMatchObject({ expected_bbl: null, coverage_complete: false, reason: "incomplete_pos_coverage" });
     expect(sql(`select md5(coalesce(jsonb_agg(to_jsonb(t) order by id)::text,'')) from public.taproom_counts t where brewery_id='${f.brewery.id}'`)[0]).toBe(physicalBefore);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);

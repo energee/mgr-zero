@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 // tests/chat-schema.test.ts — real-Postgres proof for provider-neutral chat tenancy and visibility.
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
@@ -6,7 +7,7 @@ import { admin, asUser, makeBrewery, makeStaff, makeStaffCtx } from "./helpers";
 const provider = "slack";
 
 async function insert<T>(table: string, row: Record<string, unknown>): Promise<T> {
-  const { data, error } = await admin.from(table).insert(row).select().single();
+  const { data, error } = await rawDatabase(admin).from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;
 }
@@ -244,7 +245,7 @@ describe("chat schema (live DB)", () => {
       "chat_callback_receipts",
       "chat_action_intents",
     ]) {
-      const { data, error } = await ctx.db.from(table).select("id");
+      const { data, error } = await rawDatabase(ctx.db).from(table).select("id");
       expect(data).toBeNull();
       expect(error?.code).toBe("42501");
     }
@@ -333,7 +334,7 @@ describe("chat schema (live DB)", () => {
       ["notification_destinations", destination.id, { state: "blocked", blocked_reason: "user-written" }],
       ["notification_preferences", preference.id, { enabled: false }],
     ] as const) {
-      const { error } = await ctx.db.from(table).update(update).eq("id", id);
+      const { error } = await rawDatabase(ctx.db).from(table).update(update).eq("id", id);
       expect(error?.code, table).toBe("42501");
     }
   });
@@ -572,7 +573,7 @@ describe("chat schema (live DB)", () => {
         },
       ],
     ] as const) {
-      const { error } = await admin.from(table).insert(row);
+      const { error } = await rawDatabase(admin).from(table).insert(row);
       expect(error?.code, table).toBe("23503");
     }
 

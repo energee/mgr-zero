@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 import { expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { makeBrewery, makeStaffCtx, sql } from "./helpers";
@@ -39,7 +40,7 @@ it("keeps every location identity when a location is renamed between pages, then
     .order("name").order("id").range(700, 700).single()).data!;
   const env = readServerEnv();
   let renamed = false;
-  const racingDb = createClient(env.supabaseUrl, env.supabaseSecretKey, {
+  const racingDb = createClient<Database>(env.supabaseUrl, env.supabaseSecretKey, {
     auth: { persistSession: false },
     global: { fetch: async (input, init) => {
       const response = await fetch(input, init);

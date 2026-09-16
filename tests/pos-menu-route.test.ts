@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // Public menu feed: narrow fields, explicit publication, derived availability,
 // and a documented short shared-cache window.
 import { createClient } from "@supabase/supabase-js";
@@ -92,7 +93,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     expect(changedBody).toMatchObject({ items: [{ priceCents: 650 }] });
     expect(changedBody.version).not.toBe(body.version);
 
-    const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+    const anon = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
       auth: { persistSession: false },
     });
     expect((await anon.from("pos_menus").select("*")).error?.code).toBe("42501");

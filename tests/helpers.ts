@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import type { Database } from "@/lib/supabase/database";
 // tests/helpers.ts — creates tenants/users via admin credentials; returns RLS-bound clients per user.
 import type { StaffRole } from "@/lib/commands/registry";
 import { execFileSync } from "node:child_process";
@@ -6,7 +8,7 @@ import { publicEnv } from "@/lib/env/public";
 import { readServerEnv } from "@/lib/env/server-parser";
 
 const serverEnv = readServerEnv();
-export const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
+export const admin = createClient<Database>(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
   auth: { persistSession: false },
 });
 
@@ -37,8 +39,8 @@ export async function makeCustomerUser(customerId: string) {
   return u;
 }
 
-export async function asUser(email: string): Promise<SupabaseClient> {
-  const c = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+export async function asUser(email: string): Promise<SupabaseClient<Database>> {
+  const c = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false },
   });
   const { error } = await c.auth.signInWithPassword({ email, password: "test-password-1" });
@@ -95,7 +97,7 @@ export function insertFixture<T = Record<string, unknown>>(table: PrivilegedFixt
 /** Insert one raw fixture row and return it; protected surfaces use the database owner. */
 export async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
   if (privilegedFixtureTables.has(table as PrivilegedFixtureTable)) return insertFixture<T>(table as PrivilegedFixtureTable, row)[0];
-  const { data, error } = await admin.from(table).insert(row).select().single();
+  const { data, error } = await rawDatabase(admin).from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;
 }

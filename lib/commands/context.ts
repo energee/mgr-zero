@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/commands/context.ts — resolves a command caller's verified identity and brewery membership.
 import { cache } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -21,7 +22,7 @@ export const isUuid = (value: string | undefined): value is string => value !== 
 // db_error rather than being mistaken for "not a member" (403). A malformed
 // breweryId is rejected up front (Postgres would raise 22P02 → db_error) and
 // still reads as not_member, the contract tests/api-command.test.ts pins.
-export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
+export async function ctxForBearer(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<Ctx> {
   if (!isUuid(breweryId)) {
     throw new CommandError("not a member of this brewery", 403, "not_member");
   }
@@ -114,7 +115,7 @@ export async function buildRouteContext(breweryId?: string, expected?: CommandCo
 export async function buildContextFromBearer(breweryId: string | undefined, accessToken: string, expected?: CommandContextExpectation): Promise<OperationCtx> {
   if (!accessToken) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
-  const verifier = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const verifier = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await verifier.auth.getClaims(accessToken);
@@ -123,7 +124,7 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     throw new CommandError("unauthenticated", 401, "unauthenticated");
   }
 
-  const discoveryDb = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const discoveryDb = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
   });
@@ -131,7 +132,7 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     ? ({ db: discoveryDb, userId, breweryId: null, role: null } satisfies PreTenantCtx)
     : await ctxForBearer(discoveryDb, userId, breweryId);
   assertExpectedContext(discovered, expected);
-  const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const db = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
     global: { headers: scopeHeaders(discovered) },

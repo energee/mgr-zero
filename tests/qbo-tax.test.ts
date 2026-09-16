@@ -21,7 +21,7 @@ describe("QuickBooks sales-tax calculation", () => {
         shipping: { taxAmount: { value: "1.00", currency: "USD" } },
       } } },
     }), { status: 200 }));
-    const client = new QboOAuthClient(config as any, fetch) as any;
+    const client = new QboOAuthClient(config, fetch);
 
     await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(825);
     expect(String(fetch.mock.calls[0][0])).toBe(config.taxApiBaseUrl);
@@ -37,9 +37,9 @@ describe("QuickBooks sales-tax calculation", () => {
 
   it("parses valid decimal cents exactly without binary floating-point drift", async () => {
     for (const value of ["0.29", 0.29]) {
-      const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      const client = new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         taxResponse(value, "USD", 0, "USD"),
-      )) as any;
+      ));
       await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(29);
     }
   });
@@ -60,7 +60,7 @@ describe("QuickBooks sales-tax calculation", () => {
       taxResponse(Number.NaN, "USD", 0, "USD"),
     ];
     for (const response of responses) {
-      const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(response)) as any;
+      const client = new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>().mockResolvedValue(response));
       await expect(client.calculateSalesTax(input, "access-secret")).rejects.toThrow("QuickBooks tax calculation unavailable");
     }
   });

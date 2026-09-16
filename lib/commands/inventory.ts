@@ -35,11 +35,15 @@ defineCommand({
   risk: "append_only", requiresConfirmation: true,
   compensation: "reverse_inventory_movement for an eligible standalone adjustment or loss",
   idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
-  preview: (ctx, input, conversationId) => unwrap(ctx.db.rpc("preview_inventory_movement", {
-    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
-    p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
-    p_note: input.note ?? null, p_lot: input.lotId ?? null, p_conversation: conversationId,
-  })),
+  preview: async (ctx, input, conversationId) => {
+    const preview = await unwrap(ctx.db.rpc("preview_inventory_movement", {
+      p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
+      p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
+      p_note: input.note ?? null, p_lot: input.lotId ?? null, p_conversation: conversationId,
+    }));
+    if (!preview) throw new CommandError("Inventory preview unavailable", 500);
+    return preview;
+  },
   handler: (ctx, input, execution) => insertMovement(ctx, input, execution),
 });
 

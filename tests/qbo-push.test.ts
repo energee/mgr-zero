@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { createHash } from "node:crypto";
 import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
@@ -198,6 +199,7 @@ describe("QuickBooks durable outbound push", () => {
       await retryClient.query("select set_config('request.jwt.claim.sub',$1,false)", [f.ctx.userId]);
 
       await finishClient.query("begin");
+      assert(started.data !== null);
       await finishClient.query(
         "select public.finish_qbo_push($1,$2,$3,$4,$5,$6,$7::jsonb,$8)",
         [
@@ -245,6 +247,7 @@ describe("QuickBooks durable outbound push", () => {
         [retryPid],
       )).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
       await finishClient.query("commit");
+
 
       await expect(retrying).resolves.toEqual({
         pushId: started.data.pushId,
@@ -400,7 +403,9 @@ describe("QuickBooks durable outbound push", () => {
     ]);
     expect(a.error).toBeNull();
     expect(b.error).toBeNull();
+    assert(b.data !== null);
     expect(a.data).toMatchObject({ pushId: b.data.pushId, providerRequestId: b.data.providerRequestId, requestBody: b.data.requestBody });
+    assert(a.data !== null);
     const frozen = a.data.requestBody;
     expect((await f.ctx.db.rpc("set_qbo_item_mapping", {
       p_brewery: f.brewery.id, p_sku: f.catalog.skuId, p_qbo_item_id: "item-edited", p_request_id: crypto.randomUUID(),
@@ -410,6 +415,7 @@ describe("QuickBooks durable outbound push", () => {
       p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
     });
     expect(retry.error).toBeNull();
+    assert(retry.data !== null);
     expect(retry.data.requestBody).toBe(frozen);
     expect(retry.data.requestBody).toContain('"value": "item-24"');
     expect(retry.data.requestBody).toContain('"UnitPrice": 3.33');
@@ -438,6 +444,8 @@ describe("QuickBooks durable outbound push", () => {
       .rejects.toMatchObject({ status: 409 });
     expect(fetch).not.toHaveBeenCalled();
 
+    assert(started.data !== null);
+    assert(started.data.pushId && started.data.finishRequestId);
     const finish = await admin.rpc("finish_qbo_push", {
       p_brewery: f.brewery.id, p_push: started.data.pushId, p_actor: f.ctx.userId,
       p_status: "pushed", p_qbo_entity_id: "late-old-entity", p_error: null,
@@ -463,6 +471,7 @@ describe("QuickBooks durable outbound push", () => {
     try {
       await replaceClient.query(`create function private.${delayFunction}() returns trigger language plpgsql set search_path='' as $$
         begin perform pg_catalog.pg_sleep(0.5); return new; end $$`);
+      assert(started.data !== null);
       await replaceClient.query(`create trigger ${delayTrigger} before update on public.qbo_pushes
         for each row when (old.id='${started.data.pushId}'::uuid) execute function private.${delayFunction}()`);
       await finishClient.query("set application_name='qbo_finish_lock_regression'");

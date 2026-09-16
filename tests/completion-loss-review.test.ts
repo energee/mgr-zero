@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { admin, DB, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
@@ -67,7 +68,7 @@ async function exactCompletion() {
 }
 
 const reattribute = (adjustmentId: string, bbl: string | number, classification: "sample" | "taproom" | "destruction", destinationState?: string, requestId = crypto.randomUUID()) =>
-  runCommand("reattribute_loss", { adjustmentId, bbl, classification, ...(destinationState ? { destinationState } : {}) }, adminCtx, { requestId, correlationId: crypto.randomUUID() }) as Promise<any>;
+  runCommand("reattribute_loss", { adjustmentId, bbl, classification, ...(destinationState ? { destinationState } : {}) }, adminCtx, { requestId, correlationId: crypto.randomUUID() }) as Promise<import("@/lib/commands/compliance").LossAllocation>;
 
 function expectSqlState(statement: string, state: string) {
   try { sql(statement, true, "sqlstate"); }
@@ -105,7 +106,7 @@ describe("completion loss review", () => {
     expect(completed.closedAt.slice(0, 10)).toBe(futureStart);
     const report = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: postingStart, periodEnd: postingEnd,
-    }, futureAdmin) as any;
+    }, futureAdmin) as import("@/lib/commands/compliance").Report;
     expect(report.figures.removals.loss).toBe(1);
     expect(await runCommand("get_loss_review", { periodStart: postingStart, periodEnd: postingEnd }, futureAdmin)).toEqual([
       expect.objectContaining({ adjustment_id: completed.adjustmentId, batch_id: batch.id, closed_at: expect.any(String) }),
@@ -119,13 +120,13 @@ describe("completion loss review", () => {
 
     const before = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(String(before.figures.cellarRemovals.loss)).toBe("0.05741935");
     expect(String(before.figures.removals.loss)).toBe("0.05741935");
 
     const review = await runCommand("get_loss_review", {
       periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any[];
+    }, adminCtx) as import("@/lib/commands/compliance").LossReview[];
     expect(review).toEqual([expect.objectContaining({
       adjustment_id: completed.adjustmentId,
       batch_id: completed.batchId,
@@ -145,7 +146,7 @@ describe("completion loss review", () => {
 
     const after = await runCommand("get_loss_review", {
       periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any[];
+    }, adminCtx) as import("@/lib/commands/compliance").LossReview[];
     expect(String(after[0].remaining_bbl)).toBe("0.00000000");
     expect(sql(`select round(bbl,8)::text from volume_adjustment_reclassifications where source_adjustment_id='${completed.adjustmentId}' order by created_at`)).toEqual(["0.02000000", "0.03741935"]);
     expect(sql(`select reclassification_id::text||'|'||sum(bbl)::text from volume_adjustments where reclassification_id is not null group by reclassification_id order by reclassification_id`)).toEqual(expect.arrayContaining([
@@ -154,7 +155,7 @@ describe("completion loss review", () => {
 
     const report = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(report.figures.cellarRemovals).toMatchObject({ loss: 0, sample: 0.02, destruction: 0.03741935 });
     expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(0.05741935, 8);
   });
@@ -267,8 +268,8 @@ describe("completion loss review", () => {
       brewery_id: breweryId, source_adjustment_id: completed.adjustmentId, bbl: 0.01,
       target_class: "destruction", created_by: adminCtx.userId,
     };
-    expect((await adminCtx.db.from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
-    expect((await admin.from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
+    expect((await rawDatabase(adminCtx.db).from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
+    expect((await rawDatabase(admin).from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
     expect((await admin.from("volume_adjustments").update({ note: "forbidden" }).eq("id", completed.adjustmentId)).error).not.toBeNull();
     expect((await admin.rpc("get_loss_review", { p_brewery: breweryId, p_start: completed.period.start, p_end: completed.period.end })).error).not.toBeNull();
     expect(sql(`select has_table_privilege('authenticated','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text,has_table_privilege('service_role','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text`, true)).toEqual(["false|false"]);
@@ -310,12 +311,12 @@ describe("completion loss review", () => {
     sql(`update volume_adjustments set created_at='${prior.start}T12:00:00Z' where id='${completed.adjustmentId}'; update batches set closed_at='${prior.start}T12:00:00Z' where completion_adjustment_id='${completed.adjustmentId}'`, true);
     const filed = await runCommand("file_compliance_report", {
       jurisdiction: "TTB", periodStart: prior.start, periodEnd: prior.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Filing;
     const frozen = JSON.stringify(filed.figures);
 
     const currentBefore = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
 
     const clock = new Client({ connectionString: DB });
     await clock.connect();
@@ -343,10 +344,10 @@ describe("completion loss review", () => {
     expect(sql(`select bbl::text from occupancy_volumes where occupancy_id='${occupancy}'`, true)).toEqual(beforeVolume);
     const priorReport = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: prior.start, periodEnd: prior.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
     const currentReport = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(priorReport.figures.cellarRemovals.loss).toBe(0.05741935);
     expect(Number(currentReport.figures.cellarRemovals.loss) - Number(currentBefore.figures.cellarRemovals.loss ?? 0)).toBeCloseTo(-0.02, 8);
     expect(Number(currentReport.figures.cellarRemovals.sample) - Number(currentBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
@@ -356,7 +357,7 @@ describe("completion loss review", () => {
     await reattribute(taproom.adjustmentId, "0.01", "taproom");
     const report = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, adminCtx) as any;
+    }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(report.externalMappingRequired).toEqual(["taproom"]);
     expect(report.warnings.join(" ")).toMatch(/approved external filing-line mapping/i);
     await expect(runCommand("file_compliance_report", {

@@ -8,7 +8,7 @@ type EntityWithId = { id: string };
 type OnHandRow = { qty: number | string };
 
 describe("inventory commands", () => {
-  let ctx: any;
+  let ctx: import("@/lib/commands/registry").Ctx;
   beforeAll(async () => {
     ctx = await makeStaffCtx((await makeBrewery()).id);
   });
@@ -63,7 +63,7 @@ describe("inventory commands", () => {
       .select("type, qty, bbl, sale_channel_id, tax_treatment, dest_state")
       .eq("brewery_id", ctx.breweryId).eq("sku_id", sku.id).order("created_at");
     expect(error).toBeNull();
-    expect(data?.map((row: any) => ({
+    expect(data?.map((row) => ({
       type: row.type, qty: Number(row.qty), bbl: Number(row.bbl), channel: row.sale_channel_id, tax: row.tax_treatment, state: row.dest_state,
     }))).toEqual([
       { type: "opening_balance", qty: 20, bbl: 1, channel: null, tax: null, state: null },

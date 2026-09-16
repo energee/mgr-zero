@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { beforeAll, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, seedPriceGroup } from "./helpers";
@@ -74,13 +75,16 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
   expect(duplicate.error?.code).toBe("23505");
   const blank = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: whitespace, p_request_id: crypto.randomUUID() });
   expect(blank.error).toBeNull();
+  assert(blank.data !== null);
   expect(blank.data.upc).toBeNull();
   for (const edge of whitespace) {
+    assert(blank.data !== null);
     const update = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: `${edge}9876${edge}`, p_request_id: crypto.randomUUID() });
     expect(update.error?.message).toMatch(/UPC.*another SKU/);
   }
   const cleared = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: whitespace, p_request_id: crypto.randomUUID() });
   expect(cleared.error).toBeNull();
+  assert(cleared.data !== null);
   expect(cleared.data.upc).toBeNull();
 
 });

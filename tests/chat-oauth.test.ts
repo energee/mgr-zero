@@ -1,3 +1,5 @@
+import { assert } from "vitest";
+import { rawDatabase } from "./raw-database";
 // tests/chat-oauth.test.ts — Slack installation lifecycle: admin-only OAuth start,
 // hashed ten-minute state, exact redirect binding, idempotent activation, scope
 // checks, reconciliation, and disable-first disconnect (live DB, fake Slack port).
@@ -76,6 +78,7 @@ describe("Slack installation lifecycle", () => {
     expect(r.state).toBe("pending");
     expect(r.oauth_intent_hash).toBe(createHash("sha256").update(state).digest("hex"));
     expect(JSON.stringify(r)).not.toContain(state);
+    assert(r.oauth_expires_at !== null);
     const ttl = new Date(r.oauth_expires_at).getTime() - Date.now();
     expect(ttl).toBeGreaterThan(9 * 60_000);
     expect(ttl).toBeLessThanOrEqual(11 * 60_000); // DB clock vs. JS clock skew
@@ -94,7 +97,7 @@ describe("Slack installation lifecycle", () => {
     expect(r.external_installation_id).toBe(teamId);
     expect(r.token_store_key).toBe(`slack:installation:${teamId}`);
     expect(r.oauth_consumed_at).not.toBeNull();
-    const stolen = await ctx.db.rpc("activate_chat_installation", {
+    const stolen = await rawDatabase(ctx.db).rpc("activate_chat_installation", {
       p_installation: installationId, p_state_hash: r.oauth_intent_hash, p_redirect_uri: REDIRECT,
       p_external_installation_id: teamId, p_external_enterprise_id: null, p_display_label: "Stolen",
       p_granted_capabilities: {}, p_actor: ctx.userId,

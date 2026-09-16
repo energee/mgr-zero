@@ -1,3 +1,4 @@
+import { squareUpsertSchema, type SquareUpsert } from "./provider-payloads";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
 import { runCommand } from "@/lib/commands/registry";
@@ -44,15 +45,15 @@ async function fixture(brandCount = 1) {
   return { brewery, ctx, connectionId: connection.data!.id as string, brandIds, brands, location, channel };
 }
 
-function success(body: Record<string, any>, itemId = `ITEM-${crypto.randomUUID()}`) {
-  const variations = body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+function success(body: SquareUpsert, itemId = `ITEM-${crypto.randomUUID()}`) {
+  const variations = body.object.item_data.variations.map((variation, index) => ({
     ...variation, id: `${itemId}-V${index}`, version: 2,
     item_variation_data: { ...variation.item_variation_data, item_id: itemId },
   }));
   return new Response(JSON.stringify({ catalog_object: { ...body.object, id: itemId, version: 2,
     item_data: { ...body.object.item_data, variations } }, id_mappings: [
     { client_object_id: body.object.id, object_id: itemId },
-    ...body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+    ...body.object.item_data.variations.map((variation, index) => ({
       client_object_id: variation.id, object_id: `${itemId}-V${index}`,
     })),
   ] }), { status: 200 });
@@ -92,7 +93,7 @@ describe("Square publication final orchestration fences", () => {
 
     await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! }, firstRequest,
       new SquareClient(config, vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
-        success(JSON.parse(String(init?.body)), "LOCATION-ITEM"))), "publish_pos_item"))
+        success(squareUpsertSchema.parse(JSON.parse(String(init?.body))), "LOCATION-ITEM"))), "publish_pos_item"))
       .resolves.toMatchObject({ externalItemId: "LOCATION-ITEM" });
     const secondStart = await beginSquarePublication(f.ctx, { posLocationId: "L2", brandId: f.brandIds[0]! },
       crypto.randomUUID(), "publish_pos_item");
@@ -107,7 +108,7 @@ describe("Square publication final orchestration fences", () => {
     const providerReleased = new Promise<void>((resolve) => { releaseProvider = resolve; });
     const standalone = publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: f.brandIds[0]! },
       crypto.randomUUID(), new SquareClient(config, vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
-        enteredProvider(); await providerReleased; return success(JSON.parse(String(init?.body)), "RACE-ITEM");
+        enteredProvider(); await providerReleased; return success(squareUpsertSchema.parse(JSON.parse(String(init?.body))), "RACE-ITEM");
       })), "publish_pos_item");
     await providerEntered;
 
@@ -187,7 +188,7 @@ describe("Square publication final orchestration fences", () => {
         "Square-Version": "2026-08-19", Authorization: "Bearer publication-access",
         "Content-Type": "application/json", Accept: "application/json",
       });
-      const body = JSON.parse(String(init?.body));
+      const body = squareUpsertSchema.parse(JSON.parse(String(init?.body)));
       expect(Object.keys(body).sort()).toEqual(["idempotency_key", "object"]);
       return success(body, "COMMAND-SUCCESS");
     });
@@ -228,7 +229,7 @@ describe("Square publication final orchestration fences", () => {
 
   it("returns a confirmed durable menu publication envelope", async () => {
     const f = await fixture();
-    commandSquare(vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => success(JSON.parse(String(init?.body)), "MENU-SUCCESS")));
+    commandSquare(vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => success(squareUpsertSchema.parse(JSON.parse(String(init?.body))), "MENU-SUCCESS")));
     await expect(runCommand("publish_pos_menu", { posLocationId: "L1" }, f.ctx,
       { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() })).resolves.toEqual({
       publication: { attemptId: expect.any(String), status: "succeeded", errorCode: null },
@@ -254,7 +255,7 @@ describe("Square publication final orchestration fences", () => {
     expect(exactReplayFetch).not.toHaveBeenCalled();
 
     const correctedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
-      success(JSON.parse(String(init?.body))));
+      success(squareUpsertSchema.parse(JSON.parse(String(init?.body)))));
     await expect(publishSquareMenu(f.ctx, { posLocationId: "L1", retryConflict: true }, crypto.randomUUID(),
       new SquareClient(config, correctedFetch))).resolves.toMatchObject({ published: true, items: [expect.any(Object), expect.any(Object)] });
     expect(correctedFetch).toHaveBeenCalledTimes(2);
@@ -272,7 +273,7 @@ describe("Square publication final orchestration fences", () => {
       select status from private.square_publications where brewery_id='${f.brewery.id}'`))
       .toEqual(["publishing", "prepared"]);
     const retry = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
-      success(JSON.parse(String(init?.body))));
+      success(squareUpsertSchema.parse(JSON.parse(String(init?.body)))));
     await expect(publishSquareMenu(f.ctx, { posLocationId: "L1" }, requestId,
       new SquareClient(config, retry))).resolves.toMatchObject({ published: true });
     expect(retry).toHaveBeenCalledTimes(1);

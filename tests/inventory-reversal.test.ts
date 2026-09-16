@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 import { describe, it, expect } from "vitest";
 import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
@@ -90,7 +92,7 @@ it("refuses structural forgeries and rolls rejected requests back", async () => 
   for (const changed of [{ qty: -2 }, { type: "loss" }, { ref: crypto.randomUUID() }, { source_movement_id: original.id }, { id: original.id }, { brewery_id: (await makeBrewery()).id }]) {
     expect(() => insertFixture("inventory_movements", { ...base, ...changed })).toThrow();
   }
-  expect((await ctx.db.from("inventory_movements").insert(base)).error).not.toBeNull();
+  expect((await rawDatabase(ctx.db).from("inventory_movements").insert(base)).error).not.toBeNull();
   const [owned] = insertFixture<{ id: string }>("inventory_movements", { ...base, compensates_id: null, qty: -1, type: "loss", ref: crypto.randomUUID() });
   const requestId = crypto.randomUUID();
   await expect(reverse(ctx, owned.id, "Cannot unpick one row", requestId)).rejects.toThrow(/standalone/);
@@ -144,6 +146,7 @@ it("refuses an actual count-owned depletion without changing count history", asy
   await ins("inventory_movements", { brewery_id: ctx.breweryId, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, qty: 5, type: "opening_balance", created_by: ctx.userId });
   const snapshot = await ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: location.id });
   expect(snapshot.error).toBeNull();
+  assert(snapshot.data !== null);
   const count = await runCommand("record_taproom_count", { locationId: location.id, countedOn: sql("select (now() at time zone 'America/New_York')::date")[0], revision: snapshot.data.revision,
     lines: [{ binId: location.binId, skuId: catalog.skuId, lotId: null, qtyCounted: 3 }] }, ctx) as { id: string; lines: { movement_id: string }[] };
   await expect(reverse(ctx, count.lines[0].movement_id)).rejects.toThrow(/standalone/);

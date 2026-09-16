@@ -203,7 +203,7 @@ defineCommand({
 });
 
 const PO_COLUMNS = "id, po_no, vendor_id, status, ordered_on, expected_on, sent_via, sent_by, note, created_at";
-const OPEN_STATUSES = ["draft", "sent", "partially_received"];
+const OPEN_STATUSES = ["draft", "sent", "partially_received"] as const;
 
 defineQuery({
   name: "list_purchase_orders", description: "Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled",

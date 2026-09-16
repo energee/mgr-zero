@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/chat/oauth.ts — Slack installation lifecycle services: OAuth intent start,
 // callback completion, reconciliation, and disconnect. Provider I/O goes through
 // SlackOAuthPort so tests run against a fake; durable state lives in the
@@ -28,7 +29,7 @@ export type SlackOAuthPort = {
   deleteInstallation(id: string): Promise<void>;
 };
 
-type Intent = {
+export type Intent = {
   installation_id: string;
   brewery_id: string;
   state: string;
@@ -41,13 +42,6 @@ type Intent = {
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
-// Lifecycle RPCs return bounded JSON; a null result means the row vanished.
-async function rpc<T>(db: SupabaseClient, name: string, args: Record<string, unknown>): Promise<T> {
-  const data = await unwrap(db.rpc(name, args));
-  if (data == null) throw new CommandError(`${name} returned nothing`, 404);
-  return data as T;
-}
-
 function authorizeUrl(state: string, redirectUri: string) {
   const clientId = process.env.SLACK_CLIENT_ID;
   if (!clientId) throw new CommandError("SLACK_CLIENT_ID is not configured", 500);
@@ -59,22 +53,27 @@ function authorizeUrl(state: string, redirectUri: string) {
   return url.toString();
 }
 
-async function beginIntent(ctx: Ctx, redirectUri: string, name: string, args: Record<string, unknown>, requestId: string) {
+async function beginIntent(ctx: Ctx, redirectUri: string, installationId: string | null, requestId: string) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
   // UUID entropy belongs to the caller's stable command request; hashing binds
   // the state to this verified actor while allowing an unchanged retry.
   const state = sha256(`${requestId}:${ctx.userId}`);
   const url = authorizeUrl(state, redirectUri);
-  const result = await rpc<{ installation_id: string }>(ctx.db, name, { ...args, p_request_id: requestId, p_redirect_uri: redirectUri, p_state_hash: sha256(state) });
+  const name = installationId === null ? "begin_chat_installation" : "begin_chat_reauthorization";
+  const common = { p_brewery: ctx.breweryId, p_request_id: requestId, p_redirect_uri: redirectUri, p_state_hash: sha256(state) };
+  const result = await unwrap(installationId === null
+    ? ctx.db.rpc("begin_chat_installation", { ...common, p_provider: PROVIDER })
+    : ctx.db.rpc("begin_chat_reauthorization", { ...common, p_installation: installationId }));
+  if (!result) throw new CommandError(`${name} returned nothing`, 404);
   return { installationId: result.installation_id, authorizeUrl: url };
 }
 
 export function beginSlackInstall(ctx: Ctx, redirectUri: string, requestId: string = randomUUID()) {
-  return beginIntent(ctx, redirectUri, "begin_chat_installation", { p_brewery: ctx.breweryId, p_provider: PROVIDER }, requestId);
+  return beginIntent(ctx, redirectUri, null, requestId);
 }
 
 export function beginSlackReauthorization(ctx: Ctx, installationId: string, redirectUri: string, requestId: string = randomUUID()) {
-  return beginIntent(ctx, redirectUri, "begin_chat_reauthorization", { p_brewery: ctx.breweryId, p_installation: installationId }, requestId);
+  return beginIntent(ctx, redirectUri, installationId, requestId);
 }
 
 const sameScopes = (granted: readonly string[]) =>
@@ -82,11 +81,11 @@ const sameScopes = (granted: readonly string[]) =>
 
 // Exchange into memory, then activate the mapping before publishing credentials.
 // Rejected activation never touches another workspace owner’s SDK key.
-export async function completeSlackInstall(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
+export async function completeSlackInstall(db: SupabaseClient<Database>, request: Request, port: SlackOAuthPort, redirectUri: string) {
   return withChatLifecycleLock(() => completeSlackInstallLocked(db, request, port, redirectUri));
 }
 
-async function completeSlackInstallLocked(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
+async function completeSlackInstallLocked(db: SupabaseClient<Database>, request: Request, port: SlackOAuthPort, redirectUri: string) {
   const params = new URL(request.url).searchParams;
   if (params.get("error")) throw new CommandError("oauth cancelled", 400);
   const state = params.get("state");
@@ -113,7 +112,7 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   const granted = await port.handleOAuthCallback(request, { redirectUri });
   const externalId = granted.teamId;
   if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
-  const result = await rpc<{ installation_id: string; replayed: boolean }>(jobs, "activate_chat_installation", {
+  const result = await unwrap(jobs.rpc("activate_chat_installation", {
     p_installation: intent.installation_id,
     p_state_hash: sha256(state),
     p_redirect_uri: redirectUri,
@@ -123,7 +122,8 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
     p_token_store_key: `ignored:${externalId}`,
     p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
     p_actor: user.id,
-  });
+  }));
+  if (!result) throw new CommandError("activate_chat_installation returned nothing", 404);
   try {
     await granted.persist();
   } catch {
@@ -134,11 +134,11 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
 
 // Reconciler entry point for a partial install: the token exists but the MGR
 // row never activated. Runs with the service-role client from a job.
-export async function reconcileSlackInstall(db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
+export async function reconcileSlackInstall(db: SupabaseClient<Database>, installationId: string, port: SlackOAuthPort) {
   return withChatLifecycleLock(() => reconcileSlackInstallLocked(db, installationId, port));
 }
 
-async function reconcileSlackInstallLocked(_db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
+async function reconcileSlackInstallLocked(_db: SupabaseClient<Database>, installationId: string, port: SlackOAuthPort) {
   const r = await unwrap<{ state: string; external_installation_id: string } | null>(
     serviceClient().rpc("get_chat_installation_lifecycle", { p_installation: installationId }),
   );
@@ -162,6 +162,7 @@ async function reconcileSlackInstallLocked(_db: SupabaseClient, installationId: 
 // destinations, and action intents before the provider credential is touched.
 export async function disconnectSlackInstallation(ctx: Ctx, installationId: string, port: Pick<SlackOAuthPort, "deleteInstallation">, requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  await rpc(ctx.db, "disconnect_chat_installation", { p_brewery: ctx.breweryId, p_installation: installationId, p_request_id: requestId });
+  const disconnected = await unwrap(ctx.db.rpc("disconnect_chat_installation", { p_brewery: ctx.breweryId, p_installation: installationId, p_request_id: requestId }));
+  if (disconnected === null) throw new CommandError("disconnect_chat_installation returned nothing", 404);
   return cleanupChatInstallation(ctx, installationId, port);
 }

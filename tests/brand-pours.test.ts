@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { beforeAll, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedMaterial } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -43,6 +44,7 @@ it("allows each brand its own Pint, edits ounces, and binds replay to brand and 
   expect((await rpc({ p_name: "Pint", p_request_id: request, p_brand: other.id })).error).not.toBeNull();
   await expect(runCommand("upsert_format", input(), ctx)).rejects.toThrow();
   await expect(runCommand("upsert_format", { ...input(), brandId: other.id, ounces: 12 }, ctx)).resolves.toMatchObject({ brand_id: other.id, ounces: 12 });
+  assert(first.data !== null);
   await expect(runCommand("upsert_format", { ...input(), id: first.data.id, ounces: 14 }, ctx)).resolves.toMatchObject({ id: first.data.id, ounces: 14 });
   const foreign = await makeStaffCtx((await makeBrewery()).id);
   const foreignBrand = await runCommand("upsert_brand", { name: "Foreign" }, foreign) as { id: string };
@@ -65,6 +67,7 @@ it("keeps pours out of SKUs, components and BOM, including direct rows and conve
   expect(pour).toBeTruthy();
   const pack = await runCommand("upsert_format", { name: "Case", basis: "packaged" }, ctx) as { id: string };
   const materialId = await seedMaterial(ctx.breweryId, { name: "Tray", category: "packaging" });
+  assert(pour !== null);
   await expect(runCommand("create_sku", { brandId, formatId: pour.id }, ctx)).rejects.toThrow(/packaged/);
   for (const [formatId, childFormatId] of [[pack.id, pour.id], [pour.id, pack.id]]) {
     await expect(runCommand("replace_format_components", { formatId, components: [{ childFormatId, qty: 1 }] }, ctx)).rejects.toThrow(/packaged/);

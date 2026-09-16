@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env/public";
@@ -7,7 +8,7 @@ import { publicEnv } from "@/lib/env/public";
 // request uses the new token and the browser persists it.
 export async function proxy(req: NextRequest) {
   let res = NextResponse.next({ request: req });
-  const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const supabase = createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: (cookiesToSet, headers) => {

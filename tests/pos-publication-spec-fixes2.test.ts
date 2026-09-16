@@ -1,3 +1,4 @@
+import { squareUpsertSchema, type SquareUpsert } from "./provider-payloads";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
@@ -43,15 +44,15 @@ async function fixture(role: "admin" | "warehouse" = "admin") {
     merchantId: connection.data!.merchant_id as string, channel, addBrand };
 }
 
-const createResponse = (body: Record<string, any>, itemId: string) => {
-  const variations = body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+const createResponse = (body: SquareUpsert, itemId: string) => {
+  const variations = body.object.item_data.variations.map((variation, index) => ({
     ...variation, id: `${itemId}-V${index + 1}`, version: 2,
     item_variation_data: { ...variation.item_variation_data, item_id: itemId },
   }));
   return new Response(JSON.stringify({ catalog_object: { ...body.object, id: itemId, version: 2,
     item_data: { ...body.object.item_data, variations } }, id_mappings: [
     { client_object_id: body.object.id, object_id: itemId },
-    ...body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+    ...body.object.item_data.variations.map((variation, index) => ({
       client_object_id: variation.id, object_id: `${itemId}-V${index + 1}`,
     })),
   ] }), { status: 200 });
@@ -71,7 +72,7 @@ describe("Square publication residual specification fences", () => {
       insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,external_item_id,external_variation_id)
       values('${f.brewery.id}','${f.connectionId}','${owned.brandId}','poured','${owned.formatId}','OWNED-ITEM','OWNED-VAR')`);
 
-    const writes: Record<string, any>[] = [];
+    const writes: SquareUpsert[] = [];
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
       if (!init?.method) return new Response(JSON.stringify({ object: {
         type: "ITEM", id: "OWNED-ITEM", version: 5, present_at_all_locations: false,
@@ -81,10 +82,10 @@ describe("Square publication residual specification fences", () => {
             pricing_type: "FIXED_PRICING", price_money: { amount: 700, currency: "USD" } },
         }] },
       } }), { status: 200 });
-      const body = JSON.parse(String(init.body));
+      const body = squareUpsertSchema.parse(JSON.parse(String(init.body)));
       writes.push(body);
       return new Response(JSON.stringify({ catalog_object: { ...body.object, version: 6,
-        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation: Record<string, any>) => ({ ...variation, version: 5 })) } },
+        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation) => ({ ...variation, version: 5 })) } },
       id_mappings: [] }), { status: 200 });
     });
 
@@ -114,7 +115,7 @@ describe("Square publication residual specification fences", () => {
         type: "ITEM", id: "OLD-DISAPPEARED", version: 5, present_at_all_locations: false,
         present_at_location_ids: ["L1"], item_data: { name: "Disappeared", variations: [] },
       } }), { status: 200 });
-      const body = JSON.parse(String(init?.body)) as Record<string, any>;
+      const body = squareUpsertSchema.parse(JSON.parse(String(init?.body)));
       if (String(body.object.id).startsWith("#")) return createResponse(body, "ACTIVE-ITEM");
       return new Response(JSON.stringify({ catalog_object: { ...body.object, version: 6 }, id_mappings: [] }), { status: 200 });
     });
@@ -175,7 +176,7 @@ describe("Square publication residual specification fences", () => {
     const start = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: owned.brandId }, requestId, "publish_pos_item");
     expect(start.source.externalItemId).toBeNull();
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
-      createResponse(JSON.parse(String(init?.body)), "SELLER-B-ITEM"));
+      createResponse(squareUpsertSchema.parse(JSON.parse(String(init?.body))), "SELLER-B-ITEM"));
     await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: owned.brandId }, requestId,
       new SquareClient(config, fetch), "publish_pos_item")).resolves.toMatchObject({ externalItemId: "SELLER-B-ITEM" });
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -212,7 +213,7 @@ describe("Square publication residual specification fences", () => {
         where actor_id='${f.ctx.userId}' and request_id='${staleSync.requestId}'`)).toEqual(["2", "connection_changed"]);
 
     const provider = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) =>
-      createResponse(JSON.parse(String(init?.body)), "SAME-SELLER-ITEM-2"));
+      createResponse(squareUpsertSchema.parse(JSON.parse(String(init?.body))), "SAME-SELLER-ITEM-2"));
     await expect(publishSquareCatalogItem(f.ctx, { posLocationId: "L1", brandId: brand.brandId }, crypto.randomUUID(),
       new SquareClient(config, provider), "publish_pos_item")).resolves.toMatchObject({ externalItemId: "SAME-SELLER-ITEM-2" });
     expect(provider).toHaveBeenCalledTimes(1);

@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/api-command.test.ts — verifies typed command/query envelopes over POST /api/command.
 import { randomUUID } from "node:crypto";
 import { describe, it, expect, beforeAll, vi } from "vitest";
@@ -13,7 +14,7 @@ const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 async function signIn(email: string) {
-  const c = createClient(URL, ANON, { auth: { persistSession: false } });
+  const c = createClient<Database>(URL, ANON, { auth: { persistSession: false } });
   const { data, error } = await c.auth.signInWithPassword({ email, password: "test-password-1" });
   if (error || !data.session) throw error ?? new Error("no session");
   return data.session.access_token;
@@ -63,7 +64,6 @@ describe("POST /api/command bearer auth", () => {
       json: async () => ({ ok: true, data: { created: true }, requestId: randomUUID(), correlationId: randomUUID() }),
     });
     vi.stubGlobal("fetch", fetchMock);
-
     try {
       await expect(command("brewery-id", "upsert_brand", { name: "Pils" }, undefined, {
         actorId: "00000000-0000-4000-8000-000000000001",
@@ -194,7 +194,6 @@ describe("POST /api/command bearer auth", () => {
       requestId,
     }, adminToken));
     const json = await res.json();
-
     expect(res.status).toBe(200);
     expect(json).toMatchObject({ ok: true, requestId, correlationId: expect.any(String) });
     expect(json.correlationId).not.toBe(requestId);

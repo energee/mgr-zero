@@ -13,6 +13,7 @@
     "test:e2e:chat": "tsx tests-e2e/chat-previews.ts",
     "render:slack-manifest": "tsx scripts/render-slack-manifest.ts",
     "docs:api": "bun scripts/write-api-docs.ts",
+    "types:database": "bash scripts/generate-db-types.sh",
     "migrations:lock": "bun run scripts/lock-migrations.ts"
   },
   "dependencies": {

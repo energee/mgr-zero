@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/auth/request-context.ts — request-scoped Supabase identity and membership lookups shared by layouts and commands.
 import type { StaffRole } from "@/lib/commands/registry";
 import { cache } from "react";
@@ -33,11 +34,11 @@ type CustomerMembershipRow = {
   customers: { brewery_id: string; name: string };
 };
 
-type RequestClientFactory = (headers?: Record<string, string>) => Promise<SupabaseClient>;
+type RequestClientFactory = (headers?: Record<string, string>) => Promise<SupabaseClient<Database>>;
 
 export interface RequestAuthContext {
-  getSupabaseClient(): Promise<SupabaseClient>;
-  getScopedSupabaseClient(headers: Record<string, string>): Promise<SupabaseClient>;
+  getSupabaseClient(): Promise<SupabaseClient<Database>>;
+  getScopedSupabaseClient(headers: Record<string, string>): Promise<SupabaseClient<Database>>;
   getIdentity(): Promise<RequestIdentity | null>;
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
@@ -50,7 +51,7 @@ export interface RequestAuthContext {
  * Each resolver shares one client and one promise per lookup within this context.
  */
 export function createRequestAuthContext(createClient: RequestClientFactory = createServerClient): RequestAuthContext {
-  let client: Promise<SupabaseClient> | undefined;
+  let client: Promise<SupabaseClient<Database>> | undefined;
   let identity: Promise<RequestIdentity | null> | undefined;
   let staffMemberships: Promise<StaffMembership[]> | undefined;
   let customerMemberships: Promise<CustomerMembership[]> | undefined;

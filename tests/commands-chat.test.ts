@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -9,7 +11,8 @@ import { issueChatLinkProof } from "@/lib/chat/linking";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>, installation: string, delivery: string, occurrence: string, orderId: string;
 const externalUser = "U-ACTIONS";
-async function rpc(name: string, args: Record<string, unknown>) {
+type Functions = import("@/lib/supabase/database").Database["public"]["Functions"];
+async function rpc<Name extends keyof Functions>(name: Name, args: Functions[Name]["Args"]) {
   const r = await admin.rpc(name, args); if (r.error) throw r.error; return r.data;
 }
 async function intent(action: string, deliveryId: string | null = null) {
@@ -63,6 +66,7 @@ describe("chat integration state", () => {
     await runCommand("set_personal_quiet_hours", { start: "22:00", end: "08:00", timezone: "America/New_York" }, ctx);
     await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, ctx);
     const home = await rpc("get_chat_home_items", { p_installation: installation, p_external_user_id: externalUser });
+    assert(home !== null);
     expect(home.map((i: {id:string}) => i.id)).toContain(occurrence);
   });
   it("issues opaque ten-minute actor-bound one-time intents and replays the recorded result", async () => {
@@ -71,11 +75,13 @@ describe("chat integration state", () => {
     const row = (await admin.from("chat_action_intents").select().eq("id", token).single()).data!;
     expect(new Date(row.expires_at).getTime() - new Date(row.created_at).getTime()).toBe(600000);
     const r = await receipt(token, "mgr_mute_reason");
+    assert(r !== null);
     const args = { p_receipt: r.receipt_id, p_intent: token, p_action: "mgr_mute_reason", p_input: {} };
     const first = await rpc("consume_chat_action_intent", args);
     expect(first.disposition).toBe("processed");
     expect(await rpc("consume_chat_action_intent", args)).toEqual(first);
     const second = await receipt(token, "mgr_mute_reason");
+    assert(second !== null);
     expect((await rpc("consume_chat_action_intent", { ...args, p_receipt: second.receipt_id })).disposition).toBe("ignored");
   });
   it("rejects snooze after the source resolves before the scanner runs", async () => {
@@ -84,6 +90,7 @@ describe("chat integration state", () => {
     await admin.from("orders").update({status:"cancelled"}).eq("id",orderId);
     expect((await admin.from("notification_occurrences").select("state").eq("id",occurrence).single()).data?.state).toBe("active");
     const r=await receipt(token,"mgr_snooze");
+    assert(r !== null);
     expect((await rpc("consume_chat_action_intent",{p_receipt:r.receipt_id,p_intent:token,p_action:"mgr_snooze",p_input:{}})).disposition).toBe("ignored");
     await expect(runCommand("snooze_notification",{deliveryId:delivery,until:new Date(Date.now()+7200000).toISOString()},ctx)).rejects.toMatchObject({status:403});
     expect((await admin.from("notification_deliveries").select("next_attempt_at").eq("id",delivery).single()).data).toEqual(before);
@@ -94,6 +101,7 @@ describe("chat integration state", () => {
     const otherInstall = await ins("chat_installations", { brewery_id:b.id,provider:"slack",external_installation_id:b.id,display_label:"Other",state:"active",installer_user_id:other.userId,token_store_key:b.id });
     await ins("chat_user_links", {brewery_id:b.id,installation_id:otherInstall.id,provider:"slack",external_user_id:externalUser,user_id:other.userId,state:"active",linked_at:new Date().toISOString()});
     const r=await rpc("record_chat_callback_receipt",{p_provider:"slack",p_external_installation_id:b.id,p_callback_id:crypto.randomUUID(),p_callback_kind:"mgr_refresh",p_external_user_id:externalUser,p_payload_hash:token});
+    assert(r !== null);
     expect((await rpc("consume_chat_action_intent",{p_receipt:r.receipt_id,p_intent:token,p_action:"mgr_refresh",p_input:{}})).disposition).toBe("ignored");
     expect((await admin.from("chat_action_intents").select("consumed_at").eq("id",token).single()).data?.consumed_at).toBeNull();
   });
@@ -114,14 +122,17 @@ describe("chat integration state", () => {
   it("rejects foreign users, expired intents, removed membership and ordinary callers", async () => {
     const token = await intent("mgr_refresh");
     const wrong = await receipt(token, "mgr_refresh", "U-OTHER");
+    assert(wrong !== null);
     expect((await rpc("consume_chat_action_intent", { p_receipt: wrong.receipt_id, p_intent: token, p_action: "mgr_refresh", p_input: {} })).disposition).toBe("ignored");
     expect((await ctx.db.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: externalUser, p_action: "mgr_refresh", p_delivery: null })).error).not.toBeNull();
     await admin.from("chat_action_intents").update({ expires_at: new Date(0).toISOString() }).eq("id", token);
     const expired = await receipt(token, "mgr_refresh");
+    assert(expired !== null);
     expect((await rpc("consume_chat_action_intent", { p_receipt: expired.receipt_id, p_intent: token, p_action: "mgr_refresh", p_input: {} })).disposition).toBe("ignored");
     const removedToken = await intent("mgr_refresh");
     await admin.from("brewery_users").delete().eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
     const removed = await receipt(removedToken, "mgr_refresh");
+    assert(removed !== null);
     expect((await rpc("consume_chat_action_intent", { p_receipt: removed.receipt_id, p_intent: removedToken, p_action: "mgr_refresh", p_input: {} })).disposition).toBe("ignored");
     await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: ctx.userId, role: "admin" });
   });
@@ -145,7 +156,7 @@ describe("live Chat settings", () => {
     expect(await runCommand("get_brewery_operating_defaults", {}, ctx)).toMatchObject({ fermentation_reading_due_hours: 48 });
   });
   it("rejects arbitrary destinations through the direct authenticated RPC", async () => {
-    const r = await ctx.db.rpc("set_notification_destination", { p_installation: installation, p_external_destination_id: "C-PUBLIC" });
+    const r = await rawDatabase(ctx.db).rpc("set_notification_destination", { p_installation: installation, p_external_destination_id: "C-PUBLIC" });
     expect(r.error).not.toBeNull();
   });
   it("replays quiet hours without overwriting a newer change and rejects other selected breweries", async () => {
@@ -205,7 +216,7 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
       p_request_id: request, p_actor: ctx.userId, p_version: version,
     });
     expect(stale.error?.message).toMatch(/changed|validated/);
-    expect((await ctx.db.rpc("set_notification_destination", {
+    expect((await rawDatabase(ctx.db).rpc("set_notification_destination", {
       p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request, p_actor: ctx.userId, p_version: version,
     })).error?.code).toBe("42501");
     expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
@@ -291,6 +302,7 @@ it("replays a completed shared destination after replacing its installation with
     expect(before.data).toEqual([expect.objectContaining({ state: "blocked" })]);
     provider.mockClear();
     expect(await runCommand("set_notification_destination", input, owner, execution)).toEqual(result);
+    assert(replacement.data !== null);
     await expect(runCommand("set_notification_destination", { ...input, installationId: replacement.data.installation_id }, owner, execution)).rejects.toMatchObject({ status: 409, code: "conflict" });
     expect((await admin.from("notification_destinations").select().eq("installation_id", initial.id)).data).toEqual(before.data);
     expect((await admin.from("notification_destinations").select().eq("installation_id", replacement.data.installation_id)).data).toEqual([]);

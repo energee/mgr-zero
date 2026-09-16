@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 // tests/pricing.test.ts — the price grid: channel × group × format (spec 2026-09-07-mgr-pricing-grid-naming).
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, seedPriceGroup, channelId, makeCustomerUser, asUser } from "./helpers";
@@ -18,7 +19,7 @@ async function setCell(channel: string, group: string, cents: number) {
   return ctx.db.rpc("set_channel_price", { p_brewery: b.id, p_sale_channel: channel, p_price_group: group, p_format: cat.formatId, p_unit_price_cents: cents, p_request_id: crypto.randomUUID() });
 }
 
-const group_rpc = (p: Record<string, unknown>) => ctx.db.rpc("upsert_price_group", { p_brewery: b.id, p_id: null, p_cost_ceiling_cents: null, p_request_id: crypto.randomUUID(), ...p });
+const group_rpc = (p: Record<string, unknown>) => rawDatabase(ctx.db).rpc("upsert_price_group", { p_brewery: b.id, p_id: null, p_cost_ceiling_cents: null, p_request_id: crypto.randomUUID(), ...p });
 
 describe("price groups", () => {
   it("a group is unique by name and by position within a brewery", async () => {
@@ -103,7 +104,7 @@ describe("channel prices resolve one cell per channel × group × format", () =>
 
 describe("customers and orders carry the channel", () => {
   it("a customer needs a sale channel", async () => {
-    const { error } = await admin.from("customers").insert({ brewery_id: b.id, name: "NoChan", type: "retailer", state: "PA" });
+    const { error } = await rawDatabase(admin).from("customers").insert({ brewery_id: b.id, name: "NoChan", type: "retailer", state: "PA" });
     expect(error?.code).toBe("23502");
     // and the RPC says so in words rather than letting the not-null speak
     const rpc = await ctx.db.rpc("upsert_customer", {

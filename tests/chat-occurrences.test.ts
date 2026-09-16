@@ -1,3 +1,4 @@
+import { occurrenceSchema } from "@/lib/chat/contracts";
 // tests/chat-occurrences.test.ts — durable notification occurrences: atomic
 // submitted-order transition, catch-up scan idempotence, semantic keys,
 // recipient fan-out (roles, mutes, links), and resolved suppression (live DB).
@@ -140,7 +141,7 @@ it("keeps buyer question text and customer names in MGR while projecting safe in
   expect(occ).toMatchObject({ reason: "invoice_question", subject_type: "invoice", subject_id: question.id,
     payload: { safe_label: expect.stringMatching(/^INV-\d+$/), detail: "Buyer asked about this invoice", href: `/invoices/${invoice.id}` } });
   expect(JSON.stringify(occ.payload)).not.toMatch(/Private buyer|Bar/);
-  const rendered = renderSlackMessage(toNotification(occ), { intentId: "fixture", mgrBaseUrl: "https://mgr.test" });
+  const rendered = renderSlackMessage(toNotification(occurrenceSchema.parse(occ)), { intentId: "fixture", mgrBaseUrl: "https://mgr.test" });
   expect(JSON.stringify(rendered)).not.toMatch(/Private buyer|Bar/);
   expect(JSON.stringify(rendered)).toContain(`/invoices/${invoice.id}`);
   const home = await admin.rpc("get_chat_home_items", { p_installation: inst.id, p_external_user_id: `U-${sales.userId.slice(0, 8)}` });

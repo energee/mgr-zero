@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 // tests/chat-linking.test.ts — explicit Slack→staff linking: single-use hashed
 // proofs, installation/external-user binding, membership checks, customer
 // rejection, replay, unlink, and per-callback actor revalidation (live DB).
@@ -35,6 +36,7 @@ describe("staff linking", () => {
     expect(r.external_user_id).toBe("U100");
     expect(r.proof_hash).toBe(createHash("sha256").update(issued.proof).digest("hex"));
     expect(JSON.stringify(r)).not.toContain(issued.proof);
+    assert(r.proof_expires_at !== null);
     const ttl = new Date(r.proof_expires_at).getTime() - Date.now();
     expect(ttl).toBeGreaterThan(9 * 60_000);
     expect(ttl).toBeLessThanOrEqual(11 * 60_000);

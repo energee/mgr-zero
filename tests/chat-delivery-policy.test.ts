@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 // tests/chat-delivery-policy.test.ts — delivery policy: brewery/personal quiet
 // hours (incl. DST), 08:00/12:00 digest windows with missed-window recovery,
 // and bounded leasing with lease-token outcomes and crash recovery (live DB).
@@ -42,7 +43,7 @@ const scan = async (now: string) => {
 };
 const release = async (now: string, start: string | null, end: string | null, tz = "America/New_York") =>
   (await admin.rpc("chat_quiet_release", { p_now: now, p_start: start, p_end: end, p_tz: tz })).data as string;
-const iso = (v: string) => new Date(v).toISOString();
+const iso = (v: string | null) => { assert(v !== null); return new Date(v).toISOString(); };
 // Leasing clock sits a decade ahead: submittedOrder() queues deliveries at the
 // real now(), and lease_chat_deliveries only returns rows due at or before p_now.
 const lease = async (limit = 10, seconds = 60, now = "2036-09-05T14:00:00Z") => {
@@ -103,10 +104,13 @@ describe("quiet hours", () => {
       expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-05T02:00:00Z" }).eq("id", d.id)).error).toBeNull();
       const context = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
       expect(context.error).toBeNull();
+      assert(context.data !== null);
+      assert(user !== null);
       expect(iso(context.data.quiet_release_at)).toBe(byUser[user]);
       expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-06T16:00:00Z" }).eq("id", d.id)).error).toBeNull();
       const later = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
       expect(later.error).toBeNull();
+      assert(later.data !== null);
       expect(iso(later.data.quiet_release_at)).toBe("2026-09-06T16:00:00.000Z");
     }
     await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: null, end: null }, adminCtx);

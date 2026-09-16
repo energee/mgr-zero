@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 import { Client } from "pg";
 import { DB } from "./helpers";
 import { describe, expect, it } from "vitest";
@@ -21,6 +23,7 @@ describe("durable explicit taproom counts", () => {
     const f = await fixture();
     const snapshot = await f.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id });
     expect(snapshot.error).toBeNull();
+    assert(snapshot.data !== null);
     const input = { locationId: f.location.id, countedOn: f.day, revision: snapshot.data.revision,
       lines: [{ binId: f.location.binId, skuId: f.cat.skuId, lotId: null, qtyCounted: 7 }] };
     const saved = await runCommand("record_taproom_count", input, f.ctx) as { id: string; correction_eligible: boolean; lines: unknown[] };
@@ -147,6 +150,7 @@ it("7 remaining to 2 posts exactly -5, freezes tax and volume, and replays befor
   const channel = await admin.from("sale_channels").update({ tax_treatment: "research" }).eq("brewery_id", f.brewery.id).eq("name", "Taproom");
   expect(channel.error).toBeNull();
   const first = await f.ctx.db.rpc("record_taproom_count", input); expect(first.error).toBeNull();
+  assert(first.data !== null);
   expect(first.data.lines).toMatchObject([{ qty_before: 7, qty_counted: 2, bbl: -2.5 }]);
   const posted = await admin.from("inventory_movements").select("qty,bbl,type,lot_id,tax_treatment,dest_state,ref").eq("ref", first.data.id);
   expect(posted.data).toEqual([{ qty: -5, bbl: -2.5, type: "depletion", lot_id: null, tax_treatment: "research", dest_state: null, ref: first.data.id }]);
@@ -166,17 +170,22 @@ it("corrects the latest mistaken-low count with frozen compensating and replacem
   const input = await args(f); input.p_lines[0].qty_counted = 2;
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
   const root = rootResult.data;
+  assert(root !== null);
+  assert(root.lines[0].movement_id);
   const originalMovement = (await admin.from("inventory_movements").select("sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id").eq("id", root.lines[0].movement_id).single()).data!;
   const originalHeader = sql(`select to_jsonb(c)::text from public.taproom_counts c where id='${root.id}'`)[0];
   const originalLine = sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)[0];
   expect((await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId)).error).toBeNull();
+  assert(originalMovement.sale_channel_id);
   expect((await admin.from("sale_channels").update({ name: "Bar", tax_treatment: "research" }).eq("id", originalMovement.sale_channel_id)).error).toBeNull();
+
 
   const corrected = await runCommand("correct_taproom_count", {
     countId: root.id,
     corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }],
     reason: "Counted two unopened kegs as empty",
   }, adminCtx) as { root_id: string; effective_id: string; observed_at: string; corrected_at: string; corrected_by: string; lines: { qty_before: number; qty_counted: number; bbl: number | null }[] };
+
 
   expect(corrected).toMatchObject({
     root_id: root.id,
@@ -212,6 +221,7 @@ it("revalidates a committed correction when a root line is appended", async () =
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
   const root = rootResult.data;
   const ordinarySku = await seedCatalog(f.brewery.id, { product: "Ordinary root line", sku: "Ordinary root keg", packageType: "keg", bblPerUnit: .5 });
+  assert(root !== null);
   expect(() => insertFixture("taproom_count_lines", { brewery_id: f.brewery.id, count_id: root.id, location_id: f.location.id,
     bin_id: f.location.binId, sku_id: ordinarySku.skuId, qty_before: 0, qty_counted: 0 })).not.toThrow();
   const original = root.lines.find((line: { sku_id: string }) => line.sku_id === f.cat.skuId)!;
@@ -222,6 +232,7 @@ it("revalidates a committed correction when a root line is appended", async () =
   const client = new Client({ connectionString: DB }); await client.connect();
   try {
     await client.query("begin");
+    assert(root !== null);
     await client.query(`insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,qty_before,qty_counted)
       values($1,$2,$3,$4,$5,0,0)`, [f.brewery.id, root.id, f.location.id, f.location.binId, lateSku.skuId]);
     await expect(client.query("commit")).rejects.toThrow(/incomplete taproom correction graph/);
@@ -235,6 +246,7 @@ it("restores the recorded-before quantity with compensation only", async () => {
   const input = await args(f); input.p_lines[0].qty_counted = 2;
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
   const root = rootResult.data;
+  assert(root !== null);
   const corrected = await runCommand("correct_taproom_count", {
     countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 7 }], reason: "All seven kegs were present",
   }, adminCtx) as { effective_id: string; lines: { qty_counted: number; movement_id: string | null; bbl: number | null }[] };
@@ -255,6 +267,7 @@ it("copies every root line and counts an unchanged shortage exactly once", async
   input.p_lines.find(line => line.sku_id === other.skuId)!.qty_counted = 3;
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
   const root = rootResult.data;
+  assert(root !== null);
   const changed = root.lines.find((line: { sku_id: string }) => line.sku_id === f.cat.skuId)!;
   const corrected = await runCommand("correct_taproom_count", {
     countId: root.id, corrections: [{ lineId: changed.id, qtyCounted: 4 }], reason: "Found two full kegs",
@@ -298,7 +311,8 @@ it("uses a correction as the next baseline, posts it in the audit period, and le
     p_counted_on: snapshot.counted_on, p_revision: snapshot.revision,
     p_lines: snapshot.lines.map(row => ({ bin_id: row.bin_id, sku_id: row.sku_id, lot_id: row.lot_id, qty_counted: row.qty_before })),
     p_request_id: crypto.randomUUID() });
-  expect(next.error).toBeNull(); expect(next.data.prior_count_id).toBe(corrected.effective_id);
+  expect(next.error).toBeNull(); assert(next.data !== null);
+  expect(next.data.prior_count_id).toBe(corrected.effective_id);
   expect(new Date((await admin.from("taproom_counts").select("observed_at").eq("id", corrected.effective_id).single()).data!.observed_at).toISOString()).toBe(new Date(observed).toISOString());
 });
 
@@ -309,6 +323,7 @@ it("rejects invalid correction input, foreign provenance, later roots, and non-A
     return { f, root: saved.data, adminCtx: await makeStaffCtx(f.brewery.id, "admin") };
   };
   const { f, root, adminCtx } = await makeRoot(); const other = await makeRoot(); const before = state(f);
+  assert(root !== null); assert(other.root !== null);
   const bad = [
     [{ line_id: root.lines[0].id, qty_counted: 2 }],
     [{ line_id: root.lines[0].id, qty_counted: 1 }],
@@ -317,6 +332,7 @@ it("rejects invalid correction input, foreign provenance, later roots, and non-A
     [{ line_id: other.root.lines[0].id, qty_counted: 4 }],
   ];
   for (const p_corrections of bad) {
+    assert(root !== null);
     expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
       p_corrections, p_reason: "wrong", p_request_id: crypto.randomUUID() })).error).not.toBeNull();
     expect(state(f)).toEqual(before);
@@ -348,6 +364,7 @@ it("rejects invalid correction input, foreign provenance, later roots, and non-A
 it("replays exactly, rejects changed reuse and revoked Admin, and serializes two PostgreSQL corrections", async () => {
   const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin"); const input = await args(f); input.p_lines[0].qty_counted = 2;
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull(); const root = rootResult.data;
+  assert(root !== null);
   const correction = { countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }], reason: "Found two kegs" };
   const requestId = crypto.randomUUID(); const execution = { requestId, correlationId: crypto.randomUUID() };
   const first = await runCommand("correct_taproom_count", correction, adminCtx, execution);
@@ -366,6 +383,7 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
   const race = await fixture(); const racer = await makeStaffCtx(race.brewery.id, "admin"); const raceInput = await args(race); raceInput.p_lines[0].qty_counted = 2;
   const raceRootResult = await race.ctx.db.rpc("record_taproom_count", raceInput); expect(raceRootResult.error).toBeNull(); const raceRoot = raceRootResult.data;
   const a = new Client({ connectionString: DB }), b = new Client({ connectionString: DB }); await Promise.all([a.connect(), b.connect()]);
+  assert(raceRoot !== null);
   const values = [race.brewery.id, raceRoot.id, JSON.stringify([{ line_id: raceRoot.lines[0].id, qty_counted: 4 }]), "Found two kegs"];
   let pending: Promise<unknown> | undefined;
   try {
@@ -377,6 +395,7 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
     pending = b.query("select public.correct_taproom_count($1,$2,$3::jsonb,$4,$5)", [...values, crypto.randomUUID()]);
     await expect.poll(async () => (await a.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type).toBe("Lock");
     await a.query("commit"); await expect(pending).rejects.toThrow(/already corrected/);
+    assert(raceRoot !== null);
     expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", raceRoot.id)).data).toHaveLength(1);
   } finally { await a.query("rollback"); await b.query("rollback"); await Promise.all([a.end(), b.end()]); if (pending) await pending.catch(() => undefined); }
 });
@@ -384,6 +403,7 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
 it("rejects incomplete or corrupted correction graphs at transaction commit", async () => {
   const f = await fixture(); const input = await args(f); input.p_lines[0].qty_counted = 2;
   const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull(); const root = rootResult.data;
+  assert(root !== null);
   const rootLine = root.lines[0];
   const extraSku = await seedCatalog(f.brewery.id, { product: "Extra", sku: "Extra keg", packageType: "keg", bblPerUnit: .5 });
   const historical = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id,
@@ -395,6 +415,7 @@ it("rejects incomplete or corrupted correction graphs at transaction commit", as
     const client = new Client({ connectionString: DB }); await client.connect(); const correctionId = crypto.randomUUID();
     try {
       await client.query("begin");
+      assert(root !== null);
       await client.query(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,observed_at,prior_count_id,corrects_count_id,correction_reason)
         select $1,brewery_id,location_id,counted_on,$2,observed_at,prior_count_id,id,'bad graph' from public.taproom_counts where id=$3`,
         [correctionId, f.ctx.userId, root.id]);
@@ -427,6 +448,7 @@ it("rejects incomplete or corrupted correction graphs at transaction commit", as
   try {
     await nullReasonClient.query("begin");
     const transaction = (async () => {
+      assert(root !== null);
       await nullReasonClient.query(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,observed_at,prior_count_id,corrects_count_id,correction_reason)
         select $1,brewery_id,location_id,counted_on,$2,observed_at,prior_count_id,id,null from public.taproom_counts where id=$3`,
         [nullReasonCorrection, f.ctx.userId, root.id]);
@@ -484,6 +506,7 @@ it("A4/B2/NULL0 counts A3/B2/NULL0: only A loses one, no raw lot metadata", asyn
   const input = await args(f); expect(input.p_lines).toHaveLength(3);
   input.p_lines.find(l => l.lot_id === a)!.qty_counted = 3;
   const saved = await f.ctx.db.rpc("record_taproom_count", input); expect(saved.error).toBeNull();
+  assert(saved.data !== null);
   expect(saved.data.lines).toHaveLength(3);
   expect(saved.data.lines.map((line: { lot_id: string | null }) => line.lot_id)).toEqual([null, ...[a, b].sort()]);
   const movements = await admin.from("inventory_movements").select("qty,lot_id").eq("ref", saved.data.id);
@@ -500,6 +523,7 @@ it("untracked positive stock is a separate exact bucket", async () => {
   const f = await fixture(3); const tracked = await lot(f, "A"); await movement(f, 4, tracked);
   const input = await args(f); input.p_lines.find(l => l.lot_id === null)!.qty_counted = 1;
   const saved = await f.ctx.db.rpc("record_taproom_count", input); expect(saved.error).toBeNull();
+  assert(saved.data !== null);
   expect((await admin.from("inventory_movements").select("qty,lot_id").eq("ref", saved.data.id)).data).toEqual([{ qty: -2, lot_id: null }]);
   expect((await prepare(f)).lines.find(l => l.lot_id === tracked)?.qty_before).toBe(4);
 });
@@ -518,7 +542,7 @@ it("rejects every malformed or mismatched bucket atomically", async () => {
     ...[{ lot_id: foreignLot }, { lot_id: crypto.randomUUID() }, { bin_id: wh.binId }, { bin_id: foreign.location.binId },
       { sku_id: otherSku.skuId }, { sku_id: foreign.cat.skuId }, { lot_id: undefined }].map(change => [{ ...line, ...change }, input.p_lines[1]])];
   for (const p_lines of badLines) {
-    const result = await f.ctx.db.rpc("record_taproom_count", { ...input, p_request_id: crypto.randomUUID(), p_lines });
+    const result = await rawDatabase(f.ctx.db).rpc("record_taproom_count", { ...input, p_request_id: crypto.randomUUID(), p_lines });
     expect(result.error, JSON.stringify(p_lines)).not.toBeNull(); expect(state(f)).toEqual(before);
   }
   for (const p_location of [wh.id, foreign.location.id]) {
@@ -538,6 +562,7 @@ it("permits the next chronological current-day count, rejects same/earlier/futur
     expect((await f.ctx.db.rpc("record_taproom_count", { ...input, p_counted_on })).error).not.toBeNull(); expect(state(f)).toEqual(before);
   }
   const result = await f.ctx.db.rpc("record_taproom_count", input); expect(result.error).toBeNull();
+  assert(result.data !== null);
   expect(result.data.prior_count_id).toBe(prior.id);
   expect((await f.ctx.db.rpc("record_taproom_count", { ...await args(f), p_request_id: crypto.randomUUID() })).error?.message).toContain("already exists");
   expect((await f.ctx.db.rpc("record_taproom_count", input)).data).toEqual(result.data);
@@ -559,6 +584,7 @@ it("depletes after the taproom channel is renamed", async () => {
   const saved = await f.ctx.db.rpc("record_taproom_count", input);
   expect(saved.error).toBeNull();
   const channel = await admin.from("sale_channels").select("id").eq("brewery_id", f.brewery.id).eq("system_code", "taproom").single();
+  assert(saved.data !== null);
   const movements = await admin.from("inventory_movements").select("qty,sale_channel_id").eq("ref", saved.data.id);
   expect(movements.data).toEqual([{ qty: -5, sale_channel_id: channel.data!.id }]);
 });
@@ -618,6 +644,7 @@ it("waits for a real concurrent bin transfer, then refuses its stale observation
     };
     const saved = await f.ctx.db.rpc("record_taproom_count", refreshedInput);
     expect(saved.error).toBeNull();
+    assert(saved.data !== null);
     expect(saved.data.lines).toEqual(expect.arrayContaining([
       expect.objectContaining({ bin_id: f.location.binId, qty_before: 6, qty_counted: 5, bbl: -.5 }),
       expect.objectContaining({ bin_id: bin.id, qty_before: 1, qty_counted: 1, movement_id: null }),
@@ -638,11 +665,17 @@ it("uses all movements and all buckets beyond the API 1000-row ceiling", async (
     insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,qty,type,created_by)
     select '${f.brewery.id}','${f.cat.skuId}','${f.location.id}',id,1,'opening_balance','${f.ctx.userId}' from bins`);
   const input = await args(f); expect(input.p_lines).toHaveLength(1002);
-  const result = await f.ctx.db.rpc("record_taproom_count", input); expect(result.error).toBeNull(); expect(result.data.lines).toHaveLength(1002);
+  const result = await f.ctx.db.rpc("record_taproom_count", input); expect(result.error).toBeNull(); assert(result.data !== null);
+  expect(result.data.lines).toHaveLength(1002);
+
   const receipt = (await f.ctx.db.rpc("get_taproom_count", { p_brewery: f.brewery.id, p_count: result.data.id })).data;
+  assert(receipt !== null);
   expect(receipt.lines).toHaveLength(1002);
-  expect(receipt.lines.every((line: { bin_name?: string; sku_name?: string }) => line.bin_name && line.sku_name)).toBe(true);
-  expect(new Set(receipt.lines.map((line: { bin_name: string }) => line.bin_name)).size).toBe(1002);
+
+  expect(receipt.lines.every((line) => line.bin_name && line.sku_name)).toBe(true);
+
+  expect(new Set(receipt.lines.map((line) => line.bin_name)).size).toBe(1002);
+
   expect(await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx)).toMatchObject([
     { id: result.data.id, observations: 1002, movements: 0, depleted_units: 0 },
   ]);
@@ -650,11 +683,13 @@ it("uses all movements and all buckets beyond the API 1000-row ceiling", async (
 
 it("count tables are append-only with tenant-safe references and direct DML denied", async () => {
   const f = await fixture(), other = await fixture(); const result = await f.ctx.db.rpc("record_taproom_count", await args(f)); expect(result.error).toBeNull();
-  for (const client of [f.ctx.db, admin]) for (const table of ["taproom_counts", "taproom_count_lines"]) {
+  for (const client of [f.ctx.db, admin]) for (const table of ["taproom_counts", "taproom_count_lines"] as const) {
+    assert(result.data !== null);
     const id = table === "taproom_counts" ? result.data.id : result.data.lines[0].id;
-    expect((await client.from(table).update(table === "taproom_counts" ? { counted_on: f.day } : { qty_counted: 1 }).eq("id", id)).error?.code).toBe("42501");
+    expect((await rawDatabase(client).from(table).update(table === "taproom_counts" ? { counted_on: f.day } : { qty_counted: 1 }).eq("id", id)).error?.code).toBe("42501");
     expect((await client.from(table).delete().eq("id", id)).error?.code).toBe("42501");
   }
+  assert(result.data !== null);
   const movementId = result.data.lines[0].movement_id ?? (await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id).limit(1).single()).data!.id;
   for (const client of [f.ctx.db, admin]) {
     expect((await client.from("inventory_movements").update({ qty: 99 }).eq("id", movementId)).error?.code).toBe("42501");
@@ -664,7 +699,8 @@ it("count tables are append-only with tenant-safe references and direct DML deni
   expect((await f.ctx.db.from("taproom_counts").insert(row)).error?.code).toBe("42501");
   const foreignPrior = await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id });
   expect(() => insertFixture("taproom_counts", { ...row, prior_count_id: foreignPrior.id })).toThrow(/SQLSTATE 23503/);
-  const line = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
+
+  const line: Partial<typeof result.data.lines[number]> = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
   delete line.effective_line_id;
   delete line.bin_name; delete line.sku_name;
   expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow(/SQLSTATE 23503/);

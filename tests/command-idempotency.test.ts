@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/command-idempotency.test.ts — verifies durable request replay at the database API boundary.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -5,7 +6,7 @@ import { admin, asUser, makeBrewery, makeStaff, seedCatalog, seedLocation } from
 
 let breweryId: string;
 let staffUserId: string;
-let staffDb: SupabaseClient;
+let staffDb: SupabaseClient<Database>;
 let skuId: string;
 let locationId: string;
 let binId: string;
@@ -41,7 +42,6 @@ describe("command request idempotency", () => {
     const mismatch = await staffDb.rpc("upsert_brand", {
       p_brewery: breweryId, p_name: "Different", p_id: null, p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId,
     });
-
     expect(first.error).toBeNull();
     expect(mismatch.error).not.toBeNull();
     expect(mismatch.error!.message).toMatch(/request id.*different payload/i);
@@ -101,7 +101,7 @@ describe("command request idempotency", () => {
       p_location: locationId,
       p_bin: binId,
       p_qty: 2,
-      p_type: "opening_balance",
+      p_type: "opening_balance" as const,
       p_sale_channel: null,
       p_dest_state: null,
       p_note: note,

@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/not-found.test.ts — a missing or malformed record id is a 404/400
 // CommandError, never a raw PostgREST message (docs/audits 2026-09-05, findings
 // 1–3): get_* and portal_order commands, and the
@@ -46,7 +47,7 @@ describe("ctxForBearer", () => {
   it("surfaces a membership-query database failure as 500 db_error, not 403 not_member", async () => {
     const failure = { data: null, error: { code: "57P01", message: "terminating connection due to administrator command" } };
     const chain = { select: () => chain, eq: () => chain, limit: () => Promise.resolve(failure), maybeSingle: () => Promise.resolve(failure) };
-    const db = { from: () => chain } as unknown as SupabaseClient;
+    const db = { from: () => chain } as unknown as SupabaseClient<Database>;
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(ctxForBearer(db, "user", NIL)).rejects.toMatchObject({ status: 500, code: "db_error" });
     log.mockRestore();

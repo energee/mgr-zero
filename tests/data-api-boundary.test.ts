@@ -1,10 +1,12 @@
+import { rawDatabase } from "./raw-database";
+import type { Database } from "@/lib/supabase/database";
 // tests/data-api-boundary.test.ts — proves authenticated callers use narrow RPCs, not table DML.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, asUser, channelId, makeBrewery, makeStaff, seedPriceGroup } from "./helpers";
 
 let breweryId: string;
-let staffDb: SupabaseClient;
+let staffDb: SupabaseClient<Database>;
 
 beforeAll(async () => {
   const brewery = await makeBrewery();
@@ -121,7 +123,7 @@ describe("Data API mutation boundary", () => {
   });
 
   it("denies anonymous and private helper calls while allowing named writes", async () => {
-    const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
+    const anon = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
     const { error: anonymousError } = await anon.rpc("upsert_brand", {
       p_brewery: breweryId,
       p_name: "Anonymous",
@@ -134,7 +136,7 @@ describe("Data API mutation boundary", () => {
       p_hops: null,
       p_request_id: crypto.randomUUID(),
     });
-    const { error: privateError } = await staffDb.rpc("claim_command_request", {
+    const { error: privateError } = await rawDatabase(staffDb).rpc("claim_command_request", {
       p_request_id: crypto.randomUUID(),
       p_payload: {},
     });

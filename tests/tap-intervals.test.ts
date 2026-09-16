@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 import { Client } from "pg";
 import { expect, it } from "vitest";
 import { DB, admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
@@ -25,7 +27,8 @@ it("opens packaged kegs with frozen nominal volume, stock flag, optional repeata
   await ins("inventory_movements", { brewery_id: f.brewery.id, sku_id: f.cat.skuId, location_id: f.location.id, bin_id: f.location.binId, qty: 2, type: "opening_balance", created_by: f.ctx.userId });
   for (const opening_fill of [.25,.5,.6,1]) {
     const r = await f.ctx.db.rpc("tap_keg", { ...input(f), p_tap_number: "1", p_opening_fill: opening_fill });
-    expect(r.error).toBeNull(); expect(r.data.not_in_inventory).toBe(false);
+    expect(r.error).toBeNull(); assert(r.data !== null);
+    expect(r.data.not_in_inventory).toBe(false);
   }
   expect((await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId)).error).toBeNull();
   expect((await f.ctx.db.rpc("tap_keg", i)).data).toEqual(first.data);
@@ -35,8 +38,11 @@ it("opens packaged kegs with frozen nominal volume, stock flag, optional repeata
 });
 
 it("atomically swaps, defaults own SKU, replays frozen identity after later close and rejects changed payload", async () => {
-  const f = await fixture(), a = await open(f), i = swap(f,a.id);
+  const f = await fixture(), a = await open(f);
+  assert(a !== null);
+  const i = swap(f, a.id);
   const b = await f.ctx.db.rpc("swap_keg", i); expect(b.error).toBeNull();
+  assert(b.data !== null);
   expect(b.data.outgoing).toMatchObject({ id: a.id, closed_by: f.ctx.userId, closing_fill: 0 });
   expect(b.data.incoming.sku_id).toBe(f.cat.skuId);
   expect((await f.ctx.db.rpc("swap_keg", swap(f,b.data.incoming.id))).error).toBeNull();
@@ -50,6 +56,7 @@ it("atomically swaps, defaults own SKU, replays frozen identity after later clos
 it("validates incoming identity after closing within the transaction, with no partial close or claimed request", async () => {
   const f = await fixture(), foreign = await fixture(), a = await open(f), before = state(f), effects = fingerprint(f);
   for (const change of [{ p_sku: foreign.cat.skuId }, { p_sku: crypto.randomUUID() }, { p_label: "ambiguous" }, { p_opening_fill: .75 }, { p_nominal_bbl: .5 }]) {
+    assert(a !== null);
     expect((await f.ctx.db.rpc("swap_keg", { ...swap(f,a.id), ...change })).error).not.toBeNull();
     expect(state(f)).toEqual(before); expect(fingerprint(f)).toEqual(effects);
     expect((await admin.from("tap_intervals").select("closed_at").eq("id",a.id).single()).data?.closed_at).toBeNull();
@@ -61,16 +68,18 @@ it("guests require explicit label and finite size, and never fabricate a SKU", a
   const i = { ...input(f), p_sku: null, p_label: "Guest cider", p_nominal_bbl: .5 };
   const a = await f.ctx.db.rpc("tap_keg", i); expect(a.error).toBeNull();
   expect(a.data).toMatchObject({ sku_id: null, label: "Guest cider", nominal_bbl: .5, not_in_inventory: true });
+  assert(a.data !== null);
   expect((await f.ctx.db.rpc("swap_keg", swap(f,a.data.id))).error).not.toBeNull();
   expect((await f.ctx.db.rpc("swap_keg", { ...swap(f,a.data.id), p_label: "Next guest", p_nominal_bbl: .25 })).error).toBeNull();
   for (const change of [{ p_label: null }, { p_label: " " }, { p_nominal_bbl: 0 }, { p_nominal_bbl: "NaN" }, { p_nominal_bbl: "Infinity" }]) {
-    expect((await f.ctx.db.rpc("tap_keg", { ...i, ...change, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+    expect((await rawDatabase(f.ctx.db).rpc("tap_keg", { ...i, ...change, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
   }
 });
 
 it("serializes two swaps and kick versus swap: exactly one close and at most one incoming", async () => {
-  for (const rival of ["swap_keg", "kick_keg"]) {
+  for (const rival of ["swap_keg", "kick_keg"] as const) {
     const f = await fixture(), a = await open(f);
+    assert(a !== null);
     const results = await Promise.all([f.ctx.db.rpc("swap_keg", swap(f,a.id)), f.ctx.db.rpc(rival, rival === "swap_keg" ? swap(f,a.id) : close(f,a.id))]);
     expect(results.filter(r => !r.error)).toHaveLength(1); expect(results.filter(r => r.error?.code === "MG409")).toHaveLength(1);
     const rows = await admin.from("tap_intervals").select("id,closed_at").eq("brewery_id",f.brewery.id);
@@ -85,21 +94,25 @@ it("rejects foreign locations, nonkeg SKUs, invalid fills and direct DML, preser
   const before = state(f);
   for (const change of [{ p_location: other.location.id }, { p_location: warehouse.id }, { p_sku: can.skuId }, { p_sku: "bad" }, { p_opening_fill: 0 }, { p_opening_fill: null }, { p_sku: other.cat.skuId }, { p_nominal_bbl: .25 }])
     expect((await f.ctx.db.rpc("tap_keg", { ...input(f), ...change })).error).not.toBeNull();
+  assert(a !== null);
   for (const p_closing_fill of [.6,1,.75,null]) expect((await f.ctx.db.rpc("kick_keg", { ...close(f,a.id), p_closing_fill })).error).not.toBeNull();
   expect((await other.ctx.db.rpc("kick_keg", close(f,a.id))).error?.code).toBe("42501");
   expect((await other.ctx.db.rpc("kick_keg", { ...close(other,a.id) })).error).not.toBeNull();
   for (const role of ["sales","brewer"] as const) {
     const ctx = await makeStaffCtx(f.brewery.id,role);
     expect((await ctx.db.rpc("tap_keg",input(f))).error?.code).toBe("42501");
+    assert(a !== null);
     expect((await ctx.db.rpc("kick_keg",close(f,a.id))).error?.code).toBe("42501");
     expect((await ctx.db.rpc("list_open_taps",{ p_brewery: f.brewery.id,p_location:f.location.id })).error?.code).toBe("42501");
   }
   for (const role of ["admin","warehouse"] as const) {
     const ctx = await makeStaffCtx(f.brewery.id,role);
     const r = await ctx.db.rpc("tap_keg",input(f)); expect(r.error).toBeNull();
+    assert(r.data !== null);
     expect((await ctx.db.rpc("kick_keg",close(f,r.data.id))).error).toBeNull();
   }
-  expect((await f.ctx.db.from("tap_intervals").insert({})).error?.code).toBe("42501");
+  expect((await rawDatabase(f.ctx.db).from("tap_intervals").insert({})).error?.code).toBe("42501");
+
   expect((await f.ctx.db.from("tap_intervals").update({ label: "bad" }).eq("id",a.id)).error?.code).toBe("42501");
   expect((await f.ctx.db.from("tap_intervals").delete().eq("id",a.id)).error?.code).toBe("42501");
   expect(before).toEqual(["1:0:1"]);
@@ -137,15 +150,16 @@ it("rechecks role before successful replay and canonicalizes UUIDs and trimmed i
 
 
 it("competing swap and kick connections wait for the outgoing row and cannot close it twice", async () => {
-  for (const operation of ["swap_keg", "kick_keg"]) {
+  for (const operation of ["swap_keg", "kick_keg"] as const) {
   const f = await fixture(), a = await open(f), client = new Client({ connectionString: DB });
   await client.connect(); let pending: PromiseLike<unknown> | undefined;
   try {
     await client.query("begin");
     await client.query("select set_config('request.jwt.claim.sub',$1,true)", [f.ctx.userId]);
     await client.query("set local role authenticated");
-    const b = await client.query("select public.swap_keg($1,$2,0,'Empty',null,null,null,null,1,$3) result", [f.brewery.id,a.id,crypto.randomUUID()]);
-    const rival = f.ctx.db.rpc(operation,operation === "swap_keg" ? swap(f,a.id) : close(f,a.id)).then(r => r); pending = rival;
+    assert(a !== null);
+      const b = await client.query("select public.swap_keg($1,$2,0,'Empty',null,null,null,null,1,$3) result", [f.brewery.id,a.id,crypto.randomUUID()]);
+      const rival = f.ctx.db.rpc(operation,operation === "swap_keg" ? swap(f,a.id) : close(f,a.id)).then(r => r); pending = rival;
     let waiting = false;
     for (let i=0;i<100;i++) {
       const locks = sql("select 1 from pg_locks where locktype='transactionid' and not granted");
@@ -175,7 +189,8 @@ it("freezes the format version committed before its opening lock, not a stale pr
       await new Promise(resolve=>setTimeout(resolve,10));
     }
     expect(waiting).toBe(true); await client.query("commit");
-    const result=await opening; expect(result.error).toBeNull(); expect(result.data.nominal_bbl).toBe(.25);
+    const result=await opening; expect(result.error).toBeNull(); assert(result.data !== null);
+    expect(result.data.nominal_bbl).toBe(.25);
     expect((await admin.from("formats").update({bbl_per_unit:.5}).eq("id",f.cat.formatId)).error).toBeNull();
     expect((await admin.from("tap_intervals").select("nominal_bbl").eq("id",result.data.id).single()).data?.nominal_bbl).toBe(.25);
   } finally { await client.query("rollback"); await client.end(); if(pending) await pending; }
@@ -186,10 +201,13 @@ it("freezes the authoritative composed packaged keg volume too", async () => {
   const child = await ins("formats",{brewery_id:f.brewery.id,name:"Keg component",basis:"packaged",package_type:"keg",bbl_per_unit:.25});
   expect((await admin.from("formats").update({bbl_per_unit:null}).eq("id",f.cat.formatId)).error).toBeNull();
   await ins("format_components",{brewery_id:f.brewery.id,parent_format_id:f.cat.formatId,child_format_id:child.id,qty:2});
-  const a=await open(f); expect(a.nominal_bbl).toBe(.5);
+  const a=await open(f); assert(a !== null);
+  expect(a.nominal_bbl).toBe(.5);
   expect((await admin.from("formats").update({bbl_per_unit:.5}).eq("id",child.id)).error).toBeNull();
   expect((await admin.from("tap_intervals").select("nominal_bbl").eq("id",a.id).single()).data?.nominal_bbl).toBe(.5);
-  expect((await open(f)).nominal_bbl).toBe(1);
+  const next = await open(f);
+  assert(next !== null);
+  expect(next.nominal_bbl).toBe(1);
 });
 
 it("tenant foreign keys reject foreign locations and SKUs even through fixture inserts", async () => {

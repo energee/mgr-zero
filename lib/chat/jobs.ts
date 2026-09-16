@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/chat/jobs.ts — the chat internal-job owner: the only module outside
 // lib/commands/invites.ts allowed to construct the service-role client
 // (ARCHITECTURE.md iron rule 4, explicit allowlist). It serves provider
@@ -11,15 +12,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
-import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
+import { assertPortableNotification, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
 import { chatStatePool, chatLifecycleClient } from "./state";
 import { SlackTransport, classifySlackError } from "./slack-transport";
 import { slackClientFor, slackPrivateChannels } from "./slack-adapter";
 
-let client: SupabaseClient | undefined;
-export function serviceClient(): SupabaseClient {
+let client: SupabaseClient<Database> | undefined;
+export function serviceClient(): SupabaseClient<Database> {
   client ??= createAdminClient();
   return client;
 }
@@ -60,12 +61,8 @@ export async function recordSlackCallback(rawBody: string): Promise<{ receiptId:
 
 // ---------------------------------------------------------------- worker orchestration
 
-type Occurrence = {
-  id: string; reason: NotificationReason; state: string; subject_type: PortableNotification["subject"]["type"]; subject_id: string;
-  urgency: "normal" | "attention"; due_at: string | null; semantic_key: string;
-  payload: { safe_label: string; detail: string; href: string; recipient_roles: string[]; assigned_user_id: string | null; window?: string };
-};
-type DeliveryContext = {
+export type { Occurrence } from "./contracts";
+export type DeliveryContext = {
   delivery: { id: string; state: string; attempt_count: number; provider_conversation_id: string | null; provider_message_id: string | null; resolved_at: string | null };
   occurrence: Occurrence;
   destination: { id: string; kind: "personal" | "private_channel"; external_destination_id: string; state: string; user_id: string | null };
@@ -79,7 +76,7 @@ type DeliveryContext = {
   quiet_release_at: string | null;
 };
 type Lease = { id: string; occurrence_id: string; destination_id: string; installation_id: string; provider: string; lease_expires_at: string; attempt_count: number };
-type Deps = { db?: SupabaseClient; transport?: ChatProviderTransport; now?: Date };
+type Deps = { db?: SupabaseClient<Database>; transport?: ChatProviderTransport; now?: Date };
 
 const TITLE: Record<NotificationReason, string> = {
   submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
@@ -274,7 +271,7 @@ export async function consumeSlackInteraction(p: SlackInteraction) {
   const action = p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id;
   const token = p.type === "view_submission" ? p.view?.private_metadata : p.actions![0].value;
   // Invalid metadata cannot reach a UUID cast or an error message containing provider input.
-  const intent = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token ?? "") ? token : null;
+  const intent = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token ?? "") ? token ?? null : null;
   const values = p.view?.state?.values ?? {};
   const field = (name: string) => values[name]?.[name]?.selected_option?.value ?? values[name]?.[name]?.value ?? "";
   const input = action === "mgr_save_preferences" ? {
@@ -285,7 +282,7 @@ export async function consumeSlackInteraction(p: SlackInteraction) {
   })) as { disposition: string; code?: string; intentId?: string; quietHours?: { start: string | null; end: string | null; timezone: string | null } };
 }
 
-async function homeIntents(db: SupabaseClient, installationId: string, externalUserId: string) {
+async function homeIntents(db: SupabaseClient<Database>, installationId: string, externalUserId: string) {
   const issued = await Promise.all(["mgr_preferences", "mgr_refresh", "mgr_unlink"].map(async (action) => {
     const id = await unwrap(db.rpc("issue_chat_action_intent", { p_installation: installationId, p_external_user_id: externalUserId, p_action: action, p_delivery: null }));
     return [action, id] as const;

@@ -37,9 +37,9 @@ describe("portal order deposit adjustments", () => {
   it("accepts a configured zero deposit through submit, adjustment, replay, and invoice", async () => {
     const quote = await runCommand("portal_quote_order", {
       shipToId: f.customer.shipToId, lines: [{ skuId: f.zeroDeposit.skuId, qty: 2 }],
-    }, f.portalCtx) as any;
+    }, f.portalCtx) as import("@/lib/mgr/review-order-view").PortalQuote;
     expect(quote.depositCents).toBe(0);
-    const submittedOrder = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, f.portalCtx) as any;
+    const submittedOrder = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, f.portalCtx) as { order_id: string };
     const orderId = submittedOrder.order_id as string;
     await runCommand("confirm_order", { orderId }, f.adminCtx);
     expect(await deposits(orderId)).toEqual([]);
@@ -119,8 +119,8 @@ async function setup() {
 }
 
 async function submitted(f: Awaited<ReturnType<typeof setup>>) {
-  const quote = await runCommand("portal_quote_order", { shipToId: f.customer.shipToId, lines: [{ skuId: f.first.skuId, qty: 2 }] }, f.portalCtx) as any;
-  const result = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, f.portalCtx) as any;
+  const quote = await runCommand("portal_quote_order", { shipToId: f.customer.shipToId, lines: [{ skuId: f.first.skuId, qty: 2 }] }, f.portalCtx) as import("@/lib/mgr/review-order-view").PortalQuote;
+  const result = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, f.portalCtx) as { order_id: string };
   await runCommand("confirm_order", { orderId: result.order_id }, f.adminCtx);
   return result.order_id as string;
 }
@@ -128,17 +128,17 @@ async function submitted(f: Awaited<ReturnType<typeof setup>>) {
 async function deposits(orderId: string) {
   const rows = await admin.from("order_deposit_lines").select("qty_ordered,unit_price_cents,order_lines!inner(sku_id)").eq("order_id", orderId).order("order_line_id");
   expect(rows.error).toBeNull();
-  return (rows.data ?? []).map((row: any) => ({ sku_id: row.order_lines.sku_id, qty_ordered: Number(row.qty_ordered), unit_price_cents: row.unit_price_cents })).sort((a, b) => a.sku_id.localeCompare(b.sku_id));
+  return (rows.data ?? []).map((row) => ({ sku_id: row.order_lines.sku_id, qty_ordered: Number(row.qty_ordered), unit_price_cents: row.unit_price_cents })).sort((a, b) => a.sku_id.localeCompare(b.sku_id));
 }
 
 async function ship(f: Awaited<ReturnType<typeof setup>>, orderId: string, timing: "now" | "on_delivery") {
   const lines = (await admin.from("order_lines").select("id,qty_ordered").eq("order_id", orderId)).data!;
   await runCommand("record_pick", { orderId, picks: lines.map(line => ({ lineId: line.id, qty: Number(line.qty_ordered) })) }, f.adminCtx);
-  const shipped = await runCommand("ship_order", { orderId, invoiceTiming: timing, ship: lines.map(line => ({ lineId: line.id, qty: Number(line.qty_ordered) })) }, f.adminCtx) as any;
+  const shipped = await runCommand("ship_order", { orderId, invoiceTiming: timing, ship: lines.map(line => ({ lineId: line.id, qty: Number(line.qty_ordered) })) }, f.adminCtx) as { invoice_id: string | null };
   if (timing === "now") return shipped.invoice_id as string;
   const shipment = (await admin.from("shipments").select("id").eq("order_id", orderId).single()).data!;
-  const route = await runCommand("save_route", { deliveryDate: "2026-10-20", driverUserId: f.adminCtx.userId, stops: [{ shipmentId: shipment.id, stopNo: 1 }] }, f.adminCtx) as any;
+  const route = await runCommand("save_route", { deliveryDate: "2026-10-20", driverUserId: f.adminCtx.userId, stops: [{ shipmentId: shipment.id, stopNo: 1 }] }, f.adminCtx) as { routeId: string };
   await runCommand("depart_route", { routeId: route.routeId }, f.adminCtx);
   const delivery = (await admin.from("deliveries").select("id").eq("route_id", route.routeId).single()).data!;
-  return ((await runCommand("confirm_delivery", { deliveryId: delivery.id, signedBy: "Buyer" }, f.adminCtx)) as any).invoice_id as string;
+  return ((await runCommand("confirm_delivery", { deliveryId: delivery.id, signedBy: "Buyer" }, f.adminCtx)) as { invoice_id: string | null }).invoice_id as string;
 }

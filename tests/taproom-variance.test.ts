@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 import { expect, it } from "vitest";
 import { makeBrewery, makeStaffCtx, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -145,7 +146,7 @@ it("mapped lines survive unmapped order siblings, ignored is explicit, line UID 
   await ins("pos_item_mappings", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "pretzel", ignored: true });
   expect(reconcile(f, pretzel.id)).toBe("false");
   expect((await report(f)).periods.at(-1)?.unmapped_lines).toBe(1);
-  const revision = await admin.from("pos_sales").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id, external_order_id: order, external_line_id: "line", external_item_id: "pint", external_location_id: "L", sold_at: stamp(f, -10), qty: 248, source_version: "2" }).select("id").single();
+  const revision = await admin.from("pos_sales").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id, external_order_id: order, external_line_id: "line", external_item_id: "pint", external_location_id: "L", sold_at: stamp(f, -10), qty: 248, source_version: 2 }).select("id").single();
   expect(revision.error).toBeNull();
   reconcile(f, revision.data!.id);
   expect((await report(f)).rows[0].expected_bbl).toBe(1);
@@ -213,11 +214,11 @@ it("rejects foreign source, format and location ownership, unauthorized reads an
   expect((await f.ctx.db.rpc("get_taproom_variance", { p_brewery: g.brewery.id, p_location: g.location.id, p_weeks: 4 })).error?.code).toBe("42501");
   for (const p_location of [g.location.id, (await seedLocation(f.brewery.id, { name: "Warehouse" })).id]) expect((await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location, p_weeks: 4 })).error).not.toBeNull();
   for (const p_weeks of [0, 5, 13, null]) expect((await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location: f.location.id, p_weeks })).error).not.toBeNull();
-  for (const table of ["pos_sale_expectations", "pos_sales_coverage"]) {
+  for (const table of ["pos_sale_expectations", "pos_sales_coverage"] as const) {
     expect((await admin.from(table).select("*").eq("brewery_id", f.brewery.id)).data?.length).toBeGreaterThan(0);
     expect((await g.ctx.db.from(table).select("*").eq("brewery_id", f.brewery.id)).data).toEqual([]);
     expect((await f.ctx.db.from(table).select("*").eq("brewery_id", f.brewery.id)).data).toEqual([]);
-    expect((await f.ctx.db.from(table).insert({ brewery_id: f.brewery.id })).error?.code).toBe("42501");
+    expect((await rawDatabase(f.ctx.db).from(table).insert({ brewery_id: f.brewery.id })).error?.code).toBe("42501");
     expect((await f.ctx.db.from(table).delete().eq("brewery_id", f.brewery.id)).error?.code).toBe("42501");
   }
   expect((await admin.from("pos_item_mappings").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "foreign", format_id: g.pour.id })).error?.code).toBe("23503");

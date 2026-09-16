@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 // tests/stock-transfers.test.ts — a stock transfer is a document between two
 // locations (spec 2026-09-06 Decision 3), never a third order kind; a move
 // inside one location is move_stock_bin and writes no document.
@@ -191,6 +192,7 @@ it("direct RPCs reject fractional empty kegs at move, draft, pick and receive bo
   expect((await ctx.db.rpc("create_stock_transfer", draft)).error).not.toBeNull();
   const created = await ctx.db.rpc("create_stock_transfer", { ...draft, p_lines: [{ ...line, qty: 2 }] });
   expect(created.error).toBeNull();
+  assert(created.data !== null);
   const transferId = created.data.transfer_id;
   await runCommand("submit_stock_transfer", { transferId }, ctx);
   const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();

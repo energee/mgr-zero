@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getCommandDefinition, runCommand, type Ctx } from "@/lib/commands/registry";
@@ -91,7 +92,7 @@ describe("scoped composer history and provenance", () => {
 
   it("denies application roles direct access to preview and history tables", async () => {
     for (const table of ["command_previews", "chat_conversations", "chat_messages"]) {
-      const result = await owner.db.schema("private").from(table).select("*");
+      const result = await rawDatabase(owner.db).schema("private").from(table).select("*");
       expect(result.error, table).not.toBeNull();
     }
   });

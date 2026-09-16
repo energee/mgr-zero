@@ -35,10 +35,10 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   const subject = brand ? { id: brand.id, name: brand.name } : null;
   const actions = subject
     ? Object.fromEntries([
-      ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} />]),
-      ...(compliance?.registrations ?? []).map((registration) => [registration.id, <RegistrationForm key={`${registration.id}-${registration.registration_no}-${registration.expires_on}`} brand={subject} registration={registration} />]),
+      ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} />] as const),
+      ...(compliance?.registrations ?? []).map((registration) => [registration.id, <RegistrationForm key={`${registration.id}-${registration.registration_no}-${registration.expires_on}`} brand={subject} registration={registration} />] as const),
     ])
-    : Object.fromEntries(model.compliance.map((row) => [row.key, null]));
+    : Object.fromEntries(model.compliance.map((row) => [row.key, null] as const));
   const addCompliance = subject
     ? <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>
     : E.info("Save the brand first, then record its COLA and state registrations here.");

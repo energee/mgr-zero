@@ -253,6 +253,7 @@ defineQuery({
   handler: async (ctx, i) => {
     const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, city, state)")
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
+    if (!order) throw new CommandError("Order not found", 404, "not_found");
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),

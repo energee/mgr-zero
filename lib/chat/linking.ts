@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/chat/linking.ts — explicit Slack user → MGR staff linking. The App Home
 // handler issues an opaque single-use proof (only its sha256 is stored) and a
 // deep link the person completes while authenticated in MGR; every provider
@@ -19,7 +20,7 @@ export type ResolvedChatActor = {
   role: StaffRole;
 };
 
-export async function issueChatLinkProof(db: SupabaseClient, installationId: string, externalUserId: string) {
+export async function issueChatLinkProof(db: SupabaseClient<Database>, installationId: string, externalUserId: string) {
   const base = process.env.APP_URL;
   if (!base) throw new CommandError("APP_URL is not configured", 500);
   const proof = randomBytes(32).toString("base64url");
@@ -31,7 +32,7 @@ export async function issueChatLinkProof(db: SupabaseClient, installationId: str
 }
 
 export async function resolveChatActor(
-  db: SupabaseClient,
+  db: SupabaseClient<Database>,
   provider: "slack",
   installationExternalId: string,
   externalUserId: string,

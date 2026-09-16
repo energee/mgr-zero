@@ -49,7 +49,7 @@ describe("frozen tax treatment on movements", () => {
     binId = loc.binId;
   });
 
-  async function removal(channel: string, opts: { destState?: string | null; type?: string } = {}) {
+  async function removal(channel: string, opts: { destState?: string | null; type?: import("@/lib/supabase/database").Database["public"]["Enums"]["movement_type"] } = {}) {
     const { data, error } = await ctx.db.rpc("record_inventory_movement", {
       p_brewery: breweryId, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: -1,
       p_type: opts.type ?? "sale_removal", p_sale_channel: channel,

@@ -1,8 +1,9 @@
+import type { Database } from "@/lib/supabase/database";
 import { beforeAll, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { admin, asUser, sql } from "./helpers";
-const request = vi.hoisted(() => ({ db: undefined as SupabaseClient | undefined }));
+const request = vi.hoisted(() => ({ db: undefined as SupabaseClient<Database> | undefined }));
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => request.db }));
 import { buildContext, buildContextFromBearer } from "@/lib/commands/context";
 import { canRun, defineQuery, runCommand } from "@/lib/commands/registry";
