@@ -130,30 +130,59 @@ defineCommand({
 // `record_repack` insists on. A parent whose format has several component rows,
 // or no child SKU in its brand, comes back with `child: null` so the sheet can
 // say why the button is withheld rather than offering a repack the RPC refuses.
+export type RepackComponent = { parent_format_id: string; child_format_id: string; qty: number };
+export type RepackSku = {
+  id: string; name: string; brand_id: string; format_id: string;
+  brands: { name: string } | null; formats: { name: string } | null;
+  format_volume: { bbl_per_unit: number | null } | null;
+};
+export type RepackParent = {
+  id: string; label: string; unit: string; bblPerUnit: number;
+  child: { skuId: string; unit: string; quantity: number } | null;
+};
+
+// The pure shaping behind `list_repack_parents`, kept out of the handler so it
+// can be proven without a database (tests/audit-quality-fixes.test.ts).
+//
+// A parent SKU with no `format_volumes` row has an *unknown* barrel volume, not
+// a zero one: coercing it to 0 bbl would quietly tell the Repack sheet that
+// breaking a case moves no beer. Such a SKU cannot be repacked, so it is
+// withheld from the list entirely rather than offered with a false volume.
+export function shapeRepackParents(components: RepackComponent[], skus: RepackSku[]): RepackParent[] {
+  if (components.length === 0) return [];
+  const byParent = new Map<string, RepackComponent[]>();
+  for (const c of components) byParent.set(c.parent_format_id, [...(byParent.get(c.parent_format_id) ?? []), c]);
+  const byBrandFormat = new Map(skus.map((s) => [`${s.brand_id}:${s.format_id}`, s]));
+  const parents: RepackParent[] = [];
+  for (const s of skus) {
+    const rows = byParent.get(s.format_id);
+    if (!rows) continue;
+    // `Number(null)` is 0, so the absent value is rejected before coercion;
+    // the coercion itself stays because PostgREST may hand back `numeric` as a string.
+    const raw = s.format_volume?.bbl_per_unit;
+    const bblPerUnit = raw === null || raw === undefined ? NaN : Number(raw);
+    if (!Number.isFinite(bblPerUnit)) continue;
+    const child = rows.length === 1 ? byBrandFormat.get(`${s.brand_id}:${rows[0].child_format_id}`) : undefined;
+    parents.push({
+      id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name, unit: s.formats?.name ?? "", bblPerUnit,
+      child: child ? { skuId: child.id, unit: child.formats?.name ?? child.name, quantity: Number(rows[0].qty) } : null,
+    });
+  }
+  return parents;
+}
+
 defineQuery({
   name: "list_repack_parents",
   description: "Composed SKUs a repack can break, each with the one component SKU (same brand, the format's single component row) it breaks into and how many per unit; child is null when the composition has no single row",
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {
-    type Component = { parent_format_id: string; child_format_id: string; qty: number };
-    type Sku = { id: string; name: string; brand_id: string; format_id: string; brands: { name: string } | null; formats: { name: string } | null; format_volume: { bbl_per_unit: number | null } | null };
     // ponytail: capped, not paged — a brewery's composed formats are a handful; page like list_skus if a catalog ever nears 1000 component rows.
-    const components = (await unwrap(ctx.db.from("format_components").select("parent_format_id, child_format_id, qty").eq("brewery_id", ctx.breweryId).limit(1000)) ?? []) as Component[];
+    const components = (await unwrap(ctx.db.from("format_components").select("parent_format_id, child_format_id, qty").eq("brewery_id", ctx.breweryId).limit(1000)) ?? []) as RepackComponent[];
     if (components.length === 0) return [];
-    const byParent = new Map<string, Component[]>();
-    for (const c of components) byParent.set(c.parent_format_id, [...(byParent.get(c.parent_format_id) ?? []), c]);
     const formatIds = [...new Set(components.flatMap((c) => [c.parent_format_id, c.child_format_id]))];
     const skus = (await unwrap(ctx.db.from("skus").select("id, name, brand_id, format_id, brands(name), formats(name), format_volume:format_volumes(bbl_per_unit)")
-      .eq("brewery_id", ctx.breweryId).eq("active", true).in("format_id", formatIds).order("name").limit(1000)) ?? []) as unknown as Sku[];
-    const byBrandFormat = new Map(skus.map((s) => [`${s.brand_id}:${s.format_id}`, s]));
-    return skus.filter((s) => byParent.has(s.format_id)).map((s) => {
-      const rows = byParent.get(s.format_id)!;
-      const child = rows.length === 1 ? byBrandFormat.get(`${s.brand_id}:${rows[0].child_format_id}`) : undefined;
-      return {
-        id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name, unit: s.formats?.name ?? "", bblPerUnit: Number(s.format_volume?.bbl_per_unit ?? 0),
-        child: child ? { skuId: child.id, unit: child.formats?.name ?? child.name, quantity: Number(rows[0].qty) } : null,
-      };
-    });
+      .eq("brewery_id", ctx.breweryId).eq("active", true).in("format_id", formatIds).order("name").limit(1000)) ?? []) as unknown as RepackSku[];
+    return shapeRepackParents(components, skus);
   },
 });
 

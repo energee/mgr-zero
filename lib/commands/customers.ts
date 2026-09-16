@@ -78,8 +78,8 @@ defineQuery({
   roles: ["admin", "sales", "warehouse"],
   input: z.object({ customerId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const customer = await unwrap(ctx.db.from("customers").select("*, sale_channels(name)").eq("id", i.customerId).single());
-    const shipTos = await unwrap(ctx.db.from("ship_tos").select().eq("customer_id", i.customerId).order("label"));
+    const customer = await unwrap(ctx.db.from("customers").select("*, sale_channels(name)").eq("brewery_id", ctx.breweryId).eq("id", i.customerId).single());
+    const shipTos = await unwrap(ctx.db.from("ship_tos").select().eq("brewery_id", ctx.breweryId).eq("customer_id", i.customerId).order("label"));
     return { customer, shipTos };
   },
 });

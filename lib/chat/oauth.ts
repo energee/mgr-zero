@@ -126,7 +126,9 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   });
   try {
     await granted.persist();
-  } catch {
+  } catch (error) {
+    // Name and message only — the cause never carries a token into the log.
+    console.error("chat credential store failed:", error instanceof Error ? `${error.name}: ${error.message}` : "unknown");
     return failChatCredentialStore(intent.installation_id);
   }
   return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
