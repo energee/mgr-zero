@@ -60,3 +60,14 @@ No identified backup exists (checklist, Database and deploy 1). Pre-migration ba
 2. **Preview target: reuse `ugzhwxzictzvrzlacjmv`** (us-west-2). Vercel Preview gets that project's keys; Production keeps `uogrvqmrbmolvtftotsf`.
 3. **Auth SMTP: Resend**, via the Vercel Marketplace integration.
 4. **RPC advisor: accepted as designed.** The 171 `authenticated`-executable functions are the command layer; each enforces brewery membership internally (`.agents/ARCHITECTURE.md`). No narrowing.
+
+## Actions taken 2026-09-18 (after the decisions)
+
+| Action | Result | Boundary |
+| --- | --- | --- |
+| Vercel Preview repointed to `ugzhwxzictzvrzlacjmv` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `CHAT_STATE_DATABASE_URL` set for Preview only; `mgr_chat_sdk` password rotated on that project. Project already at migration `20260920100000`, so no schema push. Redeployed preview `mgr-zero-21ofwb05w` built Ready and serves `/login` | Verified by `vercel env pull --environment=preview` and a 200 on `/login`; not an authenticated smoke |
+| Incident: production vars deleted and restored | `vercel env rm NAME preview` removed the whole record for the four names above because each targeted both environments. Restored within minutes from the Supabase management API; the production `mgr_chat_sdk` password was rotated because the old value was unrecoverable. The live production deployment keeps its baked-in env; the next production deploy picks up the rotated chat credential | Production `/login` returned 200 before and after. Chat delivery, if any installation were active, would use the old password until redeploy |
+| Resend installed via Vercel Marketplace | Blocked on terms acceptance: `https://vercel.com/mgr8/~/integrations/accept-terms/resend?source=cli`, then rerun `vercel integration add resend/resend-email --non-interactive --no-claim`. Resend also requires a verified sending domain before it will deliver to invitees; the app has no custom domain yet | No Supabase Auth SMTP fields set |
+| Advisor acceptance recorded | Decision 4 above | — |
+
+Still open: production-branch restriction (dashboard), pre-migration backup and restorer, SMTP fields once Resend has a domain, leaked-password protection, Auth `disable_signup`, #329 hosted retest, J01/J02/J06 fresh retests on the release SHA.
