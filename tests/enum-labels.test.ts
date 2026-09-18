@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 import { sentenceCase, importKindLabel } from "@/lib/mgr/labels";
 import { MOVEMENT_KIND_OPTIONS } from "@/lib/mgr/record-movement-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
-import { channelTreatmentLabel } from "@/lib/mgr/sale-channels-view";
-import { treatmentLabel, TAX_TREATMENTS } from "@/app/(app)/settings/channels/tax-treatments";
+import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { IMPORT_KINDS } from "@/lib/import-csv";
 
 describe("sentenceCase", () => {
@@ -40,10 +39,9 @@ describe("movement reasons", () => {
 
 describe("tax treatments", () => {
   it("labels every treatment in sentence case", () => {
-    expect(TAX_TREATMENTS.map(treatmentLabel)).toEqual([
+    expect(TAX_TREATMENTS.map(sentenceCase)).toEqual([
       "Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond",
     ]);
-    expect(channelTreatmentLabel("vessel_supplies")).toBe("Vessel supplies");
   });
 });
 

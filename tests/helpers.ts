@@ -57,10 +57,14 @@ export async function makeStaffCtx(breweryId: string, role: StaffRole = "admin")
 
 // psql against the test database for pg_catalog assertions (schema-* tests):
 // present on dev machines via libpq and on ubuntu-latest CI. DATABASE_URL comes
-// from .env.test.local (scripts/test-db.sh → the mgr_test stack on 54352);
-// the fallback is CI's single fresh stack. `quiet` drops psql's own chatter.
+// from .env.test.local (scripts/test-db.sh → the mgr_test stack on 54352), and
+// CI sets the same port on its single fresh stack. The fallback therefore names
+// 54352 too: the dev stack (54342) must never be reachable from a test, because
+// the suites here truncate and reseed whatever they connect to
+// (scripts/test-env.mjs enforces the same isolation for the app credentials).
+// `quiet` drops psql's own chatter.
 export const TEST_DB_PORT = 54352;
-export const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+export const DB = process.env.DATABASE_URL ?? `postgresql://postgres:postgres@127.0.0.1:${TEST_DB_PORT}/postgres`;
 export function sql(q: string, quiet = false, errorVerbosity: "default" | "sqlstate" = "default"): string[] {
   const verbosity = errorVerbosity === "sqlstate" ? ["-v", "VERBOSITY=sqlstate"] : [];
   const transaction = /^\s*begin\s*;/i.test(q) ? [] : ["--single-transaction"];

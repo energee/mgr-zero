@@ -732,7 +732,10 @@ export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Pro
   const { data, error } = await createAdminClient().rpc("read_portal_qbo_payment", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
   }).maybeSingle();
-  if (error || !isPortalPaymentRow(data)) return null;
+  // A database error is not "no payment claim": surface it like the sibling reads above,
+  // and keep null for a row whose shape says there is nothing to charge.
+  if (error) throw new Error("invoice payment is unavailable");
+  if (!isPortalPaymentRow(data)) return null;
   return {
     accessToken: data.access_token, refreshToken: data.refresh_token,
     credentialVersion: data.credential_version, connectionId: data.connection_id,

@@ -11,7 +11,8 @@ import { buildContext, isUuid } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import "@/lib/commands/all";
-import { dollars, SIZE_LABEL } from "../../keg-labels";
+import { money } from "@/lib/mgr/money";
+import { SIZE_LABEL } from "../../keg-labels";
 
 type Balance = { rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; deposit_cents: number }[]; kegs_out: number; deposit_cents: number };
 
@@ -29,12 +30,12 @@ export default async function CustomerKegBalancePage({ params }: { params: Promi
         backHref: "/kegs",
         customer: customer.name,
         kegs: `${balance.kegs_out} kegs`,
-        deposits: `${dollars(balance.deposit_cents)} deposits held`,
+        deposits: `${money(balance.deposit_cents)} deposits held`,
         rows: balance.rows.map((r) => ({
           key: `${r.pool_id}-${r.keg_size}`,
           title: `${r.pool_name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size}`,
           detail: `${r.kegs_out} out`,
-          trailing: dollars(r.deposit_cents),
+          trailing: money(r.deposit_cents),
         })),
       })}
       footer={<Link href={`/kegs/history?customer=${customerId}`}>{E.nav("Keg event history", "this customer's events")}</Link>}

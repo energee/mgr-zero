@@ -1,5 +1,6 @@
 // lib/mgr/shipment-done-view.ts — view-model for Shipment done (post-commit).
 import { docNo } from "./doc-no";
+import { saleVolume } from "@/lib/volume";
 
 export type ShipmentDoneViewModel = {
   backTo: string;
@@ -28,10 +29,6 @@ export type ShipmentDoneSnapshot = {
     skus: { name: string } | null;
   }[];
 };
-
-function saleVolume(qty: number, bblPerUnit: number | undefined) {
-  return bblPerUnit === undefined ? "" : `${(qty * bblPerUnit).toFixed(2)} bbl`;
-}
 
 /** Map get_order + get_invoice onto ShipmentDoneView. */
 export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, invoiceTiming }: ShipmentDoneSnapshot): ShipmentDoneViewModel {

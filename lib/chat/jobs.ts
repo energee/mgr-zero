@@ -147,7 +147,12 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
       }
       await done("processed"); processed++;
     } catch (e) {
-      await done("failed", classifySlackError(e).code).catch(() => undefined); failed++;
+      const classified = classifySlackError(e);
+      console.error(`chat callback receipt ${r.id} failed (${classified.code}):`, e instanceof Error ? e.message : e);
+      await done("failed", classified.code).catch((completionError) => {
+        console.error(`chat callback receipt ${r.id} could not be marked failed:`, completionError instanceof Error ? completionError.message : completionError);
+      });
+      failed++;
     }
   }
   return { processed, failed };
@@ -388,5 +393,5 @@ export async function withChatLifecycleLock<T>(work: () => Promise<T>): Promise<
     await connection.query("rollback").catch(() => undefined);
     if ((error as { code?: string }).code === "55P03") throw new CommandError("Another Slack connection change is in progress. Try again.", 503);
     throw error;
-  } finally { await connection.end(); }
+  } finally { await connection.end().catch(() => undefined); }
 }

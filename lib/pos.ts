@@ -635,7 +635,16 @@ export async function completeSquareOAuth(input: {
     tokens = await input.client.exchange(code);
     const locations = await input.client.listLocations(tokens.accessToken, tokens.merchantId);
     return await input.store.complete(claim.intentId, input.actorId, tokens, locations);
-  } catch {
+  } catch (error) {
+    // Why the callback fell through is the only way to tell a provider outage
+    // apart from a storage failure after a credential was already issued — the
+    // recovery branches below look identical from the outside. Name and status
+    // only: the caught value can carry a response body, and `tokens` is in scope.
+    console.error("square oauth callback failed:", {
+      name: (error as { name?: unknown })?.name ?? typeof error,
+      status: (error as { status?: unknown })?.status ?? null,
+      tokenIssued: tokens !== null,
+    });
     if (!tokens) {
       await input.store.fail(claim.intentId, input.actorId, "not_required", null).catch(() => undefined);
     } else {

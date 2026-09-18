@@ -12,23 +12,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { KEG_POOL_KINDS } from "@/lib/commands/taproom";
+import { dollarsInput } from "@/lib/mgr/money";
+import { KEG_POOL_KINDS } from "@/lib/mgr/enums";
 import { KIND_LABEL } from "./keg-labels";
 
 type Kind = (typeof KEG_POOL_KINDS)[number];
 export type Pool = { id: string; name: string; kind: Kind; per_fill_cents: number | null; deposit_cents: number; active: boolean };
 
-const toDollars = (cents: number | null | undefined) => (cents == null ? "" : (cents / 100).toFixed(2));
 const toCents = (s: string) => (s === "" ? undefined : Math.round(Number(s) * 100));
 
 export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string | null }; vendors: { id: string; name: string }[] }) {
   const [name, setName] = useState(pool?.name ?? "");
   const [kind, setKind] = useState<Kind>(pool?.kind ?? "owned");
   const [vendorId, setVendorId] = useState(pool?.vendor_id ?? "");
-  const [perFill, setPerFill] = useState(toDollars(pool?.per_fill_cents));
-  const [deposit, setDeposit] = useState(toDollars(pool?.deposit_cents ?? 0));
+  const [perFill, setPerFill] = useState(dollarsInput(pool?.per_fill_cents));
+  const [deposit, setDeposit] = useState(dollarsInput(pool?.deposit_cents ?? 0));
   const [active, setActive] = useState(pool?.active ?? true);
-  const reset = () => { setName(pool?.name ?? ""); setKind(pool?.kind ?? "owned"); setVendorId(pool?.vendor_id ?? ""); setPerFill(toDollars(pool?.per_fill_cents)); setDeposit(toDollars(pool?.deposit_cents ?? 0)); setActive(pool?.active ?? true); };
+  const reset = () => { setName(pool?.name ?? ""); setKind(pool?.kind ?? "owned"); setVendorId(pool?.vendor_id ?? ""); setPerFill(dollarsInput(pool?.per_fill_cents)); setDeposit(dollarsInput(pool?.deposit_cents ?? 0)); setActive(pool?.active ?? true); };
   const form = useCommandForm(pool ? "update_keg_pool" : "create_keg_pool", {
     build: () => (pool
       ? { poolId: pool.id, name, vendorId: vendorId || undefined, perFillCents: toCents(perFill), depositCents: toCents(deposit), active }

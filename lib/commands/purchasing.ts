@@ -232,7 +232,7 @@ defineQuery({
   handler: async (ctx, i) => {
     const [po, lines, balances, receipts] = await Promise.all([
       unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
-      unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("po_id", i.poId)),
+      unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("brewery_id", ctx.breweryId).eq("po_id", i.poId)),
       unwrap(ctx.db.from("po_open_balances").select("po_line_id, qty_received, qty_open").eq("po_id", i.poId)),
       unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id)").eq("po_id", i.poId).order("received_on")),
     ]);

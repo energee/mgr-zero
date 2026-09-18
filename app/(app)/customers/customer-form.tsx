@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { TAX_TREATMENTS, treatmentLabel, type TaxTreatment } from "@/app/(app)/settings/channels/tax-treatments";
+import { sentenceCase } from "@/lib/mgr/labels";
+import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
 
@@ -125,7 +126,7 @@ export function CustomerForm({
             <Label htmlFor="customer-terms">Payment terms</Label>
             <Input id="customer-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="net30" />
           </div>
-          {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: treatmentLabel(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? treatmentLabel(taxTreatment) : "Inherit sale channel" })}
+          {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>

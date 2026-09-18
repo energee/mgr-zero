@@ -28,11 +28,8 @@ export type SaleChannelsSnapshot = {
   }[];
 };
 
-/** "vessel_supplies" → "Vessel supplies"; matches tax-treatments.treatmentLabel. */
-export const channelTreatmentLabel = sentenceCase;
-
 function detail(c: SaleChannelsSnapshot["channels"][number]): string {
-  const label = channelTreatmentLabel(c.tax_treatment);
+  const label = sentenceCase(c.tax_treatment);
   return c.movements != null ? `${label} · ${plural(c.movements, "movement")}` : label;
 }
 

@@ -67,3 +67,4 @@ next-env.d.ts
 # supabase CLI scratch in the test stack workdir
 /tests/supabase/supabase/.branches/
 /tests/supabase/supabase/.temp/
+.ecc/
