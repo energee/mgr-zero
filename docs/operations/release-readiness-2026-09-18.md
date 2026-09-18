@@ -54,9 +54,20 @@ No identified backup exists (checklist, Database and deploy 1). Pre-migration ba
 
 - [#329](https://github.com/energee/mgr-zero/issues/329) Ask MGR: PR #400 merged; authenticated hosted retest still owed.
 
-## Decisions still required from Ted
+## Decisions (Ted, 2026-09-18)
 
-1. Pilot scope across J01–J07 (unchanged from 2026-09-14).
-2. Preview target: reuse `ugzhwxzictzvrzlacjmv` or provision new. Either way, new keys for Preview.
-3. SMTP provider for Auth email.
-4. Accept or narrow the 171 authenticated-executable RPCs.
+1. **Pilot scope: J01 ordering, J02 picked-order adjustment, J06 recovery.** J03 production recall, J04 taproom, J05 delivery, and J07 tap-board review are deferred from the pilot. Deferral does not touch stock, money, tenancy, auth, or recovery truth.
+2. **Preview target: reuse `ugzhwxzictzvrzlacjmv`** (us-west-2). Vercel Preview gets that project's keys; Production keeps `uogrvqmrbmolvtftotsf`.
+3. **Auth SMTP: Resend**, via the Vercel Marketplace integration.
+4. **RPC advisor: accepted as designed.** The 171 `authenticated`-executable functions are the command layer; each enforces brewery membership internally (`.agents/ARCHITECTURE.md`). No narrowing.
+
+## Actions taken 2026-09-18 (after the decisions)
+
+| Action | Result | Boundary |
+| --- | --- | --- |
+| Vercel Preview repointed to `ugzhwxzictzvrzlacjmv` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `CHAT_STATE_DATABASE_URL` set for Preview only; `mgr_chat_sdk` password rotated on that project. Project already at migration `20260920100000`, so no schema push. Redeployed preview `mgr-zero-21ofwb05w` built Ready and serves `/login` | Verified by `vercel env pull --environment=preview` and a 200 on `/login`; not an authenticated smoke |
+| Incident: production vars deleted and restored | `vercel env rm NAME preview` removed the whole record for the four names above because each targeted both environments. Restored within minutes from the Supabase management API; the production `mgr_chat_sdk` password was rotated because the old value was unrecoverable. The live production deployment keeps its baked-in env; the next production deploy picks up the rotated chat credential | Production `/login` returned 200 before and after. Chat delivery, if any installation were active, would use the old password until redeploy |
+| Resend via Vercel Marketplace | Terms accepted (installation `icfg_dV2IDkDMg1JTxRZhFLMuVlb6`); provisioning requires `-m domain=<owned domain> -m region=us-east-1`. **Parked**: no product domain exists yet. Supabase default sender stays (2 emails/hour), which caps staff invites | No resource provisioned, no Auth SMTP fields set. Reopen when a domain is chosen |
+| Advisor acceptance recorded | Decision 4 above | — |
+
+Still open: a sending domain, then `vercel integration add resend/resend-email -m domain=… -m region=us-east-1` and the four Auth SMTP fields; production-branch restriction (dashboard); pre-migration backup and restorer; leaked-password protection, Auth `disable_signup`, #329 hosted retest, J01/J02/J06 fresh retests on the release SHA.
