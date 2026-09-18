@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Gitignored local checkouts and remember-plugin scratch — not app source.
     ".agents/worktrees/**",
+    ".local/**",
     ".remember/**",
   ]),
   {
