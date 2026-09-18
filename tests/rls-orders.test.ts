@@ -7,7 +7,7 @@ let staff1: { id: string; email: string }, staff2: { id: string; email: string }
 let customer: { id: string }, custUser: { id: string; email: string };
 // An order carries its customer's sale channel (not null since the price grid).
 let saleChannelId: string;
-let order: { id: string; ship_to_id: string };
+let order: { id: string; ship_to_id: string | null };
 let whId: string;
 
 beforeAll(async () => {
@@ -55,7 +55,7 @@ describe("order_events", () => {
     // can reject it is RLS (42501), not an unrelated CHECK/NOT NULL.
     const { error: orderInsert } = await db.from("orders").insert({
       brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: order.ship_to_id,
-      from_location_id: whId, created_by: custUser.id,
+      from_location_id: whId, sale_channel_id: saleChannelId, created_by: custUser.id,
     });
     expect(orderInsert?.code).toBe("42501");
     // No UPDATE grant for app roles: a permission error, not a silent no-op.

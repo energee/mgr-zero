@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
@@ -6,9 +7,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
 /** Every staff role: the `roles` of a read that all of staff may run. */
 export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer", "taproom"];
-export type PreTenantCtx = { db: SupabaseClient; userId: string; breweryId: null; role: null };
+export type PreTenantCtx = { db: SupabaseClient<Database>; userId: string; breweryId: null; role: null };
 export type OperationCtx = Ctx | PreTenantCtx;
-export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
+export type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */
 export type OperationKind = "query" | "command";

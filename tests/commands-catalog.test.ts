@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/commands-catalog.test.ts — catalog commands must use the idempotent database API.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -5,8 +6,8 @@ import { makeBrewery, makeStaffCtx, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
-let adminCtx: { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
-let salesCtx: { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
+let adminCtx: { db: SupabaseClient<Database>; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
+let salesCtx: { db: SupabaseClient<Database>; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
 
 beforeAll(async () => {
   const brewery = await makeBrewery();

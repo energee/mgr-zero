@@ -1,3 +1,5 @@
+import type { Database } from "@/lib/supabase/database";
+import { assert } from "vitest";
 import { describe, it, expect, beforeAll } from "vitest";
 import { makeBrewery, makeStaffCtx, admin, seedCustomer, sql } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
@@ -121,14 +123,14 @@ describe("durable invitations", () => {
     expect(link.searchParams.get("audience")).toBe(kind);
 
     const token_hash = link.searchParams.get("token_hash")!;
-    const recipient = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
+    const recipient = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
     const verified = await recipient.auth.verifyOtp({ token_hash, type: "invite" });
     expect(verified.error).toBeNull();
     const auth = createRequestAuthContext(() => Promise.resolve(recipient));
     expect(await inviteLanding(auth, kind)).toMatchObject({ audience: kind });
     expect(await inviteLanding(auth, kind === "staff" ? "customer" : "staff")).toBeFalsy();
 
-    const reused = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
+    const reused = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
     expect((await reused.auth.verifyOtp({ token_hash, type: "invite" })).error).not.toBeNull();
   });
   it("concurrent first attempts produce one account and membership", async () => {
@@ -148,6 +150,7 @@ describe("durable invitations", () => {
     const ex = execution(), address = email();
     const { data: claim, error } = await ctx.db.rpc("claim_invite_request", { p_brewery: ctx.breweryId, p_email: address, p_kind: "staff", p_role: "sales", p_customer: null, p_request_id: ex.requestId });
     expect(error).toBeNull();
+    assert(claim !== null);
     const created = await admin.auth.admin.createUser({ email: address, password: "test-password-1", email_confirm: true, user_metadata: { mgr_invite_token: claim.authToken } });
     expect(created.error).toBeNull();
     expect(sql(`select auth_user_id is null from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["t"]);

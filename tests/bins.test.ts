@@ -1,3 +1,5 @@
+import type { Database } from "@/lib/supabase/database";
+import { rawDatabase } from "./raw-database";
 // tests/bins.test.ts — bins are brewery-configured subdivisions of a location; every
 // location is born with a trio and can never drop below one. Spec:
 // .agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md, Decision 1.
@@ -8,7 +10,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Row = { id: string; name: string };
-type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
+type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
 
 describe("bins", () => {
   let ctx: Ctx;
@@ -126,7 +128,7 @@ describe("bins", () => {
     expect(() => insertFixture("inventory_movements", {
       brewery_id: ctx.breweryId, sku_id: skuId, location_id: a.id, bin_id: binB.id, qty: 1, bbl: 0, type: "opening_balance", created_by: ctx.userId,
     })).toThrow(/SQLSTATE 23503/);
-    const mm = await admin.from("material_movements").insert({
+    const mm = await rawDatabase(admin).from("material_movements").insert({
       brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, bin_id: binB.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
     });
     expect(mm.error?.code).toBe("23503");
@@ -136,7 +138,7 @@ describe("bins", () => {
     expect(ke.error?.code).toBe("23503");
 
     // and a missing bin is rejected outright
-    const noBin = await admin.from("material_movements").insert({
+    const noBin = await rawDatabase(admin).from("material_movements").insert({
       brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
     });
     expect(noBin.error?.code).toBe("23502");

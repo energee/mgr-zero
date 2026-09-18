@@ -59,10 +59,17 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+
   {
-    // Tests and seed scripts cast Supabase responses freely; `any` is fine there.
-    files: ["tests/**", "scripts/**"],
-    rules: { "@typescript-eslint/no-explicit-any": "off" },
+    files: ["{app,lib,components,hooks}/**/*.{ts,tsx}", "proxy.ts"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+    },
   },
 ]);
 

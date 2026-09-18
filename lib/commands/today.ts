@@ -51,7 +51,7 @@ defineQuery({
     // Existence, not arithmetic: an exact count scans every row of a table that
     // grows without bound (inventory_movements), and this runs on every Today
     // render until setup finishes. LIMIT stops the planner at the first row or two.
-    const has = async (table: string, min = 1) => {
+    const has = async (table: "locations" | "brands" | "inventory_movements" | "brewery_users", min = 1) => {
       const { data, error } = await ctx.db.from(table).select("brewery_id").eq("brewery_id", ctx.breweryId).limit(min);
       if (error) throw error;
       return (data?.length ?? 0) >= min;

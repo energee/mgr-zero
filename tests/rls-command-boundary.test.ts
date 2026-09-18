@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
@@ -206,7 +208,7 @@ describe("tenant-safe document counters", () => {
     for (const ctx of [adminCtx, salesCtx, warehouseCtx, brewerCtx]) {
       for (const b of [brewery.id, other.id]) {
         // next_no lives in `private`, outside the Data API: PostgREST cannot resolve it at all.
-        const { error } = await ctx.db.rpc("next_no", { b, k: "order" });
+        const { error } = await rawDatabase(ctx.db).rpc("next_no", { b, k: "order" });
         expect(error?.code, `${ctx.role} next_no(${b === other.id ? "other" : "own"})`).toMatch(/^(42501|PGRST202)$/);
       }
     }
@@ -223,6 +225,7 @@ describe("tenant-safe document counters", () => {
       p_lines: [{ sku_id: skuId, qty: 1 }],
     });
     expect(error).toBeNull();
+    assert(data !== null);
     const { data: order } = await admin.from("orders").select("order_no").eq("id", data.order_id).single();
     expect(order!.order_no).toBe((before?.next ?? 1));
     const { data: foreign } = await admin.from("brewery_counters").select("key").eq("brewery_id", other.id);
@@ -803,7 +806,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       }
       for (const role of staffRoles.filter(role => !entry.allowed.includes(role))) {
         const input = await entry.input(role);
-        const { error } = await contexts()[role].db.rpc(entry.rpc, { ...input.rpc, p_request_id: crypto.randomUUID() });
+        const { error } = await rawDatabase(contexts()[role].db).rpc(entry.rpc, { ...input.rpc, p_request_id: crypto.randomUUID() });
         expect(error?.code, `${entry.command} RPC rejects ${role}`).toBe("42501");
         await expect(runCommand(entry.command, input.command, contexts()[role])).rejects.toMatchObject({ status: 403 });
       }

@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env/public";
@@ -18,7 +19,7 @@ describe("request context headers", () => {
   let resourcesA: { orderId: string; transferId: string; deliveryId: string; customerId: string; invoiceId: string };
 
   async function db(headers?: Record<string, string>) {
-    const client = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    const client = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
       auth: { persistSession: false },
       ...(headers ? { global: { headers } } : {}),
     });
@@ -90,7 +91,7 @@ describe("request context headers", () => {
 
     const limited = await makeStaff(breweryA, "admin");
     await admin.from("brewery_users").insert({ brewery_id: breweryB, user_id: limited.id, role: "brewer" });
-    const limitedDb = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    const limitedDb = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
       auth: { persistSession: false }, global: { headers: { "x-mgr-actor-id": limited.id, "x-mgr-brewery-id": breweryB } },
     });
     expect((await limitedDb.auth.signInWithPassword({ email: limited.email, password: "test-password-1" })).error).toBeNull();

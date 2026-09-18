@@ -289,7 +289,7 @@ export class SquareClient {
       ...init,
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
-    const data = await response.json().catch(() => null);
+    const data: unknown = await response.json().catch(() => null);
     if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data));
     if (!data || typeof data !== "object") throw unavailable();
     return data as Record<string, unknown>;

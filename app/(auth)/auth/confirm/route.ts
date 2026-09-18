@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 // app/(auth)/auth/confirm/route.ts — where a Supabase Auth email link lands
 // (password recovery today). Exchanges the one-time code for a session cookie,
 // then continues to `next` (Set new password); a used or timed-out code lands
@@ -11,7 +12,7 @@ function authClient(req: NextRequest) {
   type Cookie = { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] };
   const requestCookies = new Map(req.cookies.getAll().map(({ name, value }) => [name, { name, value, options: {} } as Cookie]));
   const pending = new Map<string, Cookie>();
-  const db = createServerClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const db = createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     cookies: {
       getAll: () => [...requestCookies.values()],
       setAll: (cookies) => { cookies.forEach((cookie) => { requestCookies.set(cookie.name, cookie); pending.set(cookie.name, cookie); }); },
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (!tokenHash || type !== "invite" || !audience) return NextResponse.redirect(new URL("/invite-expired", req.url));
     const { db, redirect } = authClient(req);
     const { data, error } = await db.auth.verifyOtp({ token_hash: tokenHash, type: "invite" });
-    const kind = data.user?.user_metadata?.mgr_invite_kind;
+    const kind: unknown = data.user?.user_metadata?.mgr_invite_kind;
     if (!error && kind === audience) return redirect(`/accept?audience=${audience}`);
     if (!error) await db.auth.signOut();
     return redirect("/invite-expired");

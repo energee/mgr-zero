@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 // tests/commands-portal.test.ts — portal (customer role) command registry wiring:
 // scoping to the caller's own customer, availability badges never leak raw ATP,
 // and staff-only commands reject a customer ctx.
@@ -164,7 +165,7 @@ describe("portal commands", () => {
 
   it("persists, preserves when omitted, and explicitly clears the requested date", async () => {
     const made = await runCommand("portal_create_order", { shipToId, requestedShipDate: "2026-10-01", lines: [{ skuId, qty: 2 }] }, custCtx) as { order_id: string };
-    const read = async () => (await runCommand("portal_order", { orderId: made.order_id }, custCtx) as any).order.requested_ship_date;
+    const read = async () => (await runCommand("portal_order", { orderId: made.order_id }, custCtx) as { order: { requested_ship_date: string | null } }).order.requested_ship_date;
     expect(await read()).toBe("2026-10-01");
     await runCommand("portal_update_draft_order", { orderId: made.order_id, lines: [{ skuId, qty: 3 }] }, custCtx);
     expect(await read()).toBe("2026-10-01");
@@ -284,11 +285,12 @@ describe("portal commands", () => {
   });
 
   it("exposes only the configured customer-facing fulfillment source", async () => {
-    const account = await runCommand("get_portal_account", {}, custCtx) as any;
+    const account = await runCommand("get_portal_account", {}, custCtx) as { fulfillmentSource: { id: string; name: string } | null };
     expect(account.fulfillmentSource).toMatchObject({ name: "Configured WH" });
+    assert(account.fulfillmentSource);
     const previous = account.fulfillmentSource.id;
     await admin.from("breweries").update({ portal_fulfillment_location_id: null }).eq("id", b.id);
-    try { expect((await runCommand("get_portal_account", {}, custCtx) as any).fulfillmentSource).toBeNull(); }
+    try { expect((await runCommand("get_portal_account", {}, custCtx) as { fulfillmentSource: { id: string; name: string } | null }).fulfillmentSource).toBeNull(); }
     finally { await admin.from("breweries").update({ portal_fulfillment_location_id: previous }).eq("id", b.id); }
   });
 
@@ -405,7 +407,8 @@ describe("portal commands", () => {
 
   it("portal_orders lists only the caller's own orders; portal_invoices only their invoices", async () => {
     const otherCustomer = await seedCustomer(b.id, { name: "Other Bar", saleChannelId });
-    await admin.from("orders").insert({ brewery_id: b.id, kind: "wholesale", customer_id: otherCustomer.customerId, ship_to_id: otherCustomer.shipToId, created_by: adminCtx.userId });
+    const { error } = await admin.from("orders").insert({ brewery_id: b.id, kind: "wholesale", customer_id: otherCustomer.customerId, ship_to_id: otherCustomer.shipToId, from_location_id: warehouseId, sale_channel_id: otherCustomer.saleChannelId, created_by: adminCtx.userId });
+    expect(error).toBeNull();
 
     const orders = await runCommand("portal_orders", {}, custCtx) as { customer_id: string }[];
     expect(orders.length).toBeGreaterThan(0);

@@ -90,12 +90,12 @@ describe("QuickBooks portal payment link", () => {
 
     const eligibilityFetch = vi.fn<typeof globalThis.fetch>();
     for (const unavailable of [
-      { paid_at: "2026-09-09T12:00:00Z", qbo_balance_cents: 0, qbo_remote_state: "live", written_off_at: null },
-      { paid_at: null, qbo_balance_cents: 0, qbo_remote_state: "live", written_off_at: null },
-      { paid_at: null, qbo_balance_cents: null, qbo_remote_state: "live", written_off_at: null },
-      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "voided", written_off_at: null },
-      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: null },
-      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: "2026-09-09T12:00:00Z", written_off_by: user.id, written_off_reason: "Uncollectible" },
+      { paid_at: "2026-09-09T12:00:00Z", qbo_balance_cents: 0, qbo_remote_state: "live" as const, written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 0, qbo_remote_state: "live" as const, written_off_at: null },
+      { paid_at: null, qbo_balance_cents: null, qbo_remote_state: "live" as const, written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "voided" as const, written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted" as const, written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted" as const, written_off_at: "2026-09-09T12:00:00Z", written_off_by: user.id, written_off_reason: "Uncollectible" },
     ]) {
       expect((await admin.from("invoices").update(unavailable).eq("id", invoice.data.id)).error).toBeNull();
       await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toBeNull();
@@ -105,7 +105,7 @@ describe("QuickBooks portal payment link", () => {
       expect(eligibilityFetch).not.toHaveBeenCalled();
     }
     expect((await admin.from("invoices").update({
-      paid_at: "2026-09-08T12:00:00Z", qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
+      paid_at: "2026-09-08T12:00:00Z", qbo_balance_cents: 100, qbo_remote_state: "live" as const, written_off_at: null,
       written_off_by: null, written_off_reason: null,
     }).eq("id", invoice.data.id)).error).toBeNull();
     await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toMatchObject({ remoteInvoiceId: "remote-pay-1" });
@@ -117,7 +117,7 @@ describe("QuickBooks portal payment link", () => {
     )).resolves.toEqual({ kind: "redirect", url: "https://connect.intuit.com/pay/reopened" });
     expect(reopenedFetch).toHaveBeenCalledOnce();
     expect((await admin.from("invoices").update({
-      paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
+      paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live" as const, written_off_at: null,
       written_off_by: null, written_off_reason: null,
     }).eq("id", invoice.data.id)).error).toBeNull();
     expect((await admin.from("qbo_connections").update({

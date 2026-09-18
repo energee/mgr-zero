@@ -1,3 +1,4 @@
+import { toJson } from "@/lib/supabase/json";
 import { buildReturnLines } from "@/app/(app)/invoices/[id]/credit-memo-form";
 import { beforeAll, expect, it } from "vitest";
 import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, sql, seedMaterial } from "./helpers";
@@ -102,7 +103,7 @@ it("rejects malformed scale, identity and source allocation input without side e
     (l: Record<string, unknown>) => { l.sources = [{ bin_id: bin, lot_id: lots[0], qty: 2 }, { bin_id: bin, lot_id: lots[0], qty: 2 }]; },
   ]) {
     const o = await order(); const line: Record<string,unknown> = { line_id: o.line, qty_shipped: 4, sources: [{ bin_id: bin, lot_id: lots[0], qty: 4 }] }; mutate(line);
-    expect((await ctx.db.rpc("ship_order", { p_order: o.id, p_ship: [line], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+    expect((await ctx.db.rpc("ship_order", { p_order: o.id, p_ship: toJson([line]), p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
     expect((await admin.from("inventory_movements").select("id").eq("ref", o.id)).data).toEqual([]);
     expect((await admin.from("shipments").select("id").eq("order_id", o.id)).data).toEqual([]);
   }

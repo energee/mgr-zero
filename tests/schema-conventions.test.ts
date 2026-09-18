@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 // tests/schema-conventions.test.ts — proves the baseline-migration conventions hold by
 // writing to the live local database: composite tenant FKs, lot-tracking trigger, and
 // append-only ledgers (UPDATE/DELETE revoked). See .agents/superpowers/specs/2026-08-31-mgr-schema-design.md §0.
@@ -9,7 +11,7 @@ async function seed() {
   const staff = await makeStaff(b.id);
   const db = await asUser(staff.email);
   const mk = async <T,>(table: string, row: Record<string, unknown>): Promise<T> => {
-    const { data, error } = await admin.from(table).insert(row).select().single();
+    const { data, error } = await rawDatabase(admin).from(table).insert(row).select().single();
     if (error) throw new Error(`${table}: ${error.message}`);
     return data as T;
   };
@@ -39,7 +41,7 @@ describe("schema conventions (live DB)", () => {
   });
 
   it("lot_tracked material: consumption without lot_id is rejected; with lot_id accepted", async () => {
-    const base = { brewery_id: s.b.id, material_id: s.tracked.id, location_id: s.loc.id, bin_id: s.bin.id, qty: -1, type: "consumption", created_by: s.staff.id };
+    const base = { brewery_id: s.b.id, material_id: s.tracked.id, location_id: s.loc.id, bin_id: s.bin.id, qty: -1, type: "consumption" as const, created_by: s.staff.id };
     const { error } = await admin.from("material_movements").insert(base);
     expect(error?.code).toBe("23514"); // check_violation raised by enforce_material_lot()
     const ok = await admin.from("material_movements").insert({ ...base, lot_id: s.lot.id });
@@ -64,6 +66,7 @@ describe("schema conventions (live DB)", () => {
       .select().single();
     expect(e2).toBeNull();
 
+    assert(mm !== null); assert(ke !== null);
     for (const [table, id] of [["material_movements", mm.id], ["keg_events", ke.id]] as const) {
       const upd = await s.db.from(table).update({ note: "tamper" }).eq("id", id);
       expect(upd.error?.code, `${table} update`).toBe("42501"); // insufficient_privilege

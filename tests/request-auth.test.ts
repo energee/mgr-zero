@@ -1,9 +1,10 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/request-auth.test.ts — proves request authentication and membership resolution stay distinct and deduplicated.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeBrewery, makeStaff, sql } from "./helpers";
 
-const request = vi.hoisted(() => ({ db: undefined as SupabaseClient | undefined }));
+const request = vi.hoisted(() => ({ db: undefined as SupabaseClient<Database> | undefined }));
 const navigation = vi.hoisted(() => ({
   redirect: vi.fn((path: string): never => {
     throw new Error(`redirect:${path}`);
@@ -34,7 +35,7 @@ afterEach(() => {
 });
 
 function requestClient(fetch: typeof globalThis.fetch) {
-  return createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  return createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch },
   });

@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -176,7 +177,7 @@ describe("atomic inventory movement previews", () => {
       { ...base, p_qty: -1, p_type: "sample" },
       { ...base, p_qty: 1, p_lot: randomUUID() },
     ]) {
-      expect((await ctx.db.rpc("preview_inventory_movement", args)).error).not.toBeNull();
+      expect((await rawDatabase(ctx.db).rpc("preview_inventory_movement", args)).error).not.toBeNull();
     }
 
     const proposal = await preview(chat.id, 1);

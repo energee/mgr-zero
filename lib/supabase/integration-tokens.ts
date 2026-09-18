@@ -1,5 +1,6 @@
 // lib/supabase/integration-tokens.ts — the only server boundary for private integration credentials.
 import "server-only";
+import { toJson } from "./json";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -386,7 +387,7 @@ export async function recordSquareSalesPage(
   const { data, error } = await createAdminClient().rpc("record_square_sales_page", {
     p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
     p_expected_version: start.credentialVersion, p_location_ids: page.locationIds, p_cursor: page.cursor,
-    p_next_cursor: page.nextCursor, p_orders: page.orders, p_facts: page.facts,
+    p_next_cursor: page.nextCursor, p_orders: page.orders, p_facts: toJson(page.facts),
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square sales page could not be stored");
@@ -509,7 +510,7 @@ export async function finishSquarePublication(
 ) {
   const { data, error } = await createAdminClient().rpc("finish_square_publication", {
     p_brewery: ctx.breweryId, p_publication: attemptId, p_actor: ctx.userId,
-    p_error_code: errorCode, p_response: response,
+    p_error_code: errorCode, p_response: toJson(response),
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square publication result could not be recorded");
@@ -619,7 +620,7 @@ export async function finishQboPush(ctx: Ctx, input: {
   const { data, error } = await createAdminClient().rpc("finish_qbo_push", {
     p_brewery: ctx.breweryId, p_push: input.pushId, p_actor: ctx.userId,
     p_status: input.status, p_qbo_entity_id: input.remoteId, p_error: input.error,
-    p_response: input.response, p_request_id: input.finishRequestId,
+    p_response: toJson(input.response), p_request_id: input.finishRequestId,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("QuickBooks push reconciliation failed");

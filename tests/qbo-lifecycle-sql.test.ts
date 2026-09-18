@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 // Real isolated-Postgres proof for QBO state, realm replacement and credential races.
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
@@ -359,7 +360,7 @@ describe("QuickBooks durable lifecycle", () => {
 
     expect((await admin.from("brewery_users").update({ role: "brewer" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     await expect(readVersionedIntegrationTokens(ctx, "qbo")).rejects.toMatchObject({ status: 403 });
-    expect((await ctx.db.schema("private").from("integration_tokens").select("refresh_token")).error).not.toBeNull();
+    expect((await rawDatabase(ctx.db).schema("private").from("integration_tokens").select("refresh_token")).error).not.toBeNull();
   });
 
   it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {

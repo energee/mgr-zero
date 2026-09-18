@@ -8,7 +8,8 @@ import { runChatCallbackBatch, runChatDeliveryBatch } from "@/lib/chat/jobs";
 
 export async function POST(request: Request) {
   if (!authorizeJob(request)) return NextResponse.json({ ok: false }, { status: 401 });
-  const limit = Number((await request.json().catch(() => ({})))?.limit) || 50;
+  const body: unknown = await request.json().catch(() => null);
+  const limit = Number(body && typeof body === "object" && "limit" in body ? body.limit : undefined) || 50;
   try {
     const callbacks = await runChatCallbackBatch({ limit });
     const deliveries = await runChatDeliveryBatch({ limit });

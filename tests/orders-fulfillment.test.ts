@@ -1,3 +1,5 @@
+import type { Database } from "@/lib/supabase/database";
+import { assert } from "vitest";
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, ins, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId, priceSku } from "./helpers";
@@ -5,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-let b: { id: string }, staffDb: SupabaseClient, staffId: string, staffEmail: string;
+let b: { id: string }, staffDb: SupabaseClient<Database>, staffId: string, staffEmail: string;
 let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, saleChannelId: string;
 
 beforeAll(async () => {
@@ -131,6 +133,7 @@ describe("pick and ship", () => {
     expect(mv![0].dest_state).toBe("PA");
     // The removal is classified by the brewery's Wholesale channel, and the
     // channel's tax treatment is frozen onto the row (§16.3).
+    assert(mv?.[0].sale_channel_id);
     const { data: ch } = await admin.from("sale_channels").select("name,tax_treatment").eq("id", mv![0].sale_channel_id).single();
     expect(ch!.name).toBe("Wholesale");
     expect(ch!.tax_treatment).toBe("taxable");

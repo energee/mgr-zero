@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { describe, it, expect, beforeAll } from "vitest";
 import { makeBrewery, makeStaffCtx, admin, channelId, seedCatalog, seedLocation, seedPriceGroup, ins } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
@@ -63,7 +64,8 @@ describe("import_csv rows", () => {
     expect((await ctx.db.rpc("begin_csv_import", { p_brewery: ctx.breweryId, p_request_id: id, p_kind: "opening_balances", p_rows: rows })).error).toBeNull();
     for (let n = 0; n < rows.length; n++) {
       const call = await ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: id, p_row_n: n });
-      expect(call.error).toBeNull(); expect(call.data.status).toBe("blocked");
+      expect(call.error).toBeNull(); assert(call.data !== null);
+      expect(call.data.status).toBe("blocked");
     }
   });
   it("blocks a foreign existing price cell without aborting either valid sibling or replay", async () => {

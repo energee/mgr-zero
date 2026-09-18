@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import type { Database } from "@/lib/supabase/database";
 // scripts/seed-dev.ts — idempotent dev environment seed.
 // Creates "Demo Brewing" brewery and dev@mgr.local / password "dev-password-1" admin user.
 // NOTE: password "dev-password-1" is intentionally dev-only; use only in local development.
@@ -10,7 +11,7 @@ const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 if (configuredSupabaseUrl !== undefined) assertLocalSeedUrl(configuredSupabaseUrl.trim());
 const serverEnv = readServerEnv();
 assertLocalSeedUrl(serverEnv.supabaseUrl);
-const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
+const admin = createClient<Database>(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
   auth: { persistSession: false },
 });
 
@@ -35,10 +36,10 @@ async function seed() {
         .select()
         .single();
       if (createErr) throw createErr;
-      breweryId = (newBrewery as any).id;
+      breweryId = newBrewery.id;
       console.log(`  Created brewery: ${breweryId}`);
     } else {
-      breweryId = (breweries as any).id;
+      breweryId = breweries.id;
       console.log(`  Brewery already exists: ${breweryId}`);
     }
 

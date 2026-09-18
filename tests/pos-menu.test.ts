@@ -64,19 +64,19 @@ describe("derived POS menus", () => {
       posLocationId: "L1", binId: taproom.binId, saleChannelId: channel,
     }, ctx, execution())).resolves.toMatchObject({ configured: true, publicId: expect.any(String) });
 
-    const empty = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any;
+    const empty = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>;
     expect(empty.items).toEqual([]);
     expect(empty.excluded).toContainEqual(expect.objectContaining({ formatId: pintId, reason: "out_of_stock" }));
 
     await runCommand("record_movement", {
       skuId: keg.skuId, locationId: other.id, binId: other.binId, qty: 2, type: "opening_balance",
     }, ctx, execution());
-    expect((await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any).items).toEqual([]);
+    expect((await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>).items).toEqual([]);
 
     await runCommand("record_movement", {
       skuId: keg.skuId, locationId: taproom.id, binId: taproom.binId, qty: 3, type: "opening_balance",
     }, ctx, execution());
-    const stocked = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any;
+    const stocked = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>;
     expect(stocked.items).toContainEqual(expect.objectContaining({
       formatId: pintId,
       brand: "Hazy",
@@ -96,7 +96,7 @@ describe("derived POS menus", () => {
     }, ctx, execution());
 
     await admin.from("skus").update({ active: false }).eq("id", keg.skuId);
-    const inactive = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any;
+    const inactive = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>;
     expect(inactive.items).toEqual([]);
     expect(inactive.excluded).toContainEqual({
       brandId: keg.brandId,
@@ -139,13 +139,13 @@ describe("derived POS menus", () => {
     await runCommand("configure_pos_menu", { posLocationId: "L2", binId: second.binId, saleChannelId: channel }, warehouseCtx, execution());
 
     await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, unitPriceCents: 650 }, warehouseCtx, execution());
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as any))
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 650, priceSource: "override", priceOverrideCents: 650 });
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L2", formatId: pintId }, warehouseCtx) as any))
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L2", formatId: pintId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 700, priceSource: "format", priceOverrideCents: null });
 
     await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, unitPriceCents: null }, warehouseCtx, execution());
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as any))
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 700, priceSource: "format", priceOverrideCents: null });
   });
 
@@ -158,23 +158,23 @@ describe("derived POS menus", () => {
     const channel = await channelId(brewery.id, "Taproom");
     const keg = await seedCatalog(brewery.id, { product: "Many", sku: "Many half", packageType: "keg", bblPerUnit: 0.5, format: "Half" });
     const rows = Array.from({ length: 1001 }, (_, index) => ({
-      brewery_id: brewery.id, brand_id: keg.brandId, name: `Pour ${String(index).padStart(4, "0")}`, basis: "poured", ounces: 4 + index / 100,
+      brewery_id: brewery.id, brand_id: keg.brandId, name: `Pour ${String(index).padStart(4, "0")}`, basis: "poured" as const, ounces: 4 + index / 100,
     }));
     expect((await admin.from("formats").insert(rows)).error).toBeNull();
     await runCommand("record_movement", { skuId: keg.skuId, locationId: location.id, binId: location.binId, qty: 1, type: "opening_balance" }, adminCtx, execution());
     await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, warehouseCtx, execution());
-    expect((await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as any).items).toHaveLength(1001);
+    expect((await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>).items).toHaveLength(1001);
 
     expect((await admin.from("pos_catalog_variations").insert([
       { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "FOOD", external_variation_id: "PRETZEL", external_item_name: "Pretzel", external_variation_name: "Each", source_version: 1, available: true },
       { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "GUEST", external_variation_id: "CIDER", external_item_name: "Guest cider", external_variation_name: "Pint", source_version: 1, available: false },
     ])).error).toBeNull();
-    const menu = await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as any;
+    const menu = await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>;
     expect(menu.externalItems).toEqual(expect.arrayContaining([
       expect.objectContaining({ itemName: "Pretzel", disposition: "queued", available: true }),
       expect.objectContaining({ itemName: "Guest cider", disposition: "queued", available: false }),
     ]));
-    expect(menu.items.some((item: any) => /Pretzel|Guest cider/.test(item.brand))).toBe(false);
+    expect(menu.items.some((item) => /Pretzel|Guest cider/.test(item.brand))).toBe(false);
 
     await expect(runCommand("get_pos_menu", { posLocationId: "L1" }, await makeStaffCtx(brewery.id, "sales")))
       .rejects.toMatchObject({ status: 403 });

@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/database";
 import { describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
@@ -141,7 +142,7 @@ describe("complete finished-goods reads", () => {
 
     let churned = false;
     const staff = await makeStaff(brewery.id, "admin");
-    const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    const db = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
       auth: { persistSession: false },
       global: { fetch: async (input, init) => {
         const response = await globalThis.fetch(input, init);

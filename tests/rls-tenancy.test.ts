@@ -3,7 +3,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { admin, channelId, makeBrewery, makeStaff, makeCustomerUser, asUser, seedCustomer } from "./helpers";
 
 describe("tenancy RLS", () => {
-  let bA: any, bB: any, staffA: any, custB: any;
+  let bA: Awaited<ReturnType<typeof makeBrewery>>, bB: typeof bA, staffA: Awaited<ReturnType<typeof makeStaff>>;
+  let custB: { customer: { id: string }; user: Awaited<ReturnType<typeof makeCustomerUser>> };
   beforeAll(async () => {
     bA = await makeBrewery(); bB = await makeBrewery();
     staffA = await makeStaff(bA.id, "admin");

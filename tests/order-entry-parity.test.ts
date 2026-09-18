@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -14,8 +15,8 @@ import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { orderAdjustLines, orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 
-function elements(node: ReactNode): ReactElement<Record<string, any>>[] {
-  if (!isValidElement<Record<string, any>>(node)) return [];
+function elements(node: ReactNode): ReactElement<Record<string, unknown> & { children?: ReactNode }>[] {
+  if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
   return [node, ...Children.toArray(node.props.children).flatMap(elements)];
 }
 
@@ -23,11 +24,11 @@ describe("shared order-entry controls", () => {
   it("binds adjustment row IDs, add/remove, decimal counts and the required reason", () => {
     const qty = vi.fn(), sku = vi.fn(), add = vi.fn(), remove = vi.fn(), reason = vi.fn();
     const nodes = elements(AdjustLinesView({ model: toAdjustLinesViewProps(orderAdjustLines), onQuantity: qty, onSku: sku, onAdd: add, onRemove: remove, onReason: reason }));
-    nodes.find(node => node.props.label === "Line 2 quantity")!.props.onChange("1.5");
-    nodes.find(node => node.props.label === "Line 2 SKU")!.props.onChange("actual-id");
-    nodes.find(node => node.props.children === "Add line")!.props.onClick();
-    nodes.find(node => node.props.children === "Remove")!.props.onClick();
-    nodes.find(node => node.props["aria-label"] === "Reason")!.props.onChange({ target: { value: "cut" } });
+    invoke(nodes.find(node => node.props.label === "Line 2 quantity")!, "onChange", "1.5");
+    invoke(nodes.find(node => node.props.label === "Line 2 SKU")!, "onChange", "actual-id");
+    invoke(nodes.find(node => node.props.children === "Add line")!, "onClick");
+    invoke(nodes.find(node => node.props.children === "Remove")!, "onClick");
+    invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "cut" } });
     expect(qty).toHaveBeenCalledWith(1, "1.5"); expect(sku).toHaveBeenCalledWith(1, "actual-id");
     expect(add).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledWith(0); expect(reason).toHaveBeenCalledWith("cut");
   });
@@ -36,9 +37,9 @@ describe("shared order-entry controls", () => {
     const qty = vi.fn(), short = vi.fn(), print = vi.fn();
     const model = toPickViewProps({ ...orderPick, lines: [{ ...orderPick.lines[0], qty_picked: 1.5 }] });
     const nodes = elements(PickView({ model, quantities: { [model.lines[0].key]: "1.5" }, onQuantity: qty, onShort: short, onPrint: print, footer: null }));
-    nodes.find(node => node.props.label)?.props.onChange("0");
-    nodes.find(node => node.props.children === "Short")!.props.onClick();
-    nodes.find(node => node.props.children === "Print pick sheet")!.props.onClick();
+    invoke(nodes.find(node => node.props.label), "onChange", "0");
+    invoke(nodes.find(node => node.props.children === "Short")!, "onClick");
+    invoke(nodes.find(node => node.props.children === "Print pick sheet")!, "onClick");
     expect(qty).toHaveBeenCalledWith(model.lines[0].key, "0");
     expect(short).toHaveBeenCalledWith(model.lines[0].key); expect(print).toHaveBeenCalledOnce();
   });
@@ -49,10 +50,10 @@ describe("shared order-entry controls", () => {
     const node = ShortPickView({ model, onResolution: resolution, onCounted: counted, onReason: reason, resolution: 1, messages: "command failed", submitting: true });
     const nodes = elements(node);
     const chips = nodes.find(node => node.props.onValueChange)!;
-    chips.props.onValueChange(""); expect(resolution).not.toHaveBeenCalled();
-    chips.props.onValueChange("0"); expect(resolution).toHaveBeenCalledWith(0);
-    nodes.find(node => node.props.label === "Counted")!.props.onChange("0.5");
-    nodes.find(node => node.props["aria-label"] === "Reason")!.props.onChange({ target: { value: "damage" } });
+    invoke(chips, "onValueChange", ""); expect(resolution).not.toHaveBeenCalled();
+    invoke(chips, "onValueChange", "0"); expect(resolution).toHaveBeenCalledWith(0);
+    invoke(nodes.find(node => node.props.label === "Counted")!, "onChange", "0.5");
+    invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "damage" } });
     expect(counted).toHaveBeenCalledWith("0.5"); expect(reason).toHaveBeenCalledWith("damage");
     expect(nodes.find(node => node.props.type === "submit")!.props.disabled).toBe(true);
     expect(renderToStaticMarkup(node)).toContain("remain owed");
@@ -73,11 +74,11 @@ describe("shared order-entry controls", () => {
     const shipTo = nodes.find(element => element.type === Select)!;
     expect(shipTo.props.value).toBe("s2");
     expect(nodes.find(element => element.type === SelectItem && element.props.value === "s2")?.props.children).toBe("Dock");
-    shipTo.props.onValueChange("s3");
+    invoke(shipTo, "onValueChange", "s3");
     expect(change).toHaveBeenCalledWith("s3");
     const quantity = nodes.find(element => element.props.label === "Line 1 quantity")!;
     expect(quantity.props.value).toBe("1.5");
-    quantity.props.onChange("2.5");
+    invoke(quantity, "onChange", "2.5");
     expect(change).toHaveBeenCalledWith("2.5");
     const markup = renderToStaticMarkup(node);
     expect(markup).not.toContain("ATP ");
@@ -91,14 +92,20 @@ describe("shared order-entry controls", () => {
       controls: { state, address2, isDefault }, footer: null });
     const nodes = elements(node);
     const field = (label: string) => nodes.find(element => element.props["aria-label"] === label)!;
-    field("State").props.onChange({ target: { value: "ny" } });
+    invoke(field("State"), "onChange", { target: { value: "ny" } });
     expect(state).toHaveBeenCalledWith("NY");
     expect(field("State").props.maxLength).toBe(2);
     expect(field("Address 2 (optional)").props.required).toBe(false);
-    field("Address 2 (optional)").props.onChange({ target: { value: "" } });
+    invoke(field("Address 2 (optional)"), "onChange", { target: { value: "" } });
     expect(address2).toHaveBeenCalledWith("");
-    field("Default ship-to").props.onCheckedChange(false);
+    invoke(field("Default ship-to"), "onCheckedChange", false);
     expect(isDefault).toHaveBeenCalledWith(false);
     expect(renderToStaticMarkup(node)).not.toContain("Save ship-to");
   });
 });
+
+function invoke(node: ReactElement<Record<string, unknown>> | undefined, prop: string, ...args: unknown[]) {
+  const callback = node?.props[prop];
+  assert(typeof callback === "function", `Expected ${prop} callback`);
+  Reflect.apply(callback, undefined, args);
+}

@@ -1,3 +1,4 @@
+import { assert } from "vitest";
 // tests/chat-webhook.test.ts — Slack webhook contract: signature/timestamp
 // verification, URL verification, fast acknowledgement, durable App Home
 // receipts keyed by event_id (duplicates coalesce), and no receipt for an
@@ -197,6 +198,7 @@ describe("receipt-first Slack actions", () => {
       expect(pending.disposition).toBe("pending");
       const claims = await admin.rpc("claim_chat_callback_receipts", {p_limit:100,p_now:new Date().toISOString()});
       expect(claims.error).toBeNull();
+      assert(claims.data !== null);
       expect(claims.data.map((r:{id:string})=>r.id)).not.toContain(pending.id);
     } finally {
       quiet.mockRestore();

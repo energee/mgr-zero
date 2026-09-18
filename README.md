@@ -170,6 +170,21 @@ which vitest pins over inherited Bun/app settings. Local tests fail before setup
 survives a test run and stale test rows (see `chat-jobs`) cannot pile up there.
 Without `.env.test.local`, local vitest refuses to run. CI keeps its separately provisioned disposable configuration.
 
+### Database types
+
+Supabase clients use `lib/supabase/database.generated.ts`, generated from the
+committed migrations. After applying migrations to the disposable test stack,
+run `bun run types:database`. Pass a local disposable database URL as the first
+argument when using a separate stack. Do not generate from a hosted or stale
+application database. CI checks the generated file against its fresh stack.
+
+`lib/supabase/database.ts` records facts the generator cannot infer: nullable
+RPC arguments, trigger-populated insert fields, and non-null stock views.
+JSON RPC result shapes live in `lib/supabase/rpc-results.ts`; retain integration
+coverage when changing those contracts. Unknown external data still needs
+validation before use. Tests may use `tests/raw-database.ts` solely for arbitrary
+fixtures and deliberate invalid/private requests; its results remain unknown.
+
 ## Deployment
 
 Hosted deployments exist; this does not establish release readiness. See the

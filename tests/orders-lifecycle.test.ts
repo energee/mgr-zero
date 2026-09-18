@@ -1,9 +1,10 @@
+import type { Database } from "@/lib/supabase/database";
 // tests/orders-lifecycle.test.ts — create → submit → confirm → adjust → cancel via rpc.
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, ins, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-let b: { id: string }, staffDb: SupabaseClient, staffId: string;
+let b: { id: string }, staffDb: SupabaseClient<Database>, staffId: string;
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 beforeAll(async () => {

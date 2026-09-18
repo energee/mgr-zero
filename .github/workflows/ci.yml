@@ -97,6 +97,11 @@ jobs:
       # there is no separate `db reset` step here.
       - run: supabase stop --workdir tests/supabase --no-backup || true
       - run: supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
+      - name: Generated database types match migrations
+        if: matrix.shard == '1/3'
+        run: |
+          bun run types:database
+          git diff --exit-code -- lib/supabase/database.generated.ts
       - name: Env from local stack
         # The app accepts modern Supabase names only. The mapping script keeps
         # local CLI output compatible without reintroducing runtime fallbacks.

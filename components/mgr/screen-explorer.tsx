@@ -48,10 +48,13 @@ const onHash = (cb: () => void) => {
 };
 // Keep the walk on its browser history entry, so Back and Forward restore it
 // along with the URL. A pasted hash starts a fresh walk.
-const snapshot = () => JSON.stringify({
-  hash: window.location.hash,
-  walk: history.state?.mgrExplorer?.hash === window.location.hash ? history.state.mgrExplorer.walk : [],
-});
+const snapshot = () => {
+  const state = history.state as { mgrExplorer?: { hash: string; walk: number[] } } | null;
+  return JSON.stringify({
+    hash: window.location.hash,
+    walk: state?.mgrExplorer?.hash === window.location.hash ? state.mgrExplorer.walk : [],
+  });
+};
 const useNavigation = () => JSON.parse(useSyncExternalStore(onHash, snapshot, () => '{"hash":"","walk":[]}')) as { hash: string; walk: number[] };
 const write = (state: HashState, push: boolean, walk: number[]) => {
   const hash = buildHash(state);

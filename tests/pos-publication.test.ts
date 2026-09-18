@@ -84,7 +84,7 @@ describe("Square durable catalog publication", () => {
       const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
         if (!init?.method) return new Response(JSON.stringify({ object: current }), { status: 200 });
         const body = JSON.parse(String(init.body));
-        const variations = body.object.item_data.variations.map((variation: Record<string, any>) => ({
+        const variations = body.object.item_data.variations.map((variation: { id: string; item_variation_data: Record<string, unknown> }) => ({
           ...variation, version: variation.id === "CHANGED-VAR" ? changedVersion : 4,
           ...(forgeChangedContent && variation.id === "CHANGED-VAR" ? { item_variation_data: {
             ...variation.item_variation_data, location_overrides: [{ location_id: "L1", pricing_type: "FIXED_PRICING",
@@ -177,7 +177,7 @@ describe("Square durable catalog publication", () => {
       expect(body).not.toContain("publication-access-secret");
       const response = remote.get(parsed.idempotency_key) ?? {
         catalog_object: { ...parsed.object, id: "ITEM-REMOTE", version: 11,
-          item_data: { ...parsed.object.item_data, variations: parsed.object.item_data.variations.map((v: any) => ({ ...v, id: "VAR-REMOTE", version: 11,
+          item_data: { ...parsed.object.item_data, variations: parsed.object.item_data.variations.map((v: { id: string; item_variation_data: Record<string, unknown> }) => ({ ...v, id: "VAR-REMOTE", version: 11,
             item_variation_data: { ...v.item_variation_data, item_id: "ITEM-REMOTE" } })) } },
         id_mappings: [{ client_object_id: parsed.object.id, object_id: "ITEM-REMOTE" },
           { client_object_id: parsed.object.item_data.variations[0].id, object_id: "VAR-REMOTE" }],

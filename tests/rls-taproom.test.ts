@@ -1,3 +1,6 @@
+import type { Database } from "@/lib/supabase/database";
+import { rawDatabase } from "./raw-database";
+import { assert } from "vitest";
 // Live, independently specified authorization matrix. Run only on tests/supabase.
 import { sampleInput } from "@/lib/mgr/api-schema";
 import { readFileSync } from "node:fs";
@@ -163,9 +166,9 @@ async function fixtures() {
 }
 
 type Fixture = Awaited<ReturnType<typeof fixtures>>;
-async function tenantRows(db: SupabaseClient, table: Table, f: Fixture) {
+async function tenantRows(db: SupabaseClient<Database>, table: Table, f: Fixture) {
   // The installation table grants health columns only; querying secrets would test ACL, not row scope.
-  let query = db.from(table).select(table === "chat_installations" ? "id,brewery_id,state" : "*");
+  let query = rawDatabase(db).from(table).select(table === "chat_installations" ? "id,brewery_id,state" : "*");
   if (table === "breweries") query = query.eq("id", f.brewery.id);
   else if (table === "customer_users") query = query.eq("customer_id", f.customer.customerId);
   else query = query.eq("brewery_id", f.brewery.id);
@@ -180,7 +183,7 @@ async function tenantRows(db: SupabaseClient, table: Table, f: Fixture) {
 }
 
 describe("taproom complete public RLS read boundary", () => {
-  let own: Fixture, foreign: Fixture, db: SupabaseClient;
+  let own: Fixture, foreign: Fixture, db: SupabaseClient<Database>;
   beforeAll(async () => {
     // A pre-bootstrap database fails here for the actual missing enum value.
     own = await fixtures();
@@ -219,6 +222,7 @@ describe("taproom complete public RLS read boundary", () => {
       for (const result of [await client.from("keg_bin_on_hand").select("*"), await client.rpc("keg_bin_on_hand_rows")]) {
         expect(result.error).toBeNull();
         expect(result.data).toHaveLength(6);
+        assert(result.data !== null);
         expect(result.data.every((row: Row) => row.brewery_id === own.brewery.id)).toBe(true);
         expect(result.data.filter((row: Row) => row.keg_size === "half_bbl").map((row: Row) => row.location_id).sort())
           .toEqual([own.wh.id, own.storage.id, ...own.taps.map(t => t.id)].sort());
@@ -246,6 +250,7 @@ describe("taproom complete public RLS read boundary", () => {
     const sort = (rows: Row[]) => rows.sort((a, b) => String(a.location_id).localeCompare(String(b.location_id)));
     for (const result of [await db.from("on_hand").select("*"), await db.rpc("on_hand_rows")]) {
       expect(result.error).toBeNull();
+      assert(result.data !== null);
       expect(sort(result.data)).toEqual(sort(expected));
     }
   });
@@ -256,6 +261,7 @@ describe("taproom complete public RLS read boundary", () => {
     const sort = (rows: Row[]) => rows.sort((a, b) => `${a.bin_id}:${a.keg_size}`.localeCompare(`${b.bin_id}:${b.keg_size}`));
     for (const result of [await db.from("keg_bin_on_hand").select("*"), await db.rpc("keg_bin_on_hand_rows")]) {
       expect(result.error).toBeNull();
+      assert(result.data !== null);
       expect(sort(result.data)).toEqual(sort(expected));
     }
   });
@@ -364,7 +370,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     const definition = catalog.filter(c => c.name === name);
     expect(definition, `${name} has one classified signature`).toHaveLength(1);
     expect(args.length, `${name} arity`).toBe(definition[0].args.length);
-    const result = await db.rpc(name, Object.fromEntries(definition[0].args.map((key,i) => [key,args[i]])));
+    const result = await rawDatabase(db).rpc(name, Object.fromEntries(definition[0].args.map((key,i) => [key,args[i]])));
     if (qboGenericPermission.has(name)) {
       expect(result.error?.message, definition[0].signature).toMatch(/permission denied/i);
     } else {
@@ -421,7 +427,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(serviceCatalog.map(c => c.name).sort()).toEqual(Object.keys(serviceCases).sort());
   for (const c of serviceCatalog) {
     const args = serviceCases[c.name]; expect(args.length, c.signature).toBe((c.args ?? []).length);
-    const result = await db.rpc(c.name, Object.fromEntries((c.args ?? []).map((key,i) => [key,args[i]])));
+    const result = await rawDatabase(db).rpc(c.name, Object.fromEntries((c.args ?? []).map((key,i) => [key,args[i]])));
     expect(result.error?.code, `${c.signature}: ${result.error?.message}`).toBe("42501");
   }
   expect(publicSnapshot()).toEqual(publicBefore);

@@ -1,3 +1,5 @@
+import type { Database } from "@/lib/supabase/database";
+import { rawDatabase } from "./raw-database";
 import { describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { admin, asUser, makeBrewery, makeStaff, sql } from "./helpers";
@@ -35,10 +37,10 @@ describe("authenticated command admission", () => {
   });
 
   it("denies unauthenticated calls and exposes no private rows", async () => {
-    const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
+    const anon = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
     expect((await anon.rpc("consume_command_admission")).error?.code).toBe("42501");
-    expect((await anon.from("command_admissions").select("*")).error).not.toBeNull();
-    expect((await admin.from("command_admissions").select("*")).error).not.toBeNull();
+    expect((await rawDatabase(anon).from("command_admissions").select("*")).error).not.toBeNull();
+    expect((await rawDatabase(admin).from("command_admissions").select("*")).error).not.toBeNull();
     expect(sql(`select role from (values ('anon'),('authenticated'),('service_role')) r(role)
       where has_table_privilege(role,'private.command_admissions','select,insert,update,delete') order by role`)).toEqual([]);
     expect(sql(`select pg_get_constraintdef(oid) from pg_constraint

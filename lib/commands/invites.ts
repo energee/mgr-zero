@@ -32,7 +32,7 @@ defineQuery({
 
 defineCommand({
   name: "update_staff_role", description: "Change one member's role (admin); refused when it would leave the brewery without an admin",
-  input: z.object({ userId: z.string().uuid(), role: z.enum(STAFF_ROLES as [string, ...string[]]) }), roles: ["admin"],
+  input: z.object({ userId: z.string().uuid(), role: z.enum(STAFF_ROLES) }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_staff_role", { p_brewery: ctx.breweryId, p_user: i.userId, p_role: i.role, p_request_id: execution.requestId })),
 });
 

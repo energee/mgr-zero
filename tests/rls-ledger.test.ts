@@ -4,7 +4,7 @@ import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, chann
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
-  let b: any, staff: any, sku: any, loc: any;
+  let b: Awaited<ReturnType<typeof makeBrewery>>, staff: Awaited<ReturnType<typeof makeStaff>>, sku: { id: string }, loc: Awaited<ReturnType<typeof seedLocation>>;
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
@@ -62,7 +62,7 @@ describe("removal_shape CHECK: channel/tax_treatment/dest_state required on remo
   // Uses its own brewery/sku/location (rather than the shared fixtures above)
   // so accepted inserts here don't pollute the on_hand/atp sums asserted
   // elsewhere in this file.
-  let b: any, staff: any, sku: any, loc: any;
+  let b: Awaited<ReturnType<typeof makeBrewery>>, staff: Awaited<ReturnType<typeof makeStaff>>, sku: { id: string }, loc: Awaited<ReturnType<typeof seedLocation>>;
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
@@ -122,8 +122,9 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   // against brewery A that pointed at a location or sku belonging to
   // brewery B — a cross-tenant write RLS never caught. The composite FKs
   // added in the baseline migration make that combination impossible at the database level.
-  let bA: any, bB: any, staffA: any;
-  let skuA: any, skuB: any, locA: any, locB: any, brandB: any, formatA: any;
+  let bA: Awaited<ReturnType<typeof makeBrewery>>, bB: typeof bA, staffA: Awaited<ReturnType<typeof makeStaff>>;
+  let skuA: { id: string }, skuB: typeof skuA, brandB: typeof skuA, formatA: typeof skuA;
+  let locA: Awaited<ReturnType<typeof seedLocation>>, locB: typeof locA;
 
   beforeAll(async () => {
     bA = await makeBrewery();

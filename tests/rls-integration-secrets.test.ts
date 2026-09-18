@@ -1,3 +1,5 @@
+import { rawDatabase } from "./raw-database";
+import type { Database } from "@/lib/supabase/database";
 // tests/rls-integration-secrets.test.ts — proves browser clients never receive integration tokens.
 import { beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -16,7 +18,7 @@ function privateTokenCount(breweryId: string, provider: "qbo" | "square") {
   return Number(execFileSync("psql", [DB, "-Atc", sql], { encoding: "utf8" }).trim());
 }
 
-type BrowserClient = { name: string; db: SupabaseClient };
+type BrowserClient = { name: string; db: SupabaseClient<Database> };
 
 describe("integration token isolation", () => {
   let brewery: { id: string };
@@ -65,7 +67,7 @@ describe("integration token isolation", () => {
       { name: "warehouse", db: warehouseDb },
       { name: "brewer", db: brewerDb },
       { name: "customer", db: customerDb },
-      { name: "anon", db: createClient(URL, ANON, { auth: { persistSession: false } }) },
+      { name: "anon", db: createClient<Database>(URL, ANON, { auth: { persistSession: false } }) },
     ];
   });
 
@@ -76,7 +78,7 @@ describe("integration token isolation", () => {
     for (const { name, db } of browsers) {
       const [{ error: readError }, { error: writeError }] = await Promise.all([
         db.from("qbo_connections").select("access_token, refresh_token").eq("brewery_id", brewery.id),
-        db.from("qbo_connections")
+        rawDatabase(db).from("qbo_connections")
           .update({ access_token: "browser-access-token", refresh_token: "browser-refresh-token" })
           .eq("brewery_id", brewery.id)
           .select("access_token, refresh_token"),
@@ -95,7 +97,7 @@ describe("integration token isolation", () => {
     for (const { name, db } of browsers) {
       const [{ error: readError }, { error: writeError }] = await Promise.all([
         db.from("pos_connections").select("access_token, refresh_token").eq("brewery_id", brewery.id),
-        db.from("pos_connections")
+        rawDatabase(db).from("pos_connections")
           .update({ access_token: "browser-access-token", refresh_token: "browser-refresh-token" })
           .eq("brewery_id", brewery.id)
           .select("access_token, refresh_token"),
@@ -110,7 +112,7 @@ describe("integration token isolation", () => {
   it("denies every browser role the private relation and token RPCs", async () => {
     for (const { name, db } of browsers) {
       const [{ error: relationError }, { error: readError }, { error: storeError }] = await Promise.all([
-        db.schema("private").from("integration_tokens").select("access_token, refresh_token"),
+        rawDatabase(db).schema("private").from("integration_tokens").select("access_token, refresh_token"),
         db.rpc("read_integration_tokens", {
           p_brewery: brewery.id,
           p_provider: "qbo",

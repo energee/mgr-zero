@@ -19,7 +19,7 @@ describe("portal order quote", () => {
       shipToId: fixture.customer.shipToId,
       requestedShipDate: "2026-10-10",
       lines: [{ skuId: fixture.catalog.skuId, qty: 2 }],
-    }, fixture.ctx) as any;
+    }, fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
 
     expect(quote).toMatchObject({
       taxStatus: "pending",
@@ -37,28 +37,28 @@ describe("portal order quote", () => {
 
   it("rejects price, ship-to, source, or deposit drift without writing an order", async () => {
     const submit = async () => {
-      const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+      const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
       return runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx);
     };
     const before = await orderCount(fixture.brewery.id);
 
-    const price = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const price = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     await priceSku(fixture.brewery.id, { saleChannelId: fixture.customer.saleChannelId, brandId: fixture.catalog.brandId, formatId: fixture.catalog.formatId, cents: 3700 });
     await expect(runCommand("portal_submit_quote", { quoteId: price.quoteId }, fixture.ctx)).rejects.toThrow(/review the current quote/);
     await priceSku(fixture.brewery.id, { saleChannelId: fixture.customer.saleChannelId, brandId: fixture.catalog.brandId, formatId: fixture.catalog.formatId, cents: 3600 });
 
-    const address = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const address = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     await admin.from("ship_tos").update({ address1: "2 Changed St" }).eq("id", fixture.customer.shipToId);
     await expect(runCommand("portal_submit_quote", { quoteId: address.quoteId }, fixture.ctx)).rejects.toThrow(/review the current quote/);
     await admin.from("ship_tos").update({ address1: "1 Main St" }).eq("id", fixture.customer.shipToId);
 
-    const source = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const source = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     const otherSource = await seedLocation(fixture.brewery.id, { name: "Other portal warehouse" });
     await runCommand("set_portal_fulfillment_source", { locationId: otherSource.id }, fixture.adminCtx);
     await expect(runCommand("portal_submit_quote", { quoteId: source.quoteId }, fixture.ctx)).rejects.toThrow(/review the current quote/);
     await runCommand("set_portal_fulfillment_source", { locationId: fixture.source.id }, fixture.adminCtx);
 
-    const deposit = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const deposit = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     await admin.from("keg_pools").update({ deposit_cents: 2600 }).eq("id", fixture.poolId);
     await expect(runCommand("portal_submit_quote", { quoteId: deposit.quoteId }, fixture.ctx)).rejects.toThrow(/review the current quote/);
     await admin.from("keg_pools").update({ deposit_cents: 2500 }).eq("id", fixture.poolId);
@@ -68,9 +68,9 @@ describe("portal order quote", () => {
   });
 
   it("replays a committed submit after quote expiry and catalog change without a duplicate", async () => {
-    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-    const first = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx, execution) as any;
+    const first = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx, execution) as { order_id: string };
     await fixture.adminCtx.db.from("channel_prices").select("unit_price_cents");
     await priceSku(fixture.brewery.id, { saleChannelId: fixture.customer.saleChannelId, brandId: fixture.catalog.brandId, formatId: fixture.catalog.formatId, cents: 3900 });
     sql(`update private.portal_order_quotes set expires_at=now()-interval '1 second' where id='${quote.quoteId}'`);
@@ -113,8 +113,8 @@ describe("portal order quote", () => {
   });
 
   it("persists the reviewed deposit and invoices its frozen cents through the mapped QBO line", async () => {
-    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
-    const submitted = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx) as any;
+    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
+    const submitted = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx) as { order_id: string };
     expect(sql(`select qty_ordered::text||'|'||unit_price_cents::text||'|'||amount_cents::text
       from order_deposit_lines where order_id='${submitted.order_id}'`)).toEqual(["2.00|2500|5000"]);
 
@@ -124,7 +124,7 @@ describe("portal order quote", () => {
     await runCommand("confirm_order", { orderId: submitted.order_id }, fixture.adminCtx);
     const line = (await admin.from("order_lines").select("id").eq("order_id", submitted.order_id).single()).data!;
     await runCommand("record_pick", { orderId: submitted.order_id, picks: [{ lineId: line.id, qty: 2 }] }, fixture.adminCtx);
-    const shipped = await runCommand("ship_order", { orderId: submitted.order_id, ship: [{ lineId: line.id, qty: 2 }] }, fixture.adminCtx) as any;
+    const shipped = await runCommand("ship_order", { orderId: submitted.order_id, ship: [{ lineId: line.id, qty: 2 }] }, fixture.adminCtx) as { invoice_id: string | null };
     expect(sql(`select qty::text||'|'||unit_price_cents::text||'|'||amount_cents::text
       from invoice_lines where invoice_id='${shipped.invoice_id}' and kind='keg_deposit'`)).toEqual(["2.00|2500|5000"]);
 
@@ -133,15 +133,15 @@ describe("portal order quote", () => {
       p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
     });
     expect(started.error).toBeNull();
-    const pushed = JSON.parse((started.data as { requestBody: string }).requestBody);
-    expect(pushed.Line.find((line: any) => line.SalesItemLineDetail.ItemRef.value === "deposit-item")).toMatchObject({
+    const pushed: { Line: { SalesItemLineDetail: { ItemRef: { value: string } } }[] } = JSON.parse((started.data as { requestBody: string }).requestBody);
+    expect(pushed.Line.find((line) => line.SalesItemLineDetail.ItemRef.value === "deposit-item")).toMatchObject({
       Amount: 50, SalesItemLineDetail: { Qty: 2, UnitPrice: 25 },
     });
     expect((await admin.from("keg_pools").update({ deposit_cents: 2500 }).eq("id", fixture.poolId)).error).toBeNull();
   });
 
   it("serializes a concurrent price change before drift validation and permits a safe retry", async () => {
-    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     const requestId = crypto.randomUUID();
     const before = await orderCount(fixture.brewery.id);
     const writer = new Client({ connectionString: DB, application_name: "q4-price-writer" });

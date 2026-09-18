@@ -1,3 +1,4 @@
+import { rawDatabase } from "./raw-database";
 // tests/formats.test.ts — a format is the physical shape and the only place
 // bbl_per_unit is typed (schema §16.2); packaged formats hold stock, poured
 // ones belong to a brand, carry ounces, and hold none.
@@ -58,11 +59,11 @@ describe("format_components", () => {
 describe("format_bom", () => {
   it("replace_format_bom writes the format's bill with on_break; sku_bom is gone", async () => {
     const fmt = await runCommand("upsert_format", { name: "BOM case", basis: "packaged", packageType: "can", bblPerUnit: 0.012 }, ctx) as { id: string };
-    const mat = async (name: string) => (await admin.from("materials").insert({ brewery_id: ctx.breweryId, name, category: "packaging", base_uom: "each", purchase_uom: "each", lot_tracked: false }).select("id").single()).data!.id as string;
+    const mat = async (name: string) => (await admin.from("materials").insert({ brewery_id: ctx.breweryId, name, category: "packaging" as const, base_uom: "each" as const, purchase_uom: "each" as const, lot_tracked: false }).select("id").single()).data!.id as string;
     const tray = await mat("case tray"); const paktech = await mat("PakTech");
     const out = await runCommand("replace_format_bom", { formatId: fmt.id, lines: [{ materialId: tray, qtyPerUnit: 1, onBreak: "return_to_stock" }, { materialId: paktech, qtyPerUnit: 6 }] }, ctx) as { lines: { material_id: string; on_break: string }[] };
     expect(out.lines.map((l) => [l.material_id, l.on_break]).sort()).toEqual([[paktech, "consumed"], [tray, "return_to_stock"]].sort());
-    const { error } = await admin.from("sku_bom").select("*").limit(1);
+    const { error } = await rawDatabase(admin).from("sku_bom").select("*").limit(1);
     expect(error?.code).toBe("PGRST205");
   });
 });
@@ -71,7 +72,7 @@ describe("format editing detail", () => {
   it("loads complete replacement sets and minimal material options for Sales, with tenant and role boundaries", async () => {
     const child = await runCommand("upsert_format", { name: "Detail can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, ctx) as { id: string };
     const parent = await runCommand("upsert_format", { name: "Detail case", basis: "packaged", packageType: "can" }, ctx) as { id: string };
-    const { data: material, error } = await admin.from("materials").insert({ brewery_id: ctx.breweryId, name: "Detail tray", category: "packaging", base_uom: "each", purchase_uom: "each", lot_tracked: false, active: false }).select("id").single();
+    const { data: material, error } = await admin.from("materials").insert({ brewery_id: ctx.breweryId, name: "Detail tray", category: "packaging" as const, base_uom: "each" as const, purchase_uom: "each" as const, lot_tracked: false, active: false }).select("id").single();
     expect(error).toBeNull();
     await runCommand("replace_format_components", { formatId: parent.id, components: [{ childFormatId: child.id, qty: 24 }] }, ctx);
     await runCommand("replace_format_bom", { formatId: parent.id, lines: [{ materialId: material!.id, qtyPerUnit: 1, onBreak: "return_to_stock" }] }, ctx);
@@ -101,8 +102,8 @@ describe("large format replacement sets", () => {
   it("loads and saves every component, BOM line, and option beyond the API row cap", async () => {
     const large = await makeStaffCtx((await makeBrewery()).id, "admin");
     const parent = await runCommand("upsert_format", { name: "Large case", basis: "packaged", packageType: "can" }, large) as { id: string };
-    const children = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Child ${n.toString().padStart(4, "0")}`, basis: "packaged", package_type: "can", bbl_per_unit: 0.001 }));
-    const materials = children.map((_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Material ${n.toString().padStart(4, "0")}`, category: "packaging", base_uom: "each", purchase_uom: "each", lot_tracked: false }));
+    const children = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Child ${n.toString().padStart(4, "0")}`, basis: "packaged" as const, package_type: "can" as const, bbl_per_unit: 0.001 }));
+    const materials = children.map((_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Material ${n.toString().padStart(4, "0")}`, category: "packaging" as const, base_uom: "each" as const, purchase_uom: "each" as const, lot_tracked: false }));
     expect((await admin.from("formats").insert(children)).error).toBeNull();
     expect((await admin.from("materials").insert(materials)).error).toBeNull();
     expect((await admin.from("format_components").insert(children.map((c) => ({ brewery_id: large.breweryId, parent_format_id: parent.id, child_format_id: c.id, qty: 1 })))).error).toBeNull();

@@ -1,7 +1,9 @@
 import { ESLint } from "eslint";
+import tseslint from "typescript-eslint";
 import { expect, it } from "vitest";
 
-const eslint = new ESLint();
+// These virtual JSX probes exercise syntax rules, without a file in the TS project.
+const eslint = new ESLint({ overrideConfig: tseslint.configs.disableTypeChecked });
 const filePath = "components/mgr/views/control-policy-probe.tsx";
 
 it.each(['<select />', '<input type="number" />', '<Input type="number" />', '<Input type={"number"} />'])("rejects hand-built screen controls: %s", async control => {

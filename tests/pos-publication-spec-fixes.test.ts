@@ -1,3 +1,4 @@
+import { squareUpsertSchema, type SquareUpsert } from "./provider-payloads";
 import { describe, expect, it, vi } from "vitest";
 import { getCommandDefinition, runCommand } from "@/lib/commands/registry";
 import { prepareSquareCatalogPublication, publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
@@ -63,16 +64,16 @@ describe("Square parent-item publication corrections", () => {
 
   it("publishes every derived brand as one item containing all of its format variations", async () => {
     const { brewery, ctx } = await fixture(true);
-    const bodies: Array<Record<string, any>> = [];
+    const bodies: Array<SquareUpsert> = [];
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
-      const body = JSON.parse(String(init?.body)); bodies.push(body);
+      const body = squareUpsertSchema.parse(JSON.parse(String(init?.body))); bodies.push(body);
       const itemId = `ITEM-${bodies.length}`;
       const mappings = [{ client_object_id: body.object.id, object_id: itemId },
-        ...body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+        ...body.object.item_data.variations.map((variation, index) => ({
           client_object_id: variation.id, object_id: `${itemId}-VAR-${index + 1}`,
         }))];
       return new Response(JSON.stringify({ catalog_object: { ...body.object, id: itemId, version: 2,
-        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation: Record<string, any>, index: number) => ({
+        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation, index) => ({
           ...variation, id: `${itemId}-VAR-${index + 1}`, version: 2,
           item_variation_data: { ...variation.item_variation_data, item_id: itemId },
         })) } }, id_mappings: mappings }), { status: 200 });

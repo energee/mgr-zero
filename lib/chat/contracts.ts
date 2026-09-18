@@ -63,3 +63,15 @@ export type ChatPreviewFixture = {
 export function assertPortableNotification(value: unknown): asserts value is PortableNotification {
   portableNotificationSchema.parse(value);
 }
+
+/** The database-owned safe notification projection, before provider rendering. */
+export const occurrenceSchema = z.object({
+  id: z.string(), reason: notificationReasonSchema, state: z.string(),
+  subject_type: portableNotificationSchema.shape.subject.shape.type, subject_id: z.string(),
+  urgency: z.enum(["normal", "attention"]), due_at: z.string().nullable(), semantic_key: z.string(),
+  payload: z.object({
+    safe_label: z.string(), detail: z.string(), href: z.string(), recipient_roles: z.array(z.string()),
+    assigned_user_id: z.string().nullable(), window: z.string().optional(),
+  }),
+});
+export type Occurrence = z.infer<typeof occurrenceSchema>;
