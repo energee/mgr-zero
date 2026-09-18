@@ -54,9 +54,9 @@ No identified backup exists (checklist, Database and deploy 1). Pre-migration ba
 
 - [#329](https://github.com/energee/mgr-zero/issues/329) Ask MGR: PR #400 merged; authenticated hosted retest still owed.
 
-## Decisions still required from Ted
+## Decisions (Ted, 2026-09-18)
 
-1. Pilot scope across J01–J07 (unchanged from 2026-09-14).
-2. Preview target: reuse `ugzhwxzictzvrzlacjmv` or provision new. Either way, new keys for Preview.
-3. SMTP provider for Auth email.
-4. Accept or narrow the 171 authenticated-executable RPCs.
+1. **Pilot scope: J01 ordering, J02 picked-order adjustment, J06 recovery.** J03 production recall, J04 taproom, J05 delivery, and J07 tap-board review are deferred from the pilot. Deferral does not touch stock, money, tenancy, auth, or recovery truth.
+2. **Preview target: reuse `ugzhwxzictzvrzlacjmv`** (us-west-2). Vercel Preview gets that project's keys; Production keeps `uogrvqmrbmolvtftotsf`.
+3. **Auth SMTP: Resend**, via the Vercel Marketplace integration.
+4. **RPC advisor: accepted as designed.** The 171 `authenticated`-executable functions are the command layer; each enforces brewery membership internally (`.agents/ARCHITECTURE.md`). No narrowing.
