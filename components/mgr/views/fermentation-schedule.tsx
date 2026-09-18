@@ -4,7 +4,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { FERMENTATION_STAGE_KINDS } from "@/lib/commands/production";
+import { FERMENTATION_STAGE_KINDS } from "@/lib/mgr/enums";
 import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";
 

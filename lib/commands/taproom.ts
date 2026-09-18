@@ -10,11 +10,11 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
 import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
+import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
-export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
-export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
-/** The reasons staff record by hand; transferred_in/out come from transfers and bin moves in pairs. */
-export const KEG_EVENT_REASONS = ["acquired", "retired", "shipped", "returned", "lost", "found"] as const;
+// The option arrays live in lib/mgr/enums.ts so a "use client" form can read
+// them without importing this module and registering every command in it.
+export { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
 const ROLES: ("admin" | "warehouse")[] = ["admin", "warehouse"];
 const cents = z.number().int().nonnegative();

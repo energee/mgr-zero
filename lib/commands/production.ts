@@ -12,14 +12,13 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 import { defineCommand, defineQuery, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
+import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
-// The process spec (recipe-builder spec D2, D6, D7): ordered mash steps and
-// fermentation stages, each with a type and a name, and water additions
-// carrying one stage. Stored as given; the RPC derives mash_temp_f.
-export const MASH_STEP_KINDS = ["infusion", "decoction", "direct heat", "rest"] as const;
-export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"] as const;
-export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
-export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
+// The process spec (recipe-builder spec D2, D6, D7). Stored as given; the RPC
+// derives mash_temp_f. The option arrays live in lib/mgr/enums.ts so the shared
+// views can read them without importing this module and registering every
+// command in it.
+export { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: z.number(), minutes: z.number().int().positive() });
 const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: z.number(), days: z.number().positive() });
 const processInput = z.object({

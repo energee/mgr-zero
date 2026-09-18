@@ -1,5 +1,6 @@
 // lib/mgr/ship-view.ts — view-model for Ship (invoice now and on delivery).
 import { docNo } from "./doc-no";
+import { saleVolume } from "@/lib/volume";
 
 export type ShipLineView = {
   key: string;
@@ -44,12 +45,6 @@ export type ShipSnapshot = {
 
 const pickedOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_picked ?? 0);
 const shipOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_shipped ?? pickedOf(l));
-
-function saleVolume(qty: number, bblPerUnit: number | undefined) {
-  // Sale-removal totals in the inventory are two-decimal bbl (2.00 / 0.87 / 0.97).
-  // formatVolume would drop the trailing zeros and turn a half-keg total into a glyph.
-  return bblPerUnit === undefined ? "" : `${(qty * bblPerUnit).toFixed(2)} bbl`;
-}
 
 /** Map get_order plus proposed ship qtys (qty_shipped, else qty_picked). */
 export function toShipViewProps({ order, lines, locations, invoiceTiming = "now", backHref }: ShipSnapshot): ShipViewModel {

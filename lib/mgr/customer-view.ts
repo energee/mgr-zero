@@ -1,7 +1,7 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
 import { sentenceCase } from "./labels";
-import { TAX_TREATMENTS } from "@/app/(app)/settings/channels/tax-treatments";
+import { TAX_TREATMENTS } from "./tax-treatments";
 
 export type CustomerViewModel = {
   backHref?: string;

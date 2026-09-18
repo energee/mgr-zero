@@ -4,7 +4,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { MASH_STEP_KINDS } from "@/lib/commands/production";
+import { MASH_STEP_KINDS } from "@/lib/mgr/enums";
 import { mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
 
 /** The verbs every ordered-list row carries: Edit, and move up or down while a draft is open. */

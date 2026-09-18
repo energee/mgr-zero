@@ -1,7 +1,7 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { E } from "@/components/mgr/e";
 import { buildContext } from "@/lib/commands/context";
-import { money } from "@/lib/mgr/money";
+import { dollarsInput, money } from "@/lib/mgr/money";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -21,6 +21,6 @@ export default async function PosItemPage({ params, searchParams }: { params: Pr
   return <>{E.back("Menu", `${row.brand} · ${row.format}`, undefined, backHref)}<PosRouteSheet title={`${row.brand} · ${row.format}`} backHref={backHref}><PosItemControl posLocationId={location.externalLocationId} brandId={row.brandId} formatId={row.formatId} item={{
     brand: row.brand, format: row.format, sources: row.sources.map(source => `${source.name} · ${source.qty}`).join(" · "),
     serving: row.ounces == null ? "Defined by format" : `${row.ounces} oz`, price: row.priceCents == null ? "No format price" : money(row.priceCents),
-    override: row.priceOverrideCents == null ? "" : (row.priceOverrideCents / 100).toFixed(2), websitePublished: Boolean(row.websitePublished), available: Boolean(row.available),
+    override: dollarsInput(row.priceOverrideCents), websitePublished: Boolean(row.websitePublished), available: Boolean(row.available),
   }} /></PosRouteSheet></>;
 }

@@ -10,7 +10,8 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { KegEventForm } from "./event-form";
-import { dollars, KIND_LABEL, SIZE_LABEL } from "./keg-labels";
+import { money } from "@/lib/mgr/money";
+import { KIND_LABEL, SIZE_LABEL } from "./keg-labels";
 import { PoolForm, type Pool } from "./pool-form";
 
 type Fleet = {
@@ -41,7 +42,7 @@ export default async function KegsPage() {
           const total = rows.reduce((n, r) => n + r.qty, 0);
           return {
             key: p.id, title: p.name,
-            detail: `${KIND_LABEL[p.kind]} · ${total} on hand · deposit ${dollars(p.deposit_cents)}${p.active ? "" : " · out of service"}`,
+            detail: `${KIND_LABEL[p.kind]} · ${total} on hand · deposit ${money(p.deposit_cents)}${p.active ? "" : " · out of service"}`,
             bins: rows.map((r) => ({ key: `${r.keg_size}-${r.location_name}-${r.bin_name}`, title: `${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, detail: `${r.qty} on hand · ${r.bin_name}`, qty: String(r.qty) })),
           };
         }),

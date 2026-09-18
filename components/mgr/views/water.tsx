@@ -4,7 +4,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/commands/production";
+import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import type { Ions } from "@/lib/water-chemistry";
 import { rowVerbs, type ListRowProps } from "./mash-schedule";

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/commands/taproom";
+import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/mgr/enums";
 import { REASON_LABEL, SIZE_LABEL } from "./keg-labels";
 
 type Reason = (typeof KEG_EVENT_REASONS)[number];

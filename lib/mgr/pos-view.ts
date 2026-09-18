@@ -1,4 +1,5 @@
 import type { CommandFailureDetail } from "@/lib/commands/client";
+import { money } from "@/lib/mgr/money";
 
 export type PublicationStatus = "requested" | "needs_snapshot" | "prepared" | "publishing" | "succeeded" | "rejected" | "superseded";
 
@@ -130,7 +131,7 @@ export type PosMenuModel = {
   message?: string;
 };
 
-const money = (cents: number | null) => cents == null ? "No price" : `$${(cents / 100).toFixed(2)}`;
+const price = (cents: number | null) => cents == null ? "No price" : money(cents);
 
 type PosMenuSnapshotItem = {
   brandId: string; formatId: string; brand: string; format: string; priceCents: number | null;
@@ -146,7 +147,7 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
   const selected = locations.find(location => location.externalLocationId === selectedLocationId);
   const item = (row: PosMenuSnapshotItem): PosMenuItem => ({
     brandId: row.brandId, formatId: row.formatId, label: `${row.brand} · ${row.format}`,
-    retail: money(row.priceCents), source: row.priceSource ?? "no price",
+    retail: price(row.priceCents), source: row.priceSource ?? "no price",
     destinations: `Square${row.websitePublished ? " · Website" : ""}`, available: Boolean(row.available),
     reason: row.reason?.replaceAll("_", " "), href: `/menu/item/${row.formatId}?location=${encodeURIComponent(selectedLocationId)}`,
   });

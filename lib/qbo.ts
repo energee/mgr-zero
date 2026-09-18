@@ -354,6 +354,17 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   });
 }
 
+// The one reading of a QuickBooks money field. MGR stores money as integer
+// cents, so a value that cannot round to an exact, safe integer number of
+// cents is not a number MGR can hold — it is a malformed response, and the
+// caller must reject it rather than carry `Infinity` or a lossy float into a
+// total. Invoice and payment reads share this so they cannot disagree.
+const cents = (value: unknown) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  const result = Math.round(value * 100);
+  return Number.isSafeInteger(result) ? result : null;
+};
+
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
 
@@ -451,8 +462,6 @@ export class QboOAuthClient {
     if (!response.ok) return { ok: false, status: response.status, definitive: response.status === 404 };
     const payload = await response.json() as { Invoice?: Record<string, unknown> };
     const invoice = payload?.Invoice;
-    const cents = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0
-      ? Math.round(value * 100) : null;
     const totalCents = cents(invoice?.TotalAmt);
     const balanceCents = cents(invoice?.Balance);
     const tax = invoice?.TxnTaxDetail;
@@ -498,11 +507,6 @@ export class QboOAuthClient {
     if (!response.ok) throw new Error("QuickBooks payment response was invalid");
     const payload = await response.json() as { Payment?: Record<string, unknown> };
     const payment = payload?.Payment;
-    const cents = (value: unknown) => {
-      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
-      const result = Math.round(value * 100);
-      return Number.isSafeInteger(result) ? result : null;
-    };
     const total = cents(payment?.TotalAmt);
     const unapplied = cents(payment?.UnappliedAmt);
     if (!payment || payment.Id !== paymentId || total === null || unapplied === null || unapplied > total
