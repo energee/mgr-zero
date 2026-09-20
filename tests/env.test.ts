@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readPublicEnv } from "@/lib/env/public";
-import { readQboEnv, readServerEnv, readSquareEnv } from "@/lib/env/server-parser";
+import { isChatConfigured, readQboEnv, readServerEnv, readSquareEnv } from "@/lib/env/server-parser";
 
 const validPublic = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54341",
@@ -103,4 +103,13 @@ describe("environment validation", () => {
     expect(serverEnv).toContain("export function getServerEnv()");
     expect(serverEnv).not.toContain("export const serverEnv = readServerEnv()");
   });
+});
+
+// #329 hosted retest, 2026-09-20: deployed functions never see VERCEL_OIDC_TOKEN
+// in process.env (Vercel sends it per request), so /api/chat answered 503 on live.
+describe("isChatConfigured", () => {
+  it("accepts an AI Gateway key", () => expect(isChatConfigured({ AI_GATEWAY_API_KEY: "k" })).toBe(true));
+  it("accepts a pulled development OIDC token", () => expect(isChatConfigured({ VERCEL_OIDC_TOKEN: "t" })).toBe(true));
+  it("accepts a deployed Vercel function, where the OIDC token arrives per request", () => expect(isChatConfigured({ VERCEL: "1" })).toBe(true));
+  it("rejects a bare environment", () => expect(isChatConfigured({})).toBe(false));
 });

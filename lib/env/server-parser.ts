@@ -70,3 +70,15 @@ export function readServerEnv(env: Environment = process.env): ServerEnv {
     vercelEnv: vercelEnv as ServerEnv["vercelEnv"],
   };
 }
+
+/**
+ * Whether /api/chat can reach the AI Gateway. A key works anywhere. Without one,
+ * the gateway authenticates with Vercel OIDC: `vercel env pull` writes
+ * VERCEL_OIDC_TOKEN for local dev, but a deployed function never has it in
+ * process.env — Vercel sends the token per request and the `ai` gateway provider
+ * reads it from there. So on Vercel (`VERCEL=1`) the absence of both is not a
+ * misconfiguration (#329: live answered 503 "Chat is not configured").
+ */
+export function isChatConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN || env.VERCEL === "1");
+}
