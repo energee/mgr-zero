@@ -75,6 +75,23 @@ describe("portal order deposit adjustments", () => {
     ]));
   });
 
+  it("charges the deposit on a staff-created order and a portal draft submitted without a quote (#413)", async () => {
+    const staff = await runCommand("create_order", {
+      kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.source.id,
+      lines: [{ skuId: f.first.skuId, qty: 2 }, { skuId: f.zeroDeposit.skuId, qty: 1 }],
+    }, f.adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId: staff.order_id }, f.adminCtx);
+    expect(await deposits(staff.order_id)).toEqual([{ sku_id: f.first.skuId, qty_ordered: 2, unit_price_cents: 2500 }]);
+    await runCommand("confirm_order", { orderId: staff.order_id }, f.adminCtx);
+    const invoiceId = await ship(f, staff.order_id, "now");
+    const rows = await admin.from("invoice_lines").select("qty,unit_price_cents").eq("invoice_id", invoiceId).eq("kind", "keg_deposit");
+    expect(rows.data?.map(row => ({ qty: Number(row.qty), cents: row.unit_price_cents }))).toEqual([{ qty: 2, cents: 2500 }]);
+
+    const draft = await runCommand("portal_create_order", { shipToId: f.customer.shipToId, lines: [{ skuId: f.second.skuId, qty: 1 }] }, f.portalCtx) as { order_id: string };
+    await runCommand("portal_submit_order", { orderId: draft.order_id }, f.portalCtx);
+    expect(await deposits(draft.order_id)).toEqual([{ sku_id: f.second.skuId, qty_ordered: 1, unit_price_cents: 2500 }]);
+  });
+
   it.each(["now", "on_delivery"] as const)("invoices every adjusted returnable-keg line with %s timing", async (timing) => {
     const orderId = await submitted(f);
     expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
