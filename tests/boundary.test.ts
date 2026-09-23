@@ -2,7 +2,8 @@
 // which module owns a formatter, and which modules a client or shared-view
 // file may import. Source text is the subject, because the rule is about the
 // import graph rather than a value any function returns.
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -100,4 +101,29 @@ describe("client and shared-view files never import the command registry", () =>
       expect(source).toMatch(/from "@\/lib\/mgr\/enums"/);
     },
   );
+});
+
+describe("server pages never call a function from a \"use client\" module", () => {
+  // A server component can render a client component, but calling a plain
+  // function exported next to one throws at request time ("Attempted to call
+  // … from the server"), and only once the call actually runs — /recipes/new
+  // rendered with no materials and 500'd with one (#440).
+  const isClient = (src: string) => /^(\s*\/\/.*\n)*\s*["']use client["']/.test(src);
+  const resolveImport = (from: string, spec: string) => {
+    const base = spec.startsWith("@/") ? spec.slice(2) : spec.startsWith(".") ? join(dirname(from), spec) : null;
+    return base && [".tsx", ".ts"].map((ext) => base + ext).find((p) => existsSync(new URL(`../${p}`, import.meta.url)));
+  };
+  const pages = (readdirSync(new URL("../app", import.meta.url), { recursive: true }) as string[])
+    .filter((p) => /(^|\/)(page|layout)\.tsx$/.test(p)).map((p) => `app/${p}`);
+
+  it.each(pages)("%s imports only components from client modules", (page) => {
+    const src = read(page);
+    if (isClient(src)) return;
+    for (const [, names, spec] of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*"([^"]+)"/g)) {
+      const file = resolveImport(page, spec);
+      if (!file || !isClient(read(file))) continue;
+      const values = names.split(",").map((s) => s.trim()).filter((s) => s && !s.startsWith("type ")).map((s) => s.split(/\s+as\s+/).pop()!);
+      expect(values.filter((n) => /^[a-z]/.test(n)), `${page} → ${spec}`).toEqual([]);
+    }
+  });
 });
