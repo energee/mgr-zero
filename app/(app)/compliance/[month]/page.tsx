@@ -2,6 +2,7 @@
 // Monthly compliance): the TTB month generated from the ledger, or the filed
 // snapshot once one exists. Completion losses remain reviewable through
 // append-only category allocations. MGR saves snapshots but never transmits a filing.
+import { E } from "@/components/mgr/e";
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -20,14 +21,15 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   if (!range) notFound();
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ filings: [filing] }, losses] = await Promise.all([
-    runCommand("list_compliance_reports", { jurisdiction: JURISDICTION, ...range }, ctx) as Promise<{ filings: Filing[] }>,
+  const [{ filings: [filing], today }, losses] = await Promise.all([
+    runCommand("list_compliance_reports", { jurisdiction: JURISDICTION, ...range }, ctx) as Promise<{ filings: Filing[]; today: string }>,
     runCommand("get_loss_review", range, ctx) as Promise<LossReview[]>,
   ]);
   const report: Report = filing ? { figures: filing.figures, warnings: [], externalMappingRequired: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
   return <MonthlyComplianceView
     model={toMonthlyComplianceViewProps({ monthLabel: monthLabel(month), report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
+    // A month is filed only once it is over (#429); file_compliance_report refuses earlier.
+    fileAction={filing ? undefined : range.periodEnd >= today ? E.status("File once the month ends", "w") : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
   />;
 }

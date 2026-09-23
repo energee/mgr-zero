@@ -23,7 +23,7 @@ export default async function CompliancePage() {
           const f = filed.get(m);
           return f
             ? { key: m, title: monthLabel(m), detail: `filed ${f.filed_at?.slice(0, 10)} · ${bbl(f.figures.removals.taxable ?? 0)} bbl taxable`, tone: "ok" as const, href: `/compliance/${m}` }
-            : { key: m, title: monthLabel(m), detail: "not filed · ready to review", tone: "w" as const, href: `/compliance/${m}` };
+            : { key: m, title: monthLabel(m), detail: m === today.slice(0, 7) ? "in progress · file once the month ends" : "not filed · ready to review", tone: "w" as const, href: `/compliance/${m}` };
         }),
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },
         lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${l.packaged_on}`, href: `/compliance/lots/${l.id}` })),
