@@ -41,8 +41,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
   const [water, setWater] = useState<WaterDraft>(EMPTY_WATER);
 
-  // Plain values: the React Compiler memoizes these on `materials` itself.
-  // Declared before the preview below reads `material` during render (#440).
+  // Declared before the preview reads it during render (#440).
   const material = materialLookup(materials);
   const validLines = lines.filter(lineReady);
   const eff = pctToFraction(numbers.efficiency), att = pctToFraction(numbers.attenuation);
