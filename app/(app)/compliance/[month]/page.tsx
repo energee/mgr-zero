@@ -13,7 +13,7 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, monthLabel, monthRange } from "../period";
+import { JURISDICTION, monthLabel, monthOver, monthRange } from "../period";
 
 export default async function MonthPage({ params }: { params: Promise<{ month: string }> }) {
   const { month } = await params;
@@ -29,7 +29,6 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   return <MonthlyComplianceView
     model={toMonthlyComplianceViewProps({ monthLabel: monthLabel(month), report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    // A month is filed only once it is over (#429); file_compliance_report refuses earlier.
-    fileAction={filing ? undefined : range.periodEnd >= today ? E.status("File once the month ends", "w") : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
+    fileAction={filing ? undefined : !monthOver(month, today) ? E.status("File once the month ends", "w") : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
   />;
 }
