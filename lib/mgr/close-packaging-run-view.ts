@@ -1,4 +1,5 @@
 // lib/mgr/close-packaging-run-view.ts — view-model for Close packaging run.
+import { isNumber, isPositive } from "./quantity-input";
 export type ClosePackagingRunViewModel = {
   backHref?: string;
   backTo?: string;
@@ -22,10 +23,9 @@ export type ClosePackagingRunViewModel = {
   tape?: [string, string][];
 };
 
-/** When the live Close run form may submit (#433). Blank Barrels drawn is
- *  not 0 (`Number("")` is), and a blank actual output is not an explicit 0. */
+/** When the live Close run form may submit (#433): Barrels drawn and every
+ *  actual output must be typed, not blank (an explicit 0 output is allowed). */
 export function closeRunReady(f: { bblDrawn: string; actuals: Record<string, string>; lotCode: string; packagedOn: string; locationId: string; binId: string }) {
-  const filled = (s: string) => s.trim() !== "";
-  return filled(f.bblDrawn) && Number(f.bblDrawn) > 0 && Object.values(f.actuals).every(filled)
-    && filled(f.lotCode) && f.packagedOn !== "" && f.locationId !== "" && f.binId !== "";
+  return isNumber(f.bblDrawn) && isPositive(f.bblDrawn) && Object.values(f.actuals).every(isNumber)
+    && f.lotCode.trim() !== "" && f.packagedOn !== "" && f.locationId !== "" && f.binId !== "";
 }

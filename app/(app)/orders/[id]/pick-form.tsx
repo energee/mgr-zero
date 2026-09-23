@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PickView } from "@/components/mgr/views/pick";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { isNumber } from "@/lib/mgr/quantity-input";
 import { toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
 
 export type PickLine = { id: string; skuName: string; qtyOrdered: number; qtyPicked: number | null };
@@ -17,7 +18,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     // A cleared field is not a count of 0 (#433).
-    if (snapshot.lines.some(line => !qtys[line.id]?.trim())) return setError("Enter a picked quantity for every line.");
+    if (!snapshot.lines.every(line => isNumber(qtys[line.id] ?? ""))) return setError("Enter a picked quantity for every line.");
     void run("record_pick", { orderId: snapshot.order.id, picks: snapshot.lines.map(line => ({ lineId: line.id, qty: Number(qtys[line.id]) })) }, () => router.push(`/orders/${snapshot.order.id}`));
   }}>
     <PickView model={model} quantities={qtys} onQuantity={(id, value) => setQtys(prev => ({ ...prev, [id]: value }))}
