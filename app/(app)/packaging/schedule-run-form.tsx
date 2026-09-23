@@ -21,7 +21,7 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
   const [occupancyId, setOccupancyId] = useState("");
   const [plannedOn, setPlannedOn] = useState("");
   const [lines, setLines] = useState<Line[]>([{ skuId: "", qtyPlanned: "" }]);
-  const validLines = lines.filter((l) => l.skuId && Number(l.qtyPlanned) >= 0);
+  const validLines = lines.filter((l) => l.skuId && l.qtyPlanned.trim() !== "" && Number(l.qtyPlanned) >= 0);
   const form = useCommandForm("schedule_packaging_run", {
     build: () => ({
       brandId, plannedOn, occupancyId: occupancyId || undefined,
