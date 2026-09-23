@@ -5,20 +5,15 @@
 -- volume left beer in process and appeared in no removal line. The report now
 -- adds it to the `loss` removal and the cellar breakdown in the period of the
 -- transfer, dated like every other row by the brewery's timezone.
-create function private.transfer_losses(p_brewery uuid, p_start date, p_end date)
-returns table (loss_bbl numeric) language sql stable set search_path = '' as $$
-  select t.loss_bbl from public.transfers t join public.breweries b on b.id = t.brewery_id
-  where t.brewery_id = p_brewery and t.loss_bbl > 0
-    and (t.at at time zone b.timezone)::date between p_start and p_end
-$$;
-revoke all on function private.transfer_losses(uuid, date, date) from public, anon, authenticated, service_role;
-
 create or replace function private.generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_cellar_removals jsonb; v_by_state jsonb;
-  v_packaged numeric; v_in_process numeric; v_external text[] := '{}';
+  v_packaged numeric; v_in_process numeric; v_external text[] := '{}'; v_transfer_loss numeric;
 begin
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
+  select coalesce(sum(t.loss_bbl), 0) into v_transfer_loss
+    from public.transfers t join public.breweries brewery on brewery.id = t.brewery_id
+    where t.brewery_id = p_brewery and (t.at at time zone brewery.timezone)::date between p_start and p_end;
   -- one pass over the ledger; every figure is an aggregate of the same rows
   with r as materialized (select * from private.report_movements(p_brewery, p_end)),
   per_class as (
@@ -44,7 +39,7 @@ begin
             and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
           group by 1
         union all
-        select 'loss', t.loss_bbl from private.transfer_losses(p_brewery, p_start, p_end) t
+        select 'loss', v_transfer_loss
       ) removals where k is not null group by k having sum(v) <> 0) t),
     (select coalesce(jsonb_object_agg(dest_state, round(v, 2)), '{}'::jsonb) from (
       select dest_state, -sum(bbl) as v from r where d >= p_start and type = 'sale_removal' and tax_treatment = 'taxable' group by 1) t),
@@ -58,7 +53,7 @@ begin
         where a.brewery_id = p_brewery and a.removal_class is not null
           and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
         union all
-        select 'loss', t.loss_bbl from private.transfer_losses(p_brewery, p_start, p_end) t
+        select 'loss', v_transfer_loss where v_transfer_loss <> 0
       ) cellar_rows group by removal_class
     ) cellar;
   if coalesce((v_cellar_removals->>'taproom')::numeric, 0) <> 0 then
