@@ -2,6 +2,9 @@ import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
+/** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
+const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
+
 defineQuery({
   name: "list_catalog_categories", description: "List this brewery's catalog categories",
   input: z.object({}), roles: STAFF_ROLES,
@@ -37,7 +40,7 @@ defineCommand({
 
 defineCommand({
   name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format",
-  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: z.string().trim().optional() }),
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: upc.optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
     p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId,
@@ -46,7 +49,7 @@ defineCommand({
 
 defineCommand({
   name: "update_sku", description: "Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: z.string().trim().optional() }),
+  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
     p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId,

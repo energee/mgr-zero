@@ -42,7 +42,7 @@ defineCommand({
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     address1: z.string().min(1), address2: z.string().optional(),
-    city: z.string().min(1), state: stateCode, zip: z.string().min(1),
+    city: z.string().min(1), state: stateCode, zip: z.string().trim().regex(/^\d{5}(-\d{4})?$/, "a 5-digit ZIP code or ZIP+4"),
     isDefault: z.boolean().optional(),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
