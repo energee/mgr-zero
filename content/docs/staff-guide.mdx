@@ -350,10 +350,10 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 
 1. Open **Orders** and select **New order** to open the order-entry page. The **Orders** back link leaves without saving.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
-3. For wholesale, choose the **Customer**; its default **Ship-to** is selected automatically (the first address if no default is set), and you can choose another. For a transfer, choose the destination in **To location**.
+3. For wholesale, choose the **Customer**; its default **Ship-to** is selected automatically (the first address if no default is set), and you can choose another. For a transfer, choose the destination in **To location**; it must differ from the source, or saving fails with "A transfer needs a different source and destination location."
 4. Choose the source in **Source location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
 5. Optionally choose **Requested ship** from the calendar and enter **Customer PO**.
-6. Add one or more lines. Select or search the available SKUs, then type a quantity greater than zero or use **−** and **+**. **Add line** adds a row. **Remove** takes one away, but at least one row stays. Availability is shown only when supplied; a missing ATP figure does not mean zero stock.
+6. Add one or more lines. Select or search the available SKUs, then type a quantity greater than zero or use **−** and **+**. Once a wholesale customer is chosen, the SKU list offers only active SKUs priced on that customer's sale channel; a transfer offers every active SKU. If a line's SKU has no price for the customer, saving names that SKU and says it is not active and priced for this customer. **Add line** adds a row. **Remove** takes one away, but at least one row stays. Availability is shown only when supplied; a missing ATP figure does not mean zero stock.
 7. Select **Save draft**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a source location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. Saving opens the draft order, where you can submit it. Wholesale line prices are captured from the cell where the customer's sale channel meets each beer's price group. Later price changes do not rewrite those lines.
 
 <Callout type="info">
@@ -559,7 +559,7 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
 2. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
-3. Choose **From warehouse**. The first warehouse is selected by default when one exists.
+3. Choose **From warehouse**. The first warehouse is selected by default when one exists. The taproom you are replenishing is never listed, even when it is also a warehouse.
 4. Edit **Transfer qty** as needed. Only positive lines are included.
 5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
