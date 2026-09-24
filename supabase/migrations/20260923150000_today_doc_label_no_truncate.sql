@@ -6,10 +6,18 @@
 -- (padStart never truncates). to_char(n, 'FM0000') is no fix: it prints '####'.
 -- Same columns in the same order as 00001_baseline.sql, so create or replace
 -- keeps the readers (setof private.today_candidates) and the service_role grant.
+-- One SQL owner for a document number, mirroring docNo (lib/mgr/doc-no.ts):
+-- padded to four digits, never truncated.
+create function private.doc_no(p_prefix text, p_n bigint) returns text
+language sql immutable set search_path = '' as $$
+  select p_prefix || '-' || case when p_n < 1000 then lpad(p_n::text, 4, '0') else p_n::text end
+$$;
+revoke all on function private.doc_no(text, bigint) from public, anon, authenticated, service_role;
+
 create or replace view private.today_candidates with (security_invoker = true) as
   select o.brewery_id, 'submitted_order'::text as reason, 'order'::text as subject_type, o.id::text as subject_id,
          md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)) as source_version,
-         'ORD-' || case when o.order_no < 1000 then lpad(o.order_no::text, 4, '0') else o.order_no::text end as safe_label,
+         private.doc_no('ORD', o.order_no) as safe_label,
          'submitted' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), '') as detail,
          (o.requested_ship_date::timestamp at time zone b.timezone) as due_at,
          '/orders/' || o.id as href,
@@ -20,7 +28,7 @@ create or replace view private.today_candidates with (security_invoker = true) a
   union all
   select o.brewery_id, 'pick_due', 'order', o.id::text,
          md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)),
-         'ORD-' || case when o.order_no < 1000 then lpad(o.order_no::text, 4, '0') else o.order_no::text end,
+         private.doc_no('ORD', o.order_no),
          'pick due' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), ''),
          (o.requested_ship_date::timestamp at time zone b.timezone),
          '/orders/' || o.id,
@@ -35,7 +43,7 @@ create or replace view private.today_candidates with (security_invoker = true) a
   -- standing work, not date-due: staged beer to put back while the flag is set
   select o.brewery_id, 'restock_due', 'order', o.id::text,
          md5(concat_ws('|', o.status, o.needs_restock)),
-         'ORD-' || case when o.order_no < 1000 then lpad(o.order_no::text, 4, '0') else o.order_no::text end,
+         private.doc_no('ORD', o.order_no),
          'restock staged beer',
          null::timestamptz,
          '/orders/' || o.id || '/restock',
@@ -80,7 +88,7 @@ create or replace view private.today_candidates with (security_invoker = true) a
   -- so the subject is the question and only the href points at the invoice
   select q.brewery_id, 'invoice_question', 'invoice', q.id::text,
          md5(concat_ws('|', q.id, q.answered_at)),
-         'INV-' || case when i.invoice_no < 1000 then lpad(i.invoice_no::text, 4, '0') else i.invoice_no::text end || ' · ' || c.name,
+         private.doc_no('INV', i.invoice_no) || ' · ' || c.name,
          'buyer asked: ' || left(q.body, 60),
          null::timestamptz,
          '/invoices/' || q.invoice_id,
