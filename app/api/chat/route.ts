@@ -1,5 +1,6 @@
 import { createUIMessageStreamResponse, gateway, isStepCount, streamText, toUIMessageStream } from "ai";
 import { NextResponse } from "next/server";
+import { consumeAdmission } from "@/lib/commands/admission";
 import { buildRouteContext } from "@/lib/commands/context";
 import { CommandError, runCommand, type Ctx } from "@/lib/commands/registry";
 import { createComposerTools } from "@/lib/chat/agent";
@@ -21,6 +22,12 @@ export async function POST(req: Request) {
     if (context.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
     if (!isChatConfigured()) {
       return NextResponse.json({ error: "Chat is not configured." }, { status: 503 });
+    }
+    // Same per-user budget as /api/command (#459): each turn can run several model steps and tool queries.
+    const admission = await consumeAdmission(context.db);
+    if (!admission.allowed) {
+      return NextResponse.json({ error: `Too many requests. Try again in ${admission.retryAfter} seconds.` },
+        { status: 429, headers: { "Retry-After": String(admission.retryAfter) } });
     }
     const ctx = context as Ctx;
     const [history, ai] = await Promise.all([runCommand("get_chat_history", { conversationId: body.id }, ctx), runCommand("get_brewery_ai_model", {}, ctx)]) as [{
