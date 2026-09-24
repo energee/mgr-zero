@@ -47,11 +47,12 @@ export function StartRunButton({ runId }: { runId: string }) {
   );
 }
 
-export function CloseRunForm({ runId, outputs, locations, bins }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[] }) {
+/** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */
+export function CloseRunForm({ runId, outputs, locations, bins, today }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string }) {
   const [bblDrawn, setBblDrawn] = useState("");
   const [actuals, setActuals] = useState<Record<string, string>>(Object.fromEntries(outputs.map((o) => [o.sku_id, String(o.qty_planned)])));
   const [lotCode, setLotCode] = useState("");
-  const [packagedOn, setPackagedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [packagedOn, setPackagedOn] = useState(today);
   const [bestBy, setBestBy] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState("");

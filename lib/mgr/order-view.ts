@@ -35,6 +35,8 @@ export type OrderViewModel = {
 
 export type OrderSnapshot = {
   backHref?: string;
+  /** breweries.timezone: event times print in it (#442). */
+  timeZone: string;
   order: {
     id: string;
     order_no: number | null;
@@ -112,7 +114,7 @@ function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lin
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
@@ -148,7 +150,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       };
     }),
     events: events.map((e) => [
-      `${formatDateTime(e.created_at)} · ${e.event.replace(/_/g, " ")}`,
+      `${formatDateTime(e.created_at, timeZone)} · ${e.event.replace(/_/g, " ")}`,
       e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",

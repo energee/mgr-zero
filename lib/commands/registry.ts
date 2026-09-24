@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/database";
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { breweryDate } from "@/lib/date-format";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
 /** Every staff role: the `roles` of a read that all of staff may run. */
@@ -99,7 +100,7 @@ export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknow
 /** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
 export async function breweryToday(ctx: Ctx): Promise<string> {
   const { timezone } = (await unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+  return breweryDate(timezone);
 }
 
 /** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */

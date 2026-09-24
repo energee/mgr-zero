@@ -103,6 +103,31 @@ describe("client and shared-view files never import the command registry", () =>
   );
 });
 
+describe("date field defaults come from the brewery's day (#437)", () => {
+  // `new Date().toISOString().slice(0, 10)` is the UTC day: tomorrow in a US
+  // evening. A default date is breweryToday(ctx) read on the server page and
+  // passed down; a client component never computes today itself.
+  const walk = (dir: string): string[] => readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })
+    .flatMap((entry) => entry.isDirectory() ? walk(`${dir}/${entry.name}`) : /\.tsx?$/.test(entry.name) ? [`${dir}/${entry.name}`] : []);
+  const files = walk("app");
+
+  it("finds the app files", () => {
+    expect(files).toContain("app/(app)/batches/[id]/page.tsx");
+  });
+
+  it.each(files)("%s never takes today as the UTC day", (path) => {
+    expect(read(path)).not.toMatch(/new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)/);
+  });
+
+  it.each([
+    ["app/(app)/batches/[id]/page.tsx"],
+    ["app/(app)/packaging/[id]/page.tsx"],
+    ["app/(app)/purchase-orders/[id]/page.tsx"],
+  ])("%s reads breweryToday on the server", (path) => {
+    expect(read(path)).toMatch(/breweryToday\(ctx\)/);
+  });
+});
+
 describe("server pages never call a function from a \"use client\" module", () => {
   // A server component can render a client component, but calling a plain
   // function exported next to one throws at request time ("Attempted to call
