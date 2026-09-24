@@ -19,7 +19,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
     runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
   ]);
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
-  if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
+  if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} timeZone={brewery.timeZone} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
   const [open, history] = await Promise.all([
     runCommand("list_open_taps", { locationId: location.id }, ctx) as Promise<TapInterval[]>,
     runCommand("list_tap_history", { locationId: location.id }, ctx) as Promise<TapHistory[]>,
@@ -28,7 +28,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
     .map((sku) => ({ id: sku.id, name: sku.name, nominalBbl: Number(sku.format_volume!.bbl_per_unit) }));
   const initial: TapBoardSnapshot = { open, history };
 
-  return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} navigation={{
+  return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} timeZone={brewery.timeZone} navigation={{
     backHref: "/beer", countHref: `/taproom?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
     locations: locations.map(item => [item.name, `/taproom/board?location=${item.id}`]), location: location.name,
   }} />;

@@ -39,6 +39,7 @@ export function MovementForm({
   locations,
   bins,
   channels,
+  timeZone,
 }: {
   autoOpen?: boolean;
   initial?: Partial<MovementInput>;
@@ -46,6 +47,8 @@ export function MovementForm({
   locations: { id: string; name: string; uses: string[] }[];
   bins: { id: string; location_id: string; name: string }[];
   channels: { id: string; name: string }[];
+  /** breweries.timezone: the receipt prints the movement time in it (#442). */
+  timeZone: string;
 }) {
   const breweryId = useBrewery();
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
@@ -95,7 +98,7 @@ export function MovementForm({
     kind: sentenceCase(receipt.type),
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
-    when: formatDateTime(receipt.created_at),
+    when: formatDateTime(receipt.created_at, timeZone),
     backHref: "/inventory",
     details: [
       { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
