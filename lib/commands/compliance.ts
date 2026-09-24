@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { periodKey } from "@/app/(app)/compliance/period";
 import { isoDate } from "./packaging";
-import { breweryToday, defineCommand, defineQuery, rows, stateCode, unwrap } from "./registry";
+import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 const day = isoDate.optional();
@@ -183,23 +183,12 @@ defineQuery({
     const lot = await unwrap(ctx.db.from("lots")
       .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
       .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
-    const movements: LotMovement[] = [];
-    for (let start = 0; ; start += 500) {
-      const result = await ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + 499);
-      const page = await unwrap(Promise.resolve(result)) as unknown as LotMovement[];
-      movements.push(...page);
-      if (result.count === null || (!page.length && movements.length < result.count)) throw new Error("Could not read complete lot trace");
-      if (movements.length >= result.count) break;
-    }
+    const movements = await completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as LotMovement[];
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
-    const recipients = [];
     // Small batches keep URL size bounded; each unique order has one shipment.
-    for (let start = 0; start < orderIds.length; start += 100) {
-      const orders = await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
-        .eq("brewery_id", ctx.breweryId).in("id", orderIds.slice(start, start + 100)));
-      recipients.push(...(orders ?? []));
-    }
+    const recipients = await inChunks(orderIds, async chunk => (await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
+      .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
     const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));

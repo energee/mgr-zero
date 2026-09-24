@@ -11,7 +11,7 @@
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError, type Ctx } from "./registry";
+import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
 // z.string().date() rather than a regex: api-schema.ts renders it as
 // "date (YYYY-MM-DD)" in /docs/api, as orders.ts and transfers.ts already do.
@@ -192,15 +192,15 @@ type RunRow = {
   bbl_drawn: number | null; note: string | null;
 };
 
-// Names for a set of brand ids, in one read. Embedded selects are avoided
+// Names for a set of brand ids, 100 ids per read. Embedded selects are avoided
 // throughout the command layer (see production.ts): every join here is an
 // explicit id -> name map, which keeps the composite-FK tables unambiguous.
 // production.ts shares this one.
 export async function brandNames(ctx: Ctx, ids: (string | null)[]) {
   const unique = [...new Set(ids.filter((v): v is string => !!v))];
   if (unique.length === 0) return new Map<string, string>();
-  const rows = (await unwrap(ctx.db.from("brands").select("id, name")
-    .eq("brewery_id", ctx.breweryId).in("id", unique))) ?? [];
+  const rows = await inChunks(unique, async chunk => (await unwrap(ctx.db.from("brands").select("id, name")
+    .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
   return new Map(rows.map((r) => [r.id as string, r.name as string]));
 }
 
@@ -208,20 +208,21 @@ export async function brandNames(ctx: Ctx, ids: (string | null)[]) {
 async function vesselNames(ctx: Ctx, occupancyIds: (string | null)[]) {
   const unique = [...new Set(occupancyIds.filter((v): v is string => !!v))];
   if (unique.length === 0) return new Map<string, string>();
-  const occs = (await unwrap(ctx.db.from("vessel_occupancies").select("id, vessel_id")
-    .eq("brewery_id", ctx.breweryId).in("id", unique))) ?? [];
-  const vessels = (await unwrap(ctx.db.from("vessels").select("id, name")
-    .in("id", [...new Set(occs.map((o) => o.vessel_id as string))]))) ?? [];
+  const occs = await inChunks(unique, async chunk => (await unwrap(ctx.db.from("vessel_occupancies").select("id, vessel_id")
+    .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
+  const vessels = await inChunks([...new Set(occs.map((o) => o.vessel_id as string))],
+    async chunk => (await unwrap(ctx.db.from("vessels").select("id, name").in("id", chunk))) ?? []);
   const names = new Map(vessels.map((v) => [v.id as string, v.name as string]));
   return new Map(occs.map((o) => [o.id as string, names.get(o.vessel_id as string) ?? ""]));
 }
 
 // Planned units per run. Summed here rather than in a view: the number is a
-// convenience for the list, and packaging_run_outputs stays the truth.
+// convenience for the list, and packaging_run_outputs stays the truth. Runs go
+// 100 ids per read, and each read is paged past the 1000-row cap (#469).
 async function plannedQty(ctx: Ctx, runIds: string[]) {
   if (runIds.length === 0) return new Map<string, number>();
-  const rows = (await unwrap(ctx.db.from("packaging_run_outputs").select("run_id, qty_planned")
-    .eq("brewery_id", ctx.breweryId).in("run_id", runIds))) ?? [];
+  const rows = await inChunks(runIds, chunk => completeRows("Planned units", start => ctx.db.from("packaging_run_outputs")
+    .select("run_id, qty_planned", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("run_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
   const totals = new Map<string, number>();
   for (const r of rows) totals.set(r.run_id as string, (totals.get(r.run_id as string) ?? 0) + Number(r.qty_planned));
   return totals;

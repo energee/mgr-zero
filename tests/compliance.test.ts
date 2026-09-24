@@ -102,7 +102,7 @@ describe("generate_compliance_report", () => {
   });
 
   it("prints cells that foot as printed, and a repack across package classes is the one thing that breaks the balance", async () => {
-    // 107 + 3 units of 0.0645 bbl: rounded independently, 6.45 + 0.19 ≠ 6.65; the printed end is derived from the printed cells
+    // 107 + 3 units of 0.0645 bbl: 6.9015 + 0.1935 = 7.095; rounded on their own the cells would not foot (6.90 + 0.19 ≠ 7.10)
     const other = await makeBrewery();
     const ctx = await makeStaffCtx(other.id, "admin");
     const { skuId } = await seedCatalog(other.id, { sku: "Foot case", packageType: "can", bblPerUnit: 0.0645 });
@@ -126,6 +126,33 @@ describe("generate_compliance_report", () => {
     expect(broken.figures.balances).toBe(false);
     expect(broken.warnings).toEqual(["keg does not balance", "can does not balance"]);
     await expect(runCommand("file_compliance_report", PERIOD, ctx)).rejects.toThrow(/does not balance: keg does not balance; can does not balance/);
+  });
+
+  it("a month's printed end is the next month's printed begin, and each month still foots as printed (#435)", async () => {
+    // 10.004 bbl opens in August, 0.004 arrives in September and again in October. Rounding each cell on its own
+    // printed September as 10.00 + 0.00 = 10.00 while October began at round(10.008) = 10.01.
+    const other = await makeBrewery();
+    const ctx = await makeStaffCtx(other.id, "admin");
+    const { skuId } = await seedCatalog(other.id, { sku: "Chain case", packageType: "can", bblPerUnit: 0.004 });
+    const l = await seedLocation(other.id);
+    const base = { brewery_id: other.id, location_id: l.id, bin_id: l.binId, created_by: ctx.userId, sku_id: skuId };
+    insertFixture("inventory_movements", [
+      { ...base, qty: 2501, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
+      { ...base, qty: 1, type: "production_in", created_at: "2026-09-03T12:00:00Z" },
+      { ...base, qty: 1, type: "production_in", created_at: "2026-10-03T12:00:00Z" },
+    ]);
+    const month = (periodStart: string, periodEnd: string) =>
+      runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart, periodEnd }, ctx) as Promise<Report>;
+    const [aug, sep, oct] = [await month("2026-08-01", "2026-08-31"), await month("2026-09-01", "2026-09-30"), await month("2026-10-01", "2026-10-31")];
+    for (const [prev, next] of [[aug, sep], [sep, oct]]) {
+      const nextBy = Object.fromEntries(next.figures.lines.map((x) => [x.class, x]));
+      for (const line of prev.figures.lines) expect(nextBy[line.class].begin, line.class).toBe(line.end);
+    }
+    for (const r of [aug, sep, oct]) {
+      for (const line of r.figures.lines) expect(line.begin + line.in - line.out).toBeCloseTo(line.end, 10);
+      expect(r.figures.balances).toBe(true);
+    }
+    expect(sep.figures.lines.find((x) => x.class === "can")).toMatchObject({ begin: 10, in: 0.01, out: 0, end: 10.01 });
   });
 
   it("warehouse cannot generate", async () => {
@@ -230,5 +257,25 @@ describe("trace_lot", () => {
     expect(t.on_hand).toBe(394);
     // sales may trace; an unknown lot is not found
     await expect(runCommand("trace_lot", { lotId: crypto.randomUUID() }, sales)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("cellar transfer loss (#428)", () => {
+  it("reports the volume lost on a transfer as a loss removal in the transfer's month", async () => {
+    const brewery = await makeBrewery();
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
+      from breweries where id='${brewery.id}'`, true)[0].split("|");
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
+    const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: fv2.id, volumeBbl: 8, lossBbl: 0.5 }, brewer);
+
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: start, periodEnd: end }, owner) as Report & { figures: { cellarRemovals: Record<string, number> } };
+    expect(Number(r.figures.removals.loss)).toBe(0.5);
+    expect(Number(r.figures.cellarRemovals.loss)).toBe(0.5);
   });
 });

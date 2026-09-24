@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Children, isValidElement, type ReactNode } from "react";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
+import { localModule } from "./local-module";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [] as const;
@@ -45,17 +46,6 @@ function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
 
 function sourceFile(path: string) {
   return ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-}
-
-function localModule(from: string, specifier: string): string | undefined {
-  const base = specifier.startsWith("@/")
-    ? resolve(specifier.slice(2))
-    : specifier.startsWith(".")
-      ? resolve(dirname(from), specifier)
-      : undefined;
-  if (!base) return undefined;
-  return [base, `${base}.tsx`, `${base}.ts`, resolve(base, "index.tsx"), resolve(base, "index.ts")]
-    .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
 }
 
 /** Follow function-component exports, not every sibling in an imported module.

@@ -10,7 +10,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
-import type { RecipeMaterial } from "./recipe-version-form";
+import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
 import { fermentationSummary, ingredientDetail, mashSummary, materialLookup, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };

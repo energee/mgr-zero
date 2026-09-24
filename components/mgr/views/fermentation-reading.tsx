@@ -3,6 +3,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
 import { gravityPlaceholder, gravityUnitShort, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { E } from "@/components/mgr/e";
+import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 
 export type FermentationReadingValues = {
   observedAt: string;
@@ -53,7 +54,7 @@ export function FermentationReadingView({
           {E.edit("Observed at", values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
         </div>
         <div className="flex flex-col gap-2">
-          {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true })}
+          {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true, ...READING_BOUNDS.tempF })}
           {prior?.tempF && <p className="text-xs text-muted-foreground">Prior {prior.tempF} °F</p>}
         </div>
         <div className="flex flex-col gap-2">
@@ -67,7 +68,7 @@ export function FermentationReadingView({
           ) : prior?.gravity ? <p className="text-xs text-muted-foreground">Prior {prior.gravity}</p> : null}
         </div>
         <div className="flex flex-col gap-2">
-          {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph" })}
+          {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph", ...READING_BOUNDS.ph })}
           {prior?.ph && <p className="text-xs text-muted-foreground">Prior {prior.ph}</p>}
         </div>
         <p className="text-sm text-muted-foreground">Enter only values taken now; blanks are not rewritten.</p>
