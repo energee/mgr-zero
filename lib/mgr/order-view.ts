@@ -6,6 +6,7 @@ import { docNo } from "./doc-no";
 import { money } from "./money";
 import { nextState, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
+import { stagedQty } from "./put-back-view";
 
 export type OrderLineView = {
   key: string;
@@ -103,11 +104,11 @@ function lineDetail(
 function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lines"]): string | undefined {
   if (!order.needs_restock) return undefined;
   const bits = lines.flatMap((l) => {
-    const extra = Number(l.qty_picked ?? 0) - Number(l.qty_ordered);
+    const extra = stagedQty(order.status, l);
     return extra > 0 ? [`${extra} ${l.skus?.name ?? "line"}`] : [];
   });
   if (!bits.length) return "Staged beer stayed on the floor after this order changed.";
-  return `Put back ${bits.join(", ")}. They stayed staged after the line was adjusted.`;
+  return `Put back ${bits.join(", ")}. They stayed staged after the order changed.`;
 }
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
