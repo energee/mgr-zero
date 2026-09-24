@@ -37,8 +37,8 @@ const appDebt = [
   "app/(app)/orders/[id]/lifecycle-buttons.tsx",
   "app/(app)/orders/[id]/confirm/confirm-buttons.tsx",
   "app/(app)/catalog/pour-form.tsx",
-  "app/(app)/compliance/[month]/file-button.tsx",
-  "app/(app)/compliance/[month]/loss-review-form.tsx",
+  "app/(app)/compliance/[period]/file-button.tsx",
+  "app/(app)/compliance/[period]/loss-review-form.tsx",
   "app/(app)/catalog/formats/[id]/rows-form.tsx",
 ];
 
