@@ -90,11 +90,26 @@ describe("batch completion reconciliation", () => {
     expect(result.adjustmentId).toBeNull();
   });
 
+  it("refuses the run close that tips the batch's packaged total past its baseline (#499)", async () => {
+    const source = await brew(10);
+    // Two closes, each within its tank (#432), that together would package 10.01 bbl from 10.
+    await packageBeer(source, 5, 1);
+    await expect(packageBeer(source, 5.01, 1)).rejects.toThrow(/packaged 10\.01 bbl.*batch had 10/i);
+    // The refused close rolled back: its run is still open and booked no finished goods.
+    expect(sql(`select (r.closed_at is not null)::text || '|' || count(m.id) from packaging_runs r
+      join vessel_occupancies o on o.id = r.occupancy_id
+      left join packaging_run_outputs po on po.run_id = r.id
+      left join inventory_movements m on m.id = po.movement_id
+      where o.batch_id='${source.batchId}' group by r.id order by 1`, true)).toEqual(["false|0", "true|1"]);
+  });
+
   it("refuses a negative full-precision residual atomically", async () => {
     const source = await brew(10);
-    // Two closes, each within its tank (#432), that together package 10.01 bbl from 10.
+    // Packaging fit when it closed; a measurement since then shrank the baseline under it.
     await packageBeer(source, 5, 1);
-    await packageBeer(source, 5.01, 1);
+    insertFixture("volume_adjustments", {
+      brewery_id: breweryId, occupancy_id: source.occupancyId, bbl: -5.01, reason: "measurement", created_by: ctx.userId,
+    });
     await expect(complete(source.batchId)).rejects.toThrow(/packaged.*baseline|negative residual/i);
     expect(sql(`select (closed_at is null)::text from batches where id='${source.batchId}'`, true)).toEqual(["true"]);
     expect(sql(`select (ended_at is null)::text from vessel_occupancies where id='${source.occupancyId}'`, true)).toEqual(["true"]);
