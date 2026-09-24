@@ -8,6 +8,7 @@ import { toPostedReceiptViewProps } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -43,8 +44,8 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
     if (!model) notFound();
     return <ReceiptView model={model} />;
   }
-  const [locations, bins] = await Promise.all([runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx)]) as [Location[], Bin[]];
-  return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} model={{
+  const [locations, bins, today] = await Promise.all([runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), breweryToday(ctx)]) as [Location[], Bin[], string];
+  return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
     history: po.receipts.map(receipt => ({
