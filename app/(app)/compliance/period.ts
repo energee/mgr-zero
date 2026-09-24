@@ -12,6 +12,9 @@ export function monthRange(month: string): { periodStart: string; periodEnd: str
   return { periodStart: `${month}-01`, periodEnd: `${month}-${String(last).padStart(2, "0")}` };
 }
 
+/** A month can be filed only once it is over in the brewery's calendar (#429). */
+export const monthOver = (month: string, today: string) => (monthRange(month)?.periodEnd ?? "") < today;
+
 export const monthLabel = (month: string) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
 /** The last `n` months ending with `today` (YYYY-MM-DD), newest first. */

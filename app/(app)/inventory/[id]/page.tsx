@@ -23,7 +23,7 @@ export default async function InventoryDetailPage({ params, searchParams }: {
     orNotFound(runPageQuery("list_movements", { skuId: id, movementId: movement, limit: 51, offset: page * 50 }, ctx)),
   ]) as [{ location_id: string; qty: number; locations: { name: string } | null }[], { qty: number }[], InventoryMovement[]];
   const href = `/inventory/${id}`;
-  return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: movements.slice(0, 50), backHref: "/inventory" })}
+  return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: movements.slice(0, 50), backHref: "/inventory", timeZone: brewery.timeZone })}
     movementAction={m => m.compensates_id ? E.act("Original movement", "primary", `${href}?movement=${m.compensates_id}`)
       : m.reversed_by ? E.act("Reversal recorded", "primary", `${href}?movement=${m.id}`)
       : canReverseMovement(m) ? (brewery.role === "admin" || brewery.role === "warehouse" ? <ReversalForm movement={m} /> : "Read only")
