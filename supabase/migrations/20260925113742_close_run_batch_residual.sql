@@ -3,7 +3,9 @@
 -- arithmetic moves out of private.batch_completion_calculation into a
 -- non-raising private.batch_volume_balance, which both completion and
 -- close_packaging_run call. close_packaging_run is otherwise a copy of
--- 20260924190000 (#436).
+-- 20260924190000 (#436, including its material ledger lock), and
+-- batch_completion_calculation keeps 20260924040000's rule (#431): only a
+-- negative baseline is refused, so a zero-baseline batch still completes.
 
 -- A batch's volume balance: what it had (baseline), what closed runs put in
 -- packages, what losses and removals account for, and what is left over
@@ -76,7 +78,7 @@ begin
   v_balance := private.batch_volume_balance(p_brewery, p_batch);
   v_baseline := (v_balance->>'baselineBbl')::numeric;
   v_residual := (v_balance->>'residualBbl')::numeric;
-  if v_baseline <= 0 then raise exception 'batch completion baseline must be positive'; end if;
+  if v_baseline < 0 then raise exception 'batch completion baseline must not be negative'; end if;
   if v_residual < 0 then raise exception 'batch has a negative completion residual; packaged and attributed volume exceed its baseline'; end if;
   return v_balance || jsonb_build_object(
     'batchId', p_batch, 'closedAt', null,
@@ -158,6 +160,11 @@ begin
   -- A planned line nobody filled is settled at zero rather than left null: the
   -- run is history now, and "we filled none of those" is the answer.
   update public.packaging_run_outputs set qty_actual = 0 where run_id = p_run;
+
+  -- The BOM check below reads material on hand then inserts; take the material
+  -- ledger lock (as move_stock_bin does) so two closes cannot both pass on the
+  -- same cans.
+  lock table public.material_movements in share row exclusive mode;
 
   for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
     v_sku := (v_line->>'sku_id')::uuid;
