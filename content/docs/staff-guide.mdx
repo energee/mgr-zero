@@ -229,7 +229,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale â€” Â
   <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card>
 </Cards>
 
-**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Removing an otherwise empty bin also clears any POS menu configured to use it, so configure that location's menu against another bin before publishing again. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. A bin a POS menu uses cannot be removed either, so the menu, its prices, and its public menu address stay intact; configure that location's menu against another bin first. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
 
 <Screen name="SKU detail" />
 
@@ -457,7 +457,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Bin" />
 
-Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
+Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed. A bin a POS menu uses is refused too until the menu points at another bin; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
 
 ## Stock transfers [#transfers]
 
