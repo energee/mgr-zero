@@ -2707,7 +2707,7 @@ export const SCREENS: Screen[] = [
     reads: "none",
     writes: "create_credit_memo [kind=credit_memo, own requestid]",
     states: [["applied", "reduces the customer balance here"], ["unapplied", "sits as available credit"], ["rejected", "the QuickBooks sync error is shown on the MGR credit row", 1], ["deposit line untaxed", "TaxCodeRef NON, or it refunds phantom tax", 1]],
-    spec: "Created by Return shipment or a keg return, never free-form; the plan lists free-form credit memos as deliberately deferred. Returning an empty keg posts the deposit refund and the keg event in one RPC, so the credit and the fleet balance cannot disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
+    spec: "Created by Return shipment, never free-form; the plan lists free-form credit memos as deliberately deferred. A keg deposit refund is credited through Return on the invoice that charged the deposit; the empty keg's Returned event is recorded separately in Keg fleet, so nothing yet ties the credit to the fleet balance. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
     body: (<>
       {X.stat("Applied")}
       {X.amt("Total credit", INV.creditMajor, "00")}
