@@ -1,22 +1,9 @@
--- Filed months chain (#435). The report printed each cell rounded on its own
--- and derived end from them: end = round(b) + round(i) - round(o). The next
--- month's begin is round(all prior movement), so a month could print 10.00 at
--- the end and the next begin 10.01. Printed cells must both foot (begin + in -
--- out = end, as printed) and chain (this end = next begin, as printed).
---
--- One rule gives both: round the running balance, never a movement. The
--- period's unrounded running balances are b, b + i, and b + i - o; begin and
--- end print round(b) and round(b + i - o), and the movement cells are the
--- differences of the rounded running balance:
---   in  = round(b + i) - round(b)
---   out = round(b + i) - round(b + i - o)
--- So the cells foot exactly by construction, and end is the rounded balance at
--- the period end, which for a class that balances is the same sum the next
--- period rounds as its begin, whatever either period's length. Each movement
--- cell stays within 0.01 of its unrounded total. A class that does not balance
--- is warned and blocked from filing exactly as before; that check stays on
--- the unrounded figures.
--- Otherwise identical to 20260923100000 (#428: transfer loss is a removal).
+-- Filed months chain (#435): printed cells must foot (begin + in - out = end)
+-- and chain (this end = next begin). Round the running balance, never a
+-- movement: begin = round(b), end = round(b+i-o), and in/out are differences of
+-- the rounded running balance, so each stays within 0.01 of its own total. The
+-- balance check stays on unrounded figures. Otherwise identical to
+-- 20260923100000 (#428).
 create or replace function private.generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_cellar_removals jsonb; v_by_state jsonb;
@@ -36,8 +23,7 @@ begin
       coalesce(sum(bbl), 0) as e
     from unnest(enum_range(null::public.package_type)) as c(class) left join r on r.class = c.class group by c.class)
   select
-    -- the printed cells must foot as printed and chain month to month: round the running balance, never a
-    -- movement, so in and out are differences of rounded balances; the identity is checked unrounded below
+    -- rounded running balance (see header); the identity is checked unrounded below
     (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(b + i, 2) - round(b, 2),
       'out', round(b + i, 2) - round(b + i - o, 2), 'end', round(b + i - o, 2)) order by class) from per_class),
     coalesce((select array_agg(class::text || ' does not balance' order by class) from per_class where b + i - o <> e), '{}')
