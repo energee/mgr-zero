@@ -211,7 +211,7 @@ curl -X POST "$MGR_URL/api/command" \
 ```
 
 `provision_brewery` requires authentication but no existing membership; omit
-`breweryId`. Its blank tenant-role cells below mean roles do not apply, not that
+`breweryId`. A dedicated deployment refuses it. Its blank tenant-role cells below mean roles do not apply, not that
 access is anonymous. All other operations use the following membership checks.
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
@@ -588,7 +588,7 @@ one value that ties what your client saw to what the server recorded.
 | 400 | `preview_required` | A chat-origin command arrived without a confirmed preview bound to its conversation. | Call `preview_command`, show its effects for confirmation, then send its `previewToken` with the same input and `conversationId`. |
 | 401 | `unauthenticated` | No usable session cookie or bearer token. | Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session. |
 | 403 | `not_member` | Authenticated, but not a member of the brewery named by `breweryId`. | Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`). |
-| 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role. | Each operation lists the roles allowed to call it; the role matrix collects them. |
+| 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role; or `provision_brewery` on a dedicated deployment (`MGR_DEDICATED=1`), which refuses brewery creation. | Each operation lists the roles allowed to call it; the role matrix collects them. |
 | 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload, or a confirmed preview changed before its first commit. | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. |
@@ -4423,8 +4423,8 @@ when membership is completed.
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
 admin membership and returns the brewery UUID. Replay returns that UUID without
-restoring revoked membership. `MGR_DEDICATED=1` disables web creation only;
-authenticated API provisioning remains available.
+restoring revoked membership. `MGR_DEDICATED=1` refuses brewery creation from
+the web and the API alike with `403 permission_denied`.
 
 `import_csv` accepts 1–5000 string-field rows and returns
 `{ committed, blocked, outcomes }`. Each outcome names its 1-based `row`,
