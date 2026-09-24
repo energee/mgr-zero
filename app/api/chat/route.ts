@@ -19,14 +19,14 @@ export async function POST(req: Request) {
     const body = await readChatRequest(req);
     const context = await buildRouteContext(body.breweryId, body.expectedContext);
     if (context.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
+    if (!isChatConfigured()) {
+      return NextResponse.json({ error: "Chat is not configured." }, { status: 503 });
+    }
     // Same per-user budget as /api/command (#459): each turn can run several model steps and tool queries.
     const admission = await consumeAdmission(context.db);
     if (!admission.allowed) {
       return NextResponse.json({ error: `Too many requests. Try again in ${admission.retryAfter} seconds.` },
         { status: 429, headers: { "Retry-After": String(admission.retryAfter) } });
-    }
-    if (!isChatConfigured()) {
-      return NextResponse.json({ error: "Chat is not configured." }, { status: 503 });
     }
     const ctx = context as Ctx;
     const [history, ai] = await Promise.all([runCommand("get_chat_history", { conversationId: body.id }, ctx), runCommand("get_brewery_ai_model", {}, ctx)]) as [{

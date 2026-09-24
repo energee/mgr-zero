@@ -1,9 +1,9 @@
-import type { Database } from "@/lib/supabase/database";
 // tests/chat-route-admission.test.ts — proves POST /api/chat spends the same per-user
 // command admission budget as /api/command and refuses with 429 before any model or history work (#459).
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeBrewery, makeStaff, sql } from "./helpers";
+import { asUser, makeBrewery, makeStaff, sql } from "./helpers";
 
 const request = vi.hoisted(() => ({ db: undefined as SupabaseClient<Database> | undefined }));
 
@@ -24,15 +24,6 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function signInAs(email: string) {
-  const db = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { error } = await db.auth.signInWithPassword({ email, password: "test-password-1" });
-  if (error) throw error;
-  return db;
-}
-
 function chatReq(breweryId: string, conversationId: string) {
   return new Request("http://localhost/api/chat", {
     method: "POST",
@@ -50,7 +41,7 @@ describe("POST /api/chat admission", () => {
     vi.stubEnv("AI_GATEWAY_API_KEY", "test-key");
     const brewery = await makeBrewery();
     const staff = await makeStaff(brewery.id);
-    request.db = await signInAs(staff.email);
+    request.db = await asUser(staff.email);
     sql(`insert into private.command_admissions(user_id,window_started_at,request_count) values ('${staff.id}',now(),120)
       on conflict(user_id) do update set window_started_at=now(),request_count=120`);
     try {
