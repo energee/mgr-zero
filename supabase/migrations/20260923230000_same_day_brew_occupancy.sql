@@ -7,14 +7,16 @@
 -- close of that vessel *within that same day*. A close on a later day is still
 -- a real conflict (a backdated brew into a stretch the vessel was full) and
 -- still reports `occupied`. brewed_on itself is unchanged: the cellar thinks in
--- days, only the range start moves past the same-day emptying.
+-- days, only the range start moves past the same-day emptying. "That day" is
+-- the brewery's local day (breweries.timezone), not the UTC day, so a tank
+-- emptied at 22:00 in New York still counts as the same day.
 -- create or replace keeps the baseline's grants.
 create or replace function public.record_brew_day(
   p_brewery uuid, p_batch uuid, p_vessel uuid, p_initial_bbl numeric, p_brewed_on date, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_replay jsonb; v_batch public.batches; v_vessel public.vessels; v_occ public.vessel_occupancies;
-  v_start timestamptz;
+  v_start timestamptz; v_tz text;
 begin
   perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_brew_day', p_request_id,
@@ -30,13 +32,15 @@ begin
   if v_batch.id is null then raise exception 'batch not found'; end if;
   if v_batch.brewed_on is not null then raise exception 'batch % was already brewed on %', v_batch.batch_no, v_batch.brewed_on; end if;
 
-  -- Midnight of brewed_on, pushed past any occupancy of this vessel that closed
-  -- during that same day (emptied this morning, brewed into this afternoon).
-  select greatest(p_brewed_on::timestamptz, max(o.ended_at)) into v_start
+  -- Local midnight of brewed_on, pushed past any occupancy of this vessel that
+  -- closed during that same local day (emptied this morning, brewed into this
+  -- afternoon).
+  select timezone into v_tz from public.breweries where id = p_brewery;
+  select greatest(p_brewed_on::timestamp at time zone v_tz, max(o.ended_at)) into v_start
   from public.vessel_occupancies o
   where o.vessel_id = p_vessel
-    and o.ended_at >= p_brewed_on::timestamptz
-    and o.ended_at < (p_brewed_on + 1)::timestamptz;
+    and o.ended_at >= p_brewed_on::timestamp at time zone v_tz
+    and o.ended_at < (p_brewed_on + 1)::timestamp at time zone v_tz;
 
   -- Exactly the predicate the gist exclusion enforces, so a backdated brew day
   -- that lands inside a *closed* occupancy still gets this readable error
