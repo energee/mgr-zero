@@ -92,7 +92,11 @@ describe("batch completion reconciliation", () => {
 
   it("refuses a negative full-precision residual atomically", async () => {
     const source = await brew(10);
-    await packageBeer(source, 10.01, 10);
+    // Each close fits the tank it drew from (close_packaging_run refuses one
+    // that doesn't, #432), but two runs drawing less than they packaged still
+    // package 10.01 bbl from a 10 bbl baseline.
+    await packageBeer(source, 5, 1);
+    await packageBeer(source, 5.01, 1);
     await expect(complete(source.batchId)).rejects.toThrow(/packaged.*baseline|negative residual/i);
     expect(sql(`select (closed_at is null)::text from batches where id='${source.batchId}'`, true)).toEqual(["true"]);
     expect(sql(`select (ended_at is null)::text from vessel_occupancies where id='${source.occupancyId}'`, true)).toEqual(["true"]);
