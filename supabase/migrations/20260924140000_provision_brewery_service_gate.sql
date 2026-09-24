@@ -5,14 +5,13 @@
 -- The authenticated RPC is dropped. The replacement is service_role only and
 -- takes the actor the server verified from the session (lib/supabase/provision.ts,
 -- architecture rule 4); the server refuses before calling it when dedicated.
-revoke all on function public.provision_brewery(text, text, text, uuid) from public, anon, authenticated, service_role;
 drop function public.provision_brewery(text, text, text, uuid);
 
 create function public.provision_brewery(p_actor uuid, p_name text, p_timezone text, p_ttb text, p_request_id uuid)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_result jsonb; v_id uuid;
 begin
-  if p_actor is null or not exists (select 1 from auth.users where id = p_actor)
+  if not exists (select 1 from auth.users where id = p_actor)
     then raise exception 'permission denied' using errcode = '42501'; end if;
   if p_name is null or btrim(p_name) = '' then raise exception 'brewery name is required'; end if;
   if p_timezone is null or not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone)
