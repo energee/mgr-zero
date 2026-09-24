@@ -4,11 +4,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
 
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+
 // A removal needs stock in its bin (#450), so each removal test seeds some first.
 const stockBin = (brewery: string, sku: string, loc: { id: string; binId: string }, createdBy: string, qty = 1) =>
   ins("inventory_movements", { brewery_id: brewery, sku_id: sku, location_id: loc.id, bin_id: loc.binId, qty, type: "opening_balance", created_by: createdBy });
-import { runCommand } from "@/lib/commands/registry";
-import "@/lib/commands/all";
 
 describe("sale_channels", () => {
   it("a new brewery has four channels and Export is untaxpaid", async () => {
