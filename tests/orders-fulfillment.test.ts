@@ -188,6 +188,19 @@ describe("pick and ship", () => {
     const { data: alloc } = await admin.from("allocations").select().eq("ref", line.id).single();
     expect(alloc!.status).toBe("released");
   });
+  it("refuses a pick above the ordered quantity and leaves the order untouched (#471)", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const over = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 12 }], p_request_id: crypto.randomUUID() });
+    expect(over.error?.message).toMatch(/cannot exceed ordered/);
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: null });
+    expect((await admin.from("orders").select("status").eq("id", id).single()).data).toEqual({ status: "confirmed" });
+    const exact = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    expect(exact.error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 10 });
+    // Release the open allocation so later ATP assertions in this file see the same stock.
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "test cleanup", p_request_id: crypto.randomUUID() })).error).toBeNull();
+  });
   it("ship rejects when p_ship omits an order line", async () => {
     const id = await confirmedOrder(3);
     const line = await lineOf(id);
