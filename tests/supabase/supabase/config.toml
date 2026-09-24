@@ -54,7 +54,8 @@ enable_signup = false
 minimum_password_length = 6
 
 [auth.email]
-enable_signup = false
+# Must stay true: false disables the email provider (password sign-in).
+enable_signup = true
 enable_confirmations = false
 
 [auth.email.template.invite]
