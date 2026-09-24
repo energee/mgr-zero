@@ -159,7 +159,9 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
 }
 
 // Leases due deliveries, re-checks everything from server state, then sends or
-// updates. Persists only provider ids and redacted codes.
+// updates. Persists only provider ids and redacted codes. Only provider-send
+// failures are classified and retried; a failure to record an outcome is
+// logged and never resends or aborts the rest of the batch.
 export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = serviceClient(), transport = slackTransport() }: Deps & { limit?: number } = {}) {
   const leased = (await unwrap(db.rpc("lease_chat_deliveries", { p_limit: limit, p_lease_seconds: 60, p_now: now.toISOString() }))) as Lease[];
   const counts = { sent: 0, updated: 0, suppressed: 0, retried: 0, terminal: 0 };
@@ -189,6 +191,7 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
     }
     const notification = ctx.occurrence.reason === "operations_digest" ? digestNotification(ctx) : toNotification(ctx.occurrence);
     const installationId = ctx.installation.external_installation_id;
+    let delivered: { ref: ProviderMessageRef; kind: "sent" | "updated" };
     try {
       if (personal && !resolved) {
         const extras = await Promise.all(([["snooze", "mgr_snooze", "Snooze 1 hour"], ["mute_reason", "mgr_mute_reason", "Mute this reason"]] as const).map(async ([id, action, label]) => {
@@ -209,24 +212,38 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
       const paceKey = `${installationId}:${ctx.destination.external_destination_id}`;
       if (existing) {
         await paced(paceKey, () => transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved }));
-        await complete(existing, "updated");
+        delivered = { ref: existing, kind: "updated" };
       } else {
         const ref = await paced(paceKey, () => transport.send({ installationId, destinationId: ctx.destination.external_destination_id, notification, intentId: lease.id }));
-        await complete(ref, "sent");
+        delivered = { ref, kind: "sent" };
       }
     } catch (e) {
       const cls = classifySlackError(e);
-      if (cls.retryable) {
-        const next = new Date(now.getTime() + (cls.retryAfterMs ?? backoffMs(lease.attempt_count)));
-        await unwrap(db.rpc("retry_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_next_attempt_at: next.toISOString(), p_error_code: cls.code }));
-        counts.retried++;
-      } else {
-        await stop("terminal", cls.code);
-        if (REAUTH_CODES.has(cls.code)) {
-          await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: ctx.installation.id, p_failure_code: cls.code })).catch(() => undefined);
+      try {
+        if (cls.retryable) {
+          const next = new Date(now.getTime() + (cls.retryAfterMs ?? backoffMs(lease.attempt_count)));
+          await unwrap(db.rpc("retry_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_next_attempt_at: next.toISOString(), p_error_code: cls.code }));
+          counts.retried++;
+        } else {
+          await stop("terminal", cls.code);
+          if (REAUTH_CODES.has(cls.code)) {
+            await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: ctx.installation.id, p_failure_code: cls.code })).catch(() => undefined);
+          }
         }
+      } catch (recordError) {
+        // A stale lease (an overlapping run swept it) or a database failure:
+        // leave the row to its lease owner or expiry and keep the batch going.
+        console.error(`chat delivery ${lease.id} failure (${cls.code}) could not be recorded:`, recordError instanceof Error ? recordError.message : recordError);
       }
+      continue;
     }
+    // Recorded outside the send's try: the provider already accepted the
+    // message, so a recording failure must never be classified as a send
+    // failure and retried (#462). The row stays leased; lease expiry re-leases
+    // it — the rare duplicate the design accepts (spec §20).
+    await complete(delivered.ref, delivered.kind).catch((recordError) => {
+      console.error(`chat delivery ${lease.id} ${delivered.kind} but could not be recorded:`, recordError instanceof Error ? recordError.message : recordError);
+    });
   }
   return counts;
 }
