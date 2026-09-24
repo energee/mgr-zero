@@ -5627,7 +5627,6 @@ export type Database = {
           created_by: string
           from_occupancy_id: string
           id: string
-          loss_bbl: number
           note: string | null
           to_occupancy_id: string
         }
@@ -5639,7 +5638,6 @@ export type Database = {
           created_by: string
           from_occupancy_id: string
           id?: string
-          loss_bbl?: number
           note?: string | null
           to_occupancy_id: string
         }
@@ -5651,7 +5649,6 @@ export type Database = {
           created_by?: string
           from_occupancy_id?: string
           id?: string
-          loss_bbl?: number
           note?: string | null
           to_occupancy_id?: string
         }

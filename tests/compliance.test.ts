@@ -262,7 +262,7 @@ describe("cellar transfer loss (#428)", () => {
     const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
     await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: fv2.id, volumeBbl: 8, lossBbl: 0.5 }, brewer);
 
-    expect(sql(`select sum(loss_bbl)::text from transfers where from_occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["0.000"]);
+    expect(sql(`select sum(bbl)::text from volume_adjustments where occupancy_id='${brewed.occupancy.id}' and reason = 'loss'`, true)).toEqual(["-0.500"]);
     expect(sql(`select occupancy_volumes.bbl::text from occupancy_volumes where occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["1.500"]);
 
     const review = await runCommand("get_loss_review", { periodStart: start, periodEnd: end }, owner) as import("@/lib/commands/compliance").LossReview[];

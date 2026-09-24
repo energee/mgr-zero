@@ -5,7 +5,7 @@
 -- reattributed to sample, taproom or destruction. Now:
 --   * record_cellar_transfer writes the loss as a generic cellar loss
 --     (reason and removal_class 'loss', affects_occupancy) on the source
---     occupancy; transfers.loss_bbl is always 0 and a check keeps it so;
+--     occupancy, and transfers.loss_bbl is dropped;
 --   * existing transfers.loss_bbl history is backfilled into
 --     volume_adjustments, dated at the transfer;
 --   * batch completion and the report read only volume_adjustments, so a
@@ -17,10 +17,19 @@
 insert into public.volume_adjustments (brewery_id, occupancy_id, bbl, reason, removal_class, at, note, created_by, created_at)
 select t.brewery_id, t.from_occupancy_id, -t.loss_bbl, 'loss', 'loss', t.at, 'cellar transfer loss', t.created_by, t.at
   from public.transfers t where t.loss_bbl > 0;
-update public.transfers set loss_bbl = 0 where loss_bbl > 0;
-alter table public.transfers add constraint transfers_loss_is_an_adjustment check (loss_bbl = 0);
-comment on column public.transfers.loss_bbl is
-  'Always 0: transfer loss is a volume_adjustments row on the source occupancy (#485).';
+-- The loss now reaches the source occupancy through its adjustment row, so the
+-- view stops reading transfers.loss_bbl and the column goes: a caller still
+-- reading or writing it fails loudly instead of seeing 0.
+create or replace view public.occupancy_volumes with (security_invoker = true) as
+  select o.id as occupancy_id, o.brewery_id, o.vessel_id, o.batch_id, o.started_at, o.ended_at,
+         o.initial_bbl
+           + coalesce((select sum(bbl) from public.transfers t where t.to_occupancy_id = o.id), 0)
+           - coalesce((select sum(bbl) from public.transfers t where t.from_occupancy_id = o.id), 0)
+           + coalesce((select sum(bbl) from public.volume_adjustments a where a.occupancy_id = o.id and a.affects_occupancy), 0)
+           - coalesce((select sum(bbl_drawn) from public.packaging_runs r where r.occupancy_id = o.id and r.closed_at is not null), 0)
+           as bbl
+  from public.vessel_occupancies o;
+alter table public.transfers drop column loss_bbl;
 
 -- A reclassification source is any generic loss root; completion roots keep
 -- their batch checks in the adjustment loop. Allocations never exceed the root.
