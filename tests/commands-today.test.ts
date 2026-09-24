@@ -6,6 +6,7 @@ import pg from "pg";
 import { admin, asUser, channelId, DB, ins, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
 import type { TodayItem } from "@/lib/commands/today";
+import { docNo } from "@/lib/mgr/doc-no";
 import "@/lib/commands/all";
 
 const sql = new pg.Pool({ connectionString: DB });
@@ -73,6 +74,18 @@ describe("get_today (registered reader)", () => {
     expect(item.recipientRoles).toEqual(["admin", "sales"]);
     expect(item.assignedUserId).toBeNull();
     expect(JSON.stringify(item)).not.toMatch(/Secret Bar/);
+  });
+
+  it("labels order numbers past four digits in full, like docNo (#474)", async () => {
+    // Postgres lpad truncates: lpad('12345', 4, '0') is '1234', another order's label.
+    await sql.query(
+      "insert into brewery_counters (brewery_id, key, next) values ($1, 'order', 12345) on conflict (brewery_id, key) do update set next = 12345",
+      [b.id],
+    );
+    const id = await createOrder("2026-09-06", true);
+    const item = (await today(sales, "2026-09-06T12:00:00Z")).find((i) => i.subjectId === id)!;
+    expect(item.safeLabel).toBe(docNo("ORD", 12345, ""));
+    expect(item.safeLabel).toBe("ORD-12345");
   });
 
   it("changes the source version when relevant state changes", async () => {

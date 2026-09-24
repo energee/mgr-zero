@@ -65,12 +65,12 @@ export type ParsSnapshot = {
 };
 
 function qtyVolume(qty: number, bblPerUnit: number | null, unit: string): string {
-  return `${plural(qty, unit)}${bblPerUnit === null ? "" : ` · ${formatVolume(Number((qty * bblPerUnit).toFixed(2)))}`}`;
+  return `${plural(qty, unit)}${bblPerUnit === null ? "" : ` · ${formatVolume(qty * bblPerUnit)}`}`;
 }
 
 function signedQtyVolume(qty: number, bblPerUnit: number | null, unit: string): string {
   const count = qty < 0 ? `−${plural(Math.abs(qty), unit)}` : plural(qty, unit);
-  return `${count}${bblPerUnit === null ? "" : ` · ${formatVolume(Number((qty * bblPerUnit).toFixed(2)))}`}`;
+  return `${count}${bblPerUnit === null ? "" : ` · ${formatVolume(qty * bblPerUnit)}`}`;
 }
 
 export function toParsViewProps({
