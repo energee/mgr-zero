@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { completeRangeRows, defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 defineQuery({
   name: "list_catalog_categories", description: "List this brewery's catalog categories",
@@ -153,11 +153,12 @@ defineQuery({
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
   input: z.object({ locationId: z.string().uuid().optional() }), roles: STAFF_ROLES,
   aiExposed: true,
-  handler: (ctx, i) => {
-    let q = ctx.db.from("bins").select("id, location_id, name").eq("brewery_id", ctx.breweryId).order("name");
+  // Paged past PostgREST's 1000-row cap (#475); id breaks name ties.
+  handler: (ctx, i) => completeRangeRows("Bin list", start => {
+    let q = ctx.db.from("bins").select("id, location_id, name", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
     if (i.locationId) q = q.eq("location_id", i.locationId);
-    return unwrap(q);
-  },
+    return q.range(start, start + 499);
+  }),
 });
 
 defineCommand({

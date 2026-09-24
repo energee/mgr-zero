@@ -2,7 +2,7 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { defineCommand, defineQuery, stateCode, unwrap } from "./registry";
+import { completeRangeRows, defineCommand, defineQuery, stateCode, unwrap } from "./registry";
 
 const roles = ["admin", "sales"] as const;
 
@@ -65,12 +65,13 @@ defineQuery({
   name: "list_customers", description: "Customers alphabetical with sale channel name",
   roles: ["admin", "sales", "warehouse"],
   input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer") }),
-  handler: (ctx, i) => {
+  // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
+  handler: (ctx, i) => completeRangeRows("Customer list", start => {
     const query = ctx.db.from("customers")
-      .select(i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)")
-      .eq("brewery_id", ctx.breweryId).order("name");
-    return unwrap(i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query);
-  },
+      .select(i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).order("name").order("id");
+    return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + 499);
+  }),
 });
 
 defineQuery({

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, unwrap, completeKeyedRows, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 
 export const movementInput = z.object({
@@ -83,29 +83,6 @@ defineCommand({
 
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
-
-async function completeKeyedRows<T>(name: string, page: (after: T | null) => PromiseLike<{
-  data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
-}>, key: (row: T) => string): Promise<T[]> {
-  const rows: T[] = [];
-  let total: number | undefined;
-  do {
-    const after = rows.at(-1) ?? null;
-    const result = await page(after);
-    const next = await unwrap(Promise.resolve(result));
-    const invalidPage = next?.some((row, index) => {
-      const previous = index === 0 ? rows.at(-1) : next[index - 1];
-      return previous !== undefined && key(row) <= key(previous);
-    });
-    if (result.count === null || (total !== undefined && result.count !== total) || !next || invalidPage
-      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
-      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
-    }
-    total = result.count;
-    rows.push(...next);
-  } while (rows.length < total);
-  return rows;
-}
 
 function completeRows<T extends { id: string }>(name: string, page: (afterId: string | null) => PromiseLike<{
   data: T[] | null; error: { message: string; code?: string } | null; count: number | null;

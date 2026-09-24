@@ -5,7 +5,7 @@
 // filters it. Both read through the RLS-bound ctx.db and refuse nothing: a
 // role that may not open an area simply gets no rows from it.
 import { z } from "zod";
-import { canRun, CommandError, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
+import { canRun, CommandError, completeKeyedRows, completeRangeRows, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
 import type { TodayItem } from "./today";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
@@ -86,16 +86,31 @@ defineQuery({
     }
     const [fgShortages, pars, onHand, openTaps, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
-      unwrap(ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty").eq("brewery_id", b)),
-      unwrap(ctx.db.from("on_hand").select("location_id, sku_id, qty").eq("brewery_id", b)),
+      // Paged past PostgREST's 1000-row cap (#475): a missing on-hand row reads as 0.
+      completeKeyedRows<{ location_id: string; sku_id: string; par_qty: number }>("Taproom pars", async after => {
+        let q = ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty").eq("brewery_id", b);
+        if (after) q = q.or(`location_id.gt.${after.location_id},and(location_id.eq.${after.location_id},sku_id.gt.${after.sku_id})`);
+        const [result, counted] = await Promise.all([q.order("location_id").order("sku_id").limit(500),
+          ctx.db.from("taproom_pars").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b)]);
+        return { ...result, count: counted.count, error: result.error ?? counted.error };
+      }, row => `${row.location_id}\0${row.sku_id}`),
+      completeKeyedRows<{ location_id: string; sku_id: string; qty: number }>("On-hand stock", async after => {
+        let q = ctx.db.from("on_hand").select("location_id, sku_id, qty").eq("brewery_id", b);
+        if (after) q = q.or(`location_id.gt.${after.location_id},and(location_id.eq.${after.location_id},sku_id.gt.${after.sku_id})`);
+        const [result, counted] = await Promise.all([q.order("location_id").order("sku_id").limit(500),
+          ctx.db.from("on_hand").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b)]);
+        return { ...result, count: counted.count, error: result.error ?? counted.error };
+      }, row => `${row.location_id}\0${row.sku_id}`),
       count(ctx.db.from("tap_intervals").select("id", { count: "exact", head: true }).eq("brewery_id", b).is("closed_at", null)),
       count(ctx.db.from("occupancy_volumes").select("occupancy_id", { count: "exact", head: true }).eq("brewery_id", b).is("ended_at", null)),
       count(ctx.db.from("material_requirements").select("material_id", { count: "exact", head: true }).eq("brewery_id", b).gt("short", 0)),
-      unwrap(ctx.db.from("keg_customer_balances").select("qty").eq("brewery_id", b)),
+      // keg_size is an enum, so its order is not JS string order: offset pages.
+      completeRangeRows("Kegs out", start => ctx.db.from("keg_customer_balances").select("qty", { count: "exact" }).eq("brewery_id", b)
+        .order("customer_id").order("pool_id").order("keg_size").range(start, start + 499)),
     ]);
-    // ponytail: taproom_pars and on_hand are joined here rather than in SQL; a
-    // view returning below-par and kegs-out as two scalars is the upgrade path
-    // if a brewery's location × SKU grid outgrows one page
+    // ponytail: taproom_pars and on_hand are joined here rather than in SQL,
+    // each read in full across pages; a view returning below-par and kegs-out
+    // as two scalars is the upgrade path if paging them gets slow
     const have = new Map((onHand ?? []).map((r) => [`${r.location_id}:${r.sku_id}`, Number(r.qty)]));
     return {
       fgShortages,

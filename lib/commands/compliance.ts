@@ -6,7 +6,7 @@
 // every ledger movement that names it.
 import { z } from "zod";
 import { isoDate } from "./packaging";
-import { breweryToday, defineCommand, defineQuery, rows, stateCode, unwrap } from "./registry";
+import { breweryToday, defineCommand, defineQuery, inChunks, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 const day = isoDate.optional();
@@ -187,13 +187,9 @@ defineQuery({
       if (movements.length >= result.count) break;
     }
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
-    const recipients = [];
     // Small batches keep URL size bounded; each unique order has one shipment.
-    for (let start = 0; start < orderIds.length; start += 100) {
-      const orders = await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
-        .eq("brewery_id", ctx.breweryId).in("id", orderIds.slice(start, start + 100)));
-      recipients.push(...(orders ?? []));
-    }
+    const recipients = await inChunks(orderIds, async chunk => (await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
+      .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
     const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));

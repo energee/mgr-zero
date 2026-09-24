@@ -96,6 +96,62 @@ export function latestOf<T>(query: Orderable, column: string): Promise<T | null>
 /** unwrap for a list read; supabase-js without generated types cannot say what the rows are, so the caller names T. */
 export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
 
+// PostgREST returns at most max_rows (1000) rows per request and says nothing
+// when it stops, so a list read that can pass 1000 rows goes through one of
+// the two helpers below. Both throw 409 when the row count moves mid-read.
+type CountedPage<T> = PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null; count: number | null }>;
+
+/** Every row of a keyset-paged read. `page(after)` returns the rows after the
+ *  last one loaded, ordered so `key` strictly increases (JS string order —
+ *  use it for uuid keys, not collated names or enums), with the total count. */
+export async function completeKeyedRows<T>(name: string, page: (after: T | null) => CountedPage<T>, key: (row: T) => string): Promise<T[]> {
+  const rows: T[] = [];
+  let total: number | undefined;
+  do {
+    const after = rows.at(-1) ?? null;
+    const result = await page(after);
+    const next = await unwrap(Promise.resolve(result));
+    const invalidPage = next?.some((row, index) => {
+      const previous = index === 0 ? rows.at(-1) : next[index - 1];
+      return previous !== undefined && key(row) <= key(previous);
+    });
+    if (result.count === null || (total !== undefined && result.count !== total) || !next || invalidPage
+      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
+      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
+    }
+    total = result.count;
+    rows.push(...next);
+  } while (rows.length < total);
+  return rows;
+}
+
+/** Every row of an offset-paged read, for orders keyset paging cannot check
+ *  in JS (collated names, enums, newest-first times). `page(start)` returns
+ *  `.range(start, start + n - 1)` of a fully ordered query with `count: "exact"`. */
+export async function completeRangeRows<T>(name: string, page: (start: number) => CountedPage<T>): Promise<T[]> {
+  const rows: T[] = [];
+  let total: number | undefined;
+  do {
+    const result = await page(rows.length);
+    const next = await unwrap(Promise.resolve(result));
+    if (result.count === null || (total !== undefined && result.count !== total) || !next
+      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
+      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
+    }
+    total = result.count;
+    rows.push(...next);
+  } while (rows.length < total);
+  return rows;
+}
+
+/** One `.in()` read split into groups of `size` ids, results concatenated:
+ *  a few hundred uuids in one filter can pass the gateway's URL limit. */
+export async function inChunks<T>(ids: string[], read: (chunk: string[]) => PromiseLike<T[]>, size = 100): Promise<T[]> {
+  const out: T[] = [];
+  for (let start = 0; start < ids.length; start += size) out.push(...await read(ids.slice(start, start + size)));
+  return out;
+}
+
 /** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
 export async function breweryToday(ctx: Ctx): Promise<string> {
   const { timezone } = (await unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
