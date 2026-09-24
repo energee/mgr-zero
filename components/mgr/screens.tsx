@@ -883,13 +883,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     name: "Offline outbox",
-    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading" },
+    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading", Dismiss: "Offline outbox" },
     job: "Retry an exact captured reading without broadening offline writes",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"]],
-    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original.",
-    body: <OfflineOutboxView rows={[
+    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"], ["set aside", "unreadable saved reading set aside unsent · Dismiss", 1]],
+    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original. A saved entry that can no longer be read is set aside unsent, readable siblings stay queued, and a notice says so until Dismiss deletes the set-aside copy.",
+    body: <OfflineOutboxView notice="1 unreadable offline reading was set aside and not sent. Re-enter it if still needed." onDismissNotice={() => {}} rows={[
       { id: "reading-fv3", label: "Record fermentation reading · FV3", status: "response not confirmed", retryable: true, fixHref: "#", fixTo: "Fermentation reading" },
       { id: "reading-fv2", label: "Record fermentation reading · FV2", status: "your role changed from brewer · this will not be sent" },
     ]} />,
