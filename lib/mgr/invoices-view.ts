@@ -14,7 +14,7 @@ export function toInvoiceListRow(inv: InvoiceListRecord, role: StaffRole, connec
   const paid = state === "paid" && inv.paid_at ? ` · paid ${formatDate(inv.paid_at)}` : "";
   return {
     id: inv.id, title: `${docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice")} · ${inv.customers?.name ?? "Customer unavailable"}`,
-    detail: `${credit ? "credit memo · " : ""}${qbo.detail}${paid}${!credit && state === "unpaid" && inv.due_on ? ` · due ${inv.due_on}` : ""}${inv.qbo_accountant_drift ? ` · local subtotal ${money(inv.subtotal_cents)} · current total` : ""} · ${money(inv.total_cents)}`,
+    detail: `${credit ? "credit memo · " : ""}${qbo.detail}${paid}${!credit && state === "unpaid" && inv.due_on ? ` · due ${formatDate(inv.due_on)}` : ""}${inv.qbo_accountant_drift ? ` · local subtotal ${money(inv.subtotal_cents)} · current total` : ""} · ${money(inv.total_cents)}`,
     tone: state === "voided" || state === "deleted" || inv.qbo_accountant_drift || inv.qbo_sync_status === "push_failed" ? "w" : state === "paid" || state === "written_off" || credit ? "ok" : "",
     actions: [...(qbo.actions.includes("fix_mapping") ? ["Review" as const] : []), ...(qbo.actions.includes("repush") ? ["Re-push" as const] : []), ...(qbo.actions.includes("write_off") ? ["Write off" as const] : [])],
     remoteReview: inv.qbo_accountant_drift && (role === "admin" || role === "sales"),

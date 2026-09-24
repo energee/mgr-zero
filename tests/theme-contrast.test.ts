@@ -28,3 +28,9 @@ it("keeps the pre-paint theme script inert on React client remounts", () => {
   expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
   expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
 });
+
+it("paints a selected outline toggle with the AA-checked primary pair, not the hover wash (#493)", async () => {
+  const { toggleVariants } = await import("../components/ui/toggle");
+  const outline = toggleVariants({ variant: "outline" });
+  for (const cls of ["data-[state=on]:bg-primary", "data-[state=on]:text-primary-foreground"]) expect(outline).toContain(cls);
+});

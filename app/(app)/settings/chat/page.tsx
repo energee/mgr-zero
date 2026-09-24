@@ -21,11 +21,13 @@ export default async function ChatSettingsPage({ searchParams }: { searchParams:
   const installation = health.installation;
   const configured = isChatConfigured();
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
+  // Each element slot carries a key: ChatSettingsView places it among its own
+  // siblings, where an unkeyed server element trips React's list-key warning (#493).
   return <ChatSettingsView health={health} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours}
     oauthError={Boolean(params.error)} installed={Boolean(params.installed)} previewFixtures={CHAT_PREVIEW_FIXTURES}
     backHref="/settings" healthHref="/settings/chat/health" peopleHref="/settings/chat/people" disconnectHref="/settings/chat/disconnect" preferencesHref="/settings/chat/preferences"
-    connection={<ChatConnectionAction configured={configured} installationId={connected ? installation.id : undefined} />}
+    connection={<ChatConnectionAction key="connection" configured={configured} installationId={connected ? installation.id : undefined} />}
     fields={connected ? <ChatSettingsControls key={installation.id + ":" + installation.state} installation={installation} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours} /> : null}
-    delivery={installation && ["active", "needs_reauthorization"].includes(installation.state) ? <ChatDelivery installationId={installation.id} enabled={installation.state === "active"} /> : undefined}
+    delivery={installation && ["active", "needs_reauthorization"].includes(installation.state) ? <ChatDelivery key="delivery" installationId={installation.id} enabled={installation.state === "active"} /> : undefined}
   />;
 }

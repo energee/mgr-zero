@@ -38,7 +38,8 @@ describe("Invoice view", () => {
     expect(model.title).toBe("INV-1039");
     expect(model.backHref).toBeUndefined();
     expect(model.customer).toBe(ALS.name);
-    expect(model.summary).toBe("due 10/03 · 3 lines");
+    expect(model.summary).toBe("due Oct 3, 2026 · 3 lines");
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...invoiceFailedAls.invoice, due_on: null } }).summary).toBe("issued Sep 3, 2026 · 3 lines");
     expect(model.total).toBe("$540.00");
     expect(model.headerTone).toBe("");
     expect(model.lines).toHaveLength(3);

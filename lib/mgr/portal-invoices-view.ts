@@ -2,6 +2,7 @@
 // portal_invoices returns the synchronized QBO total and frozen invoice lines.
 // The latter remain the fallback for local and not-yet-synchronized records.
 import type { EmptyState } from "./empty-state";
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
@@ -38,8 +39,9 @@ export type PortalInvoicesSnapshot = {
   }[];
 };
 
+/** "Aug 29, 2026" for a paid_at timestamp; the UTC day until #442 passes the brewery's zone here. */
 function day(iso: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
+  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDate(iso.slice(0, 10)) : iso;
 }
 
 function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string {
@@ -48,7 +50,7 @@ function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string 
   if (state === "paid") return `paid ${day(inv.paid_at!)}`;
   if (invoiceIsSettledWithoutPayment(inv)) return "settled";
   if (state !== "unpaid") return state === "written_off" ? "written off" : state;
-  return inv.due_on ? `due ${inv.due_on}` : "unpaid";
+  return inv.due_on ? `due ${formatDate(inv.due_on)}` : "unpaid";
 }
 
 /** Map a portal_invoices payload onto PortalInvoicesView. */

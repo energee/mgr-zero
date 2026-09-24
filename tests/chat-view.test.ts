@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
@@ -60,4 +61,16 @@ it("keeps real linked identities and unlink errors without fixture paths", () =>
   expect(html).toContain("Permission changed");
   expect(html).toContain("disabled");
   expect(html).not.toContain('href="/');
+});
+
+// A server element placed among a client view's siblings reaches the client as
+// a lazy Flight chunk, so the view's static-children check cannot mark it and
+// React warns "Check the top-level render call using <ChatSettingsView>" (#493).
+it("keys every element the chat settings page hands ChatSettingsView", () => {
+  const page = readFileSync("app/(app)/settings/chat/page.tsx", "utf8");
+  for (const slot of ["connection", "fields", "delivery"]) {
+    const element = page.match(new RegExp(`${slot}=\\{[^<]*<(\\w+)([^>]*)>`));
+    expect(element, slot).not.toBeNull();
+    expect(element![2], `${slot} <${element![1]}>`).toMatch(/\bkey=/);
+  }
 });

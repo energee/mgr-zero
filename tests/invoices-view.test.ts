@@ -21,3 +21,9 @@ it("preserves role and connection restrictions on deleted-invoice recovery", () 
   expect(toInvoiceListRow(deleted, "warehouse", true).actions).toEqual([]);
   expect(toInvoiceListRow({ ...deleted, kind: "credit_memo" }, "admin", true).actions).not.toContain("Write off");
 });
+
+it("prints an unpaid invoice's due day the way the rest of the app does (#493)", () => {
+  const unpaid = toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, "admin", true);
+  expect(unpaid.detail).toContain("due Sep 12, 2026");
+  expect(unpaid.detail).not.toContain("2026-09-12");
+});

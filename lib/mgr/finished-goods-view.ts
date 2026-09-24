@@ -52,8 +52,9 @@ export function assembleFinishedGoods(
   };
 }
 
+/** "Brand · SKU", unless the SKU name already leads with the brand: create_sku names a SKU "brand · format" by default. */
 export const skuLabel = (sku: { name: string; brands?: { name: string } | null }) =>
-  sku.brands?.name ? `${sku.brands.name} · ${sku.name}` : sku.name;
+  sku.brands?.name && !sku.name.startsWith(sku.brands.name) ? `${sku.brands.name} · ${sku.name}` : sku.name;
 
 export function toFinishedGoodsViewProps({ skus, backHref }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
