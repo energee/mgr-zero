@@ -4,11 +4,11 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toWaterProfileOption, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
+import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { RecipeEditor, toRecipeMaterial, type RecipeMaterial } from "../recipe-version-form";
+import { RecipeEditor } from "../recipe-version-form";
 
 type Named = { id: string; name: string };
 

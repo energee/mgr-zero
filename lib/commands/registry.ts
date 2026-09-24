@@ -2,7 +2,9 @@ import type { Database } from "@/lib/supabase/database";
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
+import { US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { breweryDate } from "@/lib/date-format";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
 /** Every staff role: the `roles` of a read that all of staff may run. */
@@ -141,15 +143,23 @@ export async function inChunks<T>(ids: string[], read: (chunk: string[]) => Prom
 /** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
 export async function breweryToday(ctx: Ctx): Promise<string> {
   const { timezone } = (await unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+  return breweryDate(timezone);
 }
 
-/** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */
-export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code");
+/** A real two-letter US state code (US_STATE_CODES), for customers.state, ship_tos.state and the registry tables. */
+export const stateCode = z.string().refine((s) => (US_STATE_CODES as readonly string[]).includes(s), "a US state code, such as PA");
+
+/** A phone number: 7 to 15 digits once spaces, dots, dashes and parentheses are dropped, with an optional leading +. "" means none. */
+export const phone = z.string().trim().refine(
+  (s) => s === "" || /^\+?\d{7,15}$/.test(s.replace(/[\s().-]/g, "")), "a phone number, such as (503) 555-0142",
+);
 
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
-// raise, so its message is the user-facing one. Anything unlisted is logged
+// raise, so its message is the user-facing one. 23505 (unique violation) is a
+// 409 and 22003 (numeric out of range) a 400, each with a fixed message: the
+// raw text names constraints and column types, so it is only logged (#422,
+// #427). Anything unlisted is logged
 // here and surfaces as a generic 500 so raw Postgres text never reaches a
 // client (security audit A2); detail pages turn not_found into the not-found
 // route (lib/mgr/not-found.ts).
@@ -159,6 +169,12 @@ function rpcError(error: { message: string; code?: string }): CommandError {
       console.error("database error 42501:", error.message);
       return new CommandError("permission denied", 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    case "23505":
+      console.error("database error 23505:", error.message);
+      return new CommandError("That already exists. Use a different name or value.", 409, "conflict");
+    case "22003":
+      console.error("database error 22003:", error.message);
+      return new CommandError("A number is out of range.");
     case "PGRST116": return new CommandError("record not found", 404, "not_found");
     case "P0001": return new CommandError(error.message);
     default:
