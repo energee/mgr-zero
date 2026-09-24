@@ -12,6 +12,8 @@ export function toInventoryDetailViewProps(input: {
   sku: { id: string; name: string; active: boolean };
   onHand: { location_id: string; qty: number; locations: { name: string } | null }[];
   atp: { qty: number }[]; movements: InventoryMovement[]; backHref?: string;
+  /** breweries.timezone: movement times print in it (#442). */
+  timeZone: string;
 }) {
   const onHand = input.onHand.reduce((total, row) => total + Number(row.qty), 0);
   const atp = input.atp[0] ? Number(input.atp[0].qty) : onHand;
