@@ -99,6 +99,40 @@ describe("purchase orders: draft, mark sent, receive", () => {
         and column_name in ('damaged_qty','supplier_disposition','disposition')`)).toEqual([]);
   });
 
+  it("a lot-tracked line counted 0 needs no lot code and never creates an empty lot (#453)", async () => {
+    const wh = await seedLocation(b.id, { name: "Zero-count dock" });
+    const vendor = await runCommand("upsert_vendor", { name: "Zero-count supplier" }, ctx) as { id: string };
+    const hop = await runCommand("upsert_material", {
+      name: "Zero-count Mosaic", category: "hop", baseUom: "lb", purchaseUom: "lb", lotTracked: true,
+    }, ctx) as { id: string };
+    const cans = await runCommand("upsert_material", {
+      name: "Zero-count cans", category: "packaging", baseUom: "each", purchaseUom: "each",
+    }, ctx) as { id: string };
+    const po = await runCommand("create_purchase_order", {
+      vendorId: vendor.id, lines: [{ materialId: hop.id, qtyOrdered: 5 }, { materialId: cans.id, qtyOrdered: 10 }],
+    }, ctx) as { id: string };
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, ctx);
+    const detail = await runCommand("get_purchase_order", { poId: po.id }, ctx) as { lines: { id: string; material_id: string }[] };
+    const hopLine = detail.lines.find((l) => l.material_id === hop.id)!;
+    const canLine = detail.lines.find((l) => l.material_id === cans.id)!;
+
+    // Counted 0 with no lot code: the receipt posts rather than refusing the whole count.
+    const first = await runCommand("receive_purchase_order", {
+      poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-19",
+      lines: [{ poLineId: hopLine.id, qtyCounted: 0 }, { poLineId: canLine.id, qtyCounted: 10 }],
+    }, ctx) as { receipt_id: string; status: string };
+    expect(first.status).toBe("partially_received");
+    expect((await admin.from("receipt_lines").select("qty_counted, lot_id, movement_id").eq("receipt_id", first.receipt_id).eq("po_line_id", hopLine.id)).data)
+      .toEqual([{ qty_counted: 0, lot_id: null, movement_id: null }]);
+
+    // Counted 0 with a lot code (the form prefills the expected one): still no lot row.
+    await runCommand("receive_purchase_order", {
+      poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-20",
+      lines: [{ poLineId: hopLine.id, qtyCounted: 0, lotCode: "MOS-EMPTY" }],
+    }, ctx);
+    expect((await admin.from("material_lots").select("id").eq("material_id", hop.id)).data).toEqual([]);
+  });
+
   it("draft → sent (mailto) → partial receipt → received; open balance and status derive from counts", async () => {
     const wh = await seedLocation(b.id);
     const vendor = (await runCommand("upsert_vendor", { name: "Country Malt", leadTimeDays: 7 }, ctx)) as { id: string };
@@ -193,6 +227,21 @@ describe("purchase orders: draft, mark sent, receive", () => {
     const m = (await runCommand("upsert_material", { name: "Caramel 60", category: "malt", baseUom: "lb", purchaseUom: "lb", reorderPoint: 200 }, ctx)) as { id: string; reorder_point: number };
     const edited = (await runCommand("upsert_material", { id: m.id, name: "Caramel 60L", category: "malt", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { reorder_point: number };
     expect(Number(edited.reorder_point)).toBe(200);
+  });
+
+  // #452: stock recorded without a lot cannot be counted, consumed, or moved
+  // once the material is lot-tracked, so the switch waits until it is gone.
+  it("lot tracking cannot turn on while unlotted stock is on hand; with none it can", async () => {
+    const wh = await seedLocation(b.id, { name: "Malt room" });
+    const base = { category: "malt", baseUom: "lb", purchaseUom: "lb" } as const;
+    const stocked = (await runCommand("upsert_material", { name: "Munich", ...base }, ctx)) as { id: string };
+    await seedMovement(b.id, { materialId: stocked.id, locationId: wh.id, binId: wh.binId, qty: 100, createdBy: ctx.userId });
+    await expect(runCommand("upsert_material", { id: stocked.id, name: "Munich", ...base, lotTracked: true }, ctx)).rejects.toThrow(/without a lot/);
+    expect((await admin.from("materials").select("lot_tracked").eq("id", stocked.id)).data).toEqual([{ lot_tracked: false }]);
+
+    const empty = (await runCommand("upsert_material", { name: "Vienna", ...base }, ctx)) as { id: string };
+    const tracked = (await runCommand("upsert_material", { id: empty.id, name: "Vienna", ...base, lotTracked: true }, ctx)) as { lot_tracked: boolean };
+    expect(tracked.lot_tracked).toBe(true);
   });
 
   it("a PO needs at least one line, and a contract never gates ordering", async () => {

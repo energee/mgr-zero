@@ -27,14 +27,15 @@ export type KegReportViewModel = {
 const BUCKET_LABEL: Record<string, string> = { "0-30": "0–30 days", "31-60": "31–60 days", "61-90": "61–90 days", "90+": "Over 90 days" };
 const pct = (out: number, total: number) => total ? `${Math.round((out / total) * 100)}%` : "—";
 
-export function toKegReportViewProps(r: KegReport, backHref?: string): KegReportViewModel {
+/** `timeZone` is breweries.timezone: the oldest-shipped day is the brewery's day, not oldest_at's UTC prefix (#442). */
+export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: string): KegReportViewModel {
   return {
     backHref,
     headline: [pct(r.fleet.out, r.fleet.total), `${r.fleet.out} of ${r.fleet.total} kegs out`],
     aging: r.aging.map((a) => [BUCKET_LABEL[a.bucket] ?? a.bucket, String(a.kegs), money(a.deposit_cents)]),
     customers: r.customers.map((c) => ({
       key: c.customer_id, href: backHref === undefined ? undefined : `/kegs/customers/${c.customer_id}`, title: c.name, overdue: c.over_90 > 0,
-      detail: `${c.over_90 || "none"} over 90 days${c.oldest_at ? ` · oldest shipped ${formatDate(c.oldest_at)}` : ""}`,
+      detail: `${c.over_90 || "none"} over 90 days${c.oldest_at ? ` · oldest shipped ${formatDate(c.oldest_at, timeZone)}` : ""}`,
     })),
     sizes: r.bySize.map((s) => ({ key: `${s.pool_id}-${s.keg_size}`, title: `${s.pool_name} ${SIZE_LABEL[s.keg_size] ?? s.keg_size}`, detail: `${s.out} of ${s.total} out`, trailing: `${pct(s.out, s.total)} utilized` })),
     empty: r.bySize.length ? undefined : { title: "No owned keg pools", description: "Add a keg pool and record kegs acquired to see utilization." },
