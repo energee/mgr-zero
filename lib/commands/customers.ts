@@ -42,7 +42,7 @@ defineCommand({
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     address1: z.string().min(1), address2: z.string().optional(),
-    city: z.string().min(1), state: stateCode, zip: z.string().min(1),
+    city: z.string().min(1), state: stateCode, zip: z.string().trim().regex(/^\d{5}(-\d{4})?$/, "a 5-digit ZIP code or ZIP+4"),
     isDefault: z.boolean().optional(),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
@@ -92,10 +92,13 @@ defineQuery({
   name: "list_channel_prices", description: "The price grid: one cell per sale channel × price group × format (integer cents); saleChannelId narrows it to one channel",
   roles: ["admin", "sales"],
   input: z.object({ saleChannelId: z.string().uuid().optional() }),
-  handler: (ctx, i) => {
-    const q = ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)").eq("brewery_id", ctx.breweryId);
-    return unwrap(i.saleChannelId ? q.eq("sale_channel_id", i.saleChannelId) : q);
-  },
+  // Paged past PostgREST's 1000-row cap (#424): channels × groups × formats
+  // outgrows it. Ordered by the primary key so pages never overlap.
+  handler: (ctx, i) => completeRows("Price grid", start => {
+    const q = ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+    return (i.saleChannelId ? q.eq("sale_channel_id", i.saleChannelId) : q)
+      .order("sale_channel_id").order("price_group_id").order("format_id").range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 defineCommand({
