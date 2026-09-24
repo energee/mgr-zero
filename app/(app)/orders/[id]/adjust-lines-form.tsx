@@ -16,8 +16,10 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
   const initialLines = () => currentLines.map(l => ({ skuId: l.skuId, qty: String(l.qty) }));
   const [lines, setLines] = useState<LineRow[]>(initialLines);
   const [reason, setReason] = useState("");
+  // A blank quantity is sent and refused, never dropped: adjust_order_lines
+  // replaces every line, so dropping it removed the SKU from the order (#433).
   const form = useCommandForm("adjust_order_lines", {
-    build: () => ({ orderId, reason, lines: lines.filter(l => l.skuId && l.qty).map(l => ({ skuId: l.skuId, qty: Number(l.qty) })) }),
+    build: () => ({ orderId, reason, lines: lines.filter(l => l.skuId).map(l => ({ skuId: l.skuId, qty: Number(l.qty) })) }),
     reset: () => { setLines(initialLines()); setReason(""); },
   });
   function updateLine(index: number, patch: Partial<LineRow>) {

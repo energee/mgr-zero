@@ -347,7 +347,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   const infrastructureNames = ["consume_command_admission"];
-  expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames,"provision_brewery"])].sort());
+  expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames])].sort());
   const publicSnapshot = () => sql((Object.keys(matrix) as Table[]).map(table => {
     const predicate = table === "breweries" ? `id='${B}'` : table === "customer_users" ? `customer_id='${f.customer.customerId}'` : `brewery_id='${B}'`;
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
@@ -357,7 +357,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
-  expect(catalog.filter(c => c.name === "provision_brewery").map(c => c.signature)).toEqual(["provision_brewery(text,text,text,uuid)"]);
+  // #467: brewery bootstrap is service-role only; the server passes the verified actor.
+  expect(catalog.filter(c => c.name === "provision_brewery")).toEqual([]);
   expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature)).toEqual(["consume_command_admission()"]);
   await expect(db.rpc("consume_command_admission")).resolves.toMatchObject({ data: [{ allowed: true, retry_after: 0 }], error: null });
   for (const name of new Set(existing)) expect(catalog.filter(c => c.name === name), `${name} existing lifecycle case`).toHaveLength(1);
@@ -419,6 +420,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     chat_credential_has_canonical_owner: [B], has_active_canonical_chat_installation: [B], get_chat_installation_lifecycle: [I], prune_chat_integration_logs: ["90 days"],
     chat_settings_request_completed: [B,f.taproom.id,importRequest],
     get_published_pos_menu: [R()],
+    provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
   };
   const serviceCatalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
