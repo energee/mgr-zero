@@ -223,8 +223,9 @@ export async function completeQboOAuth(input: {
   if (!state || !code || !realmId || params.get("error")) throw new Error("oauth state invalid");
   const claim = await input.store.claim(sha256(state), input.actorId, input.selectedBreweryId, input.redirectUri);
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
+  let tokens: QboTokens | null = null;
   try {
-    const tokens = await input.client.exchange(code);
+    tokens = await input.client.exchange(code);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
@@ -233,6 +234,10 @@ export async function completeQboOAuth(input: {
       ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
     });
   } catch (error) {
+    // Tokens issued but never stored would stay live at Intuit; revoking the
+    // refresh token revokes its access token too. Best effort, like Square's
+    // callback: a revoke failure must not mask the original failure.
+    if (tokens) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
     await input.store.fail(claim.intentId, input.actorId);
     throw new Error(sanitizeQboError(error));
   }

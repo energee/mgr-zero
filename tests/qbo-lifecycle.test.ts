@@ -144,6 +144,37 @@ describe("QuickBooks OAuth lifecycle", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("revokes issued tokens when verification or storage fails after the exchange (#426)", async () => {
+    const tokenResponse = () => new Response(JSON.stringify({
+      access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+    }), { status: 200 });
+    const claim = vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] });
+    const run = (fetch: typeof globalThis.fetch, complete: () => Promise<string>, fail = vi.fn().mockResolvedValue(undefined)) => completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=realm-1`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch),
+      store: { claim, complete, fail },
+    });
+
+    const verifyFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    await expect(run(verifyFetch, vi.fn())).rejects.toThrow("QuickBooks is unavailable");
+    expect(String(verifyFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
+    expect(verifyFetch.mock.calls[2][1]).toMatchObject({ body: JSON.stringify({ token: "refresh-secret" }) });
+
+    const storeFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }))
+      .mockRejectedValueOnce(new TypeError("revoke socket closed"));
+    const fail = vi.fn().mockResolvedValue(undefined);
+    await expect(run(storeFetch, vi.fn().mockRejectedValue(new Error("QuickBooks connection storage failed")), fail))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect(String(storeFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
+    expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+  });
+
   it("refuses a malformed CompanyInfo response or a realm-scoped request denial", async () => {
     const complete = vi.fn();
     const fail = vi.fn().mockResolvedValue(undefined);
@@ -163,7 +194,8 @@ describe("QuickBooks OAuth lifecycle", () => {
       },
     })).rejects.toThrow("QuickBooks is unavailable");
 
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(String(fetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
     const [url, init] = fetch.mock.calls[1];
     expect(String(url)).toBe("https://sandbox-quickbooks.api.intuit.com/v3/company/known-victim-realm/companyinfo/known-victim-realm?minorversion=75");
     expect(init).toMatchObject({ method: "GET", headers: { Authorization: "Bearer access-secret", Accept: "application/json" } });
