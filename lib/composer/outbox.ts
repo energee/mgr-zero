@@ -77,24 +77,23 @@ function parseOutbox(raw: string): { entries: OutboxAttempt[]; rejected: string[
   return { entries, rejected };
 }
 
-function quarantine(storage: OutboxStorage, rejected: string[]) {
-  if (rejected.length === 0) return;
-  let existing: string[] = [];
+/** The quarantined raw entries; a damaged quarantine reads as one unreadable entry. */
+function readQuarantine(storage: OutboxStorage): string[] {
   try {
     const parsed: unknown = JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY) ?? "[]");
-    if (Array.isArray(parsed)) existing = parsed.filter((item): item is string => typeof item === "string");
-  } catch { /* a damaged quarantine is replaced, not fatal */ }
-  try { storage.setItem(OUTBOX_QUARANTINE_KEY, JSON.stringify([...existing, ...rejected])); }
+    return Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];
+  } catch { return [storage.getItem(OUTBOX_QUARANTINE_KEY) ?? ""]; }
+}
+
+function quarantine(storage: OutboxStorage, rejected: string[]) {
+  if (rejected.length === 0) return;
+  try { storage.setItem(OUTBOX_QUARANTINE_KEY, JSON.stringify([...readQuarantine(storage), ...rejected])); }
   catch { throw new Error("Could not update the offline outbox. The saved requests were retained."); }
 }
 
 /** Staff-facing notice for entries set aside by migration, or null when none. */
 export function outboxQuarantineNotice(storage: OutboxStorage): string | null {
-  let count = 0;
-  try {
-    const parsed: unknown = JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY) ?? "[]");
-    count = Array.isArray(parsed) ? parsed.length : 1;
-  } catch { count = 1; }
+  const count = readQuarantine(storage).length;
   if (count === 0) return null;
   return `${count} unreadable offline reading${count === 1 ? " was" : "s were"} set aside and not sent. Re-enter ${count === 1 ? "it" : "them"} if still needed.`;
 }

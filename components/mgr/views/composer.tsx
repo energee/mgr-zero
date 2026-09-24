@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionIcon } from "@/components/mgr/icon";
@@ -128,10 +129,7 @@ export function OfflineOutboxView({ rows, busy = false, notice, onDismissNotice,
     <section aria-label="Offline outbox" className="rounded-md border bg-card p-3 shadow-sm">
       <h2 className="font-medium">Offline outbox</h2>
       <p className="mt-1 text-xs text-muted-foreground">Only exact fermentation readings can wait here. Inventory movements, picks, and transfers require a live connection.</p>
-      {notice && <div role="alert" className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm">
-        <p className="min-w-0 flex-1">{notice}</p>
-        {onDismissNotice && <Button type="button" size="sm" variant="ghost" onClick={onDismissNotice}>Dismiss</Button>}
-      </div>}
+      {notice && <div role="alert" className="mt-3">{E.note(<>{notice} {onDismissNotice && <Button type="button" size="sm" variant="ghost" onClick={onDismissNotice}>Dismiss</Button>}</>)}</div>}
       {rows.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No queued readings.</p> : (
         <div className="mt-3 flex flex-col gap-2">{rows.map((row) => (
           <div key={row.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">

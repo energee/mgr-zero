@@ -17,6 +17,8 @@ type StoredMessage = { id: string; role: "user" | "assistant" | "result"; conten
 export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
   event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
 
+const messageOf = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback;
+
 export function Composer({ role }: { role: StaffRole }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
@@ -115,9 +117,9 @@ export function Composer({ role }: { role: StaffRole }) {
     // in the staff layout, so an escape here errors every staff page (#463).
     const refresh = () => {
       try { setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope)); setOutboxNotice(outboxQuarantineNotice(localStorage)); }
-      catch (cause) { setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be read."); }
+      catch (cause) { setOutboxNotice(messageOf(cause, "Offline outbox could not be read.")); }
     };
-    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } catch (cause) { refresh(); setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be sent."); } finally { setOutboxBusy(false); } };
+    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } catch (cause) { refresh(); setOutboxNotice(messageOf(cause, "Offline outbox could not be sent.")); } finally { setOutboxBusy(false); } };
     addEventListener("online", flush); addEventListener("mgr-outbox-change", refresh); refresh(); if (navigator.onLine) void flush();
     return () => { removeEventListener("online", flush); removeEventListener("mgr-outbox-change", refresh); };
   }, [breweryId, expectedContext.actorId, role]);
