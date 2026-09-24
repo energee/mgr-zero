@@ -52,6 +52,7 @@ describe("Invoice view", () => {
 
   it("omits mapping rows when the snapshot has none", () => {
     const model = toInvoiceViewProps({
+      timeZone: invoiceFailedAls.timeZone,
       invoice: invoiceFailedAls.invoice,
       lines: invoiceFailedAls.lines,
       questions: invoiceFailedAls.questions,

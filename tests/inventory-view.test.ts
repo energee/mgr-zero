@@ -103,8 +103,9 @@ describe("Finished goods view", () => {
 
   it("opens the deep-linked movement form once instead of reopening after Close", () => {
     const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
-    expect(form).toMatch(/const autoOpened = useRef\(false\)/);
-    expect(form).toMatch(/if \(autoOpen && !autoOpened\.current\)/);
+    // Opened by initial state, never by an effect, so Close stays closed and the prefill survives (#441).
+    expect(form).toMatch(/defaultOpen: autoOpen/);
+    expect(form).not.toMatch(/setOpen\(true\)/);
   });
 });
 
