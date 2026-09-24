@@ -152,10 +152,12 @@ describe("file_compliance_report", () => {
     expect(again.id).toBe(filed.id);
     // a new request for the same period is a second filing: refused
     await expect(runCommand("file_compliance_report", PERIOD, sales, exec(crypto.randomUUID()))).rejects.toMatchObject({ status: 409 });
-    // a TTB range that is not one calendar month would overlap the real months: refused by the schema and by the RPC (#486)
-    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toThrow(/one calendar month/);
-    const { error } = await sales.db.rpc("file_compliance_report", { p_brewery: sales.breweryId, p_jurisdiction: "TTB", p_start: "2025-10-10", p_end: "2025-10-20", p_note: null, p_request_id: crypto.randomUUID() });
-    expect(error?.message).toMatch(/one calendar month/);
+    // a TTB range that is not one calendar month, quarter, or year would overlap the real periods: refused by the schema and by the RPC (#486)
+    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toThrow(/one calendar month, quarter, or year/);
+    for (const [p_start, p_end] of [["2025-10-10", "2025-10-20"], ["2025-02-01", "2025-04-30"], ["2025-01-01", "2025-12-30"]]) {
+      const { error } = await sales.db.rpc("file_compliance_report", { p_brewery: sales.breweryId, p_jurisdiction: "TTB", p_start, p_end, p_note: null, p_request_id: crypto.randomUUID() });
+      expect(error?.message, `${p_start}..${p_end}`).toMatch(/one calendar month, quarter, or year/);
+    }
   });
 
   it("refuses to file a period that has not ended in the brewery's calendar (#429)", async () => {

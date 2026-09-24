@@ -1,7 +1,8 @@
--- A TTB filing covers exactly one calendar month (#486). An arbitrary range
--- such as the 10th to the 20th claimed those days through the overlap
--- exclusion, blocking the real month's filing and leaving the rest of the
--- month in no filing. Other jurisdictions keep caller-chosen periods.
+-- A TTB filing covers exactly one calendar month, quarter (Jan-Mar, Apr-Jun,
+-- Jul-Sep, Oct-Dec), or year (#486). An arbitrary range such as the 10th to
+-- the 20th claimed those days through the overlap exclusion, blocking the real
+-- period's filing and leaving the rest of it in no filing. Other jurisdictions
+-- keep caller-chosen periods.
 create or replace function public.file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_report jsonb; v_row public.report_filings;
@@ -10,9 +11,11 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'file_compliance_report', p_request_id,
     jsonb_build_object('jurisdiction', p_jurisdiction, 'start', p_start, 'end', p_end, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  if p_jurisdiction = 'TTB' and (p_start <> date_trunc('month', p_start)::date
-      or p_end <> (date_trunc('month', p_start) + interval '1 month - 1 day')::date) then
-    raise exception 'a TTB filing covers one calendar month: the 1st through its last day';
+  if p_jurisdiction = 'TTB' and not (
+      p_end = (p_start + interval '1 month - 1 day')::date and p_start = date_trunc('month', p_start)::date
+      or p_end = (p_start + interval '3 months - 1 day')::date and p_start = date_trunc('quarter', p_start)::date
+      or p_end = (p_start + interval '1 year - 1 day')::date and p_start = date_trunc('year', p_start)::date) then
+    raise exception 'a TTB filing covers one calendar month, quarter, or year';
   end if;
   v_report := private.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
   if not (v_report->'figures'->>'balances')::boolean then

@@ -5,7 +5,7 @@
 // filing. trace_lot follows a finished-goods lot back to its batch and through
 // every ledger movement that names it.
 import { z } from "zod";
-import { monthRange } from "@/app/(app)/compliance/period";
+import { periodKey } from "@/app/(app)/compliance/period";
 import { isoDate } from "./packaging";
 import { breweryToday, defineCommand, defineQuery, rows, stateCode, unwrap } from "./registry";
 
@@ -136,12 +136,12 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
   roles: [...ROLES],
-  // A partial TTB range would claim days of the real month and block its filing (#486).
+  // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(
-    (i) => i.jurisdiction !== "TTB" || (monthRange(i.periodStart.slice(0, 7))?.periodEnd === i.periodEnd && i.periodStart.endsWith("-01")),
-    { message: "a TTB filing covers one calendar month: the 1st through its last day", path: ["periodEnd"] },
+    (i) => i.jurisdiction !== "TTB" || periodKey(i.periodStart, i.periodEnd) !== null,
+    { message: "a TTB filing covers one calendar month, quarter, or year", path: ["periodEnd"] },
   ),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("file_compliance_report", {
     p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd, p_note: i.note ?? null, p_request_id: execution.requestId,
