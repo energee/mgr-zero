@@ -36,17 +36,25 @@ begin
       union all
       select 'loss', v_transfer_loss
     ) removals where k is not null group by k having sum(v) <> 0),
-  -- cents to print: Out as printed, plus the rounded removals that are not Out
+  -- The lines must add up to: Out as printed, plus the removals that are not
+  -- part of Out (cellar removals and transfer loss, less ledger adjustments).
   target as (
-    select round(sum(round(b + i, 2) - round(b + i - o, 2)) * 100
-      + round((select coalesce(sum(v), 0) from removal_totals) - sum(o), 2) * 100) as cents from per_class),
-  -- largest remainder: every class gets its floor, the leftover cents go to the largest fractions
+    select round(sum(round(b + i, 2) - round(b + i - o, 2)), 2) as printed_out,
+           round((select coalesce(sum(v), 0) from removal_totals) - sum(o), 2) as not_out
+    from per_class),
+  -- Largest remainder: every class gets its floor in cents; the cents left over
+  -- go one each to the classes with the largest fractions.
   ranked as (
-    select k, floor(v * 100) as base, row_number() over (order by v * 100 - floor(v * 100) desc, k) as rn, count(*) over () as n
+    select k, floor(v * 100) as base, row_number() over (order by v * 100 - floor(v * 100) desc, k) as rn
     from removal_totals),
+  leftover as (
+    select (select round((printed_out + not_out) * 100) from target) - sum(base) as cents, count(*) as n
+    from ranked),
+  shares as (
+    select floor(cents / n) as each_class, cents - floor(cents / n) * n as extra from leftover where n > 0),
   allocated as (
-    select k, round((base + floor(units / n) + case when rn <= units - floor(units / n) * n then 1 else 0 end) / 100, 2) as v
-    from (select ranked.*, (select cents from target) - sum(base) over () as units from ranked) shares)
+    select k, round((base + each_class + case when rn <= extra then 1 else 0 end) / 100, 2) as v
+    from ranked, shares)
   select
     -- rounded running balance (see header); the identity is checked unrounded below
     (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(b + i, 2) - round(b, 2),
