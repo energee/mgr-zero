@@ -8,7 +8,7 @@ import { Fragment } from "react";
 
 export type { MaterialViewModel };
 
-type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId", (value: string) => void>> & {
+type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId" | "extractPotential", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;
 };
@@ -23,6 +23,10 @@ const pick = (
           { value: option.value, label: option.label }
         ))), { onChange: change })}</Fragment>
 );
+
+/** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
+/** Kinds whose extract potential feeds recipe gravity. */
+export const EXTRACT_KINDS = new Set(["malt", "adjunct"]);
 
 export function MaterialView({ model, controls = {}, messages, footer }: {
   model: MaterialViewModel;
@@ -51,6 +55,9 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
         pick("Unit", model.unit, unitOptions, controls.unit),
       )}
       {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
+      {EXTRACT_KINDS.has(model.kind.toLowerCase())
+        ? E.edit("Extract potential · optional", model.extractPotential ?? "", "number", undefined, { onChange: controls.extractPotential, min: 1, max: 1.05, step: 0.001, inputMode: "decimal" })
+        : null}
       {pick(
         "Default vendor · optional",
         model.defaultVendorId || NONE,

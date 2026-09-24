@@ -193,9 +193,9 @@ it("cross-location material receipts preserve selected lot and reject rounded so
 it("submits the real return form payload for a manual invoice without inventing shipment sources", async () => {
   const invoice = await ins("invoices", { brewery_id: ctx.breweryId, customer_id: cust.customerId, kind: "invoice" });
   const line = await ins("invoice_lines", { brewery_id: ctx.breweryId, invoice_id: invoice.id, kind: "sku", sku_id: cat.skuId, qty: 2, unit_price_cents: 12000, description: "Manual invoice" });
-  const lines = buildReturnLines([{ id: line.id, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", null);
+  const lines = buildReturnLines([{ id: line.id, kind: "sku", skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", null);
   await expect(runCommand("return_shipment", { invoiceId: invoice.id, locationId: loc.id, reason: "unsold", lines }, ctx)).resolves.toBeDefined();
-  expect(buildReturnLines([{ id: line.id, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", crypto.randomUUID())[0].sources).toEqual([]);
+  expect(buildReturnLines([{ id: line.id, kind: "sku", skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", crypto.randomUUID())[0].sources).toEqual([]);
 });
 
 it("compares parsed UUID identity for ship lines, return lines and return sources", async () => {
@@ -210,7 +210,7 @@ it("compares parsed UUID identity for ship lines, return lines and return source
   const shipped = await runCommand("ship_order", { orderId: shippedOrder.id, ship: [{ lineId: shippedOrder.line, qty: 2, sources: [{ binId: bin, lotId: lots[0], qty: 2 }] }] }, ctx) as { invoice_id: string };
   const movement = (await admin.from("inventory_movements").select("id").eq("ref", shippedOrder.id).single()).data!.id;
   const line = (await admin.from("invoice_lines").select("id").eq("invoice_id", shipped.invoice_id).single()).data!.id;
-  const emptySourceLines = buildReturnLines([{ id: line, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line]: "1" }, [], {}, bin, shipped.invoice_id);
+  const emptySourceLines = buildReturnLines([{ id: line, kind: "sku", skuId: cat.skuId, label: "Beer", qty: 2 }], { [line]: "1" }, [], {}, bin, shipped.invoice_id);
   await expect(runCommand("return_shipment", { invoiceId: shipped.invoice_id, locationId: loc.id, reason: "unsold", lines: emptySourceLines }, ctx)).rejects.toThrow(/sources/);
   for (const lines of [
     [{ invoice_line_id: line, qty: 0.25, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }] }, { invoice_line_id: line.replaceAll("-", ""), qty: 0.25, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }] }],
