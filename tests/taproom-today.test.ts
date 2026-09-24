@@ -5,7 +5,7 @@ const location = { id: "11111111-1111-4111-8111-111111111111", name: "Main tapro
 const report = { as_of: "2026-09-08T15:00:00Z", reason: null, rows: [{ variance_bbl: 0 }], periods: [{ coverage_complete: true, reason: null }] };
 
 it("shows permitted Taproom exits from observed facts without inventing due policy", () => {
-  const rows = taproomTodayRows(location, [], [{ counted_on: "2026-09-07", created_at: "2026-09-07T14:00:00Z" }], report);
+  const rows = taproomTodayRows(location, [], [{ counted_on: "2026-09-07", created_at: "2026-09-07T14:00:00Z" }], report, "America/New_York");
   expect(rows.map((row) => [row.label, row.verb, row.href])).toEqual([
     ["Tap board", "Open", `/taproom/board?location=${location.id}`],
     ["Weekly count", "Count", `/taproom?location=${location.id}`],
@@ -18,7 +18,7 @@ it("shows permitted Taproom exits from observed facts without inventing due poli
 });
 
 it("keeps unavailable variance distinct from observed zero", () => {
-  const rows = taproomTodayRows(location, [], [], { ...report, reason: "no_pos_coverage", rows: [] });
+  const rows = taproomTodayRows(location, [], [], { ...report, reason: "no_pos_coverage", rows: [] }, "America/New_York");
   expect(rows[2].detail).toContain("no pos coverage");
   expect(rows[2].detail).not.toContain("0 bbl");
 });
@@ -28,6 +28,6 @@ it("labels mapped variance from incomplete POS coverage as partial", () => {
     ...report,
     rows: [{ variance_bbl: .25 }],
     periods: [{ coverage_complete: false, reason: null }],
-  });
+  }, "America/New_York");
   expect(rows[2].detail).toContain("0.25 bbl expected minus actual · partial POS coverage");
 });
