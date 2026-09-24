@@ -657,9 +657,9 @@ computed from the SKU and the quantity. A field an operation does not declare is
 dropped before the handler runs rather than trusted, so sending your own `bbl`
 does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
-`publish_pos_item`, `publish_pos_menu`, and `record_fermentation_reading` are
-the exception: their schemas refuse an undeclared field outright with
-`400 invalid_input` instead of dropping it.
+`create_composed_format`, `publish_pos_item`, `publish_pos_menu`, and
+`record_fermentation_reading` are the exception: their schemas refuse an
+undeclared field outright with `400 invalid_input` instead of dropping it.
 
 Prices on order lines are snapshotted at creation from the customer's price
 group. You do not send them, and changing a price group later does not rewrite
