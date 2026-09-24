@@ -529,9 +529,9 @@ Event entry is unavailable until there is an active pool and a location.
 
 - **Acquired** and **Retired** add kegs to or remove them from the fleet at that bin. No customer.
 - **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
-- **Lost** removes kegs from that bin; name the customer when they were lost out at a customer, which also reduces that customer's balance. **Found** adds kegs back to a bin and never names a customer: a keg found at a customer is a shipped keg.
+- **Lost** removes kegs from the fleet. Without a customer they come out of that bin; name the customer when they were lost out at a customer, and they come off that customer's balance instead (they already left the bin when shipped). **Found** adds kegs back to a bin and never names a customer: a keg found at a customer is a shipped keg.
 
-The quantity is always positive; the reason is the direction. Retired, shipped, and lost cannot exceed what the bin holds, so a typo is refused rather than driving a bin negative. A **Note** is optional and shows next to the event in Keg event history. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
+The quantity is always positive; the reason is the direction. Retired, shipped, and lost at a bin cannot exceed what the bin holds; returned and lost at a customer cannot exceed what that customer holds of that pool and size. A typo is refused rather than driving a bin or a customer negative. A **Note** is optional and shows next to the event in Keg event history. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
 
 **Record keg event** only appears once the brewery has at least one location and one pool in service; retire every pool and it disappears until you add one back or reactivate one.
 
