@@ -92,6 +92,11 @@ describe("dreaming workflow", () => {
     }
     expect(settings.permissions.deny).toContain("Read(/home/runner/.ssh/**)");
     expect(settings.permissions.deny).toContain("Grep(**/*token*)");
+    // CI agents check out the repo, so the local-dev Bash allowlist would apply to them too.
+    const local = JSON.parse(read(".claude/settings.json")) as { permissions: { allow: string[] } };
+    for (const rule of local.permissions.allow.filter((r) => r.startsWith("Bash("))) {
+      expect(settings.permissions.deny).toContain(rule);
+    }
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain("show_full_output: false");
     expect(workflow).not.toContain("id-token: write");

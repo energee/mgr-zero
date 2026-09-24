@@ -244,7 +244,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor. Units are refused once movements exist
+Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements exist
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -258,6 +258,7 @@ Create or edit a material definition: kind, base and purchase units with the fac
 | `defaultVendorId` | uuid | no |
 | `reorderPoint` | number | no |
 | `active` | boolean | no |
+| `extractPotential` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

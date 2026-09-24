@@ -2,7 +2,8 @@
 // A pool is a mutable row (name, kind, vendor, deposit); everything else is
 // keg_events, an append-only count ledger where qty is always positive and
 // `reason` is the direction. What a bin physically holds is keg_bin_on_hand
-// ("36 in the taproom, 40 in storage" is two rows; shipped kegs have left),
+// ("36 in the taproom, 40 in storage" is two rows; shipped kegs have left,
+// so a keg lost at a customer comes off the customer, not the bin),
 // the fleet total is keg_fleet_totals (shipped kegs are still the fleet),
 // and what a customer holds is keg_customer_balances plus
 // keg_deposit_balances. Tap board writes
@@ -48,7 +49,7 @@ defineCommand({
 
 defineCommand({
   name: "record_keg_event",
-  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one, and retired, shipped or lost cannot exceed what the bin holds",
+  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one; retired, shipped, or lost at the bin cannot exceed what the bin holds, and returned or lost at a customer cannot exceed what the customer holds",
   input: z.object({
     poolId: z.string().uuid(), kegSize: z.enum(KEG_SIZES), qty: z.number().int().positive(), reason: z.enum(KEG_EVENT_REASONS),
     locationId: z.string().uuid(), binId: z.string().uuid(), customerId: z.string().uuid().optional(), note: z.string().optional(),
@@ -144,8 +145,11 @@ defineQuery({
     const [pools, totals, events, customers] = await Promise.all([
       listPools(ctx),
       unwrap(ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at")
-        .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])),
+      // Every event, oldest first, paged past PostgREST's 1000-row cap (#455);
+      // kegAging re-sorts by instant, and this order breaks same-instant ties.
+      completeRows("Keg report", start => ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])
+        .order("at").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
     ]);
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));

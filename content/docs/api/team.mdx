@@ -18,8 +18,8 @@ when membership is completed.
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
 admin membership and returns the brewery UUID. Replay returns that UUID without
-restoring revoked membership. `MGR_DEDICATED=1` disables web creation only;
-authenticated API provisioning remains available.
+restoring revoked membership. `MGR_DEDICATED=1` refuses brewery creation from
+the web and the API alike with `403 permission_denied`.
 
 `import_csv` accepts 1–5000 string-field rows and returns
 `{ committed, blocked, outcomes }`. Each outcome names its 1-based `row`,
