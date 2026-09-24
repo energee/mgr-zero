@@ -2,6 +2,7 @@
 // for INV-1039 (failed QuickBooks push). Mapping rows are inventory-only.
 import { ALS, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { InvoiceSnapshot } from "@/lib/mgr/invoice-view";
+import { DEMO_TIME_ZONE } from "./settings";
 
 const INVOICE_1039 = "00000000-0000-4000-8000-000000001039";
 
@@ -21,6 +22,7 @@ const line = (
 
 /** Failed push of INV-1039 to Al’s Bar: 3 lines, $540, item unmapped. */
 export const invoiceFailedAls: InvoiceSnapshot = {
+  timeZone: DEMO_TIME_ZONE,
   invoice: {
     id: INVOICE_1039,
     invoice_no: 1039,
