@@ -168,11 +168,35 @@ describe("QuickBooks OAuth lifecycle", () => {
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }))
       .mockRejectedValueOnce(new TypeError("revoke socket closed"));
-    const fail = vi.fn().mockResolvedValue(undefined);
+    const fail = vi.fn().mockResolvedValue(true);
     await expect(run(storeFetch, vi.fn().mockRejectedValue(new Error("QuickBooks connection storage failed")), fail))
       .rejects.toThrow("QuickBooks is unavailable");
     expect(String(storeFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+  });
+
+  it("keeps the credential when storage committed but the client saw an error (#426)", async () => {
+    // complete_qbo_oauth committed, the response was lost: fail_qbo_oauth finds
+    // the intent no longer 'exchanging' and returns false, so the stored
+    // credential is live and must not be revoked.
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    const fail = vi.fn().mockResolvedValue(false);
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=realm-1`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
+        complete: vi.fn().mockRejectedValue(new TypeError("fetch failed")), fail,
+      },
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("refuses a malformed CompanyInfo response or a realm-scoped request denial", async () => {

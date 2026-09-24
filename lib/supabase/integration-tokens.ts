@@ -221,9 +221,11 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   return data;
 }
 
+/** True when the intent moved to recovery_required; false when it was no longer 'exchanging'. */
 export async function failQboOAuth(intentId: string, actorId: string) {
-  const { error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
+  const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
+  return data === true;
 }
 
 export async function claimSquareOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {

@@ -51,7 +51,8 @@ export type QboOAuthClaim = {
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
-  fail(intentId: string, actorId: string): Promise<void>;
+  /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
+  fail(intentId: string, actorId: string): Promise<boolean>;
 };
 
 export type QboPushStart = {
@@ -224,21 +225,28 @@ export async function completeQboOAuth(input: {
   const claim = await input.store.claim(sha256(state), input.actorId, input.selectedBreweryId, input.redirectUri);
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
   let tokens: QboTokens | null = null;
+  let storing = false;
   try {
     tokens = await input.client.exchange(code);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
     await input.client.verifyRealm(realmId, tokens.accessToken);
+    storing = true;
     return await input.store.complete(claim.intentId, input.actorId, realmId, {
       ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
     });
   } catch (error) {
     // Tokens issued but never stored would stay live at Intuit; revoking the
-    // refresh token revokes its access token too. Best effort, like Square's
-    // callback: a revoke failure must not mask the original failure.
-    if (tokens) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
-    await input.store.fail(claim.intentId, input.actorId);
+    // refresh token revokes its access token too. Best effort: a revoke
+    // failure must not mask the original failure. Before the store write the
+    // tokens are certainly unstored, so revoke outright.
+    if (tokens && !storing) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
+    const recorded = await input.store.fail(claim.intentId, input.actorId);
+    // A failed store.complete may still have committed (lost response).
+    // fail_qbo_oauth returns false once the intent left 'exchanging', and then
+    // the stored credential is live, so revoke only when fail recorded it.
+    if (tokens && storing && recorded) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
     throw new Error(sanitizeQboError(error));
   }
 }
