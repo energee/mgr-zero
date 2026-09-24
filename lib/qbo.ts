@@ -53,6 +53,8 @@ export type QboOAuthStore = {
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
   /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
   fail(intentId: string, actorId: string): Promise<boolean>;
+  /** True when a stored (not disconnected) connection of any brewery uses this QuickBooks realm. */
+  realmInUse(realmId: string): Promise<boolean>;
 };
 
 export type QboPushStart = {
@@ -238,15 +240,22 @@ export async function completeQboOAuth(input: {
     });
   } catch (error) {
     // Tokens issued but never stored would stay live at Intuit; revoking the
-    // refresh token revokes its access token too. Best effort: a revoke
-    // failure must not mask the original failure. Before the store write the
-    // tokens are certainly unstored, so revoke outright.
-    if (tokens && !storing) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
+    // refresh token revokes its access token too. But Intuit's revoke
+    // disconnects the app from that QuickBooks company, so skip it when a
+    // stored connection (this brewery's or another's) already uses the realm,
+    // or when that cannot be checked. Best effort: a revoke failure must not
+    // mask the original failure.
+    const revoke = async (refreshToken: string) => {
+      if (await input.store.realmInUse(realmId).catch(() => true)) return;
+      await input.client.revoke(refreshToken).catch(() => undefined);
+    };
+    // Before the store write the tokens are certainly unstored.
+    if (tokens && !storing) await revoke(tokens.refreshToken);
     const recorded = await input.store.fail(claim.intentId, input.actorId);
     // A failed store.complete may still have committed (lost response).
     // fail_qbo_oauth returns false once the intent left 'exchanging', and then
     // the stored credential is live, so revoke only when fail recorded it.
-    if (tokens && storing && recorded) await input.client.revoke(tokens.refreshToken).catch(() => undefined);
+    if (tokens && storing && recorded) await revoke(tokens.refreshToken);
     throw new Error(sanitizeQboError(error));
   }
 }

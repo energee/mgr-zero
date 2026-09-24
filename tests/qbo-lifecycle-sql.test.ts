@@ -10,6 +10,7 @@ import {
   completeQboOAuthStore,
   disconnectQbo,
   failQboOAuth,
+  qboRealmInUse,
   getQboHealth,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
@@ -50,7 +51,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=one-time-code&state=${authorize.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual(requestedScopes);
@@ -80,7 +81,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=narrow-code&state=${narrow.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual([QBO_ACCOUNTING_SCOPE]);
@@ -105,7 +106,7 @@ describe("QuickBooks durable lifecycle", () => {
     });
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
       String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse());
-    const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth };
+    const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
@@ -153,6 +154,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect(String(tamperedFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
     expect(tamperedFetch.mock.calls[2][1]?.body).toBe(JSON.stringify({ token: "refresh-secret" }));
     expect(sql(`select count(*) from public.qbo_connections where brewery_id='${brewery.id}' or realm_id='${knownRealm}'`)).toEqual(["0"]);
+    await expect(qboRealmInUse(knownRealm)).resolves.toBe(false);
     expect(sql(`select exchange_state from private.qbo_oauth_intents where state_hash='${hash(tamperedState)}'`)).toEqual(["recovery_required"]);
     expect(JSON.stringify(sql(`select detail from private.qbo_connection_events where brewery_id='${brewery.id}'`))).not.toMatch(/attacker-access-secret|refresh-secret/);
 
@@ -172,6 +174,8 @@ describe("QuickBooks durable lifecycle", () => {
       client: new QboOAuthClient(config, legitimateFetch), store,
     })).resolves.toEqual(expect.any(String));
     expect(sql(`select brewery_id from public.qbo_connections where realm_id='${knownRealm}'`)).toEqual([legitimateBrewery.id]);
+    // Now a failed callback for knownRealm must not revoke: that would cut this connection.
+    await expect(qboRealmInUse(knownRealm)).resolves.toBe(true);
 
     const validState = `valid-${crypto.randomUUID()}`;
     const supersededState = `superseded-${crypto.randomUUID()}`;
