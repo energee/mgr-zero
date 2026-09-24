@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/pre-push.sh — the fast half of CI, run before a push so obvious
 # breakage never leaves the machine: lint, typecheck, and the pure vitest
-# files AGENTS.md names as the proof for screen work. About a minute.
+# files AGENTS.md names as the proof for screen work, plus the migration lock
+# (tests/migrations-applied.test.ts). About a minute.
 #
 # `next build` and the three database shards are deliberately NOT here. CI
 # (.github/workflows/ci.yml) runs them on every push, in parallel jobs, against
@@ -26,4 +27,4 @@ bunx tsc --noEmit
 bunx vitest run --fileParallelism --maxWorkers=2 \
   tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts \
   tests/theme-contrast.test.ts tests/screen-persona.test.ts \
-  tests/design-docs.test.ts tests/docs.test.ts
+  tests/design-docs.test.ts tests/docs.test.ts tests/migrations-applied.test.ts

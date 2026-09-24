@@ -188,6 +188,55 @@ describe("brew day overlaps a closed occupancy", () => {
     expect(day.batch.brewed_on).toBe("2026-10-06");
     expect(day.occupancy).toMatchObject({ initial_bbl: 28 });
   });
+
+  // #434: emptying and refilling a tank on the same day is a normal cycle. The
+  // transfer closes FV1 at now(), so a brew day dated today must open its
+  // occupancy after that instant, not at midnight, or the ranges overlap.
+  it("brews into a vessel emptied earlier the same day", async () => {
+    // "Today" is the brewery's local day, the window record_brew_day uses.
+    const [today] = sql(`select (now() at time zone timezone)::date::text from breweries where id = '${b.id}'`, true);
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-SAMEDAY", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const brite = (await runCommand("upsert_vessel", { name: "BR-SAMEDAY", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+    const first = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
+    const brewed = (await runCommand("record_brew_day",
+      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as { occupancy: { id: string } };
+    const moved = (await runCommand("record_cellar_transfer",
+      { fromOccupancyId: brewed.occupancy.id, toVesselId: brite.id, volumeBbl: 10 }, ctx)) as {
+        from_occupancy: { ended_at: string | null };
+      };
+    expect(moved.from_occupancy.ended_at).not.toBeNull();
+
+    const second = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
+    const again = (await runCommand("record_brew_day",
+      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as {
+        batch: { brewed_on: string }; occupancy: { started_at: string };
+      };
+    expect(again.batch.brewed_on).toBe(today);
+    expect(Date.parse(again.occupancy.started_at)).toBeGreaterThanOrEqual(Date.parse(moved.from_occupancy.ended_at!));
+  });
+
+  // "The same day" is the brewery's day, not UTC's. A tank emptied at 22:00 in
+  // New York closed on the next UTC day; a brew dated the local day must still
+  // start after that close instead of reporting the vessel occupied.
+  it("uses the brewery's time zone for the same-day window", async () => {
+    await admin.from("breweries").update({ timezone: "America/New_York" }).eq("id", b.id);
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const first = (await runCommand("schedule_batch", { plannedOn: "2026-11-01", plannedBbl: 10 }, ctx)) as { id: string };
+    const brewed = (await runCommand("record_brew_day",
+      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
+    // A first brew starts at the brewery's midnight, not UTC's (#582): still EDT until 02:00.
+    expect(Date.parse(brewed.occupancy.started_at)).toBe(Date.parse("2026-11-01T04:00:00Z"));
+    // 22:00 New York on 11-10 is 03:00 UTC on 11-11.
+    sql(`update vessel_occupancies set ended_at = timestamptz '2026-11-10 22:00 America/New_York'
+         where batch_id = '${first.id}' and ended_at is null`, true);
+
+    const second = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 10 }, ctx)) as { id: string };
+    const again = (await runCommand("record_brew_day",
+      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-10" }, ctx)) as {
+        occupancy: { started_at: string };
+      };
+    expect(Date.parse(again.occupancy.started_at)).toBe(Date.parse("2026-11-11T03:00:00Z"));
+  });
 });
 
 // Tenancy and roles. Every id these RPCs accept is matched against p_brewery,
