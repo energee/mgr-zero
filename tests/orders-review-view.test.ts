@@ -13,6 +13,7 @@ import { orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComple
 import { toCompleteTransferViewProps } from "../lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "../lib/mgr/confirm-order-view";
 import { toPutBackViewProps } from "../lib/mgr/put-back-view";
+import { OUNCES_PER_BBL } from "../lib/volume";
 
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
@@ -99,6 +100,12 @@ describe("Complete transfer view loop", () => {
     expect(model.fromLabel).toBe("Warehouse");
     expect(model.toLabel).toBe("Taproom");
     expect(model.lines[0]?.detail).toBe("4 / 4");
+  });
+
+  it("formats each tape leg from the unrounded volume (#456)", () => {
+    const line = { id: "l-can", qty_ordered: 1, qty_picked: 1, bbl_per_unit: 12 / OUNCES_PER_BBL, skus: { name: "Can" } };
+    const model = toCompleteTransferViewProps({ ...orderTransferComplete, lines: [line] });
+    expect(model.tape.map(([, volume]) => volume)).toEqual(["12 oz", "12 oz"]);
   });
 
   it("the inventory record is CompleteTransferView painted from that fixture", () => {
