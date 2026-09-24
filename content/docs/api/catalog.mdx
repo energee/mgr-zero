@@ -206,9 +206,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-SKUs with their brand and format, alphabetical
+SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
