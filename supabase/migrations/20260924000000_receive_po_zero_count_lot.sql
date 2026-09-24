@@ -1,51 +1,7 @@
--- A receipt's cost per base unit keeps sub-cent precision (#495).
--- receive_purchase_order stored round(purchase-unit cost / purchase_uom_factor)
--- as a whole-cent int, so $10/lb hops counted in grams (2.2046¢/g) became 2¢/g,
--- 9% low in every recipe cost and price-group suggestion, and anything under
--- 0.5¢ per base unit became free. recipe_version_costs (since #448/#494)
--- multiplies per_bbl_qty by this per-base-unit cost and rounds the barrel total
--- once, so the stored cost is the one place precision was lost.
---
--- Fix: widen material_movements.unit_cost_cents to unconstrained numeric and
--- store the division unrounded. Unconstrained rather than a fixed scale such
--- as numeric(14,4): any fixed scale repeats the bug one magnitude down (a
--- $1/gal adjunct counted in ml is 0.0264¢/ml). Keeping the per-purchase-unit
--- cost and dividing in the view would also work, but the movement row does not
--- carry the factor it was received under, and the factor can change later.
--- The column stays in cents (the name holds); only receipts write it.
---
--- No backfill: existing receipt rows keep their rounded values. The movement
--- does not store the purchase-unit cost it came from (receipt_lines point at
--- the PO line, whose price may since have been edited, and the material's
--- factor may have changed), so the lost fraction cannot be recovered. The
--- next receipt of each material supersedes its last cost.
---
--- material_last_cost reads the column and recipe_version_costs reads that
--- view, so both are dropped and recreated unchanged (security_invoker, grants).
-
-drop view public.recipe_version_costs;
-drop view public.material_last_cost;
-
-alter table public.material_movements alter column unit_cost_cents type numeric;
-
-create view public.material_last_cost with (security_invoker = true) as
-  select distinct on (brewery_id, material_id) brewery_id, material_id, unit_cost_cents, created_at
-  from public.material_movements where type = 'receipt' and unit_cost_cents is not null
-  order by brewery_id, material_id, created_at desc;
-
-create view public.recipe_version_costs with (security_invoker = true) as
-  select ri.recipe_version_id, ri.brewery_id,
-    case when bool_and(c.unit_cost_cents is not null)
-      then sum(ri.per_bbl_qty * c.unit_cost_cents::numeric)::integer end as cost_cents_per_bbl,
-    coalesce(array_agg(distinct ri.material_id) filter (where c.unit_cost_cents is null), '{}'::uuid[]) as uncosted_material_ids
-  from public.recipe_ingredients ri
-  left join public.material_last_cost c on c.material_id = ri.material_id
-  group by ri.recipe_version_id, ri.brewery_id;
-
-revoke all on public.material_last_cost, public.recipe_version_costs from public, anon, authenticated;
-grant select on public.material_last_cost, public.recipe_version_costs to authenticated;
-grant all on public.material_last_cost, public.recipe_version_costs to postgres, service_role;
-
+-- #453: a lot-tracked PO line counted 0 received nothing, so it needs no lot
+-- code and must not create a material_lots row (an empty lot could become the
+-- "newest lot" a count overage lands on). Same function as the baseline; only
+-- the lot branch now also requires a positive count.
 create or replace function public.receive_purchase_order(
   p_brewery uuid, p_po uuid, p_location uuid, p_bin uuid, p_received_on date, p_lines jsonb, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -69,7 +25,7 @@ begin
     v_counted := (l->>'qty_counted')::numeric;
     select qty_open into v_expected from public.po_open_balances where po_line_id = v_line.id;
     v_lot := null; v_movement := null;
-    if v_mat.lot_tracked and v_counted > 0 then  -- #453: a zero count needs no lot
+    if v_mat.lot_tracked and v_counted > 0 then
       if nullif(trim(l->>'lot_code'), '') is null then raise exception '% is lot-tracked: a lot code is required', v_mat.name; end if;
       insert into public.material_lots (brewery_id, material_id, lot_code, vendor_id, received_on, best_by)
       values (p_brewery, v_mat.id, trim(l->>'lot_code'), v_po.vendor_id, coalesce(p_received_on, current_date), (l->>'best_by')::date)
@@ -78,10 +34,9 @@ begin
       returning id into v_lot;
     end if;
     if v_counted > 0 then
-      -- Cost per base unit, unrounded (#495): the purchase-unit price over the factor.
       insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, unit_cost_cents, created_by)
       values (p_brewery, v_mat.id, p_location, p_bin, v_lot, v_counted * v_mat.purchase_uom_factor, 'receipt',
-              v_line.unit_cost_cents / v_mat.purchase_uom_factor, v_actor)
+              case when v_line.unit_cost_cents is null then null else round(v_line.unit_cost_cents / v_mat.purchase_uom_factor)::int end, v_actor)
       returning id into v_movement;
     end if;
     insert into public.receipt_lines (brewery_id, receipt_id, po_line_id, qty_expected, qty_counted, lot_id, movement_id)
