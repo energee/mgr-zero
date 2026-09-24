@@ -30,8 +30,10 @@ begin
       raise exception 'material is in use: its units cannot change';
     end if;
     if not v_row.lot_tracked and p_lot_tracked
-       and coalesce((select qty from public.material_on_hand where brewery_id = p_brewery and material_id = p_material), 0)
-           <> coalesce((select sum(qty) from public.material_lot_on_hand where brewery_id = p_brewery and material_id = p_material), 0) then
+       -- per bin: unlotted amounts in different bins must not cancel out
+       and exists (select 1 from public.material_movements
+                   where brewery_id = p_brewery and material_id = p_material and lot_id is null
+                   group by bin_id having sum(qty) <> 0) then
       raise exception 'material has stock without a lot: count it to zero before turning on lot tracking';
     end if;
     update public.materials set name = p_name, category = p_category, base_uom = p_base_uom, purchase_uom = p_purchase_uom,
