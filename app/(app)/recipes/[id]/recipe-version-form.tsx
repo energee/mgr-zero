@@ -58,7 +58,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   // Recomputed every render: a handful of numbers. Null (no "Predicted:"
   // line) until every mash ingredient's material has an extract_potential.
   const preview = eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0
-    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage })) })
+    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage, unit: material.get(l.materialId)?.base_uom })) })
     : null;
 
   const creating = recipeId === undefined;

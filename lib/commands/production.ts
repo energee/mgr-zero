@@ -189,7 +189,7 @@ defineQuery({
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
-        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
         .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
@@ -203,6 +203,7 @@ defineQuery({
           // A null snapshot stays null: recipeGravity then predicts nothing
           // rather than defaulting its potential or printing OG 0 (#430).
           perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage as string,
+          unit: l.materials?.base_uom,
         })),
       }) ?? { ogPlato: null, fgPlato: null, abv: null }),
     };
