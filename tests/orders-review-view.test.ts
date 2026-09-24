@@ -60,6 +60,32 @@ describe("Confirm order view loop", () => {
     expect(model.oversellNotes[0]).not.toMatch(/another location/i);
   });
 
+  it("warns when this order's own quantity takes ATP negative (#415)", () => {
+    // ATP excludes a submitted order's own quantity until confirm allocates it:
+    // ATP 5 with this order asking 10 leaves −5 after confirm.
+    const sku = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 10 };
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [{ sku_id: sku.sku_id, qty: 5 }],
+      sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
+    });
+    expect(model.lines[0].tone).toBe("w");
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/ATP for .* is 5.*confirming 10 leaves −5/i)]);
+  });
+
+  it("does not warn when ATP covers this order exactly", () => {
+    const sku = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 5 };
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [{ sku_id: sku.sku_id, qty: 5 }],
+      sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
+    });
+    expect(model.lines[0].tone).toBe("");
+    expect(model.oversellNotes).toEqual([]);
+  });
+
   it("does not claim other-location stock for a never-stocked SKU", () => {
     const sku = orderSubmittedRidgeline.lines[0];
     const model = toConfirmOrderViewProps({
