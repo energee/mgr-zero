@@ -5,7 +5,7 @@
 // orders.ts (Program 1) and stamps transfer stops without invoicing.
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
-import { breweryToday, defineCommand, defineQuery, rows, unwrap } from "./registry";
+import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, unwrap } from "./registry";
 
 const ROLES = ["admin", "warehouse"] as const;
 const READ = ["admin", "warehouse", "sales"] as const;
@@ -34,6 +34,11 @@ export type DeliveryRow = { id: string; route_id: string; stop_no: number; deliv
 /** A document a stop can deliver, with its one line of copy: "ORD-0012 · Ridgeline · Dock" / "TRF-0003 · Storage". */
 export type StopDoc = { id: string; label: string; kind: "shipment" | "transfer" };
 
+/** A stop with the document it delivers embedded, so its label never depends on a brewery-wide read. */
+type StopRow = DeliveryRow & { shipments: ShipmentRow | null; stock_transfers: TransferRow | null };
+const SHIPMENT_LABEL = "orders(order_no, customers(name), ship_tos(label))";
+const TRANSFER_LABEL = "transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)";
+
 const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", label: [docNo("ORD", s.orders?.order_no ?? null, "Order"), s.orders?.customers?.name, s.orders?.ship_tos?.label].filter(Boolean).join(" · ") });
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
@@ -44,27 +49,32 @@ defineQuery({
   handler: async (ctx, i) => {
     let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId).order("delivery_date").order("created_at");
     q = i.id ? q.eq("id", i.id) : i.date ? q.eq("delivery_date", i.date) : q.is("returned_at", null);
-    // ponytail: every delivery and shipment of the brewery is read to find the ones on no route, and a
-    // carrier-shipped order waits there too until someone routes it; a view of undelivered documents with
-    // a shipment-level "handed to carrier" state is the upgrade path once history outgrows one page
-    const [routes, deliveries, shipments, transfers, drivers, today] = await Promise.all([
+    // Read only what the page shows: the listed routes' stops, and the documents on no route (an
+    // anti-join on deliveries), each read whole by completeRows however many pages it spans (#473).
+    // ponytail: a carrier-shipped order still waits in "unassigned" until someone routes it; a
+    // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen
+    const [routes, shipments, transfers, drivers, today] = await Promise.all([
       rows<RouteRow>(q),
-      rows<DeliveryRow>(ctx.db.from("deliveries").select("*").eq("brewery_id", ctx.breweryId).order("stop_no")),
-      rows<ShipmentRow>(ctx.db.from("shipments").select("id, orders(order_no, customers(name), ship_tos(label))").eq("brewery_id", ctx.breweryId)),
-      rows<TransferRow>(ctx.db.from("stock_transfers").select("id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
-        .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"])),
+      completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
+      completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
       unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
       breweryToday(ctx),
     ]);
-    const docs = [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)];
-    const labelById = new Map(docs.map((d) => [d.id, d.label]));
-    const onRoute = new Set(deliveries.map((d) => d.shipment_id ?? d.stock_transfer_id));
+    const routeIds = routes.map((r) => r.id);
+    const deliveries = await inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
+      .select(`*, shipments(id, ${SHIPMENT_LABEL}), stock_transfers(id, ${TRANSFER_LABEL})`, { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("route_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<StopRow[]>);
+    deliveries.sort((a, b) => a.stop_no - b.stop_no);
     return {
       routes: routes.map((r) => ({
         ...r,
-        stops: deliveries.filter((d) => d.route_id === r.id).map((d) => ({ ...d, label: labelById.get(d.shipment_id ?? d.stock_transfer_id ?? "") ?? "Stop" })),
+        stops: deliveries.filter((d) => d.route_id === r.id).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
+          ...d, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
+        })),
       })),
-      unassigned: docs.filter((d) => !onRoute.has(d.id)),
+      unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
       drivers,
       today,
     };

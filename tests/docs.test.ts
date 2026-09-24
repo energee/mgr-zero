@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SCREENS } from "../components/mgr/screens";
 
 const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
@@ -66,8 +67,7 @@ describe("customer guides (MDX)", () => {
 // A guide section that describes a screen embeds it: <Screen name="…" /> draws
 // the inventory frame (components/mgr/screen-embed.tsx) under the prose.
 describe("guide screen embeds", () => {
-  it("names only screens the inventory has, and covers the main sections", async () => {
-    const { SCREENS } = await import("../components/mgr/screens");
+  it("names only screens the inventory has, and covers the main sections", () => {
     const names = new Set(SCREENS.filter((s) => !s.venue).map((s) => s.name));
     const embeds = (guide: string) => [...read(`content/docs/${guide}.mdx`).matchAll(/<Screen name="([^"]+)" \/>/g)].map((m) => m[1]);
     for (const guide of ["staff-guide", "portal-guide"]) {

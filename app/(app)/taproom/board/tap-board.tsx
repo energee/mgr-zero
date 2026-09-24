@@ -28,15 +28,15 @@ import {
 import { TapBoardView, type TapSku, type TapBoardNavigation } from "@/components/mgr/views/tap-board";
 export type { TapSku } from "@/components/mgr/views/tap-board";
 
-const when = (value: string) => formatDateTime(value);
 const actor = (label: string | null) => label ? `@${label}` : "staff";
 
-function closingFact(history: TapHistory[], interval: TapInterval | null) {
+function closingFact(history: TapHistory[], interval: TapInterval | null, timeZone: string) {
   const closed = interval && history.find((row) => row.id === interval.id);
-  return closed ? `${tapLabel(closed)} was closed ${when(closed.closed_at)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null;
+  return closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null;
 }
 
-export function TapBoard({ breweryId, locationId, initial, skus, navigation }: { breweryId: string; locationId: string; initial: TapBoardSnapshot; skus: TapSku[]; navigation: TapBoardNavigation }) {
+/** `timeZone` is breweries.timezone, passed from the server page so SSR and hydration print the same times (#442). */
+export function TapBoard({ breweryId, locationId, initial, skus, timeZone, navigation }: { breweryId: string; locationId: string; initial: TapBoardSnapshot; skus: TapSku[]; timeZone: string; navigation: TapBoardNavigation }) {
   const expectedContext = useRef(useCommandContext());
   const [state, setState] = useState<TapBoardState>({ snapshot: initial, sheet: null });
   const [pollError, setPollError] = useState<string | null>(null);
@@ -101,7 +101,7 @@ export function TapBoard({ breweryId, locationId, initial, skus, navigation }: {
         message = error instanceof CommandResponseError ? error.message : "This keg was already closed. Reload the board before acting.";
         try {
           snapshot = await loadLatest();
-          if (snapshot) message = closingFact(snapshot.history, submitted.interval) ?? message;
+          if (snapshot) message = closingFact(snapshot.history, submitted.interval, timeZone) ?? message;
         }
         catch { /* keep the safe conflict copy returned by the close command */ }
       }
@@ -112,6 +112,6 @@ export function TapBoard({ breweryId, locationId, initial, skus, navigation }: {
     setPollError((current) => pollErrorAfterTapBoardSave(current, result));
   }
 
-  return <TapBoardView state={state} skus={skus} navigation={navigation} pollError={pollError}
+  return <TapBoardView state={state} skus={skus} timeZone={timeZone} navigation={navigation} pollError={pollError}
     onOpen={open} onClose={() => setState(current => ({ ...current, sheet: null }))} onEdit={edit} onSubmit={submit} onReload={refresh} />;
 }
