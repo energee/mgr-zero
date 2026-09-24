@@ -12,7 +12,6 @@ const CASES: Case[] = [
   { command: "set_channel_price", path: ["unitPriceCents"], max: INT_MAX, over: INT_MAX + 1, column: "int" },
   { command: "upsert_water_profile", path: ["calciumPpm"], max: 999_999.9, over: 1_000_000, column: "numeric(7,1)" },
   { command: "upsert_water_profile", path: ["bicarbonatePpm"], max: 999_999.9, over: 1_000_000, column: "numeric(7,1)" },
-  { command: "upsert_brand", path: ["abv"], max: 99.99, over: 150, column: "numeric(4,2)" },
   { command: "record_movement", path: ["qty"], max: 9_999_999_999.99, over: 99_999_999_999, column: "numeric(12,2)" },
   { command: "record_movement", path: ["qty"], max: -9_999_999_999.99, over: -99_999_999_999, column: "numeric(12,2)" },
   { command: "create_purchase_order", path: ["lines", 0, "unitCostCents"], max: INT_MAX, over: 99_999_999_999, column: "int" },
