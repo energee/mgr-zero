@@ -34,7 +34,7 @@ describe("QuickBooks control boundaries", () => {
       qbo_balance_cents: 98000, qbo_cash_collected_cents: 0, qbo_accountant_drift: true,
       written_off_at: null, subtotal_cents: 98000, total_cents: 99000, has_pending_qbo_push: false,
       customers: { name: "Ridgeline" },
-    }, "admin", true);
+    }, "admin", true, "America/New_York");
     expect(row.detail).toContain("edited in QuickBooks · review there");
     expect(row.detail).toContain("local subtotal");
     expect(row.tone).toBe("w");

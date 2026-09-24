@@ -294,6 +294,24 @@ describe("portal commands", () => {
     finally { await admin.from("breweries").update({ portal_fulfillment_location_id: previous }).eq("id", b.id); }
   });
 
+  it("serves staff who are also customers the configured source and only active SKUs (#420)", async () => {
+    // Staff RLS sees every location and every SKU, so the portal cannot lean on RLS to narrow either.
+    const staff = await makeStaffCtx(b.id, "admin");
+    await admin.from("customer_users").insert({ customer_id: customerId, user_id: staff.userId });
+    const dual = { ...staff, role: "customer" as const, customerId };
+    const source = await seedLocation(b.id, { name: "Dual source WH" });
+    await runCommand("set_portal_fulfillment_source", { locationId: source.id }, adminCtx);
+    const account = await runCommand("get_portal_account", {}, dual) as { fulfillmentSource: { id: string } | null };
+    expect(account.fulfillmentSource).toMatchObject({ id: source.id });
+
+    const retired = await seedCatalog(b.id, { product: "Retired", sku: "Retired" });
+    await priceSku(b.id, { saleChannelId, brandId: retired.brandId, formatId: retired.formatId, cents: 3600 });
+    await admin.from("skus").update({ active: false }).eq("id", retired.skuId);
+    const rows = await runCommand("portal_catalog", {}, dual) as { skuId: string }[];
+    expect(rows.map((r) => r.skuId)).toContain(skuId);
+    expect(rows.map((r) => r.skuId)).not.toContain(retired.skuId);
+  });
+
   it("checks the active customer and brewery inside update/submit even when the actor owns both accounts", async () => {
     for (const brewery of [b, await makeBrewery()]) {
       const target = await seedCustomer(brewery.id, { name: `Owned-${crypto.randomUUID()}` });

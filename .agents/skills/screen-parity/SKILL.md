@@ -72,6 +72,10 @@ shared-view requirement below; they do not replace it.
    fixture data must not invent domain facts missing from live payloads.
    Preserve explicit `null` slot suppression and missing values. Inventory
    links stay inert or within the explorer; live destinations are explicit.
+6. Draw frames the way they were corrected before. Fixtures use fictional
+   names, never real customers, products, or beers from screenshots. Side
+   panels overlay the content instead of docking beside it. Frames render at
+   desktop width unless the screen is phone-only.
 
 Sharing `E.*`, CSS classes, a view model, or a generic `CommandForm` alone does
 not satisfy this contract. Neither does mounting the correct view while
