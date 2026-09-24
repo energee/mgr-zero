@@ -69,7 +69,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
     requestId.current = null; payload.current = null;
   }
 
-  return <CommandForm title="Reattribute completion loss" trigger={<Button size="sm" variant="outline" disabled={Number(loss.remaining_bbl) === 0}>Reattribute loss</Button>} open={open} onOpenChange={changeOpen}>
+  return <CommandForm title="Reattribute loss" trigger={<Button size="sm" variant="outline" disabled={Number(loss.remaining_bbl) === 0}>Reattribute loss</Button>} open={open} onOpenChange={changeOpen}>
     <form onSubmit={submit} className="flex flex-col gap-4">
       <p className="text-sm">Batch {loss.batch_no} · original {loss.original_bbl} bbl · remaining {loss.remaining_bbl} bbl</p>
       <div className="flex flex-col gap-1">
