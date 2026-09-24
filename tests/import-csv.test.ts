@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { parseCsv, mapCsvRows, readyImportRows, validateImportRow } from "@/lib/import-csv";
+import { parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
@@ -24,10 +24,16 @@ it("keeps only the rows the preview marked ready", () => {
   expect(readyImportRows(rows, [[], ["type is required"], []])).toEqual([{ name: "a" }, { name: "c" }]);
 });
 
+it("numbers each sent row by its preview row, so outcome row 2 is preview row 3 when row 2 was blocked", () => {
+  const sent = readyImportRowNumbers([[], ["type is required"], []]);
+  expect(sent).toEqual([1, 3]);
+  expect(sent[2 - 1]).toBe(3);
+});
+
 it("the import wizard binds the shared explorer steps, Select, and Attachment controls", () => {
   const adapter = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
   expect(adapter).toContain("<ImportView");
-  expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), expectedContext: renderedContext }");
+  expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext }");
   expect(adapter).toContain('"import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext');
   expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
   const source = readFileSync("components/mgr/views/import.tsx", "utf8");
@@ -39,6 +45,7 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   expect(source).toContain("E.stp");
   expect(source).toContain("<ToggleGroup");
   expect(source).toContain('E.tbl(["row", "record", "match", "state"]');
+  expect(source).toContain("String(model.previewRows?.[row.row - 1] ?? row.row)");
   expect(source).not.toMatch(/<select\b/);
   expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);
 });

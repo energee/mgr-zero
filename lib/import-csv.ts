@@ -42,6 +42,12 @@ export function readyImportRows(rows: Record<string, string>[], validation: stri
   return rows.filter((_, index) => !validation[index]?.length);
 }
 
+/** The 1-based preview row number of each ready row, in send order. import_csv numbers
+ *  outcomes by position in the sent array, so outcome row n is preview row numbers[n - 1]. */
+export function readyImportRowNumbers(validation: string[][]): number[] {
+  return validation.flatMap((errors, index) => errors.length ? [] : [index + 1]);
+}
+
 export function mapCsvRows(rows: string[][], mapping: Record<string, number>): Record<string, string>[] {
   return rows.map(row => Object.fromEntries(Object.entries(mapping).filter(([, index]) => index >= 0).map(([field, index]) => [field, row[index] ?? ""])));
 }
