@@ -39,5 +39,6 @@
   "20260924140000_provision_brewery_service_gate.sql": "a4bb61cf52ad33e8133a494d1a758be01be386a50c5d96cb1a953b02fdaff396",
   "20260924160000_upsert_material_extract_potential.sql": "13cec1f83752e0de6a5fcf5884d1e6779d5b2185475839429e9778b6d4e19b6b",
   "20260924170000_credit_memo_refunds_keg_deposit.sql": "0fec17c23a9f508dfd588cb7421e9f0bd10ec4fa3e64bfa46979c27c5182a59b",
-  "20260924180000_receipt_cost_precision.sql": "38ff6ae46bae7b1c9c5b6c11d1c58e4d5e3486e08c075d365ea639225a18e04f"
+  "20260924180000_receipt_cost_precision.sql": "38ff6ae46bae7b1c9c5b6c11d1c58e4d5e3486e08c075d365ea639225a18e04f",
+  "20260924190000_close_run_material_on_hand.sql": "29841bae049c228c8d5b8547d8fb5bd7c62b2c84eb462e7dc761b286b996aa07"
 }
