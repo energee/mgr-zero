@@ -27,9 +27,14 @@ export function periodRange(key: string): { periodStart: string; periodEnd: stri
 
 /** The key of the calendar month, quarter, or year that is exactly start..end; null for any other range. */
 export function periodKey(start: string, end: string): string | null {
-  const [y, m] = [start.slice(0, 4), Number(start.slice(5, 7))];
-  const keys = [`${y}-${start.slice(5, 7)}`, (m - 1) % 3 === 0 ? `${y}-Q${(m + 2) / 3}` : "", m === 1 ? y : ""];
-  return keys.find((k) => k && periodRange(k)?.periodStart === start && periodRange(k)?.periodEnd === end) ?? null;
+  // The month, quarter and year that contain start; the one whose range is exactly start..end wins.
+  const year = start.slice(0, 4);
+  const month = start.slice(5, 7);
+  const candidates = [`${year}-${month}`, `${year}-Q${Math.ceil(Number(month) / 3)}`, year];
+  return candidates.find((key) => {
+    const range = periodRange(key);
+    return range?.periodStart === start && range.periodEnd === end;
+  }) ?? null;
 }
 
 export const cadenceOf = (key: string): Cadence => (key.includes("Q") ? "quarter" : key.length === 4 ? "year" : "month");
