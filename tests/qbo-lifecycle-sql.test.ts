@@ -140,13 +140,18 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await begin(tamperedState)).error).toBeNull();
     const tamperedFetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(tokenResponse("attacker-access-secret"))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Detail: "attacker-access-secret" } }), { status: 403 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Detail: "attacker-access-secret" } }), { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
     await expect(completeQboOAuth({
       request: new Request(`${redirectUri}?code=tampered-code&state=${tamperedState}&realmId=${knownRealm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
       client: new QboOAuthClient(config, tamperedFetch), store,
     })).rejects.toThrow("QuickBooks is unavailable");
-    expect(tamperedFetch).toHaveBeenCalledTimes(2);
+    // #426: verification failed before anything was stored, so the issued
+    // tokens are unstored and live at Intuit; the third call revokes them.
+    expect(tamperedFetch).toHaveBeenCalledTimes(3);
+    expect(String(tamperedFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
+    expect(tamperedFetch.mock.calls[2][1]?.body).toBe(JSON.stringify({ token: "refresh-secret" }));
     expect(sql(`select count(*) from public.qbo_connections where brewery_id='${brewery.id}' or realm_id='${knownRealm}'`)).toEqual(["0"]);
     expect(sql(`select exchange_state from private.qbo_oauth_intents where state_hash='${hash(tamperedState)}'`)).toEqual(["recovery_required"]);
     expect(JSON.stringify(sql(`select detail from private.qbo_connection_events where brewery_id='${brewery.id}'`))).not.toMatch(/attacker-access-secret|refresh-secret/);
