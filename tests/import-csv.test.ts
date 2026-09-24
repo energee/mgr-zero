@@ -4,8 +4,16 @@ import { parseCsv, mapCsvRows, validateImportRow } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
+it("skips blank lines, admits a bare quote inside a value, and drops Excel's sep= line (#472)", () => {
+  expect(parseCsv("a,b\n1,2\n\n")).toEqual({ headers: ["a", "b"], rows: [["1", "2"]] });
+  expect(parseCsv("a,b\r\n1,2\r\n\r\n3,4\r\n")).toEqual({ headers: ["a", "b"], rows: [["1", "2"], ["3", "4"]] });
+  expect(parseCsv("name\nIPA\n\nPils\n")).toEqual({ headers: ["name"], rows: [["IPA"], ["Pils"]] });
+  expect(parseCsv('name\n16" keg\n')).toEqual({ headers: ["name"], rows: [['16" keg']] });
+  expect(parseCsv("sep=,\r\nname\r\nIPA\r\n")).toEqual({ headers: ["name"], rows: [["IPA"]] });
+  expect(parseCsv('name\n""\n')).toEqual({ headers: ["name"], rows: [[""]] });
+});
 it("rejects malformed CSV, ambiguous headers and mismatched widths", () => {
-  for (const value of ['a\n"open', 'a\n"closed"oops', 'a\nun"quoted', 'a,a\n1,2', 'a,b\n1']) expect(() => parseCsv(value)).toThrow();
+  for (const value of ['a\n"open', 'a\n"closed"oops', 'a,a\n1,2', 'a,b\n1']) expect(() => parseCsv(value)).toThrow();
 });
 it("maps explicit fields and rejects blank, fractional cents and nondecimal numbers", () => {
   expect(mapCsvRows([["IPA", "2"]], { product: 0 })).toEqual([{ product: "IPA" }]);

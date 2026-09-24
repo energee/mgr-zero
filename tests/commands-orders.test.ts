@@ -49,6 +49,17 @@ describe("order commands", () => {
   });
 });
 
+describe("taproom pars", () => {
+  it("par 0 removes the replenishment target (#472)", async () => {
+    const tap = await seedLocation(b.id, { name: "Tap par", uses: ["taproom"] });
+    await runCommand("set_taproom_par", { locationId: tap.id, skuId, parQty: 4 }, adminCtx);
+    const before = await runCommand("replenishment_suggestions", { locationId: tap.id }, adminCtx) as { skuId: string; par: number }[];
+    expect(before.map(s => [s.skuId, s.par])).toEqual([[skuId, 4]]);
+    await runCommand("set_taproom_par", { locationId: tap.id, skuId, parQty: 0 }, adminCtx);
+    expect(await runCommand("replenishment_suggestions", { locationId: tap.id }, adminCtx)).toEqual([]);
+  });
+});
+
 describe("standing taproom allocations", () => {
   it("concurrent sets for the same (location, sku) leave exactly one open allocation", async () => {
     const tap = await seedLocation(b.id, { name: "Tap race", uses: ["taproom"] });

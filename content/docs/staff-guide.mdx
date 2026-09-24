@@ -21,7 +21,7 @@ Wrong credentials show **Incorrect email or password.** You can also select **Em
 <Screen name="Reset password" />
 <Screen name="Set new password" />
 
-**Forgot password?** on the sign-in card opens **Reset password**. Enter your **Email** and select **Send reset link**; the page always says a link is on its way if that email is on an account, so it never confirms whether one is. The link in the email opens **Set new password**, which shows the account and asks you to **Choose a password** and **Save password**; a used or timed-out link lands back on Reset password saying so. Signed in already? **Change password** in **Me** opens the same page.
+**Forgot password?** on the sign-in card opens **Reset password**. Enter your **Email** and select **Send reset link**; the page always says a link is on its way if that email is on an account, so it never confirms whether one is. The link in the email opens **Set new password**, which shows the account and asks you to **Choose a password** and **Save password**; if the password is refused (for example, it matches your current one), the page says why and you can try again; a used or timed-out link lands back on Reset password saying so. Signed in already? **Change password** in **Me** opens the same page.
 
 ## Accept an invitation and create a brewery [#getting-started]
 
@@ -825,7 +825,7 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 
 <Screen name="Import" />
 
-Admin opens **Settings → Import** or **Import CSV** on the setup checklist. Upload a CSV with a header and 1–5000 data rows, choose the kind, map columns, and review the editable preview. Quoted commas, newlines, escaped quotes, and a leading byte-order mark are supported. Malformed quoting, duplicate or missing headers, unequal row widths, and empty files show an error before anything is staged.
+Admin opens **Settings → Import** or **Import CSV** on the setup checklist. Upload a CSV with a header and 1–5000 data rows, choose the kind, map columns, and review the editable preview. Quoted commas, newlines, escaped quotes, a quote inside an unquoted value (such as `16" keg`), blank lines, Excel's `sep=,` first line, and a leading byte-order mark are supported. Malformed quoting, duplicate or missing headers, unequal row widths, and empty files show an error before anything is staged.
 
 The complete API request is limited to 8 MiB. Most 5,000-row files fit; files with unusually large notes or other cells may need to be split into smaller batches.
 

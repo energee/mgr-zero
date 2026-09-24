@@ -37,10 +37,11 @@ export function mapCsvRows(rows: string[][], mapping: Record<string, number>): R
 }
 
 export function parseCsv(input: string): { headers: string[]; rows: string[][] } {
-  const text = input.replace(/^\uFEFF/, "");
+  // Excel writes a "sep=," first line; spreadsheets end files with blank lines.
+  const text = input.replace(/^\uFEFF/, "").replace(/^sep=,\r?\n/i, "");
   const records: string[][] = []; let row: string[] = [], value = "", quoted = false, closed = false;
   const field = () => { row.push(value); value = ""; closed = false; };
-  const record = () => { field(); records.push(row); row = []; if (records.length > IMPORT_ROW_CAP + 1) throw new Error(`At most ${IMPORT_ROW_CAP} rows per batch`); };
+  const record = () => { const blank = !row.length && !value && !closed; field(); if (!blank) records.push(row); row = []; if (records.length > IMPORT_ROW_CAP + 1) throw new Error(`At most ${IMPORT_ROW_CAP} rows per batch`); };
   for (let n = 0; n < text.length; n++) {
     const c = text[n];
     if (quoted) {
@@ -49,7 +50,8 @@ export function parseCsv(input: string): { headers: string[]; rows: string[][] }
     } else if (c === ',') field();
     else if (c === '\r' || c === '\n') { if (c === '\r' && text[n + 1] === '\n') n++; record(); }
     else if (c === '"' && !value && !closed) quoted = true;
-    else { if (closed || c === '"') throw new Error("Malformed CSV quoting"); value += c; }
+    // A quote inside an unquoted value (16" keg) is literal; only text after a closing quote is malformed.
+    else { if (closed) throw new Error("Malformed CSV quoting"); value += c; }
   }
   if (quoted) throw new Error("Unclosed CSV quote");
   if (value || closed || row.length) record();
