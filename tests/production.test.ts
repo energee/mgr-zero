@@ -158,6 +158,28 @@ describe("vessels, scheduling and brew day", () => {
   });
 });
 
+// #488: a brew day recorded 25 bbl into a 20 bbl fermenter and Cellar showed
+// "25 / 20 bbl". Knockout volume can never exceed vessels.capacity_bbl.
+describe("brew day refuses more than the vessel holds", () => {
+  it("refuses 25 bbl into a 20 bbl fermenter, leaves the batch unbrewed, and accepts a full 20", async () => {
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-CAP20", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 25 }, ctx)) as { id: string };
+
+    await expect(runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: "2026-10-01" }, ctx))
+      .rejects.toThrow(/FV-CAP20 holds 20 bbl/);
+    const refused = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as {
+      batch: { brewed_on: string | null }; occupancy: unknown;
+    };
+    expect(refused.batch.brewed_on).toBeNull();
+    expect(refused.occupancy).toBeNull();
+
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { initial_bbl: number } | null };
+    expect(day.occupancy).toMatchObject({ initial_bbl: 20 });
+  });
+});
+
 // A backdated brew day is the case `ended_at is null` misses: the vessel is
 // empty *now*, but the day being recorded falls inside a stretch it was full.
 // The pre-check uses the same range predicate as the gist exclusion, so this
@@ -383,6 +405,28 @@ describe("cellar transfers", () => {
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 1 }, ctx))
       .rejects.toThrow(/closed/);
+  });
+
+  // #488: the target's open occupancy plus the incoming volume must fit its
+  // capacity, whether the target is empty or already holds beer.
+  it("refuses a transfer that would overfill the target vessel", async () => {
+    const host = await brew("CAP-FV1", 25, "2026-11-05");   // capacity 30
+    const donor = await brew("CAP-FV2", 10, "2026-11-05");
+
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 10 }, ctx))
+      .rejects.toThrow(/CAP-FV1 holds 30 bbl/);
+    const small = (await runCommand("upsert_vessel", { name: "CAP-BR5", kind: "brite", capacityBbl: 5 }, ctx)) as { id: string };
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: small.id, volumeBbl: 6 }, ctx))
+      .rejects.toThrow(/CAP-BR5 holds 5 bbl/);
+    expect(await volume(host.occupancyId)).toBe(25);   // nothing moved
+    expect(await volume(donor.occupancyId)).toBe(10);
+
+    // Filling to exactly capacity is fine.
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 5 }, ctx);
+    expect(await volume(host.occupancyId)).toBe(30);
   });
 
   it("refuses another brewery's occupancy and vessel, and roles that are not admin or brewer", async () => {
