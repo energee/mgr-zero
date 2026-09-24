@@ -19,6 +19,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    // Holds the shared test-database lock for the run (scripts/test-db-lock.pl).
+    globalSetup: ["tests/test-db-lock.setup.ts"],
     testTimeout: 20000,
     fileParallelism: false,
     // Mode "test" layers .env.test.local (written by scripts/test-db.sh: the

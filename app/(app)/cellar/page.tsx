@@ -7,6 +7,7 @@ import { toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
 import { formatVesselReading, type VesselReading } from "@/lib/mgr/vessel-detail-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDateTime } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -41,7 +42,7 @@ export default async function CellarPage() {
 
   const readings = Object.fromEntries(await Promise.all(occupancies.map(async occupancy => {
     const history = await runCommand("list_fermentation_readings", { occupancyId: occupancy.occupancy_id }, ctx) as VesselReading[];
-    return [occupancy.occupancy_id, history[0] ? `${formatVesselReading(history[0], unit.effective)} · ${history[0].at}` : "No readings yet"] as const;
+    return [occupancy.occupancy_id, history[0] ? `${formatVesselReading(history[0], unit.effective)} · ${formatDateTime(history[0].at, brewery.timeZone)}` : "No readings yet"] as const;
   })));
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);
   model.backHref = "/beer"; model.addHref = "/cellar/vessels/new"; model.brewHref = "/batches";

@@ -1,6 +1,6 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions:
 // Submit (draft), Confirm (submitted — surfaces confirm_order's ATP soft
-// warnings inline), Adjust lines (confirmed/picked, via adjust-lines-form.tsx),
+// warnings inline via atp-warnings.tsx), Adjust lines (confirmed/picked, via adjust-lines-form.tsx),
 // Record pick (confirmed/picked, via pick-form.tsx; a short count opens
 // short-pick-form.tsx), Ship (picked, via
 // ship-form.tsx), Cancel with reason (any pre-ship status). Calls commands
@@ -17,11 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AdjustLinesForm } from "./adjust-lines-form";
+import { AtpWarnings, atpWarnings, type AtpWarning } from "./atp-warnings";
 import type { PickLine } from "./pick-form";
 import type { ShipLine } from "./ship-form";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
-type Warning = { sku_id: string; atp: number };
 
 export function LifecycleButtons({
   orderId,
@@ -46,7 +46,7 @@ export function LifecycleButtons({
 }) {
   const router = useRouter();
   const { busy, error, setError, run: runAction } = useCommandAction();
-  const [warnings, setWarnings] = useState<Warning[]>([]);
+  const [warnings, setWarnings] = useState<AtpWarning[]>([]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -54,8 +54,7 @@ export function LifecycleButtons({
 
   async function run(name: string) {
     await runAction(name, { orderId }, data => {
-      const result = data as { warnings?: Warning[] };
-      setWarnings(result.warnings ?? []);
+      setWarnings(atpWarnings(data));
       router.refresh();
     });
   }
@@ -111,15 +110,7 @@ export function LifecycleButtons({
         )}
       </div>
       <CommandFormMessage error={error} />
-      {warnings.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {warnings.map((w) => (
-            <CommandFormMessage key={w.sku_id} tone="warning">
-              ATP negative for {skuNames.get(w.sku_id) ?? w.sku_id}
-            </CommandFormMessage>
-          ))}
-        </div>
-      )}
+      <AtpWarnings warnings={warnings} skuNames={skuNames} />
     </div>
   );
 }
