@@ -23,7 +23,7 @@ it("preserves role and connection restrictions on deleted-invoice recovery", () 
 });
 
 it("prints an unpaid invoice's due day the way the rest of the app does (#493)", () => {
-  const unpaid = toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, "admin", true);
+  const unpaid = toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, "admin", true, "America/New_York");
   expect(unpaid.detail).toContain("due Sep 12, 2026");
   expect(unpaid.detail).not.toContain("2026-09-12");
 });

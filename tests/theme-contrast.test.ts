@@ -29,8 +29,9 @@ it("keeps the pre-paint theme script inert on React client remounts", () => {
   expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
 });
 
-it("paints a selected outline toggle with the AA-checked primary pair, not the hover wash (#493)", async () => {
-  const { toggleVariants } = await import("../components/ui/toggle");
-  const outline = toggleVariants({ variant: "outline" });
-  for (const cls of ["data-[state=on]:bg-primary", "data-[state=on]:text-primary-foreground"]) expect(outline).toContain(cls);
+it("paints selected Location Uses with the AA-checked primary pair, not the hover wash (#493)", () => {
+  const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
+  expect(e).toContain('export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";');
+  const form = readFileSync(new URL("../app/(app)/locations/location-form.tsx", import.meta.url), "utf8");
+  expect(form).toMatch(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/);
 });

@@ -12,9 +12,7 @@ const toggleVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        // Selected must read at a glance (Location Uses, #493): the base on-state
-        // is bg-muted, the same wash as hover and barely off the sheet.
-        outline: "border border-input bg-transparent hover:bg-muted data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground",
+        outline: "border border-input bg-transparent hover:bg-muted",
       },
       size: {
         default:

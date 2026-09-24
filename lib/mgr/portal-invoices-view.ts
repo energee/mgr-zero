@@ -39,7 +39,7 @@ export type PortalInvoicesSnapshot = {
   }[];
 };
 
-/** "Aug 29, 2026" for a paid_at timestamp; the UTC day until #442 passes the brewery's zone here. */
+/** "Aug 29, 2026" for a paid_at timestamp: its UTC day, since the portal payload carries no brewery time zone. */
 function day(iso: string): string {
   return /^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDate(iso.slice(0, 10)) : iso;
 }

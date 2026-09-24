@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRIGHT_ON } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -33,7 +34,7 @@ export function LocationForm({ location }: { location?: { id: string; name: stri
           <Label htmlFor="loc-uses">Uses</Label>
           <ToggleGroup id="loc-uses" type="multiple" variant="outline" size="sm" aria-label="Uses"
             value={uses} onValueChange={(v) => setUses(v as Kind[])} className="flex-wrap justify-start">
-            {KINDS.map(([value, label]) => <ToggleGroupItem key={value} value={value}>{label}</ToggleGroupItem>)}
+            {KINDS.map(([value, label]) => <ToggleGroupItem key={value} value={value} className={BRIGHT_ON}>{label}</ToggleGroupItem>)}
           </ToggleGroup>
         </div>
         <CommandFormMessage error={form.error} />
