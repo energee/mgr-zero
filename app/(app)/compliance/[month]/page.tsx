@@ -2,7 +2,6 @@
 // Monthly compliance): the TTB month generated from the ledger, or the filed
 // snapshot once one exists. Completion losses remain reviewable through
 // append-only category allocations. MGR saves snapshots but never transmits a filing.
-import { E } from "@/components/mgr/e";
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -29,6 +28,7 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   return <MonthlyComplianceView
     model={toMonthlyComplianceViewProps({ monthLabel: monthLabel(month), report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    fileAction={filing ? undefined : !monthOver(month, today) ? E.status("File once the month ends", "w") : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
+    monthOpen={!filing && !monthOver(month, today)}
+    fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
   />;
 }
