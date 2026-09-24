@@ -10,7 +10,10 @@ import { FermentationReadingActionsView, FermentationReadingView } from "@/compo
 import {
   createReadingAttempt,
   discardOutbox,
+  dismissOutboxQuarantine,
   flushOutbox,
+  OUTBOX_QUARANTINE_KEY,
+  outboxQuarantineNotice,
   OUTBOX_RETIREMENT_MAX_AGE_MS,
   outboxDiscardConfirmation,
   readOutboxAttempt,
@@ -86,14 +89,42 @@ describe("action-specific offline outbox", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("validates reloads, rejects unsupported commands, and fails closed on bad JSON", () => {
+  it("validates reloads, rejects unsupported commands, and sets unreadable legacy JSON aside (#463)", () => {
     const storage = new MemoryStorage();
     const frozen = attempt();
     storeOutboxAttempt(storage, frozen);
     expect(readOutbox(storage)).toEqual([frozen]);
     expect(() => storeOutboxAttempt(storage, { ...frozen, name: "record_movement" } as unknown as typeof frozen)).toThrow(/not eligible/i);
     storage.values.set("mgr-offline-outbox:v1", "{broken");
-    expect(() => readOutbox(storage)).toThrow(/could not be read/i);
+    expect(readOutbox(storage)).toEqual([frozen]);
+    expect(storage.getItem("mgr-offline-outbox:v1")).toBeNull();
+    expect(JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY)!)).toEqual(["{broken"]);
+  });
+
+  it("keeps valid legacy entries and quarantines a malformed sibling instead of throwing (#463)", () => {
+    const storage = new MemoryStorage();
+    const valid = attempt();
+    const malformed = { ...attempt("55555555-5555-4555-8555-555555555555"), state: "bogus" };
+    storage.values.set("mgr-offline-outbox:v1", JSON.stringify([valid, malformed]));
+
+    expect(() => readOutbox(storage)).not.toThrow();
+    expect(readOutbox(storage)).toEqual([valid]);
+    expect(storage.getItem("mgr-offline-outbox:v1")).toBeNull();
+    expect(JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY)!)).toEqual([JSON.stringify(malformed)]);
+    expect(outboxQuarantineNotice(storage)).toMatch(/1 unreadable offline reading was set aside and not sent/i);
+    dismissOutboxQuarantine(storage);
+    expect(outboxQuarantineNotice(storage)).toBeNull();
+  });
+
+  it("quarantines a legacy entry whose request identity conflicts with a stored row (#463)", () => {
+    const storage = new MemoryStorage();
+    const stored = attempt();
+    storeOutboxAttempt(storage, stored);
+    const conflicting = { ...stored, label: "Different reading" };
+    storage.values.set("mgr-offline-outbox:v1", JSON.stringify([conflicting]));
+
+    expect(readOutbox(storage)).toEqual([stored]);
+    expect(JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY)!)).toEqual([JSON.stringify(conflicting)]);
   });
 
   it("does not lose distinct readings saved from stale independent tab snapshots", () => {
