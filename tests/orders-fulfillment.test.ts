@@ -238,6 +238,35 @@ describe("credit memo", () => {
   });
 });
 
+describe("credit memo on a settled-without-payment invoice", () => {
+  // #418: a written-off or QuickBooks-voided/deleted invoice is no longer owed,
+  // so crediting it would pay the customer back for money they never paid.
+  it.each([
+    ["written off", { written_off_at: new Date().toISOString(), written_off_reason: "uncollectable" }],
+    ["voided in QuickBooks", { qbo_remote_state: "voided" as const }],
+    ["deleted in QuickBooks", { qbo_remote_state: "deleted" as const }],
+  ])("refuses a credit memo and a return on an invoice %s", async (_state, patch) => {
+    // Restock what this case ships, so later ATP assertions see the same stock.
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 2, type: "opening_balance", created_by: staffId });
+    const id = await confirmedOrder(2);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 2 }], p_request_id: crypto.randomUUID() });
+    const { data: shipped } = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 2 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    const invId = (shipped as { invoice_id: string }).invoice_id;
+    const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", invId).single();
+    expect((await admin.from("invoices").update("written_off_at" in patch ? { ...patch, written_off_by: staffId } : patch).eq("id", invId)).error).toBeNull();
+    const memo = await staffDb.rpc("create_credit_memo", {
+      p_invoice: invId, p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_location: whId, p_reason: "damaged", p_request_id: crypto.randomUUID(),
+    });
+    expect(memo.error?.message).toMatch(/cannot credit a voided or written-off invoice/);
+    const ret = await staffDb.rpc("return_shipment", {
+      p_invoice: invId, p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_location: whId, p_reason: "unsold", p_request_id: crypto.randomUUID(),
+    });
+    expect(ret.error?.message).toMatch(/cannot credit a voided or written-off invoice/);
+    expect((await admin.from("invoice_lines").select("id").eq("credited_invoice_line_id", il!.id)).data).toEqual([]);
+  });
+});
+
 describe("credit memo concurrency", () => {
   it("two concurrent credit memos for the full qty produce exactly one credit", async () => {
     const id = await confirmedOrder(4);

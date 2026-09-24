@@ -1,7 +1,8 @@
 // app/(app)/invoices/[id]/page.tsx — Invoice (screen record): one invoice or
 // credit memo with its lines and total, the buyer's questions about it with
 // Mark answered (resolve_invoice_question, mark-answered.tsx), and for an
-// invoice a credit memo against a subset of lines (credit-memo-form.tsx).
+// invoice still owed or paid (invoiceIsCreditable) a credit memo against a
+// subset of lines (credit-memo-form.tsx).
 // QuickBooks mapping, exact retry, corrected re-push and local write-off use
 // the same registered commands as the API. An unknown id renders not-found.
 import { InvoiceView } from "@/components/mgr/views/invoice";
@@ -16,6 +17,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
+import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
 
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
@@ -32,7 +34,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     brewery.role === "admin" || brewery.role === "sales" ? runCommand("get_qbo_connection", {}, ctx) : null,
   ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
-  const memo = !credit && canRun(ctx, "return_shipment")
+  const memo = invoiceIsCreditable(invoice) && canRun(ctx, "return_shipment")
     ? <Button size="sm" variant="outline" asChild><Link href={`/invoices/${invoice.id}/return`}>Return</Link></Button>
     : undefined;
   const realm = health?.connected ? health.realmId : null;
