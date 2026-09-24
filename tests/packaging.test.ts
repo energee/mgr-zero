@@ -431,6 +431,8 @@ describe("closing the run", () => {
     await expect(close({ outputs: [{ skuId: pils.skuId, qtyActual: 1 }] }))
       .rejects.toThrow(/not one of this run's planned outputs/);
     await expect(close({ bblDrawn: 20.5 })).rejects.toThrow(/more than the tank holds|only .* bbl/i);
+    // 1000 cases is 64.5 bbl out of a 20 bbl tank: a typo, not beer (#432).
+    await expect(close({ outputs: [{ skuId: stout.skuId, qtyActual: 1000 }] })).rejects.toThrow(/packaged .* bbl but the tank held/i);
 
     await close();
     await expect(close()).rejects.toThrow(/closed/);
