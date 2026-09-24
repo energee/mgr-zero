@@ -3,6 +3,7 @@
 // water additions on a draft version (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
 // and the labelled read-out of a cut version's process scalars and water.
+import { isNumber, isPositive } from "./quantity-input";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 
@@ -31,9 +32,6 @@ export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mas
 
 export const EMPTY_WATER: WaterDraft = { targetProfileId: "", sourceProfileId: "", mashGal: "", spargeGal: "", targetMashPh: "", additions: [] };
 
-/** A typed number field holds a finite number; a positive one is above zero. */
-export const isNumber = (s: string) => s !== "" && Number.isFinite(Number(s));
-export const isPositive = (s: string) => Number(s) > 0;
 /** An optional numeric field: empty means not given. */
 export const optionalNumber = (s: string) => (s === "" ? undefined : Number(s));
 
