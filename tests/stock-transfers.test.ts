@@ -53,6 +53,8 @@ describe("stock transfer lifecycle", () => {
     expect(detail.bins.length).toBe(6);
 
     await runCommand("submit_stock_transfer", { transferId: row.transferId }, ctx);
+    // a pick needs the stock in the source bin (#487)
+    await runCommand("record_movement", { skuId, locationId: from.id, binId: fromBins![0].id, qty: 2, type: "opening_balance" }, ctx);
     const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", row.transferId).single();
     await runCommand("record_stock_transfer_pick", { transferId: row.transferId, picks: [{ lineId: line!.id, qty: 2 }] }, ctx);
     const { data: after } = await admin.from("stock_transfers").select("status").eq("id", row.transferId).single();
@@ -196,10 +198,11 @@ it("direct RPCs reject fractional empty kegs at move, draft, pick and receive bo
   const transferId = created.data.transfer_id;
   await runCommand("submit_stock_transfer", { transferId }, ctx);
   const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
+  await admin.from("keg_events").insert({ brewery_id: b.id, pool_id: pool!.id, keg_size: "half_bbl", location_id: from.id, bin_id: from.binId, qty: 2, reason: "acquired", created_by: ctx.userId });
   expect((await ctx.db.rpc("record_stock_transfer_pick", { p_transfer: transferId, p_picks: [{ line_id: stored!.id, qty: 1.00001 }], p_request_id: crypto.randomUUID() })).error).not.toBeNull();
   await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: stored!.id, qty: 2 }] }, ctx);
   expect((await ctx.db.rpc("receive_stock_transfer", { p_transfer: transferId, p_lines: [{ line_id: stored!.id, qty: 1.5 }], p_request_id: crypto.randomUUID() })).error?.message).toMatch(/whole|integer/);
-  expect((await admin.from("keg_events").select("id").eq("pool_id", pool!.id)).data).toHaveLength(0);
+  expect((await admin.from("keg_events").select("id").eq("pool_id", pool!.id).in("reason", ["transferred_out", "transferred_in"])).data).toHaveLength(0);
 });
 
 it("material bin moves retain an explicit lot, replay once, and reject another material's lot atomically", async () => {
@@ -348,4 +351,78 @@ describe("source bin stock (#451)", () => {
       expect((await admin.from("stock_transfers").select("status").eq("id", transferId).single()).data!.status).toBe("picked");
     }
   });
+});
+
+// #487: a pick of 999 from an empty bin marked the transfer picked, and the
+// transfer could then be neither received nor cancelled.
+it("record_stock_transfer_pick refuses more than the source bin holds", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const from = await seedLocation(b.id, { name: "Main Warehouse", uses: ["warehouse"] });
+  const to = await seedLocation(b.id, { name: "Taproom", uses: ["taproom"] });
+  const { skuId } = await seedCatalog(b.id);
+  const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: b.id, name: "Owned", kind: "owned" }).select().single();
+  const { transferId } = await runCommand("create_stock_transfer", {
+    fromLocationId: from.id, toLocationId: to.id,
+    lines: [
+      { skuId, qty: 999, fromBinId: from.binId, toBinId: to.binId },
+      { kegPoolId: pool!.id, kegSize: "half_bbl", qty: 4, fromBinId: from.binId, toBinId: to.binId },
+    ],
+  }, ctx) as { transferId: string };
+  await runCommand("submit_stock_transfer", { transferId }, ctx);
+  const { data: lines } = await admin.from("stock_transfer_lines").select("id, sku_id").eq("transfer_id", transferId);
+  const skuLine = lines!.find((l) => l.sku_id)!.id, kegLine = lines!.find((l) => !l.sku_id)!.id;
+
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 999 }] }, ctx))
+    .rejects.toThrow(/source bin/);
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: kegLine, qty: 1 }] }, ctx))
+    .rejects.toThrow(/source bin/);
+  const { data: still } = await admin.from("stock_transfers").select("status").eq("id", transferId).single();
+  expect(still!.status).toBe("submitted");
+  expect((await admin.from("stock_transfer_lines").select("qty_picked").eq("transfer_id", transferId)).data!.every((l) => l.qty_picked === null)).toBe(true);
+
+  await runCommand("record_movement", { skuId, locationId: from.id, binId: from.binId, qty: 5, type: "opening_balance" }, ctx);
+  await admin.from("keg_events").insert({ brewery_id: b.id, pool_id: pool!.id, keg_size: "half_bbl", location_id: from.id, bin_id: from.binId, qty: 4, reason: "acquired", created_by: ctx.userId });
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 6 }] }, ctx))
+    .rejects.toThrow(/source bin/);
+  await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 5 }, { lineId: kegLine, qty: 4 }] }, ctx);
+  const { data: picked } = await admin.from("stock_transfers").select("status").eq("id", transferId).single();
+  expect(picked!.status).toBe("picked");
+});
+
+// #487: the pick asks the same helper the receipt does, so a pick that passes
+// is receivable: every lot counts at the pick (lots are chosen at receipt),
+// and lines drawing the same stock from one bin are summed.
+it("a pick that passes the source-bin check is receivable; lines sharing a bin count together", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+  const to = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
+  const { data: malt } = await admin.from("materials").insert({ brewery_id: b.id, name: "Malt", category: "malt", base_uom: "lb", purchase_uom: "lb", lot_tracked: true }).select().single();
+  const { data: lots } = await admin.from("material_lots").insert([
+    { brewery_id: b.id, material_id: malt!.id, lot_code: "M1" }, { brewery_id: b.id, material_id: malt!.id, lot_code: "M2" },
+  ]).select().order("lot_code");
+  const [m1, m2] = lots!.map((l) => l.id);
+  expect((await admin.from("material_movements").insert([m1, m2].map((lot_id) => (
+    { brewery_id: b.id, material_id: malt!.id, location_id: from.id, bin_id: from.binId, lot_id, qty: 2, type: "opening_balance", created_by: ctx.userId })))).error).toBeNull();
+  const line = { materialId: malt!.id, fromBinId: from.binId, toBinId: to.binId };
+  const { transferId } = await runCommand("create_stock_transfer", { fromLocationId: from.id, toLocationId: to.id, lines: [{ ...line, qty: 3 }, { ...line, qty: 2 }] }, ctx) as { transferId: string };
+  await runCommand("submit_stock_transfer", { transferId }, ctx);
+  const { data: stored } = await admin.from("stock_transfer_lines").select("id, qty").eq("transfer_id", transferId).order("qty", { ascending: false });
+  const [three, two] = stored!.map((l) => l.id);
+
+  // each line fits the bin's 4 on its own; together they do not
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: three, qty: 3 }, { lineId: two, qty: 2 }] }, ctx))
+    .rejects.toThrow(/insufficient selected bin and lot stock: 4 on hand in the source bin/);
+  await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: three, qty: 3 }] }, ctx);
+  // a later pick counts the lines already picked
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: two, qty: 2 }] }, ctx)).rejects.toThrow(/4 on hand/);
+  await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: two, qty: 1 }] }, ctx);
+
+  // the picked 3 + 1 spans both lots, and receives from them
+  await runCommand("receive_stock_transfer", { transferId, lines: [
+    { lineId: three, qty: 3, sources: [{ lotId: m1, qty: 2 }, { lotId: m2, qty: 1 }] },
+    { lineId: two, qty: 1, sources: [{ lotId: m2, qty: 1 }] },
+  ] }, ctx);
+  expect((await admin.from("stock_transfers").select("status").eq("id", transferId).single()).data!.status).toBe("received");
+  const { data: left } = await admin.from("material_movements").select("qty").eq("material_id", malt!.id).eq("bin_id", from.binId);
+  expect(left!.reduce((n, r) => n + Number(r.qty), 0)).toBe(0);
 });
