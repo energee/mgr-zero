@@ -1,15 +1,7 @@
 -- 20260923170000_keg_customer_loss_balances.sql — keg balances stay whole
--- when kegs are lost or returned at a customer (#449, #464).
---
--- #449: a shipped keg has already left its bin, so "lost" with a customer
--- comes off the customer's balance and the fleet, never the bin a second time.
--- keg_bin_on_hand_rows now subtracts only a bin-side loss (no customer), and
--- record_keg_event no longer asks the bin for stock on a customer loss. The
--- fleet is again bins plus customers.
---
--- #464: "returned", and "lost" at a customer, are now checked against what
--- that customer holds for the pool and size (keg_customer_balances), so a typo
--- is refused instead of driving the customer negative.
+-- when kegs are lost or returned at a customer (#449, #464): a customer loss
+-- no longer comes off the bin a second time, and returned/lost at a customer
+-- are checked against what that customer holds.
 --
 -- Both are copies of the latest definitions (keg_bin_on_hand_rows from
 -- 20260913140000_location_multi_use.sql, record_keg_event from the baseline)
@@ -54,6 +46,9 @@ begin
     jsonb_build_object('brewery', p_brewery, 'pool', p_pool, 'keg_size', p_keg_size, 'qty', p_qty, 'reason', p_reason,
                        'location', p_location, 'bin', p_bin, 'customer', p_customer, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
+  -- The bin and customer checks below read a total then insert; serialise events
+  -- for one pool and size so two cannot both pass on the same kegs.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('keg:' || p_brewery::text || ':' || p_pool::text || ':' || p_keg_size::text, 0));
   if p_qty <= 0 then raise exception 'qty must be positive'; end if;
   if p_reason in ('transferred_in','transferred_out') then raise exception 'transfers are recorded by stock transfers and bin moves'; end if;
   if p_reason in ('shipped','returned') and p_customer is null then raise exception 'customer is required for % kegs', p_reason; end if;
