@@ -204,10 +204,10 @@ Admins can open a packaged format, select **Edit format → Delete format**, and
 A brand's packages live on its own **SKU list**: open the brand from **Catalog**, then select the **SKU list** row, which names how many active packages it has.
 
 1. On that brand's **SKU list**, select **New SKU**.
-2. Choose a packaged **Format**. **Name** is optional and defaults to *Brand · Format*; **UPC** is optional.
+2. Choose a packaged **Format**. **Name** is optional and defaults to *Brand · Format*; **UPC** is optional; when given, it is 8, 12, 13 or 14 digits.
 3. Select **Create**. A brand has at most one SKU per format. After that, the SKU is available in inventory, pricing, and order forms.
 
-**Edit SKU** beside a package on that SKU list changes **Active** and **UPC**. Deactivating it removes it from New Order choices and the portal catalog, and prevents adding it to new orders; recorded inventory and order history remain. Reactivate it to sell it again at its current grid price. UPC is unique within the brewery; clear the field to remove it. The brand and format stay fixed, and provider mappings are preserved.
+**Edit SKU** beside a package on that SKU list changes **Active** and **UPC**. Deactivating it removes it from New Order choices and the portal catalog, and prevents adding it to new orders; recorded inventory and order history remain. Reactivate it to sell it again at its current grid price. UPC is 8, 12, 13 or 14 digits and unique within the brewery; clear the field to remove it. The brand and format stay fixed, and provider mappings are preserved.
 
 **BBL per unit** is the barrel volume of one inventory unit and lives on the format, so every SKU in that format shares it. One US beer barrel is 31 gallons (3,968 fl oz). Half-barrel keg = `0.5`. Sixth-barrel keg is about `0.16666667`. A 24 × 16 oz case is `384 ÷ 3968`, about `0.09677419`. Set it on the format before you record inventory.
 
@@ -293,7 +293,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 1. Open **Customers**. Select **New Customer**, or **Edit** beside an existing customer.
 2. Enter **Name** (required).
 3. Choose **Type**: `distributor`, `retailer` (default), `brewery`, or `other`.
-4. Enter the required two-letter **State**. MGR uppercases it as you type.
+4. Enter the required two-letter **State**. MGR uppercases it as you type and refuses a code that is not a US state, DC, or US territory.
 5. Choose a **Sale channel** (required; Wholesale is preselected). It decides the customer's prices and where shipped orders are recorded.
 6. Optionally enter **License number** and **Payment terms**, such as `net30`.
 7. Select **Create** or **Save**.
@@ -312,7 +312,7 @@ Customers with orders, invoices, keg records, portal access, invitations, or a Q
 
 <Screen name="Ship-to form" />
 
-Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address**, **City**, **State** (two letters, uppercased), and **Postal code**. **Address 2 (optional)** holds a suite or second address line. **Default ship-to** selects this address for new staff and portal orders. Select **Save ship-to** to save. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
+Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address**, **City**, **State** (a two-letter US state code, uppercased), and **Postal code** (a 5-digit ZIP code or ZIP+4, such as 97201-1234). **Address 2 (optional)** holds a suite or second address line. **Default ship-to** selects this address for new staff and portal orders. Select **Save ship-to** to save. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
 Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation. Existing sign-in accounts cannot be attached with this form.
 
@@ -661,7 +661,7 @@ Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **
 <Screen name="Vendors" />
 <Screen name="Contracts" />
 
-**Vendors** (More tab; Admin, Warehouse, Brewer) lists your suppliers. **Add vendor** and **Edit** take a name, optional email and phone, payment terms (due on receipt, net 15, net 30 default), and a **Lead time** in days. The lead time is the vendor's, not the material's: it is what Planning subtracts from a needed-by date to get a buy-by date. Once a vendor has received orders, the row also shows the observed average from sent to last receipt, with how many orders it rests on (n=3 is weak evidence) and how it was sent, because a date someone typed for an order phoned in is not the same evidence as one MGR stamped.
+**Vendors** (More tab; Admin, Warehouse, Brewer) lists your suppliers. **Add vendor** and **Edit** take a name, optional email and phone (7 to 15 digits; spaces, dots, dashes and parentheses are fine), payment terms (due on receipt, net 15, net 30 default), and a **Lead time** in days. The lead time is the vendor's, not the material's: it is what Planning subtracts from a needed-by date to get a buy-by date. Once a vendor has received orders, the row also shows the observed average from sent to last receipt, with how many orders it rests on (n=3 is weak evidence) and how it was sent, because a date someone typed for an order phoned in is not the same evidence as one MGR stamped.
 
 Below the vendors, **Contracts** lists commitments: one vendor, one material, a quantity in purchase units, an optional price, window, and **Contract number**. A contract with a number shows it as the row's label; without one, the row falls back to the material name. A contract is not an order. You order against it all year, so each row shows four numbers: **committed**, **received**, **on order** (placed but not yet arrived), and **available**, which is committed less both. Available is the one to decide against; received is the one accounting reconciles. A contract never stops you ordering: exceed it and the extra lines are ordinary spot lines.
 

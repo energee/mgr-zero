@@ -87,6 +87,7 @@ function baseLabel(node: $ZodType): string {
 const STRING_CANDIDATES = [
   "string", "00000000-0000-0000-0000-000000000000", "2026-01-31", "CA",
   "user@example.com", "openai/gpt-5.4", "12:00", "2026-01-31T12:00:00Z", "1", "1.0",
+  "19107", "012345678905", "(503) 555-0142",
 ];
 const NUMBER_CANDIDATES = [1, 1.5, 0];
 

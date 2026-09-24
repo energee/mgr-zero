@@ -8,7 +8,7 @@
 // override on their own brewery_users row, and null there means "follow the
 // brewery".
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, phone, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
@@ -66,7 +66,7 @@ defineCommand({
   roles: ["admin"],
   input: z.object({
     name: z.string().trim().min(1), timezone: z.string().trim().min(1),
-    ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: z.string().trim().optional(),
+    ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: phone.optional(),
     readingDueHours,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {
