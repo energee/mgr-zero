@@ -1,6 +1,7 @@
 // app/(app)/orders/[id]/confirm/page.tsx — Confirm order (screen record):
 // two taps from Today. The lines with ATP, the oversell note when ATP is
-// short, then Confirm order or Cancel order (confirm-buttons.tsx). ponytail:
+// short, then Confirm order or Cancel order (confirm-buttons.tsx, which shows
+// confirm_order's ATP warnings before leaving). ponytail:
 // the registry warning (a brand not registered for the ship-to state) waits
 // on Program 9's registry check on confirm, ruled out of scope there.
 import { redirect } from "next/navigation";
@@ -29,7 +30,7 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
   return (
     <ConfirmOrderView
       model={toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locations, backHref: "/orders" })}
-      footer={<ConfirmButtons orderId={order.id} />}
+      footer={<ConfirmButtons orderId={order.id} lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id }))} />}
     />
   );
 }

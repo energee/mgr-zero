@@ -16,12 +16,12 @@ describe("recipeGravity", () => {
     const result = recipeGravity({
       brewhouseEfficiency: 0.75,
       yeastAttenuation: 0.75,
-      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
+      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" }],
     });
 
-    expect(result.ogPlato).toBeCloseTo(2.29, 2);
-    expect(result.fgPlato).toBeCloseTo(0.57, 2);
-    expect(result.abv).toBeCloseTo(0.88, 2);
+    expect(result?.ogPlato).toBeCloseTo(2.29, 2);
+    expect(result?.fgPlato).toBeCloseTo(0.57, 2);
+    expect(result?.abv).toBeCloseTo(0.88, 2);
   });
 
   it("ignores non-mash-stage ingredients (e.g. boil hops carry no extract here)", () => {
@@ -29,51 +29,61 @@ describe("recipeGravity", () => {
       brewhouseEfficiency: 0.75,
       yeastAttenuation: 0.75,
       ingredients: [
-        { perBblQty: 10, extractPotential: 1.037, stage: "mash" },
-        { perBblQty: 1, extractPotential: 1.05, stage: "boil" },
+        { perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" },
+        { perBblQty: 1, extractPotential: 1.05, stage: "boil", unit: "lb" },
       ],
     });
     const mashOnly = recipeGravity({
       brewhouseEfficiency: 0.75,
       yeastAttenuation: 0.75,
-      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
+      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" }],
     });
     expect(withBoilAddition).toEqual(mashOnly);
   });
 
-  it("answers water's Plato and zero ABV for no mash ingredients", () => {
-    // No mash ingredients -> OG = FG = 1.000 SG. The ASBC cubic reads -0.003
-    // at SG 1, so the conversion clamps at 0: water is 0 °P, never negative.
-    const result = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [],
-    });
-    expect(result.ogPlato).toBe(0);
-    expect(result.fgPlato).toBe(0);
-    expect(result.abv).toBeCloseTo(0, 5);
+  // #430: nothing wrote materials.extract_potential, so every recipe printed
+  // "Predicted: OG 0.0 °P" — a prediction built on missing data. No answer
+  // (null) is what the caller hides; a partial or empty bill never predicts.
+  it("predicts nothing (null, not 0) when no mash ingredient carries extract", () => {
+    expect(recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75, ingredients: [] })).toBeNull();
+    expect(recipeGravity({
+      brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+      ingredients: [{ perBblQty: 1, extractPotential: 1.05, stage: "boil", unit: "lb" }],
+    })).toBeNull();
   });
 
-  it("skips an ingredient with no extract potential instead of producing NaN", () => {
+  it("predicts nothing while any mash ingredient lacks an extract potential", () => {
     // extract_snapshot is null in SQL whenever the material never had a
-    // potential typed on it (a hop, an unmeasured adjunct). Reaching the
-    // formula with null used to make the whole prediction NaN; the ingredient
-    // is skipped and the rest still predicts.
-    const withUnknown = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [
-        { perBblQty: 10, extractPotential: 1.037, stage: "mash" },
-        { perBblQty: 5, extractPotential: null, stage: "mash" },
-        { perBblQty: 5, extractPotential: undefined, stage: "mash" },
-      ],
-    });
-    const known = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
-    });
-    expect(Number.isNaN(withUnknown.ogPlato)).toBe(false);
-    expect(withUnknown).toEqual(known);
+    // potential typed on it. Skipping it would under-predict OG with no sign
+    // of it, so there is no prediction until every mash ingredient has one.
+    for (const missing of [null, undefined]) {
+      expect(recipeGravity({
+        brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+        ingredients: [
+          { perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" },
+          { perBblQty: 5, extractPotential: missing, stage: "mash", unit: "lb" },
+        ],
+      })).toBeNull();
+    }
+  });
+
+  it("converts each mash ingredient's base unit to pounds before PPG applies (#540)", () => {
+    const inLb = recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" }] })!;
+    for (const [qty, unit] of [[10 / 2.20462, "kg"], [160, "oz"], [10 * 453.592, "g"]] as const) {
+      const other = recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+        ingredients: [{ perBblQty: qty, extractPotential: 1.037, stage: "mash", unit }] })!;
+      expect(other.ogPlato).toBeCloseTo(inLb.ogPlato, 3);
+    }
+  });
+
+  it("predicts nothing when a mash ingredient is not stocked by mass (#540)", () => {
+    for (const unit of ["gal", "l", "ml", "each", undefined]) {
+      expect(recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+        ingredients: [
+          { perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" },
+          { perBblQty: 1, extractPotential: 1.04, stage: "mash", unit },
+        ] })).toBeNull();
+    }
   });
 });

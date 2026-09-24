@@ -18,7 +18,7 @@ export function PickView({ model, footer, quantities, onQuantity, onShort, onPri
     {E.info(model.info)}
     {model.lines.map(line => <div key={line.key}>
       {E.row(line.name, line.detail,
-        <OrderQuantity label={`${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} onChange={onQuantity && (value => onQuantity(line.key, value))} />,
+        <OrderQuantity label={`${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} max={line.ordered} onChange={onQuantity && (value => onQuantity(line.key, value))} />,
         line.tone ?? "")}
       {line.tone === "w" && quantities?.[line.key] !== "" && <Button type="button" size="sm" variant="outline" onClick={() => onShort?.(line.key)}>Short</Button>}
     </div>)}
