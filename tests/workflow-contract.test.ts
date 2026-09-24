@@ -172,9 +172,29 @@ describe("production-readiness workflow contract", () => {
   // table 'public.breweries' in the schema cache" and reads as broken code.
   it("reloads PostgREST's schema cache after resetting the test database", () => {
     const reset = testDb.indexOf("supabase db reset");
-    const reload = testDb.indexOf("NOTIFY pgrst, 'reload schema'");
+    // scripts/wait-rest.sh sends the reload and waits until PostgREST serves.
+    const reload = testDb.indexOf("scripts/wait-rest.sh");
     expect(reset).toBeGreaterThan(-1);
     expect(reload).toBeGreaterThan(reset);
+  });
+
+  // Parallel sessions share this one test database. scripts/test-db-lock.pl
+  // (behavior in tests/test-db-lock.test.ts) is held exclusive by a reset and
+  // shared by every vitest run, so neither can start under the other; a reset
+  // runs only when the migrations changed since the last one.
+  it("resets under the exclusive lock, and only when the schema changed", () => {
+    // The reset lives only in the --locked-reset branch, which the script
+    // reaches by re-running itself under the exclusive lock.
+    const reset = testDb.indexOf("supabase db reset");
+    expect(testDb).toContain("test-db-lock.pl ex bash scripts/test-db.sh --locked-reset");
+    expect(testDb.indexOf('= --locked-reset ]')).toBeGreaterThan(-1);
+    expect(testDb.indexOf('= --locked-reset ]')).toBeLessThan(reset);
+    expect(testDb.indexOf("mgr-schema")).toBeGreaterThan(-1);
+    expect(testDb.indexOf("mgr-schema")).toBeLessThan(reset);
+  });
+
+  it("holds the lock shared for every vitest run", () => {
+    expect(vitestConfig).toContain("tests/test-db-lock.setup.ts");
   });
 
   it("leaves the build and the database shards to CI", () => {

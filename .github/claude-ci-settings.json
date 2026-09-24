@@ -36,7 +36,13 @@
       "Glob(/home/runner/work/_temp/**)",
       "Glob(/github/home/**)",
       "Glob(**/.env*)",
-      "Glob(**/*token*)"
+      "Glob(**/*token*)",
+      "Bash(bunx tsc --noEmit)",
+      "Bash(bun run lint)",
+      "Bash(bunx vitest run tests/*)",
+      "Bash(git fetch)",
+      "Bash(git fetch -q)",
+      "Bash(git fetch -q origin)"
     ]
   }
 }
