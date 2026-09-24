@@ -41,7 +41,7 @@ An admin sees **Set up** while the brewery has neither a location nor a brand. A
 
 <Screen name="Search" />
 
-**Search** in the header finds app pages and records. Page names such as `invoice` and `catalog` show matching destinations in a separate **Pages** group, using the same role-visible navigation as the sidebar. Pages remain available while record searches load or fail. Record search covers SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read. The sheet distinguishes loading, failed, offline cached, and valid empty results.
+**Search** in the header finds app pages and records. Page names such as `invoice` and `catalog` show matching destinations in a separate **Pages** group, using the same role-visible navigation as the sidebar. Pages remain available while record searches load or fail. Record search covers SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read and open: Brewer searches batches, Warehouse does not see lots, and Sales does not see purchase orders. The sheet distinguishes loading, failed, offline cached, and valid empty results.
 
 SKU fields in **New Order** use the same search, narrowed to SKUs. They show recently selected SKUs first, followed by the current SKU list; successful searches are cached for the current signed-in session, brewery, and term so an offline retry can show those cached matches. Reloading or signing out clears recent choices and cached matches.
 
@@ -143,7 +143,7 @@ On the **Work** landing itself, chips filter the rows in place. **all** restores
 **Me** in the header shows the email you signed in with, your brewery and role, and offers **Change password** and **Sign out**. When your account belongs to more than one brewery, Me also lists them with **Switch** beside each one that is not current. Me is a centered dialog at every screen size. Other forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
 
 <Cards>
-  <Card title="Today">The tab you land on after signing in. Admin sees everything; Sales sees submitted orders (**Confirm**); Warehouse sees confirmed orders whose requested ship date has arrived (**Pick**) and orders holding staged beer that needs restocking (**Put back**), including cancelled ones, until restock is confirmed. Taproom sees three permitted exits: **Tap board**, **Weekly count**, and **Variance · 4 weeks**, each with its latest observed fact and no invented overdue or shift rule. A mapped variance from incomplete POS coverage is labeled **partial POS coverage**. A dot on the icon marks a row needing attention. Other roles with nothing waiting see **Nothing waiting** and **Record movement**.</Card>
+  <Card title="Today">The tab you land on after signing in. Admin sees everything; Sales sees submitted orders (**Confirm**); Warehouse sees confirmed orders whose requested ship date has arrived (**Pick**) and orders holding staged beer that needs restocking (**Put back**), including cancelled ones, until restock is confirmed. Taproom sees three permitted exits: **Tap board**, **Weekly count**, and **Variance · 4 weeks**, each with its latest observed fact and no invented overdue or shift rule. A mapped variance from incomplete POS coverage is labeled **partial POS coverage**. A dot on the icon marks a row needing attention. Other roles with nothing waiting see **Nothing waiting**; Admin and Warehouse also see **Record movement**.</Card>
   <Card title="Forms">A successful form closes and refreshes the page. An error stays in the open form with the values you typed.</Card>
   <Card title="Closing a form">Closing without saving throws away the edits and puts the form back to its defaults.</Card>
 </Cards>
@@ -243,7 +243,7 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 
 <Screen name="Record movement" />
 
-1. Select **Record movement** from Today, or open **Inventory** and select **Record movement**. The Today shortcut opens the same form.
+1. Select **Record movement** from Today (Admin and Warehouse), or open **Inventory** and select **Record movement**. The Today shortcut opens the same form.
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is **Opening balance** (`opening_balance` in the API).
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
@@ -752,7 +752,7 @@ Navigation hides what your role cannot open, but a bookmarked address still land
 
 *Admin only. Everyone who records or reads a movement sees the channel names; only Admin can add, rename, or remove one.*
 
-A sale channel is a named way your brewery sells beer. Every brewery starts with four: **Wholesale**, **Taproom**, **DTC**, and **Export**. Open **Sale channels** from the **More** navigation to see each channel and its tax treatment.
+A sale channel is a named way your brewery sells beer. Every brewery starts with four: **Wholesale**, **Taproom**, **DTC**, and **Export**. Open **Sale channels** from the **More** navigation to see each channel and its tax treatment. Only Admin adds, edits, or deletes channels; Sales and Warehouse see the list read-only, and their back link returns to **More**.
 
 1. Select **Add channel**, enter a **Channel name**, choose a **Tax treatment**, and select **Save channel**.
 2. To rename a channel or change its treatment, select **Edit** on its row, change the fields, and select **Save channel**.
