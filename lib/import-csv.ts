@@ -15,6 +15,11 @@ export type ImportLookups = Record<string, { id: string; name: string; location_
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
+// The opening qty: record_inventory_movement refuses qty <> round(qty, 2), the same
+// rule the order commands state as multipleOf(0.01), so trailing zeros pass and a
+// third significant decimal does not.
+const openingQty = z.number().positive().multipleOf(0.01);
+
 export function validateImportRow(kind: ImportKind, row: Record<string, string>, lookups?: ImportLookups): string[] {
   const errors: string[] = Object.keys(row).filter(key => !IMPORT_FIELDS[kind].some(f => f.name === key)).map(key => `unknown CSV field ${key}`);
   for (const f of IMPORT_FIELDS[kind]) {
@@ -24,8 +29,7 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     if (f.type === "uuid" && !z.uuid().safeParse(value).success) errors.push(`${f.name} must be a UUID`);
     if (f.type === "state" && !/^[A-Z]{2}$/.test(value)) errors.push(`${f.name} must be two uppercase letters`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
-      // "positive" is the opening qty: record_inventory_movement refuses qty <> round(qty, 2), so trailing zeros pass and a third significant decimal does not.
-      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && (Number(value) <= 0 || !/^\+?[0-9]+(\.[0-9]{1,2}0*)?$/.test(value))) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
+      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
     }
     if (f.lookup && lookups && !lookups[f.lookup]?.some(item => item.id === value)) errors.push(`${f.name} was not found`);
   }
