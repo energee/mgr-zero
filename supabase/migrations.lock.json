@@ -19,5 +19,6 @@
   "20260923150000_today_doc_label_no_truncate.sql": "510d7b48b4a40b636e90193f7b9adfeec1dd6194f864cea1f487096c0a50f4e6",
   "20260923160000_confirm_restock_lowers_picked.sql": "c75d6e8485a6c8689639c8b715dc3ae01f9d93a38da9143f18e7ce6a23e217ee",
   "20260923170000_keg_customer_loss_balances.sql": "0cb0b08e12c7706fd935436cd705a3645bdd5b7c83204303ef94927b77400ca9",
-  "20260923190000_credit_memo_refuses_void_invoice.sql": "aa6f1f9890c800f727259a1bca7474115e0991c5cbd0afb14db43f2038db2940"
+  "20260923190000_credit_memo_refuses_void_invoice.sql": "aa6f1f9890c800f727259a1bca7474115e0991c5cbd0afb14db43f2038db2940",
+  "20260923200000_short_pick_order_status.sql": "dd158d32dde3bd4a6105a97271356c808b0e6bed7d299c5dd218237d81df56ac"
 }
