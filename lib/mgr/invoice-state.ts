@@ -17,6 +17,13 @@ export const invoiceIsSettledWithoutPayment = (invoice: Parameters<typeof invoic
   && invoice.qbo_remote_state === "live"
   && invoice.qbo_balance_cents === 0;
 
+/** An invoice can take a credit memo (Return) only while it is still owed or
+ *  paid. Written off, voided, or deleted in QuickBooks means nothing is owed,
+ *  so crediting it would credit money never collected. create_credit_memo_impl
+ *  refuses the same states (#418). */
+export const invoiceIsCreditable = (invoice: Parameters<typeof invoiceCurrentState>[0] & { kind: "invoice" | "credit_memo" }) =>
+  invoice.kind === "invoice" && ["unpaid", "paid"].includes(invoiceCurrentState(invoice));
+
 export function invoiceCurrentTotalCents(
   invoice: { kind: "invoice" | "credit_memo"; qbo_total_cents?: number | null },
   localTotalCents: number,

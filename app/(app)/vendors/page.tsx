@@ -20,7 +20,7 @@ type VendorRow = Vendor & {
   observed: Observed[];
   contracts: (Contract & { material_name: string | null; qty_received: number; qty_on_order: number; qty_available: number })[];
 };
-type Material = { id: string; name: string; base_uom: string };
+type Material = { id: string; name: string; purchase_uom: string };
 
 const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
@@ -40,7 +40,8 @@ export default async function VendorsPage() {
   const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({
     ...c,
     vendor_name: v.name,
-    base_uom: materials.find((material) => material.id === c.material_id)?.base_uom,
+    // Balances are in purchase units (like qty_committed), so label them so (#465).
+    purchase_uom: materials.find((material) => material.id === c.material_id)?.purchase_uom,
   })));
 
   return (

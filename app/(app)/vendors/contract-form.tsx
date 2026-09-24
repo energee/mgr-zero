@@ -1,7 +1,7 @@
 // app/(app)/vendors/contract-form.tsx — CommandForm for upsert_material_contract:
 // one vendor, one material, the committed quantity (purchase units), an
 // optional price and window. Received and on-order are read-only evidence on
-// the Contracts list, never typed here.
+// the Contracts list, never typed here; they are labeled in the purchase unit.
 "use client";
 
 import { useState } from "react";
@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { contractBalanceFields } from "@/lib/mgr/contract-view";
 import { dollarsInput } from "@/lib/mgr/money";
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
   starts_on: string | null; ends_on: string | null; qty_committed: number;
-  qty_received?: number; qty_on_order?: number; qty_available?: number; base_uom?: string;
+  qty_received?: number; qty_on_order?: number; qty_available?: number; purchase_uom?: string;
 };
 type Option = { id: string; name: string };
 
@@ -36,16 +37,13 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
   });
   const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;
-  const unit = contract?.base_uom ? ` ${contract.base_uom}` : "";
   const model = {
     vendorId,
     vendorOptions: vendors.map(({ id, name }) => ({ id, label: name })),
     materialId,
     materialOptions: materials.map(({ id, name }) => ({ id, label: name })),
     quantity: qty,
-    received: contract?.qty_received == null ? "" : `${contract.qty_received}${unit} · read-only`,
-    onOrder: contract?.qty_on_order == null ? "" : `${contract.qty_on_order}${unit} · read-only`,
-    available: contract?.qty_available == null ? "" : `${contract.qty_available}${unit}`,
+    ...contractBalanceFields(contract),
     starts: startsOn,
     ends: endsOn,
     unitCost: cost,

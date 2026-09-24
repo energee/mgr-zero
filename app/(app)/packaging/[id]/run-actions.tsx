@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { closeRunReady } from "@/lib/mgr/close-packaging-run-view";
 
 type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
@@ -47,16 +48,17 @@ export function StartRunButton({ runId }: { runId: string }) {
   );
 }
 
-export function CloseRunForm({ runId, outputs, locations, bins }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[] }) {
+/** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */
+export function CloseRunForm({ runId, outputs, locations, bins, today }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string }) {
   const [bblDrawn, setBblDrawn] = useState("");
   const [actuals, setActuals] = useState<Record<string, string>>(Object.fromEntries(outputs.map((o) => [o.sku_id, String(o.qty_planned)])));
   const [lotCode, setLotCode] = useState("");
-  const [packagedOn, setPackagedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [packagedOn, setPackagedOn] = useState(today);
   const [bestBy, setBestBy] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState("");
   const { busy, error, run } = useCommandAction();
-  const ready = Number(bblDrawn) >= 0 && lotCode.trim() && packagedOn && locationId && binId;
+  const ready = closeRunReady({ bblDrawn, actuals, lotCode, packagedOn, locationId, binId });
   return (
     <div className="flex flex-col gap-4">
       {E.edit("Barrels drawn", bblDrawn, "number", undefined, { id: "cr-drawn", min: 0, step: "any", onChange: setBblDrawn })}
@@ -100,7 +102,7 @@ export function CloseRunForm({ runId, outputs, locations, bins }: { runId: strin
         disabled={busy || !ready}
         onClick={() => run("close_packaging_run", {
           runId, bblDrawn: Number(bblDrawn),
-          outputs: outputs.map((o) => ({ skuId: o.sku_id, qtyActual: Number(actuals[o.sku_id] || 0) })),
+          outputs: outputs.map((o) => ({ skuId: o.sku_id, qtyActual: Number(actuals[o.sku_id]) })),
           lotCode, packagedOn, bestBy: bestBy || undefined, locationId, binId,
         })}
       >

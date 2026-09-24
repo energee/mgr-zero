@@ -1,9 +1,12 @@
 // lib/mgr/fixtures/settings.ts — Settings inventory snapshot.
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 
+/** The demo brewery's zone: inventory frames print fixture timestamps in it, as live pages print in breweries.timezone (#442). */
+export const DEMO_TIME_ZONE = "America/New_York";
+
 export const settingsDemo: SettingsViewModel = {
   name: "Demo Brewing",
-  timezone: "America/New_York",
+  timezone: DEMO_TIME_ZONE,
   timezoneOptions: ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"],
   ttb: "BR-PA-12345",
   paLicense: "G-1234",
