@@ -18,12 +18,9 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type RecipeMaterial, type IngredientLine, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
-/** The material fields the editor reads; both recipe pages project list_materials to this. */
-export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
-export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential });
 type Numbers = Record<RecipeNumberKey, string>;
 
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
@@ -44,6 +41,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
   const [water, setWater] = useState<WaterDraft>(EMPTY_WATER);
 
+  // Declared before the preview reads it during render (#440).
+  const material = materialLookup(materials);
   const validLines = lines.filter(lineReady);
   const eff = pctToFraction(numbers.efficiency), att = pctToFraction(numbers.attenuation);
   const build = (id: string) => ({
@@ -55,10 +54,10 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
     ingredients: validLines.map((l) => ({ materialId: l.materialId, perBblQty: Number(l.perBblQty), stage: l.stage, timingMinutes: l.timingMinutes ? Number(l.timingMinutes) : undefined })),
   });
 
-  // Recomputed every render: a handful of numbers. A material with no
-  // extract_potential contributes nothing rather than a made-up default.
+  // Recomputed every render: a handful of numbers. Null (no "Predicted:"
+  // line) until every mash ingredient's material has an extract_potential.
   const preview = eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0
-    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage })) })
+    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage, unit: material.get(l.materialId)?.base_uom })) })
     : null;
 
   const creating = recipeId === undefined;
@@ -80,8 +79,6 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   }
   const ready = mashSchedule.length > 0 && eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0 && (!creating || parent.name.trim() !== "");
   const parentLocked = creating && createdId !== "";
-  // Plain values: the React Compiler memoizes these on `materials` itself.
-  const material = materialLookup(materials);
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${mashSchedule.length} steps`, detail: mashSummary(mashSchedule) };

@@ -156,6 +156,28 @@ describe("durable invitations", () => {
     expect(sql(`select auth_user_id is null from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["t"]);
     await expect(ctx.db.rpc("complete_invite_membership", { p_request_id: ex.requestId })).resolves.toMatchObject({ error: { message: "invitation is awaiting Auth" } });
   });
+  // #457: an unfinished request blocks only its own brewery, and a failed one never blocks.
+  const claimOnly = (c: Ctx, address: string, requestId: string) => c.db.rpc("claim_invite_request", {
+    p_brewery: c.breweryId, p_email: address, p_kind: "staff", p_role: "sales", p_customer: null, p_request_id: requestId,
+  });
+  it("another brewery's pending request does not block the address", async () => {
+    const other = await makeStaffCtx((await makeBrewery()).id);
+    const address = email();
+    expect((await claimOnly(other, address, crypto.randomUUID())).error).toBeNull(); // never sent to Auth
+    expect((await claimOnly(other, address.toUpperCase(), crypto.randomUUID())).error?.message).toBe("invitation already requested");
+    expect(await runCommand("invite_staff", { email: address, role: "sales" }, ctx)).toHaveProperty("userId");
+  });
+  it("a failed request can be retried under a new request id", async () => {
+    const address = email(), first = crypto.randomUUID();
+    expect((await claimOnly(ctx, address, first)).error).toBeNull();
+    expect((await ctx.db.rpc("record_invite_failure", { p_request_id: first })).error).toBeNull();
+    expect(sql(`select state from private.invite_requests where request_id = '${first}'`)).toEqual(["failed"]);
+    const retry = execution();
+    const { userId } = await runCommand("invite_staff", { email: address, role: "sales" }, ctx, retry) as { userId: string };
+    expect(sql(`select auth_user_id from private.invite_requests where request_id = '${retry.requestId}'`)).toEqual([userId]);
+    expect(sql(`select state || ':' || (auth_user_id is null)::text from private.invite_requests where request_id = '${first}'`)).toEqual(["failed:true"]);
+    expect(sql(`select count(*) from auth.users where email = '${address}'`)).toEqual(["1"]);
+  });
   it("rejects warehouse permissions before creating Auth", async () => {
     await expect(runCommand("invite_staff", { email: email(), role: "sales" }, warehouse)).rejects.toMatchObject({ code: "permission_denied" });
   });

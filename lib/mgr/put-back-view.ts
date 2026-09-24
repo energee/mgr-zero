@@ -15,8 +15,18 @@ export type PutBackViewModel = {
 export type PutBackSnapshot = {
   backHref?: string;
   order: { id: string; order_no: number | null; status: string; needs_restock: boolean };
-  lines: { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null }[];
+  lines: ({ id: string; skus: { name: string } | null } & StagedLine)[];
 };
+
+export type StagedLine = { qty_ordered: number; qty_picked: number | null; qty_shipped: number | null };
+
+/** Staged, not yet put back: picked minus what the order keeps (nothing if
+ *  cancelled, shipped once shipped, else ordered). confirm_restock_impl lowers
+ *  qty_picked to the same kept amount. */
+export function stagedQty(status: string, line: StagedLine): number {
+  const kept = status === "cancelled" ? 0 : Number(line.qty_shipped ?? line.qty_ordered);
+  return Math.max(0, Number(line.qty_picked ?? 0) - kept);
+}
 
 export function toPutBackViewProps({ order, lines, backHref }: PutBackSnapshot): PutBackViewModel {
   const title = `${docNo("ORD", order.order_no, "Order")} · put back`;
@@ -24,10 +34,7 @@ export function toPutBackViewProps({ order, lines, backHref }: PutBackSnapshot):
     return { backHref, title, lines: [], empty: true };
   }
   const staged = lines
-    .map((l) => ({
-      ...l,
-      staged: Math.max(0, Number(l.qty_picked ?? 0) - (order.status === "cancelled" ? 0 : Number(l.qty_ordered))),
-    }))
+    .map((l) => ({ ...l, staged: stagedQty(order.status, l) }))
     .filter((l) => l.staged > 0);
   const total = staged.reduce((n, l) => n + l.staged, 0);
   return {
