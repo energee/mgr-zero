@@ -70,6 +70,24 @@ describe("get_brand_recipe_cost", () => {
     expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 1000, uncosted: [] });
   });
 
+  it("keeps sub-cent precision on a receipt's per-base-unit cost (#495)", async () => {
+    // $10.00 a lb, counted in grams: 1000 / 453.59237 ≈ 2.2046 cents a gram, not 2 (a 9% understatement).
+    const buyer = await makeStaffCtx(ctx.breweryId, "admin");
+    const mosaic = { id: await seedMaterial(ctx.breweryId, { name: "Mosaic pellets", category: "hop", uom: "g" }) };
+    await unwrap(admin.from("materials").update({ purchase_uom: "lb", purchase_uom_factor: 453.59237 }).eq("id", mosaic.id));
+    const vendor = await runCommand("upsert_vendor", { name: "Gram hop supplier" }, buyer) as { id: string };
+    const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: mosaic.id, qtyOrdered: 1, unitCostCents: 1000 }] }, buyer) as { id: string };
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, buyer);
+    const { lines } = await runCommand("get_purchase_order", { poId: po.id }, buyer) as { lines: { id: string }[] };
+    await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: lines[0].id, qtyCounted: 1 }] }, buyer);
+    const [movement] = await unwrap(admin.from("material_movements").select("unit_cost_cents").eq("material_id", mosaic.id).eq("type", "receipt")) as { unit_cost_cents: number }[];
+    expect(Number(movement.unit_cost_cents)).toBeCloseTo(2.2046, 4);
+    // 1000 g per barrel costs $22.05, not the $20.00 a whole-cent gram implied.
+    const other = (await runCommand("create_recipe", { name: "Mosaic only", brandId }, brewer)) as { id: string };
+    const v = (await runCommand("create_recipe_version", { recipeId: other.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 150, minutes: 60 }], brewhouseEfficiency: 0.8, yeastAttenuation: 0.8, ingredients: [{ materialId: mosaic.id, perBblQty: 1000, stage: "boil", timingMinutes: 60 }] }, brewer)) as { id: string };
+    expect(await cost()).toEqual({ recipeVersionId: v.id, costCentsPerBbl: 2205, uncosted: [] });
+  });
+
   it("lets the last brewed version speak for the brand over a newer one, ignoring other brands and unrecorded brews", async () => {
     const other = await seedCatalog(ctx.breweryId, { product: "Someone Else", sku: "Someone Else · ½ bbl" });
     const theirs = (await runCommand("create_recipe", { name: "Theirs", brandId: other.brandId }, brewer)) as { id: string };
