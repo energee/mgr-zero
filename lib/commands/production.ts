@@ -212,6 +212,8 @@ defineQuery({
 
 // ------------------------------------------------------------ vessels, batches
 const VESSEL_KINDS = ["fermenter", "brite", "barrel", "kettle", "other"] as const;
+/** A barrel volume stored in numeric(10,3) (#427). */
+const bbl = z.number().positive().max(9_999_999.999);
 
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
@@ -219,7 +221,7 @@ defineCommand({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     kind: z.enum(VESSEL_KINDS),
-    capacityBbl: z.number().positive().max(9_999_999.999), // numeric(10,3)
+    capacityBbl: bbl,
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_vessel", {
@@ -244,7 +246,7 @@ defineCommand({
     intendedBrandId: z.string().uuid().optional(),
     recipeVersionId: z.string().uuid().optional(),
     plannedOn: isoDate,
-    plannedBbl: z.number().positive().max(9_999_999.999), // numeric(10,3)
+    plannedBbl: bbl,
     note: z.string().optional(),
   }),
   roles: ["admin", "brewer"],

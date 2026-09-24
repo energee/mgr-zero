@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CommandError, defineCommand, defineQuery, PG_INT_MAX, unwrap, type Ctx } from "./registry";
+import { CommandError, defineCommand, defineQuery, cents, unwrap, type Ctx } from "./registry";
 
 async function completePosRows<T>(page: (start: number) => PromiseLike<{
   data: unknown[] | null; error: { message: string; code?: string } | null; count: number | null;
@@ -268,7 +268,7 @@ defineCommand({
   name: "set_pos_price_override", description: "Set or clear one nullable poured-format price override for one Square location",
   input: z.object({
     posLocationId, formatId: z.string().uuid(),
-    unitPriceCents: z.number().int().min(0).max(PG_INT_MAX).nullable(),
+    unitPriceCents: cents.nullable(),
   }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_price_override", {
