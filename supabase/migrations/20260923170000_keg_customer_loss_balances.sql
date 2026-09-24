@@ -15,6 +15,8 @@ CREATE OR REPLACE FUNCTION public.keg_bin_on_hand_rows()
 AS $function$
   -- A loss at a customer (customer_id set) is off that customer's balance;
   -- the shipped event already took it out of the bin.
+  -- private.bin_stock_on_hand (#532) repeats this reason-to-sign arithmetic
+  -- for keg bins; change both together.
   select e.brewery_id, e.pool_id, e.keg_size, e.location_id, e.bin_id,
          sum(case e.reason when 'acquired' then e.qty when 'found' then e.qty when 'transferred_in' then e.qty when 'returned' then e.qty
                          when 'retired' then -e.qty when 'transferred_out' then -e.qty when 'shipped' then -e.qty
@@ -46,9 +48,9 @@ begin
     jsonb_build_object('brewery', p_brewery, 'pool', p_pool, 'keg_size', p_keg_size, 'qty', p_qty, 'reason', p_reason,
                        'location', p_location, 'bin', p_bin, 'customer', p_customer, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  -- The bin and customer checks below read a total then insert; serialise events
-  -- for one pool and size so two cannot both pass on the same kegs.
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('keg:' || p_brewery::text || ':' || p_pool::text || ':' || p_keg_size::text, 0));
+  -- The bin and customer checks below read a total then insert; take the keg
+  -- ledger lock (as every keg writer does) so two cannot both pass on the same kegs.
+  lock table public.keg_events in share row exclusive mode;
   if p_qty <= 0 then raise exception 'qty must be positive'; end if;
   if p_reason in ('transferred_in','transferred_out') then raise exception 'transfers are recorded by stock transfers and bin moves'; end if;
   if p_reason in ('shipped','returned') and p_customer is null then raise exception 'customer is required for % kegs', p_reason; end if;
