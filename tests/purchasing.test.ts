@@ -229,6 +229,21 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(Number(edited.reorder_point)).toBe(200);
   });
 
+  // #452: stock recorded without a lot cannot be counted, consumed, or moved
+  // once the material is lot-tracked, so the switch waits until it is gone.
+  it("lot tracking cannot turn on while unlotted stock is on hand; with none it can", async () => {
+    const wh = await seedLocation(b.id, { name: "Malt room" });
+    const base = { category: "malt", baseUom: "lb", purchaseUom: "lb" } as const;
+    const stocked = (await runCommand("upsert_material", { name: "Munich", ...base }, ctx)) as { id: string };
+    await seedMovement(b.id, { materialId: stocked.id, locationId: wh.id, binId: wh.binId, qty: 100, createdBy: ctx.userId });
+    await expect(runCommand("upsert_material", { id: stocked.id, name: "Munich", ...base, lotTracked: true }, ctx)).rejects.toThrow(/without a lot/);
+    expect((await admin.from("materials").select("lot_tracked").eq("id", stocked.id)).data).toEqual([{ lot_tracked: false }]);
+
+    const empty = (await runCommand("upsert_material", { name: "Vienna", ...base }, ctx)) as { id: string };
+    const tracked = (await runCommand("upsert_material", { id: empty.id, name: "Vienna", ...base, lotTracked: true }, ctx)) as { lot_tracked: boolean };
+    expect(tracked.lot_tracked).toBe(true);
+  });
+
   it("a PO needs at least one line, and a contract never gates ordering", async () => {
     const vendor = (await runCommand("upsert_vendor", { name: "Spot Hops" }, ctx)) as { id: string };
     const hop = (await runCommand("upsert_material", { name: "Mosaic", category: "hop", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };

@@ -2,7 +2,8 @@
 // kind, base and purchase units with the factor between them, lot tracking,
 // default vendor (what Planning drafts to when no contract covers the
 // material). Creates or edits; units are refused by the command once the
-// material has movements.
+// material has movements, and turning lot tracking on is refused while stock
+// without a lot is on hand (#452); the command's message explains a refusal.
 "use client";
 
 import { useState } from "react";
