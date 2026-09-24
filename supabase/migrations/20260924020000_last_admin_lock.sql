@@ -9,6 +9,10 @@
 create or replace function private.assert_not_last_admin(p_brewery uuid, p_user uuid) returns void
 language plpgsql volatile security definer set search_path = '' as $$
 begin
+  -- Changing a non-admin can never remove the last admin; only then lock.
+  if not exists (select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_user and role = 'admin') then
+    return;
+  end if;
   perform 1 from public.brewery_users
     where brewery_id = p_brewery and role = 'admin'
     order by user_id
