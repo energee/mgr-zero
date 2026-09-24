@@ -20,7 +20,7 @@ import { formatDayHeader } from "@/lib/date-format";
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const date = formatDayHeader(new Date());
+  const date = formatDayHeader(new Date(), brewery.timeZone);
   if (brewery.role === "admin") {
     const state = (await runCommand("get_first_run_state", {}, ctx)) as FirstRun;
     if (!state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;
@@ -41,7 +41,7 @@ export default async function TodayPage() {
       runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<{ counted_on: string; created_at: string }[]>,
       runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx) as Promise<{ as_of: string; reason: string | null; rows: { variance_bbl: number | null }[]; periods: { coverage_complete: boolean; reason: string | null }[] }>,
     ]);
-    return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report) })} linkRows />;
+    return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = (await runCommand("get_today", {}, ctx)) as TodayItem[];
   return (
