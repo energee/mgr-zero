@@ -1,7 +1,8 @@
 // app/(app)/materials/material-form.tsx — CommandForm for upsert_material: name,
 // kind, base and purchase units with the factor between them, lot tracking,
 // default vendor (what Planning drafts to when no contract covers the
-// material). Creates or edits; units are refused by the command once the
+// material), and for malt and adjunct the extract potential recipe predictions
+// read (#430). Creates or edits; units are refused by the command once the
 // material has movements, and turning lot tracking on is refused while stock
 // without a lot is on hand (#452); the command's message explains a refusal.
 "use client";
@@ -14,6 +15,7 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 export type Material = {
   id: string; name: string; category: string; base_uom: string; purchase_uom: string; purchase_uom_factor: number;
   lot_tracked: boolean; default_vendor_id: string | null; reorder_point: number | null; active: boolean;
+  extract_potential: number | null;
 };
 type Option = { id: string; name: string };
 
@@ -29,15 +31,19 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
   const [lotTracked, setLotTracked] = useState(material?.lot_tracked ?? false);
   const [vendorId, setVendorId] = useState(material?.default_vendor_id ?? "");
   const [active, setActive] = useState(material?.active ?? true);
+  const [extract, setExtract] = useState(material?.extract_potential != null ? String(material.extract_potential) : "");
   const form = useCommandForm("upsert_material", {
     build: () => ({
       id: material?.id, name, category, baseUom, purchaseUom, purchaseUomFactor: Number(factor) || 1, lotTracked,
       defaultVendorId: vendorId || undefined, active,
+      // Only where the field shows; blank or another kind sends none (an edit keeps the old one).
+      extractPotential: (category === "malt" || category === "adjunct") && Number(extract) > 0 ? Number(extract) : undefined,
     }),
     reset: () => {
       setName(material?.name ?? ""); setCategory(material?.category ?? ""); setBaseUom(material?.base_uom ?? "lb");
       setPurchaseUom(material?.purchase_uom ?? "lb"); setFactor(material ? String(material.purchase_uom_factor) : "1");
       setLotTracked(material?.lot_tracked ?? false); setVendorId(material?.default_vendor_id ?? ""); setActive(material?.active ?? true);
+      setExtract(material?.extract_potential != null ? String(material.extract_potential) : "");
     },
   });
   const ready = name.trim() && category && Number(factor) > 0;
@@ -46,8 +52,8 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Material" trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <MaterialView
-          model={{ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), lotTracked, active }}
-          controls={{ name: setName, kind: setCategory, baseUnits: setFactor, purchaseUnit: setPurchaseUom, unit: setBaseUom, defaultVendorId: setVendorId, lotTracked: setLotTracked, active: setActive }}
+          model={{ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), extractPotential: extract, lotTracked, active }}
+          controls={{ name: setName, kind: setCategory, baseUnits: setFactor, purchaseUnit: setPurchaseUom, unit: setBaseUom, defaultVendorId: setVendorId, extractPotential: setExtract, lotTracked: setLotTracked, active: setActive }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save material"}</Button></CommandFormFooter>}
         />

@@ -162,7 +162,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_brewery_state_license(uuid,text,text,text,date,text,uuid)",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,tax_treatment,uuid)",
   "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid,uuid,numeric)",
-  "upsert_material(uuid,uuid,text,material_category,uom,uom,numeric,boolean,uuid,numeric,boolean,uuid)",
+  "upsert_material(uuid,uuid,text,material_category,uom,uom,numeric,boolean,uuid,numeric,boolean,numeric,uuid)",
   "upsert_material_contract(uuid,uuid,uuid,uuid,numeric,integer,date,date,text,uuid)",
   "upsert_price_group(uuid,uuid,text,integer,integer,uuid)",
   "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid)",

@@ -19,9 +19,9 @@ describe("recipeGravity", () => {
       ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
     });
 
-    expect(result.ogPlato).toBeCloseTo(2.29, 2);
-    expect(result.fgPlato).toBeCloseTo(0.57, 2);
-    expect(result.abv).toBeCloseTo(0.88, 2);
+    expect(result?.ogPlato).toBeCloseTo(2.29, 2);
+    expect(result?.fgPlato).toBeCloseTo(0.57, 2);
+    expect(result?.abv).toBeCloseTo(0.88, 2);
   });
 
   it("ignores non-mash-stage ingredients (e.g. boil hops carry no extract here)", () => {
@@ -41,39 +41,29 @@ describe("recipeGravity", () => {
     expect(withBoilAddition).toEqual(mashOnly);
   });
 
-  it("answers water's Plato and zero ABV for no mash ingredients", () => {
-    // No mash ingredients -> OG = FG = 1.000 SG. The ASBC cubic reads -0.003
-    // at SG 1, so the conversion clamps at 0: water is 0 °P, never negative.
-    const result = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [],
-    });
-    expect(result.ogPlato).toBe(0);
-    expect(result.fgPlato).toBe(0);
-    expect(result.abv).toBeCloseTo(0, 5);
+  // #430: nothing wrote materials.extract_potential, so every recipe printed
+  // "Predicted: OG 0.0 °P" — a prediction built on missing data. No answer
+  // (null) is what the caller hides; a partial or empty bill never predicts.
+  it("predicts nothing (null, not 0) when no mash ingredient carries extract", () => {
+    expect(recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75, ingredients: [] })).toBeNull();
+    expect(recipeGravity({
+      brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+      ingredients: [{ perBblQty: 1, extractPotential: 1.05, stage: "boil" }],
+    })).toBeNull();
   });
 
-  it("skips an ingredient with no extract potential instead of producing NaN", () => {
+  it("predicts nothing while any mash ingredient lacks an extract potential", () => {
     // extract_snapshot is null in SQL whenever the material never had a
-    // potential typed on it (a hop, an unmeasured adjunct). Reaching the
-    // formula with null used to make the whole prediction NaN; the ingredient
-    // is skipped and the rest still predicts.
-    const withUnknown = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [
-        { perBblQty: 10, extractPotential: 1.037, stage: "mash" },
-        { perBblQty: 5, extractPotential: null, stage: "mash" },
-        { perBblQty: 5, extractPotential: undefined, stage: "mash" },
-      ],
-    });
-    const known = recipeGravity({
-      brewhouseEfficiency: 0.75,
-      yeastAttenuation: 0.75,
-      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
-    });
-    expect(Number.isNaN(withUnknown.ogPlato)).toBe(false);
-    expect(withUnknown).toEqual(known);
+    // potential typed on it. Skipping it would under-predict OG with no sign
+    // of it, so there is no prediction until every mash ingredient has one.
+    for (const missing of [null, undefined]) {
+      expect(recipeGravity({
+        brewhouseEfficiency: 0.75, yeastAttenuation: 0.75,
+        ingredients: [
+          { perBblQty: 10, extractPotential: 1.037, stage: "mash" },
+          { perBblQty: 5, extractPotential: missing, stage: "mash" },
+        ],
+      })).toBeNull();
+    }
   });
 });

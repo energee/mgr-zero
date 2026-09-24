@@ -195,6 +195,18 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(Number(edited.reorder_point)).toBe(200);
   });
 
+  // #430: nothing wrote extract_potential, so every recipe predicted OG 0.
+  it("stores a material's extract potential, keeps it on an edit that omits it, and bounds it", async () => {
+    const base = { category: "malt", baseUom: "lb", purchaseUom: "lb" } as const;
+    const m = (await runCommand("upsert_material", { name: "Pale ale malt", ...base, extractPotential: 1.037 }, ctx)) as { id: string; extract_potential: number };
+    expect(Number(m.extract_potential)).toBe(1.037);
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Pale ale malt 2", ...base }, ctx)) as { extract_potential: number };
+    expect(Number(edited.extract_potential)).toBe(1.037);
+    const changed = (await runCommand("upsert_material", { id: m.id, name: "Pale ale malt 2", ...base, extractPotential: 1.036 }, ctx)) as { extract_potential: number };
+    expect(Number(changed.extract_potential)).toBe(1.036);
+    await expect(runCommand("upsert_material", { name: "Typo malt", ...base, extractPotential: 37 }, ctx)).rejects.toThrow();
+  });
+
   // #452: stock recorded without a lot cannot be counted, consumed, or moved
   // once the material is lot-tracked, so the switch waits until it is gone.
   it("lot tracking cannot turn on while unlotted stock is on hand; with none it can", async () => {
