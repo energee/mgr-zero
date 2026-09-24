@@ -9,14 +9,14 @@ type Health = { connected: boolean; state: string; merchantLabel: string | null;
 type Location = { mgrLocationId: string | null };
 
 export default async function PosPage() {
-  const { ctx } = await requireAdminContext("Point of sale");
+  const { brewery, ctx } = await requireAdminContext("Point of sale");
   const health = await runCommand("get_pos_integration_health", {}, ctx) as Health;
   const locations = health.connected ? await runCommand("list_pos_locations", {}, ctx) as Location[] : [];
   const mapped = locations.filter(location => location.mgrLocationId).length;
   return <PointOfSaleView model={{
     connected: health.connected, merchant: health.merchantLabel ?? "Square seller", state: health.state.replaceAll("_", " "),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
-    lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough) : "No complete sales coverage yet",
+    lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough, brewery.timeZone) : "No complete sales coverage yet",
     error: health.lastError,
   }} syncAction={health.connected ? <SquareSyncControls /> : undefined} paths={{ back: "/settings", connect: "/settings/pos/connect", disconnect: "/settings/pos/disconnect", locations: "/settings/pos/locations", mapping: "/settings/pos/mapping", menu: "/menu", connector: "/settings/pos/connector" }} />;
 }

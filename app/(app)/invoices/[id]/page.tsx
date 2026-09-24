@@ -41,7 +41,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const presentation = qboInvoicePresentation({ kind: invoice.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
   const mappings = !credit && realm && (brewery.role === "admin" || brewery.role === "sales")
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.role === "admin" ? "/settings/accounting/mappings" : undefined) : undefined;
-  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, backHref: "/invoices" });
+  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, backHref: "/invoices", timeZone: brewery.timeZone });
   return (
     <InvoiceView
       model={model}
