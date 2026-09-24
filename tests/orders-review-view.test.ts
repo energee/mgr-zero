@@ -9,10 +9,12 @@ import { SCREENS } from "../components/mgr/screens";
 import { CompleteTransferView } from "../components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "../components/mgr/views/confirm-order";
 import { PutBackView } from "../components/mgr/views/put-back";
-import { orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete } from "../lib/mgr/fixtures/orders";
+import { orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete } from "../lib/mgr/fixtures/orders";
 import { toCompleteTransferViewProps } from "../lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "../lib/mgr/confirm-order-view";
-import { toPutBackViewProps } from "../lib/mgr/put-back-view";
+import { stagedQty, toPutBackViewProps } from "../lib/mgr/put-back-view";
+import { toOrderViewProps } from "../lib/mgr/order-view";
+import { OUNCES_PER_BBL } from "../lib/volume";
 
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
@@ -59,6 +61,32 @@ describe("Confirm order view loop", () => {
     expect(model.oversellNotes[0]).not.toMatch(/another location/i);
   });
 
+  it("warns when this order's own quantity takes ATP negative (#415)", () => {
+    // ATP excludes a submitted order's own quantity until confirm allocates it:
+    // ATP 5 with this order asking 10 leaves −5 after confirm.
+    const sku = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 10 };
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [{ sku_id: sku.sku_id, qty: 5 }],
+      sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
+    });
+    expect(model.lines[0].tone).toBe("w");
+    expect(model.oversellNotes).toEqual([expect.stringMatching(/ATP for .* is 5.*confirming 10 leaves −5/i)]);
+  });
+
+  it("does not warn when ATP covers this order exactly", () => {
+    const sku = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 5 };
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [sku],
+      atp: [{ sku_id: sku.sku_id, qty: 5 }],
+      sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
+    });
+    expect(model.lines[0].tone).toBe("");
+    expect(model.oversellNotes).toEqual([]);
+  });
+
   it("does not claim other-location stock for a never-stocked SKU", () => {
     const sku = orderSubmittedRidgeline.lines[0];
     const model = toConfirmOrderViewProps({
@@ -101,6 +129,12 @@ describe("Complete transfer view loop", () => {
     expect(model.lines[0]?.detail).toBe("4 / 4");
   });
 
+  it("formats each tape leg from the unrounded volume (#456)", () => {
+    const line = { id: "l-can", qty_ordered: 1, qty_picked: 1, bbl_per_unit: 12 / OUNCES_PER_BBL, skus: { name: "Can" } };
+    const model = toCompleteTransferViewProps({ ...orderTransferComplete, lines: [line] });
+    expect(model.tape.map(([, volume]) => volume)).toEqual(["12 oz", "12 oz"]);
+  });
+
   it("the inventory record is CompleteTransferView painted from that fixture", () => {
     const body = screen("Complete transfer").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(CompleteTransferView);
@@ -120,6 +154,34 @@ describe("Put back view loop", () => {
     expect(model.title).toBe("ORD-0229 · put back");
     expect(model.lines).toEqual([{ key: "l-pils", name: "Pils · 16 oz case", staged: "3" }]);
     expect(model.verb).toBe("Put back 3");
+  });
+
+  // #417
+  it("stages picked − shipped after a short ship, not picked − ordered", () => {
+    const line = { id: "l", qty_ordered: 10, qty_picked: 10, qty_shipped: 6, skus: { name: "Pils" } };
+    expect(stagedQty("shipped", line)).toBe(4);
+    const model = toPutBackViewProps({
+      order: { id: "o", order_no: 240, status: "shipped", needs_restock: true },
+      lines: [line],
+    });
+    expect(model.lines).toEqual([{ key: "l", name: "Pils", staged: "4" }]);
+    expect(model.verb).toBe("Put back 4");
+  });
+
+  it("stages picked − ordered before shipping and everything on a cancel", () => {
+    expect(stagedQty("picked", { qty_ordered: 6, qty_picked: 10, qty_shipped: null })).toBe(4);
+    expect(stagedQty("picked", { qty_ordered: 12, qty_picked: 10, qty_shipped: null })).toBe(0);
+    expect(stagedQty("cancelled", { qty_ordered: 6, qty_picked: 10, qty_shipped: null })).toBe(10);
+    expect(stagedQty("picked", { qty_ordered: 6, qty_picked: null, qty_shipped: null })).toBe(0);
+  });
+
+  it("the Order restock note names the same staged quantity after a short ship", () => {
+    const model = toOrderViewProps({
+      ...orderPickedRestock,
+      order: { ...orderPickedRestock.order, status: "shipped" },
+      lines: [{ ...orderPickedRestock.lines[1]!, qty_ordered: 10, qty_picked: 10, qty_shipped: 6 }],
+    });
+    expect(model.restockNote).toMatch(/^Put back 4 Pils/);
   });
 
   it("the inventory record is PutBackView painted from that fixture", () => {

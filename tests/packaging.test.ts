@@ -540,20 +540,43 @@ describe("closing the run", () => {
     }, ctx)).rejects.toThrow(/cannot post BOM for lot-tracked material "Tracked crown" yet/);
   });
 
-  it("explains an emptied tank instead of blaming the volume", async () => {
-    // A brewer who racks the heel out before closing the paperwork ends the
-    // occupancy, and the run is left pointing at a tank that no longer exists.
-    // The over-draw check would refuse any real draw anyway, but it would talk
-    // about barrels; this says what actually happened and in what order the two
-    // steps belong.
-    const { runId, occupancyId } = await startedRun("FV-EMPTIED", 12, "2026-12-06");
+  it("refuses to empty a tank a started run draws from, and the run still closes (#466)", async () => {
+    // Emptying the tank would end the occupancy under the run, and a started
+    // run can then be neither closed nor cancelled. The transfer that would
+    // empty it is refused; a partial one is not.
+    const { runId, occupancyId } = await startedRun("FV-KEEPS-RUN", 12, "2026-12-06");
     const brite = (await runCommand("upsert_vessel",
-      { name: "BT-EMPTIED", kind: "brite", capacityBbl: 60 }, ctx)) as { id: string };
-    await runCommand("record_cellar_transfer",
-      { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx);
+      { name: "BT-KEEPS-RUN", kind: "brite", capacityBbl: 60 }, ctx)) as { id: string };
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx))
+      .rejects.toThrow(/a started packaging run still draws from this tank; close the run before transferring the heel out/);
+    const open = await admin.from("vessel_occupancies").select("ended_at").eq("id", occupancyId).single();
+    expect(open.data?.ended_at).toBeNull();
 
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 2 }, ctx);
+    await runCommand("close_packaging_run", {
+      runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
+      lotCode: "L-keeps-run", packagedOn: "2026-12-06", locationId: wh.id, binId: wh.binId,
+    }, ctx);
+
+    // With the run closed, the heel goes out and the tank is freed.
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 5 }, ctx);
     const ended = await admin.from("vessel_occupancies").select("ended_at").eq("id", occupancyId).single();
     expect(ended.data?.ended_at).toBeTruthy();
+  });
+
+  it("explains an emptied tank instead of blaming the volume", async () => {
+    // record_cellar_transfer now refuses to empty a tank under a started run
+    // (#466), but an occupancy ended some other way (here a direct
+    // write) must still get this message. The over-draw check would refuse any real draw anyway, but
+    // it would talk about barrels; this says what actually happened and in
+    // what order the two steps belong.
+    const { runId, occupancyId } = await startedRun("FV-EMPTIED", 12, "2026-12-06");
+    const { error: endError } = await admin.from("vessel_occupancies")
+      .update({ ended_at: "2026-12-06T00:00:00Z" }).eq("id", occupancyId);
+    if (endError) throw endError;
 
     await expect(runCommand("close_packaging_run", {
       runId, bblDrawn: 0, outputs: [], lotCode: "L-emptied", packagedOn: "2026-12-06",

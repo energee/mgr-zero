@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { E } from "@/components/mgr/e";
 import { buildContext } from "@/lib/commands/context";
@@ -15,7 +16,7 @@ export default async function PosItemPage({ params, searchParams }: { params: Pr
   const brewery = await getActiveBrewery(), ctx = await buildContext(brewery.id);
   const observed = await runCommand("list_pos_locations", {}, ctx) as ObservedLocation[];
   const location = observed.find(row => row.mgrLocationId && row.externalLocationId === selected.location) ?? observed.find(row => row.mgrLocationId);
-  if (!location) return orNotFound(Promise.resolve(null));
+  if (!location) notFound();
   const row = await orNotFound(runCommand("get_pos_menu_item", { posLocationId: location.externalLocationId, formatId }, ctx)) as MenuItem;
   const backHref = `/menu?location=${encodeURIComponent(location.externalLocationId)}`;
   return <>{E.back("Menu", `${row.brand} · ${row.format}`, undefined, backHref)}<PosRouteSheet title={`${row.brand} · ${row.format}`} backHref={backHref}><PosItemControl posLocationId={location.externalLocationId} brandId={row.brandId} formatId={row.formatId} item={{
