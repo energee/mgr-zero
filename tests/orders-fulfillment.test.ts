@@ -324,6 +324,43 @@ describe("confirm_restock", () => {
     expect(after.data!.length).toBe(before.data!.length);
   });
 
+  // #416: put back after an adjust-down must record what went back, so the
+  // later ship of the adjusted quantity does not re-flag the same beer.
+  // Small quantities: this file shares a 100-unit opening balance (get_shortfalls).
+  it("lowers picked to what the order keeps, so shipping the adjusted amount does not re-flag", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    const adjusted = await lineOf(id);
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 1, qty_picked: 1 });
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single();
+    expect(ev!.payload).toEqual({ lines: [{ line_id: adjusted.id, qty: 2 }] });
+
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: adjusted.id, qty_shipped: 1 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(shipped.error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data)
+      .toEqual({ status: "shipped", needs_restock: false });
+  });
+
+  it("after a short ship, puts back picked − shipped", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 1 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 3, qty_picked: 1, qty_shipped: 1 });
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single();
+    expect(ev!.payload).toEqual({ lines: [{ line_id: line.id, qty: 2 }] });
+  });
+
   it("is a conflict when the flag is already clear", async () => {
     const id = await confirmedOrder(2);
     const { error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });

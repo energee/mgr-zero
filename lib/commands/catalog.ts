@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 defineQuery({
   name: "list_catalog_categories", description: "List this brewery's catalog categories",
@@ -112,15 +112,15 @@ defineQuery({
   name: "list_formats", description: "Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list",
   input: z.object({ basis: z.enum(["packaged", "poured"]).optional(), brandId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
   handler: async (ctx, i) => {
-    const [formats, volumes] = await Promise.all([completeFormatRows((start) => {
+    const [formats, volumes] = await Promise.all([completeRows("Format list", start => {
       let q = ctx.db.from("formats").select("*, brands(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
       if (i.brandId) q = q.eq("brand_id", i.brandId);
-      return q.range(start, start + 499);
-    }), completeFormatRows((start) => {
+      return q.range(start, start + PAGE_SIZE - 1);
+    }), completeRows("Format list", start => {
       let q = ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id");
       if (i.basis) q = q.eq("basis", i.basis);
-      return q.range(start, start + 499);
+      return q.range(start, start + PAGE_SIZE - 1);
     })]);
     const byId = new Map(volumes.map(volume => [volume.id, volume.bbl_per_unit]));
     return formats.map(format => ({ ...format, effective_bbl_per_unit: byId.get(format.id) ?? null }));
@@ -153,11 +153,12 @@ defineQuery({
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
   input: z.object({ locationId: z.string().uuid().optional() }), roles: STAFF_ROLES,
   aiExposed: true,
-  handler: (ctx, i) => {
-    let q = ctx.db.from("bins").select("id, location_id, name").eq("brewery_id", ctx.breweryId).order("name");
+  // Paged past PostgREST's 1000-row cap (#475); id breaks name ties.
+  handler: (ctx, i) => completeRows("Bin list", start => {
+    let q = ctx.db.from("bins").select("id, location_id, name", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
     if (i.locationId) q = q.eq("location_id", i.locationId);
-    return unwrap(q);
-  },
+    return q.range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 defineCommand({
@@ -297,24 +298,6 @@ defineQuery({
 });
 
 // Replacement inputs must include the entire set, even beyond PostgREST's row cap.
-async function completeFormatRows<T>(page: (start: number) => PromiseLike<{
-  data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
-}>): Promise<T[]> {
-  const rows: T[] = [];
-  let total: number | undefined;
-  do {
-    const result = await page(rows.length);
-    const next = await unwrap(Promise.resolve(result));
-    if (result.count === null || (total !== undefined && result.count !== total) || !next
-      || (next.length === 0 && rows.length < result.count)) {
-      throw new CommandError("The complete format could not be loaded. Reload before editing.", 409, "conflict");
-    }
-    total = result.count;
-    rows.push(...next);
-  } while (rows.length < total);
-  return rows;
-}
-
 // Format editing needs only material identity/unit, not purchasing details.
 defineQuery({
   name: "get_format_composition", description: "One format with its components, packaging BOM, atomic child options, and material names and base units",
@@ -323,10 +306,10 @@ defineQuery({
     const format = await unwrap(ctx.db.from("formats").select("*, brands(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
     if (!format) throw new CommandError("Format not found", 404, "not_found");
     const [components, lines, formats, materials, parents] = await Promise.all([
-      completeFormatRows((start) => ctx.db.from("format_components").select("child_format_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id").range(start, start + 499)),
-      completeFormatRows((start) => ctx.db.from("format_bom").select("material_id, qty_per_unit, on_break", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("format_id", i.formatId).order("material_id").range(start, start + 499)),
-      completeFormatRows((start) => ctx.db.from("format_volumes").select("id, name, basis, bbl_per_unit, composed", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
-      completeFormatRows((start) => ctx.db.from("materials").select("id, name, base_uom, active", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
+      completeRows("Format", start => ctx.db.from("format_components").select("child_format_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Format", start => ctx.db.from("format_bom").select("material_id, qty_per_unit, on_break", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("format_id", i.formatId).order("material_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Format", start => ctx.db.from("format_volumes").select("id, name, basis, bbl_per_unit, composed", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Format", start => ctx.db.from("materials").select("id, name, base_uom, active", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("format_components").select("parent_format_id").eq("brewery_id", ctx.breweryId).eq("child_format_id", i.formatId).limit(1)),
     ]);
     return { format, components, lines, formats, materials, usedAsChild: (parents ?? []).length > 0 };

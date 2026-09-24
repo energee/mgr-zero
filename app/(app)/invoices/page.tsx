@@ -15,7 +15,7 @@ export default async function InvoicesPage() {
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<{ connected: boolean; state: string; realmLabel: string | null }> : null,
   ]);
   return <InvoicesView backHref="/more" rows={invoices.map(invoice => ({
-    ...toInvoiceListRow(invoice, brewery.role, Boolean(health?.connected)), href: `/invoices/${invoice.id}`,
+    ...toInvoiceListRow(invoice, brewery.role, Boolean(health?.connected), brewery.timeZone), href: `/invoices/${invoice.id}`,
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `connected · ${health.realmLabel ?? "verified company"}` : health.state.replaceAll("_", " "),
     canConnect: brewery.role === "admin", connectHref: "/settings/accounting/connect",

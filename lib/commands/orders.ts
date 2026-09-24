@@ -3,7 +3,7 @@
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
-import { defineCommand, defineQuery, unwrap, runCommand, CommandError } from "./registry";
+import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 const salesRoles = ["admin", "sales"] as const;
@@ -137,50 +137,33 @@ defineQuery({
   handler: async (ctx, i) => {
     // Read all rows being summed, not just PostgREST's first 1,000. Filtering
     // precedes pagination; deterministic keys keep each page disjoint.
-    async function complete<T>(page: (start: number) => PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null; count: number | null }>) {
-      const result: T[] = [];
-      let total: number | undefined;
-      do {
-        const response = await page(result.length), rows = await unwrap(Promise.resolve(response));
-        if (response.count === null || (total !== undefined && response.count !== total) || !rows || (!rows.length && result.length < response.count)) {
-          throw new CommandError("Reservations changed while loading. Reload to review them.", 409, "conflict");
-        }
-        total = response.count; result.push(...rows);
-      } while (result.length < total);
-      return result;
-    }
     const [atp, onHand, allocs] = await Promise.all([
-      complete(start => {
+      completeRows("Reservations", start => {
         let q = ctx.db.from("atp").select("sku_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).lt("qty", 0);
         if (i.skuId) q = q.eq("sku_id", i.skuId);
-        return q.order("sku_id").range(start, start + 499);
+        return q.order("sku_id").range(start, start + PAGE_SIZE - 1);
       }),
-      complete(start => {
+      completeRows("Reservations", start => {
         let q = ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
         if (i.skuId) q = q.eq("sku_id", i.skuId);
-        return q.order("sku_id").order("location_id").range(start, start + 499);
+        return q.order("sku_id").order("location_id").range(start, start + PAGE_SIZE - 1);
       }),
-      complete(start => {
+      completeRows("Reservations", start => {
         let q = ctx.db.from("allocations").select("id, sku_id, qty, source, ref", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("status", "open");
         if (i.skuId) q = q.eq("sku_id", i.skuId);
-        return q.order("id").range(start, start + 499);
+        return q.order("id").range(start, start + PAGE_SIZE - 1);
       }),
     ]);
     // Aggregate view lineage is not a reliable PostgREST relationship. Read
     // labels explicitly through the same tenant/RLS boundary in bounded batches.
-    const skuNames = new Map<string, string>();
-    for (let start = 0; start < atp.length; start += 100) {
-      const skus = await unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", ctx.breweryId).in("id", atp.slice(start, start + 100).map(r => r.sku_id)));
-      for (const sku of skus ?? []) skuNames.set(sku.id, sku.name);
-    }
-    const orderLines = new Map<string, { orderId: string; orderNo: number }>();
     const refs = [...new Set(allocs.filter(a => a.source === "order_line").map(a => a.ref))];
-    for (let start = 0; start < refs.length; start += 100) {
-      const lines = await unwrap(ctx.db.from("order_lines").select("id, order_id, orders(order_no)").eq("brewery_id", ctx.breweryId).in("id", refs.slice(start, start + 100)));
-      for (const line of lines as unknown as { id: string; order_id: string; orders: { order_no: number } | null }[]) {
-        if (line.orders) orderLines.set(line.id, { orderId: line.order_id, orderNo: line.orders.order_no });
-      }
-    }
+    const [skus, lines] = await Promise.all([
+      inChunks(atp.map(r => r.sku_id), async chunk => (await unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []),
+      inChunks(refs, async chunk => (await unwrap(ctx.db.from("order_lines").select("id, order_id, orders(order_no)").eq("brewery_id", ctx.breweryId).in("id", chunk))) as unknown as { id: string; order_id: string; orders: { order_no: number } | null }[]),
+    ]);
+    const skuNames = new Map(skus.map(sku => [sku.id, sku.name]));
+    const orderLines = new Map<string, { orderId: string; orderNo: number }>();
+    for (const line of lines) if (line.orders) orderLines.set(line.id, { orderId: line.order_id, orderNo: line.orders.order_no });
     const sum = (rows: { sku_id: string; qty: number }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
     const onHandBySku = sum(onHand), allocatedBySku = sum(allocs);
     const reservationsBySku = new Map<string, typeof allocs>();
@@ -264,18 +247,11 @@ defineQuery({
     // an omitted balance into a false zero on the confirmation screen.
     const lines = ln ?? [];
     const skuIds = [...new Set(lines.map((line: { sku_id: string }) => line.sku_id))];
-    const atp: { brewery_id: string; sku_id: string; qty: number }[] = [];
-    const sourceOnHand: { sku_id: string; qty: number }[] = [];
-    for (let start = 0; start < skuIds.length; start += 100) {
-      const batch = skuIds.slice(start, start + 100);
-      const [batchAtp, batchSource] = await Promise.all([
-        unwrap(ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId).in("sku_id", batch)),
-        unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)
-          .eq("location_id", order.from_location_id).in("sku_id", batch)),
-      ]);
-      atp.push(...(batchAtp ?? []));
-      sourceOnHand.push(...(batchSource ?? []));
-    }
+    const [atp, sourceOnHand] = await Promise.all([
+      inChunks(skuIds, async batch => (await unwrap(ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId).in("sku_id", batch))) ?? []),
+      inChunks(skuIds, async batch => (await unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)
+        .eq("location_id", order.from_location_id).in("sku_id", batch))) ?? []),
+    ]);
     return { order, lines, events, shipment, atp, sourceOnHand };
   },
 });
@@ -393,14 +369,7 @@ defineQuery({
     if (!invoice?.shipment_id) return [];
     const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
     if (!shipment) throw new Error("Shipment not found");
-    const sources: ReturnSource[] = [];
-    for (let start = 0; ; start += 500) {
-      const result = await ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + 499);
-      const page = await unwrap(Promise.resolve(result)) as unknown as ReturnSource[];
-      sources.push(...page);
-      if (result.count === null || (!page.length && sources.length < result.count)) throw new Error("Could not read complete shipped sources");
-      if (sources.length >= result.count) return sources;
-    }
+    return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as ReturnSource[];
   },
 });
