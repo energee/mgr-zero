@@ -170,3 +170,11 @@ describe("Price group view", () => {
     expect(body.props.model).toEqual(toPriceGroupViewProps(priceGroupTwo));
   });
 });
+
+it("bounds Position as the command does: a required whole number from 1 (#447)", () => {
+  const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(pricingGrid), controls: { position: () => undefined }, back: null }));
+  const position = /<input[^>]*aria-label="Position"[^>]*>/.exec(html)?.[0] ?? "";
+  expect(position).toContain('min="1"');
+  expect(position).toContain('step="1"');
+  expect(position).toContain("required");
+});

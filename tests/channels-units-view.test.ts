@@ -212,3 +212,9 @@ describe("Units view", () => {
     expect(src).toContain('backHref: ctx.role === "taproom" ? "/more" : "/settings"');
   });
 });
+
+it("puts a gravity select back on the stored unit when its save fails (#447)", () => {
+  const src = readFileSync(new URL("../app/(app)/settings/units/gravity-unit-form.tsx", import.meta.url), "utf8");
+  expect(src).toContain('run("set_brewery_gravity_unit", { unit: v }).then((ok) => { if (!ok) setBreweryChoice(brewery); })');
+  expect(src).toContain('run("set_my_gravity_unit", { unit: v === NONE ? null : v }).then((ok) => { if (!ok) setMineChoice(mine ?? NONE); })');
+});
