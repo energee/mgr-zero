@@ -177,6 +177,20 @@ describe("production-readiness workflow contract", () => {
     expect(reload).toBeGreaterThan(reset);
   });
 
+  // Parallel sessions share this one test database. A reset under another
+  // session's vitest run fails that run with errors that read as broken code,
+  // and two resets at once race. So the script serializes itself and waits
+  // for running vitest processes before it resets.
+  it("waits for other resets and running vitest before resetting", () => {
+    const reset = testDb.indexOf("supabase db reset");
+    expect(testDb.indexOf("mgr-test-db.lock")).toBeGreaterThan(-1);
+    expect(testDb.indexOf("mgr-test-db.lock")).toBeLessThan(reset);
+    // Match this repo's vitest binary, not any process whose text says "vitest".
+    expect(testDb).toContain(".bin/vitest");
+    expect(testDb.search(/pgrep -f /)).toBeGreaterThan(-1);
+    expect(testDb.search(/pgrep -f /)).toBeLessThan(reset);
+  });
+
   it("leaves the build and the database shards to CI", () => {
     // Comments name the manual escape hatch; only what the hook runs counts.
     const runs = prePush.split("\n").filter((line) => !line.trimStart().startsWith("#")).join("\n");
