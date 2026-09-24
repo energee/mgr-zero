@@ -15,6 +15,8 @@ export interface StaffMembership {
   breweryId: string;
   breweryName: string;
   role: StaffRole;
+  /** breweries.timezone (IANA): every timestamp on a staff page prints in it (#442). */
+  timeZone: string;
 }
 
 export interface CustomerMembership {
@@ -79,14 +81,14 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
 
     const breweryIds = (data ?? []).map((row) => row.brewery_id);
     const { data: breweries, error: breweryError } = breweryIds.length
-      ? await db.from("staff_brewery").select("id, name").in("id", breweryIds)
+      ? await db.from("staff_brewery").select("id, name, timezone").in("id", breweryIds)
       : { data: [], error: null };
     if (breweryError) throw breweryError;
-    const breweryNames = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery.name]));
+    const breweryRows = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery]));
     return (data ?? []).map(({ brewery_id, role }) => {
-      const breweryName = breweryNames.get(brewery_id);
-      if (!breweryName) throw new Error("staff membership brewery is unavailable");
-      return { breweryId: brewery_id, breweryName, role };
+      const brewery = breweryRows.get(brewery_id);
+      if (!brewery?.name || !brewery.timezone) throw new Error("staff membership brewery is unavailable");
+      return { breweryId: brewery_id, breweryName: brewery.name, role, timeZone: brewery.timezone };
     });
   })());
   const getCustomerMemberships = () => (customerMemberships ??= (async () => {

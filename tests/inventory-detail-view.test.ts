@@ -10,7 +10,7 @@ it("offers correction only for a structurally standalone unreversed adjustment o
   for (const field of ["ref", "source_movement_id", "compensates_id", "reversed_by"]) expect(canReverseMovement({ ...original, [field]: "id" })).toBe(false);
 });
 it("keeps zero-stock historical SKUs and never invents a location or live fixture path", () => {
-  const model = toInventoryDetailViewProps({ sku: { id: "s", name: "Archived keg", active: false }, onHand: [], atp: [], movements: [] });
+  const model = toInventoryDetailViewProps({ sku: { id: "s", name: "Archived keg", active: false }, onHand: [], atp: [], movements: [], timeZone: "America/New_York" });
   expect(model).toMatchObject({ onHandTotal: 0, available: 0, allocated: 0, onHand: [] });
   expect(model.backHref).toBeUndefined();
   expect(INVENTORY_DETAIL.backHref).toBeUndefined();

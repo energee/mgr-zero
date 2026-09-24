@@ -1,4 +1,5 @@
 import type { TaproomVarianceViewModel } from "@/lib/mgr/taproom-variance-view";
+import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { WeeklyCountViewModel } from "@/components/mgr/views/weekly-count";
 import { countDraftFromSnapshot, correctionStateFromReceipt } from "@/lib/mgr/taproom-count-state";
 import { openTapBoardSheet, type TapInterval, type TapBoardState } from "@/lib/mgr/tap-board-state";
@@ -29,6 +30,7 @@ const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_o
 weeklyDraft.draft.lines[0].quantity = "4";
 weeklyDraft.draft.lines[1].quantity = "2";
 export const weeklyCount: WeeklyCountViewModel = {
+  timeZone: DEMO_TIME_ZONE,
   locations: [["Ridgeline Tap Room"], ["Downtown"]], location: "Ridgeline Tap Room", role: "admin", draft: weeklyDraft,
   lotLabels: { "cold:hazy-half:hazy-lot": "L-260901-HZ" },
   receipt: { date: "Sep 8", recorded: "Latest uncorrected count", canCorrect: true,
@@ -38,7 +40,7 @@ export const weeklyCount: WeeklyCountViewModel = {
 };
 
 export const taproomVariance: TaproomVarianceViewModel = {
-  weeks: 4,
+  weeks: 4, timeZone: DEMO_TIME_ZONE,
   trend: { brand: "Hazy IPA", detail: "short 4 weeks running · 1.8 bbl total · −4%" },
   report: {
     weeks: 4, window_start: "2026-08-12", window_end: "2026-09-08", as_of: "2026-09-08T16:00:00Z", reason: null,
