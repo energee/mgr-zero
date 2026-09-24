@@ -7,3 +7,8 @@ export function stepQuantity(value: string, direction: -1 | 1, min = -Infinity, 
   const next = Number((current + direction).toFixed(Math.min(places, 100)));
   return String(Math.max(min, Math.min(max, next)));
 }
+
+/** A typed quantity is a number only when filled: `Number("")` is 0, and a
+ *  cleared field must not submit as an explicit zero (#433). */
+export const isNumber = (s: string) => s.trim() !== "" && Number.isFinite(Number(s));
+export const isPositive = (s: string) => Number(s) > 0;
