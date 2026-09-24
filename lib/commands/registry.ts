@@ -102,6 +102,10 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
   return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
 }
 
+/** The largest Postgres `int`: the zod `.max()` for a number stored in an int column (#427), so an
+ * oversized value is a 400 validation error rather than a 22003 overflow from the database. */
+export const PG_INT_MAX = 2_147_483_647;
+
 /** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */
 export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code");
 
