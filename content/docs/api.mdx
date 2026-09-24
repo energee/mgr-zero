@@ -3653,7 +3653,7 @@ Log one timestamped fermentation reading against an open occupancy; this is the 
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 1 } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 25 } }'
 ```
 
 #### schedule_batch [#schedule_batch]
