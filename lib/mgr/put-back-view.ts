@@ -20,11 +20,9 @@ export type PutBackSnapshot = {
 
 export type StagedLine = { qty_ordered: number; qty_picked: number | null; qty_shipped: number | null };
 
-/** The one definition of "staged, not yet put back" for a line: what was
- *  picked minus what the order still takes — everything on a cancelled order,
- *  the shipped amount once shipped, otherwise the ordered amount — never
- *  negative. `confirm_restock` lowers `qty_picked` to that same kept amount
- *  (migration 20260923160000), so a put-back line reads 0 afterwards. */
+/** Staged, not yet put back: picked minus what the order keeps (nothing if
+ *  cancelled, shipped once shipped, else ordered). confirm_restock_impl lowers
+ *  qty_picked to the same kept amount. */
 export function stagedQty(status: string, line: StagedLine): number {
   const kept = status === "cancelled" ? 0 : Number(line.qty_shipped ?? line.qty_ordered);
   return Math.max(0, Number(line.qty_picked ?? 0) - kept);

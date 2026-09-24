@@ -5,11 +5,7 @@
 -- ship_order (qty_shipped < qty_picked) flagged the same staged beer again
 -- after an adjust-down was put back. Put back now lowers each line's
 -- qty_picked to what the order still takes and writes the put-back amounts on
--- the restocked event.
---
--- "Staged, not yet put back" = qty_picked minus what the order keeps:
--- nothing on a cancelled order, qty_shipped once shipped, else qty_ordered.
--- The same definition is stagedQty in lib/mgr/put-back-view.ts.
+-- the restocked event. "Kept" matches stagedQty in lib/mgr/put-back-view.ts.
 -- Replaces the baseline definition (00001_baseline.sql); the ledger never moves.
 create or replace function private.confirm_restock_impl(p_order uuid) returns jsonb
 language plpgsql set search_path = '' as $$

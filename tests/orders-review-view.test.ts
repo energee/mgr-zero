@@ -123,8 +123,7 @@ describe("Put back view loop", () => {
     expect(model.verb).toBe("Put back 3");
   });
 
-  // #417: staged = picked − shipped once shipped, picked − ordered before,
-  // everything picked on a cancelled order; never negative.
+  // #417
   it("stages picked − shipped after a short ship, not picked − ordered", () => {
     const line = { id: "l", qty_ordered: 10, qty_picked: 10, qty_shipped: 6, skus: { name: "Pils" } };
     expect(stagedQty("shipped", line)).toBe(4);
