@@ -8,7 +8,11 @@ behavior. Read `AGENTS.md` first. Scope: ${ARGUMENTS:-git diff + untracked files
 from the current task}; leave unrelated pre-existing code alone.
 
 Remove unnecessary nesting, indirection, single-use abstractions, dense one-liners,
-redundant comments, and dead code the change exposed. Preserve APIs, behavior,
+redundant comments, and dead code the change exposed. Replace any new helper,
+component, or query that duplicates an existing one with the existing one
+(AGENTS.md negative 2). Give each changed function to a Haiku subagent for a
+two-sentence "what and why"; simplify whatever it gets wrong or hedges on
+(negative 3). Preserve APIs, behavior,
 error semantics, security checks, domain terms, and comments that explain why.
 Do not touch schemas, dependencies, or generated files. Ask before any change
 that needs a design or behavior decision. Then run

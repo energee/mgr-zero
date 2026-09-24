@@ -29,13 +29,14 @@ Do not flag an instruction violation unless the applicable guidance says it spec
 
 ## Independent Review Passes
 
-For a non-trivial change, use up to three independent reviewers in parallel when delegation is available. Give each reviewer the target, base/head SHAs, applicable instruction-file paths, and a distinct lens; do not seed them with suspected findings from another reviewer.
+For a non-trivial change, use up to four independent reviewers in parallel when delegation is available. Give each reviewer the target, base/head SHAs, applicable instruction-file paths, and a distinct lens; do not seed them with suspected findings from another reviewer.
 
 Suggested lenses:
 
 1. Changed-lines correctness and repository-guidance compliance.
 2. Integration behavior: callers, state transitions, authorization, error paths, data compatibility, and migrations.
 3. Historical intent: blame, earlier changes or PR discussion, code comments, and tests around modified behavior.
+4. `AGENTS.md` negatives: over-engineering, code that duplicates something already in the repo (search for it), and the Haiku handoff check (give each changed function to a Haiku subagent for a two-sentence "what and why"; a wrong or hedged answer is a finding).
 
 For small changes or when delegation is unavailable, perform the same lenses sequentially. Reviewers return candidate findings only; they never post or modify anything.
 
