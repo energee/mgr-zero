@@ -14,6 +14,50 @@ Multi-tenant brewery operations SaaS: Next.js App Router + Supabase (Postgres,
 Auth, RLS). Nothing is deployed yet. Read this file, then follow the routes
 below just in time — don't preload everything.
 
+## Negatives (ranked; an earlier one wins a conflict)
+
+Each one has cost a revert or a rework here before.
+
+1. **Don't over-engineer.** No abstraction with one caller, no option or
+   config nobody asked for, no modeling of cases the request did not name.
+   Ship the simple version and ask about the rest. (An over-modeled
+   price-group design and a label plan had to be cut back.)
+2. **Don't reinvent.** Before writing a helper, component, query, table,
+   trigger, or validator, search for one that exists (`lib/mgr`,
+   `components/mgr/e.tsx`, `supabase/migrations`) and say what you found.
+   A second copy is a defect. (The POS tables were already in the baseline;
+   #482 merged four copies of one helper; #484 moved a copied `monthOver`
+   into `period.ts`.)
+3. **Don't write code Haiku can't explain.** After one read, a smaller model
+   should be able to say what a function or doc paragraph does and why. If
+   it can't, split or rename it. For prose: one idea per sentence, one
+   concept per table row. The check, run by `/simplify`: give all changed
+   functions to one Haiku subagent and ask for two sentences each on what
+   and why. A wrong or hedged answer is a finding.
+4. **Don't trust one search or truncated output.** Try a second pattern
+   before calling code unused or missing. Read status from the exit code,
+   `git status -sb`, or `gh pr checks <n>`, never from `| tail` or `| grep`.
+   (A truncated grep removed shadcn; `| tail` hid a failed push; `| grep`
+   hid a red test run.)
+5. **Don't swallow errors or add silent fallbacks.** Let the failure reach
+   the caller, or write why the fallback is safe. (#408 had to surface them.)
+6. **Don't expand scope.** No drive-by refactors; moves and renames follow
+   Authority below.
+7. **Don't edit YAML, JSON, SQL, or TSX with `sed`.** Use an editor tool or
+   a script, and parse-check YAML before committing. (A `sed` edit dropped a
+   workflow key; a column-0 line made YAML invalid.)
+8. **Don't act on an assumed target.** Orient first (Operating loop step 0),
+   and name the diff range (`origin/main..HEAD`) before a review.
+9. **Don't file an issue unsearched.** Run
+   `gh issue list --state all --search "<keywords>"` first and report
+   duplicates.
+10. **Don't merge until checks are green.** (A view without
+    `security_invoker` merged red and broke main.)
+11. **Don't leave review findings open.** Fix every one, or give a reason for
+    each you skip.
+12. **Don't filter in the page.** Put the predicate in the query; see the
+    pre-implementation gates in `.agents/ARCHITECTURE.md`.
+
 ## Current focus: screens
 
 For screen, form, dialog, and entry-flow changes or parity audits, use
@@ -106,7 +150,10 @@ database (as CI already has) and stop touching the dev one.
    http://localhost:3000/...` then `snapshot` / `get text` / `screenshot`, and
    `close` the same session when done. `<name>` is the branch with `/` → `-`;
    the skill has the exact incantation and why the session matters.
-5. `git diff` before committing (a stray NUL byte once made a file binary).
+   A test failing on a missing column or relation usually means a stale
+   test schema: re-run `scripts/test-db.sh` before changing code.
+5. Run `/simplify` on every code change before committing (see the tool
+   table). Then `git diff`: a stray NUL byte once made a file binary.
 6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
