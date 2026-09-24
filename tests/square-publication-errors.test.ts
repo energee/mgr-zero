@@ -18,8 +18,9 @@ const starts = [
 describe.each(starts)("%s database errors", (_name, start) => {
   it("hides raw Postgres text behind a retryable 500", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const raw = 'duplicate key value violates unique constraint "square_publication_attempts_pkey"';
-    const failure = start(ctxFailing({ message: raw, code: "23505" }));
+    // An unmapped code: 23505 is now a 409 conflict (#422), so use a transient serialization failure.
+    const raw = "could not serialize access due to concurrent update";
+    const failure = start(ctxFailing({ message: raw, code: "40001" }));
     await expect(failure).rejects.toMatchObject({ status: 500, code: "db_error", message: "database error" });
   });
 
