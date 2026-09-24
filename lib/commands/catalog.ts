@@ -147,7 +147,8 @@ defineCommand({
 
 // Bins subdivide a location (spec 2026-09-06 Decision 1). Reads go through
 // RLS; the three writes are the idempotent RPCs. A location never drops below
-// one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
+// one bin, and a bin that ever recorded stock or that a POS menu uses (#421) is not
+// deleted — delete_bin raises all three.
 defineQuery({
   // Brewers read bins too: packaging output lands in one.
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
