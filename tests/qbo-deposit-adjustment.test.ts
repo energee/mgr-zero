@@ -92,6 +92,25 @@ describe("portal order deposit adjustments", () => {
     expect(await deposits(draft.order_id)).toEqual([{ sku_id: f.second.skuId, qty_ordered: 1, unit_price_cents: 2500 }]);
   });
 
+  it("charges a keg line added by adjustment through the shared deposit helper (#413)", async () => {
+    const order = await runCommand("create_order", {
+      kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.source.id,
+      lines: [{ skuId: f.first.skuId, qty: 1 }],
+    }, f.adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId: order.order_id }, f.adminCtx);
+    await runCommand("confirm_order", { orderId: order.order_id }, f.adminCtx);
+    expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
+    await runCommand("adjust_order_lines", { orderId: order.order_id, reason: "add a keg", lines: [
+      { skuId: f.first.skuId, qty: 1 }, { skuId: f.second.skuId, qty: 2 },
+    ] }, f.adminCtx);
+    const rows = await deposits(order.order_id);
+    expect(rows).toEqual(expect.arrayContaining([
+      { sku_id: f.first.skuId, qty_ordered: 1, unit_price_cents: 2500 },
+      { sku_id: f.second.skuId, qty_ordered: 2, unit_price_cents: 3100 },
+    ]));
+    expect(rows).toHaveLength(2);
+  });
+
   it.each(["now", "on_delivery"] as const)("invoices every adjusted returnable-keg line with %s timing", async (timing) => {
     const orderId = await submitted(f);
     expect((await admin.from("keg_pools").update({ deposit_cents: 3100 }).eq("id", f.poolId)).error).toBeNull();
