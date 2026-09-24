@@ -3744,8 +3744,13 @@ line, so a partially edited BOM never exists.
 
 A packaging run is scheduled, then closed with what it actually produced and
 consumed. Closing is the step that moves beer out of a vessel and finished goods
-into inventory. No operation here previews a run's material shortfalls before
-scheduling — that read belongs to the Packaging screen, not this reference.
+into inventory. The close also draws the format's packaging BOM off the
+finished-goods bin the run closes into: a material counted in whole units
+(base unit `each` — cans, lids, trays) is drawn rounded up, and a close that
+needs more of a material than that bin holds is refused, naming the material,
+what the bin has, and what the run needs. No operation here previews a run's
+material shortfalls before scheduling — that read belongs to the Packaging
+screen, not this reference.
 
 {/* ops:packaging */}
 
