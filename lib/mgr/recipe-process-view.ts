@@ -28,7 +28,6 @@ export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mas
 
 export const EMPTY_WATER: WaterDraft = { targetProfileId: "", sourceProfileId: "", mashGal: "", spargeGal: "", targetMashPh: "", additions: [] };
 
-/** A typed number field holds a finite number; a positive one is above zero. */
 /** An optional numeric field: empty means not given. */
 export const optionalNumber = (s: string) => (s === "" ? undefined : Number(s));
 
