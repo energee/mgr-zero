@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { defineCommand, defineQuery, latestOf, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 defineQuery({
@@ -23,7 +24,7 @@ defineCommand({
 defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().optional(),
+    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
     description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
   }),
   roles: ["admin", "sales"],
