@@ -13,6 +13,11 @@
 --   * reattribution (reattribute_loss, get_loss_review, the reclassification
 --     graph) accepts any generic loss root, not only a batch's completion
 --     loss, so a batch can have more than one reattributable loss.
+-- Each function body is copied verbatim from its newest definition and changes
+-- only the transfer-loss lines: batch_completion_calculation from 20260924040000
+-- (#431), record_cellar_transfer from 20260924070000 (#488, #466),
+-- generate_compliance_report from 20260924120000 (#435), the rest from
+-- 00001_baseline.
 
 insert into public.volume_adjustments (brewery_id, occupancy_id, bbl, reason, removal_class, at, note, created_by, created_at)
 select t.brewery_id, t.from_occupancy_id, -t.loss_bbl, 'loss', 'loss', t.at, 'cellar transfer loss', t.created_by, t.at
@@ -283,7 +288,7 @@ begin
     where o.brewery_id = p_brewery and o.batch_id = p_batch and a.removal_class is not null;
 
   v_baseline := v_initial + v_in - v_out + v_physical;
-  if v_baseline <= 0 then raise exception 'batch completion baseline must be positive'; end if;
+  if v_baseline < 0 then raise exception 'batch completion baseline must not be negative'; end if;
   v_attributed := -v_removals;
   v_residual := v_baseline - v_packaged - v_attributed;
   if v_residual < 0 then raise exception 'batch has a negative completion residual; packaged and attributed volume exceed its baseline'; end if;
@@ -328,6 +333,10 @@ begin
 
   select * into v_to from public.vessel_occupancies
     where vessel_id = p_to_vessel and brewery_id = p_brewery and ended_at is null for update;
+  -- #488: what the target already holds (nothing when empty) plus this volume
+  -- must fit it. Checked before an empty target's occupancy is opened.
+  perform private.assert_vessel_fits(v_vessel, p_volume_bbl + coalesce(
+    (select bbl from public.occupancy_volumes where occupancy_id = v_to.id), 0));
   if v_to.id is null then
     insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)
     values (p_brewery, p_to_vessel, v_from.batch_id, v_now, 0) returning * into v_to;
@@ -346,6 +355,17 @@ begin
   -- Re-read the view: it now includes the row just written.
   select bbl into v_available from public.occupancy_volumes where occupancy_id = v_from.id;
   if v_available <= c_epsilon then
+    -- #466: ending the occupancy under a started, unclosed packaging run
+    -- strands it -- close_packaging_run refuses an emptied tank and a started
+    -- run cannot be cancelled. Refuse the emptying transfer instead (the raise
+    -- rolls back the transfer row written above); a partial transfer is fine.
+    if exists (
+      select 1 from public.packaging_runs r
+      where r.brewery_id = p_brewery and r.occupancy_id = v_from.id
+        and r.started_at is not null and r.closed_at is null
+    ) then
+      raise exception 'a started packaging run still draws from this tank; close the run before transferring the heel out';
+    end if;
     -- greatest(): a brew day may be dated ahead of today, so the occupancy can
     -- start in the future. tstzrange would reject an ended_at below its start;
     -- an empty range there simply frees the vessel.
@@ -375,8 +395,9 @@ begin
       coalesce(sum(bbl), 0) as e
     from unnest(enum_range(null::public.package_type)) as c(class) left join r on r.class = c.class group by c.class)
   select
-    -- the printed cells must foot as printed: end is derived from the rounded cells, the identity is checked unrounded below
-    (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(i, 2), 'out', round(o, 2), 'end', round(b, 2) + round(i, 2) - round(o, 2)) order by class) from per_class),
+    -- rounded running balance (see header); the identity is checked unrounded below
+    (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(b + i, 2) - round(b, 2),
+      'out', round(b + i, 2) - round(b + i - o, 2), 'end', round(b + i - o, 2)) order by class) from per_class),
     coalesce((select array_agg(class::text || ' does not balance' order by class) from per_class where b + i - o <> e), '{}')
       || coalesce((select array_agg(distinct 'unclassified movement type ' || type::text) from r where d >= p_start and side is null), '{}'),
     (select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from (
@@ -396,11 +417,12 @@ begin
     into v_lines, v_warnings, v_removals, v_by_state, v_packaged;
   select coalesce(jsonb_object_agg(removal_class, bbl), '{}'::jsonb)
     into v_cellar_removals from (
-      select a.removal_class::text removal_class, -sum(a.bbl) bbl
-      from public.volume_adjustments a join public.breweries brewery on brewery.id = a.brewery_id
-      where a.brewery_id = p_brewery and a.removal_class is not null
-        and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
-      group by a.removal_class
+      select removal_class, sum(bbl) bbl from (
+        select a.removal_class::text removal_class, -a.bbl bbl
+        from public.volume_adjustments a join public.breweries brewery on brewery.id = a.brewery_id
+        where a.brewery_id = p_brewery and a.removal_class is not null
+          and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
+      ) cellar_rows group by removal_class
     ) cellar;
   if coalesce((v_cellar_removals->>'taproom')::numeric, 0) <> 0 then
     v_external := array['taproom'];

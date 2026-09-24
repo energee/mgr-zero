@@ -8108,6 +8108,7 @@ export type Database = {
       }
       provision_brewery: {
         Args: {
+          p_actor: string
           p_name: string
           p_request_id: string
           p_timezone: string
@@ -9002,6 +9003,7 @@ export type Database = {
           p_brewery: string
           p_category: Database["public"]["Enums"]["material_category"]
           p_default_vendor: string
+          p_extract_potential: number
           p_lot_tracked: boolean
           p_material: string
           p_name: string

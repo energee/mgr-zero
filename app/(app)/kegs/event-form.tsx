@@ -1,6 +1,7 @@
 // app/(app)/kegs/event-form.tsx — CommandForm for record_keg_event: pool,
 // size, reason, location and bin (first bin preselected), quantity, and a
-// customer when the reason is shipped or returned. Empty kegs only: beer
+// customer when the reason is shipped or returned (optional for lost; never
+// for found, which the RPC refuses with a customer). Empty kegs only: beer
 // coming back with a keg is Return shipment.
 "use client";
 
@@ -17,7 +18,7 @@ import { REASON_LABEL, SIZE_LABEL } from "./keg-labels";
 
 type Reason = (typeof KEG_EVENT_REASONS)[number];
 const needsCustomer = (r: Reason) => r === "shipped" || r === "returned";
-const mayHaveCustomer = (r: Reason) => needsCustomer(r) || r === "lost" || r === "found";
+const mayHaveCustomer = (r: Reason) => needsCustomer(r) || r === "lost";
 
 function Pick<T extends string>({ id, label, value, onChange, options, disabled, placeholder }: {
   id: string; label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; disabled?: boolean; placeholder?: string;
