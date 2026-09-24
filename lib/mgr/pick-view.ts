@@ -6,6 +6,8 @@ export type PickLineView = {
   name: string;
   detail: string;
   qty: number;
+  /** qty_ordered: record_pick refuses a pick above it (#471), so the field caps here. */
+  ordered: number;
   tone?: "" | "w" | "ok";
 };
 
@@ -46,6 +48,7 @@ export function toPickViewProps({ order, lines, locations, backHref }: PickSnaps
         name: l.skus?.name ?? "Line",
         detail: `ordered ${ordered}`,
         qty,
+        ordered,
         tone: qty < ordered ? "w" : "ok",
       };
     }),
