@@ -1,12 +1,12 @@
 // The CSV map and its preview/command validation use the same field contract.
 import { z } from "zod";
-import { US_STATE_CODES } from "@/lib/mgr/enums";
+import { PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
 export const IMPORT_ROW_CAP = 5000;
 export const IMPORT_KINDS = ["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"] as const;
 export type ImportKind = typeof IMPORT_KINDS[number];
 type Field = { name: string; required?: boolean; type?: "uuid" | "positive" | "cents" | "number" | "state"; lookup?: string; values?: readonly string[] };
 export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
-  customers: [{ name: "name", required: true }, { name: "type", required: true, values: ["distributor", "retailer", "brewery", "other"] }, { name: "state", required: true, type: "state" }, { name: "saleChannelId", required: true, type: "uuid", lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms" }],
+  customers: [{ name: "name", required: true }, { name: "type", required: true, values: ["distributor", "retailer", "brewery", "other"] }, { name: "state", required: true, type: "state" }, { name: "saleChannelId", required: true, type: "uuid", lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }],
   ship_tos: [{ name: "customerId", required: true, type: "uuid", lookup: "customers" }, ...["label", "address1", "city", "zip"].map(name => ({ name, required: true })), { name: "state", required: true, type: "state" }, { name: "address2" }],
   products_skus: [{ name: "product", required: true }, { name: "formatId", required: true, type: "uuid", lookup: "formats" }, { name: "sku_name" }, { name: "style" }, { name: "abv", type: "number" }, { name: "upc" }],
   channel_prices: [{ name: "saleChannelId", required: true, type: "uuid", lookup: "channels" }, { name: "priceGroupId", required: true, type: "uuid", lookup: "groups" }, { name: "formatId", required: true, type: "uuid", lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
