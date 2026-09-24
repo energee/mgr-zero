@@ -18,3 +18,7 @@ const dateTime = (timeZone?: string) => {
   return format;
 };
 export const formatDateTime = (value: string | Date, timeZone?: string) => dateTime(timeZone).format(new Date(value));
+/** The calendar day (YYYY-MM-DD) `at` falls on in `timeZone`. A date field's
+ *  default is the brewery's day, not the UTC day `toISOString()` names — which
+ *  is already tomorrow on a US evening (#437). breweryToday(ctx) is the caller. */
+export const breweryDate = (timeZone: string, at: Date = new Date()) => at.toLocaleDateString("en-CA", { timeZone });
