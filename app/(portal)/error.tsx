@@ -4,11 +4,11 @@
 // shows a generic line: raw database text never reaches a customer.
 "use client";
 
-export default function PortalError({ reset }: { reset: () => void }) {
+export default function PortalError({ retry }: { retry: () => void }) {
   return (
     <div className="flex flex-col gap-2 text-sm">
       <p role="alert" className="text-destructive">Something went wrong loading this page.</p>
-      <button onClick={reset} className="w-fit underline">Try again</button>
+      <button onClick={() => retry()} className="w-fit underline">Try again</button>
     </div>
   );
 }
