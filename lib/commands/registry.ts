@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/database";
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { breweryDate } from "@/lib/date-format";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
 /** Every staff role: the `roles` of a read that all of staff may run. */
@@ -96,10 +97,52 @@ export function latestOf<T>(query: Orderable, column: string): Promise<T | null>
 /** unwrap for a list read; supabase-js without generated types cannot say what the rows are, so the caller names T. */
 export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
 
+// PostgREST returns at most max_rows (1000) rows per request and says nothing
+// when it stops, so a list read that can pass 1000 rows pages through
+// completeRows, PAGE_SIZE rows at a time.
+export const PAGE_SIZE = 500;
+type CountedPage<T> = PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null; count: number | null }>;
+
+/** Every row of a paged read. `page(start, last)` returns the page after the
+ *  `start` rows loaded so far, with the filtered total as `count`: an offset
+ *  read is `.range(start, start + PAGE_SIZE - 1)` of a fully ordered query with
+ *  `count: "exact"`; a keyset read starts after `last` and passes `key`, which
+ *  must strictly increase in JS string order (uuid keys, not collated names or
+ *  enums). Throws 409 "`name` changed while loading" when the count moves, a
+ *  page comes up short or overshoots, or a key goes backwards. */
+export async function completeRows<T>(name: string, page: (start: number, last: NoInfer<T> | undefined) => CountedPage<T>, key?: (row: NoInfer<T>) => string): Promise<T[]> {
+  const rows: T[] = [];
+  let total: number | undefined;
+  do {
+    const result = await page(rows.length, rows.at(-1));
+    const next = await unwrap(Promise.resolve(result));
+    const backwards = key && next?.some((row, index) => {
+      const previous = index === 0 ? rows.at(-1) : next[index - 1];
+      return previous !== undefined && key(row) <= key(previous);
+    });
+    if (result.count === null || (total !== undefined && result.count !== total) || !next || backwards
+      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
+      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
+    }
+    total = result.count;
+    rows.push(...next);
+  } while (rows.length < total);
+  return rows;
+}
+
+/** One `.in()` read split into groups of `size` ids, read in parallel and
+ *  concatenated in order: a few hundred uuids in one filter can pass the
+ *  gateway's URL limit. */
+export async function inChunks<T>(ids: string[], read: (chunk: string[]) => PromiseLike<T[]>, size = 100): Promise<T[]> {
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += size) chunks.push(ids.slice(start, start + size));
+  return (await Promise.all(chunks.map(chunk => read(chunk)))).flat() as T[];
+}
+
 /** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
 export async function breweryToday(ctx: Ctx): Promise<string> {
   const { timezone } = (await unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+  return breweryDate(timezone);
 }
 
 /** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */
@@ -107,7 +150,10 @@ export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code")
 
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
-// raise, so its message is the user-facing one. Anything unlisted is logged
+// raise, so its message is the user-facing one. 23505 (unique violation) is a
+// 409 and 22003 (numeric out of range) a 400, each with a fixed message: the
+// raw text names constraints and column types, so it is only logged (#422,
+// #427). Anything unlisted is logged
 // here and surfaces as a generic 500 so raw Postgres text never reaches a
 // client (security audit A2); detail pages turn not_found into the not-found
 // route (lib/mgr/not-found.ts).
@@ -117,6 +163,12 @@ function rpcError(error: { message: string; code?: string }): CommandError {
       console.error("database error 42501:", error.message);
       return new CommandError("permission denied", 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    case "23505":
+      console.error("database error 23505:", error.message);
+      return new CommandError("That already exists. Use a different name or value.", 409, "conflict");
+    case "22003":
+      console.error("database error 22003:", error.message);
+      return new CommandError("A number is out of range.");
     case "PGRST116": return new CommandError("record not found", 404, "not_found");
     case "P0001": return new CommandError(error.message);
     default:
