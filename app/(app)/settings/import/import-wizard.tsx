@@ -4,7 +4,7 @@ import { ImportView } from "@/components/mgr/views/import";
 import { command } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
-import { IMPORT_FIELDS, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
   const renderedContext = useCommandContext();
@@ -26,7 +26,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     setCsv(next); setMapping(Object.fromEntries(fields.map(f => [f.name, next.headers.indexOf(f.name)]))); setError(null);
   }
   async function commit() {
-    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows, expectedContext: renderedContext };
+    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
     try { setResult(await command(action.expectedContext.breweryId ?? breweryId, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext) as ImportResult); }
     catch (err) { setError(`${err instanceof Error ? err.message : "Import failed"}. Some rows may have committed. Retry this same batch to recover their results.`); }

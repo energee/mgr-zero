@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 
 export type ImportViewModel = {
@@ -27,7 +27,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     const next = rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
     setDraft({ rows: next, validation: next.map(row => validateImportRow(kind, row, lookups)) });
   };
-  const fields = IMPORT_FIELDS[kind], ready = validation.filter(errors => !errors.length).length;
+  const fields = IMPORT_FIELDS[kind], ready = readyImportRows(rows, validation).length;
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
     {E.stp(["upload", "map", "preview", "commit"], step)}
@@ -60,7 +60,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {fields.filter(field => field.lookup).map(field => <details key={field.name}><summary>{field.name} reference IDs</summary><ul className="space-y-1 break-all text-sm">{lookups[field.lookup!]?.map(item => <li key={item.id}>{item.name}{item.location_id ? ` · ${lookups.locations.find(location => location.id === item.location_id)?.name}` : ""} · <code>{item.id}</code></li>)}</ul></details>)}
     </>}
     {step === 2 && <>
-      <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Ready rows commit independently; blocked rows are reported individually.</p>
+      <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Only ready rows are sent, and each commits independently; fix blocked rows first or they are left out.</p>
       <div className="[&_td]:whitespace-normal [&_td]:[overflow-wrap:anywhere] [&_th:first-child]:w-10 [&_th:last-child]:w-20 [&_table]:table-fixed [&_table]:min-w-0 [&_table]:w-full">{E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]))}</div>
       {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name ?? row.product ?? row.label ?? kind.replaceAll("_", " ")}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>

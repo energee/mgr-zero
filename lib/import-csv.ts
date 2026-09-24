@@ -24,12 +24,18 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     if (f.type === "uuid" && !z.uuid().safeParse(value).success) errors.push(`${f.name} must be a UUID`);
     if (f.type === "state" && !/^[A-Z]{2}$/.test(value)) errors.push(`${f.name} must be two uppercase letters`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
-      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && Number(value) <= 0) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive decimal" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
+      // "positive" is the opening qty: record_inventory_movement refuses qty <> round(qty, 2), so trailing zeros pass and a third significant decimal does not.
+      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && (Number(value) <= 0 || !/^\+?[0-9]+(\.[0-9]{1,2}0*)?$/.test(value))) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
     }
     if (f.lookup && lookups && !lookups[f.lookup]?.some(item => item.id === value)) errors.push(`${f.name} was not found`);
   }
   if (kind === "opening_balances" && lookups && !lookups.bins?.some(b => b.id === row.binId?.trim() && b.location_id === row.locationId?.trim())) errors.push("binId must belong to locationId");
   return errors;
+}
+
+/** The rows the preview marked ready (no validation errors) — the only rows a batch sends. */
+export function readyImportRows(rows: Record<string, string>[], validation: string[][]): Record<string, string>[] {
+  return rows.filter((_, index) => !validation[index]?.length);
 }
 
 export function mapCsvRows(rows: string[][], mapping: Record<string, number>): Record<string, string>[] {
