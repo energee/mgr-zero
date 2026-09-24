@@ -12,5 +12,5 @@ export default async function KegReportPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const report = (await runCommand("get_keg_report", {}, ctx)) as KegReport;
-  return <KegReportView model={toKegReportViewProps(report, "/kegs")} />;
+  return <KegReportView model={toKegReportViewProps(report, brewery.timeZone, "/kegs")} />;
 }

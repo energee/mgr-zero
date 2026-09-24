@@ -188,6 +188,19 @@ describe("pick and ship", () => {
     const { data: alloc } = await admin.from("allocations").select().eq("ref", line.id).single();
     expect(alloc!.status).toBe("released");
   });
+  it("refuses a pick above the ordered quantity and leaves the order untouched (#471)", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const over = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 12 }], p_request_id: crypto.randomUUID() });
+    expect(over.error?.message).toMatch(/cannot exceed ordered/);
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: null });
+    expect((await admin.from("orders").select("status").eq("id", id).single()).data).toEqual({ status: "confirmed" });
+    const exact = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    expect(exact.error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 10 });
+    // Release the open allocation so later ATP assertions in this file see the same stock.
+    expect((await staffDb.rpc("cancel_order", { p_order: id, p_reason: "test cleanup", p_request_id: crypto.randomUUID() })).error).toBeNull();
+  });
   it("ship rejects when p_ship omits an order line", async () => {
     const id = await confirmedOrder(3);
     const line = await lineOf(id);
@@ -324,6 +337,43 @@ describe("confirm_restock", () => {
     expect(after.data!.length).toBe(before.data!.length);
   });
 
+  // #416: put back after an adjust-down must record what went back, so the
+  // later ship of the adjusted quantity does not re-flag the same beer.
+  // Small quantities: this file shares a 100-unit opening balance (get_shortfalls).
+  it("lowers picked to what the order keeps, so shipping the adjusted amount does not re-flag", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    const adjusted = await lineOf(id);
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 1, qty_picked: 1 });
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single();
+    expect(ev!.payload).toEqual({ lines: [{ line_id: adjusted.id, qty: 2 }] });
+
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: adjusted.id, qty_shipped: 1 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(shipped.error).toBeNull();
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data)
+      .toEqual({ status: "shipped", needs_restock: false });
+  });
+
+  it("after a short ship, puts back picked − shipped", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 1 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 3, qty_picked: 1, qty_shipped: 1 });
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single();
+    expect(ev!.payload).toEqual({ lines: [{ line_id: line.id, qty: 2 }] });
+  });
+
   it("is a conflict when the flag is already clear", async () => {
     const id = await confirmedOrder(2);
     const { error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
@@ -365,6 +415,44 @@ describe("resolve_short_pick", () => {
     expect(o!.status).toBe("picked");
     const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "short_pick").single();
     expect(ev!.payload).toMatchObject({ resolution: "keep_owed", qty_picked: 7 });
+  });
+
+  // #419: resolving a short on one line must not mark the order picked while
+  // another line has never been counted.
+  it("leaves the order confirmed until every line has a count", async () => {
+    const cat2 = await seedCatalog(b.id, { product: "Pils", sku: "Pils 1/2bbl", packageType: "keg", bblPerUnit: 0.5, format: "Pils keg #419" });
+    await priceSku(b.id, { saleChannelId, brandId: cat2.brandId, formatId: cat2.formatId, cents: 11000 });
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: cat2.skuId, location_id: whId, bin_id: whBinId, qty: 50, type: "opening_balance", created_by: staffId });
+    const { data, error } = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
+      p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: cat2.skuId, qty: 5 }],
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const id = (data as { order_id: string }).order_id;
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { data: lines } = await admin.from("order_lines").select("id, sku_id").eq("order_id", id);
+    const a = lines!.find(l => l.sku_id === skuId)!, bLine = lines!.find(l => l.sku_id === cat2.skuId)!;
+
+    const short = await staffDb.rpc("resolve_short_pick", {
+      p_order: id, p_line: a.id, p_qty_picked: 7, p_reason: "short in pick face",
+      p_resolution: "keep_owed", p_request_id: crypto.randomUUID(),
+    });
+    expect(short.error).toBeNull();
+    const status = async () => (await admin.from("orders").select("status").eq("id", id).single()).data!.status;
+    expect(await status()).toBe("confirmed");
+
+    const pick = await staffDb.rpc("record_pick", {
+      p_order: id, p_picks: [{ line_id: a.id, qty_picked: 7 }, { line_id: bLine.id, qty_picked: 5 }],
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(pick.error).toBeNull();
+    expect(await status()).toBe("picked");
+    // Release the reservations so later get_shortfalls checks see this SKU's ATP untouched.
+    const cancel = await staffDb.rpc("cancel_order", { p_order: id, p_reason: "test cleanup", p_request_id: crypto.randomUUID() });
+    expect(cancel.error).toBeNull();
   });
 
   it("rejects a count that is not short, and an empty reason", async () => {

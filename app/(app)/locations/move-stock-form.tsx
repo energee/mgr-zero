@@ -18,7 +18,9 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
   const [note, setNote] = useState("");
   const selected = selectedBinStock(stock, source);
   const amount = Number(qty);
-  const valid = selected && toBinId && toBinId !== selected.bin_id && amount > 0 && Number.isFinite(amount) && (selected.kind !== "keg" || Number.isInteger(amount));
+  // The database refuses a move larger than the source bin holds (#451); the
+  // form stops it first with the same bound.
+  const valid = selected && toBinId && toBinId !== selected.bin_id && amount > 0 && Number.isFinite(amount) && amount <= Number(selected.qty) && (selected.kind !== "keg" || Number.isInteger(amount));
   const form = useCommandForm("move_stock_bin", {
     build: () => ({
       skuId: selected?.kind === "sku" ? selected.stock_id : undefined,
@@ -48,7 +50,7 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
           <SelectContent>{bins.filter(b => b.id !== selected?.bin_id).map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      {E.edit(`Quantity${selected ? ` (${selected.unit})` : ""}`, qty, "number", undefined, { id: "bin-qty", min: selected?.kind === "keg" ? 1 : 0.0001, step: selected?.kind === "keg" ? 1 : 0.0001, onChange: setQty, required: true })}
+      {E.edit(`Quantity${selected ? ` (${selected.unit})` : ""}`, qty, "number", undefined, { id: "bin-qty", min: selected?.kind === "keg" ? 1 : 0.0001, step: selected?.kind === "keg" ? 1 : 0.0001, max: selected ? Number(selected.qty) : undefined, onChange: setQty, required: true })}
       <div className="flex flex-col gap-2"><Label htmlFor="bin-note">Note</Label><Input id="bin-note" value={note} onChange={e => setNote(e.target.value)} /></div>
       {valid && <p className="text-sm text-muted-foreground" aria-live="polite">Move {amount} {selected.unit} from {binName(selected.bin_id)} to {binName(toBinId)}. The selected lot stays with the stock; location totals stay unchanged.</p>}
       <CommandFormMessage error={form.error} />
