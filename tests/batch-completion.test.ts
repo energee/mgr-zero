@@ -219,6 +219,25 @@ describe("batch completion reconciliation", () => {
     const after = await runCommand("list_batches", {}, ctx) as { id: string; closed_at: string | null }[];
     expect(after.find((batch) => batch.id === source.batchId)?.closed_at).not.toBeNull();
   });
+
+  // #431: a lossless full transfer leaves a zero baseline (1 in − 1 out). That is
+  // a batch with nothing left to account for, not an error, so it must close.
+  it("completes a batch whose whole volume moved losslessly into another batch's tank (zero baseline)", async () => {
+    const source = await brew(1);
+    const receiving = await brew(1);
+    await runCommand("record_cellar_transfer", {
+      fromOccupancyId: source.occupancyId, toVesselId: receiving.vesselId, volumeBbl: 1, lossBbl: 0,
+    }, ctx);
+
+    const result = await preview(source.batchId);
+    expect(n(result.baselineBbl)).toBe(0);
+    expect(n(result.residualBbl)).toBe(0);
+    const completed = await complete(source.batchId);
+    expect(completed.adjustmentId).toBeNull();
+    expect(completed.closedAt).toBeTruthy();
+    expect(sql(`select count(*)::text from volume_adjustments a join vessel_occupancies o on o.id = a.occupancy_id
+      where o.batch_id='${source.batchId}'`, true)).toEqual(["0"]);
+  });
 });
 
 describe("completion root structure and privileges", () => {
