@@ -135,6 +135,20 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   it("PGRST116 (PostgREST: zero or many rows for .single()) → 404 not_found without the raw message", async () => {
     await expect(unwrap(failing("PGRST116"))).rejects.toMatchObject({ status: 404, code: "not_found", message: "record not found" });
   });
+  it("23505 (unique violation) → 409 conflict with a readable message; the constraint name is only logged (#422)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const raw = 'duplicate key value violates unique constraint "locations_brewery_id_name_key"';
+    const err = await unwrap(Promise.resolve({ data: null, error: { message: raw, code: "23505" } })).catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 409, code: "conflict", message: "That already exists. Use a different name or value." });
+    expect((err as Error).message).not.toMatch(/constraint|locations_/);
+    expect(log).toHaveBeenCalledWith("database error 23505:", raw);
+    log.mockRestore();
+  });
+  it("22003 (numeric value out of range) → 400 bad_request without the raw message (#427)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(unwrap(failing("22003"))).rejects.toMatchObject({ status: 400, code: "bad_request", message: "A number is out of range." });
+    log.mockRestore();
+  });
   it("any other database error → 500 db_error with a generic message; the original is logged", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 500, code: "db_error", message: "database error" });

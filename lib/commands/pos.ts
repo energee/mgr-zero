@@ -1,23 +1,5 @@
 import { z } from "zod";
-import { CommandError, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
-
-async function completePosRows<T>(page: (start: number) => PromiseLike<{
-  data: unknown[] | null; error: { message: string; code?: string } | null; count: number | null;
-}>): Promise<T[]> {
-  const all: T[] = [];
-  let total: number | undefined;
-  do {
-    const result = await page(all.length);
-    const next = await unwrap(Promise.resolve(result));
-    if (result.count === null || !next || (total !== undefined && result.count !== total)
-      || (next.length === 0 && all.length < result.count)) {
-      throw new CommandError("The complete Square data could not be loaded. Retry the read.", 409, "conflict");
-    }
-    total = result.count;
-    all.push(...next as T[]);
-  } while (all.length < total);
-  return all;
-}
+import { CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 
 defineCommand({
   name: "connect_square", description: "Begin administrator consent for a Square seller connection",
@@ -68,10 +50,10 @@ defineQuery({
   name: "list_pos_locations", description: "List every observed Square location and its explicit labeled MGR location mapping",
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {
-    const data = await completePosRows<{ external_location_id: string; external_name: string | null; external_status: string | null;
-      available: boolean; location_id: string | null; locations: { name: string } | null }>((start) =>
+    const data = await completeRows<{ external_location_id: string; external_name: string | null; external_status: string | null;
+      available: boolean; location_id: string | null; locations: { name: string } | null }>("Square data", start =>
       ctx.db.from("pos_locations").select("external_location_id,external_name,external_status,available,location_id,locations(name)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).order("external_location_id").range(start, start + 499),
+        .eq("brewery_id", ctx.breweryId).order("external_location_id").range(start, start + PAGE_SIZE - 1),
     );
     return data.map((row) => ({ externalLocationId: row.external_location_id, name: row.external_name,
       status: row.external_status, available: row.available, mgrLocationId: row.location_id,
@@ -98,21 +80,21 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
   if (!rows.length) return [];
   const connectionIds = [...new Set(rows.map((row) => row.connection_id))];
   const [expectations, locations, catalog, mappings, orderVersions] = await Promise.all([
-    completePosRows<PosExpectation>((start) => ctx.db.from("pos_sale_expectations")
+    completeRows<PosExpectation>("Square data", start => ctx.db.from("pos_sale_expectations")
       .select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).order("sale_id").range(start, start + 499)),
-    completePosRows<PosSaleLocation>((start) => ctx.db.from("pos_locations")
+      .eq("brewery_id", ctx.breweryId).order("sale_id").range(start, start + PAGE_SIZE - 1)),
+    completeRows<PosSaleLocation>("Square data", start => ctx.db.from("pos_locations")
       .select("connection_id,external_location_id,external_name,locations(name)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_location_id").range(start, start + 499)),
-    completePosRows<PosCatalogVariation>((start) => ctx.db.from("pos_catalog_variations")
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_location_id").range(start, start + PAGE_SIZE - 1)),
+    completeRows<PosCatalogVariation>("Square data", start => ctx.db.from("pos_catalog_variations")
       .select("connection_id,external_item_id,external_variation_id,external_item_name,external_variation_name", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + 499)),
-    completePosRows<PosMapping>((start) => ctx.db.from("pos_item_mappings")
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + PAGE_SIZE - 1)),
+    completeRows<PosMapping>("Square data", start => ctx.db.from("pos_item_mappings")
       .select("connection_id,external_item_id,external_variation_id,ignored", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + 499)),
-    completePosRows<PosOrderVersion>((start) => ctx.db.rpc("pos_order_versions", {}, { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_variation_id").range(start, start + PAGE_SIZE - 1)),
+    completeRows<PosOrderVersion>("Square data", start => ctx.db.rpc("pos_order_versions", {}, { count: "exact" })
       .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds)
-      .order("connection_id").order("external_order_id").range(start, start + 499)),
+      .order("connection_id").order("external_order_id").range(start, start + PAGE_SIZE - 1)),
   ]);
   const expectationBySale = new Map(expectations.map((row) => [row.sale_id, row]));
   const key = (connection: string, variation: string | null) => `${connection}\0${variation ?? ""}`;
@@ -174,9 +156,9 @@ defineQuery({
     const selected = await unwrap(ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id")
       .eq("brewery_id", ctx.breweryId).eq("id", input.saleId).maybeSingle()) as PosSale | null;
     if (!selected) throw new CommandError("Square sale fact not found", 404, "not_found");
-    const revisions = await completePosRows<PosSale>((start) => ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id", { count: "exact" })
+    const revisions = await completeRows("Square data", start => ctx.db.from("pos_sales").select("id,connection_id,external_order_id,external_line_id,source_version,fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,qty,gross_cents,source_quantity,unsupported_reason,source_order_id,source_line_id", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("connection_id", selected.connection_id).eq("external_order_id", selected.external_order_id)
-      .order("source_version", { ascending: false }).order("external_line_id").order("id").range(start, start + 499));
+      .order("source_version", { ascending: false }).order("external_line_id").order("id").range(start, start + PAGE_SIZE - 1)) as PosSale[];
     const enriched = await posSaleRows(ctx, revisions);
     return { sale: enriched.find((row) => row.id === selected.id), revisions: enriched };
   },
@@ -187,15 +169,15 @@ defineQuery({
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {
     const [data, mappings] = await Promise.all([
-      completePosRows<{ external_item_id: string; external_variation_id: string; external_item_name: string | null;
-        external_variation_name: string | null; available: boolean }>((start) =>
+      completeRows<{ external_item_id: string; external_variation_id: string; external_item_name: string | null;
+        external_variation_name: string | null; available: boolean }>("Square data", start =>
         ctx.db.from("pos_catalog_variations").select("external_item_id,external_variation_id,external_item_name,external_variation_name,available", { count: "exact" })
-          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + 499),
+          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + PAGE_SIZE - 1),
       ),
-      completePosRows<{ external_item_id: string; external_variation_id: string; sku_id: string | null; format_id: string | null;
-        ignored: boolean; skus: { name: string } | null; formats: { name: string } | null }>((start) =>
+      completeRows<{ external_item_id: string; external_variation_id: string; sku_id: string | null; format_id: string | null;
+        ignored: boolean; skus: { name: string } | null; formats: { name: string } | null }>("Square data", start =>
         ctx.db.from("pos_item_mappings").select("external_item_id,external_variation_id,sku_id,format_id,ignored,skus(name),formats(name)", { count: "exact" })
-          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + 499),
+          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + PAGE_SIZE - 1),
       ),
     ]);
     const byVariation = new Map(mappings.map((row) => [`${row.external_item_id}\0${row.external_variation_id}`, row]));
@@ -256,12 +238,25 @@ defineQuery({
   })),
 });
 
+// The RPC raises plain exceptions for a stale link: no menu at that location
+// (the location was remapped) or no such item in its snapshot (the bin was
+// deleted, or the snapshot is NULL while Square needs recovery). Both mean
+// "no such record", so they are 404 not_found and the page renders not-found.
+const MENU_ITEM_MISSING = new Set(["Menu is not configured", "Menu item not found"]);
+
 defineQuery({
   name: "get_pos_menu_item", description: "Read one derived poured-format menu item and its location-specific price source",
   input: z.object({ posLocationId, formatId: z.string().uuid() }), roles: [...menuRoles],
-  handler: (ctx, input) => unwrap(ctx.db.rpc("get_pos_menu_item", {
-    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
-  })),
+  handler: async (ctx, input) => {
+    try {
+      return await unwrap(ctx.db.rpc("get_pos_menu_item", {
+        p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+      }));
+    } catch (e) {
+      if (e instanceof CommandError && MENU_ITEM_MISSING.has(e.message)) throw new CommandError(e.message, 404, "not_found");
+      throw e;
+    }
+  },
 });
 
 defineCommand({

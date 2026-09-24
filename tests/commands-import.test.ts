@@ -36,6 +36,10 @@ describe("import_csv rows", () => {
     expect((await admin.from("styles").select("id").eq("brewery_id", ctx.breweryId).eq("name", "Rollback style")).data).toEqual([]);
     expect((await execute("products_skus", [{ product: "Imported brand", formatId: format }])).committed).toBe(1);
   });
+  it("blocks an imported brand whose ABV is out of range, as the brand form does (#489)", async () => {
+    expect((await execute("products_skus", [{ product: "Negative ABV brand", abv: "-5", formatId: format }])).blocked).toBe(1);
+    expect((await admin.from("brands").select("id").eq("brewery_id", ctx.breweryId).eq("name", "Negative ABV brand")).data).toEqual([]);
+  });
   it("rejects nonadmin and direct row calls without a matching manifest", async () => {
     await expect(runCommand("import_csv", { kind: "customers", rows: [] }, sales)).rejects.toThrow(/permission/);
     expect((await ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: crypto.randomUUID(), p_row_n: 0 })).error).not.toBeNull();
