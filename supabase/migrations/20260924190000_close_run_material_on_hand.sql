@@ -78,6 +78,11 @@ begin
   -- run is history now, and "we filled none of those" is the answer.
   update public.packaging_run_outputs set qty_actual = 0 where run_id = p_run;
 
+  -- The BOM check below reads material on hand then inserts; take the material
+  -- ledger lock (as move_stock_bin does) so two closes cannot both pass on the
+  -- same cans.
+  lock table public.material_movements in share row exclusive mode;
+
   for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
     v_sku := (v_line->>'sku_id')::uuid;
     v_qty := (v_line->>'qty_actual')::numeric;
