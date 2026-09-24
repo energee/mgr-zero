@@ -31,7 +31,6 @@ const AUTHENTICATED_RPCS = [
   "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
   "complete_invite_membership(uuid)",
   "record_invite_failure(uuid)",
-  "provision_brewery(text,text,text,uuid)",
   "record_keg_event(uuid,uuid,keg_size,integer,keg_event_reason,uuid,uuid,uuid,text,uuid)",
   "save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)",
   "depart_route(uuid,uuid)",
@@ -193,6 +192,15 @@ it("grants action issuance and receipt consumption only to the service owner", (
     where p.pronamespace='public'::regnamespace and p.proname in ('issue_chat_action_intent','consume_chat_action_intent')
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
     "consume_chat_action_intent:service_role", "issue_chat_action_intent:service_role",
+  ]);
+});
+
+it("grants brewery bootstrap only to the service owner (#467)", () => {
+  expect(sql(`select p.oid::regprocedure::text || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname = 'provision_brewery'
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "provision_brewery(uuid,text,text,text,uuid):service_role",
   ]);
 });
 

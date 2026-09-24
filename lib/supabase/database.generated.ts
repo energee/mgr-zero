@@ -8111,6 +8111,7 @@ export type Database = {
       }
       provision_brewery: {
         Args: {
+          p_actor: string
           p_name: string
           p_request_id: string
           p_timezone: string
