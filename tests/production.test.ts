@@ -244,7 +244,10 @@ describe("brew day overlaps a closed occupancy", () => {
     await admin.from("breweries").update({ timezone: "America/New_York" }).eq("id", b.id);
     const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-11-01", plannedBbl: 10 }, ctx)) as { id: string };
-    await runCommand("record_brew_day", { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx);
+    const brewed = (await runCommand("record_brew_day",
+      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
+    // A first brew starts at the brewery's midnight, not UTC's (#582): still EDT until 02:00.
+    expect(Date.parse(brewed.occupancy.started_at)).toBe(Date.parse("2026-11-01T04:00:00Z"));
     // 22:00 New York on 11-10 is 03:00 UTC on 11-11.
     sql(`update vessel_occupancies set ended_at = timestamptz '2026-11-10 22:00 America/New_York'
          where batch_id = '${first.id}' and ended_at is null`, true);
