@@ -58,13 +58,22 @@ export function useFields<T extends Record<string, string>>(initial: T) {
 /** An optional field is sent only when filled. */
 export const orUndef = (s: string) => s || undefined;
 
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void }) {
+/**
+ * reset runs on open as well as on close: an edit sheet's fields are seeded
+ * from props, and only the render after a save's router.refresh() has the
+ * saved values, so reseeding on close alone reopened the pre-save values and a
+ * second Save reverted the edit (#441). reset must therefore restore the same
+ * values the fields' useState starts from. defaultOpen opens on mount without
+ * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
+ */
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean }) {
   const { busy, error, setError, run } = useCommandAction();
-  const [open, setOpenState] = useState(false);
+  const [open, setOpenState] = useState(opts.defaultOpen ?? false);
 
   function setOpen(next: boolean) {
     setOpenState(next);
-    if (!next) { opts.reset(); setError(null); }
+    opts.reset();
+    setError(null);
   }
 
   async function submit(e: React.FormEvent) {
