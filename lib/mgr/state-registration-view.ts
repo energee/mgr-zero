@@ -8,16 +8,8 @@ export type StateRegistrationViewModel = {
 };
 
 /** The upsert_state_registration input from the sheet's fields. The upsert
- *  replaces the whole row, so an edit sends back the approval date the sheet
- *  does not show; omitting it would clear it (#438). */
-export function registrationInput(
-  brandId: string,
-  f: { state: string; registrationNo: string; expiresOn: string },
-  existing?: { approved_on: string | null },
-) {
-  return {
-    brandId, state: f.state.toUpperCase(),
-    registrationNo: f.registrationNo || undefined, expiresOn: f.expiresOn || undefined,
-    approvedOn: existing?.approved_on ?? undefined,
-  };
+ *  keeps the approval date the sheet does not show because it is omitted
+ *  (#438, #522); an empty field is null so clearing it clears the saved value. */
+export function registrationInput(brandId: string, f: { state: string; registrationNo: string; expiresOn: string }) {
+  return { brandId, state: f.state.toUpperCase(), registrationNo: f.registrationNo || null, expiresOn: f.expiresOn || null };
 }
