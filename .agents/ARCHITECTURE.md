@@ -240,7 +240,8 @@ a gap to close, not a convention to trust.
   Completion locks the invitation and atomically creates membership and marks
   complete. Tests force both lost Auth responses and real membership failures
   for staff and customers. Completed retries return the original user id without
-  restoring revoked access. Existing Auth emails are refused; attaching existing
+  restoring revoked access. An unfinished request blocks its email only within
+  its own brewery; a failed request never blocks a new one. Existing Auth emails are refused; attaching existing
   accounts needs a separate consent workflow. Team, first-run, and customer detail
   share invitation forms that retain request identity for an unchanged failed
   submission while the page remains open.
