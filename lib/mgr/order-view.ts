@@ -6,6 +6,7 @@ import { docNo } from "./doc-no";
 import { money } from "./money";
 import { nextState, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
+import { stagedQty } from "./put-back-view";
 
 export type OrderLineView = {
   key: string;
@@ -35,6 +36,8 @@ export type OrderViewModel = {
 
 export type OrderSnapshot = {
   backHref?: string;
+  /** breweries.timezone: event times print in it (#442). */
+  timeZone: string;
   order: {
     id: string;
     order_no: number | null;
@@ -103,16 +106,16 @@ function lineDetail(
 function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lines"]): string | undefined {
   if (!order.needs_restock) return undefined;
   const bits = lines.flatMap((l) => {
-    const extra = Number(l.qty_picked ?? 0) - Number(l.qty_ordered);
+    const extra = stagedQty(order.status, l);
     return extra > 0 ? [`${extra} ${l.skus?.name ?? "line"}`] : [];
   });
   if (!bits.length) return "Staged beer stayed on the floor after this order changed.";
-  return `Put back ${bits.join(", ")}. They stayed staged after the line was adjusted.`;
+  return `Put back ${bits.join(", ")}. They stayed staged after the order changed.`;
 }
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
@@ -148,7 +151,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       };
     }),
     events: events.map((e) => [
-      `${formatDateTime(e.created_at)} · ${e.event.replace(/_/g, " ")}`,
+      `${formatDateTime(e.created_at, timeZone)} · ${e.event.replace(/_/g, " ")}`,
       e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",
