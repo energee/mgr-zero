@@ -137,7 +137,7 @@ defineQuery({
   },
 });
 
-// Coming up: planned batches as brand + expected week (Monday), soonest
+// Coming up: upcoming planned batches as brand + expected week (Monday), soonest
 // first, and whether the brand has a package on the buyer's list. The
 // portal_schedule view exposes nothing else about a batch.
 defineQuery({

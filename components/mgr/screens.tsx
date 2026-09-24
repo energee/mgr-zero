@@ -1416,7 +1416,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_schedule [planned batches as brand + expected week and whether the brand is on the buyer's list; a definer view scoped to the buyer's brewery, no customer policy on batches]",
     writes: "none",
     states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
-    spec: "Planned batches (not yet brewed) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
+    spec: "Planned batches (not yet brewed, planned this week or later) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
     body: <ComingUpView model={toComingUpViewProps(ridgelineComingUp)} />,
   },
   {
