@@ -3,6 +3,7 @@
 // server-generated correlation ID. Unexpected errors are logged and returned
 // as a generic 500; database errors are sanitized in registry.ts (unwrap).
 import { NextResponse } from "next/server";
+import { consumeAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer, buildRouteContext, isUuid } from "@/lib/commands/context";
 import {
   type CommandContextExpectation,
@@ -100,24 +101,13 @@ export async function POST(req: Request) {
     const ctx = token === null
       ? await buildRouteContext(body.breweryId, expectedContext)
       : await buildContextFromBearer(body.breweryId, token, expectedContext);
-    const { data: admission, error: admissionError } = await ctx.db.rpc("consume_command_admission");
-    if (admissionError) {
-      console.error(`command admission error ${admissionError.code ?? "unknown"}:`, admissionError.message);
-      throw new CommandError("command admission unavailable", 503, "admission_unavailable");
-    }
-    const decision = (Array.isArray(admission) ? admission[0] : admission) as { allowed?: unknown; retry_after?: unknown } | null;
-    if (!decision || typeof decision.allowed !== "boolean"
-      || typeof decision.retry_after !== "number" || !Number.isFinite(decision.retry_after) || decision.retry_after < 0) {
-      console.error("command admission returned an invalid decision");
-      throw new CommandError("command admission unavailable", 503, "admission_unavailable");
-    }
-    if (!decision.allowed) {
-      const retryAfter = Math.max(1, Math.ceil(decision.retry_after));
+    const admission = await consumeAdmission(ctx.db);
+    if (!admission.allowed) {
       const response: CommandFailure = {
         ok: false, error: { code: "rate_limited", message: "too many requests" },
         ...(requestId === undefined ? {} : { requestId }), correlationId,
       };
-      return NextResponse.json(response, { status: 429, headers: { "Retry-After": String(retryAfter) } });
+      return NextResponse.json(response, { status: 429, headers: { "Retry-After": String(admission.retryAfter) } });
     }
     const response: CommandSuccess<unknown> = {
       ok: true,

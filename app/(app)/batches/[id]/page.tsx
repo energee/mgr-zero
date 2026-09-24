@@ -6,6 +6,7 @@
 import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -23,10 +24,11 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ batch, occupancy }, vessels] = (await Promise.all([
+  const [{ batch, occupancy }, vessels, today] = (await Promise.all([
     orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)),
     runCommand("list_vessels", {}, ctx),
-  ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[]];
+    breweryToday(ctx),
+  ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[], string];
 
   const recorded = Boolean(batch.brewed_on || occupancy);
   const model = {
@@ -34,7 +36,7 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
     planned: Number(batch.planned_bbl) + " bbl · " + batch.planned_on, note: batch.note ?? undefined,
     recorded, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
-    brewedOn: batch.brewed_on ?? (recorded ? "" : new Date().toISOString().slice(0, 10)),
+    brewedOn: batch.brewed_on ?? (recorded ? "" : today),
   };
   return recorded ? <BrewDayView model={model} /> : <RecordBrewDayForm key={batch.id} batchId={batch.id} model={model} />;
 }
