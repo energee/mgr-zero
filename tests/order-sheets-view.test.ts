@@ -109,6 +109,13 @@ describe("Pick view", () => {
     expect(markup).toMatch(/>Done picking</);
     expect(markup).toMatch(/aria-label="Decrease"/);
   });
+
+  it("caps each pick field at the ordered quantity (#471)", () => {
+    const model = toPickViewProps(orderPick);
+    expect(model.lines.map((l) => l.ordered)).toEqual([4, 10, 2]);
+    const markup = html(createElement(PickView, { model }));
+    expect(markup.match(/max="(\d+)"/g)).toEqual(['max="4"', 'max="10"', 'max="2"']);
+  });
 });
 
 describe("Ship view", () => {

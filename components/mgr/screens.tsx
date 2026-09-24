@@ -170,7 +170,7 @@ import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
 import { entityPickerPalette, searchPalette } from "@/lib/mgr/fixtures/search";
 import { sessionExpiredQueued } from "@/lib/mgr/fixtures/session-expired";
-import { settingsDemo } from "@/lib/mgr/fixtures/settings";
+import { DEMO_TIME_ZONE, settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
@@ -883,13 +883,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     name: "Offline outbox",
-    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading" },
+    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading", Dismiss: "Offline outbox" },
     job: "Retry an exact captured reading without broadening offline writes",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"]],
-    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original.",
-    body: <OfflineOutboxView rows={[
+    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"], ["set aside", "unreadable saved reading set aside unsent · Dismiss", 1]],
+    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original. A saved entry that can no longer be read is set aside unsent, readable siblings stay queued, and a notice says so until Dismiss deletes the set-aside copy.",
+    body: <OfflineOutboxView notice="1 unreadable offline reading was set aside and not sent. Re-enter it if still needed." onDismissNotice={() => {}} rows={[
       { id: "reading-fv3", label: "Record fermentation reading · FV3", status: "response not confirmed", retryable: true, fixHref: "#", fixTo: "Fermentation reading" },
       { id: "reading-fv2", label: "Record fermentation reading · FV2", status: "your role changed from brewer · this will not be sent" },
     ]} />,
@@ -2174,7 +2174,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
     spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment.",
-    body: <KegReportView model={toKegReportViewProps(kegReportOwned)} />,
+    body: <KegReportView model={toKegReportViewProps(kegReportOwned, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7,
@@ -2188,7 +2188,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -2202,7 +2202,7 @@ export const SCREENS: Screen[] = [
     writes: "kick_keg",
     states: permitted("taproom, warehouse or admin required").concat([["empty", "tap becomes empty"], ["beer remaining", "closing fill is a coarse observation only"], ["already closed", "safe closer and time shown; reload before acting", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
-    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} />,
+    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 7,
@@ -2216,7 +2216,7 @@ export const SCREENS: Screen[] = [
     writes: "swap_keg",
     states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
-    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} closedFact="Helles was swapped out at 7:42pm by Ali" />,
+    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} closedFact="Helles was swapped out at 7:42pm by Ali" />,
   },
   {
     step: 7,

@@ -16,6 +16,7 @@ never copy it into a second place.
 | `lib/commands/compliance.ts` | Compliance registry, lot trace, generated and immutable filed reports, and completion-loss review. Loss reattribution allocates one exact part of a completion root through a frozen append-only signed pair; report removal totals include it once, while the cellar breakdown is explanatory. Direct cellar Taproom volume retains an explicit external-mapping filing gate. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
+| `lib/commands/admission.ts` | `consumeAdmission`: the per-user request budget (`consume_command_admission`) shared by `/api/command` and the Ask MGR `/api/chat` route; fails closed with 503 and returns a whole-second retry for the caller's 429. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/invites.ts` | Durable staff/customer invitations: RLS-bound claim and membership RPCs surround the sole Auth admin invite call. `private.invite_requests` and an Auth-transaction trigger preserve identity across lost responses; replay never regrants revoked membership. |
@@ -246,7 +247,9 @@ a gap to close, not a convention to trust.
   Completion locks the invitation and atomically creates membership and marks
   complete. Tests force both lost Auth responses and real membership failures
   for staff and customers. Completed retries return the original user id without
-  restoring revoked access. Existing Auth emails are refused; attaching existing
+  restoring revoked access. An unfinished request blocks its email only within
+  its own brewery; a failed request never blocks a new one. Existing Auth
+  emails are refused; attaching existing
   accounts needs a separate consent workflow. Team, first-run, and customer detail
   share invitation forms that retain request identity for an unchanged failed
   submission while the page remains open.
