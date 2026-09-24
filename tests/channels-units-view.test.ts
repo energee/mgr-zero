@@ -209,6 +209,6 @@ describe("Units view", () => {
     expect(src).toMatch(/<UnitsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<GravityUnitForm\b/);
-    expect(src).toContain('backHref: ctx.role === "taproom" ? "/more" : "/settings"');
+    expect(src).toContain('backHref: toSettings ? "/settings" : "/more"');
   });
 });
