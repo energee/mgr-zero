@@ -3,7 +3,7 @@ import { assert } from "vitest";
 // locations (spec 2026-09-06 Decision 3), never a third order kind; a move
 // inside one location is move_stock_bin and writes no document.
 import { describe, it, expect } from "vitest";
-import { admin, insertFixture, makeBrewery, makeStaffCtx, seedLocation, seedCatalog, sql } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCustomer, seedLocation, seedCatalog, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -310,6 +310,22 @@ describe("source bin stock (#451)", () => {
     const left = await runCommand("get_bin_move_stock", { locationId: s.from.id }, s.ctx) as { bin_id: string }[];
     expect(left.filter(r => r.bin_id === s.bin)).toEqual([]);
     expect(left.filter(r => r.bin_id === s.bins[1].id)).toHaveLength(4);
+  });
+
+  it("move_stock_bin counts empty kegs from the bin's own keg events, not a customer's loss", async () => {
+    const s = await setup();
+    const { customerId } = await seedCustomer(s.b.id, { name: "Ridgeline" });
+    // 2 acquired + 2 found, 1 shipped: the bin holds 3. Losing the shipped keg
+    // at the customer takes it off the customer, not the bin again (#449).
+    expect((await admin.from("keg_events").insert([
+      { brewery_id: s.b.id, pool_id: s.pool, keg_size: "half_bbl", location_id: s.from.id, bin_id: s.bin, qty: 2, reason: "found", created_by: s.ctx.userId },
+      { brewery_id: s.b.id, pool_id: s.pool, keg_size: "half_bbl", location_id: s.from.id, bin_id: s.bin, qty: 1, reason: "shipped", customer_id: customerId, created_by: s.ctx.userId },
+      { brewery_id: s.b.id, pool_id: s.pool, keg_size: "half_bbl", location_id: s.from.id, bin_id: s.bin, qty: 1, reason: "lost", customer_id: customerId, created_by: s.ctx.userId },
+    ])).error).toBeNull();
+    const move = { kegPoolId: s.pool, kegSize: "half_bbl", fromBinId: s.bin, toBinId: s.bins[1].id };
+    await expect(runCommand("move_stock_bin", { ...move, qty: 4 }, s.ctx)).rejects.toThrow(/insufficient selected bin and lot stock: 3 on hand/);
+    await runCommand("move_stock_bin", { ...move, qty: 3 }, s.ctx);
+    await expect(runCommand("move_stock_bin", { ...move, qty: 1 }, s.ctx)).rejects.toThrow(/0 on hand/);
   });
 
   it("receive_stock_transfer refuses material, keg and untracked SKU lines beyond the source bin", async () => {
