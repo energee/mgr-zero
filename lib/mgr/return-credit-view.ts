@@ -8,6 +8,8 @@ export type ReturnCreditLineView = {
   detail: string;
   qty: number;
   shipped: number;
+  /** Quantity step: 0.01 for beer, 1 for a keg deposit (whole kegs). */
+  step: string;
 };
 
 export type ReturnCreditViewModel = {
@@ -20,8 +22,6 @@ export type ReturnCreditViewModel = {
   returnToId: string;
   returnToOptions: { id: string; label: string }[];
   reason: number;
-  depositLabel?: string;
-  depositAmount?: string;
   creditInfo: string;
   tape: [string, string][];
   note: string;
@@ -42,8 +42,10 @@ export type ReturnCreditSnapshot = {
     qty_returning: number;
     unit_price_cents: number;
     skus: { name: string } | null;
+    /** A keg_deposit invoice line refunds its deposit (whole kegs, no
+     *  inventory); omitted or "sku" is a beer line that comes back as stock. */
+    kind?: "sku" | "keg_deposit";
   }[];
-  deposit?: { label: string; cents: number };
   locations: { id: string; name: string }[];
   reason?: "damaged" | "wrong_item" | "unsold" | "";
 };
@@ -59,9 +61,11 @@ export const RETURN_REASONS = [
   { id: "unsold", label: "unsold · back to stock" },
 ] as const;
 
-/** Map get_order / get_invoice plus the return qty onto ReturnCreditView. */
+/** Map get_order / get_invoice plus the return qty onto ReturnCreditView. Beer
+ *  lines come back as stock (and, when damaged, go to loss); keg deposit lines
+ *  refund whole kegs' deposits in the same credit memo and move no stock. */
 export function toReturnCreditViewProps({
-  order, invoice, lines, deposit, locations, reason = "damaged", backHref, returnLocationId }: ReturnCreditSnapshot): ReturnCreditViewModel {
+  order, invoice, lines, locations, reason = "damaged", backHref, returnLocationId }: ReturnCreditSnapshot): ReturnCreditViewModel {
   const destinationId = returnLocationId ?? order?.from_location_id ?? "";
   const from = locations.find((l) => l.id === destinationId);
   const returnToOptions = locations.map(l => ({ id: l.id, label: l.id === order?.from_location_id ? `${l.name} · original fulfillment source` : l.name }));
@@ -73,6 +77,10 @@ export function toReturnCreditViewProps({
     const qty = Number(l.qty_returning);
     if (qty <= 0) continue;
     const short = l.skus?.name ?? "Line";
+    if (l.kind === "keg_deposit") {
+      tape.push([`${qty} ${short} · deposit refund`, money(-Math.round(qty * Number(l.unit_price_cents)))]);
+      continue;
+    }
     tape.push([`+${qty} ${short} · return in`, destName]);
     if (reason === "damaged") tape.push([`−${qty} ${short} · loss · damaged`, "not sellable"]);
   }
@@ -84,17 +92,16 @@ export function toReturnCreditViewProps({
     lines: lines.map((l) => ({
       key: l.id,
       name: l.skus?.name ?? "Line",
-      detail: `shipped ${Number(l.qty_shipped ?? 0)} · returning`,
+      detail: l.kind === "keg_deposit" ? `deposit on ${Number(l.qty_shipped ?? 0)} kegs · refunding` : `shipped ${Number(l.qty_shipped ?? 0)} · returning`,
       qty: Number(l.qty_returning),
       shipped: Number(l.qty_shipped ?? 0),
+      step: l.kind === "keg_deposit" ? "1" : "0.01",
     })),
     reasons: RETURN_REASONS.map(entry => entry.label),
     returnTo: returnToOptions.find(option => option.id === destinationId)?.label ?? destName,
     returnToId: destinationId,
     returnToOptions,
     reason: RETURN_REASONS.findIndex(entry => entry.id === reason),
-    depositLabel: deposit?.label,
-    depositAmount: deposit ? money(-deposit.cents) : undefined,
     creditInfo: `Credited at the price on ${inv}, not today’s price group.`,
     tape: reason ? tape : [],
     note: "Empty-keg asset returns are a different Keg fleet command.",

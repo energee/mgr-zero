@@ -6,7 +6,7 @@
 // the only ratio the RPC accepts as volume-neutral.
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { repackFooter, RepackView } from "@/components/mgr/views/repack";
@@ -27,17 +27,10 @@ export function RepackForm({ locations, bins, parents, autoOpen = false }: { aut
   const parent = parents.find((p) => p.id === parentSkuId);
   const child = parent?.child ?? null;
   const form = useCommandForm("record_repack", {
+    defaultOpen: autoOpen,
     build: () => ({ locationId, binId, parentSkuId, parentQty: Number(qty), childSkuId: child?.skuId ?? "", childQty: Number(qty) * (child?.quantity ?? 0) }),
     reset: () => { setLocationId(""); setBinId(""); setParentSkuId(""); setQty(""); },
   });
-  const { setOpen } = form;
-  const autoOpened = useRef(false);
-  useEffect(() => {
-    if (autoOpen && !autoOpened.current) {
-      autoOpened.current = true;
-      setOpen(true);
-    }
-  }, [autoOpen, setOpen]);
   const model = {
     ...toRepackView({
       parent: parent?.label ?? "", unit: parent?.unit ?? "", qty,

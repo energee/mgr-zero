@@ -2,13 +2,14 @@
 // A pool is a mutable row (name, kind, vendor, deposit); everything else is
 // keg_events, an append-only count ledger where qty is always positive and
 // `reason` is the direction. What a bin physically holds is keg_bin_on_hand
-// ("36 in the taproom, 40 in storage" is two rows; shipped kegs have left),
+// ("36 in the taproom, 40 in storage" is two rows; shipped kegs have left,
+// so a keg lost at a customer comes off the customer, not the bin),
 // the fleet total is keg_fleet_totals (shipped kegs are still the fleet),
 // and what a customer holds is keg_customer_balances plus
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { defineCommand, defineQuery, cents, unwrap, type Ctx } from "./registry";
+import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
 import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
@@ -47,7 +48,7 @@ defineCommand({
 
 defineCommand({
   name: "record_keg_event",
-  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one, and retired, shipped or lost cannot exceed what the bin holds",
+  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one; retired, shipped, or lost at the bin cannot exceed what the bin holds, and returned or lost at a customer cannot exceed what the customer holds",
   input: z.object({
     poolId: z.string().uuid(), kegSize: z.enum(KEG_SIZES), qty: z.number().int().positive(), reason: z.enum(KEG_EVENT_REASONS),
     locationId: z.string().uuid(), binId: z.string().uuid(), customerId: z.string().uuid().optional(), note: z.string().optional(),
@@ -97,14 +98,15 @@ defineQuery({
 defineQuery({
   name: "list_keg_events", description: "Keg event history, newest first, optionally for one pool or one customer",
   input: z.object({ poolId: z.string().uuid().optional(), customerId: z.string().uuid().optional() }), roles: ROLES,
-  handler: (ctx, i) => {
+  // Paged past PostgREST's 1000-row cap (#469); id breaks same-instant ties.
+  handler: (ctx, i) => completeRows("Keg history", start => {
     let q = ctx.db.from("keg_events")
-      .select("id, pool_id, keg_size, qty, reason, location_id, bin_id, customer_id, shipment_id, at, note")
-      .eq("brewery_id", ctx.breweryId).order("at", { ascending: false }).order("created_at", { ascending: false });
+      .select("id, pool_id, keg_size, qty, reason, location_id, bin_id, customer_id, shipment_id, at, note", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).order("at", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false });
     if (i.poolId) q = q.eq("pool_id", i.poolId);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    return unwrap(q);
-  },
+    return q.range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 // What one customer holds: net shipped − returned − lost per pool × size from
