@@ -1,0 +1,160 @@
+---
+title: "Customers"
+description: "Customer accounts, ship-to addresses and portal invitations."
+---
+
+A customer is a distributor, retailer, brewery, or other account, carrying a
+two-letter `state`, a required sale channel (which decides its prices), and an
+optional licence number and payment terms.
+`upsert_customer` creates when `id` is omitted and updates when it is present.
+
+Ship-to addresses matter beyond delivery. The state on the ship-to drives excise
+destination reporting, so an address is a compliance record, not just a label.
+Portal orders ship from one warehouse per brewery, set with
+`set_portal_fulfillment_source`. Portal ordering fails until that is set.
+
+`invite_customer_user` is available to Admin and Sales. It emails a new Auth
+account and attaches buyer membership to the specified customer. Existing
+Auth emails conflict; there is no existing-account attachment or resend flow.
+Keep the same request ID and input after an interrupted invitation; completion
+reuses the saved user identity. Replaying a completed invite never restores
+revoked membership.
+
+{/* ops:customers */}
+
+## delete_customer [#delete_customer]
+
+`command` · admin
+
+Delete an unused customer and its ship-to addresses; preserve linked history, portal access, invitations and QuickBooks customers
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_customer [#get_customer]
+
+`query` · admin, sales, warehouse
+
+One customer with its sale channel name and ship-tos
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_customer", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## invite_customer_user [#invite_customer_user]
+
+`command` · admin, sales
+
+Invite a customer portal user
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `email` | string | yes |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_customer_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_customers [#list_customers]
+
+`query` · admin, sales, warehouse
+
+Customers alphabetical with sale channel name
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `includeShipTos` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_customers", "input": {} }'
+```
+
+## set_portal_fulfillment_source [#set_portal_fulfillment_source]
+
+`command` · admin
+
+Set the warehouse used for customer portal orders
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_portal_fulfillment_source", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## upsert_customer [#upsert_customer]
+
+`command` · admin, sales
+
+Create or update a customer account: its sale channel decides its prices and where its removals post; tax treatment may override the channel default
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `type` | distributor or retailer or brewery or other | yes |
+| `state` | string | yes |
+| `saleChannelId` | uuid | yes |
+| `id` | uuid | no |
+| `licenseNumber` | string | no |
+| `paymentTerms` | string | no |
+| `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "CA", "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## upsert_ship_to [#upsert_ship_to]
+
+`command` · admin, sales
+
+Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `label` | string | yes |
+| `address1` | string | yes |
+| `city` | string | yes |
+| `state` | string | yes |
+| `zip` | string | yes |
+| `id` | uuid | no |
+| `address2` | string | no |
+| `isDefault` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "CA", "zip": "string" } }'
+```
+
+{/* end ops:customers */}

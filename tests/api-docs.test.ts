@@ -1,4 +1,4 @@
-// tests/api-docs.test.ts — gates the HTTP API reference at content/docs/api:
+// tests/api-docs.test.ts — gates the HTTP API reference in content/docs/api/:
 // every registered operation is documented as available, every operation a
 // screen names has a page to live on, and no page is orphaned. The tables
 // themselves are generated (lib/mgr/api-operations.ts), so this covers the
@@ -21,9 +21,14 @@ const root = resolve(__dirname, "..");
 // The pages that explain the endpoint itself, in the order a caller meets them.
 const CONCEPTS = ["overview", "authentication", "idempotency", "errors", "conventions"];
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
-// One page: the rail is its headings, so it tracks the scroll — the rules as
-// `##`, then `## Operations` with each area as `###` and its operations `####`.
-const PAGE = () => read("content/docs/api.mdx");
+// An index page with the rules every operation shares, then one page per area
+// whose `##` headings are its operations. One page carrying every operation
+// compiled to a module big enough to exhaust `next dev`'s heap (#492).
+const INDEX = () => read("content/docs/api/index.mdx");
+const AREA = (slug: string) => read(`content/docs/api/${slug}.mdx`);
+const AREA_PAGES = () => API_AREAS.map((a) => AREA(a.slug));
+// For a claim that may sit on any page of the reference.
+const ALL = () => [INDEX(), ...AREA_PAGES()].join("\n");
 
 describe("HTTP API reference", () => {
   it("asks Zod whether nested wrappers accept omission and null", () => {
@@ -57,16 +62,16 @@ describe("HTTP API reference", () => {
     expect(apiOperations().find(o => o.name === correction.name)).toMatchObject({ status: "available", roles: "admin" });
     expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4 }], reason: "Misread tally" }).success).toBe(true);
     expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4.5 }], reason: " " }).success).toBe(false);
-    expect(PAGE()).toContain("latest uncorrected mistaken-low Taproom count");
-    expect(PAGE()).toContain("partial keg counts as one until gone");
-    expect(PAGE()).toContain("current positive Taproom stock");
-    expect(PAGE()).toContain("Full lot history remains outside this projection");
+    expect(AREA("taproom")).toContain("latest uncorrected mistaken-low Taproom count");
+    expect(AREA("taproom")).toContain("partial keg counts as one until gone");
+    expect(AREA("taproom")).toContain("current positive Taproom stock");
+    expect(AREA("taproom")).toContain("Full lot history remains outside this projection");
   });
 
   it("documents provisioning as authenticated pre-tenant and omits brewery from its example", () => {
     const operation = apiOperations().find(o => o.name === "provision_brewery");
     expect(operation).toMatchObject({ scope: "pretenant", roles: "authenticated pre-tenant" });
-    const block = renderArea("team").split("#### provision_brewery")[1].split("#### ")[0];
+    const block = renderArea("team").split("## provision_brewery")[1].split("## ")[0];
     expect(block).not.toContain('"breweryId"');
     expect(block).toContain('"timezone": "America/New_York"');
     expect(block).toContain('"requestId"');
@@ -106,16 +111,24 @@ describe("HTTP API reference", () => {
     }
   });
 
-  it("puts the rules first, then every area under Operations, Today leading", () => {
-    const page = PAGE();
-    const h2 = [...page.matchAll(/^## .+ \[#([a-z-]+)\]$/gm)].map((m) => m[1]);
+  it("puts the rules first, then links a page per area, Today leading", () => {
+    const index = INDEX();
+    const h2 = [...index.matchAll(/^## .+ \[#([a-z-]+)\]$/gm)].map((m) => m[1]);
     // The cross-cutting rules come before the operation list: a caller who
     // reads the operations first still has to come back for auth and retries.
     expect(h2).toEqual([...CONCEPTS, "operations"]);
-    const h3 = [...page.matchAll(/^### .+ \[#([a-z-]+)\]$/gm)].map((m) => m[1]).filter((s) => API_AREAS.some((a) => a.slug === s));
-    expect(h3[0], "Today leads the operations").toBe("today");
-    expect(h3.sort()).toEqual(API_AREAS.map((a) => a.slug).sort());
+    // meta.json orders the sidebar: the index, then every area, Today first.
+    const pages: string[] = JSON.parse(read("content/docs/api/meta.json")).pages;
+    expect(pages[0]).toBe("index");
+    expect(pages[1], "Today leads the operations").toBe("today");
+    expect([...pages.slice(1)].sort()).toEqual(API_AREAS.map((a) => a.slug).sort());
+    const files = readdirSync(resolve(root, "content/docs/api")).filter((f) => f.endsWith(".mdx")).sort();
+    expect(files).toEqual(pages.map((p) => `${p}.mdx`).sort());
+    const operations = index.slice(index.indexOf("## Operations"));
     for (const area of API_AREAS) {
+      expect(operations, `the index does not link ${area.slug}`).toContain(`href="/docs/api/${area.slug}"`);
+      const page = AREA(area.slug);
+      expect(page).toMatch(new RegExp(`^---\ntitle: "${area.title}"\ndescription: .+\n---\n`));
       // One derivation per area: operationsInArea re-walks every screen and the
       // whole registry on each call.
       const inArea = operationsInArea(area.slug);
@@ -131,7 +144,7 @@ describe("HTTP API reference", () => {
       // in the closing list, because there is no schema to document yet.
       for (const operation of inArea) {
         const entry = operation.status === "available"
-          ? `#### ${operation.name} [#${operation.name}]`
+          ? `## ${operation.name} [#${operation.name}]`
           : `| \`${operation.name}\` |`;
         expect(page, `${area.slug} is missing ${operation.name}`).toContain(entry);
       }
@@ -140,7 +153,7 @@ describe("HTTP API reference", () => {
       const live = inArea.filter((o) => o.status === "available");
       if (planned.length > 0 && live.length > 0) {
         expect(page.indexOf(`{/* ${area.slug}-designed */}`), `${area.slug} lists designed operations before available ones`)
-          .toBeGreaterThan(page.lastIndexOf(`#### ${live[live.length - 1].name} `));
+          .toBeGreaterThan(page.lastIndexOf(`## ${live[live.length - 1].name} `));
       }
       // A caller should never have to guess the request: an available
       // operation carries a runnable example naming itself.
@@ -173,7 +186,7 @@ describe("HTTP API reference", () => {
     for (const { name } of listTools()) {
       const schema = getCommandDefinition(name)?.input;
       if (!schema) continue;
-      const page = PAGE();
+      const page = AREA(areaOf(name)!);
       for (const field of fieldsOf(schema)) {
         expect(page, `${name} does not document ${field.name}`).toContain(`| \`${field.name}\` |`);
       }
@@ -183,25 +196,38 @@ describe("HTTP API reference", () => {
     }
   });
 
-  // Every area lives on one page, so a repeated anchor is both a duplicate DOM
-  // id (links land on the wrong section) and a duplicate React key, which stops
-  // the table of contents rendering and tracking. This caught `#available` and
-  // `#designed` repeating 13 times each.
-  it("gives every heading on the page a unique anchor", () => {
-    const anchors = [...PAGE().matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]);
-    const repeated = [...new Set(anchors.filter((a, i) => anchors.indexOf(a) !== i))];
-    expect(repeated).toEqual([]);
+  // A repeated anchor on one page is both a duplicate DOM id (links land on the
+  // wrong section) and a duplicate React key, which stops the table of
+  // contents rendering and tracking.
+  it("gives every heading on each page a unique anchor", () => {
+    for (const page of [INDEX(), ...AREA_PAGES()]) {
+      const anchors = [...page.matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]);
+      const repeated = [...new Set(anchors.filter((a, i) => anchors.indexOf(a) !== i))];
+      expect(repeated).toEqual([]);
+    }
   });
 
   // tests/docs.test.ts checks in-page links for the customer guides but skips
-  // this page, which carries more of them than any guide. Without this, a typo
-  // in one of the Cards' hrefs would ship as a link that scrolls nowhere.
-  it("points every in-page link at an anchor the reference declares", () => {
-    const page = PAGE();
-    const declared = new Set([...page.matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]));
-    const links = [...page.matchAll(/href="#([a-z0-9_-]+)"|\]\(#([a-z0-9_-]+)\)/g)].map((m) => m[1] ?? m[2]);
-    expect(links.length, "the reference cross-links its own sections").toBeGreaterThan(0);
-    expect(links.filter((l) => !declared.has(l))).toEqual([]);
+  // the reference, which carries more of them than any guide. Without this, a
+  // typo in one of the Cards' hrefs would ship as a link that goes nowhere.
+  it("points every link inside the reference at a page and anchor it declares", () => {
+    const pages = new Map([["index", INDEX()], ...API_AREAS.map((a) => [a.slug, AREA(a.slug)] as [string, string])]);
+    const anchors = (page: string) => new Set([...page.matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]));
+    const broken: string[] = [];
+    let count = 0;
+    for (const [slug, page] of pages) {
+      const links = [...page.matchAll(/href="((?:\/docs\/api[a-z/]*)?)(?:#([a-z0-9_-]+))?"|\]\(((?:\/docs\/api[a-z/]*)?)(?:#([a-z0-9_-]+))?\)/g)]
+        .map((m) => ({ path: m[1] ?? m[3] ?? "", anchor: m[2] ?? m[4] }))
+        .filter((l) => l.path !== "" || l.anchor);
+      for (const { path, anchor } of links) {
+        count++;
+        const target = path === "" ? slug : path === "/docs/api" ? "index" : path.replace("/docs/api/", "");
+        const targetPage = pages.get(target);
+        if (!targetPage || (anchor && !anchors(targetPage).has(anchor))) broken.push(`${slug} -> ${path}#${anchor ?? ""}`);
+      }
+    }
+    expect(count, "the reference cross-links its own sections").toBeGreaterThan(0);
+    expect(broken).toEqual([]);
   });
 
   // The designed operations are the backend push. The reference publishes them
@@ -234,27 +260,28 @@ describe("HTTP API reference", () => {
     const documented = new Set(API_ERRORS.map((e) => e.code));
     expect([...raised].filter((c) => !documented.has(c)), "raised but undocumented").toEqual([]);
     expect([...documented].filter((c) => !raised.has(c)), "documented but never raised").toEqual([]);
-    const page = PAGE();
+    const page = INDEX();
     for (const error of API_ERRORS) expect(page, `${error.code} missing`).toContain(`\`${error.code}\``);
   });
 
   // The matrix is what a developer building for one role reads instead of
   // checking 55 operations by hand.
   it("puts every available operation in the role matrix", () => {
-    const page = PAGE();
+    const page = INDEX();
     for (const operation of apiOperations().filter((o) => o.status === "available")) {
       expect(page, `${operation.name} is not in the role matrix`).toContain(`| \`${operation.name}\` |`);
     }
   });
 
   it("states the envelope once, in the overview, and the codes under errors", () => {
-    const page = PAGE();
+    const page = INDEX();
     const overview = page.slice(page.indexOf("## Overview"), page.indexOf("## Authentication"));
     expect(overview).toContain("POST /api/command");
     expect(overview).toContain("correlationId");
     const errors = page.slice(page.indexOf("## Errors"), page.indexOf("## Conventions"));
     for (const code of ["400", "401", "403", "404", "409", "500"]) expect(errors).toContain(code);
     expect(page.slice(page.indexOf("## Operations"))).not.toContain("POST /api/command");
+    for (const area of AREA_PAGES()) expect(area).not.toContain("POST /api/command");
   });
   // A screen must not invent a second name for an operation the registry
   // already answers: the reference would then list the same capability twice,
@@ -356,7 +383,7 @@ describe("HTTP API reference", () => {
   // of payload. Naming the exceptions keeps the promise from being false for
   // whichever command is registered next without a claiming RPC.
   it("names every registered command that does not honour the idempotency contract", () => {
-    const page = read("content/docs/api.mdx");
+    const page = INDEX();
     const outcomes = page.slice(page.indexOf("### The three outcomes"), page.indexOf("## Errors"));
     const exempt = ["set_notification_preference", "set_brewery_quiet_hours", "set_notification_destination",
       "consume_chat_link_proof", "unlink_chat_user"];
@@ -390,14 +417,14 @@ describe("HTTP API reference", () => {
   // two did not: an absolute about ids, and a fail-closed warning that stayed
   // behind in one area when the operation moved to another.
   it("makes no claim its own generated tables disprove", () => {
-    const page = read("content/docs/api.mdx");
+    const page = ALL();
     // set_notification_destination.externalDestinationId is a Slack channel
     // id: z.string().min(1), rendered `string` in its own table 100 lines up.
     expect(page).not.toContain("Every id in every operation, without exception");
     // Customer invitations are live and documented in their owning area.
-    const customers = page.slice(page.indexOf("{/* ops:customers */}"), page.indexOf("{/* end ops:customers */}"));
+    const customers = AREA("customers").slice(AREA("customers").indexOf("{/* ops:customers */}"), AREA("customers").indexOf("{/* end ops:customers */}"));
     expect(customers, "invite_customer_user is documented here").toContain("invite_customer_user");
-    const invite = page.slice(page.indexOf("#### invite_customer_user"));
+    const invite = page.slice(page.indexOf("## invite_customer_user"));
     expect(invite.slice(0, 600), "its example describes the supported invitation").not.toMatch(/not available in this release/);
   });
 });
@@ -470,7 +497,7 @@ describe("post-merge HTTP API maintainer", () => {
     // Bash out of the allowlist and a hand-written table out of the page.
     expect(workflow).toContain("bun run docs:api");
     expect(workflow).not.toMatch(/allowedTools[^\n]*Bash/);
-    expect(workflow).toMatch(/Edit\(content\/docs\/api\.mdx\)/);
+    expect(workflow).toContain("Edit(content/docs/api/*.mdx)");
     expect(workflow).toMatch(/Edit\(components\/mgr\/screens\.tsx\)/);
   });
 
@@ -482,7 +509,7 @@ describe("post-merge HTTP API maintainer", () => {
     // structurally different from "rewrite a screen's spec or body".
     expect(workflow).toMatch(/grep -vE '\(reads\|writes\):'/);
     // And the validate step may not accept a file outside the three it renders.
-    expect(workflow).toContain("content/docs/api.mdx");
+    expect(workflow).toContain("content/docs/api/[a-z-]+\\.mdx");
     expect(workflow).toContain("2026-09-06-api-operations-backlog.md");
   });
 

@@ -1,0 +1,340 @@
+---
+title: "Catalog & pricing"
+description: "Brands, formats, SKUs, sale channels, price groups and prices."
+---
+
+A brand is the beer's sellable identity — name, style, ABV. A
+format is the physical package (keg, can, bottle); it owns `unitsPerCase` and
+`bblPerUnit`. A poured format (a pint, a taster) never holds stock: it is a
+ratio back to the keg it pours from, and never becomes a SKU. A SKU is one
+brand × one packaged format, with an optional UPC.
+
+Prices live on a grid, not on SKUs. A price group is a row of that grid and a
+brand sits on one; a sale channel is the column and a customer sits on one.
+`set_channel_price` fills one cell — sale channel × price group × format —
+with an integer `unitPriceCents`, and every SKU of that group and format sells
+at it on that channel. `clear_channel_price` empties the cell, which unprices
+those SKUs on that channel. There is no per-SKU exception.
+
+{/* ops:catalog */}
+
+## clear_channel_price [#clear_channel_price]
+
+`command` · admin, sales
+
+Empty one cell of the price grid; SKUs on that group and format become unpriced on that channel
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | yes |
+| `priceGroupId` | uuid | yes |
+| `formatId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "clear_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## create_sku [#create_sku]
+
+`command` · admin, sales
+
+Create a SKU: one brand × one packaged format; the name defaults to brand · format
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+| `formatId` | uuid | yes |
+| `name` | string | no |
+| `upc` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## delete_catalog_category [#delete_catalog_category]
+
+`command` · admin, sales
+
+Delete an unused category; brands using it block deletion
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_catalog_category", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
+## delete_price_group [#delete_price_group]
+
+`command` · admin, sales
+
+Remove a price group no brand sits on and no cell prices
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `priceGroupId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_price_group", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceGroupId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## delete_sale_channel [#delete_sale_channel]
+
+`command` · admin
+
+Remove a sale channel nothing references
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `channelId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_sale_channel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "channelId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_brand_recipe_cost [#get_brand_recipe_cost]
+
+`query` · admin, sales
+
+A brand's recipe cost per barrel from its last brewed (else newest) recipe version, naming any ingredient with no receipt cost yet
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brand_recipe_cost", "input": { "brandId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_brands [#list_brands]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Brands with their style and SKUs, alphabetical
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_brands", "input": {} }'
+```
+
+## list_catalog_categories [#list_catalog_categories]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+List this brewery's catalog categories
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_catalog_categories", "input": {} }'
+```
+
+## list_channel_prices [#list_channel_prices]
+
+`query` · admin, sales
+
+The price grid: one cell per sale channel × price group × format (integer cents); saleChannelId narrows it to one channel
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": {} }'
+```
+
+## list_price_groups [#list_price_groups]
+
+`query` · admin, sales, warehouse
+
+Rows of the price grid in position order
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_groups", "input": {} }'
+```
+
+## list_sale_channels [#list_sale_channels]
+
+`query` · admin, sales, warehouse
+
+Sale channels with their tax treatment, alphabetical
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_sale_channels", "input": {} }'
+```
+
+## list_skus [#list_skus]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+SKUs with their brand and format, alphabetical
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_skus", "input": {} }'
+```
+
+## save_catalog_category [#save_catalog_category]
+
+`command` · admin, sales
+
+Add a category or rename it across every brand in this brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `previousName` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "save_catalog_category", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
+## set_channel_price [#set_channel_price]
+
+`command` · admin, sales
+
+Fill one cell of the price grid: every SKU on that group and format sells at it on that channel
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | yes |
+| `priceGroupId` | uuid | yes |
+| `formatId` | uuid | yes |
+| `unitPriceCents` | integer | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+```
+
+## update_sku [#update_sku]
+
+`command` · admin, sales
+
+Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+| `active` | boolean | yes |
+| `upc` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "active": true } }'
+```
+
+## upsert_brand [#upsert_brand]
+
+`command` · admin, sales
+
+Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `id` | uuid | no |
+| `style` | string | no |
+| `abv` | number | no |
+| `description` | string | no |
+| `category` | string | no |
+| `priceGroupId` | uuid | no |
+| `hops` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_brand", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
+## upsert_price_group [#upsert_price_group]
+
+`command` · admin, sales
+
+Create or rename a price group (a row of the price grid), set its position and optional cost ceiling
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `position` | integer | yes |
+| `id` | uuid | no |
+| `costCeilingCents` | integer | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_price_group", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "position": 1 } }'
+```
+
+## upsert_sale_channel [#upsert_sale_channel]
+
+`command` · admin
+
+Create or edit a sale channel: its name and the tax treatment its removals are recorded under
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | yes |
+| `id` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_sale_channel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "taxTreatment": "taxable" } }'
+```
+
+{/* end ops:catalog */}

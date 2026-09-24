@@ -1,0 +1,229 @@
+---
+title: "Customer portal"
+description: "The operations a customer portal user may call."
+---
+
+Callers with the `customer` role are portal users, not staff. They see only
+their own customer's data, and these are the only operations that role can call.
+The scope is enforced server-side, not by which operations the client chooses
+to show.
+
+Portal orders are wholesale orders shipped from the brewery's warehouse, and
+they move through the same lifecycle staff orders do. A portal user drafts,
+updates, and submits. Confirming, picking, and shipping stay with the brewery.
+
+{/* ops:portal */}
+
+## get_portal_account [#get_portal_account]
+
+`query` · customer
+
+Portal: the caller's customer, ship-tos, this login's membership, and keg deposits held; peer portal users are never listed
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_portal_account", "input": {} }'
+```
+
+## portal_catalog [#portal_catalog]
+
+`query` · customer
+
+Portal: orderable SKUs with the caller's prices and an availability badge
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_catalog", "input": {} }'
+```
+
+## portal_create_order [#portal_create_order]
+
+`command` · customer
+
+Portal: create a draft order for the caller's account
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `shipToId` | uuid | yes |
+| `lines` | array of object | yes |
+| `poNumber` | string | no |
+| `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_create_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+## portal_invoice [#portal_invoice]
+
+`query` · customer
+
+Portal: one of the caller's invoices or credit memos with its lines, total, and the brewery's customer-facing phone for paying it; another customer's id is not found
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_invoice", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## portal_invoices [#portal_invoices]
+
+`query` · customer
+
+Portal: the caller's invoices and credit memos
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_invoices", "input": {} }'
+```
+
+## portal_order [#portal_order]
+
+`query` · customer
+
+Portal: one order with lines, its event history, and its shipment with that shipment's invoice once billed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_order", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## portal_orders [#portal_orders]
+
+`query` · customer
+
+Portal: the caller's orders, newest first
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_orders", "input": {} }'
+```
+
+## portal_quote_order [#portal_quote_order]
+
+`command` · customer
+
+Portal: freeze current prices, deposits, addresses, and optional QuickBooks tax for review
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `shipToId` | uuid | yes |
+| `lines` | array of object | yes |
+| `poNumber` | string | no |
+| `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_quote_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+## portal_schedule [#portal_schedule]
+
+`query` · customer
+
+Portal: what the brewery plans to brew next, as brand and expected week, and whether that brand is on the buyer's list
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_schedule", "input": {} }'
+```
+
+## portal_submit_order [#portal_submit_order]
+
+`command` · customer
+
+Portal: submit a draft order
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+| `expectedIdentity` | object | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_submit_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## portal_submit_quote [#portal_submit_quote]
+
+`command` · customer
+
+Portal: atomically submit an unchanged reviewed quote as a new or existing draft order
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `quoteId` | uuid | yes |
+| `orderId` | uuid | no |
+| `expectedIdentity` | object | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_submit_quote", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "quoteId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## portal_update_draft_order [#portal_update_draft_order]
+
+`command` · customer
+
+Portal: replace a draft order's lines/fields
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+| `lines` | array of object | yes |
+| `shipToId` | uuid | no |
+| `poNumber` | string | no |
+| `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_update_draft_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+{/* end ops:portal */}
