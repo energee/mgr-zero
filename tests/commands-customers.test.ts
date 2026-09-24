@@ -1,6 +1,6 @@
 // tests/commands-customers.test.ts — customer/ship-to CRUD commands and the price grid's cells.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedPriceGroup } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedPriceGroup, sql } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -78,4 +78,21 @@ describe("customer CRUD", () => {
     }, ctx) as { payment_terms: string };
     expect(updated.payment_terms).toBe("net15");
   });
+});
+
+// #475: list_customers stopped at PostgREST's max_rows (1000), so the order
+// picker, /customers and the import preview lost every customer past it.
+describe("list_customers past the 1000-row cap", () => {
+  it("returns every customer, alphabetical", async () => {
+    const many = await makeBrewery();
+    const staff = await makeStaffCtx(many.id, "sales");
+    const channel = await channelId(many.id, "Wholesale");
+    sql(`insert into customers (brewery_id, name, type, state, sale_channel_id)
+      select '${many.id}', 'Customer ' || lpad(n::text, 4, '0'), 'retailer', 'PA', '${channel}'
+      from generate_series(1, 1005) n`, true);
+    const list = await runCommand("list_customers", {}, staff) as { name: string }[];
+    expect(list).toHaveLength(1005);
+    expect(list.at(0)?.name).toBe("Customer 0001");
+    expect(list.at(-1)?.name).toBe("Customer 1005");
+  }, 30_000);
 });

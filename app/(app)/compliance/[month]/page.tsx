@@ -12,7 +12,7 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, monthLabel, monthRange } from "../period";
+import { JURISDICTION, monthLabel, monthOver, monthRange } from "../period";
 
 export default async function MonthPage({ params }: { params: Promise<{ month: string }> }) {
   const { month } = await params;
@@ -20,14 +20,15 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   if (!range) notFound();
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ filings: [filing] }, losses] = await Promise.all([
-    runCommand("list_compliance_reports", { jurisdiction: JURISDICTION, ...range }, ctx) as Promise<{ filings: Filing[] }>,
+  const [{ filings: [filing], today }, losses] = await Promise.all([
+    runCommand("list_compliance_reports", { jurisdiction: JURISDICTION, ...range }, ctx) as Promise<{ filings: Filing[]; today: string }>,
     runCommand("get_loss_review", range, ctx) as Promise<LossReview[]>,
   ]);
   const report: Report = filing ? { figures: filing.figures, warnings: [], externalMappingRequired: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
   return <MonthlyComplianceView
     model={toMonthlyComplianceViewProps({ monthLabel: monthLabel(month), report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
+    monthOpen={!filing && !monthOver(month, today)}
     fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
   />;
 }
