@@ -434,15 +434,15 @@ Returns preserve the selected shipment lot and its original recorded volume even
 <Screen name="Return and credit" />
 
 1. Open the invoice and select **Return** to open the Beer return page.
-2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
-3. Split the returned quantity under **Original shipped source**. The source amounts must sum to the line quantity; a source cannot be returned more than was shipped. Choose **Return to**, the destination **Return to bin**, and a reason: *unsold* and *wrong item* put the beer back as sellable stock at that location; *damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity. The invoice's keg deposit lines are listed too: enter the number of kegs whose deposit you are refunding, in whole kegs.
+3. For beer lines, split the returned quantity under **Original shipped source**. The source amounts must sum to the line quantity; a source cannot be returned more than was shipped. Choose **Return to**, the destination **Return to bin**, and a reason: *unsold* and *wrong item* put the beer back as sellable stock at that location; *damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
 For older invoices that have no shipment, choose the return location; MGR records untracked stock in its first bin. Shipment-backed invoices always require the original source selection.
 
-The preview uses the selected destination and the invoice's captured beer prices. Deposit refunds are not included in this beer return; the deposit-refund field is unavailable. After saving, MGR returns to the original invoice.
+The preview uses the selected destination and the invoice's captured beer and deposit prices. A deposit refund moves no stock and needs no source or bin; a refund of deposits alone still asks for a return location and reason, which it does not use. After saving, MGR returns to the original invoice.
 
-MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited. An invoice that is **Written off**, or voided or deleted in QuickBooks, is no longer owed: it shows no **Return**, and MGR refuses a return or credit memo against it.
+MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, with a keg deposit refund line for each refunded deposit (which lowers that customer's deposit held on **Customer keg balance** and the portal Account page), records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited. An invoice that is **Written off**, or voided or deleted in QuickBooks, is no longer owed: it shows no **Return**, and MGR refuses a return or credit memo against it.
 
 ## Locations [#locations]
 
@@ -531,7 +531,7 @@ Event entry is unavailable until there is an active pool and a location.
 - **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
 - **Lost** removes kegs from the fleet. Without a customer they come out of that bin; name the customer when they were lost out at a customer, and they come off that customer's balance instead (they already left the bin when shipped). **Found** adds kegs back to a bin and never names a customer: a keg found at a customer is a shipped keg.
 
-The quantity is always positive; the reason is the direction. Retired, shipped, and lost at a bin cannot exceed what the bin holds; returned and lost at a customer cannot exceed what that customer holds of that pool and size. A typo is refused rather than driving a bin or a customer negative. A **Note** is optional and shows next to the event in Keg event history. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here; both refuse to take out more kegs than the source bin holds. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
+The quantity is always positive; the reason is the direction. Retired, shipped, and lost at a bin cannot exceed what the bin holds; returned and lost at a customer cannot exceed what that customer holds of that pool and size. A typo is refused rather than driving a bin or a customer negative. A **Note** is optional and shows next to the event in Keg event history. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here; both refuse to take out more kegs than the source bin holds. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo: open the invoice that charged the deposit, select **Return**, and enter the kegs on its deposit line.
 
 **Record keg event** only appears once the brewery has at least one location and one pool in service; retire every pool and it disappears until you add one back or reactivate one.
 
@@ -545,7 +545,7 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 <Screen name="Customer keg balance" />
 
-**Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit invoiced for them (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost. It shows **No kegs currently out** once everything is back.
+**Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit held for them: deposits invoiced less deposits refunded on credit memos (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost. It shows **No kegs currently out** once everything is back.
 
 <Screen name="Keg event history" />
 

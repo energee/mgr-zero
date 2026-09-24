@@ -215,26 +215,24 @@ describe("Shipment done view", () => {
 
 describe("Return and credit view", () => {
   it("keeps an invoice-only return factual and uses the selected destination", () => {
-    const model = toReturnCreditViewProps({ ...orderReturnCredit, order: undefined, returnLocationId: "taproom", locations: [{ id: "taproom", name: "Taproom" }], deposit: undefined });
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, order: undefined, returnLocationId: "taproom", locations: [{ id: "taproom", name: "Taproom" }], lines: orderReturnCredit.lines.slice(0, 1) });
     expect(model.backTo).toBe("INV-1042");
     expect(model.tape[0]).toEqual(["+1 Hazy IPA · ½ bbl keg · return in", "Taproom"]);
-    expect(model.depositAmount).toBeUndefined();
+    expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
   });
-  it("does not include an unsupported deposit refund in the credit amount", () => {
-    expect(toReturnCreditViewProps(orderReturnCredit).tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
-  });
-  it("shows the recorded deposit separately from the supported $150 beer credit", () => {
+  it("credits the beer and the refunded keg deposit in one memo, in whole kegs, with no stock for the deposit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
-    expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1 });
+    expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1, step: "0.01" });
+    expect(model.lines[1]).toMatchObject({ name: "Keg deposit · ½ bbl", detail: "deposit on 4 kegs · refunding", qty: 1, step: "1" });
     expect(model.reasons).toEqual(["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"]);
     expect(model.returnTo).toBe("Warehouse · original fulfillment source");
-    expect(model.depositAmount).toBe("−$30.00");
     expect(model.creditInfo).toMatch(/INV-1042/);
     expect(model.tape).toEqual([
       ["+1 Hazy IPA · ½ bbl keg · return in", "Warehouse"],
       ["−1 Hazy IPA · ½ bbl keg · loss · damaged", "not sellable"],
-      ["credit memo number · on commit", "−$150.00"],
+      ["1 Keg deposit · ½ bbl · deposit refund", "−$30.00"],
+      ["credit memo number · on commit", "−$180.00"],
     ]);
   });
 
