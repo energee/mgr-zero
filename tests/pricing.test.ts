@@ -122,8 +122,15 @@ describe("customers and orders carry the channel", () => {
     expect(o.data!.sale_channel_id).toBe(wholesale);
     expect(o.data!.order_lines).toEqual([{ unit_price_cents: 13500 }]);
     const dtc = await seedCustomer(b.id, { name: "DTC Buyer", saleChannelId: await channelId(b.id, "DTC") });
-    await expect(runCommand("create_order", { kind: "wholesale", customerId: dtc.customerId, shipToId: dtc.shipToId, fromLocationId: loc.id, lines: [{ skuId: cat.skuId, qty: 1 }] }, ctx))
-      .rejects.toThrow(/not active and priced/);
+    // #490: the refusal names the SKU, never its id
+    const refused = await runCommand("create_order", { kind: "wholesale", customerId: dtc.customerId, shipToId: dtc.shipToId, fromLocationId: loc.id, lines: [{ skuId: cat.skuId, qty: 1 }] }, ctx).catch((e: Error) => e);
+    expect((refused as Error).message).toMatch(/IPA case is not active and priced/);
+    expect((refused as Error).message).not.toContain(cat.skuId);
+  });
+  it("list_skus narrowed to a sale channel offers only the SKUs priced on it (#490)", async () => {
+    const priced = await runCommand("list_skus", { saleChannelId: wholesale }, ctx) as { id: string }[];
+    expect(priced.map(s => s.id)).toContain(cat.skuId);
+    expect(await runCommand("list_skus", { saleChannelId: await channelId(b.id, "DTC") }, ctx)).toEqual([]);
   });
   it("a portal customer reads only its own channel's cells", async () => {
     const cust = await seedCustomer(b.id, { name: "Portal Co" });
