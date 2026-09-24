@@ -163,6 +163,8 @@ describe("production-readiness workflow contract", () => {
       expect(prePush).toContain(command);
     }
     expect(prePush).toContain("tests/mgr-screens.test.ts");
+    // An edited migration fails here in a second instead of after the push.
+    expect(prePush).toContain("tests/migrations-applied.test.ts");
   });
 
   // `supabase db reset` rebuilds the schema behind PostgREST, which cached it at
