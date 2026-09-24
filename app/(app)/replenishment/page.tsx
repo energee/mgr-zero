@@ -28,6 +28,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   ]);
   const locationRows = [...taprooms, ...warehouses];
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
+  // A location can be both warehouse and taproom; it is never its own source (#454).
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
   const [skus, allocations, suggestions] = await Promise.all([
     runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
@@ -56,7 +57,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
           <QuantityForm key={`par-${toLocationId}-${JSON.stringify(suggestions)}`} locationId={toLocationId} skus={skus} kind="par" values={parValues} />
           <QuantityForm key={`standing-${toLocationId}-${JSON.stringify(allocations)}`} locationId={toLocationId} skus={skus} kind="standing" values={standingValues} />
         </div>}
-        <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} toLocationId={toLocationId} canCreate={canEdit} warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />
+        <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} toLocationId={toLocationId} canCreate={canEdit} warehouses={warehouses.filter((w) => w.id !== toLocationId).map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />
         <h2 id="standing-allocations" className="text-lg font-semibold">Standing allocations</h2>
         {allocations.length ? allocations.map((a) => <div key={a.id}>{E.row(a.skus?.name ?? a.sku_id, `${a.qty} units reserved`, canEdit ? <ReleaseAllocationForm allocationId={a.id} sku={a.skus?.name ?? a.sku_id} qty={Number(a.qty)} /> : undefined)}</div>) : E.blank("No standing allocations for this taproom.")}
       </>}

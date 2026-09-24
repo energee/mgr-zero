@@ -275,6 +275,21 @@ describe("replenishment", () => {
     expect(mv!.length).toBe(2);
     expect(Number(mv!.find(m => m.location_id === tapId)!.qty)).toBe(3);
   });
+
+  it("rejects a transfer whose source and destination are the same location (#454)", async () => {
+    const replen = await staffDb.rpc("create_replenishment_order", {
+      p_from: tapId, p_to: tapId, p_lines: [{ sku_id: skuId, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(replen.error?.message).toBe("A transfer needs a different source and destination location.");
+    const draft = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "taproom_transfer", p_customer: null, p_ship_to: null,
+      p_from_location: tapId, p_to_location: tapId, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(draft.error?.message).toBe("A transfer needs a different source and destination location.");
+    const { count } = await admin.from("orders").select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("to_location_id", tapId).eq("from_location_id", tapId);
+    expect(count).toBe(0);
+  });
 });
 
 describe("confirm_restock", () => {
