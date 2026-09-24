@@ -1,6 +1,7 @@
 // lib/commands/use-command-form.ts — the two client-side command lifecycles.
 // useCommandAction is the primitive: run one command, hold busy/error (rendered
-// by CommandFormMessage as role="alert"), refresh on success. useCommandForm
+// by CommandFormMessage as role="alert"), refresh on success unless the
+// caller opts out. useCommandForm
 // adds the open/close and reset a mutation form needs (rendered in
 // components/mgr/command-form.tsx). Forms own only their fields and how to
 // build the command input.
@@ -22,7 +23,10 @@ export function useCommandAction() {
   const pending = useRef<{ key: string; requestId: string; expectedContext: typeof expectedContext } | null>(null);
 
   // Resolves true on success, so a caller that navigates away can wait for it.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string) {
+  // `refresh: false` skips the post-success router.refresh() for a caller that
+  // must keep its client state on screen (the Confirm order review, whose
+  // server page redirects once the order is no longer submitted).
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string, { refresh = true }: { refresh?: boolean } = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -33,7 +37,7 @@ export function useCommandAction() {
       const data = await command(attempt.expectedContext.breweryId ?? breweryId, name, input, requestId ?? attempt.requestId, attempt.expectedContext);
       pending.current = null;
       onSuccess?.(data);
-      router.refresh();
+      if (refresh) router.refresh();
       return true;
     } catch (err) {
       const detail = classifyCommandFailure(err);
