@@ -33,5 +33,6 @@
   "20260924070000_transfer_keeps_open_run.sql": "529dc933671b5f259421f4c6fc5ddf999f1ffd9d558b5e4988136fd5d9c2d9dd",
   "20260924090000_bin_move_stock_check.sql": "decc8da13cc9ff78a603f05d2c0e1cbb1c2d02fe796b4ae5413e99bbce130200",
   "20260924100000_upsert_material_lot_tracking_guard.sql": "c1deba0e8cb70db37b08065bd83280b023cdc613d989b97c35aaf5a079233c10",
-  "20260924110000_transfer_pick_stock.sql": "ce6ff8706f4758ac29912e6be297912d56d0af8ce87b14ee2087f6cdf8dbcdb6"
+  "20260924110000_transfer_pick_stock.sql": "ce6ff8706f4758ac29912e6be297912d56d0af8ce87b14ee2087f6cdf8dbcdb6",
+  "20260924120000_compliance_balance_chain.sql": "460a65226ef3236c470e377b4d900b9b544852b49b2dd8682f910a510731deee"
 }
