@@ -2,6 +2,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { money } from "@/lib/mgr/money";
+import { canOpen } from "@/lib/mgr/nav";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { PosSaleRow, PosVariationRow } from "@/lib/mgr/pos-view";
 import "@/lib/commands/all";
@@ -37,7 +38,9 @@ export default async function PosMappingPage() {
   const coverage = facts.coverage.filter(row => row.complete).map(row =>
     `${row.external_location_id} · ${formatDateTime(row.starts_at)} to ${formatDateTime(row.ends_at)}`,
   );
-  return <PosMappingControl variations={variations} sales={sales} coverage={coverage} canSync={brewery.role === "admin"} targets={[
+  // Point of sale is admin-only; warehouse reached POS mapping from More (#444).
+  const back = canOpen(brewery.role, "/settings/pos") ? { href: "/settings/pos", label: "Point of sale" } : { href: "/more", label: "More" };
+  return <PosMappingControl variations={variations} sales={sales} coverage={coverage} canSync={brewery.role === "admin"} back={back} targets={[
     ...skus.filter(row => row.active).map(row => ({ value: `sku:${row.id}`, label: `SKU · ${row.name}` })),
     ...formats.map(row => ({ value: `format:${row.id}`, label: `Pour · ${row.brands?.name ?? "Brand"} · ${row.name}` })),
   ]} />;

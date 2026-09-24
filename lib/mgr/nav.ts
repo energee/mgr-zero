@@ -125,6 +125,21 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
 export const isUnder = (pathname: string, href: string) =>
   pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
+/**
+ * Whether `role` may open `path`, by the gate of the deepest STAFF_NAV entry
+ * whose href covers it: /settings/units follows Units (every role), while
+ * /settings/pos has no entry of its own and follows Settings (admin). A path
+ * no entry covers has no nav gate and counts as open. Back links use this so
+ * they never point a role at a page that sends it to No access (#444).
+ */
+export function canOpen(role: StaffRole, path: string): boolean {
+  let best: NavItem | undefined;
+  for (const item of STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])])) {
+    if (isUnder(path, item.href) && (!best || item.href.length > best.href.length)) best = item;
+  }
+  return !best || allowed(best, role);
+}
+
 /** The tab whose href (or a child's) is the longest prefix of the path. */
 export function activeTab(items: readonly NavItem[], pathname: string): NavItem | undefined {
   let best: { tab: NavItem; len: number } | undefined;

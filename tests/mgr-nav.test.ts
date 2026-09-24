@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeTab, canOpen, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
@@ -73,4 +73,19 @@ it("taproom has Beer and own settings without forbidden Work", () => {
     { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
     { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
   ]);
+});
+
+describe("canOpen", () => {
+  it("reads the role gate of the deepest nav entry covering the path (#444)", () => {
+    // /settings is admin-only; Units and POS mapping under it are not.
+    expect(canOpen("admin", "/settings")).toBe(true);
+    for (const role of ["sales", "brewer", "warehouse", "taproom"] as const) {
+      expect.soft(canOpen(role, "/settings"), role).toBe(false);
+      expect.soft(canOpen(role, "/settings/pos"), role).toBe(false);
+      expect.soft(canOpen(role, "/settings/units"), role).toBe(true);
+    }
+    expect(canOpen("warehouse", "/settings/pos/mapping")).toBe(true);
+    expect(canOpen("brewer", "/settings/pos/mapping")).toBe(false);
+    expect(canOpen("warehouse", "/more")).toBe(true);
+  });
 });
