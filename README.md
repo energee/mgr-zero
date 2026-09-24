@@ -135,6 +135,13 @@ required`.
 bun run dev   # http://localhost:3000
 ```
 
+`bun run dev` passes `--disable-source-maps`. With Node source maps on (the
+`next dev` default), the first render of `/docs/api` pushed the dev server past
+its 4 GB heap and crashed it (#492); with them off it renders in about 2 s. The
+cost: server stack traces in the dev terminal point at compiled files under
+`.next/` instead of your source. When you need source-mapped server traces, run
+`bunx next dev` without the flag.
+
 ## Tests
 
 ```bash

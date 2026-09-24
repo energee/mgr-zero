@@ -4,7 +4,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --disable-source-maps",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
