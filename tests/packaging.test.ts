@@ -17,7 +17,7 @@
 // the call only ever breaks down: the components lookup is directional.
 import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, sql } from "./helpers";
+import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -333,6 +333,66 @@ describe("closing the run", () => {
       formatId: stout.formatId,
       lines: [{ materialId: tray, qtyPerUnit: 1 }, { materialId: lid, qtyPerUnit: 24 }],
     }, adminCtx);
+    // A close draws its BOM off the finished-goods bin and refuses one the bin
+    // cannot cover (#436), so the shelf starts stocked for every close below.
+    await seedMovement(b.id, { materialId: tray, locationId: wh.id, binId: wh.binId, qty: 10_000, createdBy: adminCtx.userId });
+    await seedMovement(b.id, { materialId: lid, locationId: wh.id, binId: wh.binId, qty: 100_000, createdBy: adminCtx.userId });
+  });
+
+  // A run of its own brand and format, started in a fresh tank, whose format's
+  // BOM is `lines` — for the consumption rules, away from the shared Stout BOM.
+  async function bomRun(label: string, lines: { materialId: string; qtyPerUnit: number }[]) {
+    const adminCtx = await makeStaffCtx(b.id, "admin");
+    // Its own format name: seedCatalog shares a format by name, and the Stout BOM must not move.
+    const cat = await seedCatalog(b.id, { product: label, sku: `${label} case`, format: `${label} can`, bblPerUnit: 0.0645 });
+    await runCommand("replace_format_bom", { formatId: cat.formatId, lines }, adminCtx);
+    const { occupancyId } = await brewInto(`FV-${label}`, cat.brandId, 10, "2026-11-10");
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: cat.brandId, plannedOn: "2026-12-10", occupancyId, outputs: [{ skuId: cat.skuId, qtyPlanned: 10 }],
+    }, ctx)) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-10T14:00:00Z" }, ctx);
+    const close = (qtyActual: number) => runCommand("close_packaging_run", {
+      runId: run.id, bblDrawn: 1, outputs: [{ skuId: cat.skuId, qtyActual }],
+      lotCode: `L-${label}`, packagedOn: "2026-12-10", locationId: wh.id, binId: wh.binId,
+    }, ctx);
+    return { runId: run.id, close, adminCtx };
+  }
+
+  it("rounds a discrete material up to whole units and leaves a weighed one exact (#436)", async () => {
+    const carrier = await material("Half carrier");
+    const shrink = await seedMaterial(b.id, { name: "Shrink film", category: "packaging", uom: "lb" });
+    const { runId, close, adminCtx } = await bomRun("ROUNDUP", [
+      { materialId: carrier, qtyPerUnit: 0.5 }, { materialId: shrink, qtyPerUnit: 0.5 },
+    ]);
+    await seedMovement(b.id, { materialId: carrier, locationId: wh.id, binId: wh.binId, qty: 10, createdBy: adminCtx.userId });
+    await seedMovement(b.id, { materialId: shrink, locationId: wh.id, binId: wh.binId, qty: 10, createdBy: adminCtx.userId });
+
+    await close(3);
+
+    const cons = (await admin.from("packaging_run_consumptions").select("movement_id").eq("run_id", runId)).data!;
+    const mm = (await admin.from("material_movements").select("material_id, qty").in("id", cons.map((c) => c.movement_id))).data!;
+    const qtyByMaterial = new Map(mm.map((m) => [m.material_id as string, Number(m.qty)]));
+    // Three units at half a carrier each is 1.5 carriers: nobody uses half a one.
+    expect(qtyByMaterial.get(carrier)).toBe(-2);
+    expect(qtyByMaterial.get(shrink)).toBe(-1.5);
+  });
+
+  it("refuses a close that needs more material than the finished-goods bin holds (#436)", async () => {
+    const can = await material("Short can");
+    const { runId, close, adminCtx } = await bomRun("SHORTCAN", [{ materialId: can, qtyPerUnit: 1 }]);
+    await seedMovement(b.id, { materialId: can, locationId: wh.id, binId: wh.binId, qty: 5, createdBy: adminCtx.userId });
+
+    await expect(close(10)).rejects.toThrow(/only 5 "Short can" in that bin; this run needs 10/);
+
+    // Nothing of the refused close survives, and the bin is not driven negative.
+    const run = (await admin.from("packaging_runs").select("closed_at").eq("id", runId).single()).data!;
+    expect(run.closed_at).toBeNull();
+    const [onHand] = sql(`select qty from material_bin_on_hand where material_id = '${can}' and bin_id = '${wh.binId}'`);
+    expect(Number(onHand)).toBe(5);
+
+    await close(5);
+    const [after] = sql(`select coalesce(sum(qty), 0) from material_movements where material_id = '${can}' and bin_id = '${wh.binId}'`);
+    expect(Number(after)).toBe(0);
   });
 
   // A run standing in a tank with `bbl` in it, started and ready to close.
