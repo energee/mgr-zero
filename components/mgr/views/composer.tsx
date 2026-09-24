@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionIcon } from "@/components/mgr/icon";
@@ -112,8 +113,11 @@ export function ComposerConversationView({ messages, model, activity, error, onR
   );
 }
 
-export function OfflineOutboxView({ rows, busy = false, onRetry, onDiscard, onRetryAll, onDiscardAll }: {
+export function OfflineOutboxView({ rows, busy = false, notice, onDismissNotice, onRetry, onDiscard, onRetryAll, onDiscardAll }: {
   rows: OfflineOutboxRow[];
+  /** Why the list may be incomplete, e.g. unreadable entries set aside (#463). */
+  notice?: string;
+  onDismissNotice?: () => void;
   busy?: boolean;
   onRetry?: (id: string) => void;
   onDiscard?: (id: string) => void;
@@ -125,6 +129,7 @@ export function OfflineOutboxView({ rows, busy = false, onRetry, onDiscard, onRe
     <section aria-label="Offline outbox" className="rounded-md border bg-card p-3 shadow-sm">
       <h2 className="font-medium">Offline outbox</h2>
       <p className="mt-1 text-xs text-muted-foreground">Only exact fermentation readings can wait here. Inventory movements, picks, and transfers require a live connection.</p>
+      {notice && <div role="alert" className="mt-3">{E.note(<>{notice} {onDismissNotice && <Button type="button" size="sm" variant="ghost" onClick={onDismissNotice}>Dismiss</Button>}</>)}</div>}
       {rows.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No queued readings.</p> : (
         <div className="mt-3 flex flex-col gap-2">{rows.map((row) => (
           <div key={row.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">

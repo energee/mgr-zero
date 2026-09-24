@@ -8,13 +8,15 @@ import { RETURN_REASONS, toReturnCreditViewProps } from "@/lib/mgr/return-credit
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ReturnSource } from "@/lib/commands/orders";
 
-type Line = { id: string; skuId: string; label: string; qty: number };
+/** A creditable invoice line: beer (`sku`, returns as stock from its shipped
+ *  sources) or a keg deposit (`keg_deposit`, refunded in whole kegs, no stock). */
+export type ReturnLine = { id: string; label: string; qty: number } & ({ kind: "sku"; skuId: string } | { kind: "keg_deposit"; skuId: null });
 
-export function buildReturnLines(lines: Line[], qtys: Record<string, string>, sources: ReturnSource[], sourceQtys: Record<string, string>, binId: string, shipmentId: string | null) {
+export function buildReturnLines(lines: ReturnLine[], qtys: Record<string, string>, sources: ReturnSource[], sourceQtys: Record<string, string>, binId: string, shipmentId: string | null) {
   return lines.filter(l => Number(qtys[l.id] ?? 0) > 0).map(l => ({
     invoiceLineId: l.id,
     qty: Number(qtys[l.id]),
-    ...(shipmentId === null ? {} : {
+    ...(shipmentId === null || l.kind === "keg_deposit" ? {} : {
       sources: sources.filter(s => s.sku_id === l.skuId && Number(sourceQtys[s.id]) > 0)
         .map(s => ({ movementId: s.id, binId, qty: Number(sourceQtys[s.id]) })),
     }),
@@ -23,7 +25,7 @@ export function buildReturnLines(lines: Line[], qtys: Record<string, string>, so
 
 export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locations, sources, bins }: {
   invoiceId: string; invoiceNo: number | null; shipmentId: string | null;
-  lines: (Line & { unitPriceCents: number })[];
+  lines: (ReturnLine & { unitPriceCents: number })[];
   locations: { id: string; name: string }[]; sources: ReturnSource[];
   bins: { id: string; name: string; location_id: string }[];
 }) {
@@ -34,10 +36,12 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locati
   const [locationId, setLocationId] = useState("");
   const [reason, setReason] = useState<"damaged" | "wrong_item" | "unsold" | "">("");
   const { busy, error, run } = useCommandAction();
-  const disabled = !reason || !locationId || (shipmentId !== null && !binId) || !lines.some(line => Number(qtys[line.id]) > 0);
+  const beerLines = lines.filter(line => line.kind === "sku");
+  const returningBeer = beerLines.some(line => Number(qtys[line.id]) > 0);
+  const disabled = !reason || !locationId || (shipmentId !== null && returningBeer && !binId) || !lines.some(line => Number(qtys[line.id]) > 0);
   const model = toReturnCreditViewProps({
     invoice: { invoice_no: invoiceNo }, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
-    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label } })),
+    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
   });
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
@@ -49,7 +53,7 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locati
       onReason={index => setReason(RETURN_REASONS[index]?.id ?? "")}
       onReturnTo={id => { setLocationId(id); setBinId(""); }}
       bins={shipmentId === null ? undefined : bins.filter(bin => bin.location_id === locationId)} binId={binId} onBin={setBinId}
-      sources={shipmentId === null ? null : <ReturnSourcesView groups={lines.map(line => ({
+      sources={shipmentId === null ? null : <ReturnSourcesView groups={beerLines.map(line => ({
         key: line.id, name: line.label, sources: sources.filter(source => source.sku_id === line.skuId).map(source => ({
           id: source.id, label: `${source.lots?.code ?? "Untracked / legacy stock"} · shipped from ${source.bins?.name ?? "—"}`, shipped: -Number(source.qty),
         })),

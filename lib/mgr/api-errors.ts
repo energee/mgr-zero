@@ -24,7 +24,7 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session." },
   { code: "not_member", status: 403, meaning: "Authenticated, but not a member of the brewery named by `breweryId`.",
     remedy: "Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`)." },
-  { code: "permission_denied", status: 403, meaning: "A member of the brewery, but the operation does not admit that role.",
+  { code: "permission_denied", status: 403, meaning: "A member of the brewery, but the operation does not admit that role; or `provision_brewery` on a dedicated deployment (`MGR_DEDICATED=1`), which refuses brewery creation.",
     remedy: "Each operation lists the roles allowed to call it; the role matrix collects them." },
   { code: "unknown_command", status: 404, meaning: "No operation is registered under that `name`.",
     remedy: "Check the spelling. An operation marked designed is not registered yet and answers this." },

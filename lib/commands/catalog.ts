@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 
 defineQuery({
@@ -23,7 +24,7 @@ defineCommand({
 defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().optional(),
+    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
     description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
   }),
   roles: ["admin", "sales"],
@@ -147,7 +148,8 @@ defineCommand({
 
 // Bins subdivide a location (spec 2026-09-06 Decision 1). Reads go through
 // RLS; the three writes are the idempotent RPCs. A location never drops below
-// one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
+// one bin, and a bin that ever recorded stock or that a POS menu uses (#421) is not
+// deleted — delete_bin raises all three.
 defineQuery({
   // Brewers read bins too: packaging output lands in one.
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
