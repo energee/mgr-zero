@@ -507,17 +507,14 @@ describe("closing the run", () => {
 
   it("explains an emptied tank instead of blaming the volume", async () => {
     // record_cellar_transfer now refuses to empty a tank under a started run
-    // (#466), but the occupancy can still end another way (complete_batch, or a
-    // direct write). The over-draw check would refuse any real draw anyway, but
+    // (#466), but an occupancy ended some other way (here a direct
+    // write) must still get this message. The over-draw check would refuse any real draw anyway, but
     // it would talk about barrels; this says what actually happened and in
     // what order the two steps belong.
     const { runId, occupancyId } = await startedRun("FV-EMPTIED", 12, "2026-12-06");
     const { error: endError } = await admin.from("vessel_occupancies")
       .update({ ended_at: "2026-12-06T00:00:00Z" }).eq("id", occupancyId);
     if (endError) throw endError;
-
-    const ended = await admin.from("vessel_occupancies").select("ended_at").eq("id", occupancyId).single();
-    expect(ended.data?.ended_at).toBeTruthy();
 
     await expect(runCommand("close_packaging_run", {
       runId, bblDrawn: 0, outputs: [], lotCode: "L-emptied", packagedOn: "2026-12-06",
