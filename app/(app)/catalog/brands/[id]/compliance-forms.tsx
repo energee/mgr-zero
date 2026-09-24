@@ -10,16 +10,18 @@ import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import type { Approval, Registration } from "@/lib/commands/compliance";
-import { orUndef, useCommandForm, useFields } from "@/lib/commands/use-command-form";
-import { APPROVAL_KINDS } from "@/lib/mgr/brand-approval-view";
+import { useCommandForm, useFields } from "@/lib/commands/use-command-form";
+import { APPROVAL_KINDS, approvalInput } from "@/lib/mgr/brand-approval-view";
+import { registrationInput } from "@/lib/mgr/state-registration-view";
 type Brand = { id: string; name: string };
 
 export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: Approval }) {
-  // No expiry: a COLA does not expire. The expires_on column stays until a
-  // migration drops it and is simply never sent from here.
+  // No expiry field: a COLA does not expire. The expires_on column and note
+  // are not shown; approvalInput sends an edited record's values back so the
+  // upsert keeps them (#438).
   const { v, set, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", submittedOn: approval?.approved_on ?? "" });
   const form = useCommandForm("upsert_brand_approval", {
-    build: () => ({ id: approval?.id, brandId: brand.id, kind: v.kind, ttbId: v.ttbId, approvedOn: orUndef(v.submittedOn) }),
+    build: () => approvalInput(brand.id, v, approval),
     reset,
   });
   const model = {
@@ -45,10 +47,11 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
 }
 
 export function RegistrationForm({ brand, registration }: { brand: Brand; registration?: Registration }) {
-  // state is locked when editing: a registration is addressed by brand and state, so changing it would add a row, not move it
+  // state is locked when editing: a registration is addressed by brand and state, so changing it would add a row, not move it.
+  // approved_on is not shown; registrationInput sends an edited record's value back so the upsert keeps it (#438).
   const { v, set, reset } = useFields({ state: registration?.state ?? "", registrationNo: registration?.registration_no ?? "", expiresOn: registration?.expires_on ?? "" });
   const form = useCommandForm("upsert_state_registration", {
-    build: () => ({ brandId: brand.id, state: v.state.toUpperCase(), registrationNo: orUndef(v.registrationNo), expiresOn: orUndef(v.expiresOn) }),
+    build: () => registrationInput(brand.id, v, registration),
     reset,
   });
   const model = {

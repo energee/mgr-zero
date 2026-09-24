@@ -13,7 +13,8 @@ export type PoLine = {
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
-export function ReceiveForm({ poId, lines, locations, bins, model }: { poId: string; lines: PoLine[]; locations: Location[]; bins: Bin[]; model: ReceivePoViewModel }) {
+/** `today` is the brewery's day (breweryToday on the server page), the received-on default. */
+export function ReceiveForm({ poId, lines, locations, bins, today, model }: { poId: string; lines: PoLine[]; locations: Location[]; bins: Bin[]; today: string; model: ReceivePoViewModel }) {
   const router = useRouter();
   const receiving = model.state === "sent" || model.state === "partially_received";
   const open = receiving ? lines.filter(line => line.qty_open > 0) : lines;
@@ -23,7 +24,7 @@ export function ReceiveForm({ poId, lines, locations, bins, model }: { poId: str
   const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
   const binsHere = bins.filter(bin => bin.location_id === locationId);
   const [binId, setBinId] = useState(binsHere[0]?.id ?? "");
-  const [receivedOn, setReceivedOn] = useState(new Date().toISOString().slice(0, 10));
+  const [receivedOn, setReceivedOn] = useState(today);
   const [via, setVia] = useState("mailto");
   const { busy, error, run } = useCommandAction();
   const counted = open.filter(line => counts[line.id] !== "" && Number.isFinite(Number(counts[line.id])) && Number(counts[line.id]) >= 0);

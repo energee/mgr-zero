@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
-import { defineCommand, defineQuery, unwrap, CommandError, type Ctx, latestOf } from "./registry";
+import { defineCommand, defineQuery, inChunks, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
@@ -287,21 +287,22 @@ type BatchRow = {
 async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
   const ids = [...new Set(batches.map((b) => b.recipe_version_id).filter((v): v is string => !!v))];
   if (ids.length === 0) return new Map<string, string>();
-  const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id").in("id", ids))) ?? [];
+  const versions = await inChunks(ids, async chunk => (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id").in("id", chunk))) ?? []);
   const recipeIds = [...new Set(versions.map((v) => v.recipe_id as string))];
-  const recipes = (await unwrap(ctx.db.from("recipes").select("id, name").in("id", recipeIds))) ?? [];
+  const recipes = await inChunks(recipeIds, async chunk => (await unwrap(ctx.db.from("recipes").select("id, name").in("id", chunk))) ?? []);
   const byRecipe = new Map(recipes.map((r) => [r.id as string, r.name as string]));
   return new Map(versions.map((v) => [v.id as string, byRecipe.get(v.recipe_id as string) ?? ""]));
 }
 
 // The open occupancy (ended_at is null) is where a batch physically is; the
 // gist exclusion on vessel_occupancies guarantees at most one per vessel.
+// Ids go 100 per read so the URL stays bounded (#469).
 async function openVessels(ctx: Ctx, batchIds: string[]) {
-  const rows = (await unwrap(ctx.db.from("vessel_occupancies")
-    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", batchIds).is("ended_at", null))) ?? [];
+  const rows = await inChunks(batchIds, async chunk => (await unwrap(ctx.db.from("vessel_occupancies")
+    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", chunk).is("ended_at", null))) ?? []);
   if (rows.length === 0) return new Map<string, { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string }>();
-  const vessels = (await unwrap(ctx.db.from("vessels").select("id, name")
-    .in("id", [...new Set(rows.map((r) => r.vessel_id as string))]))) ?? [];
+  const vessels = await inChunks([...new Set(rows.map((r) => r.vessel_id as string))],
+    async chunk => (await unwrap(ctx.db.from("vessels").select("id, name").in("id", chunk))) ?? []);
   const names = new Map(vessels.map((v) => [v.id as string, v.name as string]));
   return new Map(rows.map((r) => [r.batch_id as string, {
     id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
