@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { MaterialView } from "@/components/mgr/views/material";
+import { MaterialView, EXTRACT_KINDS } from "@/components/mgr/views/material";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 export type Material = {
   id: string; name: string; category: string; base_uom: string; purchase_uom: string; purchase_uom_factor: number;
@@ -37,7 +37,7 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
       id: material?.id, name, category, baseUom, purchaseUom, purchaseUomFactor: Number(factor) || 1, lotTracked,
       defaultVendorId: vendorId || undefined, active,
       // Only where the field shows; blank or another kind sends none (an edit keeps the old one).
-      extractPotential: (category === "malt" || category === "adjunct") && Number(extract) > 0 ? Number(extract) : undefined,
+      extractPotential: EXTRACT_KINDS.has(category) && Number(extract) > 0 ? Number(extract) : undefined,
     }),
     reset: () => {
       setName(material?.name ?? ""); setCategory(material?.category ?? ""); setBaseUom(material?.base_uom ?? "lb");

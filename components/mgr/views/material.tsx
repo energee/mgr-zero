@@ -25,7 +25,8 @@ const pick = (
 );
 
 /** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
-const EXTRACT_KINDS = new Set(["malt", "adjunct"]);
+/** Kinds whose extract potential feeds recipe gravity. */
+export const EXTRACT_KINDS = new Set(["malt", "adjunct"]);
 
 export function MaterialView({ model, controls = {}, messages, footer }: {
   model: MaterialViewModel;
