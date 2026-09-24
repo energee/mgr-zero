@@ -1,7 +1,9 @@
 // app/(app)/orders/[id]/restock/page.tsx — Put back: the staged quantities
-// left after an adjust-after-pick or cancel-when-picked, drawn to the Put
+// left after an adjust-after-pick, a short ship, or cancel-when-picked
+// (stagedQty in put-back-view.ts), drawn to the Put
 // back screen record. Reads get_order; the button runs confirm_restock
-// (put-back-button.tsx). Nothing moves in the ledger.
+// (put-back-button.tsx), which lowers each line's picked amount to what the
+// order keeps. Nothing moves in the ledger.
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -11,7 +13,7 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { PutBackButton } from "./put-back-button";
 
-type Line = { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
+type Line = { id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; skus: { name: string } | null };
 type Order = { id: string; order_no: number | null; status: string; needs_restock: boolean };
 
 export default async function RestockPage({ params }: { params: Promise<{ id: string }> }) {

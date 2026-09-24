@@ -29,7 +29,11 @@ describe("catalog commands", () => {
     expect(sku.name).toBe("Command Lager · 16 oz can");
     expect(location.id).toMatch(/^[0-9a-f-]{36}$/i);
     // one brand × one format, once
-    await expect(runCommand("create_sku", { brandId: brand.id, formatId: fmt.id }, salesCtx)).rejects.toBeTruthy();
+    await expect(runCommand("create_sku", { brandId: brand.id, formatId: fmt.id }, salesCtx))
+      .rejects.toMatchObject({ status: 409, code: "conflict" }); // #422: a readable conflict, not a 500
+    // a second location with the same name is a conflict, not a 500 "database error" (#422)
+    await expect(runCommand("create_location", { name: "Command Warehouse", uses: ["warehouse"] }, adminCtx))
+      .rejects.toMatchObject({ status: 409, code: "conflict", message: "That already exists. Use a different name or value." });
     // a poured format is never a sku
     const pour = await runCommand("upsert_format", { name: "pint", basis: "poured", brandId: brand.id, ounces: 16 }, salesCtx) as { id: string };
     await expect(runCommand("create_sku", { brandId: brand.id, formatId: pour.id }, salesCtx)).rejects.toThrow(/packaged/);
