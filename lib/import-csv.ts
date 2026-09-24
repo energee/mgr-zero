@@ -16,6 +16,11 @@ export type ImportLookups = Record<string, { id: string; name: string; location_
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
+// The opening qty: record_inventory_movement refuses qty <> round(qty, 2), the same
+// rule the order commands state as multipleOf(0.01), so trailing zeros pass and a
+// third significant decimal does not.
+const openingQty = z.number().positive().multipleOf(0.01);
+
 export function validateImportRow(kind: ImportKind, row: Record<string, string>, lookups?: ImportLookups): string[] {
   const errors: string[] = Object.keys(row).filter(key => !IMPORT_FIELDS[kind].some(f => f.name === key)).map(key => `unknown CSV field ${key}`);
   for (const f of IMPORT_FIELDS[kind]) {
@@ -25,12 +30,23 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     if (f.type === "uuid" && !z.uuid().safeParse(value).success) errors.push(`${f.name} must be a UUID`);
     if (f.type === "state" && !(US_STATE_CODES as readonly string[]).includes(value)) errors.push(`${f.name} must be a US state code, such as PA`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
-      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && Number(value) <= 0) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive decimal" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
+      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
     }
     if (f.lookup && lookups && !lookups[f.lookup]?.some(item => item.id === value)) errors.push(`${f.name} was not found`);
   }
   if (kind === "opening_balances" && lookups && !lookups.bins?.some(b => b.id === row.binId?.trim() && b.location_id === row.locationId?.trim())) errors.push("binId must belong to locationId");
   return errors;
+}
+
+/** The rows the preview marked ready (no validation errors) — the only rows a batch sends. */
+export function readyImportRows(rows: Record<string, string>[], validation: string[][]): Record<string, string>[] {
+  return rows.filter((_, index) => !validation[index]?.length);
+}
+
+/** The 1-based preview row number of each ready row, in send order. import_csv numbers
+ *  outcomes by position in the sent array, so outcome row n is preview row numbers[n - 1]. */
+export function readyImportRowNumbers(validation: string[][]): number[] {
+  return validation.flatMap((errors, index) => errors.length ? [] : [index + 1]);
 }
 
 export function mapCsvRows(rows: string[][], mapping: Record<string, number>): Record<string, string>[] {
