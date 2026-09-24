@@ -67,7 +67,7 @@ describe("recipes and immutable versions", () => {
     expect(got.version).toMatchObject({ id: v2.id, version: 2 });
     const expected = recipeGravity({
       brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
-      ingredients: [{ perBblQty: 70, extractPotential: 1.02, stage: "mash" }],
+      ingredients: [{ perBblQty: 70, extractPotential: 1.02, stage: "mash", unit: "lb" }],
     });
     expect({ ogPlato: got.ogPlato, fgPlato: got.fgPlato, abv: got.abv }).toEqual(expected);
 
