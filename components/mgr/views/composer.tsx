@@ -22,10 +22,17 @@ export type OfflineOutboxRow = {
 };
 export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
 
+/** Enter sends; Shift+Enter is a new line, and Enter that confirms an IME
+ * candidate (Japanese, Chinese…) is the IME's, not a send. */
+export const isSendKey = (event: { key: string; shiftKey: boolean; nativeEvent: { isComposing: boolean } }) =>
+  event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing;
+
+// The conversation and its restored history open from the drawer handle
+// (Open / Expand Ask MGR); the strip used to draw a History button that
+// nothing wired (#446). Listing older conversations is a separate feature.
 export function ComposerStripView({
   actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],
   onAction,
-  onHistory,
   onOutbox,
   outboxCount = 0,
   disabled = false,
@@ -38,7 +45,6 @@ export function ComposerStripView({
 }: {
   actions?: ComposerStripAction[];
   onAction?: (value: string) => void;
-  onHistory?: () => void;
   onOutbox?: () => void;
   outboxCount?: number;
   disabled?: boolean;
@@ -63,7 +69,7 @@ export function ComposerStripView({
             maxLength={4000}
             className="min-h-14 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
             onKeyDown={onSubmit ? (event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
+              if (isSendKey(event)) {
                 event.preventDefault();
                 const message = value?.trim();
                 if (message) onSubmit(message);
@@ -76,7 +82,6 @@ export function ComposerStripView({
             </span>
             <span className="flex flex-wrap items-center justify-end gap-1">
               <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
-              <Button type="button" variant="ghost" size="sm" onClick={onHistory}>History</Button>
               <span className="text-xs text-muted-foreground">Enter to send · Shift + Enter for a new line</span>
               {streaming
                 ? <Button type="button" size="sm" variant="outline" onClick={onStop}>Stop response</Button>
