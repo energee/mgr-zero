@@ -248,10 +248,10 @@ export const E = {
   tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
     <TabBar names={names} on={on} cls={cls} to={to} />
   ),
-  chips: (arr: string[], on = 0, bright = false) => (
+  chips: (arr: string[], on = 0) => (
     <ToggleGroup type="single" defaultValue={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
-        <ToggleGroupItem key={c} value={c} className={cn(bright && "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground")}>{c}</ToggleGroupItem>
+        <ToggleGroupItem key={c} value={c}>{c}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   ),
