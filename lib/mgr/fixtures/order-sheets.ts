@@ -115,7 +115,7 @@ export const orderShipmentDone: ShipmentDoneSnapshot = {
   ],
 };
 
-/** One Hazy keg returning damaged against INV-1042; deposit $30. */
+/** One Hazy keg returning damaged against INV-1042, and its $30 deposit refunded. */
 export const orderReturnCredit: ReturnCreditSnapshot = {
   order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id },
   invoice: { invoice_no: 1042 },
@@ -125,8 +125,14 @@ export const orderReturnCredit: ReturnCreditSnapshot = {
     qty_returning: 1,
     unit_price_cents: SKU_HAZY.unit_price_cents,
     skus: { name: SKU_HAZY.name },
+  }, {
+    id: "l-hazy-deposit",
+    qty_shipped: 4,
+    qty_returning: 1,
+    unit_price_cents: 3000,
+    skus: { name: "Keg deposit · ½ bbl" },
+    kind: "keg_deposit",
   }],
-  deposit: { label: "½ bbl pool · 1 · as deposited", cents: 3000 },
   locations: [LOC_WAREHOUSE, LOC_TAPROOM],
   reason: "damaged",
 };

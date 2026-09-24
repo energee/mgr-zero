@@ -84,7 +84,9 @@ describe("bins", () => {
     expect(renamed.name).toBe("Only");
   });
 
-  it("delete_bin clears a menu configured against that empty bin", async () => {
+  // #421: pos_menus.bin_id cascades on delete, so deleting an "empty" bin used to
+  // take the location's menu, its price overrides, and its public URL with it.
+  it("delete_bin refuses an empty bin a POS menu points at, and the menu survives", async () => {
     const loc = (await runCommand("create_location", { name: "Menu bin", uses: ["taproom"] }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     const connection = await admin.from("pos_connections").insert({ brewery_id: ctx.breweryId,
@@ -102,9 +104,12 @@ describe("bins", () => {
     insertFixture("pos_menu_lines", { menu_id: menu.menuId, brewery_id: ctx.breweryId, format_id: poured.data!.id,
       price_override_cents: 700 });
 
-    await expect(runCommand("delete_bin", { binId: bins[0].id }, ctx)).resolves.toMatchObject({ id: bins[0].id });
-    expect((await admin.from("pos_menus").select("id").eq("id", menu.menuId)).data).toEqual([]);
-    expect((await admin.from("pos_menu_lines").select("menu_id").eq("menu_id", menu.menuId)).data).toEqual([]);
+    await expect(runCommand("delete_bin", { binId: bins[0].id }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/POS menu/i) });
+    expect((await admin.from("pos_menus").select("id").eq("id", menu.menuId)).data).toEqual([{ id: menu.menuId }]);
+    expect((await admin.from("pos_menu_lines").select("menu_id").eq("menu_id", menu.menuId)).data)
+      .toEqual([{ menu_id: menu.menuId }]);
+    expect((await admin.from("bins").select("id").eq("id", bins[0].id)).data).toEqual([{ id: bins[0].id }]);
   });
 
   it("a bin belongs to the caller's brewery or the RPC refuses it", async () => {

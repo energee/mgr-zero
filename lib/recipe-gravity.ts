@@ -20,6 +20,11 @@
 // and trub loss are therefore already accounted for by the brewer when the
 // recipe is written; this function never models them.
 //
+// Mass unit (#540): PPG is gravity points per POUND per gallon, and
+// `perBblQty` is in the material's base_uom, so each mash ingredient is
+// converted to pounds first. A mash ingredient stocked by volume or count
+// (syrup in gal, "each") has no honest weight, so there is no prediction.
+//
 // brewing-domain.md does not spell this equation; this implementation and its
 // constants are pinned by the golden example in tests/recipe-gravity.test.ts.
 // Not duplicated in SQL.
@@ -37,9 +42,11 @@
 export type RecipeGravityIngredient = {
   perBblQty: number;
   /** Null when the material never had one typed (recipe_ingredients.extract_snapshot
-   * is nullable). Such an ingredient is skipped, never defaulted — see recipeGravity. */
+   * is nullable). A mash ingredient without one means no prediction — see recipeGravity. */
   extractPotential: number | null | undefined;
   stage: string;
+  /** The material's base_uom; perBblQty is in this unit. */
+  unit: string | null | undefined;
 };
 
 export type RecipeGravityInput = {
@@ -55,6 +62,8 @@ export type RecipeGravityResult = {
 };
 
 const BBL_TO_GALLONS = 31;
+/** Pounds per one of each mass unit in public.uom. */
+const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00220462 };
 
 /**
  * ASBC cubic approximation converting specific gravity to degrees Plato.
@@ -77,22 +86,26 @@ export function platoToSg(plato: number): number {
   return 1 + plato / (258.6 - (plato / 258.2) * 227.1);
 }
 
-/** Predicts OG/FG/ABV from a recipe version's mash-stage ingredients. */
-export function recipeGravity(input: RecipeGravityInput): RecipeGravityResult {
+/**
+ * Predicts OG/FG/ABV from a recipe version's mash-stage ingredients, or null
+ * when there is nothing honest to predict: no mash ingredient, or any mash
+ * ingredient without an extract potential. A null/undefined potential means
+ * nobody typed one on the material (recipe_ingredients.extract_snapshot is
+ * nullable), which is not "contributes nothing" — skipping it would
+ * under-predict OG with no sign of it, and defaulting it would invent one.
+ * Callers hide the prediction on null rather than print 0.0 (#430). A mash
+ * ingredient that truly bears no extract (rice hulls) is given 1.000.
+ * A mash ingredient whose unit is not a mass also means no prediction (#540).
+ */
+export function recipeGravity(input: RecipeGravityInput): RecipeGravityResult | null {
+  const mash = input.ingredients.filter((ingredient) => ingredient.stage === "mash");
+  if (mash.length === 0 || mash.some((ingredient) => ingredient.extractPotential == null || !LB_PER[ingredient.unit ?? ""])) return null;
   const gravityUnits =
-    input.ingredients
-      // A null/undefined potential means nobody ever measured this material,
-      // which is not the same as "it contributes nothing measurable" — but
-      // inventing a default potential would silently move a brewer's predicted
-      // OG, so the ingredient is skipped and the prediction stands on the
-      // ingredients that do carry a number. (Null arrives straight from SQL:
-      // recipe_ingredients.extract_snapshot is nullable.)
-      .filter((ingredient) => ingredient.stage === "mash" && ingredient.extractPotential != null)
-      .reduce(
-        (sum, ingredient) =>
-          sum + ingredient.perBblQty * (ingredient.extractPotential! - 1) * 1000 * input.brewhouseEfficiency,
-        0,
-      ) / BBL_TO_GALLONS;
+    mash.reduce(
+      (sum, ingredient) =>
+        sum + ingredient.perBblQty * LB_PER[ingredient.unit!] * (ingredient.extractPotential! - 1) * 1000 * input.brewhouseEfficiency,
+      0,
+    ) / BBL_TO_GALLONS;
 
   const og = 1 + gravityUnits / 1000;
   const fg = 1 + (og - 1) * (1 - input.yeastAttenuation);

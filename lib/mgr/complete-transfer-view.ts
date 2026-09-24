@@ -42,7 +42,7 @@ export function toCompleteTransferViewProps({ order, lines, locations, backHref 
     tape: lines.flatMap(line => {
       const qty = Number(line.qty_shipped ?? line.qty_picked ?? 0);
       if (qty <= 0) return [];
-      const volume = line.bbl_per_unit === undefined ? "" : formatVolume((qty * line.bbl_per_unit).toFixed(2));
+      const volume = line.bbl_per_unit === undefined ? "" : formatVolume(qty * line.bbl_per_unit);
       return [
         [`−${qty} ${line.skus?.name ?? "Line"} · taproom transfer · ${name(order.from_location_id)}`, volume],
         [`+${qty} ${line.skus?.name ?? "Line"} · taproom transfer · ${name(order.to_location_id)}`, volume],

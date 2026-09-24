@@ -23,6 +23,8 @@ export type WeeklyCountViewModel = {
   draft?: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>;
   receipt?: { date: string; recorded: string; priorHref?: string; correction?: string; correctionForm?: TaproomCorrectionState; canCorrect: boolean; lines: { key: string; name: string; detail: string; result: string }[] };
   history: { key: string; date: string; detail: string; href?: string }[];
+  /** breweries.timezone: the server renders these client views first, so both sides format in it (#442). */
+  timeZone: string;
 };
 
 export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCountViewModel; draft?: ReactNode; correction?: ReactNode }) {
@@ -33,7 +35,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
       {model.locations.length > 0 && (model.locations.some(([, href]) => href) ? <LinkTabs items={model.locations.map(([name, href]) => [name, href ?? "#"])} current={model.location} className="w-full" /> : E.tabs(model.locations.map(([name]) => name), model.locations.findIndex(([name]) => name === model.location), "w-full"))}
     </div>
     {model.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
-      {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} role={model.role} lotLabels={model.lotLabels} />}
+      {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} role={model.role} lotLabels={model.lotLabels} timeZone={model.timeZone} />}
       <div className="contents print:hidden">
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
@@ -51,8 +53,8 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
   </>;
 }
 
-export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onSubmit }: {
-  state: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>; priorHref?: string; print?: ReactNode;
+export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, timeZone, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onSubmit }: {
+  state: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>; timeZone: string; priorHref?: string; print?: ReactNode;
   projectionBusy?: boolean; projectionError?: string | null; onRefreshExpected?: () => void; onRefreshSnapshot?: () => void;
   onQuantity?: (key: string, value: string) => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -71,7 +73,7 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
     {E.note(prior ? <>Captured prior · {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)} · reopen saved count</> : "Captured prior · first count")}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
       : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable · {(projection?.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
-    {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at)} through {formatDateTime(projection.as_of)}</p>}
+    {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at, timeZone)} through {formatDateTime(projection.as_of, timeZone)}</p>}
     {comparison.map(row => <div key={row.brandId}>{E.row(row.brandName, `expected ${bbl(row.expectedBbl)} · draft actual ${row.complete ? bbl(row.actualBbl) : "Enter all buckets"}`, `difference ${bbl(row.differenceBbl)}`)}</div>)}
     {comparison.length > 0 && <p className="text-xs text-muted-foreground">Draft actual is an estimate from this snapshot&apos;s package volumes. Expected minus actual is a comparison only; the saved receipt is authoritative.</p>}
     {aligned && projection && ((projection.unmapped_lines ?? 0) > 0 || (projection.ignored_lines ?? 0) > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) && <p className="text-xs text-muted-foreground">Coverage {projection.coverage_complete ? "complete" : "incomplete"} · {projection.unmapped_lines} unmapped · {projection.ignored_lines} ignored · {projection.excluded_bbl} bbl excluded · {projection.unattributed_bbl} bbl unattributed</p>}

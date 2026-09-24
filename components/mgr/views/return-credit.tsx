@@ -34,9 +34,9 @@ export function ReturnCreditView({ model, sources, footer, tape, reason, quantit
   const selectedReason = reason ?? model.reason;
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
-    {model.lines.length === 0 && E.info("No returnable beer lines")}
+    {model.lines.length === 0 && E.info("No returnable lines")}
     {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
-      <OrderQuantity label={`${line.name} return quantity`} value={quantities?.[line.key] ?? line.qty} max={line.shipped} step="0.01" onChange={onQuantity && (value => onQuantity(line.key, value))} />)}</div>)}
+      <OrderQuantity label={`${line.name} return quantity`} value={quantities?.[line.key] ?? line.qty} max={line.shipped} step={line.step} onChange={onQuantity && (value => onQuantity(line.key, value))} />)}</div>)}
     <ToggleGroup type="single" aria-label="Reason" variant="outline" size="sm" className="flex-wrap justify-start"
       value={onReason ? String(selectedReason) : undefined} defaultValue={onReason ? undefined : String(selectedReason)}
       onValueChange={value => { if (value !== "") onReason?.(Number(value)); }}>
@@ -44,7 +44,6 @@ export function ReturnCreditView({ model, sources, footer, tape, reason, quantit
     </ToggleGroup>
     {E.pick("Return to", model.returnToId, model.returnToOptions.map(option => ({ value: option.id, label: option.label })), { onChange: onReturnTo, placeholder: "Select location" })}
     {bins !== undefined && E.pick("Return to bin", binId, [{ value: "", label: "Choose bin" }, ...(bins.map(bin => ({ value: bin.id, label: bin.name })))], { onChange: onBin, required: true })}
-    {model.depositLabel && model.depositAmount ? <>{E.row("Deposit refund · unavailable", model.depositLabel, model.depositAmount)}{E.info("Deposit refunds are not included in this beer return.")}</> : null}
     {E.info(model.creditInfo)}
     {E.tape(tape ?? model.tape)}
     {E.note(model.note)}

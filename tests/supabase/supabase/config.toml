@@ -50,10 +50,11 @@ additional_redirect_urls = [
   "http://127.0.0.1:3002/auth/confirm**",
 ]
 jwt_expiry = 3600
-enable_signup = true
+enable_signup = false
 minimum_password_length = 6
 
 [auth.email]
+# Must stay true: false disables the email provider (password sign-in).
 enable_signup = true
 enable_confirmations = false
 

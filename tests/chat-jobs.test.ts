@@ -148,6 +148,34 @@ describe("delivery batch", () => {
     expect((await deliver()).sent).toBe(0);
   });
 
+  // #462: recording "sent" failed after Slack accepted the message (here an
+  // overlapping run swept the lease), which was classified as a retryable
+  // network error — posting again — and the retry's stale lease threw out of
+  // the loop, aborting the rest of the batch.
+  it("does not resend or abort the batch when recording a sent message fails", async () => {
+    await drain(); calls.sends.length = 0;
+    const id = await submittedOrder();
+    const [first, second] = await deliveriesOf(id);
+    let stolen: string | null = null;
+    const db = new Proxy(admin, { get(target, prop, receiver) {
+      if (prop !== "rpc") return Reflect.get(target, prop, receiver);
+      return (fn: string, args: { p_delivery?: string }) => {
+        if (fn !== "complete_chat_delivery" || stolen) return (target.rpc as (f: string, a: unknown) => unknown)(fn, args);
+        stolen = args.p_delivery!;
+        return admin.from("notification_deliveries").update({ lease_expires_at: "2036-09-05T15:00:00Z" }).eq("id", stolen)
+          .then(() => (target.rpc as (f: string, a: unknown) => PromiseLike<unknown>)(fn, args));
+      };
+    } }) as typeof admin;
+    const result = await runChatDeliveryBatch({ limit: 50, now: new Date(NOW), transport, db });
+    expect(stolen).not.toBeNull();
+    expect(calls.sends).toHaveLength(2); // each delivery posted exactly once
+    expect(result).toMatchObject({ sent: 1, retried: 0 });
+    const rows = await deliveriesOf(id);
+    expect(rows.find((d) => d.id === stolen)!.state).toBe("leased"); // left to the lease owner / expiry
+    expect(rows.find((d) => d.id !== stolen)!.state).toBe("sent");
+    expect([first.id, second.id]).toContain(stolen);
+  });
+
   it("updates a sent message when its occurrence resolves and suppresses unsent ones", async () => {
     await drain(); calls.updates.length = 0;
     const id = await submittedOrder();
