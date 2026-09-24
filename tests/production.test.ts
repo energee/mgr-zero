@@ -402,3 +402,23 @@ describe("fermentation readings", () => {
       .rejects.toThrow(/closed/);
   });
 });
+
+// A partial transfer splits a batch across two open tanks. list_batches names
+// both; get_brew_day keeps the tank the brew went into, the earliest still
+// open, rather than whichever row the Map kept last (#439).
+describe("a batch split across tanks", () => {
+  it("lists every open vessel and keeps the brew-day tank on get_brew_day", async () => {
+    const fv = (await runCommand("upsert_vessel", { name: `FV-SPLIT ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string; name: string };
+    const bt = (await runCommand("upsert_vessel", { name: `BT-SPLIT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 30 }, ctx)) as { id: string; name: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, ctx)) as { id: string };
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: bt.id, volumeBbl: 5 }, ctx);
+
+    const listed = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null }[];
+    expect(listed.find((r) => r.id === batch.id)?.vessel_name).toBe(`${fv.name}, ${bt.name}`);
+    const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { vessel_name: string; initial_bbl: number } };
+    expect(day.occupancy).toMatchObject({ vessel_name: fv.name, initial_bbl: 20 });
+  });
+});
+

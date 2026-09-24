@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/date-format";
 import { runNo } from "@/lib/mgr/doc-no";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
@@ -39,7 +40,7 @@ function row(run: PackagingRunSnapshot, href?: string): PackagingRunRowView {
   const title = `${runNo(run.run_no)} · ${run.brand_name ?? "no brand"}`;
   if (run.closed_at) {
     const detail = [
-      `closed ${run.planned_on}`,
+      `closed ${formatDate(run.closed_at)}`,
       run.lot_code,
       run.output_summary ?? `${run.qty_planned} planned`,
       run.yield_percent === undefined ? undefined : `${run.yield_percent}% yield`,

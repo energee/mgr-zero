@@ -295,23 +295,33 @@ async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
   return new Map(versions.map((v) => [v.id as string, byRecipe.get(v.recipe_id as string) ?? ""]));
 }
 
-// The open occupancy (ended_at is null) is where a batch physically is; the
-// gist exclusion on vessel_occupancies guarantees at most one per vessel.
+// The open occupancies (ended_at is null) are where a batch physically is; the
+// gist exclusion on vessel_occupancies guarantees at most one per vessel, but a
+// partial transfer leaves one batch open in several vessels. Each batch maps to
+// all of them, oldest first, so the brew-day tank (created first) leads.
+type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
 async function openVessels(ctx: Ctx, batchIds: string[]) {
   const rows = (await unwrap(ctx.db.from("vessel_occupancies")
-    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", batchIds).is("ended_at", null))) ?? [];
-  if (rows.length === 0) return new Map<string, { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string }>();
+    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", batchIds).is("ended_at", null)
+    .order("created_at").order("id"))) ?? [];
+  const byBatch = new Map<string, OpenVessel[]>();
+  if (rows.length === 0) return byBatch;
   const vessels = (await unwrap(ctx.db.from("vessels").select("id, name")
     .in("id", [...new Set(rows.map((r) => r.vessel_id as string))]))) ?? [];
   const names = new Map(vessels.map((v) => [v.id as string, v.name as string]));
-  return new Map(rows.map((r) => [r.batch_id as string, {
-    id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
-    started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
-  }]));
+  for (const r of rows) {
+    const list = byBatch.get(r.batch_id as string) ?? [];
+    list.push({
+      id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
+      started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
+    });
+    byBatch.set(r.batch_id as string, list);
+  }
+  return byBatch;
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open",
+  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels (comma-separated when split across tanks) when any is open",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: async (ctx) => {
     const batches = (await unwrap(ctx.db.from("batches")
@@ -329,20 +339,20 @@ defineQuery({
       ...b,
       brand_name: b.intended_brand_id ? brands.get(b.intended_brand_id) ?? null : null,
       recipe_name: b.recipe_version_id ? recipes.get(b.recipe_version_id) ?? null : null,
-      vessel_name: vessels.get(b.id)?.vessel_name ?? null,
+      vessel_name: vessels.get(b.id)?.map((v) => v.vessel_name).join(", ") || null,
     }));
   },
 });
 
 defineQuery({
-  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in: the vessel's name and the volume that went in",
+  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in",
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
       .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
-    return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId) ?? null };
+    return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId)?.[0] ?? null };
   },
 });
 

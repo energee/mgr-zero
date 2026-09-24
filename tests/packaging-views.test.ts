@@ -50,4 +50,13 @@ describe("packaging views", () => {
     expect(repackForm).not.toMatch(/Child qty|childSkuId, setChildSkuId/);
     expect(page).not.toMatch(/\bE\./);
   });
+
+  it("dates a closed run by when it closed, not when it was planned (#439)", () => {
+    const [recent] = toPackagingRunsViewProps([{
+      id: "r", run_no: 7, planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", closed_at: "2026-09-04T18:30:00Z",
+      brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
+    }]).recent;
+    expect(recent.detail).toMatch(/^closed Sep 4, 2026/);
+    expect(recent.detail).not.toContain("2026-09-01");
+  });
 });

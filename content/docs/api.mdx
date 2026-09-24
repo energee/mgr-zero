@@ -3465,7 +3465,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One batch with the occupancy it is currently sitting in: the vessel's name and the volume that went in
+One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3499,7 +3499,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open
+Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels (comma-separated when split across tanks) when any is open
 
 Takes no input.
 
