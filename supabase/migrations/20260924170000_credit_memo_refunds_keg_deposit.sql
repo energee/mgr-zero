@@ -77,7 +77,6 @@ begin
   end loop;
   -- Append to the originating order's event log, if this invoice came from a
   -- shipment (credit memos on a manually-issued invoice have none).
-  select s.order_id into v_order from public.shipments s where s.id = v_inv.shipment_id;
   if v_order is not null then
     insert into public.order_events (brewery_id, order_id, actor, event, payload)
     values (v_inv.brewery_id, v_order, auth.uid(), 'credit_memo',
