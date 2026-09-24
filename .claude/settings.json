@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bunx tsc --noEmit)",
+      "Bash(bunx tsc --noEmit *)",
+      "Bash(bun run lint)",
+      "Bash(bunx vitest run *)",
+      "Bash(git fetch *)"
+    ]
+  }
+}
