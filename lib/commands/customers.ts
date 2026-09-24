@@ -2,7 +2,7 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { completeRangeRows, defineCommand, defineQuery, stateCode, unwrap } from "./registry";
+import { completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 
 const roles = ["admin", "sales"] as const;
 
@@ -66,11 +66,11 @@ defineQuery({
   roles: ["admin", "sales", "warehouse"],
   input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer") }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
-  handler: (ctx, i) => completeRangeRows("Customer list", start => {
+  handler: (ctx, i) => completeRows("Customer list", start => {
     const query = ctx.db.from("customers")
       .select(i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).order("name").order("id");
-    return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + 499);
+    return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
   }),
 });
 

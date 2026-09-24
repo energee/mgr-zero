@@ -11,7 +11,7 @@
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
-import { completeKeyedRows, defineCommand, defineQuery, inChunks, unwrap, CommandError, type Ctx } from "./registry";
+import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
 // z.string().date() rather than a regex: api-schema.ts renders it as
 // "date (YYYY-MM-DD)" in /docs/api, as orders.ts and transfers.ts already do.
@@ -221,13 +221,8 @@ async function vesselNames(ctx: Ctx, occupancyIds: (string | null)[]) {
 // 100 ids per read, and each read is paged past the 1000-row cap (#469).
 async function plannedQty(ctx: Ctx, runIds: string[]) {
   if (runIds.length === 0) return new Map<string, number>();
-  const rows = await inChunks(runIds, chunk => completeKeyedRows<{ id: string; run_id: string; qty_planned: number }>("Planned units", async after => {
-    let q = ctx.db.from("packaging_run_outputs").select("id, run_id, qty_planned").eq("brewery_id", ctx.breweryId).in("run_id", chunk);
-    if (after) q = q.gt("id", after.id);
-    const [result, counted] = await Promise.all([q.order("id").limit(500),
-      ctx.db.from("packaging_run_outputs").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId).in("run_id", chunk)]);
-    return { ...result, count: counted.count, error: result.error ?? counted.error };
-  }, row => row.id));
+  const rows = await inChunks(runIds, chunk => completeRows("Planned units", start => ctx.db.from("packaging_run_outputs")
+    .select("run_id, qty_planned", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("run_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
   const totals = new Map<string, number>();
   for (const r of rows) totals.set(r.run_id as string, (totals.get(r.run_id as string) ?? 0) + Number(r.qty_planned));
   return totals;

@@ -2,15 +2,15 @@
 // complete past PostgREST's max_rows (1000) and keep `.in()` URLs bounded
 // (#469, #475). Pure: each page is a stubbed PostgREST response.
 import { describe, it, expect } from "vitest";
-import { completeKeyedRows, completeRangeRows, inChunks, CommandError } from "@/lib/commands/registry";
+import { completeRows, inChunks, CommandError } from "@/lib/commands/registry";
 
 type Row = { id: string };
 const rows = Array.from({ length: 2345 }, (_, n) => ({ id: String(n).padStart(5, "0") }));
 
-describe("completeRangeRows", () => {
+describe("completeRows", () => {
   it("reads every page past the 1000-row cap", async () => {
     const starts: number[] = [];
-    const got = await completeRangeRows<Row>("Rows", start => {
+    const got = await completeRows<Row>("Rows", start => {
       starts.push(start);
       return Promise.resolve({ data: rows.slice(start, start + 500), error: null, count: rows.length });
     });
@@ -20,15 +20,13 @@ describe("completeRangeRows", () => {
 
   it("refuses a list whose count moves while loading", async () => {
     let call = 0;
-    await expect(completeRangeRows<Row>("Rows", start =>
+    await expect(completeRows<Row>("Rows", start =>
       Promise.resolve({ data: rows.slice(start, start + 500), error: null, count: rows.length + call++ }),
     )).rejects.toBeInstanceOf(CommandError);
   });
-});
 
-describe("completeKeyedRows", () => {
   it("walks keyset pages past the 1000-row cap", async () => {
-    const got = await completeKeyedRows<Row>("Rows", after => {
+    const got = await completeRows<Row>("Rows", (_, after) => {
       const from = after ? rows.findIndex(r => r.id === after.id) + 1 : 0;
       return Promise.resolve({ data: rows.slice(from, from + 500), error: null, count: rows.length });
     }, row => row.id);

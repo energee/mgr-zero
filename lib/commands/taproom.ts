@@ -8,7 +8,7 @@
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { completeRangeRows, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
 import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
@@ -99,13 +99,13 @@ defineQuery({
   name: "list_keg_events", description: "Keg event history, newest first, optionally for one pool or one customer",
   input: z.object({ poolId: z.string().uuid().optional(), customerId: z.string().uuid().optional() }), roles: ROLES,
   // Paged past PostgREST's 1000-row cap (#469); id breaks same-instant ties.
-  handler: (ctx, i) => completeRangeRows("Keg history", start => {
+  handler: (ctx, i) => completeRows("Keg history", start => {
     let q = ctx.db.from("keg_events")
       .select("id, pool_id, keg_size, qty, reason, location_id, bin_id, customer_id, shipment_id, at, note", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).order("at", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false });
     if (i.poolId) q = q.eq("pool_id", i.poolId);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    return q.range(start, start + 499);
+    return q.range(start, start + PAGE_SIZE - 1);
   }),
 });
 
