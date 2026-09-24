@@ -33,8 +33,8 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
   const openStops = route.stops.filter((s) => !s.delivered_at);
   const next = openStops[0];
   const driverVehicle = [driverLabel(route.driver_user_id), route.vehicle].filter(Boolean).join(" · ");
-  const departed = formatTime(route.departed_at);
-  const action = route.returned_at ? E.status(`Returned ${formatTime(route.returned_at)}`, "ok") : <ReturnRoute routeId={route.id} open={openStops.length} />;
+  const departed = formatTime(route.departed_at, brewery.timeZone);
+  const action = route.returned_at ? E.status(`Returned ${formatTime(route.returned_at, brewery.timeZone)}`, "ok") : <ReturnRoute routeId={route.id} open={openStops.length} />;
   if (openStops.length === 0) {
     return (
       <ReturnRouteView
@@ -47,7 +47,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
           stops: route.stops.map((s) => ({
             key: s.id,
             title: `Stop ${s.stop_no} · ${s.label}`,
-            detail: s.delivered_at ? `delivered ${formatTime(s.delivered_at)}` : "",
+            detail: s.delivered_at ? `delivered ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
           })),
         }}
         action={action}
@@ -65,7 +65,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
         stops: route.stops.map((s) => {
           const isNext = s.id === next?.id;
           if (s.delivered_at) {
-            return { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `delivered ${formatTime(s.delivered_at)}`, trailing: "done", ok: true };
+            return { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `delivered ${formatTime(s.delivered_at, brewery.timeZone)}`, trailing: "done", ok: true };
           }
           return {
             key: s.id,

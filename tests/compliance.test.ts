@@ -227,3 +227,23 @@ describe("trace_lot", () => {
     await expect(runCommand("trace_lot", { lotId: crypto.randomUUID() }, sales)).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe("cellar transfer loss (#428)", () => {
+  it("reports the volume lost on a transfer as a loss removal in the transfer's month", async () => {
+    const brewery = await makeBrewery();
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
+      from breweries where id='${brewery.id}'`, true)[0].split("|");
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
+    const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: fv2.id, volumeBbl: 8, lossBbl: 0.5 }, brewer);
+
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: start, periodEnd: end }, owner) as Report & { figures: { cellarRemovals: Record<string, number> } };
+    expect(Number(r.figures.removals.loss)).toBe(0.5);
+    expect(Number(r.figures.cellarRemovals.loss)).toBe(0.5);
+  });
+});
