@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
 import { movementFormHref } from "@/lib/composer/state";
-import { discardOutbox, flushOutbox, outboxDiscardConfirmation, readOutbox, sendOutboxAttempt, visibleOutbox, type OutboxAttempt } from "@/lib/composer/outbox";
+import { discardOutbox, dismissOutboxQuarantine, flushOutbox, outboxDiscardConfirmation, outboxQuarantineNotice, readOutbox, sendOutboxAttempt, visibleOutbox, type OutboxAttempt } from "@/lib/composer/outbox";
 import type { StaffRole } from "@/lib/commands/registry";
 
 type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
@@ -36,6 +36,8 @@ export function Composer({ role }: { role: StaffRole }) {
   const [outboxOpen, setOutboxOpen] = useState(false);
   const [outboxBusy, setOutboxBusy] = useState(false);
   const [outboxEntries, setOutboxEntries] = useState<OutboxAttempt[]>([]);
+  // Why the outbox list may be incomplete: set-aside entries or a read failure.
+  const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   // Identifies the current setup load; a superseded run drops its response.
   const setupRun = useRef(0);
@@ -109,8 +111,13 @@ export function Composer({ role }: { role: StaffRole }) {
 
   useEffect(() => {
     const scope = { actorId: expectedContext.actorId, breweryId, role };
-    const refresh = () => setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope));
-    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } finally { setOutboxBusy(false); } };
+    // Reading the outbox must never throw out of this effect: the Composer sits
+    // in the staff layout, so an escape here errors every staff page (#463).
+    const refresh = () => {
+      try { setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope)); setOutboxNotice(outboxQuarantineNotice(localStorage)); }
+      catch (cause) { setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be read."); }
+    };
+    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } catch (cause) { refresh(); setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be sent."); } finally { setOutboxBusy(false); } };
     addEventListener("online", flush); addEventListener("mgr-outbox-change", refresh); refresh(); if (navigator.onLine) void flush();
     return () => { removeEventListener("online", flush); removeEventListener("mgr-outbox-change", refresh); };
   }, [breweryId, expectedContext.actorId, role]);
@@ -146,7 +153,7 @@ export function Composer({ role }: { role: StaffRole }) {
     <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
-    {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}
+    {outboxOpen && <><OfflineOutboxView notice={outboxNotice ?? undefined} onDismissNotice={() => { try { dismissOutboxQuarantine(localStorage); } finally { setOutboxNotice(null); } }} rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}
     <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || streaming || committing} streaming={streaming} onStop={stop} />
   </ComposerDrawerView>;
 }

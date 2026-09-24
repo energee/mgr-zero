@@ -11,6 +11,12 @@ export const OUTBOX_STORAGE_KEY = "mgr-offline-outbox:v1";
 export const OUTBOX_ENTRY_PREFIX = "mgr-offline-outbox:v2:";
 export const OUTBOX_RETIRED_PREFIX = "mgr-offline-outbox:v2-retired:";
 export const OUTBOX_RETIREMENT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/**
+ * Raw legacy entries that failed validation or collided with a stored request
+ * identity during migration. They are kept (never sent) so one bad entry cannot
+ * crash every staff page or hide its valid siblings (#463).
+ */
+export const OUTBOX_QUARANTINE_KEY = "mgr-offline-outbox:quarantine";
 
 const staffRole = z.enum(["admin", "sales", "warehouse", "brewer", "taproom"]);
 const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), role: staffRole }).strict();
@@ -50,19 +56,53 @@ type OutboxTransport = (
 ) => Promise<unknown>;
 export type OutboxSendResult = { status: "sent" | "uncertain" | "fix" | "permission_changed" | "not_current"; entry?: OutboxAttempt };
 
-const outboxSchema = z.array(attemptSchema).superRefine((entries, context) => {
-  const ids = new Set<string>();
-  for (const [index, entry] of entries.entries()) {
-    if (ids.has(entry.id)) context.addIssue({ code: "custom", path: [index, "id"], message: "Duplicate outbox request" });
-    ids.add(entry.id);
-  }
-});
 const sends = new WeakMap<object, Map<string, { startedAt: number; pending: Promise<OutboxSendResult> }>>();
 
-function parseOutbox(raw: string | null) {
-  if (raw === null) return [];
-  try { return outboxSchema.parse(JSON.parse(raw)); }
-  catch { throw new Error("Offline outbox could not be read. Nothing was sent or replaced."); }
+/**
+ * Splits the legacy array into valid attempts and the raw text of everything
+ * else. Unparseable JSON or a non-array quarantines the whole value; otherwise
+ * each element is judged alone, so valid siblings survive (#463).
+ */
+function parseOutbox(raw: string): { entries: OutboxAttempt[]; rejected: string[] } {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return { entries: [], rejected: [raw] }; }
+  if (!Array.isArray(value)) return { entries: [], rejected: [raw] };
+  const entries: OutboxAttempt[] = [];
+  const rejected: string[] = [];
+  for (const element of value) {
+    const parsed = attemptSchema.safeParse(element);
+    if (parsed.success) entries.push(parsed.data);
+    else rejected.push(JSON.stringify(element));
+  }
+  return { entries, rejected };
+}
+
+function quarantine(storage: OutboxStorage, rejected: string[]) {
+  if (rejected.length === 0) return;
+  let existing: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY) ?? "[]");
+    if (Array.isArray(parsed)) existing = parsed.filter((item): item is string => typeof item === "string");
+  } catch { /* a damaged quarantine is replaced, not fatal */ }
+  try { storage.setItem(OUTBOX_QUARANTINE_KEY, JSON.stringify([...existing, ...rejected])); }
+  catch { throw new Error("Could not update the offline outbox. The saved requests were retained."); }
+}
+
+/** Staff-facing notice for entries set aside by migration, or null when none. */
+export function outboxQuarantineNotice(storage: OutboxStorage): string | null {
+  let count = 0;
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(OUTBOX_QUARANTINE_KEY) ?? "[]");
+    count = Array.isArray(parsed) ? parsed.length : 1;
+  } catch { count = 1; }
+  if (count === 0) return null;
+  return `${count} unreadable offline reading${count === 1 ? " was" : "s were"} set aside and not sent. Re-enter ${count === 1 ? "it" : "them"} if still needed.`;
+}
+
+/** Drops the quarantined raw entries once staff have seen the notice. */
+export function dismissOutboxQuarantine(storage: OutboxStorage) {
+  storage.removeItem(OUTBOX_QUARANTINE_KEY);
+  notifyOutboxChange();
 }
 
 function notifyOutboxChange() {
@@ -145,13 +185,16 @@ function storedAttempt(storage: OutboxStorage, id: string): OutboxAttempt | null
 function migrateLegacyOutbox(storage: OutboxStorage) {
   const raw = storage.getItem(OUTBOX_STORAGE_KEY);
   if (raw === null) return;
-  const legacy = parseOutbox(raw);
-  for (const entry of legacy) {
+  const { entries, rejected } = parseOutbox(raw);
+  for (const entry of entries) {
     if (isRetired(storage, entry.id)) continue;
-    const current = storedAttempt(storage, entry.id);
-    if (current && !sameImmutableAttempt(current, entry)) throw new Error("Outbox request identity was already used.");
+    let current: OutboxAttempt | null;
+    try { current = storedAttempt(storage, entry.id); } catch { rejected.push(JSON.stringify(entry)); continue; }
+    // A reused identity (duplicate or conflicting row) is set aside, never sent.
+    if (current && !sameImmutableAttempt(current, entry)) { rejected.push(JSON.stringify(entry)); continue; }
     if (!current) writeAttempt(storage, entry);
   }
+  quarantine(storage, rejected);
   try { storage.removeItem(OUTBOX_STORAGE_KEY); notifyOutboxChange(); }
   catch { throw new Error("Could not update the offline outbox. The saved requests were retained."); }
 }
