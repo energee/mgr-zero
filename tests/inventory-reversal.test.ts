@@ -52,6 +52,7 @@ describe("exact standalone inventory reversal", () => {
 
   it("restricts roles, foreign resources, unsupported types and compensation chains", async () => {
     const { ctx, movement } = await setup();
+    await movement(2, "opening_balance"); // a removal needs stock in the bin (#450)
     const original = await movement(-2, "loss");
     for (const role of ["sales", "brewer", "taproom"] as const) {
       await expect(reverse(await makeStaffCtx(ctx.breweryId, role), original.id)).rejects.toThrow(/permission/i);
@@ -133,7 +134,10 @@ it("preserves tracked identity and refuses borrowing other lots or bins", async 
 
 it("nets losses and negative adjustments in their original report outflow side", async () => {
   const { ctx, movement } = await setup();
+  // A removal needs stock in the bin (#450); the stock adjustment is reversed too, so every line nets to zero.
+  const stock = await movement(4);
   for (const type of ["adjustment", "loss"]) await reverse(ctx, (await movement(-2, type)).id);
+  await reverse(ctx, stock.id);
   const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2000-01-01", periodEnd: "2099-12-31" }, ctx) as { figures: { lines: { in: number; out: number; end: number }[]; removals: Record<string, number>; balances: boolean } };
   for (const line of report.figures.lines) expect(line).toMatchObject({ in: 0, out: 0, end: 0 });
   expect(report.figures.removals.loss ?? 0).toBe(0);
@@ -179,6 +183,7 @@ it("copies frozen package class on source-linked returns and damaged-return loss
 
 it("rechecks current membership before replaying a completed request", async () => {
   const { ctx, movement } = await setup();
+  await movement(1, "opening_balance"); // a removal needs stock in the bin (#450)
   const row = await movement(-1, "loss");
   const requestId = crypto.randomUUID();
   await reverse(ctx, row.id, "Wrong entry", requestId);
