@@ -37,8 +37,9 @@ Each one has cost a revert or a rework here before.
 4. **Don't trust one search or truncated output.** Try a second pattern
    before calling code unused or missing. Read status from the exit code,
    `git status -sb`, or `gh pr checks <n>`, never from `| tail` or `| grep`.
-   (A truncated grep removed shadcn; `| tail` hid a failed push; `| grep`
-   hid a red test run.)
+   Read hashes, trailers, and merge state from `git` or `gh`, never from
+   memory. (A truncated grep removed shadcn; `| tail` hid a failed push;
+   `| grep` hid a red test run; a cited hash and a trailer claim were wrong.)
 5. **Don't swallow errors or add silent fallbacks.** Let the failure reach
    the caller, or write why the fallback is safe. (#408 had to surface them.)
 6. **Don't expand scope.** No drive-by refactors; moves and renames follow
@@ -57,6 +58,17 @@ Each one has cost a revert or a rework here before.
     each you skip.
 12. **Don't filter in the page.** Put the predicate in the query; see the
     pre-implementation gates in `.agents/ARCHITECTURE.md`.
+13. **Don't relay a subagent's claim unchecked.** Confirm its commits with
+    `git log` and its files with `git status` before reporting. Reviews use
+    read-only agents. (A subagent claimed commits that did not exist; a
+    "read-only" reviewer left test files behind.)
+14. **Don't use a bare `git stash`.** The stash is shared by every worktree;
+    make a WIP commit instead. (Parallel agents swapped changes through it.)
+15. **Don't guess between two readings.** If a request reads two ways,
+    restate it in one line first. A request to explain gets an explanation,
+    not a code change.
+16. **Don't stack PRs unasked.** Base every PR on `main`. (A PR based on
+    another branch merged into that branch instead of `main`.)
 
 ## Current focus: screens
 
@@ -153,7 +165,8 @@ database (as CI already has) and stop touching the dev one.
    A test failing on a missing column or relation usually means a stale
    test schema: re-run `scripts/test-db.sh` before changing code.
 5. Run `/simplify` on every code change before committing (see the tool
-   table). Then `git diff`: a stray NUL byte once made a file binary.
+   table), then re-run step 4's checks: simplify passes have broken tests.
+   Then `git diff`: a stray NUL byte once made a file binary.
 6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
