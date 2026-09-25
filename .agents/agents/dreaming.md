@@ -19,21 +19,15 @@ consolidation: make the living agent docs match reality, citing evidence.
    do not derive a different window from the checked-out branch.
 2. Review that window with `git log --stat <accepted-base>..<main-head>` and
    `gh pr list --state merged --search 'merged:>=<last-dream date>' --limit 500
-   --json number,title,mergedAt`. `gh pr list` defaults to 30 results and
-   silently truncates past whatever `--limit` you pass with no error — a
-   window with more merged PRs than your `--limit` loses the oldest ones.
-   Confirm the true count first with `--json number --jq 'length'` at a high
-   `--limit` (500 covers this repo's largest window so far) before trusting
-   the list. `gh api --paginate` and `gh issue *` may be blocked in this
-   sandbox; `gh pr list` / `gh pr view` are the reliable primitives — use
-   `gh pr view <n>` only for PRs you need evidence from.
-3. Search merged PR bodies for a `## Durable decisions (for the dreaming log)`
-   heading (or similar) first — feature PRs that make a real design ruling
-   often write one, and it is a stronger, cheaper signal than reading every
-   diff. `gh pr view <n> --json body --jq .body` on the PRs the title suggests
-   are substantial (a Program/design/audit PR, not a routine `docs:` refresh
-   or single-issue `fix:`) is the practical way to find them while `gh api`
-   search is blocked.
+   --json number,title,mergedAt`. `gh pr list` truncates silently at its
+   `--limit`, so count first with `--json number --jq 'length' --limit 500`
+   and trust the list only if it is shorter. `gh api` and `gh issue` may be
+   blocked here; use `gh pr view <n>` for the PRs you need evidence from.
+3. Look first for a `## Durable decisions (for the dreaming log)` heading in
+   merged PR bodies; it marks a design ruling and is cheaper than reading
+   diffs. Open only substantial PRs (Program, design, or audit work) with
+   `gh pr view <n> --json body --jq .body`; skip `docs:` refreshes and
+   single-issue `fix:` PRs.
 4. Read any committed .remember/today-*.md session digests (there may be
    none; the remember plugin retires them locally once a day rolls over).
 5. Read every editable file end to end.
