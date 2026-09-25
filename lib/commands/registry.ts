@@ -146,6 +146,13 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
   return breweryDate(timezone);
 }
 
+/** The largest Postgres `int`: the zod `.max()` for a number stored in an int column (#427), so an
+ * oversized value is a 400 validation error rather than a 22003 overflow from the database. */
+const PG_INT_MAX = 2_147_483_647;
+
+/** Whole cents stored in an int column: never negative, never past PG_INT_MAX. */
+export const cents = z.number().int().nonnegative().max(PG_INT_MAX);
+
 /** A real two-letter US state code (US_STATE_CODES), for customers.state, ship_tos.state and the registry tables. */
 export const stateCode = z.string().refine((s) => (US_STATE_CODES as readonly string[]).includes(s), "a US state code, such as PA");
 

@@ -2,7 +2,7 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const roles = ["admin", "sales"] as const;
@@ -107,7 +107,7 @@ defineQuery({
 defineCommand({
   name: "set_channel_price", description: "Fill one cell of the price grid: every SKU on that group and format sells at it on that channel",
   roles: ["admin", "sales"],
-  input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
+  input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: cents }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_channel_price", {
     p_brewery: ctx.breweryId, p_sale_channel: i.saleChannelId, p_price_group: i.priceGroupId, p_format: i.formatId,
     p_unit_price_cents: i.unitPriceCents, p_request_id: execution.requestId,

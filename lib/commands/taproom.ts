@@ -9,7 +9,7 @@
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
+import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
 import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
@@ -18,7 +18,6 @@ import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 export { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
 const ROLES: ("admin" | "warehouse")[] = ["admin", "warehouse"];
-const cents = z.number().int().nonnegative();
 
 defineCommand({
   name: "create_keg_pool", description: "Add a keg pool: owned, leased from a vendor, or pay-per-fill, with its per-keg deposit",

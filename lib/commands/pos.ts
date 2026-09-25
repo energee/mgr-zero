@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
+import { CommandError, cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
 
 defineCommand({
   name: "connect_square", description: "Begin administrator consent for a Square seller connection",
@@ -263,7 +263,7 @@ defineCommand({
   name: "set_pos_price_override", description: "Set or clear one nullable poured-format price override for one Square location",
   input: z.object({
     posLocationId, formatId: z.string().uuid(),
-    unitPriceCents: z.number().int().min(0).max(2_147_483_647).nullable(),
+    unitPriceCents: cents.nullable(),
   }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_price_override", {

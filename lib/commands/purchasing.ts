@@ -4,7 +4,7 @@
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
-import { defineCommand, defineQuery, phone, unwrap, CommandError } from "./registry";
+import { defineCommand, defineQuery, cents, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 
@@ -73,7 +73,7 @@ defineCommand({
     vendorId: z.string().uuid(),
     materialId: z.string().uuid(),
     qtyCommitted: z.number().positive(),
-    unitCostCents: z.number().int().nonnegative().optional(),
+    unitCostCents: cents.optional(),
     startsOn: isoDate.optional(),
     endsOn: isoDate.optional(),
     contractNo: z.string().trim().optional(),
@@ -159,7 +159,7 @@ defineQuery({
 const poLine = z.object({
   materialId: z.string().uuid(),
   qtyOrdered: z.number().positive(),
-  unitCostCents: z.number().int().nonnegative().optional(),
+  unitCostCents: cents.optional(),
   contractId: z.string().uuid().optional(),
   expectedLotCode: z.string().trim().optional(),
 });

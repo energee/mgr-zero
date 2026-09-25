@@ -5,7 +5,7 @@ import { stockLine } from "./stock-line";
 export const movementInput = z.object({
   lotId: z.string().uuid().optional(),
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
-  qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
+  qty: z.number().min(-9_999_999_999.99).max(9_999_999_999.99).refine(n => n !== 0, "qty cannot be 0"), // numeric(12,2)
   // Order-owned sale/transfer movements stay behind their atomic workflows.
   type: z.enum(["opening_balance", "production_in", "adjustment", "depletion", "return_in",
                 "destruction", "loss", "sample", "festival_removal"]),
