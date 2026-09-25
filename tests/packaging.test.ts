@@ -516,28 +516,42 @@ describe("closing the run", () => {
       .rejects.toThrow(/start the run before closing it/);
   });
 
-  it("refuses a BOM line whose material is lot-tracked rather than inventing a lot", async () => {
-    const adminCtx = await makeStaffCtx(b.id, "admin");
-    const yeast = await material("Tracked crown", true);
-    const fmt = (await runCommand("upsert_format", {
-      name: "tracked can", basis: "packaged", packageType: "can", bblPerUnit: 0.0645,
-    }, adminCtx)) as { id: string };
-    await runCommand("replace_format_bom",
-      { formatId: fmt.id, lines: [{ materialId: yeast, qtyPerUnit: 1 }] }, adminCtx);
-    const sku = (await runCommand("create_sku",
-      { brandId: stout.brandId, formatId: fmt.id, name: "Stout tracked" }, adminCtx)) as { id: string };
+  it("draws a lot-tracked material first-expiring-first across the bin's lots (#436)", async () => {
+    const crown = await material("Tracked crown", true);
+    const { runId, close, adminCtx } = await bomRun("FEFO", [{ materialId: crown, qtyPerUnit: 1 }]);
+    const lot = (code: string, best_by: string | null, received_on: string) =>
+      insert("material_lots", { brewery_id: b.id, material_id: crown, lot_code: code, best_by, received_on });
+    const late = await lot("CR-LATE", "2027-06-01", "2026-10-01");
+    const early = await lot("CR-EARLY", "2027-01-01", "2026-11-01");
+    const undated = await lot("CR-NONE", null, "2026-09-01");
+    for (const lotId of [late, early, undated]) {
+      await seedMovement(b.id, { materialId: crown, locationId: wh.id, binId: wh.binId, qty: 4, lotId, createdBy: adminCtx.userId });
+    }
 
-    const { occupancyId } = await brewInto("FV-TRACKED", stout.brandId, 10, "2026-11-12");
-    const run = (await runCommand("schedule_packaging_run", {
-      brandId: stout.brandId, plannedOn: "2026-12-05", occupancyId,
-      outputs: [{ skuId: sku.id, qtyPlanned: 50 }],
-    }, ctx)) as { id: string };
-    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-05T14:00:00Z" }, ctx);
+    await close(7);
 
-    await expect(runCommand("close_packaging_run", {
-      runId: run.id, bblDrawn: 3, outputs: [{ skuId: sku.id, qtyActual: 50 }],
-      lotCode: "L-tracked", packagedOn: "2026-12-05", locationId: wh.id, binId: wh.binId,
-    }, ctx)).rejects.toThrow(/cannot post BOM for lot-tracked material "Tracked crown" yet/);
+    const cons = (await admin.from("packaging_run_consumptions").select("movement_id").eq("run_id", runId)).data!;
+    const mm = (await admin.from("material_movements").select("lot_id, qty").in("id", cons.map((c) => c.movement_id))).data!;
+    // Earliest best-by first, then the next; a lot with no best-by goes last.
+    expect(new Map(mm.map((m) => [m.lot_id as string, Number(m.qty)]))).toEqual(new Map([[early, -4], [late, -3]]));
+  });
+
+  it("refuses a lot-tracked draw that only stock outside a lot could cover (#436)", async () => {
+    const crown = await material("Half-lotted crown", true);
+    const { close, adminCtx } = await bomRun("LOTLESS", [{ materialId: crown, qtyPerUnit: 1 }]);
+    const lotId = await insert("material_lots", { brewery_id: b.id, material_id: crown, lot_code: "HL-1", best_by: "2027-01-01" });
+    await seedMovement(b.id, { materialId: crown, locationId: wh.id, binId: wh.binId, qty: 2, lotId, createdBy: adminCtx.userId });
+    await seedMovement(b.id, { materialId: crown, locationId: wh.id, binId: wh.binId, qty: 20, createdBy: adminCtx.userId });
+
+    await expect(close(5)).rejects.toThrow(/only 2 "Half-lotted crown" in that bin; this run needs 5/);
+  });
+
+  it("plans a counted material in whole units, the way a close draws it (#588)", async () => {
+    const carrier = await material("Quarter carrier");
+    const { runId } = await bomRun("PLANROUND", [{ materialId: carrier, qtyPerUnit: 0.25 }]);
+    // Ten planned units at a quarter carrier each is 2.5; the close will draw 3.
+    expect(sql(`select required from packaging_run_requirements where run_id = '${runId}' and material_id = '${carrier}'`)).toEqual(["3"]);
+    expect(sql(`select required from material_requirements where material_id = '${carrier}'`)).toEqual(["3"]);
   });
 
   it("refuses to empty a tank a started run draws from, and the run still closes (#466)", async () => {
@@ -659,6 +673,30 @@ describe("record_repack", () => {
     ]);
   });
 
+  it("rounds counted packaging to whole units and refuses a draw the bin cannot cover (#588)", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    const divider = await seedMaterial(b.id, { name: "half divider", category: "packaging", uom: "each" });
+    const pad = await seedMaterial(b.id, { name: "half insert", category: "packaging", uom: "each" });
+    await ins("format_bom", { brewery_id: b.id, format_id: caseFormatId, material_id: divider, qty_per_unit: 0.5, on_break: "consumed" });
+    await ins("format_bom", { brewery_id: b.id, format_id: caseFormatId, material_id: pad, qty_per_unit: 0.5, on_break: "return_to_stock" });
+    const userId = warehouseCtx.userId;
+    await seedMovement(b.id, { materialId: divider, locationId: repackLocationId, binId: repackBinId, qty: 1, createdBy: userId });
+    const repack = () => runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 3,
+      childSkuId: fourPackSkuId, childQty: 3 * PER_CASE,
+    }, warehouseCtx);
+
+    // Three cases at half a divider each is 1.5: a whole two come off the shelf, and it holds one.
+    await expect(repack()).rejects.toThrow(/insufficient selected bin and lot stock: 1 on hand in the source bin/);
+    await seedMovement(b.id, { materialId: divider, locationId: repackLocationId, binId: repackBinId, qty: 1, createdBy: userId });
+    await repack();
+
+    const moved = sql(`select material_id || ':' || trim_scale(qty) from material_movements where note like 'repack %' and material_id in ('${divider}', '${pad}') order by qty`);
+    // Consumed rounds up, returned rounds down: neither books a part of a counted thing.
+    expect(moved).toEqual([`${divider}:-2`, `${pad}:1`]);
+    await admin.from("format_bom").delete().eq("format_id", caseFormatId).in("material_id", [divider, pad]);
+  });
+
   it("consumes a BOM material marked consumed on break", async () => {
     const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
     // Glue is destroyed when the case is opened; the tray is not. Same call,
@@ -670,6 +708,8 @@ describe("record_repack", () => {
       brewery_id: b.id, format_id: caseFormatId, material_id: glueId, qty_per_unit: 2, on_break: "consumed",
     });
     if (error) throw error;
+    // A repack checks the shelf holds what it consumes (#588).
+    await seedMovement(b.id, { materialId: glueId, locationId: repackLocationId, binId: repackBinId, qty: 2, createdBy: warehouseCtx.userId });
 
     await runCommand("record_repack", {
       locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
@@ -677,7 +717,7 @@ describe("record_repack", () => {
     }, warehouseCtx);
 
     const { data, error: me } = await admin.from("material_movements")
-      .select("qty, type").eq("brewery_id", b.id).eq("material_id", glueId);
+      .select("qty, type").eq("brewery_id", b.id).eq("material_id", glueId).eq("type", "consumption");
     if (me) throw me;
     expect(data).toEqual([{ qty: -2, type: "consumption" }]);
   });
@@ -696,15 +736,16 @@ describe("record_repack", () => {
     });
     if (error) throw error;
 
+    const repackRows = async () => (await admin.from("inventory_movements")
+      .select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("type", "repack")).count;
+    const before = await repackRows();
     await expect(runCommand("record_repack", {
       locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
       childSkuId: fourPackSkuId, childQty: PER_CASE,
     }, warehouseCtx)).rejects.toThrow(/lot-tracked material "shrink wrap"/);
 
     // Nothing was written: the refusal comes before the FG rows.
-    const { count } = await admin.from("inventory_movements")
-      .select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("type", "repack");
-    expect(count).toBe(4);
+    expect(await repackRows()).toBe(before);
 
     await admin.from("format_bom").delete().eq("format_id", caseFormatId).eq("material_id", shrinkId);
   });
