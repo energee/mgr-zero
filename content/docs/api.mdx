@@ -4346,7 +4346,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record
+Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4354,9 +4354,9 @@ Record or edit one brand's COLA or formula approval by its TTB id; the same id o
 | `kind` | cola or formula | yes |
 | `ttbId` | string | yes |
 | `id` | uuid | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4369,15 +4369,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)
+Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `state` | string | yes |
 | `kind` | string | yes |
-| `licenseNo` | string | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `licenseNo` | string or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4390,15 +4390,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace a brand's permission to sell in one state
+Record or edit a brand's permission to sell in one state; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `brandId` | uuid | yes |
 | `state` | string | yes |
-| `registrationNo` | string | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
+| `registrationNo` | string or null | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

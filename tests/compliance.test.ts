@@ -49,6 +49,27 @@ describe("registry", () => {
     expect(reg.licenses).toEqual([expect.objectContaining({ state: "PA", kind: "brewery", license_no: "G-21885" })]);
     expect((await admin.from("state_registrations").select("id").eq("brand_id", brandId)).data!.length).toBe(1);
   });
+
+  it("an upsert keeps a field the caller omits and clears one sent as null (#522)", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Keep Porter", sku: "Keep Porter case" });
+    const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "K-1", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1" }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: "2030-01-02", note: "label v2" });
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1", expiresOn: null, note: null }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: null, note: null });
+
+    await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: "MI-1", approvedOn: "2026-02-03", expiresOn: "2027-02-03" }, sales);
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", expiresOn: "2028-02-03" }, sales))
+      .toMatchObject({ registration_no: "MI-1", approved_on: "2026-02-03", expires_on: "2028-02-03" });
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: null, approvedOn: null }, sales))
+      .toMatchObject({ registration_no: null, approved_on: null, expires_on: "2028-02-03" });
+
+    await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-1", expiresOn: "2027-06-30", note: "renew online" }, sales);
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-2" }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: "2027-06-30", note: "renew online" });
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", expiresOn: null, note: null }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: null, note: null });
+  });
 });
 
 const SEPT = { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" };

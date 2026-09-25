@@ -1,40 +1,29 @@
-// tests/compliance-edit-inputs.test.ts — #438: the License, Brand approval
-// and State registration sheets upsert a whole row, so an edit must send back
-// the record's values for the columns the sheet does not show (license note;
-// approval expiry and note; registration approval date), or the upsert clears them.
+// tests/compliance-edit-inputs.test.ts — the License, Brand approval and State
+// registration sheets build their upsert input from the fields they show. The
+// upsert keeps a column the input omits and clears one sent as null (#522), so
+// a hidden column (license note; approval expiry and note; registration
+// approval date) is omitted and kept (#438), and a shown field left empty is
+// null so emptying it clears it.
 import { describe, expect, it } from "vitest";
 import { licenseInput } from "../lib/mgr/license-view";
 import { approvalInput } from "../lib/mgr/brand-approval-view";
 import { registrationInput } from "../lib/mgr/state-registration-view";
 
-describe("compliance edit sheets keep the fields they do not show (#438)", () => {
-  it("License edit sends the existing note", () => {
-    const license = { note: "Renew via PLCB portal" };
-    expect(licenseInput({ state: "pa", kind: "brewery", licenseNo: "B-1", expiresOn: "" }, license))
-      .toEqual({ state: "PA", kind: "brewery", licenseNo: "B-1", expiresOn: undefined, note: "Renew via PLCB portal" });
+describe("compliance sheets omit the fields they do not show and null the ones left empty", () => {
+  it("License", () => {
+    expect(licenseInput({ state: "pa", kind: "brewery", licenseNo: "B-1", expiresOn: "" }))
+      .toEqual({ state: "PA", kind: "brewery", licenseNo: "B-1", expiresOn: null });
   });
 
-  it("License create and a null note send no note", () => {
-    const fields = { state: "ny", kind: "brewery", licenseNo: "", expiresOn: "2027-01-31" };
-    expect(licenseInput(fields)).toEqual({ state: "NY", kind: "brewery", licenseNo: undefined, expiresOn: "2027-01-31", note: undefined });
-    expect(licenseInput(fields, { note: null }).note).toBeUndefined();
-  });
-
-  it("Brand approval edit sends the existing expiry and note", () => {
-    const approval = { id: "a1", expires_on: "2028-05-01", note: "label v2" };
-    expect(approvalInput("b1", { kind: "cola", ttbId: "123", submittedOn: "2026-01-02" }, approval))
-      .toEqual({ id: "a1", brandId: "b1", kind: "cola", ttbId: "123", approvedOn: "2026-01-02", expiresOn: "2028-05-01", note: "label v2" });
-  });
-
-  it("Brand approval create sends neither", () => {
+  it("Brand approval edit keeps its id", () => {
+    expect(approvalInput("b1", { kind: "cola", ttbId: "123", submittedOn: "2026-01-02" }, { id: "a1" }))
+      .toEqual({ id: "a1", brandId: "b1", kind: "cola", ttbId: "123", approvedOn: "2026-01-02" });
     expect(approvalInput("b1", { kind: "formula", ttbId: "F9", submittedOn: "" }))
-      .toEqual({ id: undefined, brandId: "b1", kind: "formula", ttbId: "F9", approvedOn: undefined, expiresOn: undefined, note: undefined });
+      .toEqual({ id: undefined, brandId: "b1", kind: "formula", ttbId: "F9", approvedOn: null });
   });
 
-  it("State registration edit sends the existing approval date", () => {
-    const registration = { approved_on: "2026-03-04" };
-    expect(registrationInput("b1", { state: "oh", registrationNo: "R-7", expiresOn: "2027-03-04" }, registration))
-      .toEqual({ brandId: "b1", state: "OH", registrationNo: "R-7", expiresOn: "2027-03-04", approvedOn: "2026-03-04" });
-    expect(registrationInput("b1", { state: "oh", registrationNo: "", expiresOn: "" }).approvedOn).toBeUndefined();
+  it("State registration", () => {
+    expect(registrationInput("b1", { state: "oh", registrationNo: "R-7", expiresOn: "" }))
+      .toEqual({ brandId: "b1", state: "OH", registrationNo: "R-7", expiresOn: null });
   });
 });
