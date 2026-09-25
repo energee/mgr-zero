@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
-import { claimQboOAuth, completeQboOAuthStore, failQboOAuth } from "@/lib/supabase/integration-tokens";
+import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, qboRealmInUse } from "@/lib/supabase/integration-tokens";
 import { getActiveBrewery } from "@/lib/brewery";
 
 export async function GET(request: Request) {
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     await completeQboOAuth({
       request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
       client: new QboOAuthClient(config),
-      store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+      store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     destination.searchParams.set("connected", "1");
   } catch {

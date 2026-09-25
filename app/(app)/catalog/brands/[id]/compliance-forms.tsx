@@ -17,8 +17,7 @@ type Brand = { id: string; name: string };
 
 export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: Approval }) {
   // No expiry field: a COLA does not expire. The expires_on column and note
-  // are not shown; approvalInput sends an edited record's values back so the
-  // upsert keeps them (#438).
+  // are not shown; approvalInput omits them, so the upsert keeps them (#438, #522).
   const { v, set, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", submittedOn: approval?.approved_on ?? "" });
   const form = useCommandForm("upsert_brand_approval", {
     build: () => approvalInput(brand.id, v, approval),
@@ -48,10 +47,10 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
 
 export function RegistrationForm({ brand, registration }: { brand: Brand; registration?: Registration }) {
   // state is locked when editing: a registration is addressed by brand and state, so changing it would add a row, not move it.
-  // approved_on is not shown; registrationInput sends an edited record's value back so the upsert keeps it (#438).
+  // approved_on is not shown; registrationInput omits it, so the upsert keeps it (#438, #522).
   const { v, set, reset } = useFields({ state: registration?.state ?? "", registrationNo: registration?.registration_no ?? "", expiresOn: registration?.expires_on ?? "" });
   const form = useCommandForm("upsert_state_registration", {
-    build: () => registrationInput(brand.id, v, registration),
+    build: () => registrationInput(brand.id, v),
     reset,
   });
   const model = {

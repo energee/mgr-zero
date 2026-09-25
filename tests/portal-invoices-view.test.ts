@@ -33,6 +33,12 @@ it("question shares required input, errors, busy and sent states", () => {
   expect(htmlOf(createElement(QuestionInvoiceView, { model, sent: true, footer: null }))).not.toContain(">Close<");
 });
 
+it("question counts characters against the 2,000 limit so a long paste is not cut silently (#493)", () => {
+  const model = { label: "INV-42", breweryName: "Actual brewery" };
+  expect(htmlOf(createElement(QuestionInvoiceView, { model, body: "Question", onBody: () => {} }))).toContain("8 of 2,000 characters");
+  expect(htmlOf(createElement(QuestionInvoiceView, { model, body: "x".repeat(2000), onBody: () => {} }))).toContain("2,000 of 2,000 characters · longer text is cut off");
+});
+
 describe("Invoice history view", () => {
   it("maps portal_invoices rows, summing invoice_lines", () => {
     const model = toPortalInvoicesViewProps(portalInvoicesRidgeline);
@@ -41,7 +47,7 @@ describe("Invoice history view", () => {
     expect(model.rows).toHaveLength(2);
     expect(model.rows[0]).toMatchObject({
       title: "INV-1042",
-      detail: "due 2026-10-03",
+      detail: "due Oct 3, 2026",
       total: "$948.00",
       unpaid: true,
       tone: "",
@@ -49,7 +55,7 @@ describe("Invoice history view", () => {
     });
     expect(model.rows[1]).toMatchObject({
       title: "INV-1037",
-      detail: "paid 2026-08-29",
+      detail: "paid Aug 29, 2026",
       total: "$980.00",
       unpaid: false,
       tone: "ok",
@@ -110,10 +116,10 @@ describe("Invoice history view", () => {
     expect(html).toMatch(/Invoices/);
     expect(html).toContain(RIDGELINE.name);
     expect(html).toMatch(/INV-1042/);
-    expect(html).toMatch(/due 2026-10-03 · \$948\.00/);
+    expect(html).toMatch(/due Oct 3, 2026 · \$948\.00/);
     expect(html).toMatch(/>Pay</);
     expect(html).toMatch(/INV-1037/);
-    expect(html).toMatch(/paid 2026-08-29/);
+    expect(html).toMatch(/paid Aug 29, 2026/);
     expect(html).toMatch(/\$980\.00/);
     expect(html).not.toMatch(/href="\/portal\/invoices/);
     expect(html).not.toMatch(/→/);
@@ -127,8 +133,8 @@ describe("Invoice history view", () => {
     expect(html).toMatch(/href="\/portal\/invoices\/00000000-0000-4000-8000-000000001042"/);
     expect(html).toMatch(/>\$948\.00</);
     expect(html).not.toMatch(/>Pay</);
-    expect(html).toMatch(/due 2026-10-03/);
-    expect(html).not.toMatch(/due 2026-10-03 · \$948\.00/);
+    expect(html).toMatch(/due Oct 3, 2026/);
+    expect(html).not.toMatch(/due Oct 3, 2026 · \$948\.00/);
   });
 });
 
@@ -138,7 +144,8 @@ describe("Portal invoice view", () => {
     expect(model.title).toBe("INV-1042");
     expect(model.backHref).toBeUndefined();
     expect(model.total).toBe("$948.00");
-    expect(model.due).toBe("2026-10-03");
+    expect(model.due).toBe("Oct 3, 2026");
+    expect(model.issued).toBe("Sep 3, 2026");
     expect(model.paid).toBe(false);
     expect(model.breweryName).toBe("Demo Brewing");
     expect(model.breweryPhone).toBe("(610) 555-0142");
@@ -154,7 +161,7 @@ describe("Portal invoice view", () => {
     expect(model.title).toBe("INV-1037");
     expect(model.total).toBe("$980.00");
     expect(model.paid).toBe(true);
-    expect(model.paidOn).toBe("2026-08-29");
+    expect(model.paidOn).toBe("Aug 29, 2026");
     expect(model.lines).toHaveLength(2);
   });
 
@@ -213,7 +220,7 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/INV-1037/);
     expect(html).toMatch(/\$980\.00/);
     expect(html).toMatch(/Paid/);
-    expect(html).toMatch(/2026-08-29/);
+    expect(html).toMatch(/Aug 29, 2026/);
     expect(html).toMatch(/>Download PDF</);
     expect(html).not.toMatch(/>Pay invoice</);
     expect(html).toMatch(/Question this invoice/);

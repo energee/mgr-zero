@@ -6,11 +6,11 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, cents, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
+import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
 const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
 const UOMS = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"] as const;
-const PAYMENT_TERMS = ["due_on_receipt", "net15", "net30"] as const;
 // Purchase orders are the warehouse's: a brewer reads materials and vendors but
 // does not place or receive orders (Purchase orders / Receive PO screens).
 const PO_ROLES = ["admin", "warehouse"] as const;

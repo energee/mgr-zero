@@ -30,9 +30,13 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
   const controlled = value !== undefined;
   const date = controlled ? parseISODate(value) : internalDate;
+  // Picking a day closes the calendar; left open, it covers the form's own
+  // submit button (Save schedule) until Escape (#493).
+  const [open, setOpen] = React.useState(false);
   const selectDate = (next: Date | undefined) => {
     if (!controlled) setInternalDate(next);
     onChange?.(next ? formatISODate(next) : "");
+    setOpen(false);
   };
   // A <label for> does not name a button, so the trigger points back at both the
   // label and itself: "Best by, September 5, 2026".
@@ -42,7 +46,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
   return (
     <Field>
       <FieldLabel id={labelId} className="whitespace-nowrap">{label}</FieldLabel>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"

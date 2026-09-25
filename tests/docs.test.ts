@@ -19,7 +19,8 @@ const CUSTOMER_GUIDES = GUIDES.filter((g) => g !== "api");
 describe("customer guides (MDX)", () => {
   it("has exactly the pages meta.json lists, each with frontmatter and no code", () => {
     const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
-    expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
+    // The API reference is a folder of pages (content/docs/api/), not one file.
+    expect(files).toEqual(CUSTOMER_GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of CUSTOMER_GUIDES) {
       const mdx = read(`content/docs/${guide}.mdx`);
       expect(mdx).toMatch(/^---\n(?:\w+: .+\n)*title: .+\ndescription: .+\n(?:\w+: .+\n)*---\n/);
@@ -32,6 +33,7 @@ describe("customer guides (MDX)", () => {
 
   it("gives the API reference a place in the sidebar and on the chooser", () => {
     expect(GUIDES).toContain("api");
+    expect(read("content/docs/api/index.mdx")).toMatch(/^---\n/);
     expect(read("content/docs/index.mdx")).toContain('href="/docs/api"');
   });
 

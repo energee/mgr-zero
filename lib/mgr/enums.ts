@@ -27,6 +27,12 @@ export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest"
 export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
 export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
 
+// Payment terms, one list for customers and vendors (#491; lib/commands/customers.ts,
+// lib/commands/purchasing.ts, lib/import-csv.ts). Nothing computes a due date
+// from them yet. Labels: PAYMENT_TERM_LABEL in lib/mgr/labels.ts.
+export const PAYMENT_TERMS = ["due_on_receipt", "net15", "net30"] as const;
+export type PaymentTerm = (typeof PAYMENT_TERMS)[number];
+
 // US state codes (USPS), plus DC and the inhabited territories, for every
 // state field: customers, ship-tos, licenses, label registrations, CSV import
 // (lib/commands/registry.ts `stateCode`, lib/import-csv.ts).

@@ -3,6 +3,7 @@
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
 import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const roles = ["admin", "sales"] as const;
 
@@ -24,7 +25,9 @@ defineCommand({
     state: stateCode, // customers.state is NOT NULL (home state)
     // The channel is the customer's row into the price grid (§16.3) and is required.
     saleChannelId: z.string().uuid(),
-    licenseNumber: z.string().optional(), paymentTerms: z.string().optional(),
+    licenseNumber: z.string().optional(),
+    // The vendor list (#491); omit it to keep the current term (net30 on create).
+    paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     // Overrides the sale channel's tax treatment for this customer's removals
     // (§16.3); omit it to inherit the channel default.
     taxTreatment: z.enum(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"]).optional(),
@@ -32,7 +35,7 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state,
     p_sale_channel: i.saleChannelId, p_license_no: i.licenseNumber ?? null,
-    p_payment_terms: i.paymentTerms || null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
+    p_payment_terms: i.paymentTerms ?? null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
   })),
 });
 

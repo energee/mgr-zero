@@ -67,11 +67,14 @@ const LB_PER: Record<string, number> = { lb: 1, kg: 2.20462, oz: 1 / 16, g: 0.00
 
 /**
  * ASBC cubic approximation converting specific gravity to degrees Plato.
- * Clamped at 0: the cubic returns -0.003 at SG 1.000, and negative Plato is
- * not a thing a brewer can read — water is 0 °P.
+ * At or above SG 1.000 it is clamped at 0, because the cubic returns -0.003 at
+ * exactly 1.000 and water is 0 °P. Below 1.000 it goes negative: a dry finished
+ * beer (FG 0.998 is about -0.5 °P) is a real reading, and clamping it stored 0
+ * and read it back as 1.000.
  */
 export function sgToPlato(sg: number): number {
-  return Math.max(0, -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3);
+  const plato = -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3;
+  return sg >= 1 ? Math.max(0, plato) : plato;
 }
 
 /**
