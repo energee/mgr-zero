@@ -28,7 +28,7 @@ describe("Monthly compliance view", () => {
   });
 
   it("the live route mounts the shared view and slots both mutation controls", () => {
-    const page = readFileSync("app/(app)/compliance/[month]/page.tsx", "utf8");
+    const page = readFileSync("app/(app)/compliance/[period]/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/monthly-compliance"/);
     expect(page).toMatch(/<MonthlyComplianceView\b/);
     expect(page).toMatch(/<LossReviewForm\b/);

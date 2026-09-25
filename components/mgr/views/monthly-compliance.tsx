@@ -7,7 +7,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
   model: MonthlyComplianceViewModel;
   lossAction?: (loss: LossReview) => ReactNode;
   fileAction?: ReactNode;
-  /** The month has not ended: it can be reviewed, not filed (#429). */
+  /** The period (month, quarter, or year) has not ended: it can be reviewed, not filed (#429). */
   monthOpen?: boolean;
 }) {
   return <>
@@ -29,6 +29,6 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "destination state", row.bbl)}</Fragment>)}
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
-    {monthOpen ? E.status("File once the month ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
+    {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
   </>;
 }
