@@ -71,7 +71,7 @@ export function MovementForm({
     defaultOpen: autoOpen,
     onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
-    reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
+    reset: () => { setStockError(null); setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
 
   useEffect(() => {

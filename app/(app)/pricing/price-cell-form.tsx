@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { dollarsInput } from "@/lib/mgr/money";
-import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function PriceCellForm({
   saleChannelId, priceGroupId, formatId, cents, label, groupName, formatName, channelName,
@@ -22,7 +22,6 @@ export function PriceCellForm({
   const initial = dollarsInput(cents);
   // The page keys this form on `cents`, so a save or clear remounts it fresh.
   const [dollars, setDollars] = useState(initial);
-  const clear = useCommandAction();
   const form = useCommandForm("set_channel_price", {
     build: () => ({ saleChannelId, priceGroupId, formatId, unitPriceCents: Math.round(Number(dollars) * 100) }),
     reset: () => setDollars(initial),
@@ -41,19 +40,18 @@ export function PriceCellForm({
           Every SKU of a brand on group {groupName} sells at this price as {formatName} on {channelName}. An empty cell is unpriced: that package cannot sell on this channel.
         </p>
         <CommandFormMessage error={form.error} />
-        <CommandFormMessage error={clear.error} />
         <CommandFormFooter>
           {cents !== null && (
             <Button
               type="button"
               variant="ghost"
-              disabled={clear.busy}
-              onClick={() => clear.run("clear_channel_price", { saleChannelId, priceGroupId, formatId })}
+              disabled={form.busy}
+              onClick={() => form.run("clear_channel_price", { saleChannelId, priceGroupId, formatId })}
             >
               Clear
             </Button>
           )}
-          <Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save price"}</Button>
+          <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price"}</Button>
         </CommandFormFooter>
       </form>
     </CommandForm>
