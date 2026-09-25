@@ -158,6 +158,13 @@ describe("Price group view", () => {
     expect(html).not.toMatch(/Remove/);
   });
 
+  it("a new group starts past the highest position when a middle group was removed (#423)", () => {
+    // Positions 1 and 3 remain; count + 1 would be 3, which collides with
+    // unique (brewery_id, position).
+    const groups = pricingGrid.groups.filter((g) => g.position !== 2);
+    expect(toPriceGroupViewProps({ ...pricingGrid, groups }).position).toBe("4");
+  });
+
   it("keeps the ceiling note to one sentence", () => {
     const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(priceGroupTwo) }));
     const note = html.match(/<div data-slot="alert-description"[^>]*>(.*?)<\/div>/)?.[1] ?? "";

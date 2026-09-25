@@ -1,8 +1,10 @@
-import { createUIMessageStreamResponse, gateway, isStepCount, streamText, toUIMessageStream, type ModelMessage } from "ai";
+import { createUIMessageStreamResponse, gateway, isStepCount, streamText, toUIMessageStream } from "ai";
 import { NextResponse } from "next/server";
+import { consumeAdmission } from "@/lib/commands/admission";
 import { buildRouteContext } from "@/lib/commands/context";
 import { CommandError, runCommand, type Ctx } from "@/lib/commands/registry";
 import { createComposerTools } from "@/lib/chat/agent";
+import { buildModelMessages, type StoredChatMessage } from "@/lib/chat/model-messages";
 import { readChatRequest } from "@/lib/chat/request";
 import { isChatConfigured } from "@/lib/env/server-parser";
 import "@/lib/commands/all";
@@ -21,15 +23,18 @@ export async function POST(req: Request) {
     if (!isChatConfigured()) {
       return NextResponse.json({ error: "Chat is not configured." }, { status: 503 });
     }
+    // Same per-user budget as /api/command (#459): each turn can run several model steps and tool queries.
+    const admission = await consumeAdmission(context.db);
+    if (!admission.allowed) {
+      return NextResponse.json({ error: `Too many requests. Try again in ${admission.retryAfter} seconds.` },
+        { status: 429, headers: { "Retry-After": String(admission.retryAfter) } });
+    }
     const ctx = context as Ctx;
     const [history, ai] = await Promise.all([runCommand("get_chat_history", { conversationId: body.id }, ctx), runCommand("get_brewery_ai_model", {}, ctx)]) as [{
-      messages: { role: "user" | "assistant" | "result"; content: string | null }[];
+      messages: StoredChatMessage[];
     }, { model: string }];
     await runCommand("append_chat_message", { conversationId: body.id, role: "user", content: body.text }, ctx, execution(body.message.id));
-    const messages: ModelMessage[] = history.messages
-      .filter((message): message is { role: "user" | "assistant"; content: string } => message.role !== "result" && Boolean(message.content))
-      .map((message) => ({ role: message.role, content: message.content }));
-    messages.push({ role: "user", content: body.text });
+    const messages = buildModelMessages(history.messages, { id: body.message.id, text: body.text });
     const result = streamText({
       model: gateway(ai.model),
       system: SYSTEM,

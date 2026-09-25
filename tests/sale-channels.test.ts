@@ -2,9 +2,14 @@
 // docs/plans/sale-channels-customizable.md) that replaced the `sale_channel`
 // enum, plus the tax treatment frozen onto every classified removal (§16.3).
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
+
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+
+// A removal needs stock in its bin (#450), so each removal test seeds some first.
+const stockBin = (brewery: string, sku: string, loc: { id: string; binId: string }, createdBy: string, qty = 1) =>
+  ins("inventory_movements", { brewery_id: brewery, sku_id: sku, location_id: loc.id, bin_id: loc.binId, qty, type: "opening_balance", created_by: createdBy });
 
 describe("sale_channels", () => {
   it("a new brewery has four channels and Export is untaxpaid", async () => {
@@ -47,6 +52,7 @@ describe("frozen tax treatment on movements", () => {
     const loc = await seedLocation(breweryId);
     locationId = loc.id;
     binId = loc.binId;
+    await stockBin(breweryId, skuId, loc, ctx.userId, 100);
   });
 
   async function removal(channel: string, opts: { destState?: string | null; type?: import("@/lib/supabase/database").Database["public"]["Enums"]["movement_type"] } = {}) {
@@ -72,6 +78,7 @@ describe("frozen tax treatment on movements", () => {
     const { skuId: sku } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
     const loc = await seedLocation(b.id);
     const wholesale = await channelId(b.id, "Wholesale");
+    await stockBin(b.id, sku, loc, c.userId);
     const { error: mvErr } = await c.db.rpc("record_inventory_movement", {
       p_brewery: b.id, p_sku: sku, p_location: loc.id, p_bin: loc.binId, p_qty: -1,
       p_type: "sale_removal", p_sale_channel: wholesale, p_dest_state: "PA",
@@ -156,6 +163,7 @@ describe("sale channel commands", () => {
     const { skuId: sku } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
     const loc = await seedLocation(b.id);
     const taproom = await channelId(b.id, "Taproom");
+    await stockBin(b.id, sku, loc, c.userId);
     const movement = await c.db.rpc("record_inventory_movement", {
       p_brewery: b.id, p_sku: sku, p_location: loc.id, p_bin: loc.binId, p_qty: -1,
       p_type: "sale_removal", p_sale_channel: taproom, p_dest_state: "PA", p_note: null,

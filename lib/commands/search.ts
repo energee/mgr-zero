@@ -3,11 +3,12 @@
 // purchase orders, batches). A document number (ORD-0231, INV-1042, PO-0142,
 // B-0012, L-240831-HZ) matches exactly and sorts first; names match on prefix.
 // Reads go through the RLS-bound ctx.db, so RLS decides the rows either way
-// and `kinds` only narrows. ponytail: seven prefix queries in parallel rather
-// than one definer SQL function; a trigram index is the upgrade path if a
+// and `kinds` only narrows. A kind whose page the caller's role cannot open is
+// not searched at all (openableKinds), so no hit links to No access (#478).
+// ponytail: seven prefix queries in parallel rather than one definer SQL function; a trigram index is the upgrade path if a
 // brewery's catalog outgrows prefix matching.
 import { z } from "zod";
-import { defineQuery, unwrap, type Ctx } from "./registry";
+import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch"] as const;
@@ -17,6 +18,22 @@ export type SearchHit = { kind: SearchKind; id: string; label: string; detail: s
 const LIMIT = 25;
 /** A document prefix, its kind, and the number column it names. */
 const DOC: [RegExp, SearchKind, string][] = [[/^ORD-?(\d+)$/i, "order", "order_no"], [/^INV-?(\d+)$/i, "invoice", "invoice_no"], [/^PO-?(\d+)$/i, "po", "po_no"], [/^B-?(\d+)$/i, "batch", "batch_no"]];
+
+/** The registry reads each kind's href page makes; the role must pass them all
+ * or the page redirects to No access. Keep in step with those pages. */
+const PAGE_READS: Record<SearchKind, readonly string[]> = {
+  sku: ["list_brands", "list_formats", "list_price_groups"], // /catalog
+  customer: ["get_customer", "list_sale_channels"], // /customers/[id]
+  lot: ["trace_lot"], // /compliance/lots/[id]
+  order: ["get_order", "list_locations", "list_skus"], // /orders/[id]
+  invoice: ["get_invoice"], // /invoices/[id]; its other reads are role-conditional
+  po: ["get_purchase_order", "list_locations", "list_bins"], // /purchase-orders/[id]
+  batch: ["get_brew_day", "list_vessels"], // /batches/[id]
+};
+
+/** The kinds whose result page `ctx`'s role may open. */
+export const openableKinds = (ctx: Ctx, kinds: readonly SearchKind[]) =>
+  kinds.filter((k) => PAGE_READS[k].every((name) => canRun(ctx, name)));
 
 type Row = Record<string, unknown>;
 const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
@@ -68,12 +85,12 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
 
 defineQuery({
   name: "search_entities",
-  description: "Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow",
+  description: "Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped",
   input: z.object({ q: z.string().trim().min(1).max(80), kinds: z.array(z.enum(SEARCH_KINDS)).optional() }),
   roles: ["admin", "sales", "warehouse", "brewer"],
   aiExposed: true,
   handler: async (ctx, i): Promise<SearchHit[]> => {
-    const kinds = i.kinds?.length ? i.kinds : [...SEARCH_KINDS];
+    const kinds = openableKinds(ctx, i.kinds?.length ? i.kinds : SEARCH_KINDS);
     const hits = (await Promise.all(kinds.map((k) => byKind(ctx, k, i.q)))).flat();
     return hits.sort((a, b) => Number(b.exact) - Number(a.exact) || a.label.localeCompare(b.label)).slice(0, LIMIT);
   },

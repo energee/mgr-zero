@@ -9,12 +9,15 @@ export type { SaleChannelsViewModel };
 
 export function SaleChannelsView({
   model,
+  backLabel = "Settings",
   createAction,
   info,
   rowTrailing,
   linkRows,
 }: {
   model: SaleChannelsViewModel;
+  /** Live: "More" for a role that cannot open Settings. */
+  backLabel?: string;
   createAction?: ReactNode;
   /** Live tax-treatment copy. Inventory omits this. */
   info?: string;
@@ -25,7 +28,7 @@ export function SaleChannelsView({
 }) {
   return (
     <>
-      {E.back("Settings", "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
+      {E.back(backLabel, "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
       {info ? E.info(info) : null}
       {model.empty
         ? E.blank(model.empty)

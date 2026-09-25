@@ -26,3 +26,13 @@ export const MASH_STEP_KINDS = ["infusion", "decoction", "direct heat", "rest"] 
 export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"] as const;
 export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
 export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
+
+// US state codes (USPS), plus DC and the inhabited territories, for every
+// state field: customers, ship-tos, licenses, label registrations, CSV import
+// (lib/commands/registry.ts `stateCode`, lib/import-csv.ts).
+export const US_STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY",
+  "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND",
+  "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+  "DC", "PR", "VI", "GU", "AS", "MP",
+] as const;

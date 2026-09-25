@@ -1,7 +1,7 @@
 // lib/mgr/nav.ts — the navigation manifests both shells consume (plan §3):
 // the four staff tabs with their desktop-rail children, the portal's tabs,
 // and the pure helpers AppShell needs — role filtering (a hidden entry
-// leaves no gap), shipped filtering, and active-tab resolution. Planned
+// leaves no gap), shipped filtering, and active tab/child resolution. Planned
 // subareas (Taproom, Batches, Menu, …) are listed with `planned: true` and an
 // anchor on the parent route they will one day belong to, so the docs and the
 // screen inventory (components/mgr/screen-frame.tsx) still know the groups;
@@ -125,13 +125,38 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
 export const isUnder = (pathname: string, href: string) =>
   pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
+/** The candidate whose href is the longest prefix of `pathname`. */
+function longestMatch<T>(pathname: string, candidates: readonly (readonly [T, string])[]): T | undefined {
+  let best: { item: T; len: number } | undefined;
+  for (const [item, href] of candidates) {
+    if (isUnder(pathname, href) && (!best || href.length > best.len)) best = { item, len: href.length };
+  }
+  return best?.item;
+}
+
+/**
+ * Whether `role` may open `path`, by the gate of the deepest STAFF_NAV entry
+ * whose href covers it: /settings/units follows Units (every role), while
+ * /settings/pos has no entry of its own and follows Settings (admin). A path
+ * no entry covers has no nav gate and counts as open. Back links use this so
+ * they never point a role at a page that sends it to No access (#444).
+ */
+export function canOpen(role: StaffRole, path: string): boolean {
+  const best = longestMatch(path, STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]).map((i) => [i, i.href] as const));
+  return !best || allowed(best, role);
+}
+
 /** The tab whose href (or a child's) is the longest prefix of the path. */
 export function activeTab(items: readonly NavItem[], pathname: string): NavItem | undefined {
-  let best: { tab: NavItem; len: number } | undefined;
-  for (const tab of items) {
-    for (const href of [tab.href, ...(tab.children ?? []).map((c) => c.href)]) {
-      if (isUnder(pathname, href) && (!best || href.length > best.len)) best = { tab, len: href.length };
-    }
-  }
-  return best?.tab;
+  return longestMatch(pathname, items.flatMap((tab) =>
+    [tab.href, ...(tab.children ?? []).map((c) => c.href)].map((href) => [tab, href] as const)));
+}
+
+/**
+ * The one child of `tab` to highlight: the longest href prefix of the path, so
+ * /taproom/board lights Taps and not Taproom too, and /settings/units lights
+ * Units and not Settings.
+ */
+export function activeChild(tab: NavItem, pathname: string): NavItem | undefined {
+  return longestMatch(pathname, (tab.children ?? []).map((c) => [c, c.href] as const));
 }
