@@ -18,6 +18,16 @@ describe("Monthly compliance view", () => {
     expect(body.props.model).toEqual(toMonthlyComplianceViewProps(monthlyComplianceAugust));
   });
 
+  it("draws the period in progress: reviewable, File once the period ends replaces Save (#579)", () => {
+    const body = SCREENS.find((screen) => screen.name === "Period in progress")!.body as { type: unknown; props: { monthOpen?: boolean } };
+    expect(body.type).toBe(MonthlyComplianceView);
+    expect(body.props.monthOpen).toBe(true);
+    const html = htmlOf(body as ReactNode);
+    expect(html).toMatch(/September 2026/);
+    expect(html).toMatch(/File once the period ends/);
+    expect(html).not.toMatch(/Save filed snapshot/);
+  });
+
   it("keeps fixture actions inert and supports null live actions", () => {
     const model = toMonthlyComplianceViewProps(monthlyComplianceAugust);
     const fixture = htmlOf(createElement(MonthlyComplianceView, { model }));

@@ -10,7 +10,7 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
   cadences: ["Monthly", "Quarterly", "Annual"],
   cadence: 0,
   months: [
-    { key: "2026-09", title: "September 2026", detail: "not filed · ready to review", tone: "w" },
+    { key: "2026-09", title: "September 2026", detail: "in progress · file once the month ends", tone: "w" },
     { key: "2026-08", title: "August 2026", detail: "filed 2026-09-02 · 41.20 bbl taxable", tone: "ok" },
     { key: "2026-07", title: "July 2026", detail: "filed 2026-08-04 · 38.75 bbl taxable", tone: "ok" },
   ],
