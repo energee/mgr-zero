@@ -11,7 +11,7 @@ import { isInertOn } from "../lib/mgr/screen-links";
 it("shares guest requirements and coarse fill controls without inventing own SKU volume", () => {
   const state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "actual-location");
   const sheet = { ...state.sheet!, fields: { ...state.sheet!.fields, identity: "guest" as const } };
-  const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: [] }));
+  const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: [], timeZone: "America/New_York" }));
   expect(html).toContain("Guest keg label");
   expect(html).toContain("Guest nominal BBL");
   expect(html).toContain("Opening fill");
@@ -20,7 +20,7 @@ it("shares guest requirements and coarse fill controls without inventing own SKU
 });
 
 it("retains both keg actions without nesting buttons or inventing yield bars", () => {
-  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, navigation: { locations: [["Taproom"]], location: "Taproom" } }));
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [["Taproom"]], location: "Taproom" } }));
   expect(html.match(/>Swap<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html.match(/>Kick<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);
@@ -33,7 +33,7 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
 
 it("keeps the outgoing captured SKU selectable for an atomic same-SKU swap", () => {
   const pick = vi.spyOn(E, "pick");
-  const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: [] }));
+  const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: [], timeZone: "America/New_York" }));
   expect(pick).toHaveBeenCalledWith("Packaged keg SKU", swapKeg.interval!.sku_id, expect.arrayContaining([expect.objectContaining({ value: swapKeg.interval!.sku_id })]), expect.anything());
   expect(pick).toHaveBeenCalledWith("Identity", "same", expect.arrayContaining([{ value: "same", label: "Same own SKU", disabled: false }]), expect.anything());
   pick.mockRestore();
@@ -42,7 +42,7 @@ it("keeps the outgoing captured SKU selectable for an atomic same-SKU swap", () 
 
 it("freezes kick fields while retaining the unchanged retry", () => {
   const sheet = { ...kickKeg, attempt: { kind: "unknown" as const, requestId: "frozen", payload: { openIntervalId: kickKeg.interval!.id, closeFill: 0 as const, reason: "Kicked empty" } } };
-  const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: [] }));
+  const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: [], timeZone: "America/New_York" }));
   expect(html).toContain("<fieldset disabled");
   expect(html).toContain("Retry unchanged");
   expect(html).not.toContain("Guest keg label");

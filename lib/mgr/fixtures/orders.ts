@@ -6,6 +6,7 @@ import type { CompleteTransferSnapshot } from "@/lib/mgr/complete-transfer-view"
 import type { ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
 import type { NewOrderSnapshot } from "@/lib/mgr/new-order-view";
 import type { OrderSnapshot } from "@/lib/mgr/order-view";
+import { DEMO_TIME_ZONE } from "./settings";
 import type { OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
 import type { PutBackSnapshot } from "@/lib/mgr/put-back-view";
 
@@ -32,6 +33,7 @@ const line = (
 
 /** Picked wholesale order after a line was adjusted down (Order + Put back). */
 export const orderPickedRestock: OrderSnapshot = {
+  timeZone: DEMO_TIME_ZONE,
   order: {
     id: ORDER_229,
     order_no: 229,

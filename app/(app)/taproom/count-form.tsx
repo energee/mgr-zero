@@ -110,8 +110,10 @@ export function TaproomPrintWorksheet({ breweryId, locationId, locationName, rev
   </>;
 }
 
-export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, role, print }: {
+export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, role, timeZone, print }: {
   breweryId: string;
+  /** breweries.timezone, from the server page: SSR and hydration format the same times (#442). */
+  timeZone: string;
   snapshot: TaproomCountSnapshot;
   projection: DraftProjection;
   lotLabels: Record<string, string>;
@@ -160,7 +162,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
     }
   }
 
-  return <WeeklyCountDraftView state={state} role={role} lotLabels={lotLabels} print={print}
+  return <WeeklyCountDraftView state={state} role={role} lotLabels={lotLabels} timeZone={timeZone} print={print}
     priorHref={state.draft.priorCount ? `/taproom?location=${state.draft.locationId}&count=${state.draft.priorCount.id}` : undefined}
     projectionBusy={projectionBusy} projectionError={projectionError} onRefreshExpected={refreshProjection} onRefreshSnapshot={refreshSnapshot}
     onQuantity={(key, value) => setState(current => updateCountQuantity(current, key, value))} onSubmit={submit} />;

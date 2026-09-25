@@ -3,7 +3,7 @@
 // replaces a route's stops in one RPC; depart/confirm/return walk the route
 // and Today's delivery_next follows the assigned driver.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -247,4 +247,47 @@ describe("route edges", () => {
     const changed = await adminCtx.db.rpc("save_route", { ...input, p_name: "Other", p_request_id: requestId });
     expect(changed.error?.code).toBe("MG409");
   });
+});
+
+// #473: list_routes read every shipment and delivery of the brewery in one
+// unpaged request, so past PostgREST's 1000-row cap new shipped orders fell
+// out of "unassigned" and stops fell off long routes.
+describe("list_routes past one PostgREST page", () => {
+  it("still offers a new shipped order and every stop of a long route", async () => {
+    const big = await makeBrewery();
+    const ctx = await makeStaffCtx(big.id, "admin");
+    const { id: locationId } = await seedLocation(big.id);
+    const cust = await seedCustomer(big.id);
+    const n = 1001;
+    const { data: orders, error: oErr } = await admin.from("orders").insert(Array.from({ length: n }, () => ({
+      brewery_id: big.id, status: "shipped" as const, customer_id: cust.customerId, ship_to_id: cust.shipToId,
+      from_location_id: locationId, sale_channel_id: cust.saleChannelId, created_by: ctx.userId, shipped_at: "2026-01-02T00:00:00Z",
+    }))).select("id");
+    expect(oErr).toBeNull();
+    const { data: old, error: sErr } = await admin.from("shipments")
+      .insert(orders!.map((o) => ({ brewery_id: big.id, order_id: o.id, created_by: ctx.userId }))).select("id");
+    expect(sErr).toBeNull();
+    const { data: done } = await admin.from("routes").insert({
+      brewery_id: big.id, delivery_date: "2026-01-02", name: "History", departed_at: "2026-01-02T08:00:00Z", returned_at: "2026-01-02T17:00:00Z",
+    }).select().single();
+    const { error: dErr } = await admin.from("deliveries").insert(old!.map((s, k) => ({
+      brewery_id: big.id, route_id: done!.id, shipment_id: s.id, stop_no: k + 1, delivered_at: "2026-01-02T12:00:00Z",
+    })));
+    expect(dErr).toBeNull();
+
+    const { data: fresh } = await admin.from("orders").insert({
+      brewery_id: big.id, status: "shipped", customer_id: cust.customerId, ship_to_id: cust.shipToId,
+      from_location_id: locationId, sale_channel_id: cust.saleChannelId, created_by: ctx.userId,
+    }).select("id").single();
+    const { data: sh } = await admin.from("shipments").insert({ brewery_id: big.id, order_id: fresh!.id, created_by: ctx.userId }).select("id").single();
+    // a thousand rows in one statement outruns autovacuum; stale stats pick a nested-loop plan hosted never sees
+    sql("analyze public.orders; analyze public.shipments; analyze public.deliveries;", true);
+
+    const listed = await runCommand("list_routes", {}, ctx) as { unassigned: { id: string }[] };
+    expect(listed.unassigned.map((d) => d.id)).toEqual([sh!.id]);
+    const history = await runCommand("list_routes", { id: done!.id }, ctx) as { routes: { stops: { stop_no: number; label: string }[] }[] };
+    expect(history.routes[0].stops).toHaveLength(n);
+    expect(history.routes[0].stops.map((s) => s.stop_no)).toEqual(Array.from({ length: n }, (_, k) => k + 1));
+    expect(history.routes[0].stops.every((s) => s.label.startsWith("ORD-"))).toBe(true);
+  }, 60_000);
 });
