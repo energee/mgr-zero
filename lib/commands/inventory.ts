@@ -186,10 +186,10 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand and format, alphabetical",
-  input: z.object({}), roles: STAFF_ROLES,
+  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel",
+  input: z.object({ saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price") }), roles: STAFF_ROLES,
   aiExposed: true,
-  handler: async (ctx) => {
+  handler: async (ctx, i) => {
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
       let query = ctx.db.from("skus")
         .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
@@ -201,7 +201,15 @@ defineQuery({
       ]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     }, row => row.id);
-    return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    const sorted = rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    const channel = i.saleChannelId;
+    if (!channel) return sorted;
+    // sku_prices is the same resolution create_order prices a line with.
+    const priced = await completeRows("SKU prices", start => ctx.db.from("sku_prices").select("sku_id", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", channel).eq("active", true)
+      .order("sku_id").range(start, start + PAGE_SIZE - 1));
+    const ids = new Set(priced.map(p => p.sku_id));
+    return sorted.filter(sku => ids.has(sku.id));
   },
 });
 

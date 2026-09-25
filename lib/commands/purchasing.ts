@@ -4,7 +4,7 @@
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
-import { defineCommand, defineQuery, cents, unwrap, CommandError } from "./registry";
+import { defineCommand, defineQuery, cents, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
@@ -23,7 +23,7 @@ defineCommand({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     email: z.string().email().optional(),
-    phone: z.string().trim().optional(),
+    phone: phone.optional(),
     leadTimeDays: z.number().int().nonnegative().optional(),
     paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     active: z.boolean().optional(),

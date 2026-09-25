@@ -6,17 +6,20 @@ import { NewOrderView } from "@/components/mgr/views/new-order";
 import Link from "next/link";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { defaultShipToId, isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
+import { useCommandQuery } from "@/components/mgr/query-provider";
+import { defaultShipToId, isCompleteLine, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
 export type CustomerOption = {
   id: string;
   name: string;
+  sale_channel_id: string;
   shipTos: { id: string; label: string; is_default?: boolean }[];
 };
 export type LocationOption = { id: string; name: string; kind: "warehouse" | "taproom" };
 export type SkuOption = { id: string; label: string };
+export type SkuRow = { id: string; name: string; active: boolean; brands: { name: string } | null };
 
 type LineRow = { skuId: string; qty: string };
 
@@ -41,7 +44,13 @@ export function OrderForm({
   const [poNumber, setPoNumber] = useState("");
   const [lines, setLines] = useState<LineRow[]>([{ skuId: "", qty: "" }]);
 
-  const shipTos = customers.find((c) => c.id === customerId)?.shipTos ?? [];
+  const customer = customers.find((c) => c.id === customerId);
+  const shipTos = customer?.shipTos ?? [];
+  // A wholesale line must be priced on the customer's channel (#490), so the
+  // picker offers only those SKUs once a customer is chosen.
+  const channel = skuPickerChannel(kind, customer);
+  const priced = useCommandQuery<SkuRow[]>("list_skus", { saleChannelId: channel }, channel !== undefined);
+  const skuOptions = channel === undefined ? skus : (priced.data ?? []).map(toSkuOption);
   const readiness = orderFormReadiness({
     kind, customerId, shipToId, fromLocationId, toLocationId, lines,
     catalog: { customers: customers.length, locations: locations.length, skus: skus.length },
@@ -90,9 +99,9 @@ export function OrderForm({
       <NewOrderView feedback={feedback} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
-        shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus,
+        shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
         requestedShip: requestedShipDate, po: poNumber, backHref: "/orders",
-        lines: lines.map(line => ({ ...line, name: skus.find(sku => sku.id === line.skuId)?.label ?? "", warning: false })),
+        lines: lines.map(line => ({ ...line, name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? "", warning: false })),
       }} controls={{
         kind: setKind, customer: value => { setCustomerId(value); setShipToId(defaultShipToId(customers.find(customer => customer.id === value)?.shipTos ?? [])); },
         shipTo: setShipToId, source: setFromLocationId, destination: setToLocationId,
