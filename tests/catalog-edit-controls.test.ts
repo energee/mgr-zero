@@ -29,9 +29,9 @@ it("edits SKU facts with replay, conflict and duplicate UPC protection while pre
   const movement = await runCommand("record_movement", { skuId: cat.skuId, locationId: loc.id, binId: loc.binId, type: "opening_balance", qty: 10 }, await makeStaffCtx(ctx.breweryId));
   expect((await admin.from("skus").update({ qbo_item_id: "provider-identity" }).eq("id", cat.skuId)).error).toBeNull();
   const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
-  const input = { skuId: cat.skuId, active: false, upc: " 12345 " };
+  const input = { skuId: cat.skuId, active: false, upc: " 012345678905 " };
   const saved = await runCommand("update_sku", input, ctx, execution);
-  expect(saved).toMatchObject({ id: cat.skuId, brand_id: cat.brandId, format_id: cat.formatId, active: false, upc: "12345", qbo_item_id: "provider-identity" });
+  expect(saved).toMatchObject({ id: cat.skuId, brand_id: cat.brandId, format_id: cat.formatId, active: false, upc: "012345678905", qbo_item_id: "provider-identity" });
   expect(await runCommand("update_sku", input, ctx, execution)).toEqual(saved);
   await expect(runCommand("update_sku", { ...input, active: true }, ctx, execution)).rejects.toThrow(/different payload/);
   expect(await runCommand("portal_catalog", {}, buyer)).toEqual([]);
@@ -40,7 +40,7 @@ it("edits SKU facts with replay, conflict and duplicate UPC protection while pre
   expect((await admin.from("order_lines").select().eq("order_id", order.order_id)).data).toEqual(beforeLines.data);
   expect((await admin.from("inventory_movements").select().eq("sku_id", cat.skuId)).data).toEqual([movement]);
   const other = await seedCatalog(ctx.breweryId, { product: "Other editable", sku: "Other editable" });
-  await expect(runCommand("update_sku", { skuId: other.skuId, active: true, upc: "12345" }, ctx)).rejects.toThrow(/UPC.*another SKU/);
+  await expect(runCommand("update_sku", { skuId: other.skuId, active: true, upc: "012345678905" }, ctx)).rejects.toThrow(/UPC.*another SKU/);
   expect(await runCommand("update_sku", { skuId: cat.skuId, active: true, upc: " " }, await makeStaffCtx(ctx.breweryId))).toMatchObject({ upc: null, active: true });
   expect(await runCommand("portal_catalog", {}, buyer)).toMatchObject([{ skuId: cat.skuId }]);
   expect((await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: cat.skuId, p_active: null, p_upc: "invalid", p_request_id: crypto.randomUUID() })).error?.message).toMatch(/active is required/);
@@ -62,16 +62,16 @@ it("edits SKU facts with replay, conflict and duplicate UPC protection while pre
 it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqueness", async () => {
   const brand = await runCommand("upsert_brand", { name: "Barcode creation" }, ctx) as { id: string };
   const format = await runCommand("upsert_format", { name: "Barcode format", basis: "packaged", bblPerUnit: 0.5 }, ctx) as { id: string };
-  const saved = await runCommand("create_sku", { brandId: brand.id, formatId: format.id, upc: "  9876  " }, ctx);
-  expect(saved).toMatchObject({ upc: "9876" });
+  const saved = await runCommand("create_sku", { brandId: brand.id, formatId: format.id, upc: "  40063813  " }, ctx);
+  expect(saved).toMatchObject({ upc: "40063813" });
   const second = await runCommand("upsert_brand", { name: "Barcode second" }, ctx) as { id: string };
-  await expect(runCommand("create_sku", { brandId: second.id, formatId: format.id, upc: "9876" }, ctx)).rejects.toThrow();
-  const rawDuplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: " 9876 ", p_request_id: crypto.randomUUID() });
+  await expect(runCommand("create_sku", { brandId: second.id, formatId: format.id, upc: "40063813" }, ctx)).rejects.toThrow();
+  const rawDuplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: " 40063813 ", p_request_id: crypto.randomUUID() });
   expect(rawDuplicate.error?.code).toBe("23505");
   // ECMAScript trim whitespace, including Unicode separators and BOM, must
   // normalize identically when the registered command is bypassed.
   const whitespace = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
-  const duplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: `${whitespace}9876${whitespace}`, p_request_id: crypto.randomUUID() });
+  const duplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: `${whitespace}40063813${whitespace}`, p_request_id: crypto.randomUUID() });
   expect(duplicate.error?.code).toBe("23505");
   const blank = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: whitespace, p_request_id: crypto.randomUUID() });
   expect(blank.error).toBeNull();
@@ -79,7 +79,7 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
   expect(blank.data.upc).toBeNull();
   for (const edge of whitespace) {
     assert(blank.data !== null);
-    const update = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: `${edge}9876${edge}`, p_request_id: crypto.randomUUID() });
+    const update = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: `${edge}40063813${edge}`, p_request_id: crypto.randomUUID() });
     expect(update.error?.message).toMatch(/UPC.*another SKU/);
   }
   const cleared = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: whitespace, p_request_id: crypto.randomUUID() });

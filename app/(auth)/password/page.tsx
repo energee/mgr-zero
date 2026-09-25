@@ -14,7 +14,7 @@ import { savePassword } from "../actions";
 export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const [{ error }, identity] = await Promise.all([searchParams, getRequestIdentity()]);
   if (!identity) redirect("/reset?expired=1");
-  const model = { ...toSetPasswordViewProps(identity.email ?? "signed in"), note: error };
+  const model = toSetPasswordViewProps(identity.email ?? "signed in", error);
   return <EntrySurface>
     {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
     <EntryView model={model} action={savePassword} />

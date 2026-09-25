@@ -3,15 +3,17 @@ import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
 import type { MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
 
-export function MonthlyComplianceView({ model, lossAction, fileAction }: {
+export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen = false }: {
   model: MonthlyComplianceViewModel;
   lossAction?: (loss: LossReview) => ReactNode;
   fileAction?: ReactNode;
+  /** The period (month, quarter, or year) has not ended: it can be reviewed, not filed (#429). */
+  monthOpen?: boolean;
 }) {
   return <>
     {E.back("Compliance", model.title, undefined, model.backHref)}
     {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
-    {model.losses.length === 0 ? E.info("No completion reconciliation losses posted in this period.") : model.losses.map((loss) => <section key={loss.key} className="rounded-xl border p-4">
+    {model.losses.length === 0 ? E.info("No generic cellar losses posted in this period.") : model.losses.map((loss) => <section key={loss.key} className="rounded-xl border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{loss.title}</p><p className="text-sm text-muted-foreground">{loss.detail}</p></div>{lossAction ? lossAction(loss.source) : E.btn("Reattribute loss", "g")}</div>
       {loss.allocations.length ? <div className="mt-3 grid gap-2">{loss.allocations.map((allocation) => <Fragment key={allocation.key}>{E.fld(`${allocation.title} · ${allocation.detail}`, allocation.bbl)}</Fragment>)}</div> : null}
     </section>)}
@@ -27,6 +29,6 @@ export function MonthlyComplianceView({ model, lossAction, fileAction }: {
     {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "destination state", row.bbl)}</Fragment>)}
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
-    {fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
+    {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
   </>;
 }

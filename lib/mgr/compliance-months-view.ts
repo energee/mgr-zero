@@ -8,6 +8,10 @@ export type ComplianceNavView = {
 };
 
 export type ComplianceMonthsViewModel = {
+  /** The filing cadence tabs (Monthly, Quarterly, Annual) and the one shown. */
+  cadences: string[];
+  cadence: number;
+  /** The periods of the shown cadence; the name predates quarters and years. */
   months: ComplianceNavView[];
   registry: ComplianceNavView;
   lots: ComplianceNavView[];

@@ -11,7 +11,7 @@ import { RecordMovementView } from "../components/mgr/views/record-movement";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { ReverseMovementView } from "../components/mgr/views/reverse-movement";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
-import { toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
+import { assembleFinishedGoods, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
@@ -30,6 +30,12 @@ describe("Finished goods view", () => {
     ]);
     expect(model.rows[1]?.warning).toBe(true);
     expect(model.rows[1]?.shortfallHref).toBe(`/replenishment?sku=${SKU_PILS.sku_id}`);
+  });
+
+  it("rounds summed decimal on-hand rows to the two-decimal qty (#472)", () => {
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Hazy" }], [{ sku_id: "s1", qty: "0.10" }, { sku_id: "s1", qty: "0.20" }], [{ sku_id: "s1", qty: "0.10" }]);
+    expect(snapshot.skus[0]?.on_hand).toBe(0.3);
+    expect(toFinishedGoodsViewProps(snapshot).rows[0]?.detail).toBe("0.3 on hand · 0.2 allocated · ATP 0.1");
   });
 
   it("names an empty list without inventing rows", () => {
@@ -90,10 +96,17 @@ describe("Finished goods view", () => {
     expect(form).toMatch(/<MovementRecordedView\b/);
   });
 
+  it("the live movement form picks SKUs by id, not by their non-unique label (#472)", () => {
+    const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
+    expect(form).not.toMatch(/item\.label === value/);
+    expect(form).toMatch(/skuOptions: skus\.map\(item => \(\{ value: item\.id, label: item\.label \}\)\)/);
+  });
+
   it("opens the deep-linked movement form once instead of reopening after Close", () => {
     const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
-    expect(form).toMatch(/const autoOpened = useRef\(false\)/);
-    expect(form).toMatch(/if \(autoOpen && !autoOpened\.current\)/);
+    // Opened by initial state, never by an effect, so Close stays closed and the prefill survives (#441).
+    expect(form).toMatch(/defaultOpen: autoOpen/);
+    expect(form).not.toMatch(/setOpen\(true\)/);
   });
 });
 

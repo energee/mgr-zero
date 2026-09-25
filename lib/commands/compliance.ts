@@ -5,39 +5,48 @@
 // filing. trace_lot follows a finished-goods lot back to its batch and through
 // every ledger movement that names it.
 import { z } from "zod";
+import { periodKey } from "@/app/(app)/compliance/period";
 import { isoDate } from "./packaging";
-import { breweryToday, defineCommand, defineQuery, rows, stateCode, unwrap } from "./registry";
+import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
-const day = isoDate.optional();
+// The three registry upserts below keep a saved value when the caller omits
+// its field and clear it when the caller sends null (#522); the RPC takes the
+// cleared column names in p_clear.
+const day = isoDate.nullable().optional();
+const text = z.string().nullable().optional();
+const cleared = (fields: Record<string, unknown>) => Object.keys(fields).filter((column) => fields[column] === null);
 
 defineCommand({
-  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record",
+  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
-  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), approvedOn: day, expiresOn: day, note: z.string().optional() }),
+  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), approvedOn: day, expiresOn: day, note: text }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand_approval", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_brand: i.brandId, p_kind: i.kind, p_ttb_id: i.ttbId,
     p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
+    p_clear: cleared({ approved_on: i.approvedOn, expires_on: i.expiresOn, note: i.note }),
   })),
 });
 
 defineCommand({
-  name: "upsert_state_registration", description: "Record or replace a brand's permission to sell in one state",
+  name: "upsert_state_registration", description: "Record or edit a brand's permission to sell in one state; an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
-  input: z.object({ brandId: z.string().uuid(), state: stateCode, registrationNo: z.string().optional(), approvedOn: day, expiresOn: day }),
+  input: z.object({ brandId: z.string().uuid(), state: stateCode, registrationNo: text, approvedOn: day, expiresOn: day }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_state_registration", {
     p_brewery: ctx.breweryId, p_brand: i.brandId, p_state: i.state, p_registration_no: i.registrationNo ?? null,
     p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_request_id: execution.requestId,
+    p_clear: cleared({ registration_no: i.registrationNo, approved_on: i.approvedOn, expires_on: i.expiresOn }),
   })),
 });
 
 defineCommand({
-  name: "upsert_brewery_state_license", description: "Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)",
+  name: "upsert_brewery_state_license", description: "Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
-  input: z.object({ state: stateCode, kind: z.string().trim().min(1), licenseNo: z.string().optional(), expiresOn: day, note: z.string().optional() }),
+  input: z.object({ state: stateCode, kind: z.string().trim().min(1), licenseNo: text, expiresOn: day, note: text }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brewery_state_license", {
     p_brewery: ctx.breweryId, p_state: i.state, p_kind: i.kind, p_license_no: i.licenseNo ?? null,
     p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
+    p_clear: cleared({ license_no: i.licenseNo, expires_on: i.expiresOn, note: i.note }),
   })),
 });
 
@@ -94,14 +103,16 @@ export type LossAllocation = {
   id: string; bbl: string; classification: "sample" | "taproom" | "destruction";
   destination_state: string | null; tax_treatment: string | null; created_at: string; created_by: string;
 };
+/** A generic loss the review can reattribute: the batch's completion loss, or a
+ * cellar transfer loss (#485), which posts while the batch is open (closed_at null). */
 export type LossReview = {
-  adjustment_id: string; batch_id: string; batch_no: number; closed_at: string;
+  adjustment_id: string; batch_id: string; batch_no: number; closed_at: string | null; kind: "completion" | "transfer";
   original_bbl: string; remaining_bbl: string; allocations: LossAllocation[];
 };
 
 defineQuery({
   name: "get_loss_review",
-  description: "List completion reconciliation losses in a period with exact original, allocated, and remaining BBL",
+  description: "List generic cellar losses (batch completion and cellar transfer losses) posted in a period with exact original, allocated, and remaining BBL",
   roles: [...ROLES],
   input: z.object({ periodStart: isoDate, periodEnd: isoDate }),
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_loss_review", {
@@ -111,7 +122,7 @@ defineQuery({
 
 defineCommand({
   name: "reattribute_loss",
-  description: "Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
+  description: "Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
   roles: [...ROLES],
   input: z.object({
     adjustmentId: z.string().uuid(),
@@ -135,8 +146,13 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
-  roles: [...ROLES], input: period.extend({ note: z.string().optional() }),
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
+  roles: [...ROLES],
+  // A partial TTB range would claim days of a real period and block its filing (#486).
+  input: period.extend({ note: z.string().optional() }).refine(
+    (i) => i.jurisdiction !== "TTB" || periodKey(i.periodStart, i.periodEnd) !== null,
+    { message: "a TTB filing covers one calendar month, quarter, or year", path: ["periodEnd"] },
+  ),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("file_compliance_report", {
     p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd, p_note: i.note ?? null, p_request_id: execution.requestId,
   })),
@@ -177,23 +193,12 @@ defineQuery({
     const lot = await unwrap(ctx.db.from("lots")
       .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
       .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
-    const movements: LotMovement[] = [];
-    for (let start = 0; ; start += 500) {
-      const result = await ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + 499);
-      const page = await unwrap(Promise.resolve(result)) as unknown as LotMovement[];
-      movements.push(...page);
-      if (result.count === null || (!page.length && movements.length < result.count)) throw new Error("Could not read complete lot trace");
-      if (movements.length >= result.count) break;
-    }
+    const movements = await completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as LotMovement[];
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
-    const recipients = [];
     // Small batches keep URL size bounded; each unique order has one shipment.
-    for (let start = 0; start < orderIds.length; start += 100) {
-      const orders = await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
-        .eq("brewery_id", ctx.breweryId).in("id", orderIds.slice(start, start + 100)));
-      recipients.push(...(orders ?? []));
-    }
+    const recipients = await inChunks(orderIds, async chunk => (await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
+      .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
     const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));

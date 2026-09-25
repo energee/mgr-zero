@@ -15,7 +15,7 @@ it("keeps unavailable variance distinct from measured zero and labels incomplete
 
 it("preserves nulls, coverage, exclusions and absent trends in the shared report", () => {
   const report = taproomVariance.report!;
-  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { weeks: 4, report: { ...report, rows: [{ ...report.rows[0], expected_bbl: null, variance_bbl: null, excluded_bbl: 2, unattributed_bbl: 1 }], periods: [{ ...report.periods[0], expected_bbl: null, coverage_complete: false, unmapped_lines: 3 }] } } }));
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { weeks: 4, timeZone: "America/New_York", report: { ...report, rows: [{ ...report.rows[0], expected_bbl: null, variance_bbl: null, excluded_bbl: 2, unattributed_bbl: 1 }], periods: [{ ...report.periods[0], expected_bbl: null, coverage_complete: false, unmapped_lines: 3 }] } } }));
   expect(html).toContain("2 bbl excluded outside inventory");
   expect(html).toContain("1 bbl unattributed");
   expect(html).toContain("coverage incomplete");

@@ -5627,7 +5627,6 @@ export type Database = {
           created_by: string
           from_occupancy_id: string
           id: string
-          loss_bbl: number
           note: string | null
           to_occupancy_id: string
         }
@@ -5639,7 +5638,6 @@ export type Database = {
           created_by: string
           from_occupancy_id: string
           id?: string
-          loss_bbl?: number
           note?: string | null
           to_occupancy_id: string
         }
@@ -5651,7 +5649,6 @@ export type Database = {
           created_by?: string
           from_occupancy_id?: string
           id?: string
-          loss_bbl?: number
           note?: string | null
           to_occupancy_id?: string
         }
@@ -8111,6 +8108,7 @@ export type Database = {
       }
       provision_brewery: {
         Args: {
+          p_actor: string
           p_name: string
           p_request_id: string
           p_timezone: string
@@ -8946,6 +8944,7 @@ export type Database = {
           p_approved_on: string
           p_brand: string
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_id: string
           p_kind: Database["public"]["Enums"]["approval_kind"]
@@ -8958,6 +8957,7 @@ export type Database = {
       upsert_brewery_state_license: {
         Args: {
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_kind: string
           p_license_no: string
@@ -9005,6 +9005,7 @@ export type Database = {
           p_brewery: string
           p_category: Database["public"]["Enums"]["material_category"]
           p_default_vendor: string
+          p_extract_potential: number
           p_lot_tracked: boolean
           p_material: string
           p_name: string
@@ -9072,6 +9073,7 @@ export type Database = {
           p_approved_on: string
           p_brand: string
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_registration_no: string
           p_request_id: string

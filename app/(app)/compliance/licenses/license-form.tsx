@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
-import { orUndef, useCommandForm, useFields } from "@/lib/commands/use-command-form";
-// state and kind are locked when editing: a license is addressed by them, so changing one would add a row, not move it
+import { licenseInput } from "@/lib/mgr/license-view";
+import { useCommandForm, useFields } from "@/lib/commands/use-command-form";
+// state and kind are locked when editing (licenseInput omits the unshown note, so the upsert keeps it): a license is addressed by them, so changing one would add a row, not move it
 export function LicenseForm({ license }: { license?: License }) {
   const { v, set, reset } = useFields({ state: license?.state ?? "", kind: license?.kind ?? "brewery", licenseNo: license?.license_no ?? "", expiresOn: license?.expires_on ?? "" });
   const form = useCommandForm("upsert_brewery_state_license", {
-    build: () => ({ state: v.state.toUpperCase(), kind: v.kind, licenseNo: orUndef(v.licenseNo), expiresOn: orUndef(v.expiresOn) }),
+    build: () => licenseInput(v),
     reset,
   });
   const model = {

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { isNumber } from "@/lib/mgr/quantity-input";
 
 
 type Brand = { id: string; name: string };
@@ -21,7 +22,7 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
   const [occupancyId, setOccupancyId] = useState("");
   const [plannedOn, setPlannedOn] = useState("");
   const [lines, setLines] = useState<Line[]>([{ skuId: "", qtyPlanned: "" }]);
-  const validLines = lines.filter((l) => l.skuId && Number(l.qtyPlanned) >= 0);
+  const validLines = lines.filter((l) => l.skuId && isNumber(l.qtyPlanned) && Number(l.qtyPlanned) >= 0);
   const form = useCommandForm("schedule_packaging_run", {
     build: () => ({
       brandId, plannedOn, occupancyId: occupancyId || undefined,

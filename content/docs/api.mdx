@@ -211,7 +211,7 @@ curl -X POST "$MGR_URL/api/command" \
 ```
 
 `provision_brewery` requires authentication but no existing membership; omit
-`breweryId`. Its blank tenant-role cells below mean roles do not apply, not that
+`breweryId`. A dedicated deployment refuses it. Its blank tenant-role cells below mean roles do not apply, not that
 access is anonymous. All other operations use the following membership checks.
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
@@ -579,7 +579,7 @@ one value that ties what your client saw to what the server recorded.
 {/* ops:errors */}
 | Status | `code` | What happened | What to do |
 | --- | --- | --- | --- |
-| 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked. | Read the message: it is the rule, written for a person. Change the state or the input. |
+| 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked, or a number was out of range for its field. | Read the message: it is the rule, written for a person. Change the state or the input. |
 | 400 | `duplicate_command` | Two operations tried to register the same name. A server fault, not a caller one. | Report it; no request will succeed until it is fixed. |
 | 400 | `invalid_command_metadata` | A registered operation declared an unsafe or contradictory execution policy. A server fault, not a caller one. | Report it; the operation registration must be corrected before the server can start. |
 | 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names. The operation's field table lists types and which are required. |
@@ -588,10 +588,10 @@ one value that ties what your client saw to what the server recorded.
 | 400 | `preview_required` | A chat-origin command arrived without a confirmed preview bound to its conversation. | Call `preview_command`, show its effects for confirmation, then send its `previewToken` with the same input and `conversationId`. |
 | 401 | `unauthenticated` | No usable session cookie or bearer token. | Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session. |
 | 403 | `not_member` | Authenticated, but not a member of the brewery named by `breweryId`. | Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`). |
-| 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role. | Each operation lists the roles allowed to call it; the role matrix collects them. |
+| 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role; or `provision_brewery` on a dedicated deployment (`MGR_DEDICATED=1`), which refuses brewery creation. | Each operation lists the roles allowed to call it; the role matrix collects them. |
 | 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
-| 409 | `conflict` | A `requestId` was reused with a different payload, or a confirmed preview changed before its first commit. | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. |
+| 409 | `conflict` | A `requestId` was reused with a different payload, a confirmed preview changed before its first commit, or the write would duplicate a record that must be unique (such as a second location with the same name). | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. For a duplicate, change the name or value, or edit the existing record. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
 | 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
@@ -657,9 +657,9 @@ computed from the SKU and the quantity. A field an operation does not declare is
 dropped before the handler runs rather than trusted, so sending your own `bbl`
 does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
-`publish_pos_item`, `publish_pos_menu`, and `record_fermentation_reading` are
-the exception: their schemas refuse an undeclared field outright with
-`400 invalid_input` instead of dropping it.
+`create_composed_format`, `publish_pos_item`, `publish_pos_menu`, and
+`record_fermentation_reading` are the exception: their schemas refuse an
+undeclared field outright with `400 invalid_input` instead of dropping it.
 
 Prices on order lines are snapshotted at creation from the customer's price
 group. You do not send them, and changing a price group later does not rewrite
@@ -1027,7 +1027,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow
+Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2289,9 +2289,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-SKUs with their brand and format, alphabetical
+SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -2575,7 +2577,7 @@ Create or update a ship-to address; isDefault switches the customer default, omi
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "CA", "zip": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "CA", "zip": "19107" } }'
 ```
 
 {/* end ops:customers */}
@@ -2914,7 +2916,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one, and retired, shipped or lost cannot exceed what the bin holds
+Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one; retired, shipped, or lost at the bin cannot exceed what the bin holds, and returned or lost at a customer cannot exceed what the customer holds
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3299,7 +3301,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor. Units are refused once movements exist
+Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements exist
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3313,6 +3315,7 @@ Create or edit a material definition: kind, base and purchase units with the fac
 | `defaultVendorId` | uuid | no |
 | `reorderPoint` | number | no |
 | `active` | boolean | no |
+| `extractPotential` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3653,7 +3656,7 @@ Log one timestamped fermentation reading against an open occupancy; this is the 
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 1 } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 25 } }'
 ```
 
 #### schedule_batch [#schedule_batch]
@@ -4007,7 +4010,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4200,7 +4203,7 @@ breakdown is explanatory and must not be added to `figures.removals`.
 
 `command` · admin, sales
 
-Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4254,7 +4257,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-List completion reconciliation losses in a period with exact original, allocated, and remaining BBL
+List generic cellar losses (batch completion and cellar transfer losses) posted in a period with exact original, allocated, and remaining BBL
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4306,7 +4309,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
+Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4343,7 +4346,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record
+Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4351,9 +4354,9 @@ Record or edit one brand's COLA or formula approval by its TTB id; the same id o
 | `kind` | cola or formula | yes |
 | `ttbId` | string | yes |
 | `id` | uuid | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4366,15 +4369,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)
+Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `state` | string | yes |
 | `kind` | string | yes |
-| `licenseNo` | string | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `licenseNo` | string or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4387,15 +4390,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace a brand's permission to sell in one state
+Record or edit a brand's permission to sell in one state; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `brandId` | uuid | yes |
 | `state` | string | yes |
-| `registrationNo` | string | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
+| `registrationNo` | string or null | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4423,8 +4426,8 @@ when membership is completed.
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
 admin membership and returns the brewery UUID. Replay returns that UUID without
-restoring revoked membership. `MGR_DEDICATED=1` disables web creation only;
-authenticated API provisioning remains available.
+restoring revoked membership. `MGR_DEDICATED=1` refuses brewery creation from
+the web and the API alike with `403 permission_denied`.
 
 `import_csv` accepts 1–5000 string-field rows and returns
 `{ committed, blocked, outcomes }`. Each outcome names its 1-based `row`,

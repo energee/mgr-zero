@@ -5,12 +5,14 @@
 // Compliance is the brand's: its approvals and state registrations list here
 // with their sheets; the brewery's licenses are their own page. The recipe
 // cost suggests a price group (lib/mgr/price-group-suggestion.ts); Use only
-// fills the select, and Save brand is still the commit.
+// fills the select, and Save brand is still the commit. ABV is the shared
+// numeric stepper, bounded by BRAND_ABV like upsert_brand's schema.
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
+import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 
@@ -58,7 +60,7 @@ export function BrandView({
       <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />
       {E.cols(
         <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
-        <RegistryInput label="ABV" value={model.abv} onChange={controls.abv} />,
+        E.edit("ABV", model.abv, "number", undefined, { onChange: controls.abv, min: String(BRAND_ABV.min), max: String(BRAND_ABV.max), step: "0.1" }),
         <div className="flex flex-col gap-2">
           <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
           {categoryAction !== undefined ? categoryAction : <CatalogCategoriesControl categories={model.categoryOptions} />}

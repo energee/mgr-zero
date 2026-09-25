@@ -132,4 +132,22 @@ describe("inventory commands", () => {
     expect((await ctx.db.from("inventory_movements").select("id", { count: "exact", head: true })
       .eq("brewery_id", ctx.breweryId).eq("sku_id", sku.id)).count).toBe(before);
   });
+
+  // #450: the form path refuses the same over-removal the chat preview refuses.
+  it("refuses a form removal larger than the untracked stock in a lotless bin", async () => {
+    const brand = (await runCommand("upsert_brand", { name: "Untracked removal" }, ctx)) as EntityWithId;
+    const format = (await runCommand("upsert_format", {
+      name: "Untracked case", basis: "packaged", packageType: "can", unitsPerCase: 24, bblPerUnit: 0.05,
+    }, ctx)) as EntityWithId;
+    const sku = (await runCommand("create_sku", { brandId: brand.id, formatId: format.id }, ctx)) as EntityWithId;
+    const location = (await runCommand("create_location", { name: "Untracked warehouse", uses: ["warehouse"] }, ctx)) as EntityWithId;
+    const [bin] = (await runCommand("list_bins", { locationId: location.id }, ctx)) as EntityWithId[];
+    await runCommand("record_movement", { skuId: sku.id, locationId: location.id, binId: bin.id, qty: 5, type: "opening_balance" }, ctx);
+
+    await expect(runCommand("record_movement", {
+      skuId: sku.id, locationId: location.id, binId: bin.id, qty: -50, type: "loss",
+    }, ctx)).rejects.toThrow(/insufficient selected bin and lot stock/i);
+    const onHand = (await runCommand("get_bin_on_hand", { skuId: sku.id, locationId: location.id }, ctx)) as (OnHandRow & { bin_id: string })[];
+    expect(onHand.map((row) => [row.bin_id, Number(row.qty)])).toEqual([[bin.id, 5]]);
+  });
 });

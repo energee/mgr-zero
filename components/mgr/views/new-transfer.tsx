@@ -43,7 +43,7 @@ export function NewTransferView({
       <Field><FieldLabel>Lines</FieldLabel>
       {model.lines.map((line, index) => (
         <div key={`${line.title}:${index}`} className="flex gap-2">
-          {E.pick(`Line ${index + 1} SKU`, line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true })}
+          {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true })}
           {E.edit(`Line ${index + 1} qty`, String(controls.lineQty ? String(line.qty) : line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, min: "0", step: "any", hideLabel: true })}
           {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => controls.removeLine?.(index)}>Remove</Button> : null}
         </div>
