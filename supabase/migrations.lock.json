@@ -46,5 +46,5 @@
   "20260925093817_transfer_distinct_locations.sql": "b63415b9aa0d058c0a0a6245d537f742567b2bccc54026452c54b056555df7b0",
   "20260925093851_removals_foot_to_out.sql": "34d2bf7f450866425e79c3cc04c5cd8cb04533cd2b775086079f3230b5b1085d",
   "20260925113742_close_run_batch_residual.sql": "9aaf4bcfb9e60fa0594ff62f32dab0d95b02d1f572bd79b221e53df94300a6e8",
-  "20260925152847_transfer_loss_adjustments.sql": "260fdc4609d1eae385eeab0c4244db9ac96caf0c3fec1b916aa64239580d9447"
+  "20260925152847_transfer_loss_adjustments.sql": "21de4f98d5939a684a3b368284bb14f954fcd37fecaf50fd2b4cee57bf28bb06"
 }
