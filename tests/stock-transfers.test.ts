@@ -67,6 +67,55 @@ describe("stock transfer lifecycle", () => {
   });
 });
 
+describe("cancel_stock_transfer (#578)", () => {
+  it("cancels a picked transfer with a reason: picks released, nothing posted, stock still in the source bin", async () => {
+    const b = await makeBrewery();
+    const adminCtx = await makeStaffCtx(b.id, "admin");
+    const warehouse = await makeStaffCtx(b.id, "warehouse");
+    const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+    const to = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
+    const { skuId } = await seedCatalog(b.id);
+    await runCommand("record_movement", { skuId, locationId: from.id, binId: from.binId, qty: 3, type: "opening_balance" }, adminCtx);
+    const { transferId } = await runCommand("create_stock_transfer", {
+      fromLocationId: from.id, toLocationId: to.id, lines: [{ skuId, qty: 3, fromBinId: from.binId, toBinId: to.binId }],
+    }, adminCtx) as { transferId: string };
+    await runCommand("submit_stock_transfer", { transferId }, adminCtx);
+    const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
+    await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: line!.id, qty: 3 }] }, adminCtx);
+
+    await expect(runCommand("cancel_stock_transfer", { transferId, reason: "  " }, warehouse)).rejects.toThrow();
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("cancel_stock_transfer", { transferId, reason: "stuck" }, sales)).rejects.toMatchObject({ code: "permission_denied" });
+
+    await runCommand("cancel_stock_transfer", { transferId, reason: "over-picked before the pick check" }, warehouse);
+
+    const { data: hdr } = await admin.from("stock_transfers").select("status, cancel_reason, cancelled_by, cancelled_at").eq("id", transferId).single();
+    expect(hdr).toMatchObject({ status: "cancelled", cancel_reason: "over-picked before the pick check", cancelled_by: warehouse.userId });
+    expect(hdr!.cancelled_at).not.toBeNull();
+    const { data: l2 } = await admin.from("stock_transfer_lines").select("qty_picked").eq("id", line!.id).single();
+    expect(l2!.qty_picked).toBeNull();
+    // A pick never moved stock, so the source bin still holds all of it.
+    expect(sql(`select trim_scale(sum(qty)) from inventory_movements where sku_id = '${skuId}' and bin_id = '${from.binId}'`)).toEqual(["3"]);
+    expect(sql(`select count(*) from inventory_movements where sku_id = '${skuId}' and bin_id = '${to.binId}'`)).toEqual(["0"]);
+
+    await expect(runCommand("receive_stock_transfer", { transferId, lines: [{ lineId: line!.id, qty: 3 }] }, adminCtx)).rejects.toThrow(/transfer is cancelled/);
+    await expect(runCommand("cancel_stock_transfer", { transferId, reason: "again" }, warehouse)).rejects.toThrow(/transfer is cancelled/);
+  });
+
+  it("refuses to cancel a received transfer: its stock has already moved", async () => {
+    const b = await makeBrewery();
+    const ctx = await makeStaffCtx(b.id, "admin");
+    const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
+    const to = await seedLocation(b.id, { name: "Storage", uses: ["storage"] });
+    const { skuId } = await seedCatalog(b.id);
+    const { transferId } = await runCommand("create_stock_transfer", {
+      fromLocationId: from.id, toLocationId: to.id, lines: [{ skuId, qty: 1, fromBinId: from.binId, toBinId: to.binId }],
+    }, ctx) as { transferId: string };
+    await admin.from("stock_transfers").update({ status: "received" }).eq("id", transferId);
+    await expect(runCommand("cancel_stock_transfer", { transferId, reason: "too late" }, ctx)).rejects.toThrow(/transfer is received/);
+  });
+});
+
 describe("receive_stock_transfer", () => {
   it("corrects a completed wrong-destination transfer with a linked compensating transfer", async () => {
     const b = await makeBrewery();

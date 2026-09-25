@@ -24,6 +24,24 @@ transaction, so a transfer is never left half-received.
 
 {/* ops:inventory */}
 
+## cancel_stock_transfer [#cancel_stock_transfer]
+
+`command` · admin, warehouse
+
+Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `transferId` | uuid | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "cancel_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "transferId": "00000000-0000-0000-0000-000000000000", "reason": "string" } }'
+```
+
 ## create_bin [#create_bin]
 
 `command` · admin, warehouse

@@ -1,7 +1,7 @@
 // app/(app)/transfers/[id]/page.tsx — one stock transfer: header, lines with
 // from/to bins, and the next verb (transfer-actions.tsx): Submit, Record pick,
-// Receive. Receiving posts the paired ledger rows; the page then shows what
-// moved. Same movements as Complete transfer, no invoice.
+// Receive, or Cancel transfer. Receiving posts the paired ledger rows; the
+// page then shows what moved. A cancelled transfer shows its reason. Same movements as Complete transfer, no invoice.
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -13,7 +13,7 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { TransferActions } from "./transfer-actions";
 
 type Detail = {
-  transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };
+  transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; cancel_reason: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };
   lines: { id: string; sku_id: string | null; material_id: string | null; qty: number; qty_picked: number | null; from_bin_id: string; to_bin_id: string; keg_size: string | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }[];
   bins: { id: string; name: string }[];
 };
@@ -27,7 +27,7 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
   const binById = new Map(bins.map((b) => [b.id, b.name]));
   const bin = (id: string) => binById.get(id) ?? "—";
   const what = (l: Detail["lines"][number]) => l.skus?.name ?? l.materials?.name ?? (l.keg_pools ? `${l.keg_pools.name} · ${l.keg_size?.replace("_", " ")}` : "Line");
-  const done = transfer.status === "received";
+  const done = transfer.status === "received" || transfer.status === "cancelled";
   return (
     <TransferDetailView
       model={toTransferDetailViewProps({
@@ -36,6 +36,7 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
           transfer_no: transfer.transfer_no,
           status: transfer.status,
           note: transfer.note,
+          cancel_reason: transfer.cancel_reason,
           from_name: transfer.from_location?.name ?? "—",
           to_name: transfer.to_location?.name ?? "—",
         },

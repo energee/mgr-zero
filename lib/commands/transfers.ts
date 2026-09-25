@@ -59,6 +59,13 @@ defineCommand({
   },
 });
 
+defineCommand({
+  name: "cancel_stock_transfer", description: "Cancel an unreceived stock transfer with a reason; its picks are released and no stock moves, since a pick never left the source bin",
+  roles: [...roles], requiresConfirmation: true,
+  input: z.object({ transferId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_stock_transfer", { p_transfer: i.transferId, p_reason: i.reason, p_request_id: execution.requestId })),
+});
+
 defineQuery({
   name: "get_stock_transfer", description: "One stock transfer with its lines, location and bin names",
   roles: [...readRoles],

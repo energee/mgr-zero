@@ -135,6 +135,20 @@ describe("Transfer detail view", () => {
     expect(html).not.toMatch(/→/);
   });
 
+  it("an unreceived transfer also offers Cancel transfer; a cancelled one shows its reason and no verb (#578)", () => {
+    expect(htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }))).toMatch(/>Cancel transfer</);
+    const cancelled = toTransferDetailViewProps({ ...transferDetailSubmitted, transfer: { ...transferDetailSubmitted.transfer, status: "cancelled", cancel_reason: "over-picked" } });
+    expect(cancelled.nextVerb).toBeUndefined();
+    const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
+    expect(html).toMatch(/over-picked/);
+    expect(html).not.toMatch(/>Cancel transfer<|>Record pick</);
+  });
+
+  it("the live footer can cancel with a reason", () => {
+    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
+    expect(src).toMatch(/run\("cancel_stock_transfer", \{ transferId, reason \}/);
+  });
+
   it("a footer slot replaces Record pick", () => {
     const html = htmlOf(createElement(TransferDetailView, {
       model: toTransferDetailViewProps(transferDetailSubmitted),
