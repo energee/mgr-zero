@@ -1027,7 +1027,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow
+Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2289,9 +2289,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-SKUs with their brand and format, alphabetical
+SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4201,7 +4203,7 @@ breakdown is explanatory and must not be added to `figures.removals`.
 
 `command` · admin, sales
 
-Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
 
 | Field | Type | Required |
 | --- | --- | --- |
