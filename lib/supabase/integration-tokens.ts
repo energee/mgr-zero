@@ -221,9 +221,19 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   return data;
 }
 
+/** True when the intent moved to recovery_required; false when it was no longer 'exchanging'. */
 export async function failQboOAuth(intentId: string, actorId: string) {
-  const { error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
+  const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
+  return data === true;
+}
+
+/** True when a stored (not disconnected) QuickBooks connection of any brewery uses this realm; the OAuth callback must not revoke then. */
+export async function qboRealmInUse(realmId: string) {
+  const { count, error } = await createAdminClient().from("qbo_connections")
+    .select("id", { count: "exact", head: true }).eq("realm_id", realmId).neq("state", "disconnected");
+  if (error) throw new Error("QuickBooks connection lookup failed");
+  return (count ?? 0) > 0;
 }
 
 export async function claimSquareOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {
