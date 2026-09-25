@@ -29,7 +29,8 @@ describe("Shop view", () => {
     ]);
     expect(model.groups[2]?.items[0]).toMatchObject({ name: "⅙ bbl keg", price: "$62.00", qty: 0 });
     expect(model.source).toBe("Warehouse");
-    expect(model.shipToLine).toBe("Main · 2026-09-09");
+    expect(model.shipToLine).toBe("Main · Sep 9, 2026");
+    expect(toShopViewProps({ ...ridgelineShop, requestedDate: "" }).shipToLine).toBe("Main");
     expect(model.reviewVerb).toBe("Review order · $828.00");
     expect(model.depositInfo).toMatch(/pending/);
   });
@@ -41,7 +42,7 @@ describe("Shop view", () => {
     expect(html).toMatch(/Coming up/);
     expect(html).toMatch(/½ bbl keg/);
     expect(html).toMatch(/Ships from/);
-    expect(html).toMatch(/Main · 2026-09-09/);
+    expect(html).toMatch(/Main · Sep 9, 2026/);
     expect(html).not.toMatch(/Wed 9\/9/);
     expect(html).not.toMatch(/→/);
   });

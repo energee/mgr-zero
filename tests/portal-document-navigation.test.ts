@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { formatDate } from "@/lib/date-format";
 const state = vi.hoisted(() => ({ kind: "invoice" as "invoice" | "credit_memo", paid: false }));
 vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "customer" }) }));
@@ -20,13 +21,13 @@ it.each([{ kind: "invoice" as const, paid: false, status: "Unpaid" }, { kind: "i
   expect(html).toContain('href="/portal/invoices"');
   expect(html).not.toContain("Download PDF");
   expect(html).toContain("Issued");
-  expect(html).toContain("2026-09-08");
+  expect(html).toContain(formatDate("2026-09-08"));
   expect(html).toContain(`>${status}<`);
   if (kind === "credit_memo") {
     expect(html).not.toContain("still due");
     expect(html).not.toContain("Online payment");
     expect(html).not.toContain(">Paid<");
-    expect(html).not.toContain("2026-10-08");
+    expect(html).not.toContain(formatDate("2026-10-08"));
   }
 });
 it("keeps each history detail link alongside exact draft and short-shipped reorder actions", async () => {

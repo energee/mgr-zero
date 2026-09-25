@@ -32,6 +32,11 @@ import Link from "next/link";
 import * as React from "react";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 
+/** Selected outline toggle painted with the primary pair instead of the faint
+ *  bg-muted wash, for choices that must read at a glance (Location Uses, #493).
+ *  E.chips takes it as `bright`; components/ui/toggle.tsx stays stock shadcn. */
+export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
+
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
 /** --dot-warning / --dot-success in app/globals.css say why these are not the
@@ -251,7 +256,7 @@ export const E = {
   chips: (arr: string[], on = 0, bright = false) => (
     <ToggleGroup type="single" defaultValue={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
-        <ToggleGroupItem key={c} value={c} className={cn(bright && "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground")}>{c}</ToggleGroupItem>
+        <ToggleGroupItem key={c} value={c} className={cn(bright && BRIGHT_ON)}>{c}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   ),

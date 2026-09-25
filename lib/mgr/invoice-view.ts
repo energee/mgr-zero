@@ -99,7 +99,7 @@ export function invoiceMappingRows(customer: { name: string; qbo_customer_id: st
 export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref, timeZone }: InvoiceSnapshot): InvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
   const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
-  const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
+  const dueOrIssued = invoice.due_on ? `due ${formatDate(invoice.due_on)}` : `issued ${formatDate(invoice.issued_on)}`;
   const state = invoiceCurrentState(invoice);
   const stateDetail = state === "paid" ? ` · paid ${formatDate(invoice.paid_at!, timeZone)}`
     : state === "written_off" ? " · written off" : state === "unpaid" ? "" : ` · ${state}`;

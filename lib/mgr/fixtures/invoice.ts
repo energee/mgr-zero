@@ -28,7 +28,7 @@ export const invoiceFailedAls: InvoiceSnapshot = {
     invoice_no: 1039,
     kind: "invoice",
     issued_on: "2026-09-03",
-    due_on: "10/03",
+    due_on: "2026-10-03",
     paid_at: null,
     customers: { name: ALS.name },
   },

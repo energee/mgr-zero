@@ -11,7 +11,7 @@ import { RecordMovementView } from "../components/mgr/views/record-movement";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { ReverseMovementView } from "../components/mgr/views/reverse-movement";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
-import { assembleFinishedGoods, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
+import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
@@ -94,6 +94,17 @@ describe("Finished goods view", () => {
     expect(form).not.toContain('title="Record Movement"');
     expect(form).toMatch(/<RecordMovementView\b/);
     expect(form).toMatch(/<MovementRecordedView\b/);
+  });
+
+  it("names a SKU once when its name already starts with the brand (#493)", () => {
+    expect(skuLabel({ name: "Hazy IPA · 4 × 12.3 oz cans", brands: { name: "Hazy IPA" } })).toBe("Hazy IPA · 4 × 12.3 oz cans");
+    expect(skuLabel({ name: "Case", brands: { name: "Pils" } })).toBe("Pils · Case");
+    expect(skuLabel({ name: "Case" })).toBe("Case");
+  });
+
+  it("does not print the raw movement id on inventory movement rows (#493)", () => {
+    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    expect(src).not.toMatch(/ · \{m\.id\}/);
   });
 
   it("the live movement form picks SKUs by id, not by their non-unique label (#472)", () => {

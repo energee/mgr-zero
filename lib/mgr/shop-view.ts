@@ -1,6 +1,7 @@
 // lib/mgr/shop-view.ts — view-model for portal Shop. portal_catalog +
 // get_portal_account paint the domain; qty on each catalog row is cart state.
 import type { EmptyState } from "./empty-state";
+import { formatDate } from "@/lib/date-format";
 import { money } from "./money";
 
 export type ShopCatalogItem = {
@@ -111,7 +112,7 @@ export function toShopViewProps({
     groups,
     empty: catalog.length === 0 ? { title: "Nothing listed for wholesale yet", description: "Call the brewery." } : undefined,
     source: source.name,
-    shipToLine: `${shipTo?.label ?? "Ship-to"} · ${requestedDate}`,
+    shipToLine: `${shipTo?.label ?? "Ship-to"}${requestedDate ? ` · ${formatDate(requestedDate)}` : ""}`,
     depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal. The brewery confirms final invoice amounts and the requested delivery date.",
     reviewVerb: `Review order · ${money(merchandiseCents)}`,
     shipToId,

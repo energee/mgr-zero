@@ -62,7 +62,8 @@ describe("Batches view", () => {
     expect(model.active[0]).toMatchObject({ verb: "Open", href: "/batches/active" });
     expect(model.completed?.[0].key).toBe("closed");
     const html = htmlOf(createElement(BatchesView, { model, workHrefs: { all: "/work", batches: "/batches" }, newVesselHref: "/cellar/vessels/new" }));
-    for (const text of ["Planned", "Active", "Completed", "Reading details unavailable", "Actual tank", "12.5 bbl", "No vessels yet"]) expect(html).toContain(text);
+    for (const text of ["Planned", "Active", "Completed", "Reading details unavailable", "Actual tank", "12.5 bbl · Sep 12, 2026", "No vessels yet"]) expect(html).toContain(text);
+    expect(html).not.toContain("2026-09-12");
     expect(html).not.toContain("°P");
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
