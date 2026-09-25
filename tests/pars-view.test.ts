@@ -8,12 +8,13 @@ import { SCREENS } from "../components/mgr/screens";
 import { ParsView } from "../components/mgr/views/pars";
 import { parsPils } from "../lib/mgr/fixtures/pars";
 import { toParsViewProps } from "../lib/mgr/pars-view";
+import { OUNCES_PER_BBL } from "../lib/volume";
 
 describe("Pars view", () => {
   it("maps ATP −6 and Adjust/Release verbs from the shortfall snapshot", () => {
     const model = toParsViewProps(parsPils);
     expect(model.title).toBe("Pils · 16 oz case");
-    expect(model.atp).toBe("−6 cases · −0.58 bbl");
+    expect(model.atp).toBe("−6 cases · −18 gal");
     expect(model.atpDetail).toBe("ATP · 22 cases on hand · 28 allocated");
     expect(model.rows.map((r) => r.verb)).toEqual(["Adjust", "Release", "Edit", "Edit par"]);
     expect(model.rows[0]?.title).toMatch(/^ORD-0231 · Ridgeline/);
@@ -22,6 +23,12 @@ describe("Pars view", () => {
     expect(model.rows[1]?.tone).toBe("destructive");
     expect(model.rows[2]?.title).toBe("Taproom standing");
     expect(model.rows[3]?.title).toBe("Taproom par");
+  });
+
+  it("formats the unrounded volume: one short can is −12 oz, one short sixth is −⅙ bbl (#456)", () => {
+    const one = (bblPerUnit: number, unit: string) => toParsViewProps({ ...parsPils, bblPerUnit, unit, shortfall: { ...parsPils.shortfall, atp: -1 } }).atp;
+    expect(one(12 / OUNCES_PER_BBL, "can")).toBe("−1 can · −12 oz");
+    expect(one(1 / 6, "sixth")).toBe("−1 sixth · −⅙ bbl");
   });
 
   it("renders those verbs from the view", () => {

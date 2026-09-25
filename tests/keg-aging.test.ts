@@ -21,4 +21,15 @@ describe("kegAging", () => {
   it("ignores events with no customer", () => {
     expect(kegAging([ev("acquired", 10, "2026-01-01", null)], now)).toEqual([]);
   });
+  it("orders by instant, not by text: PostgREST drops the fraction on whole seconds (#455)", () => {
+    // localeCompare puts "…10:00:00+00:00" after "…10:00:00.5+00:00", so the
+    // return used to run before both shipments, retire nothing, and leave 3 open.
+    const out = kegAging([
+      ev("shipped", 2, "2026-09-01T10:00:00+00:00"),
+      ev("shipped", 1, "2026-09-01T10:00:00+00:00"),
+      ev("returned", 1, "2026-09-01T10:00:00.5+00:00"),
+    ], now);
+    expect(out.reduce((n, a) => n + a.qty, 0)).toBe(2);
+  });
 });
+

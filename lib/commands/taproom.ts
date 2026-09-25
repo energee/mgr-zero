@@ -145,8 +145,11 @@ defineQuery({
     const [pools, totals, events, customers] = await Promise.all([
       listPools(ctx),
       unwrap(ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at")
-        .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])),
+      // Every event, oldest first, paged past PostgREST's 1000-row cap (#455);
+      // kegAging re-sorts by instant, and this order breaks same-instant ties.
+      completeRows("Keg report", start => ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])
+        .order("at").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
     ]);
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));

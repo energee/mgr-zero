@@ -4,7 +4,7 @@ import { ImportView } from "@/components/mgr/views/import";
 import { command } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
-import { IMPORT_FIELDS, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
   const renderedContext = useCommandContext();
@@ -14,7 +14,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [step, setStep] = useState(0);
   // ponytail: batch state lasts while this page stays open; persist it for reload recovery.
-  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[]; expectedContext: CommandContextExpectation } | null>(null);
+  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[]; previewRows: number[]; expectedContext: CommandContextExpectation } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,7 +26,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     setCsv(next); setMapping(Object.fromEntries(fields.map(f => [f.name, next.headers.indexOf(f.name)]))); setError(null);
   }
   async function commit() {
-    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows, expectedContext: renderedContext };
+    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
     try { setResult(await command(action.expectedContext.breweryId ?? breweryId, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext) as ImportResult); }
     catch (err) { setError(`${err instanceof Error ? err.message : "Import failed"}. Some rows may have committed. Retry this same batch to recover their results.`); }
@@ -38,7 +38,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     stage({ headers: fields.map(f => f.name), rows: blocked.map(row => fields.map(f => row[f.name] ?? "")) });
     setBatch(null); setResult(null); setStep(2);
   }
-  return <ImportView model={{ kind, step, fileName, headers: csv?.headers, csvRowCount: csv?.rows.length, mapping, rows, validation, lookups, result, error, busy, batchId: batch?.requestId, backHref: "/settings" }}
+  return <ImportView model={{ kind, step, fileName, headers: csv?.headers, csvRowCount: csv?.rows.length, mapping, rows, validation, lookups, result, error, busy, batchId: batch?.requestId, previewRows: batch?.previewRows, backHref: "/settings" }}
     onKind={value => { setKind(value); setCsv(null); setFileName(null); }}
     onStep={setStep} onMapping={(field, column) => setMapping({ ...mapping, [field]: column })}
     onFile={async file => {

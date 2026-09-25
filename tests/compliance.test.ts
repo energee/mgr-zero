@@ -155,6 +155,26 @@ describe("generate_compliance_report", () => {
     expect(sep.figures.lines.find((x) => x.class === "can")).toMatchObject({ begin: 10, in: 0.01, out: 0, end: 10.01 });
   });
 
+  it("the removal lines foot to the printed Out (#533)", async () => {
+    // 10 bbl opens; 0.005 bbl leaves as a sample and 0.005 is destroyed. Out prints 10.00 − 9.99 = 0.01, but rounding
+    // each removal on its own printed 0.01 + 0.01. The rounded Out is allocated by largest remainder instead.
+    const other = await makeBrewery();
+    const ctx = await makeStaffCtx(other.id, "admin");
+    const { skuId } = await seedCatalog(other.id, { sku: "Foot removals", packageType: "can", bblPerUnit: 0.005 });
+    const l = await seedLocation(other.id);
+    const base = { brewery_id: other.id, location_id: l.id, bin_id: l.binId, created_by: ctx.userId, sku_id: skuId };
+    insertFixture("inventory_movements", [
+      { ...base, qty: 2000, type: "opening_balance", created_at: "2025-08-15T12:00:00Z" },
+      { ...base, qty: -1, type: "sample", dest_state: "PA", created_at: "2025-09-10T12:00:00Z" },
+      { ...base, qty: -1, type: "destruction", created_at: "2025-09-11T12:00:00Z" },
+    ]);
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" }, ctx) as Report;
+    const out = r.figures.lines.reduce((sum, line) => sum + line.out, 0);
+    const removed = Object.values(r.figures.removals).reduce((sum, v) => sum + Number(v), 0);
+    expect(out).toBeCloseTo(0.01, 10);
+    expect(removed).toBeCloseTo(out, 10);
+  });
+
   it("warehouse cannot generate", async () => {
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     await expect(runCommand("generate_compliance_report", PERIOD, warehouse)).rejects.toMatchObject({ status: 403 });
