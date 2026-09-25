@@ -1,0 +1,473 @@
+---
+title: "Today & notifications"
+description: "A member's work list, notifications, search and chat."
+---
+
+Today is the one read a member starts from: work assigned to them, due now, or
+overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
+`now`, which is what makes the view testable at a fixed moment.
+
+Notification `reason` is `submitted_order`, `pick_due`, `restock_due`,
+`delivery_next`, `fermentation_reading_overdue`, `invoice_question`, or
+`operations_digest`. A preference enables or mutes one reason for the calling
+member. Quiet hours use `HH:MM` start and end
+with an optional timezone. Brewery-wide quiet hours set by an admin apply on
+top of them.
+
+{/* ops:today */}
+
+## append_chat_message [#append_chat_message]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Append one message to the current author's composer conversation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `conversationId` | uuid | yes |
+| `role` | user or assistant | yes |
+| `content` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "append_chat_message", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "conversationId": "00000000-0000-0000-0000-000000000000", "role": "user", "content": "string" } }'
+```
+
+## begin_chat_installation [#begin_chat_installation]
+
+`command` · admin
+
+Begin explicit administrator consent to install Slack with the three required scopes
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "begin_chat_installation", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## begin_chat_reauthorization [#begin_chat_reauthorization]
+
+`command` · admin
+
+Begin explicit administrator consent to reauthorize the existing Slack workspace
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "begin_chat_reauthorization", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## consume_chat_link_proof [#consume_chat_link_proof]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Complete a Slack → MGR account link using the single-use proof from App Home (current staff only)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `proof` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "consume_chat_link_proof", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "proof": "string" } }'
+```
+
+## create_chat_conversation [#create_chat_conversation]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Create one server-owned composer conversation for the current author and brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `title` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_chat_conversation", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## disable_chat_installation [#disable_chat_installation]
+
+`command` · admin
+
+Stop all Slack delivery locally without needing Slack to be reachable
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disable_chat_installation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## disconnect_chat_installation [#disconnect_chat_installation]
+
+`command` · admin
+
+Stop Slack delivery and invalidate links, then attempt credential cleanup; retry if cleanup is pending
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_chat_installation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_beer_overview [#get_beer_overview]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_beer_overview", "input": {} }'
+```
+
+## get_chat_history [#get_chat_history]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Read one composer conversation and its messages for the current author and brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `conversationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_history", "input": { "conversationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_chat_integration_health [#get_chat_integration_health]
+
+`query` · admin
+
+Read bounded, redacted Slack integration health for brewery admins
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_integration_health", "input": {} }'
+```
+
+## get_chat_link_intent [#get_chat_link_intent]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Preview both identities and the brewery before explicit account-link consent; does not consume the proof
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `proof` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_link_intent", "input": { "proof": "string" } }'
+```
+
+## get_chat_link_status [#get_chat_link_status]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Whether the current user has an active Slack link for an installation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_link_status", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_notification_preferences [#get_notification_preferences]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Read your own reason preferences, personal quiet hours and Slack link
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_notification_preferences", "input": {} }'
+```
+
+## get_shortfalls [#get_shortfalls]
+
+`query` · admin, sales, warehouse
+
+SKUs whose available-to-promise is negative, with on-hand and open reservations
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_shortfalls", "input": {} }'
+```
+
+## get_today [#get_today]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue, buyer questions about invoices)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `now` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_today", "input": {} }'
+```
+
+## list_chat_channels [#list_chat_channels]
+
+`query` · admin
+
+List private active Slack channels with the bot present and no sharing
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_chat_channels", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_chat_conversations [#list_chat_conversations]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+List the current author's composer conversations in this brewery
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_chat_conversations", "input": {} }'
+```
+
+## list_chat_user_links [#list_chat_user_links]
+
+`query` · admin
+
+List currently linked staff in this brewery, without link proofs
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_chat_user_links", "input": {} }'
+```
+
+## list_work [#list_work]
+
+`query` · admin, sales, warehouse, brewer
+
+Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_work", "input": {} }'
+```
+
+## preview_command [#preview_command]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | record_movement | yes |
+| `input` | object | yes |
+| `conversationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "preview_command", "input": { "name": "record_movement", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" }, "conversationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## search_entities [#search_entities]
+
+`query` · admin, sales, warehouse, brewer
+
+Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | yes |
+| `kinds` | array of sku or order or invoice or lot or customer or po or batch | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "search_entities", "input": { "q": "string" } }'
+```
+
+## set_notification_destination [#set_notification_destination]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Provide reason + personalDestinationId to choose your verified personal destination, or as admin provide installationId + externalDestinationId for the private operations channel
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reason` | submitted_order or pick_due or restock_due or delivery_next or fermentation_reading_overdue or invoice_question or operations_digest | no |
+| `personalDestinationId` | uuid | no |
+| `installationId` | uuid | no |
+| `externalDestinationId` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_notification_destination", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "reason": "submitted_order", "personalDestinationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_notification_preference [#set_notification_preference]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reason` | submitted_order or pick_due or restock_due or delivery_next or fermentation_reading_overdue or invoice_question or operations_digest | yes |
+| `enabled` | boolean | yes |
+| `quietHours` | object or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_notification_preference", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "reason": "submitted_order", "enabled": true } }'
+```
+
+## set_personal_quiet_hours [#set_personal_quiet_hours]
+
+`command` · admin, sales, warehouse, brewer
+
+Override personal chat quiet hours for every reason; null clears the override
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `start` | string or null | yes |
+| `end` | string or null | yes |
+| `timezone` | string or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_personal_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "start": "12:00", "end": "12:00" } }'
+```
+
+## snooze_notification [#snooze_notification]
+
+`command` · admin, sales, warehouse, brewer
+
+Delay one personal chat reminder for up to seven days; Today due state is unchanged
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryId` | uuid | yes |
+| `until` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "snooze_notification", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000", "until": "2026-01-31T12:00:00Z" } }'
+```
+
+## unlink_chat_user [#unlink_chat_user]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Unlink a Slack user from MGR (own link, or any link as admin); stops personal delivery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `linkId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "unlink_chat_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "linkId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+---
+
+**Designed, not yet available** {/* today-designed */}
+
+26 of the 28 operations in this area are available today; the 2 below are not.
+
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
+
+| Operation | Kind | Needed by |
+| --- | --- | --- |
+| `get_notification_occurrence` | query | Personal DM |
+| `issue_chat_link_proof` | command | Link identity |
+
+{/* end ops:today */}

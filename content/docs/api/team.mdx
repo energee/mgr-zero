@@ -1,0 +1,788 @@
+---
+title: "Team & brewery settings"
+description: "Staff, invitations, brewery setup, operating defaults, imports and integrations."
+---
+
+Staff roles are `admin`, `sales`, `warehouse`, `brewer` and `taproom`, and
+every operation in this reference lists the roles allowed to call it. A membership is what ties a
+user to a brewery. Revoking one ends access without deleting the history that
+member wrote.
+
+`invite_staff` assigns one role and returns `{ userId }`. Invitation requests
+retain their Auth identity through interrupted completion; retry unchanged
+requests with the same ID. Changing the email, role, customer, actor, or brewery
+is different intent. Existing accounts cannot be attached, and completed replay
+does not restore revoked membership. The inviter must still have permission
+when membership is completed.
+
+`provision_brewery` omits `breweryId`; authenticated callers send name, a valid
+timezone, and optional `ttb`. One transaction creates the brewery and first
+admin membership and returns the brewery UUID. Replay returns that UUID without
+restoring revoked membership. `MGR_DEDICATED=1` refuses brewery creation from
+the web and the API alike with `403 permission_denied`.
+
+`import_csv` accepts 1–5000 string-field rows and returns
+`{ committed, blocked, outcomes }`. Each outcome names its 1-based `row`,
+`status` (`committed` or `blocked`), and its original `result` or `error`.
+Dependent writes within one row commit together; independent rows may succeed
+when another fails. Both successful and blocked outcomes are durable: resend
+the identical kind and complete rows array with the same request ID to recover
+the original results. Changed, appended, or removed rows conflict. Start a new
+request containing only corrected blocked rows; posting committed opening
+balances with a new ID adds stock again.
+
+All import values are strings. Required fields precede the semicolon:
+
+| Kind | Fields |
+| --- | --- |
+| `customers` | `name`, `type`, `state`, `saleChannelId`; `licenseNumber`, `paymentTerms` |
+| `ship_tos` | `customerId`, `label`, `address1`, `city`, `zip`, `state`; `address2` |
+| `products_skus` | `product`, `formatId`; `sku_name`, `style`, `abv`, `upc` |
+| `channel_prices` | `saleChannelId`, `priceGroupId`, `formatId`, `unitPriceCents` |
+| `opening_balances` | `skuId`, `locationId`, `binId`, `qty`; `note` |
+
+Unknown row fields are rejected. References use explicit UUIDs; create missing
+formats before importing. Product imports reuse an existing brand without
+changing its metadata and create the SKU in the same row transaction. Duplicate
+customer/SKU creation is blocked; channel-price rows set the existing grid cell.
+Opening quantities are positive SKU-unit quantities with a bin belonging to the
+location. Prices are nonnegative integer cents, at most 2147483647.
+
+{/* ops:team */}
+
+## configure_pos_menu [#configure_pos_menu]
+
+`command` · admin, warehouse
+
+Choose the mapped MGR bin and sale channel that derive one Square location's menu
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `binId` | uuid | yes |
+| `saleChannelId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "configure_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "binId": "00000000-0000-0000-0000-000000000000", "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## connect_qbo [#connect_qbo]
+
+`command` · admin
+
+Begin administrator consent for a QuickBooks connection
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reconnect` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## connect_square [#connect_square]
+
+`command` · admin
+
+Begin administrator consent for a Square seller connection
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reconnect` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_square", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## disconnect_qbo [#disconnect_qbo]
+
+`command` · admin
+
+Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `connectionId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## disconnect_square [#disconnect_square]
+
+`command` · admin
+
+Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `connectionId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_square", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_brewery [#get_brewery]
+
+`query` · admin, sales, warehouse, brewer
+
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery", "input": {} }'
+```
+
+## get_brewery_ai_model [#get_brewery_ai_model]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Read the brewery-wide AI Gateway model used by Ask MGR
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery_ai_model", "input": {} }'
+```
+
+## get_brewery_operating_defaults [#get_brewery_operating_defaults]
+
+`query` · admin
+
+Read the brewery timezone and fermentation reading cadence
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery_operating_defaults", "input": {} }'
+```
+
+## get_first_run_state [#get_first_run_state]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Whether the brewery has a location, a brand, any inventory movement, and staff besides the owner; Today shows the First-run checklist until a location and a brand exist
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_first_run_state", "input": {} }'
+```
+
+## get_gravity_unit [#get_gravity_unit]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+The gravity display unit in force for the caller: the brewery default, their own override (null = none), and the effective one
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_gravity_unit", "input": {} }'
+```
+
+## get_pos_integration_health [#get_pos_integration_health]
+
+`query` · admin
+
+Get redacted Square seller connection health
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_integration_health", "input": {} }'
+```
+
+## get_pos_menu [#get_pos_menu]
+
+`query` · admin, warehouse
+
+Read one complete Square-location menu derived from its configured bin, active keg stock, poured formats, and channel prices
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_menu", "input": { "posLocationId": "string" } }'
+```
+
+## get_pos_menu_item [#get_pos_menu_item]
+
+`query` · admin, warehouse
+
+Read one derived poured-format menu item and its location-specific price source
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `formatId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_menu_item", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_pos_sale [#get_pos_sale]
+
+`query` · admin, warehouse
+
+Get one immutable Square fact and every retained source revision for its order
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_sale", "input": { "saleId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_qbo_connection [#get_qbo_connection]
+
+`query` · admin, sales
+
+Get redacted QuickBooks connection health and the connectionId required to disconnect
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_qbo_connection", "input": {} }'
+```
+
+## import_csv [#import_csv]
+
+`command` · admin
+
+Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances; each row commits independently and the same requestId safely replays the exact batch
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `kind` | customers or ship_tos or products_skus or channel_prices or opening_balances | yes |
+| `rows` | array of record of string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "import_csv", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "kind": "customers", "rows": [ { "field": "string" } ] } }'
+```
+
+## invite_staff [#invite_staff]
+
+`command` · admin
+
+Invite staff
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `email` | string | yes |
+| `role` | admin or sales or warehouse or brewer or taproom | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
+```
+
+## list_pos_locations [#list_pos_locations]
+
+`query` · admin, warehouse
+
+List every observed Square location and its explicit labeled MGR location mapping
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_locations", "input": {} }'
+```
+
+## list_pos_sales [#list_pos_sales]
+
+`query` · admin, warehouse
+
+List recent immutable Square sale, return, and revision facts with explicit coverage
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_sales", "input": {} }'
+```
+
+## list_pos_variations [#list_pos_variations]
+
+`query` · admin, warehouse
+
+List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_variations", "input": {} }'
+```
+
+## list_team_members [#list_team_members]
+
+`query` · admin, sales, warehouse
+
+Staff roster for the brewery: user id, email, @handle (the email's local part) and role
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_team_members", "input": {} }'
+```
+
+## provision_brewery [#provision_brewery]
+
+`command` · authenticated pre-tenant
+
+Create a brewery and join it as its first admin.
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `timezone` | string | yes |
+| `ttb` | string or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "name": "provision_brewery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "timezone": "America/New_York" } }'
+```
+
+## publish_pos_item [#publish_pos_item]
+
+`command` · admin, warehouse
+
+Create, update, retire, or explicitly adopt one brand's Square item and format variations
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `brandId` | uuid | yes |
+| `adoptItemId` | string | no |
+| `adoptVariationId` | string | no |
+| `retryConflict` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "brandId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## publish_pos_menu [#publish_pos_menu]
+
+`command` · admin, warehouse
+
+Publish every derived brand and format change for one Square location
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `retryConflict` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string" } }'
+```
+
+## revoke_staff [#revoke_staff]
+
+`command` · admin
+
+End one member's brewery membership (admin); never yourself or the last admin; the sign-in account remains
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `userId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "revoke_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_brewery_ai_model [#set_brewery_ai_model]
+
+`command` · admin
+
+Set the brewery-wide AI Gateway model used by Ask MGR
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `model` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_ai_model", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "model": "openai/gpt-5.4" } }'
+```
+
+## set_brewery_gravity_unit [#set_brewery_gravity_unit]
+
+`command` · admin
+
+Set the brewery-wide default unit gravity is shown and entered in (storage stays degrees Plato)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `unit` | plato or sg | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
+## set_brewery_operating_defaults [#set_brewery_operating_defaults]
+
+`command` · admin
+
+Change only the brewery fermentation reading cadence, in hours
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `readingDueHours` | integer | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_operating_defaults", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "readingDueHours": 1 } }'
+```
+
+## set_brewery_quiet_hours [#set_brewery_quiet_hours]
+
+`command` · admin
+
+Set the brewery-wide quiet hours (brewery time) that delay every personal chat notification; null clears them
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `installationId` | uuid | yes |
+| `start` | string or null | yes |
+| `end` | string or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000", "start": "12:00", "end": "12:00" } }'
+```
+
+## set_my_gravity_unit [#set_my_gravity_unit]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Set your own gravity display unit, or null to follow the brewery default
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `unit` | plato or sg or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_my_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
+## set_pos_item_mapping [#set_pos_item_mapping]
+
+`command` · admin, warehouse
+
+Map one Square variation to a packaged SKU or brand-owned poured format, or explicitly ignore it
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `externalItemId` | string | yes |
+| `externalVariationId` | string | yes |
+| `disposition` | mapped or ignored | yes |
+| `skuId` | uuid | no |
+| `formatId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "externalItemId": "string", "externalVariationId": "string", "disposition": "mapped", "skuId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_pos_location_mapping [#set_pos_location_mapping]
+
+`command` · admin
+
+Map one observed Square location to one unclaimed MGR location; a pre-history remap clears its menu, and observed history prevents remapping
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `mgrLocationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_location_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "mgrLocationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_pos_price_override [#set_pos_price_override]
+
+`command` · admin, warehouse
+
+Set or clear one nullable poured-format price override for one Square location
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `formatId` | uuid | yes |
+| `unitPriceCents` | integer or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_price_override", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+```
+
+## set_pos_website_publication [#set_pos_website_publication]
+
+`command` · admin, warehouse
+
+Publish or unpublish one currently priced, stocked menu row on the brewery website feed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `formatId` | uuid | yes |
+| `published` | boolean | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_website_publication", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "published": true } }'
+```
+
+## set_qbo_customer_mapping [#set_qbo_customer_mapping]
+
+`command` · admin, sales
+
+Bind a customer to a QuickBooks customer in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `qboCustomerId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_customer_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "qboCustomerId": "string" } }'
+```
+
+## set_qbo_deposit_mapping [#set_qbo_deposit_mapping]
+
+`command` · admin
+
+Set the QuickBooks item used for returnable-keg deposit charges
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_deposit_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qboItemId": "string" } }'
+```
+
+## set_qbo_item_mapping [#set_qbo_item_mapping]
+
+`command` · admin, sales
+
+Bind a SKU to a QuickBooks item in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "qboItemId": "string" } }'
+```
+
+## set_qbo_push_defaults [#set_qbo_push_defaults]
+
+`command` · admin
+
+Set the ACH and card options copied onto future QuickBooks invoices
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `allowAch` | boolean | yes |
+| `allowCard` | boolean | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_push_defaults", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "allowAch": true, "allowCard": true } }'
+```
+
+## sync_qbo_payments [#sync_qbo_payments]
+
+`command` · admin, sales
+
+Read one frozen batch of current QuickBooks invoice balances, payment evidence, edits, voids, and deletions, then apply it all-or-none; the exact requestId replays the recorded result
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_qbo_payments", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## sync_square_catalog [#sync_square_catalog]
+
+`command` · admin
+
+Refresh the complete Square location and catalog-variation snapshot without changing inventory
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_square_catalog", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## sync_square_sales [#sync_square_sales]
+
+`command` · admin
+
+Resume a bounded Square UPDATED_AT scan, append immutable sale and return revisions, and complete honest coverage without changing inventory
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_square_sales", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+## update_brewery [#update_brewery]
+
+`command` · admin
+
+Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, PA license, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `timezone` | string | yes |
+| `readingDueHours` | integer | yes |
+| `ttbRegistryNo` | string | no |
+| `paLicenseNo` | string | no |
+| `customerPhone` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_brewery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "timezone": "string", "readingDueHours": 1 } }'
+```
+
+## update_staff_role [#update_staff_role]
+
+`command` · admin
+
+Change one member's role (admin); refused when it would leave the brewery without an admin
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `userId` | uuid | yes |
+| `role` | admin or sales or warehouse or brewer or taproom | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_staff_role", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000", "role": "admin" } }'
+```
+
+{/* end ops:team */}

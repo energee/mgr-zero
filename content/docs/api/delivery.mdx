@@ -1,0 +1,143 @@
+---
+title: "Delivery & routes"
+description: "Routes, stops, departure, delivery and return."
+---
+
+A route groups a driver's shipped orders and picked stock transfers into one
+run. It is built, saved, departed, and returned. Each stop is confirmed as
+delivered along the way, and `return_route` refuses until every stop on the
+route has been confirmed delivered.
+
+{/* ops:delivery */}
+
+## confirm_delivery [#confirm_delivery]
+
+`command` · admin, warehouse
+
+Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryId` | uuid | yes |
+| `signedBy` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_delivery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000", "signedBy": "string" } }'
+```
+
+## depart_route [#depart_route]
+
+`command` · admin, warehouse
+
+Stamp the route's departure as its driver or an admin; needs at least one stop, and its transfer stops become in transit
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `routeId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "depart_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "routeId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_delivery_stop [#get_delivery_stop]
+
+`query` · admin, warehouse, sales
+
+One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, and whether it is signed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_delivery_stop", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_routes [#list_routes]
+
+`query` · admin, warehouse, sales
+
+Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `id` | uuid | no |
+| `date` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_routes", "input": {} }'
+```
+
+## return_route [#return_route]
+
+`command` · admin, warehouse
+
+Stamp the route's return as its driver or an admin, once it has departed and every stop is delivered
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `routeId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "routeId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## return_shipment [#return_shipment]
+
+`command` · admin, sales
+
+Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+| `locationId` | uuid | yes |
+| `reason` | damaged or wrong_item or unsold | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_shipment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "reason": "damaged", "lines": [ { "invoiceLineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+## save_route [#save_route]
+
+`command` · admin, warehouse
+
+Create or edit a delivery route and replace its stops (shipments or stock transfers) in one step; delivered stops must be kept and a departed route cannot change
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryDate` | date (YYYY-MM-DD) | yes |
+| `stops` | array of object | yes |
+| `id` | uuid | no |
+| `name` | string | no |
+| `driverUserId` | uuid | no |
+| `vehicle` | string | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "save_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryDate": "2026-01-31", "stops": [ { "stopNo": 1 } ] } }'
+```
+
+{/* end ops:delivery */}
