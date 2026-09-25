@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
@@ -61,6 +61,21 @@ describe("activeTab", () => {
   });
   it("returns undefined off the map", () => {
     expect(activeTab(STAFF_NAV, "/nowhere")).toBeUndefined();
+  });
+});
+
+describe("activeChild", () => {
+  const beer = STAFF_NAV.find((t) => t.label === "Beer")!;
+  const more = STAFF_NAV.find((t) => t.label === "More")!;
+  it("picks only the longest matching child, never its parent path too (#446)", () => {
+    expect(activeChild(beer, "/taproom/board")?.label).toBe("Taps");
+    expect(activeChild(beer, "/taproom")?.label).toBe("Taproom");
+    expect(activeChild(more, "/settings/units")?.label).toBe("Units");
+    expect(activeChild(more, "/settings")?.label).toBe("Settings");
+    expect(activeChild(more, "/settings/team")?.label).toBe("Settings");
+  });
+  it("returns undefined when no child matches", () => {
+    expect(activeChild(beer, "/beer")).toBeUndefined();
   });
 });
 
