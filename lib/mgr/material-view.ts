@@ -10,6 +10,9 @@ export type MaterialViewModel = {
   unitOptions: string[];
   defaultVendorId?: string;
   defaultVendorOptions: { id: string; label: string }[];
+  /** SG-style (1.037 = 37 PPG); asked on malt and adjunct only, where recipe
+   * predictions read it (lib/recipe-gravity.ts). Empty means none typed. */
+  extractPotential?: string;
   lotTracked: boolean;
   active: boolean;
 };

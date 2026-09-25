@@ -6,6 +6,8 @@ export const varianceReason = (value: string | null) => value === "missing_basel
 
 export type TaproomVarianceViewModel = {
   report?: VarianceReport; backHref?: string; countHref?: string; boardHref?: string;
+  /** breweries.timezone: period boundaries print in it (#442). */
+  timeZone: string;
   locations?: [string, string][]; location?: string; weeks: number; weekHrefs?: [string, string][];
   trend?: { brand: string; detail: string; href?: string };
 };

@@ -5,10 +5,10 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toWaterProfileOption, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
+import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
-import { RecipeEditor, toRecipeMaterial, type RecipeMaterial } from "../[id]/recipe-version-form";
+import { RecipeEditor } from "../[id]/recipe-version-form";
 
 type Named = { id: string; name: string };
 

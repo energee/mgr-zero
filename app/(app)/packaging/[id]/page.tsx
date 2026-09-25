@@ -6,6 +6,7 @@ import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-ru
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -29,11 +30,12 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
   const picking = !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
-  const [occupancies, locations, bins] = (await Promise.all([
+  const [occupancies, locations, bins, today] = (await Promise.all([
     picking ? runCommand("list_occupancies", {}, ctx) : [],
     closing ? runCommand("list_locations", {}, ctx) : [],
     closing ? runCommand("list_bins", {}, ctx) : [],
-  ])) as [Occupancy[], Location[], Bin[]];
+    closing ? breweryToday(ctx) : "",
+  ])) as [Occupancy[], Location[], Bin[], string];
 
   const title = runNo(run.run_no);
   if (run.closed_at) {
@@ -64,7 +66,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
             ? <PickTankForm runId={run.id} occupancies={occupancies} />
             : !run.started_at
               ? <StartRunButton runId={run.id} />
-              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} />}
+              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} />}
         </>
       }
     />
