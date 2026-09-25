@@ -319,4 +319,34 @@ describe("cellar transfer loss (#428)", () => {
     expect(Number(r.figures.removals.loss)).toBe(0.5);
     expect(Number(r.figures.cellarRemovals.loss)).toBe(0.5);
   });
+
+  // #485: the loss is one volume_adjustments row, so the report reads it once and
+  // Review auto-reconciled losses can reattribute it like a completion loss.
+  it("writes the loss as a reattributable cellar loss the report counts once", async () => {
+    const brewery = await makeBrewery();
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
+      from breweries where id='${brewery.id}'`, true)[0].split("|");
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
+    const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: fv2.id, volumeBbl: 8, lossBbl: 0.5 }, brewer);
+
+    expect(sql(`select sum(bbl)::text from volume_adjustments where occupancy_id='${brewed.occupancy.id}' and reason = 'loss'`, true)).toEqual(["-0.500"]);
+    expect(sql(`select occupancy_volumes.bbl::text from occupancy_volumes where occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["1.500"]);
+
+    const review = await runCommand("get_loss_review", { periodStart: start, periodEnd: end }, owner) as import("@/lib/commands/compliance").LossReview[];
+    expect(review).toEqual([expect.objectContaining({ batch_id: batch.id, kind: "transfer", closed_at: null, original_bbl: "0.500", remaining_bbl: "0.500" })]);
+    await runCommand("reattribute_loss", { adjustmentId: review[0].adjustment_id, bbl: "0.2", classification: "destruction" }, owner);
+
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: start, periodEnd: end }, owner) as Report & { figures: { cellarRemovals: Record<string, number> } };
+    expect(Number(r.figures.removals.loss)).toBeCloseTo(0.3, 8);
+    expect(Number(r.figures.removals.destruction)).toBeCloseTo(0.2, 8);
+    expect(Number(r.figures.cellarRemovals.loss) + Number(r.figures.cellarRemovals.destruction)).toBeCloseTo(0.5, 8);
+    // reattribution changes the class, never the volume in the tank
+    expect(sql(`select occupancy_volumes.bbl::text from occupancy_volumes where occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["1.500"]);
+  });
 });

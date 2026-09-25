@@ -355,7 +355,7 @@ describe("cellar transfers", () => {
 
     const first = (await runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: brite.id, volumeBbl: 5 }, ctx)) as {
-        transfer: { bbl: number; loss_bbl: number }; to_occupancy: { id: string; batch_id: string }; from_occupancy: { ended_at: string | null };
+        transfer: { bbl: number }; to_occupancy: { id: string; batch_id: string }; from_occupancy: { ended_at: string | null };
       };
     expect(Number(first.transfer.bbl)).toBe(5);
     // Filled by transfer, so the new occupancy opens at zero and carries the source's batch.

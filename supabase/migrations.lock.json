@@ -49,5 +49,6 @@
   "20260925114317_ttb_filing_calendar_period.sql": "f0f548d8a009f332790fb4d178991999703706ee61b254fccd43904fdfcacaed",
   "20260925114519_mark_picked_if_complete.sql": "2b1667447b01768f1116749de7b087b0c9238477d5797abbc9712bc6f5a1beda",
   "20260925143817_taproom_par_zero_removes.sql": "ed1c7a4c1d9c0409c9819f5c5abd2342a925acdba2cccae9bef6813727f0f2b8",
-  "20260925150000_compliance_upsert_keep_omitted.sql": "0dbe859ffed4ca6906f3f485dfa1044d89c12e6331638a9ca35a3187ad730667"
+  "20260925150000_compliance_upsert_keep_omitted.sql": "0dbe859ffed4ca6906f3f485dfa1044d89c12e6331638a9ca35a3187ad730667",
+  "20260925152847_transfer_loss_adjustments.sql": "21de4f98d5939a684a3b368284bb14f954fcd37fecaf50fd2b4cee57bf28bb06"
 }

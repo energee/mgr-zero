@@ -1655,7 +1655,7 @@ export const SCREENS: Screen[] = [
     to: { "Record transfer": "Cellar map" },
     job: "Write one transfer row that carries its own loss volume",
     reads: "list_occupancies · list_vessels",
-    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
+    writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
     body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
@@ -2042,7 +2042,7 @@ export const SCREENS: Screen[] = [
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Admin and Sales review exact completion reconciliation losses and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
+    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {

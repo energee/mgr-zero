@@ -44,7 +44,7 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     losses: snapshot.losses.map((loss) => ({
       source: loss,
       key: loss.adjustment_id,
-      title: `Batch ${loss.batch_no}`,
+      title: `Batch ${loss.batch_no} · ${loss.kind} loss`,
       detail: `Original generic loss ${loss.original_bbl} bbl · remaining ${loss.remaining_bbl} bbl`,
       allocations: loss.allocations.map((allocation) => ({
         key: allocation.id,

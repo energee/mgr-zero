@@ -3,7 +3,7 @@ import type { MonthlyComplianceSnapshot } from "@/lib/mgr/monthly-compliance-vie
 export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
   monthLabel: "August 2026",
   losses: [{
-    adjustment_id: "loss-1042", batch_id: "batch-1042", batch_no: 1042, closed_at: "2026-08-31",
+    adjustment_id: "loss-1042", batch_id: "batch-1042", batch_no: 1042, closed_at: "2026-08-31", kind: "completion",
     original_bbl: "0.05741935", remaining_bbl: "0.03741935",
     allocations: [{ id: "allocation-1", bbl: "0.02000000", classification: "sample", destination_state: "PA", tax_treatment: null, created_at: "2026-08-31", created_by: "user-1" }],
   }],

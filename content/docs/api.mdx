@@ -4257,7 +4257,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-List completion reconciliation losses in a period with exact original, allocated, and remaining BBL
+List generic cellar losses (batch completion and cellar transfer losses) posted in a period with exact original, allocated, and remaining BBL
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4309,7 +4309,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
+Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
 
 | Field | Type | Required |
 | --- | --- | --- |

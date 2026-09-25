@@ -103,14 +103,16 @@ export type LossAllocation = {
   id: string; bbl: string; classification: "sample" | "taproom" | "destruction";
   destination_state: string | null; tax_treatment: string | null; created_at: string; created_by: string;
 };
+/** A generic loss the review can reattribute: the batch's completion loss, or a
+ * cellar transfer loss (#485), which posts while the batch is open (closed_at null). */
 export type LossReview = {
-  adjustment_id: string; batch_id: string; batch_no: number; closed_at: string;
+  adjustment_id: string; batch_id: string; batch_no: number; closed_at: string | null; kind: "completion" | "transfer";
   original_bbl: string; remaining_bbl: string; allocations: LossAllocation[];
 };
 
 defineQuery({
   name: "get_loss_review",
-  description: "List completion reconciliation losses in a period with exact original, allocated, and remaining BBL",
+  description: "List generic cellar losses (batch completion and cellar transfer losses) posted in a period with exact original, allocated, and remaining BBL",
   roles: [...ROLES],
   input: z.object({ periodStart: isoDate, periodEnd: isoDate }),
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_loss_review", {
@@ -120,7 +122,7 @@ defineQuery({
 
 defineCommand({
   name: "reattribute_loss",
-  description: "Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
+  description: "Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
   roles: [...ROLES],
   input: z.object({
     adjustmentId: z.string().uuid(),
