@@ -165,6 +165,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx", additionalFiles: ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"] },
   { name: "Compliance months", file: "app/(app)/compliance/page.tsx" },
   { name: "Monthly compliance", file: "app/(app)/compliance/[period]/page.tsx" },
+  { name: "Period in progress", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Licenses", file: "app/(app)/compliance/licenses/page.tsx" },
   { name: "Brand approval", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },
   { name: "State registration", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },
