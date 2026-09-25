@@ -24,3 +24,11 @@ export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
     externalMappingRequired: [],
   },
 };
+
+/** The period still running (#579): reviewable from the ledger, not fileable yet. */
+export const monthlyComplianceSeptember: MonthlyComplianceSnapshot = {
+  ...monthlyComplianceAugust,
+  monthLabel: "September 2026",
+  losses: [],
+  report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30" } },
+};
