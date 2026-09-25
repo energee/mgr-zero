@@ -18,14 +18,25 @@ consolidation: make the living agent docs match reality, citing evidence.
 1. Use the exact accepted base and main HEAD supplied by the workflow prompt;
    do not derive a different window from the checked-out branch.
 2. Review that window with `git log --stat <accepted-base>..<main-head>` and
-   `gh pr list --state merged --limit 20 --json number,title,mergedAt`
-   (use `gh pr view <n>` only for PRs you need evidence from). The list is
-   sorted by creation date, so also check `mergedAt` against the last-dream
-   date — a long-open PR merged recently may need
-   `--search 'merged:>=<last-dream date>'` to appear.
-3. Read any committed .remember/today-*.md session digests (there may be
+   `gh pr list --state merged --search 'merged:>=<last-dream date>' --limit 500
+   --json number,title,mergedAt`. `gh pr list` defaults to 30 results and
+   silently truncates past whatever `--limit` you pass with no error — a
+   window with more merged PRs than your `--limit` loses the oldest ones.
+   Confirm the true count first with `--json number --jq 'length'` at a high
+   `--limit` (500 covers this repo's largest window so far) before trusting
+   the list. `gh api --paginate` and `gh issue *` may be blocked in this
+   sandbox; `gh pr list` / `gh pr view` are the reliable primitives — use
+   `gh pr view <n>` only for PRs you need evidence from.
+3. Search merged PR bodies for a `## Durable decisions (for the dreaming log)`
+   heading (or similar) first — feature PRs that make a real design ruling
+   often write one, and it is a stronger, cheaper signal than reading every
+   diff. `gh pr view <n> --json body --jq .body` on the PRs the title suggests
+   are substantial (a Program/design/audit PR, not a routine `docs:` refresh
+   or single-issue `fix:`) is the practical way to find them while `gh api`
+   search is blocked.
+4. Read any committed .remember/today-*.md session digests (there may be
    none; the remember plugin retires them locally once a day rolls over).
-4. Read every editable file end to end.
+5. Read every editable file end to end.
 
 ## Curate (editable files only)
 - Prune facts contradicted by merged work; convert relative dates to absolute.

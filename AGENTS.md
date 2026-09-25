@@ -11,8 +11,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # MGR — agent guide
 
 Multi-tenant brewery operations SaaS: Next.js App Router + Supabase (Postgres,
-Auth, RLS). Nothing is deployed yet. Read this file, then follow the routes
-below just in time — don't preload everything.
+Auth, RLS). Pre-release: hosted Supabase and Vercel projects exist, but the
+release is not signed off (owner Ted, tracks #311; see
+`docs/operations/release-readiness-2026-09-18.md`) — treat any deploy or
+hosted-infra change as ask-first per Authority below. Read this file, then
+follow the routes below just in time — don't preload everything.
 
 ## Negatives (ranked; an earlier one wins a conflict)
 
@@ -94,20 +97,26 @@ belong only inside the shared quantity implementation, where native spinners
 are hidden. The Slack venue replica has a documented native-select exception;
 it is not a pattern for MGR interfaces. Do not suppress the rule for new forms.
 
-Decided 2026-09-06. `components/mgr/screens.tsx` and the pages that render it
-are the work. Schema, migrations, RPCs, and the database-backed test suites
-wait for the backend push; when that starts, tests get their own throwaway
-database (as CI already has) and stop touching the dev one.
+Decided 2026-09-06; the backend push landed 2026-09-08 (Programs 0–10 of
+`.agents/superpowers/plans/2026-09-07-backend-database-integration.md`, PRs
+#185–#209) and continued through the adversarial-walkthrough remediation wave
+(PRs #480–#600). `components/mgr/screens.tsx` and the pages that render it
+are still the entry point for interface work, but schema, migrations, RPCs,
+and the database-backed test suites are normal work now, not gated: the
+throwaway `mgr_test` stack (`scripts/test-db.sh`, a portable lock lets
+parallel sessions share it safely) is the default per Operating loop step 1.
 
-- Don't start database work, test-database isolation, or migrations
-  unprompted. If a screen change seems to need one, say so in a line and
-  draw the screen gated (`SCHEMA-GATE` in `writes`), as the inventory already does.
-- Proof for screen work is `bunx tsc --noEmit && bun run lint`, the pure
-  vitest files (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts
+- A screen still marked `SCHEMA-GATE` in its `writes` is blocked on a named
+  product/schema decision, not on the backend push — say what's missing and
+  leave it gated rather than resolving the decision inline. Only one screen
+  is gated today: the taproom role's per-role RLS (spec §16.13/§16.16 q3).
+- Proof for a screen-only change (no schema/RPC touched) may use
+  `bunx tsc --noEmit && bun run lint` plus the pure vitest files
+  (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts
   tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts
-  tests/design-docs.test.ts tests/docs.test.ts` covers the inventory),
-  and looking at the rendered page (step 4). Leave the database-backed suites
-  to CI, which runs them on a fresh database.
+  tests/design-docs.test.ts tests/docs.test.ts` covers the inventory) and
+  looking at the rendered page (step 4); any change touching schema, RPCs, or
+  commands runs the full Operating loop step 4 proof instead.
 - If `tests/chat-jobs.test.ts` times out locally, that is the shared dev
   database, not your change: its `runChatScan` walks every brewery with an
   active `chat_installations` row, and every past run left a fake one behind.
@@ -147,16 +156,17 @@ database (as CI already has) and stop touching the dev one.
 0. Orient first: follow `.agents/skills/orient/SKILL.md` (`/orient` in Claude
    Code) — report worktree, branch, status, PR base, then wait for confirmation.
 1. `bunx supabase start` must be running for the database-backed suites and
-   the dev server; those suites hit the real local database. Screen work
-   under the current focus needs only the pure files listed above.
+   the dev server; those suites hit the real local database. A screen-only
+   change (no schema/RPC/command touched) needs only the pure files listed
+   above.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
    then implement; the commit contains the test. Applies to every harness
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
    logic below the component boundary; step 4 covers the eyeball check.
-4. Prove it: `bun run test && bunx tsc --noEmit && bun run lint` (under the
-   current focus, the pure vitest files stand in for `bun run test` locally;
-   CI runs the full suite). For UI, look at the rendered page — tests don't
+4. Prove it: `bun run test && bunx tsc --noEmit && bun run lint` (for a
+   screen-only change, the pure vitest files stand in for `bun run test`
+   locally; CI runs the full suite). For UI, look at the rendered page — tests don't
    cover rendering. Use the `browse` skill
    (`.agents/skills/browse/SKILL.md`): `bunx agent-browser --session <name> open
    http://localhost:3000/...` then `snapshot` / `get text` / `screenshot`, and
