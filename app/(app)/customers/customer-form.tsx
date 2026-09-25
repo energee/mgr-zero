@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { sentenceCase } from "@/lib/mgr/labels";
+import { PAYMENT_TERMS, type PaymentTerm } from "@/lib/mgr/enums";
+import { PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
@@ -50,7 +51,7 @@ export function CustomerForm({
   const [state, setState] = useState(customer?.state ?? "");
   const [saleChannelId, setSaleChannelId] = useState(initialChannel);
   const [licenseNumber, setLicenseNumber] = useState(customer?.licenseNumber ?? "");
-  const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "");
+  const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "net30");
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const form = useCommandForm("upsert_customer", {
     build: () => ({
@@ -60,7 +61,7 @@ export function CustomerForm({
       state: state.toUpperCase(),
       saleChannelId,
       licenseNumber: licenseNumber || undefined,
-      paymentTerms: paymentTerms || undefined,
+      paymentTerms: paymentTerms as PaymentTerm,
       taxTreatment: taxTreatment || undefined,
     }),
     reset: () => {
@@ -69,7 +70,7 @@ export function CustomerForm({
       setState(customer?.state ?? "");
       setSaleChannelId(initialChannel);
       setLicenseNumber(customer?.licenseNumber ?? "");
-      setPaymentTerms(customer?.paymentTerms ?? "");
+      setPaymentTerms(customer?.paymentTerms ?? "net30");
       setTaxTreatment(customer?.taxTreatment ?? "");
     },
   });
@@ -122,10 +123,7 @@ export function CustomerForm({
             <Label htmlFor="customer-license">License number</Label>
             <Input id="customer-license" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-terms">Payment terms</Label>
-            <Input id="customer-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="net30" />
-          </div>
+          {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
           {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>

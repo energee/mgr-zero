@@ -1,6 +1,6 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
-import { sentenceCase } from "./labels";
+import { paymentTermLabel, PAYMENT_TERM_LABEL, sentenceCase } from "./labels";
 import { TAX_TREATMENTS } from "./tax-treatments";
 
 export type CustomerViewModel = {
@@ -11,6 +11,7 @@ export type CustomerViewModel = {
   typeOptions: string[];
   license: string;
   terms: string;
+  termsOptions: string[];
   channel: string;
   channelOptions: string[];
   taxTreatment: string;
@@ -65,7 +66,8 @@ export function toCustomerViewProps({
     type: titleType(customer.type),
     typeOptions: TYPES,
     license: customer.license_no ?? "",
-    terms: customer.payment_terms ?? "",
+    terms: customer.payment_terms ? paymentTermLabel(customer.payment_terms) : "",
+    termsOptions: Object.values(PAYMENT_TERM_LABEL),
     channel: customer.sale_channels?.name ?? "",
     channelOptions: CHANNELS,
     taxTreatment: tax,

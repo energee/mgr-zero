@@ -84,7 +84,7 @@ export function CustomerView({
               {E.fld("Tax treatment", model.taxTreatment)}
             </div> : <div className="flex flex-col gap-4">
               {E.pick("Sale channel", model.channel, model.channelOptions)}
-              {E.edit("Terms", model.terms)}
+              {E.pick("Terms", model.terms, model.termsOptions)}
               {E.pick("Tax treatment", model.taxTreatment, model.taxOptions)}
             </div>}
           </section>
