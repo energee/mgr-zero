@@ -30,7 +30,7 @@ export function RecordMovementView({
     <>
       <div className="md:hidden"><Pick label="Kind" value={model.kind} options={model.kindOptions} onChange={controls.kind} /></div>
       <div className="hidden md:block"><ToggleGroup type="single" value={controls.kind ? model.kind : undefined} defaultValue={controls.kind ? undefined : model.kind} onValueChange={controls.kind} variant="outline" size="sm" className="flex-wrap justify-start">{model.kindOptions.map(option => <ToggleGroupItem key={option} value={option}>{option}</ToggleGroupItem>)}</ToggleGroup></div>
-      <Pick label="SKU / package" value={model.sku} options={model.skuOptions} onChange={controls.sku} forward />
+      {E.pick("SKU / package", model.skuId ?? model.sku, model.skuOptions, { onChange: controls.sku, forward: true, placeholder: "Select sku / package", displayValue: model.sku || undefined })}
       <Pick label="Location" value={model.location} options={model.locationOptions} onChange={controls.location} />
       <Pick label="Bin" value={model.bin} options={model.binOptions} onChange={controls.bin} disabled={model.binOptions.length === 0} />
       {model.channelOptions.length ? <Pick label="Channel" value={model.channel} options={model.channelOptions} onChange={controls.channel} /> : null}

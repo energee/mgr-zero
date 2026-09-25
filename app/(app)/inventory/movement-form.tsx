@@ -110,7 +110,7 @@ export function MovementForm({
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
     kind: sentenceCase(type), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
-    sku: selectedSku?.label ?? "", skuOptions: skus.map(item => item.label),
+    sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })),
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
     channel: selectedChannel?.name ?? "", channelOptions: requiresChannel(type) ? channels.map(item => item.name) : [],
@@ -136,7 +136,7 @@ export function MovementForm({
             model={movementModel}
             controls={{
               kind: value => { const next = MOVEMENT_TYPES[kindOptions.indexOf(value)]; if (next) onTypeChange(next); },
-              sku: value => { setSkuId(skus.find(item => item.label === value)?.id ?? ""); setLotId(""); },
+              sku: value => { setSkuId(value); setLotId(""); },
               location: value => { const id = locations.find(item => item.name === value)?.id ?? ""; setLocationId(id); setLotId(""); setBinId(bins.find(item => item.location_id === id)?.id ?? ""); },
               bin: value => { setBinId(bins.find(item => item.location_id === locationId && item.name === value)?.id ?? ""); setLotId(""); },
               channel: value => setSaleChannelId(channels.find(item => item.name === value)?.id ?? ""),

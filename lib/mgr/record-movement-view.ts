@@ -12,7 +12,10 @@ export type RecordMovementViewModel = {
   kindIndex: number;
   kindOptions: string[];
   sku: string;
-  skuOptions: string[];
+  /** The picked option's value (the live form's SKU id); sku is its label. */
+  skuId?: string;
+  /** SKU names are not unique, so the live form keys options by SKU id. */
+  skuOptions: { value: string; label: string }[];
   location: string;
   locationOptions: string[];
   bin: string;
@@ -53,7 +56,7 @@ export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMove
     kindIndex: kindIndex < 0 ? 0 : kindIndex,
     kindOptions: [...MOVEMENT_KIND_OPTIONS],
     sku: s.sku,
-    skuOptions: [s.sku],
+    skuOptions: [{ value: s.sku, label: s.sku }],
     location: s.location,
     locationOptions: s.locationOptions,
     bin: s.bin,
