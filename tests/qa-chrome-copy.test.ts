@@ -65,6 +65,7 @@ describe("timestamps use the shared formatters (#253)", () => {
       [],
       [{ counted_on: "2026-09-07", created_at: "2026-09-07T14:00:00Z" }],
       { as_of: "2026-09-08T15:00:00Z", reason: null, rows: [{ variance_bbl: 0 }], periods: [{ coverage_complete: true, reason: null }] },
+      "America/New_York",
     ).map((row) => row.detail).join(" · ");
     expect(detail).toContain("Sep 8, 2026");
     expect(detail).not.toMatch(/\d{1,2}:\d{2}:\d{2}/);

@@ -31,12 +31,12 @@ export default async function PosMappingPage() {
   }));
   const sales: PosSaleRow[] = facts.sales.map(row => ({
     id: row.id, label: `${row.factKind === "return" ? "Return" : "Sale"} · ${row.itemName} · ${row.variationName}`,
-    detail: `${row.locationName} · ${formatDateTime(row.soldAt)} · ${row.current ? "current revision" : `revision ${row.sourceVersion}`}`,
+    detail: `${row.locationName} · ${formatDateTime(row.soldAt, brewery.timeZone)} · ${row.current ? "current revision" : `revision ${row.sourceVersion}`}`,
     amount: row.grossCents == null ? "No amount" : money(row.grossCents), status: row.mappingStatus,
     href: `/settings/pos/sales/${row.id}`,
   }));
   const coverage = facts.coverage.filter(row => row.complete).map(row =>
-    `${row.external_location_id} · ${formatDateTime(row.starts_at)} to ${formatDateTime(row.ends_at)}`,
+    `${row.external_location_id} · ${formatDateTime(row.starts_at, brewery.timeZone)} to ${formatDateTime(row.ends_at, brewery.timeZone)}`,
   );
   // Point of sale is admin-only; warehouse reached POS mapping from More (#444).
   const back = canOpen(brewery.role, "/settings/pos") ? { href: "/settings/pos", label: "Point of sale" } : { href: "/more", label: "More" };

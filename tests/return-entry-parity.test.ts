@@ -10,10 +10,11 @@ import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 
 const params = Promise.resolve({ id: "invoice" });
 const invoice = { id: "invoice", invoice_no: 35, kind: "invoice", shipment_id: "shipment" };
-const line = { id: "line", sku_id: "sku", qty: 2, unit_price_cents: 101, description: "Actual line", skus: null };
+const line = { id: "line", kind: "sku", sku_id: "sku", keg_size: null, qty: 2, unit_price_cents: 101, description: "Actual line", skus: null };
+const deposit = { ...line, id: "deposit", kind: "keg_deposit", sku_id: null, keg_size: "half_bbl", unit_price_cents: 3000, description: "Keg deposit" };
 beforeEach(() => {
   query.mockReset(); permission.mockReset();
-  query.mockImplementation(async name => name === "get_invoice" ? { invoice, lines: [line, { ...line, id: "deposit", sku_id: null }] } : []);
+  query.mockImplementation(async name => name === "get_invoice" ? { invoice, lines: [line, deposit, { ...line, id: "adjustment", kind: "adjustment", sku_id: null }] } : []);
 });
 
 it("guards deep links before loading invoice, sources and bins", async () => {
@@ -26,7 +27,10 @@ it("guards deep links before loading invoice, sources and bins", async () => {
 it("binds invoice identities and captured prices without fabricated order data", async () => {
   const page = await ReturnPage({ params });
   expect(page.type).toBe(CreditMemoForm);
-  expect(page.props.lines).toEqual([{ id: "line", skuId: "sku", label: "Actual line", qty: 2, unitPriceCents: 101 }]);
+  expect(page.props.lines).toEqual([
+    { id: "line", kind: "sku", skuId: "sku", label: "Actual line", qty: 2, unitPriceCents: 101 },
+    { id: "deposit", kind: "keg_deposit", skuId: null, label: "Keg deposit · ½ bbl", qty: 2, unitPriceCents: 3000 },
+  ]);
   expect(page.props.invoiceNo).toBe(35);
   expect(page.props.shipmentId).toBe("shipment");
 });
@@ -37,7 +41,7 @@ it("refuses returning a credit memo", async () => {
 });
 
 it("keeps explicit shipped movement IDs, and omits sources only for legacy invoices", () => {
-  const rows = [{ id: "line", skuId: "sku", label: "Actual line", qty: 2 }];
+  const rows = [{ id: "line", kind: "sku" as const, skuId: "sku", label: "Actual line", qty: 2 }];
   const sources = [{ id: "movement", sku_id: "sku", qty: -2, lot_id: null, lots: null, bins: null }];
   expect(buildReturnLines(rows, { line: "0.5" }, sources, { movement: "0.5" }, "bin", "shipment")).toEqual([
     { invoiceLineId: "line", qty: 0.5, sources: [{ movementId: "movement", binId: "bin", qty: 0.5 }] },
@@ -45,6 +49,11 @@ it("keeps explicit shipped movement IDs, and omits sources only for legacy invoi
   expect(buildReturnLines(rows, { line: "1" }, [], {}, "", null)).toEqual([{ invoiceLineId: "line", qty: 1 }]);
   expect(buildReturnLines(rows, { line: "1" }, [], {}, "", "shipment")[0].sources).toEqual([]);
   expect(buildReturnLines(rows, { line: "0" }, sources, {}, "bin", "shipment")).toEqual([]);
+  const depositRow = { id: "deposit", kind: "keg_deposit" as const, skuId: null, label: "Keg deposit · ½ bbl", qty: 2 };
+  expect(buildReturnLines([...rows, depositRow], { line: "0.5", deposit: "1" }, sources, { movement: "0.5" }, "bin", "shipment")).toEqual([
+    { invoiceLineId: "line", qty: 0.5, sources: [{ movementId: "movement", binId: "bin", qty: 0.5 }] },
+    { invoiceLineId: "deposit", qty: 1 },
+  ]);
 });
 
 it("rounds credits at captured line prices and does not preselect a live reason", () => {

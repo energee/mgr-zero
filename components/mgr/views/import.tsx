@@ -5,13 +5,15 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 
 export type ImportViewModel = {
   kind: ImportKind; step: number; fileName?: string | null; headers?: string[]; csvRowCount?: number;
   mapping: Record<string, number>; rows: Record<string, string>[]; validation: string[][]; lookups: ImportLookups;
   batchId?: string; result?: ImportResult | null; error?: string | null; busy?: boolean; backHref?: string;
+  /** Preview row number of each sent row; outcome row n renders as previewRows[n - 1]. */
+  previewRows?: number[];
 };
 
 export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked }: {
@@ -27,7 +29,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     const next = rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
     setDraft({ rows: next, validation: next.map(row => validateImportRow(kind, row, lookups)) });
   };
-  const fields = IMPORT_FIELDS[kind], ready = validation.filter(errors => !errors.length).length;
+  const fields = IMPORT_FIELDS[kind], ready = readyImportRows(rows, validation).length;
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
     {E.stp(["upload", "map", "preview", "commit"], step)}
@@ -60,7 +62,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {fields.filter(field => field.lookup).map(field => <details key={field.name}><summary>{field.name} reference IDs</summary><ul className="space-y-1 break-all text-sm">{lookups[field.lookup!]?.map(item => <li key={item.id}>{item.name}{item.location_id ? ` · ${lookups.locations.find(location => location.id === item.location_id)?.name}` : ""} · <code>{item.id}</code></li>)}</ul></details>)}
     </>}
     {step === 2 && <>
-      <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Ready rows commit independently; blocked rows are reported individually.</p>
+      <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Only ready rows are sent, and each commits independently; fix blocked rows first or they are left out.</p>
       <div className="[&_td]:whitespace-normal [&_td]:[overflow-wrap:anywhere] [&_th:first-child]:w-10 [&_th:last-child]:w-20 [&_table]:table-fixed [&_table]:min-w-0 [&_table]:w-full">{E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]))}</div>
       {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name ?? row.product ?? row.label ?? kind.replaceAll("_", " ")}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
@@ -75,7 +77,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       <p>{busy ? "Committing rows…" : result ? `${result.committed} committed · ${result.blocked} blocked` : "Batch results need recovery"}</p>
       <p className="break-all text-sm">Batch request: {model.batchId}</p>
       {E.note("Retry keeps the exact batch and returns its first results. Keep this page open until results are recovered. To correct blocked records, start a batch containing only those rows; never resend committed opening balances as a new batch.")}
-      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
+      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
     </>}

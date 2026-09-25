@@ -4,7 +4,7 @@
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError } from "./registry";
+import { defineCommand, defineQuery, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
@@ -23,7 +23,7 @@ defineCommand({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     email: z.string().email().optional(),
-    phone: z.string().trim().optional(),
+    phone: phone.optional(),
     leadTimeDays: z.number().int().nonnegative().optional(),
     paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     active: z.boolean().optional(),
@@ -38,7 +38,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor. Units are refused once movements exist",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements exist",
   input: z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
@@ -50,13 +50,18 @@ defineCommand({
     defaultVendorId: z.string().uuid().optional(),
     reorderPoint: z.number().nonnegative().optional(),
     active: z.boolean().optional(),
+    // SG-style, per pound per gallon: 1.037 means 37 PPG (lib/recipe-gravity.ts).
+    // The bounds catch the usual typo of points (37) for a gravity; 1.000 is
+    // allowed for a mash ingredient that carries no extract (rice hulls).
+    // Omitted on an edit keeps the potential the material had.
+    extractPotential: z.number().min(1).max(1.05).optional(),
   }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material", {
     p_brewery: ctx.breweryId, p_material: i.id ?? null, p_name: i.name, p_category: i.category, p_base_uom: i.baseUom,
     p_purchase_uom: i.purchaseUom, p_purchase_uom_factor: i.purchaseUomFactor ?? null, p_lot_tracked: i.lotTracked ?? null,
     p_default_vendor: i.defaultVendorId ?? null, p_reorder_point: i.reorderPoint ?? null, p_active: i.active ?? null,
-    p_request_id: execution.requestId,
+    p_extract_potential: i.extractPotential ?? null, p_request_id: execution.requestId,
   })),
 });
 

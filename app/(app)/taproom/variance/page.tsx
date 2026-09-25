@@ -15,10 +15,10 @@ export default async function TaproomVariancePage({ searchParams }: { searchPara
   requirePagePermission(ctx, "get_taproom_variance", "Variance by brand");
   const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as Location[];
   const location = locations.find(item => item.id === selected.location) ?? locations[0];
-  if (!location) return <TaproomVarianceView model={{ backHref: "/beer", weeks }} />;
+  if (!location) return <TaproomVarianceView model={{ backHref: "/beer", weeks, timeZone: brewery.timeZone }} />;
   const report = await runCommand("get_taproom_variance", { locationId: location.id, weeks }, ctx) as VarianceReport;
   return <TaproomVarianceView model={{
-    report, weeks, backHref: "/beer", location: location.name,
+    report, weeks, timeZone: brewery.timeZone, backHref: "/beer", location: location.name,
     countHref: `/taproom?location=${location.id}`, boardHref: `/taproom/board?location=${location.id}`,
     locations: locations.map(item => [item.name, `/taproom/variance?location=${item.id}&weeks=${weeks}`]),
     weekHrefs: [[ "4 weeks", `/taproom/variance?location=${location.id}&weeks=4` ], [ "12 weeks", `/taproom/variance?location=${location.id}&weeks=12` ]],
