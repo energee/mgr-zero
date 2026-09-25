@@ -72,7 +72,7 @@ export function RecipeView({
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty)}</Fragment>
       ))}
       {slots.addIngredient ?? (readOnly ? null : E.row("+ add ingredient", "material · stage · timing", ""))}
-      {E.cols(...RECIPE_NUMBERS.map(([key, label]) => E.edit(label, model[key] ?? "", "number", undefined, bind(key))))}
+      {E.cols(...RECIPE_NUMBERS.map(([key, label, bounds]) => E.edit(label, model[key] ?? "", "number", undefined, controls ? { ...bounds, ...bind(key) } : bind(key))))}
       {schedule(model.mash, slots.mash)}
       {schedule(model.fermentation, slots.fermentation)}
       {schedule(model.water, slots.water)}

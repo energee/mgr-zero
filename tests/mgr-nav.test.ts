@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
@@ -64,6 +64,21 @@ describe("activeTab", () => {
   });
 });
 
+describe("activeChild", () => {
+  const beer = STAFF_NAV.find((t) => t.label === "Beer")!;
+  const more = STAFF_NAV.find((t) => t.label === "More")!;
+  it("picks only the longest matching child, never its parent path too (#446)", () => {
+    expect(activeChild(beer, "/taproom/board")?.label).toBe("Taps");
+    expect(activeChild(beer, "/taproom")?.label).toBe("Taproom");
+    expect(activeChild(more, "/settings/units")?.label).toBe("Units");
+    expect(activeChild(more, "/settings")?.label).toBe("Settings");
+    expect(activeChild(more, "/settings/team")?.label).toBe("Settings");
+  });
+  it("returns undefined when no child matches", () => {
+    expect(activeChild(beer, "/beer")).toBeUndefined();
+  });
+});
+
 it("taproom has Beer and own settings without forbidden Work", () => {
   const nav = navFor(shippedNav(STAFF_NAV), "taproom");
   expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
@@ -73,4 +88,19 @@ it("taproom has Beer and own settings without forbidden Work", () => {
     { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
     { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
   ]);
+});
+
+describe("canOpen", () => {
+  it("reads the role gate of the deepest nav entry covering the path (#444)", () => {
+    // /settings is admin-only; Units and POS mapping under it are not.
+    expect(canOpen("admin", "/settings")).toBe(true);
+    for (const role of ["sales", "brewer", "warehouse", "taproom"] as const) {
+      expect.soft(canOpen(role, "/settings"), role).toBe(false);
+      expect.soft(canOpen(role, "/settings/pos"), role).toBe(false);
+      expect.soft(canOpen(role, "/settings/units"), role).toBe(true);
+    }
+    expect(canOpen("warehouse", "/settings/pos/mapping")).toBe(true);
+    expect(canOpen("brewer", "/settings/pos/mapping")).toBe(false);
+    expect(canOpen("warehouse", "/more")).toBe(true);
+  });
 });

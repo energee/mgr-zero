@@ -51,7 +51,10 @@ export type QboOAuthClaim = {
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
-  fail(intentId: string, actorId: string): Promise<void>;
+  /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
+  fail(intentId: string, actorId: string): Promise<boolean>;
+  /** True when a stored (not disconnected) connection of any brewery uses this QuickBooks realm. */
+  realmInUse(realmId: string): Promise<boolean>;
 };
 
 export type QboPushStart = {
@@ -223,17 +226,36 @@ export async function completeQboOAuth(input: {
   if (!state || !code || !realmId || params.get("error")) throw new Error("oauth state invalid");
   const claim = await input.store.claim(sha256(state), input.actorId, input.selectedBreweryId, input.redirectUri);
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
+  let tokens: QboTokens | null = null;
+  let storing = false;
   try {
-    const tokens = await input.client.exchange(code);
+    tokens = await input.client.exchange(code);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
     await input.client.verifyRealm(realmId, tokens.accessToken);
+    storing = true;
     return await input.store.complete(claim.intentId, input.actorId, realmId, {
       ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
     });
   } catch (error) {
-    await input.store.fail(claim.intentId, input.actorId);
+    // Tokens issued but never stored would stay live at Intuit; revoking the
+    // refresh token revokes its access token too. But Intuit's revoke
+    // disconnects the app from that QuickBooks company, so skip it when a
+    // stored connection (this brewery's or another's) already uses the realm,
+    // or when that cannot be checked. Best effort: a revoke failure must not
+    // mask the original failure.
+    const revoke = async (refreshToken: string) => {
+      if (await input.store.realmInUse(realmId).catch(() => true)) return;
+      await input.client.revoke(refreshToken).catch(() => undefined);
+    };
+    // Before the store write the tokens are certainly unstored.
+    if (tokens && !storing) await revoke(tokens.refreshToken);
+    const recorded = await input.store.fail(claim.intentId, input.actorId);
+    // A failed store.complete may still have committed (lost response).
+    // fail_qbo_oauth returns false once the intent left 'exchanging', and then
+    // the stored credential is live, so revoke only when fail recorded it.
+    if (tokens && storing && recorded) await revoke(tokens.refreshToken);
     throw new Error(sanitizeQboError(error));
   }
 }

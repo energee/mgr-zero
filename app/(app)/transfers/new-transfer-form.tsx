@@ -40,8 +40,8 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
     toOptions: locations.filter(location => location.id !== fromId).map(location => location.name),
     toBin: toBins.find(bin => bin.id === toBin)?.name ?? "",
     toBinOptions: toBins.map(bin => bin.name),
-    skuOptions: skus.map(sku => sku.label),
-    lines: lines.map(line => ({ title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
+    skuOptions: skus.map(sku => ({ value: sku.id, label: sku.label })),
+    lines: lines.map(line => ({ sku: line.skuId, title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
   };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New transfer" trigger={<Button size="sm">New transfer</Button>}>
@@ -53,7 +53,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
             fromBin: value => setFromBin(fromBins.find(bin => bin.name === value)?.id ?? ""),
             to: value => { const id = locations.find(location => location.name === value)?.id ?? ""; setToId(id); setToBin(firstBin(id)); },
             toBin: value => setToBin(toBins.find(bin => bin.name === value)?.id ?? ""),
-            lineSku: (index, value) => setLines(previous => previous.map((line, lineIndex) => lineIndex === index ? { ...line, skuId: skus.find(sku => sku.label === value)?.id ?? "" } : line)),
+            lineSku: (index, value) => setLines(previous => previous.map((line, lineIndex) => lineIndex === index ? { ...line, skuId: value } : line)),
             lineQty: (index, value) => setLines(previous => previous.map((line, lineIndex) => lineIndex === index ? { ...line, qty: value } : line)),
             addLine: () => setLines(previous => [...previous, { skuId: "", qty: "" }]),
             removeLine: index => setLines(previous => previous.filter((_, lineIndex) => lineIndex !== index)),

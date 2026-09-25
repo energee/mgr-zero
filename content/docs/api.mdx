@@ -1027,7 +1027,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow
+Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3468,7 +3468,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One batch with the occupancy it is currently sitting in: the vessel's name and the volume that went in
+One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3502,7 +3502,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open
+Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels (comma-separated when split across tanks) when any is open
 
 Takes no input.
 
@@ -4203,7 +4203,7 @@ breakdown is explanatory and must not be added to `figures.removals`.
 
 `command` · admin, sales
 
-Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4257,7 +4257,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-List completion reconciliation losses in a period with exact original, allocated, and remaining BBL
+List generic cellar losses (batch completion and cellar transfer losses) posted in a period with exact original, allocated, and remaining BBL
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4309,7 +4309,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
+Allocate part of a generic cellar loss (batch completion or cellar transfer) to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4346,7 +4346,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record
+Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4354,9 +4354,9 @@ Record or edit one brand's COLA or formula approval by its TTB id; the same id o
 | `kind` | cola or formula | yes |
 | `ttbId` | string | yes |
 | `id` | uuid | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4369,15 +4369,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)
+Record or edit one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed); an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `state` | string | yes |
 | `kind` | string | yes |
-| `licenseNo` | string | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
-| `note` | string | no |
+| `licenseNo` | string or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
+| `note` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4390,15 +4390,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace a brand's permission to sell in one state
+Record or edit a brand's permission to sell in one state; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `brandId` | uuid | yes |
 | `state` | string | yes |
-| `registrationNo` | string | no |
-| `approvedOn` | date (YYYY-MM-DD) | no |
-| `expiresOn` | date (YYYY-MM-DD) | no |
+| `registrationNo` | string or null | no |
+| `approvedOn` | date (YYYY-MM-DD) or null | no |
+| `expiresOn` | date (YYYY-MM-DD) or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -39,6 +39,16 @@ describe("Recipe creation", () => {
     expect(resolveTap(screen("Recipes"), "Create recipe")).toBe("Recipe");
   });
 
+  it("bounds the process numbers as create_recipe_version does, so the browser refuses them first (#447)", () => {
+    const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", notes: "" }, controls: { set: () => {}, onSubmit: () => {} } }));
+    const input = (label: string) => new RegExp(`<input[^>]*aria-label="${label}"[^>]*>`).exec(live)?.[0] ?? "";
+    expect(input("Boil time min")).toMatch(/min="1"[^>]*step="1"|step="1"[^>]*min="1"/);
+    expect(input("Whirlpool min")).toMatch(/min="0"/);
+    expect(input("Whirlpool min")).toMatch(/step="1"/);
+    expect(input("Whirlpool rest min")).toMatch(/step="1"/);
+    expect(input("Pre-boil volume bbl")).toMatch(/min="0.01"/);
+  });
+
   it("RecipeView is the one editor: controlled when given controls, static for the fixture", () => {
     const fixture = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(fixture).not.toMatch(/<form\b/);

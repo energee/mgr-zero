@@ -10,6 +10,7 @@
 // not instant, and a controlled select bound to the stale prop visibly snaps
 // back to the old unit for that gap. State seeded from the prop, re-synced when
 // the refreshed prop arrives, keeps the control on what the brewer just picked.
+// A failed save changes no prop, so it puts the choice back itself (#447).
 "use client";
 
 import { useState } from "react";
@@ -51,7 +52,7 @@ export function GravityUnitForm({
           <Select
             value={breweryChoice}
             disabled={busy}
-            onValueChange={(v) => { setBreweryChoice(v); run("set_brewery_gravity_unit", { unit: v }); }}
+            onValueChange={(v) => { setBreweryChoice(v); run("set_brewery_gravity_unit", { unit: v }).then((ok) => { if (!ok) setBreweryChoice(brewery); }); }}
           >
             <SelectTrigger id="gu-brewery"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -73,7 +74,7 @@ export function GravityUnitForm({
           disabled={busy}
           onValueChange={(v) => {
             setMineChoice(v);
-            run("set_my_gravity_unit", { unit: v === NONE ? null : v });
+            run("set_my_gravity_unit", { unit: v === NONE ? null : v }).then((ok) => { if (!ok) setMineChoice(mine ?? NONE); });
           }}
         >
           <SelectTrigger id="gu-mine"><SelectValue /></SelectTrigger>

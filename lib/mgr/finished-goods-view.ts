@@ -32,13 +32,16 @@ export type FinishedGoodsSnapshot = {
 
 type StockRow = { sku_id: string; qty: string | number };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function assembleFinishedGoods(
   skus: Omit<FinishedGoodsSku, "on_hand" | "atp">[],
   onHandRows: StockRow[],
   atpRows: StockRow[],
 ): FinishedGoodsSnapshot {
+  // qty is numeric(12,2); round each running total so 0.10 + 0.20 stays 0.3.
   const sum = (rows: StockRow[]) => rows.reduce(
-    (totals, row) => totals.set(row.sku_id, (totals.get(row.sku_id) ?? 0) + Number(row.qty)),
+    (totals, row) => totals.set(row.sku_id, round2((totals.get(row.sku_id) ?? 0) + Number(row.qty))),
     new Map<string, number>(),
   );
   const onHand = sum(onHandRows);
@@ -61,7 +64,7 @@ export function toFinishedGoodsViewProps({ skus, backHref }: FinishedGoodsSnapsh
     backHref: backHref ?? "/beer",
     empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
     rows: skus.map((s) => {
-      const allocated = s.on_hand - s.atp;
+      const allocated = round2(s.on_hand - s.atp);
       const short = s.atp < 0;
       const atp = short ? `−${Math.abs(s.atp)}` : String(s.atp);
       return {

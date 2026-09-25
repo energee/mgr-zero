@@ -27,8 +27,14 @@ describe("Monthly compliance view", () => {
     expect(htmlOf(createElement(MonthlyComplianceView, { model, lossAction: () => null, fileAction: null }))).not.toMatch(/Reattribute loss|Save filed snapshot/);
   });
 
+  it("names which loss each review row is, since a batch can have several (#485)", () => {
+    const [completion] = monthlyComplianceAugust.losses;
+    const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, losses: [completion, { ...completion, adjustment_id: "loss-transfer", kind: "transfer", closed_at: null }] });
+    expect(model.losses.map((loss) => loss.title)).toEqual(["Batch 1042 · completion loss", "Batch 1042 · transfer loss"]);
+  });
+
   it("the live route mounts the shared view and slots both mutation controls", () => {
-    const page = readFileSync("app/(app)/compliance/[month]/page.tsx", "utf8");
+    const page = readFileSync("app/(app)/compliance/[period]/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/monthly-compliance"/);
     expect(page).toMatch(/<MonthlyComplianceView\b/);
     expect(page).toMatch(/<LossReviewForm\b/);

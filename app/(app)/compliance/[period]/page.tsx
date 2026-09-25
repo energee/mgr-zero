@@ -1,5 +1,6 @@
-// app/(app)/compliance/[month]/page.tsx — Monthly compliance (screen record
-// Monthly compliance): the TTB month generated from the ledger, or the filed
+// app/(app)/compliance/[period]/page.tsx — Monthly compliance (screen record
+// Monthly compliance): the TTB period — the segment is a month YYYY-MM, a
+// quarter YYYY-Qn, or a year YYYY (period.ts) — generated from the ledger, or the filed
 // snapshot once one exists. Completion losses remain reviewable through
 // append-only category allocations. MGR saves snapshots but never transmits a filing.
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
@@ -12,11 +13,11 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, monthLabel, monthOver, monthRange } from "../period";
+import { JURISDICTION, periodLabel, periodOver, periodRange } from "../period";
 
-export default async function MonthPage({ params }: { params: Promise<{ month: string }> }) {
-  const { month } = await params;
-  const range = monthRange(month);
+export default async function PeriodPage({ params }: { params: Promise<{ period: string }> }) {
+  const { period } = await params;
+  const range = periodRange(period);
   if (!range) notFound();
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -26,9 +27,9 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   ]);
   const report: Report = filing ? { figures: filing.figures, warnings: [], externalMappingRequired: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
   return <MonthlyComplianceView
-    model={toMonthlyComplianceViewProps({ monthLabel: monthLabel(month), report, filing, losses, backHref: "/compliance" })}
+    model={toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    monthOpen={!filing && !monthOver(month, today)}
+    monthOpen={!filing && !periodOver(period, today)}
     fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} externalMappingRequired={report.externalMappingRequired} />}
   />;
 }
