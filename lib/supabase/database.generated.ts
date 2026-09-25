@@ -5210,6 +5210,9 @@ export type Database = {
       stock_transfers: {
         Row: {
           brewery_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           created_by: string
           from_location_id: string
@@ -5223,6 +5226,9 @@ export type Database = {
         }
         Insert: {
           brewery_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by: string
           from_location_id: string
@@ -5236,6 +5242,9 @@ export type Database = {
         }
         Update: {
           brewery_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           created_by?: string
           from_location_id?: string
@@ -7218,6 +7227,10 @@ export type Database = {
       }
       cancel_order: {
         Args: { p_order: string; p_reason: string; p_request_id: string }
+        Returns: Json
+      }
+      cancel_stock_transfer: {
+        Args: { p_reason: string; p_request_id: string; p_transfer: string }
         Returns: Json
       }
       cas_integration_tokens: {

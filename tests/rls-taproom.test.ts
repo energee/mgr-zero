@@ -329,7 +329,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R()],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R()], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
     schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()],
-    set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], submit_stock_transfer: [f.transfer.id,R()],
+    set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], submit_stock_transfer: [f.transfer.id,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
     set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
     set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
     set_pos_location_mapping: [B,"L1",f.taps[0].id,R()], set_pos_item_mapping: [B,"I1","V1",SKU,null,false,R()],

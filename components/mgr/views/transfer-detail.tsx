@@ -1,5 +1,6 @@
 // components/mgr/views/transfer-detail.tsx — Transfer detail. Live slots
-// TransferActions as footer; inventory draws the next verb from status.
+// TransferActions as footer; inventory draws the next verb from status, and
+// Cancel transfer beside it until the transfer is received or cancelled.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { TransferDetailViewModel } from "@/lib/mgr/transfer-detail-view";
@@ -19,6 +20,7 @@ export function TransferDetailView({
       {E.fld(<>From {E.arrow(null)} to</>, <>{model.from} {E.arrow()} {model.to}</>)}
       {E.fld("Status", model.status)}
       {model.note ? E.fld("Note", model.note) : null}
+      {model.cancelReason ? E.fld("Cancelled", model.cancelReason) : null}
       {model.lines.map((line) => (
         <div key={line.key}>{E.row(line.title, line.detail, line.qty, model.received ? "ok" : "")}</div>
       ))}
@@ -31,6 +33,7 @@ export function TransferDetailView({
               <>
                 {E.sp()}
                 {E.btn(model.nextVerb)}
+                {E.btn("Cancel transfer", "g")}
               </>
             )
             : null}

@@ -140,6 +140,7 @@ const AUTHENTICATED_RPCS = [
   "staff_role(uuid)",
   "submit_order(uuid,uuid,uuid,uuid)",
   "submit_stock_transfer(uuid,uuid)",
+  "cancel_stock_transfer(uuid,text,uuid)",
   "today_live_reasons()",
   "unlink_chat_user(uuid,uuid,uuid)",
   "set_personal_quiet_hours(uuid,time without time zone,time without time zone,text,uuid)",

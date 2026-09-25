@@ -17,7 +17,9 @@ export type TransferDetailViewModel = {
   note?: string;
   lines: TransferDetailLineView[];
   received: boolean;
+  /** Also when Cancel transfer is offered: until received or cancelled (#578). */
   nextVerb?: string;
+  cancelReason?: string;
 };
 
 export type TransferDetailSnapshot = {
@@ -26,6 +28,7 @@ export type TransferDetailSnapshot = {
     transfer_no: number | null;
     status: string;
     note?: string | null;
+    cancel_reason?: string | null;
     from_name: string;
     to_name: string;
   };
@@ -58,6 +61,7 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
     note: transfer.note ?? undefined,
     received,
     nextVerb: nextVerb(transfer.status),
+    cancelReason: transfer.cancel_reason ?? undefined,
     lines: lines.map((l) => ({
       key: l.id,
       title: l.name,
