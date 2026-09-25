@@ -4,6 +4,7 @@
 // the personal quiet-hours override beside it. The Slack previews in
 // lib/chat/preview-fixtures.ts still spell their own window out by hand.
 import { plural } from "@/lib/mgr/plural";
+import { formatTimeOfDay } from "@/lib/date-format";
 
 export const MINUTES_PER_DAY = 1440;
 export const NOON = MINUTES_PER_DAY / 2;
@@ -13,8 +14,8 @@ export const NOON = MINUTES_PER_DAY / 2;
 // reports a hydration mismatch.
 const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
-/** A timestamp as a wall-clock time ("8:42 AM"); empty when there is none. */
-export const formatTime = (iso: string | null) => (iso ? clock.format(new Date(iso)) : "");
+/** A timestamp as a wall-clock time ("8:42 AM") in the brewery's zone; empty when there is none. */
+export const formatTime = (iso: string | null, timeZone: string) => (iso ? formatTimeOfDay(iso, timeZone) : "");
 
 /** A 24-hour `hh:mm` as minutes since midnight. Anything unparseable is midnight, never NaN. */
 export function parseClock(value: string) {

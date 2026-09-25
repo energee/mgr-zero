@@ -1,7 +1,7 @@
 // tests/tap-coverage.test.ts — the explorer is a walkable prototype only if
 // taps land somewhere: every link, button and row title in every MGR screen is
 // run through lib/mgr/screen-links.ts and the misses are counted. Chrome that
-// acts in place (steppers, the composer's History, tabs, chips, selects, the
+// acts in place (steppers, tabs, chips, selects, the
 // sidebar toggle) is not a tap to resolve. Set REPORT=<file> to write the
 // misses per area, which is how the rules get written.
 import { writeFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { ScreenFrame } from "../components/mgr/screen-frame";
 
 const text = (h: string) => h.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
-const INERT_LABEL = /^[−+]$|^History$/;
+const INERT_LABEL = /^[−+]$/;
 // The explorer's own rule, so the coverage report matches what a tap does:
 // a screen that maps an INERT label meant it, and that tap must resolve.
 const inert = (s: Screen, l: string, to?: string | null) => INERT_LABEL.test(l) || isInertOn(s, l, to);

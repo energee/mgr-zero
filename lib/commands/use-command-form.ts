@@ -1,6 +1,7 @@
 // lib/commands/use-command-form.ts — the two client-side command lifecycles.
 // useCommandAction is the primitive: run one command, hold busy/error (rendered
-// by CommandFormMessage as role="alert"), refresh on success. useCommandForm
+// by CommandFormMessage as role="alert"), refresh on success unless the
+// caller opts out. useCommandForm
 // adds the open/close and reset a mutation form needs (rendered in
 // components/mgr/command-form.tsx), and hands back its `run` so a sheet's
 // secondary verb (Remove, Delete, Clear) shares the one error slot that closing
@@ -23,7 +24,10 @@ export function useCommandAction() {
   const pending = useRef<{ key: string; requestId: string; expectedContext: typeof expectedContext } | null>(null);
 
   // Resolves true on success, so a caller that navigates away can wait for it.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string) {
+  // `refresh: false` skips the post-success router.refresh() for a caller that
+  // must keep its client state on screen (the Confirm order review, whose
+  // server page redirects once the order is no longer submitted).
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string, { refresh = true }: { refresh?: boolean } = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -34,7 +38,7 @@ export function useCommandAction() {
       const data = await command(attempt.expectedContext.breweryId ?? breweryId, name, input, requestId ?? attempt.requestId, attempt.expectedContext);
       pending.current = null;
       onSuccess?.(data);
-      router.refresh();
+      if (refresh) router.refresh();
       return true;
     } catch (err) {
       const detail = classifyCommandFailure(err);
@@ -59,9 +63,17 @@ export function useFields<T extends Record<string, string>>(initial: T) {
 /** An optional field is sent only when filled. */
 export const orUndef = (s: string) => s || undefined;
 
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void }) {
+/**
+ * reset runs on open as well as on close: an edit sheet's fields are seeded
+ * from props, and only the render after a save's router.refresh() has the
+ * saved values, so reseeding on close alone reopened the pre-save values and a
+ * second Save reverted the edit (#441). reset must therefore restore the same
+ * values the fields' useState starts from. defaultOpen opens on mount without
+ * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
+ */
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean }) {
   const { error, setError, run: runAction } = useCommandAction();
-  const [open, setOpenState] = useState(false);
+  const [open, setOpenState] = useState(opts.defaultOpen ?? false);
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
 
@@ -73,7 +85,8 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
 
   function setOpen(next: boolean) {
     setOpenState(next);
-    if (!next) { opts.reset(); setError(null); }
+    opts.reset();
+    setError(null);
   }
 
   async function submit(e: React.FormEvent) {

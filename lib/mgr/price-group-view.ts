@@ -44,7 +44,9 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
   return {
     backHref: snapshot.backHref,
     name: group?.name ?? "",
-    position: String(group?.position ?? ordered.length + 1),
+    // Past the highest position, not count + 1: a removed group leaves a gap,
+    // and positions are unique per brewery.
+    position: String(group?.position ?? (ordered.at(-1)?.position ?? 0) + 1),
     costCeiling: group?.cost_ceiling_cents == null ? "" : money(group.cost_ceiling_cents),
     costCeilingInput: dollarsInput(group?.cost_ceiling_cents),
     previousCeilingLabel: previous && `Cost ceiling · group ${previous.name}`,
