@@ -183,6 +183,14 @@ describe("Materials", () => {
     expect(html).toMatch(/Default vendor/);
   });
 
+  // #430: the potential recipe predictions read, asked only where it applies.
+  it("MaterialView asks for extract potential on malt and adjunct only", () => {
+    const of = (kind: string) => htmlOf(createElement(MaterialView, { model: { ...materialCitra, kind, extractPotential: "1.037" } }));
+    expect(of("Malt")).toMatch(/Extract potential/);
+    expect(of("adjunct")).toMatch(/Extract potential/);
+    expect(of("Hop")).not.toMatch(/Extract potential/);
+  });
+
   it("the live material form mounts the shared controlled body", () => {
     const form = src("app/(app)/materials/material-form.tsx");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/material"/);

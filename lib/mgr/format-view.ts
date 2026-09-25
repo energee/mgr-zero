@@ -131,7 +131,8 @@ export function formatControls(model: FormatViewModel, patch: (next: Partial<For
 
 export function formatCommandInput(model: FormatViewModel, saved?: FormatSnapshot["format"]) {
   const sizing = formatSizing(model);
-  const input = { id: saved?.id, name: sizing.name, basis: "packaged", packageType: model.packageType };
+  // A legacy format may have no package type; send none rather than "" (#447).
+  const input = { id: saved?.id, name: sizing.name, basis: "packaged", packageType: model.packageType || undefined };
   const initial = saved ? toFormatViewProps({ format: saved }) : undefined;
   if (saved && initial) {
     const unchanged = (["packageType", "kegSize", "unitsPerCase", "volumeValue", "volumeUnitIndex", "composed"] as const).every(key => model[key] === initial[key]);

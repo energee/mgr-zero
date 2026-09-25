@@ -158,6 +158,13 @@ describe("Price group view", () => {
     expect(html).not.toMatch(/Remove/);
   });
 
+  it("a new group starts past the highest position when a middle group was removed (#423)", () => {
+    // Positions 1 and 3 remain; count + 1 would be 3, which collides with
+    // unique (brewery_id, position).
+    const groups = pricingGrid.groups.filter((g) => g.position !== 2);
+    expect(toPriceGroupViewProps({ ...pricingGrid, groups }).position).toBe("4");
+  });
+
   it("keeps the ceiling note to one sentence", () => {
     const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(priceGroupTwo) }));
     const note = html.match(/<div data-slot="alert-description"[^>]*>(.*?)<\/div>/)?.[1] ?? "";
@@ -169,4 +176,12 @@ describe("Price group view", () => {
     expect(body.type).toBe(PriceGroupView);
     expect(body.props.model).toEqual(toPriceGroupViewProps(priceGroupTwo));
   });
+});
+
+it("bounds Position as the command does: a required whole number from 1 (#447)", () => {
+  const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(pricingGrid), controls: { position: () => undefined }, back: null }));
+  const position = /<input[^>]*aria-label="Position"[^>]*>/.exec(html)?.[0] ?? "";
+  expect(position).toContain('min="1"');
+  expect(position).toContain('step="1"');
+  expect(position).toContain("required");
 });

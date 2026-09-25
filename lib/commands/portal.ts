@@ -122,10 +122,11 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     const customer = await unwrap(ctx.db.from("customers").select("sale_channel_id").eq("id", customerId).eq("brewery_id", ctx.breweryId).single()) as { sale_channel_id: string };
     // sku_prices resolves the grid cell where the selected customer's channel
-    // meets the brand's price group and SKU format.
+    // meets the brand's price group and SKU format. Filter active explicitly:
+    // a login that is also staff reads inactive SKUs through RLS (#420).
     const [prices, avail] = await Promise.all([
       unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")
-        .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id)),
+        .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id).eq("active", true)),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
@@ -137,7 +138,7 @@ defineQuery({
   },
 });
 
-// Coming up: planned batches as brand + expected week (Monday), soonest
+// Coming up: upcoming planned batches as brand + expected week (Monday), soonest
 // first, and whether the brand has a package on the buyer's list. The
 // portal_schedule view exposes nothing else about a batch.
 defineQuery({
@@ -186,9 +187,13 @@ defineQuery({
       unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
       unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
-      // customer_read_portal_source exposes only this brewery's explicitly
-      // configured warehouse. Never choose an arbitrary/default warehouse.
-      unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId).maybeSingle()),
+      // Only this brewery's explicitly configured warehouse, never an
+      // arbitrary/default one. Filter by the configured id rather than leaning
+      // on customer_read_portal_source: a login that is also staff reads every
+      // location through staff_read (#420).
+      unwrap(ctx.db.from("portal_brewery").select("portal_fulfillment_location_id").eq("id", ctx.breweryId).single())
+        .then((b) => { const id = (b as { portal_fulfillment_location_id: string | null }).portal_fulfillment_location_id;
+          return id ? unwrap(ctx.db.from("locations").select("id, name").eq("id", id).maybeSingle()) : null; }),
     ]);
     return {
       customer, shipTos, fulfillmentSource, membership: { userId: ctx.userId },

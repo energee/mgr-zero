@@ -123,7 +123,7 @@ defineQuery({
 
 // Water profiles: a catalog entity of six ions in ppm (Water profiles /
 // Water profile screens). One upsert creates (no profileId) or edits.
-const ppm = z.number().nonnegative();
+const ppm = z.number().nonnegative().max(999_999.9); // numeric(7,1)
 defineQuery({
   name: "list_water_profiles", description: "Water profiles, alphabetical: a name and six ions in ppm",
   input: z.object({}), roles: ["admin", "brewer"],
@@ -165,8 +165,8 @@ defineQuery({
 
 // Number() guards the numeric columns against a driver that hands them back as
 // strings. A missing extract snapshot is NOT defaulted here — it is passed
-// through as null so recipeGravity can skip the ingredient outright rather
-// than have a made-up potential move the predicted OG.
+// through as null so recipeGravity answers no prediction (null OG/FG/ABV,
+// which the page hides) rather than have a made-up potential move the OG.
 const num = (v: unknown) => Number(v ?? 0);
 
 defineQuery({
@@ -189,29 +189,31 @@ defineQuery({
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
-        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
         .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
 
     return {
       recipe, version, ingredients, waterAdditions,
-      ...recipeGravity({
+      ...(recipeGravity({
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
         ingredients: ingredients.map((l) => ({
-          // A null snapshot stays null: recipeGravity skips that ingredient
-          // rather than defaulting its potential, which would silently move
-          // the predicted OG.
+          // A null snapshot stays null: recipeGravity then predicts nothing
+          // rather than defaulting its potential or printing OG 0 (#430).
           perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage as string,
+          unit: l.materials?.base_uom,
         })),
-      }),
+      }) ?? { ogPlato: null, fgPlato: null, abv: null }),
     };
   },
 });
 
 // ------------------------------------------------------------ vessels, batches
 const VESSEL_KINDS = ["fermenter", "brite", "barrel", "kettle", "other"] as const;
+/** A barrel volume stored in numeric(10,3) (#427). */
+const bbl = z.number().positive().max(9_999_999.999);
 
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
@@ -219,7 +221,7 @@ defineCommand({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     kind: z.enum(VESSEL_KINDS),
-    capacityBbl: z.number().positive(),
+    capacityBbl: bbl,
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_vessel", {
@@ -244,7 +246,7 @@ defineCommand({
     intendedBrandId: z.string().uuid().optional(),
     recipeVersionId: z.string().uuid().optional(),
     plannedOn: isoDate,
-    plannedBbl: z.number().positive(),
+    plannedBbl: bbl,
     note: z.string().optional(),
   }),
   roles: ["admin", "brewer"],
@@ -295,24 +297,35 @@ async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
   return new Map(versions.map((v) => [v.id as string, byRecipe.get(v.recipe_id as string) ?? ""]));
 }
 
-// The open occupancy (ended_at is null) is where a batch physically is; the
-// gist exclusion on vessel_occupancies guarantees at most one per vessel.
-// Ids go 100 per read so the URL stays bounded (#469).
+// The open occupancies (ended_at is null) are where a batch physically is; the
+// gist exclusion on vessel_occupancies guarantees at most one per vessel, but a
+// partial transfer leaves one batch open in several vessels. Each batch maps to
+// all of them, oldest first, so the brew-day tank (created first) leads. Ids go
+// 100 per read so the URL stays bounded (#469); a batch's rows all land in one
+// chunk, so the per-chunk order is the per-batch order.
+type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
 async function openVessels(ctx: Ctx, batchIds: string[]) {
   const rows = await inChunks(batchIds, async chunk => (await unwrap(ctx.db.from("vessel_occupancies")
-    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", chunk).is("ended_at", null))) ?? []);
-  if (rows.length === 0) return new Map<string, { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string }>();
+    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", chunk).is("ended_at", null)
+    .order("created_at").order("id"))) ?? []);
+  const byBatch = new Map<string, OpenVessel[]>();
+  if (rows.length === 0) return byBatch;
   const vessels = await inChunks([...new Set(rows.map((r) => r.vessel_id as string))],
     async chunk => (await unwrap(ctx.db.from("vessels").select("id, name").in("id", chunk))) ?? []);
   const names = new Map(vessels.map((v) => [v.id as string, v.name as string]));
-  return new Map(rows.map((r) => [r.batch_id as string, {
-    id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
-    started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
-  }]));
+  for (const r of rows) {
+    const list = byBatch.get(r.batch_id as string) ?? [];
+    list.push({
+      id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
+      started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
+    });
+    byBatch.set(r.batch_id as string, list);
+  }
+  return byBatch;
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open",
+  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels (comma-separated when split across tanks) when any is open",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: async (ctx) => {
     const batches = (await unwrap(ctx.db.from("batches")
@@ -330,20 +343,20 @@ defineQuery({
       ...b,
       brand_name: b.intended_brand_id ? brands.get(b.intended_brand_id) ?? null : null,
       recipe_name: b.recipe_version_id ? recipes.get(b.recipe_version_id) ?? null : null,
-      vessel_name: vessels.get(b.id)?.vessel_name ?? null,
+      vessel_name: vessels.get(b.id)?.map((v) => v.vessel_name).join(", ") || null,
     }));
   },
 });
 
 defineQuery({
-  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in: the vessel's name and the volume that went in",
+  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in",
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
       .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
-    return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId) ?? null };
+    return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId)?.[0] ?? null };
   },
 });
 

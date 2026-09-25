@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
-  claim: vi.fn(), complete: vi.fn(), fail: vi.fn(),
+  claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(),
 }));
 const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, role: "admin" }));
 
@@ -23,6 +23,7 @@ vi.mock("@/lib/supabase/integration-tokens", () => ({
   claimQboOAuth: lifecycle.claim,
   completeQboOAuthStore: lifecycle.complete,
   failQboOAuth: lifecycle.fail,
+  qboRealmInUse: lifecycle.realmInUse,
 }));
 
 import { GET } from "@/app/api/integrations/qbo/oauth/route";
@@ -37,6 +38,7 @@ describe("QuickBooks OAuth callback route", () => {
     vi.stubEnv("QBO_API_BASE", "https://sandbox-quickbooks.api.intuit.com");
     lifecycle.claim.mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] });
     lifecycle.fail.mockResolvedValue(undefined);
+    lifecycle.realmInUse.mockResolvedValue(false);
   });
 
   afterEach(() => {

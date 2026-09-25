@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SCREENS } from "../components/mgr/screens";
 
 const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
@@ -18,7 +19,8 @@ const CUSTOMER_GUIDES = GUIDES.filter((g) => g !== "api");
 describe("customer guides (MDX)", () => {
   it("has exactly the pages meta.json lists, each with frontmatter and no code", () => {
     const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
-    expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
+    // The API reference is a folder of pages (content/docs/api/), not one file.
+    expect(files).toEqual(CUSTOMER_GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of CUSTOMER_GUIDES) {
       const mdx = read(`content/docs/${guide}.mdx`);
       expect(mdx).toMatch(/^---\n(?:\w+: .+\n)*title: .+\ndescription: .+\n(?:\w+: .+\n)*---\n/);
@@ -31,6 +33,7 @@ describe("customer guides (MDX)", () => {
 
   it("gives the API reference a place in the sidebar and on the chooser", () => {
     expect(GUIDES).toContain("api");
+    expect(read("content/docs/api/index.mdx")).toMatch(/^---\n/);
     expect(read("content/docs/index.mdx")).toContain('href="/docs/api"');
   });
 
@@ -66,8 +69,7 @@ describe("customer guides (MDX)", () => {
 // A guide section that describes a screen embeds it: <Screen name="…" /> draws
 // the inventory frame (components/mgr/screen-embed.tsx) under the prose.
 describe("guide screen embeds", () => {
-  it("names only screens the inventory has, and covers the main sections", async () => {
-    const { SCREENS } = await import("../components/mgr/screens");
+  it("names only screens the inventory has, and covers the main sections", () => {
     const names = new Set(SCREENS.filter((s) => !s.venue).map((s) => s.name));
     const embeds = (guide: string) => [...read(`content/docs/${guide}.mdx`).matchAll(/<Screen name="([^"]+)" \/>/g)].map((m) => m[1]);
     for (const guide of ["staff-guide", "portal-guide"]) {

@@ -67,7 +67,7 @@ describe("recipes and immutable versions", () => {
     expect(got.version).toMatchObject({ id: v2.id, version: 2 });
     const expected = recipeGravity({
       brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
-      ingredients: [{ perBblQty: 70, extractPotential: 1.02, stage: "mash" }],
+      ingredients: [{ perBblQty: 70, extractPotential: 1.02, stage: "mash", unit: "lb" }],
     });
     expect({ ogPlato: got.ogPlato, fgPlato: got.fgPlato, abv: got.abv }).toEqual(expected);
 
@@ -158,6 +158,28 @@ describe("vessels, scheduling and brew day", () => {
   });
 });
 
+// #488: a brew day recorded 25 bbl into a 20 bbl fermenter and Cellar showed
+// "25 / 20 bbl". Knockout volume can never exceed vessels.capacity_bbl.
+describe("brew day refuses more than the vessel holds", () => {
+  it("refuses 25 bbl into a 20 bbl fermenter, leaves the batch unbrewed, and accepts a full 20", async () => {
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-CAP20", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 25 }, ctx)) as { id: string };
+
+    await expect(runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: "2026-10-01" }, ctx))
+      .rejects.toThrow(/FV-CAP20 holds 20 bbl/);
+    const refused = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as {
+      batch: { brewed_on: string | null }; occupancy: unknown;
+    };
+    expect(refused.batch.brewed_on).toBeNull();
+    expect(refused.occupancy).toBeNull();
+
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { initial_bbl: number } | null };
+    expect(day.occupancy).toMatchObject({ initial_bbl: 20 });
+  });
+});
+
 // A backdated brew day is the case `ended_at is null` misses: the vessel is
 // empty *now*, but the day being recorded falls inside a stretch it was full.
 // The pre-check uses the same range predicate as the gist exclusion, so this
@@ -187,6 +209,55 @@ describe("brew day overlaps a closed occupancy", () => {
     };
     expect(day.batch.brewed_on).toBe("2026-10-06");
     expect(day.occupancy).toMatchObject({ initial_bbl: 28 });
+  });
+
+  // #434: emptying and refilling a tank on the same day is a normal cycle. The
+  // transfer closes FV1 at now(), so a brew day dated today must open its
+  // occupancy after that instant, not at midnight, or the ranges overlap.
+  it("brews into a vessel emptied earlier the same day", async () => {
+    // "Today" is the brewery's local day, the window record_brew_day uses.
+    const [today] = sql(`select (now() at time zone timezone)::date::text from breweries where id = '${b.id}'`, true);
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-SAMEDAY", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const brite = (await runCommand("upsert_vessel", { name: "BR-SAMEDAY", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+    const first = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
+    const brewed = (await runCommand("record_brew_day",
+      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as { occupancy: { id: string } };
+    const moved = (await runCommand("record_cellar_transfer",
+      { fromOccupancyId: brewed.occupancy.id, toVesselId: brite.id, volumeBbl: 10 }, ctx)) as {
+        from_occupancy: { ended_at: string | null };
+      };
+    expect(moved.from_occupancy.ended_at).not.toBeNull();
+
+    const second = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
+    const again = (await runCommand("record_brew_day",
+      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as {
+        batch: { brewed_on: string }; occupancy: { started_at: string };
+      };
+    expect(again.batch.brewed_on).toBe(today);
+    expect(Date.parse(again.occupancy.started_at)).toBeGreaterThanOrEqual(Date.parse(moved.from_occupancy.ended_at!));
+  });
+
+  // "The same day" is the brewery's day, not UTC's. A tank emptied at 22:00 in
+  // New York closed on the next UTC day; a brew dated the local day must still
+  // start after that close instead of reporting the vessel occupied.
+  it("uses the brewery's time zone for the same-day window", async () => {
+    await admin.from("breweries").update({ timezone: "America/New_York" }).eq("id", b.id);
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const first = (await runCommand("schedule_batch", { plannedOn: "2026-11-01", plannedBbl: 10 }, ctx)) as { id: string };
+    const brewed = (await runCommand("record_brew_day",
+      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
+    // A first brew starts at the brewery's midnight, not UTC's (#582): still EDT until 02:00.
+    expect(Date.parse(brewed.occupancy.started_at)).toBe(Date.parse("2026-11-01T04:00:00Z"));
+    // 22:00 New York on 11-10 is 03:00 UTC on 11-11.
+    sql(`update vessel_occupancies set ended_at = timestamptz '2026-11-10 22:00 America/New_York'
+         where batch_id = '${first.id}' and ended_at is null`, true);
+
+    const second = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 10 }, ctx)) as { id: string };
+    const again = (await runCommand("record_brew_day",
+      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-10" }, ctx)) as {
+        occupancy: { started_at: string };
+      };
+    expect(Date.parse(again.occupancy.started_at)).toBe(Date.parse("2026-11-11T03:00:00Z"));
   });
 });
 
@@ -284,7 +355,7 @@ describe("cellar transfers", () => {
 
     const first = (await runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: brite.id, volumeBbl: 5 }, ctx)) as {
-        transfer: { bbl: number; loss_bbl: number }; to_occupancy: { id: string; batch_id: string }; from_occupancy: { ended_at: string | null };
+        transfer: { bbl: number }; to_occupancy: { id: string; batch_id: string }; from_occupancy: { ended_at: string | null };
       };
     expect(Number(first.transfer.bbl)).toBe(5);
     // Filled by transfer, so the new occupancy opens at zero and carries the source's batch.
@@ -337,6 +408,28 @@ describe("cellar transfers", () => {
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 1 }, ctx))
       .rejects.toThrow(/closed/);
+  });
+
+  // #488: the target's open occupancy plus the incoming volume must fit its
+  // capacity, whether the target is empty or already holds beer.
+  it("refuses a transfer that would overfill the target vessel", async () => {
+    const host = await brew("CAP-FV1", 25, "2026-11-05");   // capacity 30
+    const donor = await brew("CAP-FV2", 10, "2026-11-05");
+
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 10 }, ctx))
+      .rejects.toThrow(/CAP-FV1 holds 30 bbl/);
+    const small = (await runCommand("upsert_vessel", { name: "CAP-BR5", kind: "brite", capacityBbl: 5 }, ctx)) as { id: string };
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: small.id, volumeBbl: 6 }, ctx))
+      .rejects.toThrow(/CAP-BR5 holds 5 bbl/);
+    expect(await volume(host.occupancyId)).toBe(25);   // nothing moved
+    expect(await volume(donor.occupancyId)).toBe(10);
+
+    // Filling to exactly capacity is fine.
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 5 }, ctx);
+    expect(await volume(host.occupancyId)).toBe(30);
   });
 
   it("refuses another brewery's occupancy and vessel, and roles that are not admin or brewer", async () => {
@@ -402,3 +495,23 @@ describe("fermentation readings", () => {
       .rejects.toThrow(/closed/);
   });
 });
+
+// A partial transfer splits a batch across two open tanks. list_batches names
+// both; get_brew_day keeps the tank the brew went into, the earliest still
+// open, rather than whichever row the Map kept last (#439).
+describe("a batch split across tanks", () => {
+  it("lists every open vessel and keeps the brew-day tank on get_brew_day", async () => {
+    const fv = (await runCommand("upsert_vessel", { name: `FV-SPLIT ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string; name: string };
+    const bt = (await runCommand("upsert_vessel", { name: `BT-SPLIT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 30 }, ctx)) as { id: string; name: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, ctx)) as { id: string };
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: bt.id, volumeBbl: 5 }, ctx);
+
+    const listed = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null }[];
+    expect(listed.find((r) => r.id === batch.id)?.vessel_name).toBe(`${fv.name}, ${bt.name}`);
+    const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { vessel_name: string; initial_bbl: number } };
+    expect(day.occupancy).toMatchObject({ vessel_name: fv.name, initial_bbl: 20 });
+  });
+});
+

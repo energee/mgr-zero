@@ -122,7 +122,8 @@ describe("completion loss review", () => {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(String(before.figures.cellarRemovals.loss)).toBe("0.05741935");
-    expect(String(before.figures.removals.loss)).toBe("0.05741935");
+    // Printed removal lines are whole cents that foot to the printed Out (#533); the exact figure stays in cellarRemovals.
+    expect(String(before.figures.removals.loss)).toBe("0.06");
 
     const review = await runCommand("get_loss_review", {
       periodStart: completed.period.start, periodEnd: completed.period.end,
@@ -157,7 +158,8 @@ describe("completion loss review", () => {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(report.figures.cellarRemovals).toMatchObject({ loss: 0, sample: 0.02, destruction: 0.03741935 });
-    expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(0.05741935, 8);
+    // Reattribution moves the loss between printed lines without changing their total.
+    expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(Number(before.figures.removals.loss), 8);
   });
 
   it("rejects invalid precision, invalid target state, excess, wrong source, tenant, and role without rows", async () => {
@@ -183,17 +185,18 @@ describe("completion loss review", () => {
     }, adminCtx)).rejects.toMatchObject({ status: 400 });
     await expect(reattribute(completed.adjustmentId, "1", "destruction")).rejects.toThrow(/remaining/i);
 
-    const physical = insertFixture<{ id: string }>("volume_adjustments", {
+    // A gain is not a loss; any generic loss root (completion or transfer, #485) is.
+    const gain = insertFixture<{ id: string }>("volume_adjustments", {
       brewery_id: breweryId,
       occupancy_id: sql(`select occupancy_id::text from volume_adjustments where id='${completed.adjustmentId}'`, true)[0],
-      bbl: -0.01, reason: "loss", created_by: adminCtx.userId,
+      bbl: 0.01, reason: "gain", created_by: adminCtx.userId,
     })[0];
-    await expect(reattribute(physical.id, "0.01", "destruction")).rejects.toThrow(/completion loss not found/i);
+    await expect(reattribute(gain.id, "0.01", "destruction")).rejects.toThrow(/loss not found/i);
     const foreign = await makeBrewery();
     const foreignAdmin = await makeStaffCtx(foreign.id, "admin");
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction",
-    }, foreignAdmin)).rejects.toThrow(/completion loss not found/i);
+    }, foreignAdmin)).rejects.toThrow(/loss not found/i);
     await expect(runCommand("get_loss_review", { periodStart: completed.period.start, periodEnd: completed.period.end }, brewerCtx)).rejects.toMatchObject({ status: 403 });
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction",
@@ -252,7 +255,7 @@ describe("completion loss review", () => {
       pending = b.query("select public.reattribute_loss($1,$2,$3,$4::public.cellar_removal_class,$5,$6)", [...args, crypto.randomUUID()]);
       await expect.poll(async () => sql(`select wait_event_type from pg_stat_activity where pid=${pid}`, true)[0]).toBe("Lock");
       await a.query("commit");
-      await expect(pending).rejects.toThrow(/remaining completion loss/i);
+      await expect(pending).rejects.toThrow(/remaining loss/i);
       expect(sql(`select count(*) from volume_adjustment_reclassifications where source_adjustment_id='${race.adjustmentId}'`, true)).toEqual(["1"]);
     } finally {
       await a.query("rollback").catch(() => undefined);

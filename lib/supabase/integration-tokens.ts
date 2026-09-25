@@ -1,7 +1,7 @@
 // lib/supabase/integration-tokens.ts — the only server boundary for private integration credentials.
 import "server-only";
 import { toJson } from "./json";
-import { CommandError, type Ctx } from "@/lib/commands/registry";
+import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -221,9 +221,19 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   return data;
 }
 
+/** True when the intent moved to recovery_required; false when it was no longer 'exchanging'. */
 export async function failQboOAuth(intentId: string, actorId: string) {
-  const { error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
+  const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
+  return data === true;
+}
+
+/** True when a stored (not disconnected) QuickBooks connection of any brewery uses this realm; the OAuth callback must not revoke then. */
+export async function qboRealmInUse(realmId: string) {
+  const { count, error } = await createAdminClient().from("qbo_connections")
+    .select("id", { count: "exact", head: true }).eq("realm_id", realmId).neq("state", "disconnected");
+  if (error) throw new Error("QuickBooks connection lookup failed");
+  return (count ?? 0) > 0;
 }
 
 export async function claimSquareOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {
@@ -421,16 +431,12 @@ export async function beginSquarePublication(
   requestId: string,
   commandName: "publish_pos_menu" | "publish_pos_item",
 ) {
-  const { data, error } = await ctx.db.rpc("begin_square_publication", {
+  return squarePublicationStart(await unwrap(ctx.db.rpc("begin_square_publication", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_brand: input.brandId,
     p_adopt_item: input.adoptItemId ?? null, p_adopt_variation: input.adoptVariationId ?? null,
     p_retry_conflict: input.retryConflict ?? false, p_command: commandName, p_request_id: requestId,
     p_menu_publication: input.menuPublicationId ?? null,
-  });
-  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
-  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
-  if (error) throw new CommandError(error.message);
-  return squarePublicationStart(data);
+  })));
 }
 
 function squareMenuPublicationStart(data: unknown): SquareMenuPublicationStart {
@@ -451,14 +457,10 @@ function squareMenuPublicationStart(data: unknown): SquareMenuPublicationStart {
 export async function beginSquareMenuPublication(
   ctx: Ctx, input: { posLocationId: string; retryConflict?: boolean }, requestId: string,
 ) {
-  const { data, error } = await ctx.db.rpc("begin_square_menu_publication", {
+  return squareMenuPublicationStart(await unwrap(ctx.db.rpc("begin_square_menu_publication", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
     p_retry_conflict: input.retryConflict ?? false, p_request_id: requestId,
-  });
-  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
-  if (error?.code === "42501") throw new CommandError("permission denied", 403, "permission_denied");
-  if (error) throw new CommandError(error.message);
-  return squareMenuPublicationStart(data);
+  })));
 }
 
 export async function finishSquareMenuPublication(ctx: Ctx, menuAttemptId: string) {

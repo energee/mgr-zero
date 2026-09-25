@@ -64,9 +64,9 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("New Name");
   });
 
-  it("empty paymentTerms preserves the create default and an existing payment term", async () => {
+  it("omitted paymentTerms preserves the create default and an existing payment term", async () => {
     const created = await runCommand("upsert_customer", {
-      name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "",
+      name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,
     }, ctx) as { id: string; payment_terms: string };
     expect(created.payment_terms).toBe("net30");
 
@@ -74,9 +74,21 @@ describe("customer CRUD", () => {
       name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "net15",
     }, ctx) as { id: string; payment_terms: string };
     const updated = await runCommand("upsert_customer", {
-      id: configured.id, name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "",
+      id: configured.id, name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,
     }, ctx) as { payment_terms: string };
     expect(updated.payment_terms).toBe("net15");
+  });
+
+  // #491: customer terms are the vendor list; the command and the table both refuse anything else.
+  it("refuses a payment term outside due_on_receipt / net15 / net30", async () => {
+    const input = { name: "Odd terms", type: "retailer", state: "PA", saleChannelId: wholesale };
+    await expect(runCommand("upsert_customer", { ...input, paymentTerms: "Net 30" }, ctx)).rejects.toThrow();
+    const direct = await ctx.db.rpc("upsert_customer", {
+      p_brewery: b.id, p_id: null, p_name: "Odd terms", p_type: "retailer", p_state: "PA",
+      p_sale_channel: wholesale, p_license_no: null, p_payment_terms: "net45",
+      p_tax_treatment: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(direct.error?.message).toMatch(/customers_payment_terms_check/);
   });
 });
 
@@ -94,5 +106,25 @@ describe("list_customers past the 1000-row cap", () => {
     expect(list).toHaveLength(1005);
     expect(list.at(0)?.name).toBe("Customer 0001");
     expect(list.at(-1)?.name).toBe("Customer 1005");
+  }, 30_000);
+});
+
+// #424: list_channel_prices stopped at PostgREST's max_rows (1000), so the
+// pricing grid showed real prices past it as unpriced.
+describe("list_channel_prices past the 1000-row cap", () => {
+  it("returns every cell", async () => {
+    const many = await makeBrewery();
+    const staff = await makeStaffCtx(many.id, "sales");
+    const channel = await channelId(many.id, "Wholesale");
+    const { formatId: format } = await seedCatalog(many.id);
+    sql(`with g as (
+        insert into price_groups (brewery_id, name, position)
+        select '${many.id}', 'G' || n, n from generate_series(1, 1005) n returning id)
+      insert into channel_prices (brewery_id, sale_channel_id, price_group_id, format_id, unit_price_cents)
+      select '${many.id}', '${channel}', id, '${format}', 100 from g`, true);
+    const cells = await runCommand("list_channel_prices", {}, staff) as unknown[];
+    expect(cells).toHaveLength(1005);
+    const narrowed = await runCommand("list_channel_prices", { saleChannelId: channel }, staff) as unknown[];
+    expect(narrowed).toHaveLength(1005);
   }, 30_000);
 });

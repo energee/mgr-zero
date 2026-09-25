@@ -11,6 +11,7 @@ import { E } from "@/components/mgr/e";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { replenishmentLines } from "@/lib/replenishment-form";
 
 type Suggestion = { skuId: string; sku: string; par: number; onHand: number; suggested: number };
 type Location = { id: string; name: string };
@@ -33,14 +34,9 @@ export function ReplenishForm({
   const [fromLocationId, setFromLocationId] = useState(warehouses[0]?.id ?? "");
   const [qtys, setQtys] = useState<Record<string, string>>(() => initialQtys(suggestions));
 
+  const lines = replenishmentLines(suggestions, qtys);
   const form = useCommandForm("create_replenishment_order", {
-    build: () => ({
-      fromLocationId,
-      toLocationId,
-      lines: suggestions
-        .filter((s) => Number(qtys[s.skuId] ?? 0) > 0)
-        .map((s) => ({ skuId: s.skuId, qty: Number(qtys[s.skuId]) })),
-    }),
+    build: () => ({ fromLocationId, toLocationId, lines }),
     reset: () => setQtys(initialQtys(suggestions)),
   });
 
@@ -98,7 +94,7 @@ export function ReplenishForm({
 
       <CommandFormMessage error={form.error} />
       {canCreate && <div>
-        <Button type="submit" disabled={form.submitting || !fromLocationId || suggestions.length === 0}>
+        <Button type="submit" disabled={form.submitting || !fromLocationId || lines.length === 0}>
           {form.submitting ? "Creating…" : "Create replenishment order"}
         </Button>
       </div>}

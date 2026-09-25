@@ -42,7 +42,7 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
   const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
   return <PackagingRunsView
-    model={toPackagingRunsViewProps(runs, (id) => `/packaging/${id}`)}
+    model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.role)}
     actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
   />;

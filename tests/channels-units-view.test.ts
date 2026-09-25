@@ -101,7 +101,10 @@ describe("Sale channels view", () => {
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ChannelForm\b/);
     expect(src).toMatch(/<DeleteChannelButton\b/);
-    expect(src).toContain('backHref: "/settings"');
+    expect(src).toContain('backHref: toSettings ? "/settings" : "/more"');
+    // Add/Edit/Delete are drawn only for a role the registry lets run them (#478).
+    expect(src).toContain('canRun(ctx, "upsert_sale_channel")');
+    expect(src).toContain('canRun(ctx, "delete_sale_channel")');
   });
 });
 
@@ -209,6 +212,12 @@ describe("Units view", () => {
     expect(src).toMatch(/<UnitsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<GravityUnitForm\b/);
-    expect(src).toContain('backHref: ctx.role === "taproom" ? "/more" : "/settings"');
+    expect(src).toContain('backHref: toSettings ? "/settings" : "/more"');
   });
+});
+
+it("puts a gravity select back on the stored unit when its save fails (#447)", () => {
+  const src = readFileSync(new URL("../app/(app)/settings/units/gravity-unit-form.tsx", import.meta.url), "utf8");
+  expect(src).toContain('run("set_brewery_gravity_unit", { unit: v }).then((ok) => { if (!ok) setBreweryChoice(brewery); })');
+  expect(src).toContain('run("set_my_gravity_unit", { unit: v === NONE ? null : v }).then((ok) => { if (!ok) setMineChoice(mine ?? NONE); })');
 });

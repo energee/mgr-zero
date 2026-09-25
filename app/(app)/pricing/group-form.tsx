@@ -10,12 +10,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
-import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
   const [draft, setDraft] = useState(model);
   const edit = (key: "name" | "position" | "costCeilingInput") => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
-  const remove = useCommandAction();
   const form = useCommandForm("upsert_price_group", {
     build: () => ({
       ...(groupId ? { id: groupId } : {}),
@@ -40,12 +39,12 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           model={draft}
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
-          messages={<><CommandFormMessage error={form.error} /><CommandFormMessage error={remove.error} /></>}
+          messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (
-              <Button type="button" variant="ghost" disabled={remove.busy} onClick={() => remove.run("delete_price_group", { priceGroupId: groupId })}>Delete</Button>
+              <Button type="button" variant="ghost" disabled={form.busy} onClick={() => form.run("delete_price_group", { priceGroupId: groupId })}>Delete</Button>
             )}
-            <Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save price group"}</Button>
+            <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price group"}</Button>
           </CommandFormFooter>}
         />
       </form>

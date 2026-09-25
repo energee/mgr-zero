@@ -1,6 +1,7 @@
 // lib/mgr/portal-invoice-view.ts — view-model for one portal invoice. Domain
 // comes from portal_invoice (number, total, due/paid, lines, brewery phone).
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
@@ -55,8 +56,9 @@ export type PortalInvoiceSnapshot = {
   brewery: { name: string; customer_phone: string | null };
 };
 
+/** "Aug 29, 2026" for a paid_at timestamp: its UTC day, since the portal payload carries no brewery time zone. */
 function day(iso: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
+  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDate(iso.slice(0, 10)) : iso;
 }
 
 /** Map a portal_invoice payload onto PortalInvoiceView. */
@@ -73,12 +75,12 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     total: money(invoiceCurrentTotalCents(invoice, invoice.total_cents)),
-    due: status === "Unpaid" ? invoice.due_on ?? undefined : undefined,
+    due: status === "Unpaid" && invoice.due_on ? formatDate(invoice.due_on) : undefined,
     paidOn: paid ? day(invoice.paid_at!) : undefined,
     paid,
     payable: !credit && status === "Unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
     kind: invoice.kind,
-    issued: invoice.issued_on,
+    issued: formatDate(invoice.issued_on),
     status: credit ? "Credit" : status,
     breweryName: brewery.name,
     breweryPhone: brewery.customer_phone,

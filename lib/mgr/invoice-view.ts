@@ -43,6 +43,8 @@ export type InvoiceViewModel = {
 
 export type InvoiceSnapshot = {
   backHref?: string;
+  /** breweries.timezone: paid and question days are the brewery's day, not the UTC prefix (#442). */
+  timeZone: string;
   invoice: {
     id: string;
     invoice_no: number | null;
@@ -94,12 +96,12 @@ export function invoiceMappingRows(customer: { name: string; qbo_customer_id: st
 }
 
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
-export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref }: InvoiceSnapshot): InvoiceViewModel {
+export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref, timeZone }: InvoiceSnapshot): InvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
   const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
-  const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
+  const dueOrIssued = invoice.due_on ? `due ${formatDate(invoice.due_on)}` : `issued ${formatDate(invoice.issued_on)}`;
   const state = invoiceCurrentState(invoice);
-  const stateDetail = state === "paid" ? ` · paid ${formatDate(invoice.paid_at!)}`
+  const stateDetail = state === "paid" ? ` · paid ${formatDate(invoice.paid_at!, timeZone)}`
     : state === "written_off" ? " · written off" : state === "unpaid" ? "" : ` · ${state}`;
   const drift = invoice.qbo_accountant_drift ? " · edited in QuickBooks" : "";
   return {
@@ -118,7 +120,7 @@ export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHr
     questions: questions.map((q) => ({
       key: q.id,
       id: q.id,
-      detail: `“${q.body}” · ${q.customers?.name ?? "buyer"}, ${formatDate(q.created_at)}`,
+      detail: `“${q.body}” · ${q.customers?.name ?? "buyer"}, ${formatDate(q.created_at, timeZone)}`,
       answered: Boolean(q.answered_at),
     })),
     mappings,

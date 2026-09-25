@@ -60,7 +60,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp))}
-      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
       afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
       linkRows
       footer={
@@ -69,7 +69,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           {movements.length === 0
             ? E.blank("No movements recorded yet")
             : movements.slice(0, 50).map((m) => (
-              <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? m.bin_id} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? m.sale_channel_id}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span className="break-all">{formatDateTime(m.created_at)} · {m.id}{m.ref ? ` · source ${m.ref}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
+              <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? m.bin_id} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? m.sale_channel_id}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span className="break-all">{formatDateTime(m.created_at, brewery.timeZone)}{m.ref ? ` · source ${m.ref}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
             ))}
           <div className="flex gap-2">{page > 0 && E.btn("Newer movements", "g", `/inventory?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `/inventory?page=${page + 2}`)}</div>
         </>

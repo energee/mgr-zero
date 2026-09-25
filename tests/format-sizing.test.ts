@@ -47,3 +47,9 @@ it("preserves a legacy fleet size on volume edits without applying it to other c
   expect(formatCommandInput({ ...model, packageType: "can" }, saved).kegSize).toBeUndefined();
   expect(formatCommandInput({ ...model, volumeValue: "0.1663" }).kegSize).toBeUndefined();
 });
+
+it("sends no package type rather than an empty one the enum refuses (#447)", () => {
+  const model = toFormatViewProps({ format: { id: "f", name: "Legacy", basis: "packaged", package_type: null, keg_size: null, units_per_case: 1, bbl_per_unit: 0.1, composed: false } as never });
+  expect(model.packageType).toBe("");
+  expect(formatCommandInput({ ...model, name: "Renamed" }, undefined).packageType).toBeUndefined();
+});

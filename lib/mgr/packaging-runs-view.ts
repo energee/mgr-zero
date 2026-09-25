@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/date-format";
 import { runNo } from "@/lib/mgr/doc-no";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
@@ -35,11 +36,11 @@ export type PackagingRunsViewModel = {
   workTabs: Record<string, string>;
 };
 
-function row(run: PackagingRunSnapshot, href?: string): PackagingRunRowView {
+function row(run: PackagingRunSnapshot, timeZone: string, href?: string): PackagingRunRowView {
   const title = `${runNo(run.run_no)} · ${run.brand_name ?? "no brand"}`;
   if (run.closed_at) {
     const detail = [
-      `closed ${run.planned_on}`,
+      `closed ${formatDate(run.closed_at, timeZone)}`,
       run.lot_code,
       run.output_summary ?? `${run.qty_planned} planned`,
       run.yield_percent === undefined ? undefined : `${run.yield_percent}% yield`,
@@ -52,10 +53,11 @@ function row(run: PackagingRunSnapshot, href?: string): PackagingRunRowView {
   return { key: run.id, title, detail, verb, tone: run.material_shortfall || run.started_at ? "attention" : "info", warning: Boolean(run.material_shortfall), href };
 }
 
-export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], hrefFor?: (id: string) => string): PackagingRunsViewModel {
+/** `timeZone` is breweries.timezone: a closed run is dated by the brewery's day, not closed_at's UTC prefix (#442). */
+export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone: string, hrefFor?: (id: string) => string): PackagingRunsViewModel {
   return {
-    upcoming: runs.filter((run) => !run.closed_at).map((run) => row(run, hrefFor?.(run.id))),
-    recent: runs.filter((run) => run.closed_at).map((run) => row(run, hrefFor?.(run.id))),
+    upcoming: runs.filter((run) => !run.closed_at).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    recent: runs.filter((run) => run.closed_at).map((run) => row(run, timeZone, hrefFor?.(run.id))),
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };

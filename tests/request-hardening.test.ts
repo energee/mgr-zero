@@ -24,7 +24,7 @@ describe("bounded command request bodies", () => {
 
   it("leaves room for a realistic 5,000-row CSV import envelope", () => {
     const body = JSON.stringify({ breweryId: crypto.randomUUID(), name: "import_csv", requestId: crypto.randomUUID(), input: {
-      kind: "customers", rows: Array.from({ length: 5_000 }, (_, i) => ({ name: `Customer ${i}`, type: "retailer", state: "PA", paymentTerms: "Net 30" })),
+      kind: "customers", rows: Array.from({ length: 5_000 }, (_, i) => ({ name: `Customer ${i}`, type: "retailer", state: "PA", paymentTerms: "net30" })),
     } });
     expect(new TextEncoder().encode(body).byteLength).toBeLessThan(MAX_COMMAND_BODY_BYTES);
   });

@@ -10,6 +10,7 @@ import { InvoiceView } from "../components/mgr/views/invoice";
 import { invoiceFailedAls } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
 import { invoiceMappingRows, toInvoiceViewProps } from "../lib/mgr/invoice-view";
+import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -38,7 +39,8 @@ describe("Invoice view", () => {
     expect(model.title).toBe("INV-1039");
     expect(model.backHref).toBeUndefined();
     expect(model.customer).toBe(ALS.name);
-    expect(model.summary).toBe("due 10/03 · 3 lines");
+    expect(model.summary).toBe("due Oct 3, 2026 · 3 lines");
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...invoiceFailedAls.invoice, due_on: null } }).summary).toBe("issued Sep 3, 2026 · 3 lines");
     expect(model.total).toBe("$540.00");
     expect(model.headerTone).toBe("");
     expect(model.lines).toHaveLength(3);
@@ -51,6 +53,7 @@ describe("Invoice view", () => {
 
   it("omits mapping rows when the snapshot has none", () => {
     const model = toInvoiceViewProps({
+      timeZone: invoiceFailedAls.timeZone,
       invoice: invoiceFailedAls.invoice,
       lines: invoiceFailedAls.lines,
       questions: invoiceFailedAls.questions,
@@ -98,5 +101,17 @@ describe("Invoice view", () => {
     expect(src).not.toMatch(/qboGate=|<QboInvoiceRow/);
     expect(src).toMatch(/<QboInvoiceActions/);
     expect(src).toMatch(/<MarkAnswered\b/);
+  });
+
+  it("offers Return only on an invoice that is still owed or paid, never voided, deleted, or written off (#418)", () => {
+    const base = { kind: "invoice" as const, paid_at: null, qbo_remote_state: "live" as const, qbo_balance_cents: null, written_off_at: null };
+    expect(invoiceIsCreditable(base)).toBe(true);
+    expect(invoiceIsCreditable({ ...base, paid_at: "2026-09-01", qbo_balance_cents: 0 })).toBe(true);
+    expect(invoiceIsCreditable({ ...base, written_off_at: "2026-09-02" })).toBe(false);
+    expect(invoiceIsCreditable({ ...base, qbo_remote_state: "voided" })).toBe(false);
+    expect(invoiceIsCreditable({ ...base, qbo_remote_state: "deleted" })).toBe(false);
+    expect(invoiceIsCreditable({ ...base, kind: "credit_memo" })).toBe(false);
+    const src = readFileSync("app/(app)/invoices/[id]/page.tsx", "utf8");
+    expect(src).toMatch(/invoiceIsCreditable\(invoice\) && canRun\(ctx, "return_shipment"\)/);
   });
 });

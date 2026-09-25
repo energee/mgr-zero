@@ -2,7 +2,8 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const roles = ["admin", "sales"] as const;
 
@@ -24,7 +25,9 @@ defineCommand({
     state: stateCode, // customers.state is NOT NULL (home state)
     // The channel is the customer's row into the price grid (§16.3) and is required.
     saleChannelId: z.string().uuid(),
-    licenseNumber: z.string().optional(), paymentTerms: z.string().optional(),
+    licenseNumber: z.string().optional(),
+    // The vendor list (#491); omit it to keep the current term (net30 on create).
+    paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     // Overrides the sale channel's tax treatment for this customer's removals
     // (§16.3); omit it to inherit the channel default.
     taxTreatment: z.enum(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"]).optional(),
@@ -32,7 +35,7 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state,
     p_sale_channel: i.saleChannelId, p_license_no: i.licenseNumber ?? null,
-    p_payment_terms: i.paymentTerms || null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
+    p_payment_terms: i.paymentTerms ?? null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
   })),
 });
 
@@ -42,7 +45,7 @@ defineCommand({
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     address1: z.string().min(1), address2: z.string().optional(),
-    city: z.string().min(1), state: stateCode, zip: z.string().min(1),
+    city: z.string().min(1), state: stateCode, zip: z.string().trim().regex(/^\d{5}(-\d{4})?$/, "a 5-digit ZIP code or ZIP+4"),
     isDefault: z.boolean().optional(),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
@@ -92,16 +95,19 @@ defineQuery({
   name: "list_channel_prices", description: "The price grid: one cell per sale channel × price group × format (integer cents); saleChannelId narrows it to one channel",
   roles: ["admin", "sales"],
   input: z.object({ saleChannelId: z.string().uuid().optional() }),
-  handler: (ctx, i) => {
-    const q = ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)").eq("brewery_id", ctx.breweryId);
-    return unwrap(i.saleChannelId ? q.eq("sale_channel_id", i.saleChannelId) : q);
-  },
+  // Paged past PostgREST's 1000-row cap (#424): channels × groups × formats
+  // outgrows it. Ordered by the primary key so pages never overlap.
+  handler: (ctx, i) => completeRows("Price grid", start => {
+    const q = ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+    return (i.saleChannelId ? q.eq("sale_channel_id", i.saleChannelId) : q)
+      .order("sale_channel_id").order("price_group_id").order("format_id").range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 defineCommand({
   name: "set_channel_price", description: "Fill one cell of the price grid: every SKU on that group and format sells at it on that channel",
   roles: ["admin", "sales"],
-  input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
+  input: z.object({ saleChannelId: z.string().uuid(), priceGroupId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: cents }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_channel_price", {
     p_brewery: ctx.breweryId, p_sale_channel: i.saleChannelId, p_price_group: i.priceGroupId, p_format: i.formatId,
     p_unit_price_cents: i.unitPriceCents, p_request_id: execution.requestId,
