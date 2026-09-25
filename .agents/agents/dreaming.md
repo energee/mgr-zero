@@ -18,14 +18,19 @@ consolidation: make the living agent docs match reality, citing evidence.
 1. Use the exact accepted base and main HEAD supplied by the workflow prompt;
    do not derive a different window from the checked-out branch.
 2. Review that window with `git log --stat <accepted-base>..<main-head>` and
-   `gh pr list --state merged --limit 20 --json number,title,mergedAt`
-   (use `gh pr view <n>` only for PRs you need evidence from). The list is
-   sorted by creation date, so also check `mergedAt` against the last-dream
-   date — a long-open PR merged recently may need
-   `--search 'merged:>=<last-dream date>'` to appear.
-3. Read any committed .remember/today-*.md session digests (there may be
+   `gh pr list --state merged --search 'merged:>=<last-dream date>' --limit 500
+   --json number,title,mergedAt`. `gh pr list` truncates silently at its
+   `--limit`, so count first with `--json number --jq 'length' --limit 500`
+   and trust the list only if it is shorter. `gh api` and `gh issue` may be
+   blocked here; use `gh pr view <n>` for the PRs you need evidence from.
+3. Look first for a `## Durable decisions (for the dreaming log)` heading in
+   merged PR bodies; it marks a design ruling and is cheaper than reading
+   diffs. Open only substantial PRs (Program, design, or audit work) with
+   `gh pr view <n> --json body --jq .body`; skip `docs:` refreshes and
+   single-issue `fix:` PRs.
+4. Read any committed .remember/today-*.md session digests (there may be
    none; the remember plugin retires them locally once a day rolls over).
-4. Read every editable file end to end.
+5. Read every editable file end to end.
 
 ## Curate (editable files only)
 - Prune facts contradicted by merged work; convert relative dates to absolute.
