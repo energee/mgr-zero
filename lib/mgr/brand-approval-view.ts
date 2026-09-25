@@ -17,17 +17,10 @@ export function approvalNumberLabel(kind: string): string {
   return kind === "formula" ? "Formula number" : "Serial number";
 }
 
-/** The upsert_brand_approval input from the sheet's fields. The sheet's
- *  submitted date is stored as approved_on. The upsert replaces the whole row,
- *  so an edit sends back the expiry and note the sheet does not show; omitting
- *  them would clear them (#438). */
-export function approvalInput(
-  brandId: string,
-  f: { kind: string; ttbId: string; submittedOn: string },
-  existing?: { id: string; expires_on: string | null; note: string | null },
-) {
-  return {
-    id: existing?.id, brandId, kind: f.kind, ttbId: f.ttbId, approvedOn: f.submittedOn || undefined,
-    expiresOn: existing?.expires_on ?? undefined, note: existing?.note ?? undefined,
-  };
+/** The upsert_brand_approval input from the sheet's fields; an edit passes
+ *  the record for its id. The sheet's submitted date is stored as approved_on.
+ *  The upsert keeps the expiry and note the sheet does not show because they
+ *  are omitted (#438, #522); an empty date is null so clearing it clears it. */
+export function approvalInput(brandId: string, f: { kind: string; ttbId: string; submittedOn: string }, existing?: { id: string }) {
+  return { id: existing?.id, brandId, kind: f.kind, ttbId: f.ttbId, approvedOn: f.submittedOn || null };
 }

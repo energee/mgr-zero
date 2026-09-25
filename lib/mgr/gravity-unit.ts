@@ -39,8 +39,13 @@ export const INVALID_GRAVITY = Symbol("invalid gravity");
 /** Plato, or null for an empty field, or INVALID_GRAVITY for unreadable input. */
 export type ParsedGravity = number | null | typeof INVALID_GRAVITY;
 
-// The widest gravity a brewer can actually read: water to a barleywine wort,
-// with headroom. Outside it the entry is a typo, not a reading.
+// The widest gravity a brewer can actually read: below water (a dry finished
+// beer reads under SG 1.000) to a barleywine wort, with headroom. Outside it
+// the entry is a typo, not a reading. Plato's floor is the SG floor converted,
+// so both units accept the same readings.
+const MIN_SG = 0.9;
+const MAX_SG = 1.2;
+const MIN_PLATO = sgToPlato(MIN_SG);
 const MAX_PLATO = 40;
 
 /**
@@ -49,7 +54,8 @@ const MAX_PLATO = 40;
  * hydrometer could produce, is INVALID_GRAVITY so the caller can show a field
  * error. In SG both spellings a brewer uses are accepted: the decimal `1.050`
  * and the "gravity points" shorthand `1050`, which is the same reading with the
- * decimal point left out. Anything at or above 100 is read as points, since no
+ * decimal point left out. Plato may be negative (a reading below SG 1.000);
+ * SG never is. Anything at or above 100 is read as points, since no
  * real SG reaches it. A trailing `°P` is tolerated so a value copied out of
  * formatGravity parses straight back.
  */
@@ -58,13 +64,13 @@ export function parseGravity(input: string, unit: GravityUnit): ParsedGravity {
   if (trimmed === "") return null;
   // Number() is deliberately not the gate: it reads "" as 0, "Infinity" as
   // infinite and tolerates whitespace, none of which is a typed gravity.
-  if (!/^\d+(\.\d+)?$/.test(trimmed)) return INVALID_GRAVITY;
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return INVALID_GRAVITY;
   const n = Number(trimmed);
   if (!Number.isFinite(n)) return INVALID_GRAVITY;
 
-  if (unit !== "sg") return n >= 0 && n <= MAX_PLATO ? n : INVALID_GRAVITY;
+  if (unit !== "sg") return n >= MIN_PLATO && n <= MAX_PLATO ? n : INVALID_GRAVITY;
 
   const sg = n >= 100 ? n / 1000 : n;
-  if (sg < 0.9 || sg > 1.2) return INVALID_GRAVITY;
+  if (sg < MIN_SG || sg > MAX_SG) return INVALID_GRAVITY;
   return sgToPlato(sg);
 }

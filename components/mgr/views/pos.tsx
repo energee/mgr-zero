@@ -116,13 +116,13 @@ function VariationMappingRow({ row, targets, busy, onSave }: {
   </form>;
 }
 
-export function PosMappingView({ variations, targets, sales, coverage, busy, error, syncAction, onSave, backHref }: {
+export function PosMappingView({ variations, targets, sales, coverage, busy, error, syncAction, onSave, backHref, backLabel = "Point of sale" }: {
   variations: PosVariationRow[]; targets: { value: string; label: string }[]; sales: PosSaleRow[];
-  coverage: string[]; busy?: boolean; error?: string | null; syncAction?: ReactNode; backHref?: string;
+  coverage: string[]; busy?: boolean; error?: string | null; syncAction?: ReactNode; backHref?: string; backLabel?: string;
   onSave?: (row: PosVariationRow, target: string) => void;
 }) {
   return <>
-    {E.back("Point of sale", "POS mapping", syncAction, backHref)}
+    {E.back(backLabel, "POS mapping", syncAction, backHref)}
     {E.info("Map a Square variation to one packaged SKU or poured format, or explicitly ignore it. Sales remain source facts and never post inventory.")}
     {E.ttl("Variation queue")}
     {variations.length ? variations.map(row => <VariationMappingRow key={`${row.externalItemId}:${row.externalVariationId}`} row={row} targets={targets} busy={busy} onSave={onSave} />) : E.blank("No Square variations yet")}

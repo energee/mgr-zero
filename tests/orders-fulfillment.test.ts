@@ -317,6 +317,21 @@ describe("replenishment", () => {
     expect(mv!.length).toBe(2);
     expect(Number(mv!.find(m => m.location_id === tapId)!.qty)).toBe(3);
   });
+
+  it("rejects a transfer whose source and destination are the same location (#454)", async () => {
+    const replen = await staffDb.rpc("create_replenishment_order", {
+      p_from: tapId, p_to: tapId, p_lines: [{ sku_id: skuId, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(replen.error?.message).toBe("A transfer needs a different source and destination location.");
+    const draft = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "taproom_transfer", p_customer: null, p_ship_to: null,
+      p_from_location: tapId, p_to_location: tapId, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(draft.error?.message).toBe("A transfer needs a different source and destination location.");
+    const { count } = await admin.from("orders").select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("to_location_id", tapId).eq("from_location_id", tapId);
+    expect(count).toBe(0);
+  });
 });
 
 describe("confirm_restock", () => {
@@ -417,8 +432,8 @@ describe("resolve_short_pick", () => {
     expect(ev!.payload).toMatchObject({ resolution: "keep_owed", qty_picked: 7 });
   });
 
-  // #419: resolving a short on one line must not mark the order picked while
-  // another line has never been counted.
+  // #419/#514: neither resolving a short nor recording a pick marks the order
+  // picked while another line has never been counted.
   it("leaves the order confirmed until every line has a count", async () => {
     const cat2 = await seedCatalog(b.id, { product: "Pils", sku: "Pils 1/2bbl", packageType: "keg", bblPerUnit: 0.5, format: "Pils keg #419" });
     await priceSku(b.id, { saleChannelId, brandId: cat2.brandId, formatId: cat2.formatId, cents: 11000 });
@@ -442,6 +457,13 @@ describe("resolve_short_pick", () => {
     });
     expect(short.error).toBeNull();
     const status = async () => (await admin.from("orders").select("status").eq("id", id).single()).data!.status;
+    expect(await status()).toBe("confirmed");
+
+    // record_pick answers the same question (#514): a pick that leaves a line uncounted is not the order picked.
+    const partial = await staffDb.rpc("record_pick", {
+      p_order: id, p_picks: [{ line_id: a.id, qty_picked: 7 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(partial.error).toBeNull();
     expect(await status()).toBe("confirmed");
 
     const pick = await staffDb.rpc("record_pick", {

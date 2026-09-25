@@ -3,8 +3,9 @@
 // by CommandFormMessage as role="alert"), refresh on success unless the
 // caller opts out. useCommandForm
 // adds the open/close and reset a mutation form needs (rendered in
-// components/mgr/command-form.tsx). Forms own only their fields and how to
-// build the command input.
+// components/mgr/command-form.tsx), and hands back its `run` so a sheet's
+// secondary verb (Remove, Delete, Clear) shares the one error slot that closing
+// clears (#447). Forms own only their fields and how to build the command input.
 "use client";
 
 import { useRef, useState } from "react";
@@ -71,8 +72,16 @@ export const orUndef = (s: string) => s || undefined;
  * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
  */
 export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean }) {
-  const { busy, error, setError, run } = useCommandAction();
+  const { error, setError, run: runAction } = useCommandAction();
   const [open, setOpenState] = useState(opts.defaultOpen ?? false);
+  // The command in flight: `submitting` is the form's own verb, `busy` any.
+  const [running, setRunning] = useState<string | null>(null);
+
+  /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot. */
+  async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void) {
+    setRunning(command);
+    try { return await runAction(command, input, onSuccess); } finally { setRunning(null); }
+  }
 
   function setOpen(next: boolean) {
     setOpenState(next);
@@ -88,5 +97,5 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); });
   }
 
-  return { open, setOpen, error, submitting: busy, submit };
+  return { open, setOpen, error, submitting: running === name, busy: running !== null, submit, run };
 }

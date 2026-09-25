@@ -49,6 +49,27 @@ describe("registry", () => {
     expect(reg.licenses).toEqual([expect.objectContaining({ state: "PA", kind: "brewery", license_no: "G-21885" })]);
     expect((await admin.from("state_registrations").select("id").eq("brand_id", brandId)).data!.length).toBe(1);
   });
+
+  it("an upsert keeps a field the caller omits and clears one sent as null (#522)", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Keep Porter", sku: "Keep Porter case" });
+    const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "K-1", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1" }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: "2030-01-02", note: "label v2" });
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1", expiresOn: null, note: null }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: null, note: null });
+
+    await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: "MI-1", approvedOn: "2026-02-03", expiresOn: "2027-02-03" }, sales);
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", expiresOn: "2028-02-03" }, sales))
+      .toMatchObject({ registration_no: "MI-1", approved_on: "2026-02-03", expires_on: "2028-02-03" });
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: null, approvedOn: null }, sales))
+      .toMatchObject({ registration_no: null, approved_on: null, expires_on: "2028-02-03" });
+
+    await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-1", expiresOn: "2027-06-30", note: "renew online" }, sales);
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-2" }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: "2027-06-30", note: "renew online" });
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", expiresOn: null, note: null }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: null, note: null });
+  });
 });
 
 const SEPT = { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" };
@@ -155,6 +176,26 @@ describe("generate_compliance_report", () => {
     expect(sep.figures.lines.find((x) => x.class === "can")).toMatchObject({ begin: 10, in: 0.01, out: 0, end: 10.01 });
   });
 
+  it("the removal lines foot to the printed Out (#533)", async () => {
+    // 10 bbl opens; 0.005 bbl leaves as a sample and 0.005 is destroyed. Out prints 10.00 − 9.99 = 0.01, but rounding
+    // each removal on its own printed 0.01 + 0.01. The rounded Out is allocated by largest remainder instead.
+    const other = await makeBrewery();
+    const ctx = await makeStaffCtx(other.id, "admin");
+    const { skuId } = await seedCatalog(other.id, { sku: "Foot removals", packageType: "can", bblPerUnit: 0.005 });
+    const l = await seedLocation(other.id);
+    const base = { brewery_id: other.id, location_id: l.id, bin_id: l.binId, created_by: ctx.userId, sku_id: skuId };
+    insertFixture("inventory_movements", [
+      { ...base, qty: 2000, type: "opening_balance", created_at: "2025-08-15T12:00:00Z" },
+      { ...base, qty: -1, type: "sample", dest_state: "PA", created_at: "2025-09-10T12:00:00Z" },
+      { ...base, qty: -1, type: "destruction", created_at: "2025-09-11T12:00:00Z" },
+    ]);
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" }, ctx) as Report;
+    const out = r.figures.lines.reduce((sum, line) => sum + line.out, 0);
+    const removed = Object.values(r.figures.removals).reduce((sum, v) => sum + Number(v), 0);
+    expect(out).toBeCloseTo(0.01, 10);
+    expect(removed).toBeCloseTo(out, 10);
+  });
+
   it("warehouse cannot generate", async () => {
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     await expect(runCommand("generate_compliance_report", PERIOD, warehouse)).rejects.toMatchObject({ status: 403 });
@@ -177,9 +218,14 @@ describe("file_compliance_report", () => {
     // the same request id returns the same filing
     const again = await runCommand("file_compliance_report", { ...PERIOD, note: "filed on pay.gov" }, sales, exec(requestId)) as { id: string };
     expect(again.id).toBe(filed.id);
-    // a new request for the same period is a second filing: refused; so is a period overlapping it
+    // a new request for the same period is a second filing: refused
     await expect(runCommand("file_compliance_report", PERIOD, sales, exec(crypto.randomUUID()))).rejects.toMatchObject({ status: 409 });
-    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toMatchObject({ status: 409 });
+    // a TTB range that is not one calendar month, quarter, or year would overlap the real periods: refused by the schema and by the RPC (#486)
+    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toThrow(/one calendar month, quarter, or year/);
+    for (const [p_start, p_end] of [["2025-10-10", "2025-10-20"], ["2025-02-01", "2025-04-30"], ["2025-01-01", "2025-12-30"]]) {
+      const { error } = await sales.db.rpc("file_compliance_report", { p_brewery: sales.breweryId, p_jurisdiction: "TTB", p_start, p_end, p_note: null, p_request_id: crypto.randomUUID() });
+      expect(error?.message, `${p_start}..${p_end}`).toMatch(/one calendar month, quarter, or year/);
+    }
   });
 
   it("refuses to file a period that has not ended in the brewery's calendar (#429)", async () => {
@@ -272,5 +318,35 @@ describe("cellar transfer loss (#428)", () => {
     const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: start, periodEnd: end }, owner) as Report & { figures: { cellarRemovals: Record<string, number> } };
     expect(Number(r.figures.removals.loss)).toBe(0.5);
     expect(Number(r.figures.cellarRemovals.loss)).toBe(0.5);
+  });
+
+  // #485: the loss is one volume_adjustments row, so the report reads it once and
+  // Review auto-reconciled losses can reattribute it like a completion loss.
+  it("writes the loss as a reattributable cellar loss the report counts once", async () => {
+    const brewery = await makeBrewery();
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
+      from breweries where id='${brewery.id}'`, true)[0].split("|");
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
+    const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: fv2.id, volumeBbl: 8, lossBbl: 0.5 }, brewer);
+
+    expect(sql(`select sum(bbl)::text from volume_adjustments where occupancy_id='${brewed.occupancy.id}' and reason = 'loss'`, true)).toEqual(["-0.500"]);
+    expect(sql(`select occupancy_volumes.bbl::text from occupancy_volumes where occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["1.500"]);
+
+    const review = await runCommand("get_loss_review", { periodStart: start, periodEnd: end }, owner) as import("@/lib/commands/compliance").LossReview[];
+    expect(review).toEqual([expect.objectContaining({ batch_id: batch.id, kind: "transfer", closed_at: null, original_bbl: "0.500", remaining_bbl: "0.500" })]);
+    await runCommand("reattribute_loss", { adjustmentId: review[0].adjustment_id, bbl: "0.2", classification: "destruction" }, owner);
+
+    const r = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: start, periodEnd: end }, owner) as Report & { figures: { cellarRemovals: Record<string, number> } };
+    expect(Number(r.figures.removals.loss)).toBeCloseTo(0.3, 8);
+    expect(Number(r.figures.removals.destruction)).toBeCloseTo(0.2, 8);
+    expect(Number(r.figures.cellarRemovals.loss) + Number(r.figures.cellarRemovals.destruction)).toBeCloseTo(0.5, 8);
+    // reattribution changes the class, never the volume in the tank
+    expect(sql(`select occupancy_volumes.bbl::text from occupancy_volumes where occupancy_id='${brewed.occupancy.id}'`, true)).toEqual(["1.500"]);
   });
 });

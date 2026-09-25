@@ -759,11 +759,11 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "file_compliance_report", rpc: "file_compliance_report", allowed: ["admin", "sales"],
       input: async role => {
-        // one period per role: a filed period conflicts on its second filing
-        const month = { admin: "01", sales: "02", warehouse: "03", brewer: "04", taproom: "05" }[role];
+        // one whole calendar month per role (#486): a filed period conflicts on its second filing
+        const [month, last] = { admin: ["01", "31"], sales: ["02", "28"], warehouse: ["03", "31"], brewer: ["04", "30"], taproom: ["05", "31"] }[role];
         return {
-          command: { jurisdiction: "TTB", periodStart: `2025-${month}-01`, periodEnd: `2025-${month}-28` },
-          rpc: { p_brewery: brewery.id, p_jurisdiction: "TTB", p_start: `2025-${month}-01`, p_end: `2025-${month}-28`, p_note: null },
+          command: { jurisdiction: "TTB", periodStart: `2025-${month}-01`, periodEnd: `2025-${month}-${last}` },
+          rpc: { p_brewery: brewery.id, p_jurisdiction: "TTB", p_start: `2025-${month}-01`, p_end: `2025-${month}-${last}`, p_note: null },
         };
       },
     },

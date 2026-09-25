@@ -7,15 +7,8 @@ export type LicenseViewModel = {
 };
 
 /** The upsert_brewery_state_license input from the sheet's fields. The upsert
- *  replaces the whole row, so an edit sends back the note the sheet does not
- *  show; omitting it would clear it (#438). */
-export function licenseInput(
-  f: { state: string; kind: string; licenseNo: string; expiresOn: string },
-  existing?: { note: string | null },
-) {
-  return {
-    state: f.state.toUpperCase(), kind: f.kind,
-    licenseNo: f.licenseNo || undefined, expiresOn: f.expiresOn || undefined,
-    note: existing?.note ?? undefined,
-  };
+ *  keeps the note the sheet does not show because it is omitted (#438, #522);
+ *  an empty field is null so clearing it clears the saved value. */
+export function licenseInput(f: { state: string; kind: string; licenseNo: string; expiresOn: string }) {
+  return { state: f.state.toUpperCase(), kind: f.kind, licenseNo: f.licenseNo || null, expiresOn: f.expiresOn || null };
 }

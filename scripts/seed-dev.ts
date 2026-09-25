@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/database";
 import { createClient } from "@supabase/supabase-js";
 import { readServerEnv } from "@/lib/env/server-parser";
 import { assertLocalSeedUrl } from "@/scripts/seed-dev-url";
+import { findUserByEmail } from "@/scripts/seed-dev-user";
 
 const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 if (configuredSupabaseUrl !== undefined) assertLocalSeedUrl(configuredSupabaseUrl.trim());
@@ -45,11 +46,8 @@ async function seed() {
 
     // Ensure user exists
     const email = "dev@mgr.local";
-    const { data: users, error: userListErr } = await admin.auth.admin.listUsers();
-    if (userListErr) throw userListErr;
-
     let userId: string;
-    const existingUser = users.users.find((u) => u.email === email);
+    const existingUser = await findUserByEmail(admin.auth.admin, email);
     if (existingUser) {
       userId = existingUser.id;
       console.log(`  User already exists: ${userId} (${email})`);
