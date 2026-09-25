@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn() }));
+const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), updateUser: vi.fn() }));
 const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => ({ auth }) }));
@@ -27,5 +27,15 @@ describe("passwordless sign-in", () => {
         emailRedirectTo: "https://mgr.example/auth/confirm?next=/",
       },
     });
+  });
+});
+
+describe("set new password", () => {
+  it("redirects with the Supabase error code, never its message (#472)", async () => {
+    const { savePassword } = await import("@/app/(auth)/actions");
+    auth.updateUser.mockResolvedValue({ error: { code: "same_password", message: "New password should be different from the old password." } });
+    const form = new FormData();
+    form.set("password", "hunter2hunter2");
+    await expect(savePassword(form)).rejects.toThrow("redirect:/password?error=same_password");
   });
 });

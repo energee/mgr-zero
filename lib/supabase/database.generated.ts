@@ -8944,6 +8944,7 @@ export type Database = {
           p_approved_on: string
           p_brand: string
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_id: string
           p_kind: Database["public"]["Enums"]["approval_kind"]
@@ -8956,6 +8957,7 @@ export type Database = {
       upsert_brewery_state_license: {
         Args: {
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_kind: string
           p_license_no: string
@@ -9071,6 +9073,7 @@ export type Database = {
           p_approved_on: string
           p_brand: string
           p_brewery: string
+          p_clear?: string[]
           p_expires_on: string
           p_registration_no: string
           p_request_id: string

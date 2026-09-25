@@ -49,6 +49,27 @@ describe("registry", () => {
     expect(reg.licenses).toEqual([expect.objectContaining({ state: "PA", kind: "brewery", license_no: "G-21885" })]);
     expect((await admin.from("state_registrations").select("id").eq("brand_id", brandId)).data!.length).toBe(1);
   });
+
+  it("an upsert keeps a field the caller omits and clears one sent as null (#522)", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Keep Porter", sku: "Keep Porter case" });
+    const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "K-1", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1" }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: "2030-01-02", note: "label v2" });
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1", expiresOn: null, note: null }, sales))
+      .toMatchObject({ approved_on: "2026-01-02", expires_on: null, note: null });
+
+    await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: "MI-1", approvedOn: "2026-02-03", expiresOn: "2027-02-03" }, sales);
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", expiresOn: "2028-02-03" }, sales))
+      .toMatchObject({ registration_no: "MI-1", approved_on: "2026-02-03", expires_on: "2028-02-03" });
+    expect(await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: null, approvedOn: null }, sales))
+      .toMatchObject({ registration_no: null, approved_on: null, expires_on: "2028-02-03" });
+
+    await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-1", expiresOn: "2027-06-30", note: "renew online" }, sales);
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", licenseNo: "L-2" }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: "2027-06-30", note: "renew online" });
+    expect(await runCommand("upsert_brewery_state_license", { state: "MI", kind: "keep", expiresOn: null, note: null }, sales))
+      .toMatchObject({ license_no: "L-2", expires_on: null, note: null });
+  });
 });
 
 const SEPT = { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" };
@@ -197,9 +218,14 @@ describe("file_compliance_report", () => {
     // the same request id returns the same filing
     const again = await runCommand("file_compliance_report", { ...PERIOD, note: "filed on pay.gov" }, sales, exec(requestId)) as { id: string };
     expect(again.id).toBe(filed.id);
-    // a new request for the same period is a second filing: refused; so is a period overlapping it
+    // a new request for the same period is a second filing: refused
     await expect(runCommand("file_compliance_report", PERIOD, sales, exec(crypto.randomUUID()))).rejects.toMatchObject({ status: 409 });
-    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toMatchObject({ status: 409 });
+    // a TTB range that is not one calendar month, quarter, or year would overlap the real periods: refused by the schema and by the RPC (#486)
+    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2025-09-15", periodEnd: "2025-10-15" }, sales)).rejects.toThrow(/one calendar month, quarter, or year/);
+    for (const [p_start, p_end] of [["2025-10-10", "2025-10-20"], ["2025-02-01", "2025-04-30"], ["2025-01-01", "2025-12-30"]]) {
+      const { error } = await sales.db.rpc("file_compliance_report", { p_brewery: sales.breweryId, p_jurisdiction: "TTB", p_start, p_end, p_note: null, p_request_id: crypto.randomUUID() });
+      expect(error?.message, `${p_start}..${p_end}`).toMatch(/one calendar month, quarter, or year/);
+    }
   });
 
   it("refuses to file a period that has not ended in the brewery's calendar (#429)", async () => {

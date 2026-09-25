@@ -60,7 +60,8 @@ export async function sendReset(form: FormData) {
 export async function savePassword(form: FormData) {
   const db = await createServerClient();
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
-  if (error) redirect(`/password?error=${encodeURIComponent(error.message)}`);
+  // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
+  if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
   redirect(await home(db));
 }
 
