@@ -64,9 +64,9 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("New Name");
   });
 
-  it("empty paymentTerms preserves the create default and an existing payment term", async () => {
+  it("omitted paymentTerms preserves the create default and an existing payment term", async () => {
     const created = await runCommand("upsert_customer", {
-      name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "",
+      name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,
     }, ctx) as { id: string; payment_terms: string };
     expect(created.payment_terms).toBe("net30");
 
@@ -74,9 +74,21 @@ describe("customer CRUD", () => {
       name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "net15",
     }, ctx) as { id: string; payment_terms: string };
     const updated = await runCommand("upsert_customer", {
-      id: configured.id, name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "",
+      id: configured.id, name: "Configured payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,
     }, ctx) as { payment_terms: string };
     expect(updated.payment_terms).toBe("net15");
+  });
+
+  // #491: customer terms are the vendor list; the command and the table both refuse anything else.
+  it("refuses a payment term outside due_on_receipt / net15 / net30", async () => {
+    const input = { name: "Odd terms", type: "retailer", state: "PA", saleChannelId: wholesale };
+    await expect(runCommand("upsert_customer", { ...input, paymentTerms: "Net 30" }, ctx)).rejects.toThrow();
+    const direct = await ctx.db.rpc("upsert_customer", {
+      p_brewery: b.id, p_id: null, p_name: "Odd terms", p_type: "retailer", p_state: "PA",
+      p_sale_channel: wholesale, p_license_no: null, p_payment_terms: "net45",
+      p_tax_treatment: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(direct.error?.message).toMatch(/customers_payment_terms_check/);
   });
 });
 

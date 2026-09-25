@@ -3,7 +3,7 @@
 // every record carries its metadata, `states` is a caption (never rendered
 // into the body), and each body renders through the E vocabulary without
 // throwing. Rendering uses react-dom/server, so no DOM is needed.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
@@ -152,7 +152,8 @@ describe("SCREENS", () => {
     // everywhere; the bare word "tier" is judged only where all the text is
     // user copy, because lib/ uses it correctly for resolver precedence.
     const copyOnly = [
-      "components/mgr/screens.tsx", "content/docs/staff-guide.mdx", "content/docs/api.mdx",
+      "components/mgr/screens.tsx", "content/docs/staff-guide.mdx",
+      ...readdirSync(resolve(__dirname, "../content/docs/api")).filter((f) => f.endsWith(".mdx")).map((f) => `content/docs/api/${f}`),
       "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
       "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
       "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",

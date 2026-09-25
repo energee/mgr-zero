@@ -23,11 +23,11 @@ export type ApiOperation = {
   screens: string[];
 };
 
-/** A page of the reference: its slug, title, and the names it claims. Ordered
- * by match precedence, first rule wins — `create_purchase_order` is purchasing
- * rather than orders because purchasing is listed first. The page's own heading
- * order is what a reader scrolls through; the two orders are deliberately
- * independent. */
+/** A page of the reference (content/docs/api/<slug>.mdx): its slug, title,
+ * and the names it claims. Ordered by match precedence, first rule wins —
+ * `create_purchase_order` is purchasing rather than orders because purchasing
+ * is listed first. content/docs/api/meta.json orders the pages for a reader;
+ * the two orders are deliberately independent. */
 export const API_AREAS = [
   { slug: "portal", title: "Customer portal", match: /^(portal_|get_portal_|list_portal_)/ },
   { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|list_lots|trace_lot|loss)/ },

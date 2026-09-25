@@ -1,5 +1,6 @@
 // lib/mgr/customers-view.ts — view-model for the Customers list.
 import type { EmptyState } from "./empty-state";
+import { paymentTermLabel } from "./labels";
 export type CustomersRowView = {
   key: string;
   title: string;
@@ -33,7 +34,7 @@ function detail(c: CustomersSnapshot["customers"][number]): string {
   if (c.portal_user_count != null) return `${head} · ${c.portal_user_count} portal users`;
   if (c.remit) return `${head} · ${c.remit}`;
   const channel = c.sale_channels?.name;
-  const terms = c.payment_terms;
+  const terms = c.payment_terms && paymentTermLabel(c.payment_terms);
   const tail = [channel, terms].filter(Boolean).join(" · ");
   return tail ? `${head} · ${tail}` : head;
 }

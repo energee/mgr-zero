@@ -3,7 +3,7 @@
 // Pure: only parses command input schemas, never runs a handler.
 import { describe, expect, it } from "vitest";
 import { getCommandDefinition } from "@/lib/commands/registry";
-import { validateImportRow } from "@/lib/import-csv";
+import { IMPORT_FIELDS, validateImportRow } from "@/lib/import-csv";
 import "@/lib/commands/all";
 
 /** Whether `command` raises an issue at the top-level field `field` for `value`; other fields may be missing. */
@@ -41,6 +41,19 @@ describe("field shapes are validated (#491)", () => {
     expect(fieldRejects(command, field, "12")).toBe(true);
     expect(fieldRejects(command, field, "(503) 555-0142")).toBe(false);
     expect(fieldRejects(command, field, "+1 503.555.0142")).toBe(false);
+  });
+
+  it.each(["upsert_customer", "upsert_vendor"])("%s takes payment terms from the one fixed list", (command) => {
+    for (const bad of ["Net 30", "net45", ""]) expect(fieldRejects(command, "paymentTerms", bad)).toBe(true);
+    for (const good of ["due_on_receipt", "net15", "net30"]) expect(fieldRejects(command, "paymentTerms", good)).toBe(false);
+  });
+
+  it("CSV import lists the payment terms and rejects any other", () => {
+    expect(IMPORT_FIELDS.customers.find((f) => f.name === "paymentTerms")?.values).toEqual(["due_on_receipt", "net15", "net30"]);
+    const row = { name: "Bar", type: "retailer", state: "PA", saleChannelId: crypto.randomUUID() };
+    expect(validateImportRow("customers", { ...row, paymentTerms: "Net 30" }).join(" ")).toMatch(/paymentTerms/);
+    expect(validateImportRow("customers", { ...row, paymentTerms: "net15" })).toEqual([]);
+    expect(validateImportRow("customers", { ...row, paymentTerms: "" })).toEqual([]);
   });
 
   it("CSV import rejects a state that is not a US state code", () => {

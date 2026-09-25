@@ -14,10 +14,14 @@ One endpoint: `POST /api/command`. Every domain read/write is a
 capability = new registered command, then these docs — not a new route.
 Decision: `.agents/MEMORY.md` (public HTTP API). Owner of the endpoint:
 `app/api/command/route.ts`. Owner of operations: `lib/commands/registry.ts`
-plus `lib/commands/<area>.ts`. Owner of integrator docs: `content/docs/api.mdx`, the reference Fumadocs serves
-at `/docs/api` (README only links to it). One page: the cross-cutting rules are
-`##` sections of prose you write, then a single `## Operations` holds each area
-as a `###` and each operation under it as a `####` you do not write.
+plus `lib/commands/<area>.ts`. Owner of integrator docs: `content/docs/api/`, the reference Fumadocs serves
+at `/docs/api` (README only links to it). `index.mdx` holds the cross-cutting
+rules as `##` sections of prose you write, then `## Operations` links one page
+per area. Each area page (`content/docs/api/<slug>.mdx`, ordered by
+`content/docs/api/meta.json`) opens with prose you write, and each operation
+on it is a `##` you do not write. One page per area, not one page for the
+whole reference: a single page compiled to a module big enough to crash
+`next dev` (#492).
 `lib/mgr/api-operations.ts` derives the operations from the registry and from
 `components/mgr/screens.tsx`, and `bun run docs:api` writes each area's block
 between its `ops:<slug>` and `end ops:<slug>` MDX comment markers. Never
@@ -41,10 +45,10 @@ command, run this before calling the work done.
    `requiresConfirmation` and other AI-only metadata unless `route.ts`
    enforces it. Ignore tables that have no registered command.
 
-2. **Inventory the docs.** Read `content/docs/api.mdx`: the preamble states the
-   envelope, auth and status codes, then `## Operations` holds one `###` section
-   per area. Run
-   `bun run docs:api` and a new command writes itself into its section, with a
+2. **Inventory the docs.** Read `content/docs/api/index.mdx`: it states the
+   envelope, auth and status codes, then `## Operations` links one page per
+   area (`content/docs/api/<slug>.mdx`). Run
+   `bun run docs:api` and a new command writes itself into its area page, with a
    field table and an example request generated from its Zod schema. What you
    check is that its `description` and `roles` read well as documentation, and
    that the area's prose still states the rules a caller needs.
@@ -59,13 +63,13 @@ command, run this before calling the work done.
    code → remove. Roles or input mismatch → fix. Envelope/auth mismatch →
    fix. Do not document planned or schema-only work.
 
-5. **Patch.** Edit only an area's prose in `content/docs/api.mdx`, a command's
+5. **Patch.** Edit only an area's prose in `content/docs/api/<slug>.mdx`, a command's
    `description`/`roles` at its definition, or an area rule in
    `lib/mgr/api-operations.ts` when a new name has no section — then run
    `bun run docs:api`. Unless the HTTP envelope or
    auth changed, in which case also update `tests/api-command.test.ts` (that
    file covers auth/envelope only — do not add a test per command). Do not
-   add files, routes, generators, or a second docs page.
+   add files, routes, generators, or docs pages beyond one per area.
 
 6. **Check every prose claim against the code.** The generated blocks cannot
    drift — `tests/api-docs.test.ts` re-renders them — so the risk lives in the
@@ -113,7 +117,7 @@ command, run this before calling the work done.
 
 `.github/workflows/http-api-agent.yml` runs this prompt after every merge to
 `main`, with a narrower reach than you have interactively. There you may edit
-only `content/docs/api.mdx`, `components/mgr/screens.tsx` and
+only `content/docs/api/*.mdx`, `components/mgr/screens.tsx` and
 `lib/mgr/api-operations.ts`, and you have no shell. So:
 
 - **Do not run `bun run docs:api`** — the workflow runs it for you, after you
@@ -173,7 +177,7 @@ reshuffle existing groups without a new command that has no home.
 - Documenting `orders` / invoices / etc. before they have `defineCommand`s
 - Rewriting the auth examples or status table when they still match the route
 - Duplicating this workflow into a skill
-- Never edit between the `ops:` and `end ops:` markers in `content/docs/api.mdx`.
+- Never edit between the `ops:` and `end ops:` markers in `content/docs/api/*.mdx`.
   That is generated: change what a screen declares or what the registry holds,
   and let `bun run docs:api` render it. Hand-editing there is reverted by the
   next render and fails `tests/api-docs.test.ts` meanwhile.
