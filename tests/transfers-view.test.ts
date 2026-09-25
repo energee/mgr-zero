@@ -78,6 +78,12 @@ describe("Transfers list", () => {
     expect(src).toMatch(/<NewTransferForm\b/);
     expect(form).toMatch(/<NewTransferView\b/);
   });
+
+  it("the live New transfer form picks SKUs by id, not by their non-unique label (#472)", () => {
+    const form = readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8");
+    expect(form).not.toMatch(/sku\.label === value/);
+    expect(form).toMatch(/skuOptions: skus\.map\(sku => \(\{ value: sku\.id, label: sku\.label \}\)\)/);
+  });
 });
 
 describe("New transfer view", () => {

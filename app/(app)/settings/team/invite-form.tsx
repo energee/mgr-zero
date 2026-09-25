@@ -31,7 +31,7 @@ export function InviteForm({ customerId }: { customerId?: string }) {
   }
   return <>
     {sent && <CommandFormMessage tone="warning">Invite sent. The recipient can set their name and password from the email.</CommandFormMessage>}
-    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) setSent(false); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
+    <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) setSent(false); if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
       <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} />
     </CommandForm>
   </>;

@@ -1,14 +1,13 @@
-// lib/mgr/api-reference.ts — renders one area's operations as the markdown that
-// lives inside content/docs/api.mdx. Fumadocs extracts its "On this
-// page" tree from MDX headings at compile time, so a component cannot put an
-// operation in the table of contents: each operation has to be a real heading
-// in the file. Levels are chosen for the TOC's three indents (fumadocs-ui
-// getItemOffset: depth <=2, 3, and 4+): content/docs/api.mdx writes the rules
-// as `##`, `## Operations` holds each area as `###`, and each operation is
-// `####`, so the rail nests area over operation and tracks the scroll, while
-// the left sidebar carries one HTTP API entry. scripts/write-api-docs.ts writes these blocks and
-// tests/api-docs.test.ts re-renders them to prove the files still match the
-// registry and the screens.
+// lib/mgr/api-reference.ts — renders the generated blocks of the HTTP API
+// reference: one area's operations for content/docs/api/<area>.mdx, and the
+// role matrix and error catalogue for content/docs/api/index.mdx. Fumadocs
+// extracts each page's "On this page" tree from MDX headings at compile time,
+// so a component cannot put an operation in the table of contents: each
+// operation is a real `##` heading on its area's page. The reference is one
+// page per area, not one page, because a single page carrying every operation
+// compiled to a module large enough to exhaust `next dev`'s heap (#492).
+// scripts/write-api-docs.ts writes these blocks and tests/api-docs.test.ts
+// re-renders them to prove the files still match the registry and the screens.
 import { apiOperations, areaOf, operationsInArea, API_AREAS, type ApiAreaSlug, type ApiOperation } from "@/lib/mgr/api-operations";
 import { fieldsOf, sampleInput } from "@/lib/mgr/api-schema";
 import { API_ERRORS } from "@/lib/mgr/api-errors";
@@ -32,7 +31,7 @@ const literalMdxText = (text: string) => text.replaceAll("{", "&#123;").replaceA
 function available(o: ApiOperation) {
   const schema = getCommandDefinition(o.name)?.input;
   const fields = schema ? fieldsOf(schema) : [];
-  const parts = [`#### ${o.name} [#${o.name}]`, `\`${o.kind}\` · ${o.roles}`, o.description ? literalMdxText(o.description) : ""];
+  const parts = [`## ${o.name} [#${o.name}]`, `\`${o.kind}\` · ${o.roles}`, o.description ? literalMdxText(o.description) : ""];
 
   parts.push(
     fields.length > 0
@@ -55,11 +54,9 @@ function available(o: ApiOperation) {
 const designed = (o: ApiOperation) => `| \`${o.name}\` | ${o.kind} | ${o.screens.join(", ")} |`;
 
 /**
- * The generated block for one area section, headings and all. Anchors are
- * area-scoped (`#orders-available`, not `#available`): every area lives on the
- * one page, so a bare status anchor would repeat 13 times — duplicate ids that
- * send a link to the wrong section, and duplicate React keys that stop the
- * table of contents rendering and tracking correctly.
+ * The generated block for one area's page, headings and all: each available
+ * operation in full, then the designed ones as a closing list. An operation's
+ * anchor is its name, so a link reads `/docs/api/<area>#<name>`.
  */
 export function renderArea(slug: ApiAreaSlug): string {
   const operations = operationsInArea(slug);
@@ -76,7 +73,7 @@ export function renderArea(slug: ApiAreaSlug): string {
   if (planned.length > 0) {
     sections.push(
       "---",
-      // A label, not a heading: the rail lists areas, and this is not one.
+      // A label, not a heading: the rail lists operations, and this is not one.
       `**Designed, not yet available** {/* ${slug}-designed */}`,
       live.length > 0
         ? `${live.length} of the ${operations.length} operations in this area are available today; the ${planned.length} below are not.`

@@ -62,12 +62,12 @@ export function SquareLocationsControl({ rows, locations }: { rows: PosLocationR
     onSave={(row, mgrLocationId) => void action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId })} />;
 }
 
-export function PosMappingControl({ variations, targets, sales, coverage, canSync }: {
+export function PosMappingControl({ variations, targets, sales, coverage, canSync, back }: {
   variations: PosVariationRow[]; targets: { value: string; label: string }[]; sales: PosSaleRow[]; coverage: string[];
-  canSync: boolean;
+  canSync: boolean; back: { href: string; label: string };
 }) {
   const action = useCommandAction();
-  return <PosMappingView variations={variations} targets={targets} sales={sales} coverage={coverage} busy={action.busy} error={action.error} backHref="/settings/pos"
+  return <PosMappingView variations={variations} targets={targets} sales={sales} coverage={coverage} busy={action.busy} error={action.error} backHref={back.href} backLabel={back.label}
     syncAction={canSync ? <SquareSyncControls /> : undefined} onSave={(row, target) => {
       const [kind, id] = target.split(":", 2);
       void action.run("set_pos_item_mapping", {

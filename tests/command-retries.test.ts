@@ -72,3 +72,27 @@ it("keeps a sheet's submit from reaching an enclosing page form", async () => {
   await form!.submit(event);
   expect(seen).toEqual({ prevented: true, stopped: true });
 });
+
+it("runs a sheet's secondary action (Remove, Delete, Clear) through the form's one error slot (#447)", async () => {
+  const names: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    names.push(JSON.parse(init.body).name);
+    return { status: 400, json: async () => ({ ok: false, error: { message: "in use" } }) };
+  }));
+  let form: ReturnType<typeof useCommandForm>;
+  function Harness() { form = useCommandForm("update_bin", { build: () => ({}), reset: vi.fn() }); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  expect(await form!.run("delete_bin", { binId: "b" })).toBe(false);
+  expect(names).toEqual(["delete_bin"]);
+});
+
+it("clears every sheet error on close: secondary actions share the form's slot, bespoke state resets (#447)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = (p: string) => readFileSync(new URL(`../app/(app)/${p}`, import.meta.url), "utf8");
+  for (const p of ["locations/bin-form.tsx", "pricing/group-form.tsx", "pricing/price-cell-form.tsx", "settings/team/member-form.tsx"]) {
+    expect(src(p), p).not.toContain("useCommandAction(");
+    expect(src(p), p).toContain("form.run(");
+  }
+  expect(src("settings/team/invite-form.tsx")).toContain("if (!next) action.setError(null)");
+  expect(src("inventory/movement-form.tsx")).toMatch(/reset: \(\) => \{ setStockError\(null\);/);
+});

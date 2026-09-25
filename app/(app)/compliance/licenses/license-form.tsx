@@ -10,11 +10,11 @@ import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
 import { licenseInput } from "@/lib/mgr/license-view";
 import { useCommandForm, useFields } from "@/lib/commands/use-command-form";
-// state and kind are locked when editing (licenseInput sends the unshown note back): a license is addressed by them, so changing one would add a row, not move it
+// state and kind are locked when editing (licenseInput omits the unshown note, so the upsert keeps it): a license is addressed by them, so changing one would add a row, not move it
 export function LicenseForm({ license }: { license?: License }) {
   const { v, set, reset } = useFields({ state: license?.state ?? "", kind: license?.kind ?? "brewery", licenseNo: license?.license_no ?? "", expiresOn: license?.expires_on ?? "" });
   const form = useCommandForm("upsert_brewery_state_license", {
-    build: () => licenseInput(v, license),
+    build: () => licenseInput(v),
     reset,
   });
   const model = {

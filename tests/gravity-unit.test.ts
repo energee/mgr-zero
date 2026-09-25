@@ -49,7 +49,8 @@ describe("parseGravity", () => {
   });
 
   it("rejects a number outside any gravity a brewer can read", () => {
-    expect(parseGravity("-1", "plato")).toBe(INVALID_GRAVITY);
+    // Negative Plato is a real reading down to the SG floor (0.9 ≈ -28 °P).
+    expect(parseGravity("-30", "plato")).toBe(INVALID_GRAVITY);
     expect(parseGravity("400", "plato")).toBe(INVALID_GRAVITY);
     // 0.5 is neither a decimal SG (>= 0.9) nor points (>= 100).
     expect(parseGravity("0.5", "sg")).toBe(INVALID_GRAVITY);
@@ -75,3 +76,22 @@ describe("round trips", () => {
     }
   });
 });
+
+// A finished dry beer reads below water: FG 0.998 is about -0.5 °P. Storage is
+// Plato, so the number must go negative rather than clamp to 0 and read back
+// as 1.000 (#439).
+describe("gravity below 1.000", () => {
+  it("keeps SG under 1.000 as negative Plato and prints it back", () => {
+    const plato = parseGravity("0.998", "sg") as number;
+    expect(plato).toBeLessThan(0);
+    expect(formatGravity(plato, "sg")).toBe("0.998");
+    expect(sgToPlato(1)).toBe(0);
+  });
+
+  it("accepts negative Plato typed directly, within the same floor as SG", () => {
+    expect(parseGravity("-0.5", "plato")).toBe(-0.5);
+    expect(formatGravity(-0.5, "plato")).toBe("-0.5 °P");
+    expect(parseGravity("-40", "plato")).toBe(INVALID_GRAVITY);
+  });
+});
+

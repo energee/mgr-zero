@@ -1,0 +1,478 @@
+---
+title: "Taproom & kegs"
+description: "Taproom counts, taps, kegs and replenishment."
+---
+
+Physical counts are available to Admin, Warehouse, and Taproom through the commands below and the live **Taproom** page. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting. `list_taproom_counts` returns only the newest 50 headers for one owned taproom; use `get_taproom_count` for a complete durable receipt with safe bin and SKU labels independent of list-query row caps.
+
+`get_taproom_print_labels` accepts the exact prepared revision and returns only current positive Taproom stock, retaining each bucket's row number from the complete count worksheet. It supplies safe bin, SKU, brand and package labels plus a tracked lot UUID and code, or untracked, and quantity. A changed revision is refused. Full lot history remains outside this projection, and the query neither posts inventory nor claims a command request.
+
+Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. `correct_taproom_count` lets Admin replace only the latest uncorrected root count, and refuses outright unless every submitted line was counted too low. Every changed quantity must be a whole increase no greater than its frozen quantity before the count, and a reason is required. The correction preserves the root observation time, appends exact frozen compensation and smaller replacement legs in the correction's audit period, supplies one effective receipt and next-count baseline, and leaves original and filed records unchanged. Warehouse and Taproom may read the effective receipt and correction audit but cannot run the correction. An uncertain response keeps the exact request frozen for replay. Generic inventory adjustments do not reverse count depletion. Direct raw lot history remains unavailable; use the checked current-stock print projection to match a physical tracked lot without guessing.
+
+`get_taproom_draft_projection` compares an unsaved recount with expected consumption from the latest effective saved count's observation time through the response's server `as_of`. It identifies that baseline and both bounds, groups expected BBL by brand, and reports coverage-source bounds and completeness, unmapped and ignored lines, excluded shares, and unattributed poured volume. No saved baseline or usable POS observation leaves expected null; a complete empty observation may return zero. This live read never posts inventory, allocates lots, freezes a POS snapshot, or replaces the count snapshot revision, and late reconciled facts may change a later response.
+
+A taproom holds stock like any other location, with two things a warehouse does
+not have: a par level per SKU, and standing allocations that reserve stock
+against a recurring need. Setting a standing allocation to zero releases it.
+
+Replenishment reads the gap between par and on-hand and suggests a transfer
+quantity. `create_replenishment_order` turns those quantities into an
+already-confirmed taproom transfer, skipping the draft and submit steps a
+wholesale order goes through.
+
+Kegs are tracked as pools — owned, leased, or pay-per-fill — over a
+location-grain event ledger. A leased or pay-per-fill pool names its vendor,
+and a pay-per-fill pool also needs a per-fill cost; `update_keg_pool` only
+changes the fields you send, and an inactive pool refuses new events.
+`record_keg_event` posts one append-only row: quantity is always positive and
+`reason` carries the direction (acquired, retired, shipped, returned, lost,
+found). Shipped and returned require a customer; acquired, retired, and found
+never carry one; lost may optionally name a customer, which reduces their keg
+balance. Retired, shipped, and lost cannot take out more kegs than the bin
+currently holds. Kegs moving between bins or locations go through the
+transfer and movement commands, not this one, and a keg deposit refund is its
+own credit memo.
+
+{/* ops:taproom */}
+
+## correct_taproom_count [#correct_taproom_count]
+
+`command` · admin
+
+Admin-only replacement for the latest uncorrected mistaken-low Taproom count. Send only increased root-line quantities plus a reason; the original stays immutable and exact frozen compensation/replacement entries preserve reporting
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `countId` | uuid | yes |
+| `corrections` | array of object | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "correct_taproom_count", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "countId": "00000000-0000-0000-0000-000000000000", "corrections": [ { "lineId": "00000000-0000-0000-0000-000000000000", "qtyCounted": 1 } ], "reason": "string" } }'
+```
+
+## create_keg_pool [#create_keg_pool]
+
+`command` · admin, warehouse
+
+Add a keg pool: owned, leased from a vendor, or pay-per-fill, with its per-keg deposit
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `kind` | owned or leased or pay_per_fill | yes |
+| `vendorId` | uuid | no |
+| `perFillCents` | integer | no |
+| `depositCents` | integer | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_keg_pool", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "owned" } }'
+```
+
+## create_replenishment_order [#create_replenishment_order]
+
+`command` · admin, sales
+
+Create a confirmed taproom transfer order from par-gap quantities
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `fromLocationId` | uuid | yes |
+| `toLocationId` | uuid | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_replenishment_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+## get_customer_keg_balance [#get_customer_keg_balance]
+
+`query` · admin, warehouse
+
+Kegs a customer has out per pool and size, with the deposit held for them
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_customer_keg_balance", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_keg_fleet [#get_keg_fleet]
+
+`query` · admin, warehouse
+
+Keg pools, kegs on hand per pool, size, location and bin, and customers with kegs out
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_keg_fleet", "input": {} }'
+```
+
+## get_keg_report [#get_keg_report]
+
+`query` · admin, warehouse
+
+Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, and the customers holding kegs over 90 days
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_keg_report", "input": {} }'
+```
+
+## get_taproom_count [#get_taproom_count]
+
+`query` · admin, warehouse, taproom
+
+Read one logical saved taproom count resolved to its effective observations, correction audit, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `countId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_count", "input": { "countId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_taproom_count_snapshot [#get_taproom_count_snapshot]
+
+`query` · admin, warehouse, taproom
+
+Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe brand/package-volume labels, prior count and revision, without POS or lot-label access
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_count_snapshot", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_taproom_draft_projection [#get_taproom_draft_projection]
+
+`query` · admin, warehouse, taproom
+
+Expected consumption since the latest saved taproom count through the server as-of, grouped by brand for a draft recount. Returns the prior count identity and exact bounds, nullable expected BBL, coverage source bounds and completeness, mapping gaps, ignored lines, excluded shares and unattributed volume. Complete empty observation may mean zero; no baseline or usable observation stays null. Late reconciled sales may change this read, which never posts inventory or allocates physical lots
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_draft_projection", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_taproom_print_labels [#get_taproom_print_labels]
+
+`query` · admin, warehouse, taproom
+
+Printable labels for current positive stock in one exact Taproom count snapshot: original worksheet row, safe bin/SKU/brand/package labels, tracked lot code or untracked, and quantity; excludes zero and historical stock
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `revision` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_print_labels", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "revision": "string" } }'
+```
+
+## get_taproom_variance [#get_taproom_variance]
+
+`query` · admin, warehouse, taproom
+
+Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior observed_at, current observed_at]; first counts lack a baseline. Actual is effective frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `weeks` | 4 or 12 | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_variance", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "weeks": 4 } }'
+```
+
+## kick_keg [#kick_keg]
+
+`command` · admin, warehouse, taproom
+
+Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. An already-closed conflict returns its safe closer label and timestamp. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `openIntervalId` | uuid | yes |
+| `closeFill` | 0 or 0.25 or 0.5 | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "kick_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "openIntervalId": "00000000-0000-0000-0000-000000000000", "closeFill": 0, "reason": "string" } }'
+```
+
+## list_keg_events [#list_keg_events]
+
+`query` · admin, warehouse
+
+Keg event history, newest first, optionally for one pool or one customer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | no |
+| `customerId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_keg_events", "input": {} }'
+```
+
+## list_keg_pools [#list_keg_pools]
+
+`query` · admin, warehouse
+
+Keg pools, alphabetical, active and retired alike
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_keg_pools", "input": {} }'
+```
+
+## list_open_taps [#list_open_taps]
+
+`query` · admin, warehouse, taproom
+
+All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/handle/time. No POS yield or remaining-volume estimate
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_open_taps", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_tap_history [#list_tap_history]
+
+`query` · admin, warehouse, taproom
+
+The latest 50 closed intervals at one taproom with opening and closing actor IDs, safe handles, times, frozen nominal size, fill and reason
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_tap_history", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## list_taproom_counts [#list_taproom_counts]
+
+`query` · admin, warehouse, taproom
+
+Newest 50 logical physical-count occurrences at one owned taproom, with effective correction, observation, movement and depleted-unit totals
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_taproom_counts", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## record_keg_event [#record_keg_event]
+
+`command` · admin, warehouse
+
+Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one; retired, shipped, or lost at the bin cannot exceed what the bin holds, and returned or lost at a customer cannot exceed what the customer holds
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | yes |
+| `kegSize` | half_bbl or quarter_bbl or sixth_bbl or fifty_l or thirty_l or twenty_l | yes |
+| `qty` | integer | yes |
+| `reason` | acquired or retired or shipped or returned or lost or found | yes |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `customerId` | uuid | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_keg_event", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poolId": "00000000-0000-0000-0000-000000000000", "kegSize": "half_bbl", "qty": 1, "reason": "acquired", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## record_taproom_count [#record_taproom_count]
+
+`command` · admin, warehouse, taproom
+
+Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `countedOn` | date (YYYY-MM-DD) | yes |
+| `revision` | string | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_taproom_count", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "countedOn": "2026-01-31", "revision": "string", "lines": [ { "binId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "lotId": "00000000-0000-0000-0000-000000000000", "qtyCounted": 1 } ] } }'
+```
+
+## replenishment_suggestions [#replenishment_suggestions]
+
+`query` · admin, sales, warehouse
+
+Per-taproom par gap: par − on-hand, suggested transfer qty
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replenishment_suggestions", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_taproom_par [#set_taproom_par]
+
+`command` · admin, sales
+
+Set par level for a SKU at a taproom
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `skuId` | uuid | yes |
+| `parQty` | number | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_taproom_par", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "parQty": 1 } }'
+```
+
+## swap_keg [#swap_keg]
+
+`command` · admin, warehouse, taproom
+
+Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is &#123;skuId&#125; or &#123;label, nominalBbl&#125;; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair; an already-closed conflict returns its safe closer label and timestamp. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `openIntervalId` | uuid | yes |
+| `incomingOpeningFill` | 0.25 or 0.5 or 0.6 or 1 | yes |
+| `closeFill` | 0 or 0.25 or 0.5 | yes |
+| `reason` | string | yes |
+| `incomingKeg` | object or object | no |
+| `tapNumber` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "swap_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "openIntervalId": "00000000-0000-0000-0000-000000000000", "incomingOpeningFill": 0.25, "closeFill": 0, "reason": "string" } }'
+```
+
+## tap_keg [#tap_keg]
+
+`command` · admin, warehouse, taproom
+
+Open a keg interval at an owned taproom. keg is &#123;skuId&#125; for an own packaged keg or &#123;label, nominalBbl&#125; for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `keg` | object or object | yes |
+| `openingFill` | 0.25 or 0.5 or 0.6 or 1 | yes |
+| `tapNumber` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "tap_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "keg": { "skuId": "00000000-0000-0000-0000-000000000000" }, "openingFill": 0.25 } }'
+```
+
+## update_keg_pool [#update_keg_pool]
+
+`command` · admin, warehouse
+
+Rename a keg pool, change its vendor, per-fill cost or deposit, or take it out of service; omitted fields keep their value
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | yes |
+| `name` | string | no |
+| `vendorId` | uuid | no |
+| `perFillCents` | integer | no |
+| `depositCents` | integer | no |
+| `active` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_keg_pool", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poolId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+{/* end ops:taproom */}

@@ -1,13 +1,14 @@
 // app/(app)/page.tsx — Today: the role-filtered work list from get_today,
 // drawn to the Today screen record (components/mgr/screens.tsx) in the E
 // vocabulary. The row verb is the action and opens the item's href; the
-// empty state offers the role's first verb. An admin on a brewery with no
-// location and no brand sees the First-run checklist (first-run.tsx) instead.
+// empty state offers Record movement to the roles that may record one. An
+// admin on a brewery with no location and no brand sees the First-run checklist (first-run.tsx) instead.
 // Screens stay fixtures: nothing here imports SCREENS.
 import { E } from "@/components/mgr/e";
 import { TodayView } from "@/components/mgr/views/today";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TodayItem } from "@/lib/commands/today";
 import { toTodayViewProps } from "@/lib/mgr/today-view";
@@ -44,10 +45,13 @@ export default async function TodayPage() {
     return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = (await runCommand("get_today", {}, ctx)) as TodayItem[];
+  // Only a role that may record a movement is offered one; the others get no
+  // empty-state verb rather than a link to No access or a formless page (#478).
+  const canMove = canRun(ctx, "record_movement");
   return (
     <TodayView
-      model={toTodayViewProps({ date, items, emptyVerb: "Record movement" })}
-      emptyAction={E.btn("Record movement", "g", "/inventory?recordMovement=1")}
+      model={toTodayViewProps({ date, items, emptyVerb: canMove ? "Record movement" : "" })}
+      emptyAction={canMove ? E.btn("Record movement", "g", "/inventory?recordMovement=1") : null}
       linkRows
     />
   );

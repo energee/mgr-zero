@@ -37,6 +37,14 @@ export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
 };
-export function toSetPasswordViewProps(account: string): EntryViewModel {
-  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password" };
+/** Supabase Auth error codes savePassword passes back as `?error=`. */
+const SET_PASSWORD_ERRORS: Record<string, string> = {
+  same_password: "Choose a password different from your current one.",
+  weak_password: "Choose a stronger password.",
+};
+
+/** `error` is the `?error=` code; any other value (a crafted link) shows the generic note, never its own text. */
+export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
+  const note = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
+  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", note };
 }

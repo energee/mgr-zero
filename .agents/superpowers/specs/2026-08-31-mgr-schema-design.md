@@ -494,8 +494,9 @@ is null`.
 ### `transfers` — ledger
 `from_occupancy_id → vessel_occupancies, to_occupancy_id → vessel_occupancies, bbl
 numeric > 0, loss_bbl numeric >= 0 default 0, at timestamptz, note, created_by`. check
-`from <> to`. The transfer's contemporaneous loss is represented once in `loss_bbl`; the
-command must not also insert a `volume_adjustments` loss row. A transfer to an empty
+`from <> to`. The transfer's contemporaneous loss is represented once, as a generic
+`volume_adjustments` loss row (`affects_occupancy`) on the source occupancy; `loss_bbl`
+is always 0 (#485, so the loss can be reattributed and the report has one source). A transfer to an empty
 vessel first creates its target occupancy with `initial_bbl = 0` in the same function;
 after appending the transfer, that function sets the source occupancy's `ended_at` only
 when its derived remainder is zero. A transfer into an existing compatible occupancy
@@ -513,8 +514,8 @@ requires a two-letter state, Taproom freezes tax from the tenant channel whose i
 
 `complete_batch` is implemented as one Admin/Brewer RPC. Its shared calculation covers
 every occupancy whose stored batch identity matches, cross-batch transfer boundaries,
-signed physical gain/measurement adjustments, transfer losses, classified cellar
-removals, and frozen positive production movements from closed runs. It refuses missing,
+signed physical gain/measurement adjustments, classified cellar removals (transfer
+losses among them), and frozen positive production movements from closed runs. It refuses missing,
 unbrewed or already-completed batches, missing occupancy, nonpositive baselines, open
 packaging runs and negative residuals. It closes all still-open scoped occupancies at one
 valid timestamp and appends one nonphysical generic-loss root only when the residual is
@@ -546,7 +547,7 @@ material_movements unique not null`. Trigger asserts the movement `type =
 'consumption'`. idx `(batch_id)`.
 
 ### View `occupancy_volumes`
-`initial_bbl + transfers_in − transfers_out − transfer losses + adjustments − bbl_drawn
+`initial_bbl + transfers_in − transfers_out + adjustments (transfer losses among them) − bbl_drawn
 by closed packaging runs` per occupancy, where only adjustments with
 `affects_occupancy=true` change physical volume; `vessel_contents` joins open occupancies to
 vessels (this replaces a vessel status column).
