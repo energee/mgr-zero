@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/database";
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
+import { US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
 
@@ -145,8 +146,13 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
   return breweryDate(timezone);
 }
 
-/** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */
-export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code");
+/** A real two-letter US state code (US_STATE_CODES), for customers.state, ship_tos.state and the registry tables. */
+export const stateCode = z.string().refine((s) => (US_STATE_CODES as readonly string[]).includes(s), "a US state code, such as PA");
+
+/** A phone number: 7 to 15 digits once spaces, dots, dashes and parentheses are dropped, with an optional leading +. "" means none. */
+export const phone = z.string().trim().refine(
+  (s) => s === "" || /^\+?\d{7,15}$/.test(s.replace(/[\s().-]/g, "")), "a phone number, such as (503) 555-0142",
+);
 
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs

@@ -238,12 +238,25 @@ defineQuery({
   })),
 });
 
+// The RPC raises plain exceptions for a stale link: no menu at that location
+// (the location was remapped) or no such item in its snapshot (the bin was
+// deleted, or the snapshot is NULL while Square needs recovery). Both mean
+// "no such record", so they are 404 not_found and the page renders not-found.
+const MENU_ITEM_MISSING = new Set(["Menu is not configured", "Menu item not found"]);
+
 defineQuery({
   name: "get_pos_menu_item", description: "Read one derived poured-format menu item and its location-specific price source",
   input: z.object({ posLocationId, formatId: z.string().uuid() }), roles: [...menuRoles],
-  handler: (ctx, input) => unwrap(ctx.db.rpc("get_pos_menu_item", {
-    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
-  })),
+  handler: async (ctx, input) => {
+    try {
+      return await unwrap(ctx.db.rpc("get_pos_menu_item", {
+        p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+      }));
+    } catch (e) {
+      if (e instanceof CommandError && MENU_ITEM_MISSING.has(e.message)) throw new CommandError(e.message, 404, "not_found");
+      throw e;
+    }
+  },
 });
 
 defineCommand({

@@ -165,8 +165,8 @@ defineQuery({
 
 // Number() guards the numeric columns against a driver that hands them back as
 // strings. A missing extract snapshot is NOT defaulted here — it is passed
-// through as null so recipeGravity can skip the ingredient outright rather
-// than have a made-up potential move the predicted OG.
+// through as null so recipeGravity answers no prediction (null OG/FG/ABV,
+// which the page hides) rather than have a made-up potential move the OG.
 const num = (v: unknown) => Number(v ?? 0);
 
 defineQuery({
@@ -189,23 +189,23 @@ defineQuery({
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
-        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot")
+        .select("id, material_id, per_bbl_qty, stage, timing_minutes, sort, extract_snapshot, materials(base_uom)")
         .eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
       unwrap(ctx.db.from("recipe_water_additions").select("material_id, qty, unit, stage").eq("recipe_version_id", version.id).order("sort")).then((r) => r ?? []),
     ]);
 
     return {
       recipe, version, ingredients, waterAdditions,
-      ...recipeGravity({
+      ...(recipeGravity({
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
         ingredients: ingredients.map((l) => ({
-          // A null snapshot stays null: recipeGravity skips that ingredient
-          // rather than defaulting its potential, which would silently move
-          // the predicted OG.
+          // A null snapshot stays null: recipeGravity then predicts nothing
+          // rather than defaulting its potential or printing OG 0 (#430).
           perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage as string,
+          unit: l.materials?.base_uom,
         })),
-      }),
+      }) ?? { ogPlato: null, fgPlato: null, abv: null }),
     };
   },
 });

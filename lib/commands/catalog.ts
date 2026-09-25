@@ -1,5 +1,9 @@
 import { z } from "zod";
+import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
+
+/** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
+const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
 
 defineQuery({
   name: "list_catalog_categories", description: "List this brewery's catalog categories",
@@ -23,7 +27,7 @@ defineCommand({
 defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().optional(),
+    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
     description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
   }),
   roles: ["admin", "sales"],
@@ -36,7 +40,7 @@ defineCommand({
 
 defineCommand({
   name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format",
-  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: z.string().trim().optional() }),
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: upc.optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
     p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId,
@@ -45,7 +49,7 @@ defineCommand({
 
 defineCommand({
   name: "update_sku", description: "Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: z.string().trim().optional() }),
+  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
     p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId,
@@ -72,7 +76,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)",
+  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
     packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
@@ -147,7 +151,8 @@ defineCommand({
 
 // Bins subdivide a location (spec 2026-09-06 Decision 1). Reads go through
 // RLS; the three writes are the idempotent RPCs. A location never drops below
-// one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
+// one bin, and a bin that ever recorded stock or that a POS menu uses (#421) is not
+// deleted — delete_bin raises all three.
 defineQuery({
   // Brewers read bins too: packaging output lands in one.
   name: "list_bins", description: "Bins of one location (or all), alphabetical",

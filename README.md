@@ -104,9 +104,15 @@ reauthorize each workspace; old encrypted installation tokens cannot be read
 with a new key. The scheduled chat-state cleanup endpoint is
 `POST /api/chat/jobs/cleanup`, authenticated with `CHAT_JOB_SECRET`.
 
-`MGR_DEDICATED=1` hides and rejects the hosted-web **Create brewery** page and action.
-It does not block authenticated API provisioning or database bootstrap. Omit it
-for the hosted web entry.
+`MGR_DEDICATED=1` hides the hosted-web **Create brewery** page and makes brewery
+creation refuse (403) for every caller, web or API. The database function is
+service-role only, so signed-in accounts cannot bypass the server through
+PostgREST (#467). Omit it for the hosted web entry.
+
+Accounts are invitation-only: local Auth sets `enable_signup = false`, and the
+invite path (`inviteUserByEmail`) and admin-created accounts still work. Hosted
+Supabase Auth keeps its own signup setting; turn off **Allow new users to sign
+up** in the hosted project separately.
 
 Local Auth configs allow password-recovery callbacks on localhost and 127.0.0.1,
 ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase

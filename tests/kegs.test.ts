@@ -122,4 +122,44 @@ describe("customer keg balance", () => {
     const fleetAfter = (await runCommand("get_keg_fleet", {}, ctx)) as { customers: unknown[] };
     expect(fleetAfter.customers).toEqual([]);
   });
+
+  it("a keg lost at a customer leaves the bin alone, so the fleet is bins plus customers (#449)", async () => {
+    const pool = (await runCommand("create_keg_pool", { name: "Lost at customer", kind: "owned" }, ctx)) as { id: string };
+    const { customerId } = await seedCustomer(b.id, { name: "Hilltop" });
+    const k = { poolId: pool.id, kegSize: "half_bbl", locationId: storage.id, binId: storage.binId };
+    await event({ ...k, qty: 10, reason: "acquired" });
+    await event({ ...k, qty: 2, reason: "shipped", customerId });
+    await event({ ...k, qty: 1, reason: "lost", customerId });
+
+    // keg_bin_on_hand is scoped to the caller, so read the bin through the registry.
+    const onHand = (await runCommand("get_keg_fleet", {}, ctx)) as { rows: { pool_id: string; qty: number }[] };
+    const bin = onHand.rows.find((r) => r.pool_id === pool.id)?.qty;
+    const { data: cust } = await admin.from("keg_customer_balances").select("qty").eq("pool_id", pool.id).single();
+    const { data: fleet } = await admin.from("keg_fleet_totals").select("qty").eq("pool_id", pool.id).single();
+    expect(bin).toBe(8);
+    expect(Number(cust!.qty)).toBe(1);
+    expect(Number(fleet!.qty)).toBe(9);
+    expect(bin! + Number(cust!.qty)).toBe(Number(fleet!.qty));
+
+    // With every keg out, a loss at the customer is not refused for bin stock.
+    await event({ ...k, qty: 8, reason: "shipped", customerId });
+    await event({ ...k, qty: 2, reason: "lost", customerId });
+    const { data: after } = await admin.from("keg_customer_balances").select("qty").eq("pool_id", pool.id).single();
+    expect(Number(after!.qty)).toBe(7);
+  });
+
+  it("refuses to return or lose more kegs than the customer holds (#464)", async () => {
+    const pool = (await runCommand("create_keg_pool", { name: "Customer bound", kind: "owned" }, ctx)) as { id: string };
+    const { customerId } = await seedCustomer(b.id, { name: "Bayside" });
+    const k = { poolId: pool.id, kegSize: "half_bbl", locationId: storage.id, binId: storage.binId };
+    await event({ ...k, qty: 10, reason: "acquired" });
+    await event({ ...k, qty: 5, reason: "shipped", customerId });
+    await expect(event({ ...k, qty: 6, reason: "returned", customerId })).rejects.toThrow(/customer holds 5/i);
+    await expect(event({ ...k, qty: 6, reason: "lost", customerId })).rejects.toThrow(/customer holds 5/i);
+    // The balance is per pool and size: sixths were never shipped.
+    await expect(event({ ...k, kegSize: "sixth_bbl", qty: 1, reason: "returned", customerId })).rejects.toThrow(/customer holds 0/i);
+    await event({ ...k, qty: 5, reason: "returned", customerId });
+    const { data } = await admin.from("keg_customer_balances").select("qty").eq("pool_id", pool.id).single();
+    expect(Number(data!.qty)).toBe(0);
+  });
 });
