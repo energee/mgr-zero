@@ -46,3 +46,30 @@ describe("get_keg_report", () => {
     await expect(runCommand("get_keg_report", {}, brewer)).rejects.toThrow();
   });
 });
+
+// #455: keg_events was read unordered and unpaged, so past PostgREST's
+// 1000-row cap aging ran on an arbitrary subset. 1001 one-keg shipments must
+// all count.
+describe("get_keg_report past the 1000-row cap", () => {
+  it("ages every shipment", async () => {
+    const big = await makeBrewery();
+    const bigCtx = await makeStaffCtx(big.id, "warehouse");
+    const storage = await seedLocation(big.id, { name: "Storage", uses: ["storage"] });
+    const { customerId: holder } = await seedCustomer(big.id, { name: "Big Holder" });
+    const pool = ((await runCommand("create_keg_pool", { name: "Owned", kind: "owned", depositCents: 0 }, bigCtx)) as { id: string }).id;
+    const event = (i: Record<string, unknown>) => runCommand("record_keg_event", { poolId: pool, kegSize: "half_bbl", locationId: storage.id, binId: storage.binId, ...i }, bigCtx) as Promise<{ id: string }>;
+    await event({ qty: 1001, reason: "acquired" });
+    const first = await event({ qty: 1, reason: "shipped", customerId: holder });
+    const { data: row, error } = await admin.from("keg_events").select("*").eq("id", first.id).single();
+    if (error) throw error;
+    const copy: Partial<typeof row> = { ...row };
+    delete copy.id;
+    const inserted = await admin.from("keg_events").insert(Array.from({ length: 1000 }, () => copy as typeof row));
+    if (inserted.error) throw inserted.error;
+
+    const r = (await runCommand("get_keg_report", {}, bigCtx)) as Report;
+    expect(r.aging.reduce((n, a) => n + a.kegs, 0)).toBe(1001);
+    expect(r.fleet.out).toBe(1001);
+  });
+});
+

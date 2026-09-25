@@ -1,4 +1,4 @@
-// app/(app)/compliance/[month]/file-button.tsx — Save filed snapshot →
+// app/(app)/compliance/[period]/file-button.tsx — Save filed snapshot →
 // file_compliance_report. Disabled until the generated report balances and
 // every required external filing mapping is approved.
 "use client";

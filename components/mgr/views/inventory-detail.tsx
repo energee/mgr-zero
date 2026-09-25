@@ -17,7 +17,7 @@ export function InventoryDetailView({ model, movementAction, footer }: {
     {model.movements.length ? model.movements.map(m => <div key={m.id} id={`movement-${m.id}`}>
       {E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} · ${sentenceCase(m.type)}`, "", movementAction?.(m), "", undefined, <>
         <p className="text-sm">{m.locations?.name ?? m.location_id} · {m.bins?.name ?? m.bin_id} · {m.lot_id ? m.lots?.code ?? m.lot_id : "Untracked"} · {m.bbl} bbl · {m.package_type}{m.tax_treatment ? ` · ${sentenceCase(m.tax_treatment)}` : ""}{m.dest_state ? ` · ${m.dest_state}` : ""}</p>
-        <p className="break-all text-xs text-muted-foreground">{formatDateTime(m.created_at)} · {m.id}{m.note ? ` · ${m.note}` : ""}{m.ref ? ` · source ${m.ref}` : ""}{m.source_movement_id ? ` · source movement ${m.source_movement_id}` : ""}</p>
+        <p className="break-all text-xs text-muted-foreground">{formatDateTime(m.created_at, model.timeZone)} · {m.id}{m.note ? ` · ${m.note}` : ""}{m.ref ? ` · source ${m.ref}` : ""}{m.source_movement_id ? ` · source movement ${m.source_movement_id}` : ""}</p>
       </>)}
     </div>) : E.blank("No movements recorded yet")}
     {footer}

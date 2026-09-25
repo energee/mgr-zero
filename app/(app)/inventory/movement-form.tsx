@@ -8,7 +8,7 @@ import type { BinMoveStock } from "@/lib/commands/inventory";
 import { movementFields } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
@@ -39,6 +39,7 @@ export function MovementForm({
   locations,
   bins,
   channels,
+  timeZone,
 }: {
   autoOpen?: boolean;
   initial?: Partial<MovementInput>;
@@ -46,6 +47,8 @@ export function MovementForm({
   locations: { id: string; name: string; uses: string[] }[];
   bins: { id: string; location_id: string; name: string }[];
   channels: { id: string; name: string }[];
+  /** breweries.timezone: the receipt prints the movement time in it (#442). */
+  timeZone: string;
 }) {
   const breweryId = useBrewery();
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
@@ -65,19 +68,11 @@ export function MovementForm({
   const [saleChannelId, setSaleChannelId] = useState(initial?.saleChannelId ?? defaultChannelId);
   const [note, setNote] = useState(initial?.note ?? "");
   const form = useCommandForm("record_movement", {
+    defaultOpen: autoOpen,
     onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
     reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
-  const { setOpen } = form;
-  const autoOpened = useRef(false);
-
-  useEffect(() => {
-    if (autoOpen && !autoOpened.current) {
-      autoOpened.current = true;
-      setOpen(true);
-    }
-  }, [autoOpen, setOpen]);
 
   useEffect(() => {
     if (!locationId || !form.open) return;
@@ -95,7 +90,7 @@ export function MovementForm({
     kind: sentenceCase(receipt.type),
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
-    when: formatDateTime(receipt.created_at),
+    when: formatDateTime(receipt.created_at, timeZone),
     backHref: "/inventory",
     details: [
       { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },

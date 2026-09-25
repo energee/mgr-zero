@@ -170,7 +170,7 @@ import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
 import { entityPickerPalette, searchPalette } from "@/lib/mgr/fixtures/search";
 import { sessionExpiredQueued } from "@/lib/mgr/fixtures/session-expired";
-import { settingsDemo } from "@/lib/mgr/fixtures/settings";
+import { DEMO_TIME_ZONE, settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
@@ -711,9 +711,9 @@ export const SCREENS: Screen[] = [
     to: { "Create brewery": "First-run checklist" },
     job: "Provision tenant and first owner atomically",
     reads: "none [deployment mode gate]",
-    writes: "provision_brewery [existing; authenticated pre-tenant; one RPC: brewery + first admin membership]",
+    writes: "provision_brewery [existing; authenticated pre-tenant command; service-only RPC with the verified actor: brewery + first admin membership]",
     states: DEFAULT_STATES,
-    spec: "Hidden in dedicated mode; this is the pre-brewery provisioning boundary.",
+    spec: "Hidden in dedicated mode, and the command refuses there for every caller; this is the pre-brewery provisioning boundary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <CreateBreweryView />,
   },
@@ -872,7 +872,7 @@ export const SCREENS: Screen[] = [
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "History is a visible control in the composer strip; no swipe-only interaction.",
+    spec: "The drawer handle is a visible button (Open, Expand, Minimize Ask MGR); no swipe-only interaction.",
     body: <ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
@@ -883,13 +883,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     name: "Offline outbox",
-    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading" },
+    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading", Dismiss: "Offline outbox" },
     job: "Retry an exact captured reading without broadening offline writes",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"]],
-    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original.",
-    body: <OfflineOutboxView rows={[
+    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"], ["set aside", "unreadable saved reading set aside unsent · Dismiss", 1]],
+    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original. A saved entry that can no longer be read is set aside unsent, readable siblings stay queued, and a notice says so until Dismiss deletes the set-aside copy.",
+    body: <OfflineOutboxView notice="1 unreadable offline reading was set aside and not sent. Re-enter it if still needed." onDismissNotice={() => {}} rows={[
       { id: "reading-fv3", label: "Record fermentation reading · FV3", status: "response not confirmed", retryable: true, fixHref: "#", fixTo: "Fermentation reading" },
       { id: "reading-fv2", label: "Record fermentation reading · FV2", status: "your role changed from brewer · this will not be sent" },
     ]} />,
@@ -1135,9 +1135,9 @@ export const SCREENS: Screen[] = [
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
     reads: "get_invoice · get_invoice_return_sources · list_bins",
-    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price] · Deposit refund [SCHEMA-GATE: beer returns do not refund deposits]",
+    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price, with a deposit refund line for each refunded keg deposit]",
     states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
-    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
+    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. Keg deposit lines refund in whole kegs on the same credit memo and move no stock; the empty keg itself is a Keg fleet event. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: <ReturnCreditView sources={<ReturnSourcesView groups={[{ key: "l-hazy", name: orderReturnCredit.lines[0].skus?.name ?? "Line", sources: [{ id: "shipped-hazy", label: "L-240831-HZ · shipped from Cooler", shipped: 4 }] }]} quantities={{ "shipped-hazy": "1" }} />} bins={[{ id: "cooler", name: "Cooler" }]} binId="cooler" model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
@@ -1840,7 +1840,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material definition",
     reads: "list_materials",
     writes: "upsert_material",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
+    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"], ["malt or adjunct", "extract potential asked; recipe predictions read it"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: <MaterialView model={materialCitra} />,
   },
@@ -2025,11 +2025,11 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Compliance months",
-    job: "Choose a reporting month and see whether its snapshot was filed",
+    job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
     states: [["not filed", "ready to review", 1], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
-    spec: "This is the shared destination for the registry back link, the month rows, and the lot trace. The last three months always show, plus every filed period; a month is TTB, the API takes other jurisdictions and ranges.",
+    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years always show, plus every filed period of that length. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
@@ -2174,7 +2174,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
     spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment.",
-    body: <KegReportView model={toKegReportViewProps(kegReportOwned)} />,
+    body: <KegReportView model={toKegReportViewProps(kegReportOwned, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7,
@@ -2188,7 +2188,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -2202,7 +2202,7 @@ export const SCREENS: Screen[] = [
     writes: "kick_keg",
     states: permitted("taproom, warehouse or admin required").concat([["empty", "tap becomes empty"], ["beer remaining", "closing fill is a coarse observation only"], ["already closed", "safe closer and time shown; reload before acting", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
-    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} />,
+    body: <TapKegView sheet={kickKeg} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 7,
@@ -2216,7 +2216,7 @@ export const SCREENS: Screen[] = [
     writes: "swap_keg",
     states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
-    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} closedFact="Helles was swapped out at 7:42pm by Ali" />,
+    body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} closedFact="Helles was swapped out at 7:42pm by Ali" />,
   },
   {
     step: 7,
@@ -2707,7 +2707,7 @@ export const SCREENS: Screen[] = [
     reads: "none",
     writes: "create_credit_memo [kind=credit_memo, own requestid]",
     states: [["applied", "reduces the customer balance here"], ["unapplied", "sits as available credit"], ["rejected", "the QuickBooks sync error is shown on the MGR credit row", 1], ["deposit line untaxed", "TaxCodeRef NON, or it refunds phantom tax", 1]],
-    spec: "Created by Return shipment or a keg return, never free-form; the plan lists free-form credit memos as deliberately deferred. Returning an empty keg posts the deposit refund and the keg event in one RPC, so the credit and the fleet balance cannot disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
+    spec: "Created by Return shipment, never free-form; the plan lists free-form credit memos as deliberately deferred. A keg deposit refund is credited through Return on the invoice that charged the deposit; the empty keg's Returned event is recorded separately in Keg fleet, so nothing yet ties the credit to the fleet balance. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
     body: (<>
       {X.stat("Applied")}
       {X.amt("Total credit", INV.creditMajor, "00")}

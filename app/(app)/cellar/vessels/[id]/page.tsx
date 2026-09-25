@@ -6,6 +6,7 @@ import { VesselForm } from "@/app/(app)/batches/vessel-form";
 import { formatVesselReading, VESSEL_TYPES, type VesselReading } from "@/lib/mgr/vessel-detail-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { batNo } from "@/lib/mgr/doc-no";
+import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
 
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
@@ -28,7 +29,7 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
     title: vessel.name, backHref: "/cellar", name: vessel.name, type: vessel.kind[0].toUpperCase() + vessel.kind.slice(1), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl),
     occupancy: occupancy ? { title: `${occupancy.brand_name ?? "No brand yet"} · ${batNo(occupancy.batch_no)}`, detail: `${occupancy.bbl} / ${vessel.capacity_bbl} bbl`, verb: "Open batch", href: `/batches/${occupancy.batch_id}` } : undefined,
     readingHref: occupancy ? `/cellar/${occupancy.occupancy_id}/reading` : undefined,
-    currentReading: readings[0] ? `${formatVesselReading(readings[0], unit.effective)} · ${readings[0].at}` : "No readings yet",
-    history: readings.map(reading => ({ key: reading.id, title: reading.at, detail: formatVesselReading(reading, unit.effective) })),
+    currentReading: readings[0] ? `${formatVesselReading(readings[0], unit.effective)} · ${formatDateTime(readings[0].at, brewery.timeZone)}` : "No readings yet",
+    history: readings.map(reading => ({ key: reading.id, title: formatDateTime(reading.at, brewery.timeZone), detail: formatVesselReading(reading, unit.effective) })),
   }} />;
 }
