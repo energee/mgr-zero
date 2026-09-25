@@ -19,7 +19,7 @@ import {
   SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
+import { activeChild, activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
 export type AppShellProps = {
@@ -59,17 +59,19 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
             <SidebarMenu>
               {items.map((tab) => {
                 const leaf = !tab.children?.length;
+                const tabActive = tab.label === current && (leaf || isUnder(pathname, tab.href));
+                const child = tab.label === current ? activeChild(tab, pathname) : undefined;
                 return (
                   <SidebarMenuItem key={tab.label}>
-                    <SidebarMenuButton asChild tooltip={tab.label} isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
-                      <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}<span>{tab.label}</span></Link>
+                    <SidebarMenuButton asChild tooltip={tab.label} isActive={tabActive}>
+                      <Link href={tab.href} aria-current={tabActive ? "page" : undefined}>{tab.icon && <Icon icon={tab.icon} />}<span>{tab.label}</span></Link>
                     </SidebarMenuButton>
                     {!leaf && (
                       <SidebarMenuSub>
                         {tab.children!.map((c) => (
                           <SidebarMenuSubItem key={c.href}>
-                            <SidebarMenuSubButton asChild isActive={tab.label === current && isUnder(pathname, c.href)}>
-                              <Link href={c.href}>{c.label}</Link>
+                            <SidebarMenuSubButton asChild isActive={c === child}>
+                              <Link href={c.href} aria-current={c === child ? "page" : undefined}>{c.label}</Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}

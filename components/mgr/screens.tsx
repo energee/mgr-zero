@@ -872,7 +872,7 @@ export const SCREENS: Screen[] = [
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "History is a visible control in the composer strip; no swipe-only interaction.",
+    spec: "The drawer handle is a visible button (Open, Expand, Minimize Ask MGR); no swipe-only interaction.",
     body: <ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },

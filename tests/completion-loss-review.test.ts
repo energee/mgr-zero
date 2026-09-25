@@ -122,7 +122,8 @@ describe("completion loss review", () => {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(String(before.figures.cellarRemovals.loss)).toBe("0.05741935");
-    expect(String(before.figures.removals.loss)).toBe("0.05741935");
+    // Printed removal lines are whole cents that foot to the printed Out (#533); the exact figure stays in cellarRemovals.
+    expect(String(before.figures.removals.loss)).toBe("0.06");
 
     const review = await runCommand("get_loss_review", {
       periodStart: completed.period.start, periodEnd: completed.period.end,
@@ -157,7 +158,8 @@ describe("completion loss review", () => {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as import("@/lib/commands/compliance").Report;
     expect(report.figures.cellarRemovals).toMatchObject({ loss: 0, sample: 0.02, destruction: 0.03741935 });
-    expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(0.05741935, 8);
+    // Reattribution moves the loss between printed lines without changing their total.
+    expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(Number(before.figures.removals.loss), 8);
   });
 
   it("rejects invalid precision, invalid target state, excess, wrong source, tenant, and role without rows", async () => {

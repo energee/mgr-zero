@@ -43,3 +43,13 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
 export function defaultShipToId(shipTos: { id: string; is_default?: boolean }[]): string {
   return shipTos.find((s) => s.is_default)?.id ?? shipTos[0]?.id ?? "";
 }
+
+/** The sale channel a wholesale order's SKU picker narrows to; a transfer, or no customer yet, offers every active SKU. */
+export function skuPickerChannel(kind: "wholesale" | "taproom_transfer", customer: { sale_channel_id: string } | undefined): string | undefined {
+  return kind === "wholesale" ? customer?.sale_channel_id : undefined;
+}
+
+/** A list_skus row as a picker option: "Brand — SKU". */
+export function toSkuOption(sku: { id: string; name: string; brands: { name: string } | null }) {
+  return { id: sku.id, label: sku.brands ? `${sku.brands.name} — ${sku.name}` : sku.name };
+}

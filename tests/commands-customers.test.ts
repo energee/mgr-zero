@@ -96,3 +96,23 @@ describe("list_customers past the 1000-row cap", () => {
     expect(list.at(-1)?.name).toBe("Customer 1005");
   }, 30_000);
 });
+
+// #424: list_channel_prices stopped at PostgREST's max_rows (1000), so the
+// pricing grid showed real prices past it as unpriced.
+describe("list_channel_prices past the 1000-row cap", () => {
+  it("returns every cell", async () => {
+    const many = await makeBrewery();
+    const staff = await makeStaffCtx(many.id, "sales");
+    const channel = await channelId(many.id, "Wholesale");
+    const { formatId: format } = await seedCatalog(many.id);
+    sql(`with g as (
+        insert into price_groups (brewery_id, name, position)
+        select '${many.id}', 'G' || n, n from generate_series(1, 1005) n returning id)
+      insert into channel_prices (brewery_id, sale_channel_id, price_group_id, format_id, unit_price_cents)
+      select '${many.id}', '${channel}', id, '${format}', 100 from g`, true);
+    const cells = await runCommand("list_channel_prices", {}, staff) as unknown[];
+    expect(cells).toHaveLength(1005);
+    const narrowed = await runCommand("list_channel_prices", { saleChannelId: channel }, staff) as unknown[];
+    expect(narrowed).toHaveLength(1005);
+  }, 30_000);
+});
