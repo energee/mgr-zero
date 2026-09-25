@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderFormReadiness } from "@/lib/order-form-rules";
+import { orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 const catalog = { customers: 1, locations: 1, skus: 1 };
 const line = { skuId: "sku-1", qty: "12" };
@@ -50,4 +50,17 @@ it("new-order destination prefers the default and falls back only when none is d
   expect(defaultShipToId([{ id: "first" }, { id: "default", is_default: true }])).toBe("default");
   expect(defaultShipToId([{ id: "first" }, { id: "second" }])).toBe("first");
   expect(defaultShipToId([])).toBe("");
+});
+
+// #490: a wholesale order's SKU picker offers only what the customer's channel prices.
+describe("SKU picker", () => {
+  it("narrows to the chosen wholesale customer's sale channel, not a transfer's", () => {
+    expect(skuPickerChannel("wholesale", { sale_channel_id: "wholesale" })).toBe("wholesale");
+    expect(skuPickerChannel("wholesale", undefined)).toBeUndefined();
+    expect(skuPickerChannel("taproom_transfer", { sale_channel_id: "wholesale" })).toBeUndefined();
+  });
+  it("labels a SKU with its brand when it has one", () => {
+    expect(toSkuOption({ id: "s", name: "½ bbl", brands: { name: "Hazy IPA" } })).toEqual({ id: "s", label: "Hazy IPA — ½ bbl" });
+    expect(toSkuOption({ id: "s", name: "½ bbl", brands: null })).toEqual({ id: "s", label: "½ bbl" });
+  });
 });

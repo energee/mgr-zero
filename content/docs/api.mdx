@@ -2289,9 +2289,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-SKUs with their brand and format, alphabetical
+SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4008,7 +4010,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured
 
 | Field | Type | Required |
 | --- | --- | --- |
