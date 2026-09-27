@@ -1351,7 +1351,7 @@ export const SCREENS: Screen[] = [
     writes: "replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["complete", "every material has a quantity"], ["empty", "the Format consumes no tracked packaging"]],
     spec: "The BOM belongs entirely to the Format. A different physical package requires another Format; correcting its existing definition affects future calculations, not recorded consumption. SKUs never override it.",
-    body: <PackageBomView model={toPackageBomViewProps(packageBomCase)} />,
+    body: <PackageBomView model={toPackageBomViewProps(packageBomCase)} rowAction={E.act("Edit")} />,
   },
   {
     step: 5,
