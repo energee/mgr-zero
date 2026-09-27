@@ -276,6 +276,66 @@ describe("purchase orders: draft, mark sent, receive", () => {
   });
 });
 
+// #614: readers such as get_recipe apply a material's current units to stored
+// quantities, so units lock once any row stores a quantity in them, not only
+// once stock has moved.
+describe("material units lock once anything stores a quantity in them", () => {
+  const lb = { category: "malt", baseUom: "lb", purchaseUom: "lb" } as const;
+  const kg = { ...lb, baseUom: "kg", purchaseUom: "kg" } as const;
+  let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
+  beforeAll(async () => { owner = await makeStaffCtx(b.id, "admin"); });
+
+  const refusesUnitChange = async (id: string, name: string) => {
+    await expect(runCommand("upsert_material", { id, name, ...kg }, owner)).rejects.toThrow(/units cannot change/);
+    expect((await admin.from("materials").select("base_uom").eq("id", id)).data).toEqual([{ base_uom: "lb" }]);
+  };
+
+  it("a recipe version locks the units, so its predicted gravity cannot move", async () => {
+    const m = (await runCommand("upsert_material", { name: "Maris Otter", ...lb, extractPotential: 1.037 }, owner)) as { id: string };
+    const recipe = (await runCommand("create_recipe", { name: "Bitter" }, owner)) as { id: string };
+    await runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ materialId: m.id, perBblQty: 60, stage: "mash" }],
+    }, owner);
+    const before = (await runCommand("get_recipe", { recipeId: recipe.id }, owner)) as { ogPlato: number; abv: number };
+    await refusesUnitChange(m.id, "Maris Otter");
+    const after = (await runCommand("get_recipe", { recipeId: recipe.id }, owner)) as { ogPlato: number; abv: number };
+    expect({ ogPlato: after.ogPlato, abv: after.abv }).toEqual({ ogPlato: before.ogPlato, abv: before.abv });
+  });
+
+  it("a format BOM, PO line, contract, or draft transfer line locks the units too", async () => {
+    const vendor = (await runCommand("upsert_vendor", { name: "Unit Lock Supply" }, owner)) as { id: string };
+    const from = await seedLocation(b.id, { name: "Unit lock A" });
+    const to = await seedLocation(b.id, { name: "Unit lock B" });
+    const uses: [string, (materialId: string) => Promise<unknown>][] = [
+      ["bom", async (materialId) => {
+        const format = (await runCommand("upsert_format", { name: "Unit lock case", basis: "packaged" }, owner)) as { id: string };
+        return runCommand("replace_format_bom", { formatId: format.id, lines: [{ materialId, qtyPerUnit: 1 }] }, owner);
+      }],
+      ["po", (materialId) => runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId, qtyOrdered: 10 }] }, owner)],
+      ["contract", (materialId) => runCommand("upsert_material_contract", { vendorId: vendor.id, materialId, qtyCommitted: 100 }, owner)],
+      ["transfer", (materialId) => runCommand("create_stock_transfer", {
+        fromLocationId: from.id, toLocationId: to.id, lines: [{ materialId, qty: 5, fromBinId: from.binId, toBinId: to.binId }],
+      }, owner)],
+    ];
+    for (const [use, reference] of uses) {
+      const name = `Unit lock ${use}`;
+      const m = (await runCommand("upsert_material", { name, ...lb }, owner)) as { id: string };
+      await reference(m.id);
+      await refusesUnitChange(m.id, name);
+      // A change that leaves the units alone still saves.
+      const renamed = (await runCommand("upsert_material", { id: m.id, name: `${name} (renamed)`, ...lb }, owner)) as { name: string };
+      expect(renamed.name).toBe(`${name} (renamed)`);
+    }
+  });
+
+  it("a material nothing references can still change units", async () => {
+    const m = (await runCommand("upsert_material", { name: "Unit lock unused", ...lb }, owner)) as { id: string };
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Unit lock unused", ...kg }, owner)) as { base_uom: string };
+    expect(edited.base_uom).toBe("kg");
+  });
+});
+
 describe("planning: draft purchase orders from material gaps", () => {
   it("one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped", async () => {
     // Dates relative to today (UTC, like the database's current_date), so buy-by never drifts into the past.
