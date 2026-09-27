@@ -1,3 +1,4 @@
+import { unwrap } from "@/lib/commands/registry";
 import { rawDatabase } from "./raw-database";
 // Real isolated-Postgres proof for QBO state, realm replacement and credential races.
 import { createHash } from "node:crypto";
@@ -18,6 +19,28 @@ import {
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("QuickBooks durable lifecycle", () => {
+  it.each([400, 500])("records only definitive invalid_grant refresh rejection (%s)", async (status) => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connection = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: `invalid-grant-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+    }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection.data!.id}','access-secret','refresh-secret',1)`);
+    const transport = vi.fn<typeof globalThis.fetch>(async () => Response.json({
+      error: "invalid_grant", error_description: "secret provider detail",
+    }, { status }));
+    const client = new QboOAuthClient({ clientId: "client", clientSecret: "secret",
+      redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport);
+    await expect(refreshQboTokens(ctx, client)).rejects.toThrow("QuickBooks is unavailable");
+    const health = await getQboHealth(ctx);
+    expect(health).toMatchObject({ state: status === 400 ? "recovery_required" : "connected",
+      lastError: status === 400 ? "QuickBooks authorization expired or was revoked" : null });
+    expect(sql(`select refresh_token from private.integration_tokens where connection_id='${connection.data!.id}'`))
+      .toEqual(["refresh-secret"]);
+  });
+
   it("carries exact intent scopes through an omitted token scope into the tax credential path", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
@@ -370,6 +393,75 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("brewery_users").update({ role: "brewer" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     await expect(readVersionedIntegrationTokens(ctx, "qbo")).rejects.toMatchObject({ status: 403 });
     expect((await rawDatabase(ctx.db).schema("private").from("integration_tokens").select("refresh_token")).error).not.toBeNull();
+  });
+
+  it("restricts recovery writes and recognizes a locally expired credential without provider work", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "sales");
+    const foreign = await makeBrewery();
+    const { data: connection, error } = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: `expired-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+      refresh_expires_at: "2026-01-01T00:00:00Z",
+    }).select("id").single();
+    expect(error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection!.id}','old-access','old-refresh',1)`);
+    const args = { p_brewery: brewery.id, p_connection: connection!.id, p_actor: ctx.userId, p_expected_version: 1 };
+    expect(sql(`select r.role from (values ('anon'),('authenticated'),('service_role')) r(role)
+      where has_function_privilege(r.role,'public.mark_qbo_authorization_failed(uuid,uuid,uuid,bigint,uuid,uuid)','execute')`))
+      .toEqual(["service_role"]);
+    expect((await ctx.db.rpc("mark_qbo_authorization_failed", args)).error?.code).toBe("42501");
+    expect(await admin.rpc("mark_qbo_authorization_failed", { ...args, p_brewery: foreign.id }))
+      .toMatchObject({ data: false, error: null });
+    expect(await admin.rpc("mark_qbo_authorization_failed", { ...args, p_actor: crypto.randomUUID() }))
+      .toMatchObject({ data: false, error: null });
+    const transport = vi.fn<typeof globalThis.fetch>();
+    await expect(refreshQboTokens(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
+      redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport)))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect(transport).not.toHaveBeenCalled();
+    expect(await getQboHealth(ctx)).toMatchObject({ state: "recovery_required" });
+  });
+
+  it.each(["refresh", "reconnect", "disconnect", "role change"])("ignores a rejected stale refresh after %s", async (change) => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const { data: connection, error } = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: `recovery-race-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+    }).select("id").single();
+    expect(error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection!.id}','old-access','old-refresh',1)`);
+    const transport = vi.fn<typeof globalThis.fetch>(async () => {
+      if (change === "refresh") {
+        expect(await admin.rpc("cas_integration_tokens", {
+          p_brewery: brewery.id, p_provider: "qbo", p_connection: connection!.id, p_actor: ctx.userId,
+          p_expected_version: 1, p_access_token: "new-access", p_refresh_token: "new-refresh",
+          p_received_at: new Date().toISOString(), p_access_seconds: 3600, p_refresh_seconds: null, p_hard_seconds: null,
+        })).toMatchObject({ data: true, error: null });
+      } else if (change === "reconnect") {
+        const state = crypto.randomUUID();
+        await unwrap(ctx.db.rpc("begin_qbo_oauth", { p_brewery: brewery.id, p_redirect_uri: "https://mgr.test/qbo",
+          p_state_hash: hash(state), p_provider_intent: "reconnect", p_request_id: crypto.randomUUID() }));
+        const claim = await claimQboOAuth(hash(state), ctx.userId, brewery.id, "https://mgr.test/qbo");
+        const { data: row } = await admin.from("qbo_connections").select("realm_id").eq("id", connection!.id).single();
+        await completeQboOAuthStore(claim!.intentId, ctx.userId, row!.realm_id, {
+          accessToken: "reconnected-access", refreshToken: "reconnected-refresh", receivedAt: new Date().toISOString(),
+          accessExpiresIn: 3600, refreshExpiresIn: null, refreshHardExpiresIn: null, grantedScopes: null,
+        });
+      } else if (change === "disconnect") {
+        await disconnectQbo(ctx, connection!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID());
+      } else {
+        expect((await admin.from("brewery_users").update({ role: "brewer" })
+          .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
+      }
+      return Response.json({ error: "invalid_grant" }, { status: 400 });
+    });
+    await expect(refreshQboTokens(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
+      redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport)))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect((await admin.from("qbo_connections").select("state,last_error").eq("id", connection!.id).single()).data)
+      .toMatchObject({ state: change === "disconnect" ? "disconnected" : "connected", last_error: null });
   });
 
   it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {
