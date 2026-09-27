@@ -3,11 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { InviteView, TeamMemberView } from "../components/mgr/views/team-controls";
 
-it("keeps buyer invitations fixed and staff invitations inclusive of taproom", () => {
+it("keeps buyer invitations fixed and staff invitations to the four offered roles", () => {
   const staff = renderToStaticMarkup(createElement(InviteView, { buyer: false, role: "taproom", busy: true, error: "Retry unchanged details" }));
   expect(staff).toContain('type="email"');
   expect(staff).toContain("required");
-  expect(staff).toContain("Taproom");
+  // The taproom role is not offered until a taproom customer needs it (2026-09-26).
+  expect(staff).not.toContain("Taproom");
+  expect(staff).not.toContain("taproom stock and personal preferences");
   expect(staff).toContain("disabled");
   expect(staff).toContain("Retry unchanged details");
   const buyer = renderToStaticMarkup(createElement(InviteView, { buyer: true }));

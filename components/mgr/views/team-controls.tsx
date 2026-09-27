@@ -4,10 +4,11 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 
+// The staff_role enum also holds `taproom`; Team does not offer it until a
+// taproom customer needs it (owner decision 2026-09-26).
 const ROLES = [
   ["warehouse", "Warehouse", "pick, receive, count, transfer"], ["sales", "Sales", "orders, customers, price groups"],
-  ["brewer", "Brewer", "batches, cellar, packaging"], ["taproom", "Taproom", "taproom stock and personal preferences"],
-  ["admin", "Admin", "everything, including team and settings"],
+  ["brewer", "Brewer", "batches, cellar, packaging"], ["admin", "Admin", "everything, including team and settings"],
 ];
 
 function StaffRoleField({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
