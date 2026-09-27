@@ -178,8 +178,8 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
       <Button disabled={busy || !binId || !channelId}>{busy ? "Saving…" : "Configure menu"}</Button>
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
-    {model.items.map(item => <div key={item.formatId}>{E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, item.href ? E.act("Open", "primary", item.href) : "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={item.formatId}>{E.row(item.label, item.reason ?? "Unavailable", item.href ? E.act("Open", "primary", item.href) : E.status("Off register", "w"), "w")}</div>)}
+    {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, item.href ? E.act("Open", "primary", item.href) : "", "ok")}</div>)}
+    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, item.reason ?? "Unavailable", item.href ? E.act("Open", "primary", item.href) : E.status("Off register", "w"), "w")}</div>)}
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />

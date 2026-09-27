@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { SquareClient, syncSquareCatalog, syncSquareSales } from "@/lib/pos";
 import "@/lib/commands/all";
-import { admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 
 const config = {
   applicationId: "app",
@@ -82,10 +82,7 @@ async function fixture(options: { squareCatalog?: boolean } = {}) {
   const one = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
   const two = await seedLocation(brewery.id, { name: "Beer garden", uses: ["taproom"] });
   const catalog = await seedCatalog(brewery.id, { product: "Hazy", packageType: "keg", bblPerUnit: .5 });
-  const pour = await admin.from("formats").insert({
-    brewery_id: brewery.id, brand_id: catalog.brandId, name: "Pint", basis: "poured", ounces: 16,
-  }).select("id").single();
-  expect(pour.error).toBeNull();
+  const pour = { id: await seedPour(brewery.id, { brandId: catalog.brandId, name: "Pint", ounces: 16 }) };
   expect((await admin.from("pos_locations").insert([
     { brewery_id: brewery.id, connection_id: connection.data!.id, external_location_id: "L1", location_id: one.id },
     { brewery_id: brewery.id, connection_id: connection.data!.id, external_location_id: "L2", location_id: two.id },
@@ -97,10 +94,10 @@ async function fixture(options: { squareCatalog?: boolean } = {}) {
     })).error).toBeNull();
     expect((await admin.from("pos_item_mappings").insert({
       brewery_id: brewery.id, connection_id: connection.data!.id, external_item_id: "I1", external_variation_id: "V1",
-      format_id: pour.data!.id,
+      format_id: pour.id,
     })).error).toBeNull();
   }
-  return { brewery, ctx, merchantId, connectionId: connection.data!.id as string, locations: [one, two], catalog, pour: pour.data! };
+  return { brewery, ctx, merchantId, connectionId: connection.data!.id as string, locations: [one, two], catalog, pour };
 }
 
 function currentExpected(breweryId: string) {

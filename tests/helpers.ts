@@ -122,10 +122,11 @@ export async function seedMaterial(breweryId: string, o: {
 // brand + packaged format + the sku that is their product (§16.1, §16.2).
 export async function seedCatalog(
   breweryId: string,
-  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number; format?: string } = {},
+  // priceGroupId puts the brand on an existing group, so it shares that group's pours.
+  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number; format?: string; priceGroupId?: string } = {},
 ) {
   const { data: b, error: be } = await admin.from("brands")
-    .insert({ brewery_id: breweryId, name: opts.product ?? "IPA" }).select("id").single();
+    .insert({ brewery_id: breweryId, name: opts.product ?? "IPA", price_group_id: opts.priceGroupId ?? null }).select("id").single();
   if (be) throw be;
   const formatName = opts.format ?? `${opts.packageType ?? "can"} ${opts.bblPerUnit ?? 0.0645} bbl`;
   const existing = await admin.from("formats").select("id").eq("brewery_id", breweryId).eq("name", formatName).eq("basis", "packaged").maybeSingle();
@@ -183,12 +184,35 @@ export async function seedPriceGroup(breweryId: string, name = "1", position?: n
 // Price every SKU of a brand on one channel and format: put the brand on group "1"
 // (created if missing) and fill that cell. Replaces the old set_price seeding.
 export async function priceSku(breweryId: string, o: { saleChannelId: string; brandId: string; formatId: string; cents: number }) {
-  let group = (await admin.from("price_groups").select("id").eq("brewery_id", breweryId).eq("name", "1").maybeSingle()).data?.id as string | undefined;
-  if (!group) group = await seedPriceGroup(breweryId);
-  await admin.from("brands").update({ price_group_id: group }).eq("id", o.brandId);
+  const brand = (await admin.from("brands").select("price_group_id").eq("id", o.brandId).maybeSingle()).data;
+  let group = brand?.price_group_id as string | undefined;
+  if (!group) {
+    group = (await admin.from("price_groups").select("id").eq("brewery_id", breweryId).eq("name", "1").maybeSingle()).data?.id as string | undefined;
+    if (!group) group = await seedPriceGroup(breweryId);
+    await admin.from("brands").update({ price_group_id: group }).eq("id", o.brandId);
+  }
   const { error } = await admin.from("channel_prices").upsert({ brewery_id: breweryId, sale_channel_id: o.saleChannelId, price_group_id: group, format_id: o.formatId, unit_price_cents: o.cents });
   if (error) throw error;
   return group;
+}
+
+/** A group-owned pour. Puts the brand on a price group when needed. */
+export async function seedPour(breweryId: string, o: { brandId?: string; priceGroupId?: string; name: string; ounces: number }) {
+  let group = o.priceGroupId;
+  if (!group && o.brandId) {
+    const brand = (await admin.from("brands").select("price_group_id").eq("id", o.brandId).single()).data;
+    group = brand?.price_group_id as string | undefined;
+    if (!group) {
+      group = await seedPriceGroup(breweryId, `g-${o.brandId.slice(0, 8)}`);
+      await admin.from("brands").update({ price_group_id: group }).eq("id", o.brandId);
+    }
+  }
+  if (!group) group = await seedPriceGroup(breweryId);
+  const { data, error } = await admin.from("formats").insert({
+    brewery_id: breweryId, name: o.name, basis: "poured", ounces: o.ounces, price_group_id: group,
+  }).select("id").single();
+  if (error) throw error;
+  return data.id as string;
 }
 
 // A brewery's seeded sale channel by name (Wholesale, Taproom, DTC, Export —

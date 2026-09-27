@@ -59,9 +59,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 ## delete_format [#delete_format]
 
-`command` · admin
+`command` · admin, sales
 
-Delete an unused packaged format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history
+Delete an unused format and its own contents and materials; refuse formats referenced by SKUs, other packages, prices or history. Sales may delete an unused pour; packaged formats stay admin.
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -112,7 +112,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, taproom
 
-Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list
+Formats alphabetical; brandId filters pours on that brand's price group
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -274,7 +274,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -285,7 +285,7 @@ Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) 
 | `kegSize` | half_bbl or quarter_bbl or sixth_bbl or fifty_l or thirty_l or twenty_l | no |
 | `unitsPerCase` | integer | no |
 | `bblPerUnit` | number | no |
-| `brandId` | uuid | no |
+| `priceGroupId` | uuid | no |
 | `ounces` | number | no |
 
 ```bash

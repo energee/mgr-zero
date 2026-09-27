@@ -21,7 +21,7 @@ async function query(name: string, input?: { basis?: string }) {
   switch (name) {
     case "list_brands": return [brand];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
-    case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: "brand", brands: { name: "Hazy" } }].filter(f => !input?.basis || f.basis === input.basis);
+    case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: null, price_group_id: "group", price_groups: { name: "Core" } }].filter(f => !input?.basis || f.basis === input.basis);
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
@@ -102,10 +102,12 @@ it("bins shared view retains actual stock move inputs and suppresses Warehouse-o
   expect(state.calls).not.toContain("get_bin_move_stock");
   expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
 });
-it("pricing shared tables retain brand-qualified poured columns", async () => {
+it("pricing shared tables draw a group's pour as a column by its name, with a cell on that group", async () => {
   const page = await PricingPage();
   expect(page.type).toBe(PriceGroupsView);
-  expect(render(page)).toContain("Hazy · Pint");
+  const html = render(page);
+  expect(html).toMatch(/>Pint<\/th>/);
+  expect(html.match(/not priced/g)).toHaveLength(2);
 });
 it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();

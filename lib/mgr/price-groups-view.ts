@@ -1,12 +1,11 @@
 // lib/mgr/price-groups-view.ts — view-model for the Price groups grid.
 // list_sale_channels × list_price_groups × list_formats, filled from
-// list_channel_prices. Every format is a column on every channel, as the live
-// grid draws it: an unpriced format still needs a cell to tap. A cell is the
-// money string, or null when unpriced; the view draws the label. Ids ride
-// along so the live page can hang its forms on the same table.
+// list_channel_prices. Packaged formats are one column each. Pours owned by a
+// price group share a column by name; a group with no pour of that name has
+// no cell. A cell is the money string, or null when unpriced.
 import { money } from "./money";
 
-export type PriceGroupsRowView = { id: string; name: string; cells: (string | null)[] };
+export type PriceGroupsRowView = { id: string; name: string; cells: (string | null)[]; formatIds: (string | null)[] };
 
 export type PriceGroupsChannelView = {
   id: string;
@@ -30,7 +29,15 @@ export type PriceGroupsSnapshot = {
   backHref?: string;
   channels: { id: string; name: string }[];
   groups: PriceGroupRow[];
-  formats: { id: string; name: string; brands?: { name: string } | null }[];
+  formats: {
+    id: string;
+    name: string;
+    basis?: "packaged" | "poured";
+    ounces?: number | string | null;
+    price_group_id?: string | null;
+    brands?: { name: string } | null;
+    price_groups?: { name: string } | null;
+  }[];
   cells: {
     sale_channel_id: string;
     price_group_id: string;
@@ -44,23 +51,42 @@ export const cellKey = (channelId: string, groupId: string, formatId: string) =>
 /** A format column's label: "Hazy · ½ bbl keg" when the format belongs to a brand. */
 export const formatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;
 
+/** One column per packaged format, then one per pour name; `formatId` says which format a group's cell prices. */
+function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
+  const packaged = formats.filter((f) => f.basis !== "poured");
+  const pours = Map.groupBy(formats.filter((f) => f.basis === "poured"), (f) => f.name);
+  return [
+    ...packaged.map((f) => ({ label: formatLabel(f), formatId: (): string | null => f.id })),
+    ...[...pours].map(([name, group]) => ({
+      label: name,
+      formatId: (groupId: string) => group.find((f) => f.price_group_id === groupId)?.id ?? null,
+    })),
+  ];
+}
+
 /** Map the four list_* pricing queries onto PriceGroupsView tables. */
 export function toPriceGroupsViewProps({ channels, groups, formats, cells }: PriceGroupsSnapshot): PriceGroupsViewModel {
   const byKey = new Map(cells.map((c) => [cellKey(c.sale_channel_id, c.price_group_id, c.format_id), c.unit_price_cents]));
+  const columns = pricingColumns(formats);
   return {
-    formats: formats.map(formatLabel),
+    formats: columns.map((c) => c.label),
     groupCount: groups.length,
     channels: channels.map((channel) => ({
       id: channel.id,
       name: channel.name,
-      rows: groups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        cells: formats.map((format) => {
-          const cents = byKey.get(cellKey(channel.id, group.id, format.id));
-          return cents === undefined ? null : money(cents);
-        }),
-      })),
+      rows: groups.map((group) => {
+        const formatIds = columns.map((column) => column.formatId(group.id));
+        return {
+          id: group.id,
+          name: group.name,
+          formatIds,
+          cells: formatIds.map((formatId) => {
+            if (!formatId) return null;
+            const cents = byKey.get(cellKey(channel.id, group.id, formatId));
+            return cents === undefined ? null : money(cents);
+          }),
+        };
+      }),
     })),
   };
 }

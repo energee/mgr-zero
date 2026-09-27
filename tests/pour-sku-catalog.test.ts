@@ -17,17 +17,18 @@ describe('pours in the sellable SKU catalog', () => {
   });
 });
 
-import { skuCreateCommand } from '../lib/mgr/sku-view';
-it('routes pour creation to the serving command and excludes stock fields', () => {
-  const fields = { brandId:'brand', kind:'poured' as const, pourName:'Pint', ounces:'16', formatId:'case', name:'Case', upc:'123' };
-  expect(skuCreateCommand(fields)).toEqual({ name:'upsert_format', input:{brandId:'brand',basis:'poured',name:'Pint',ounces:16}, valid:true });
-  expect(skuCreateCommand({...fields, ounces:'0'}).valid).toBe(false);
-  expect(skuCreateCommand({...fields, ounces:'1000'}).valid).toBe(false);
-  expect(skuCreateCommand({...fields, ounces:'Infinity'}).valid).toBe(false);
-  expect(skuCreateCommand({...fields, kind:'packaged'}).input).toEqual({brandId:'brand',formatId:'case',name:'Case',upc:'123'});
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { pourSkuName, skuCreateCommand, toSkuViewProps } from '../lib/mgr/sku-view';
+import { SkuView } from '../components/mgr/views/sku';
+it('New SKU creates a packaged SKU only; pours are added on the price group', () => {
+  expect(skuCreateCommand({ brandId:'brand', formatId:'case', name:'Case', upc:'123' })).toEqual({ name:'create_sku', input:{brandId:'brand',formatId:'case',name:'Case',upc:'123'}, valid:true });
+  expect(skuCreateCommand({ brandId:'brand', formatId:'', name:'', upc:'' }).valid).toBe(false);
+  const html = renderToStaticMarkup(createElement(SkuView, { model: toSkuViewProps({ formats: [{ id:'case', name:'Case' }] }) }));
+  expect(html).toContain('Format');
+  expect(html).not.toContain('>Type<');
 });
 it('suggests a pour name from serving size when no custom name is supplied', () => {
-  const result = skuCreateCommand({ brandId:'brand', kind:'poured', pourName:'', ounces:'16', formatId:'', name:'', upc:'' });
-  expect(result.input).toMatchObject({name:'16 oz pour',ounces:16});
-  expect(result.valid).toBe(true);
+  expect(pourSkuName('', '16')).toBe('16 oz pour');
+  expect(pourSkuName(' Pint ', '16')).toBe('Pint');
 });

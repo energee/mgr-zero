@@ -42,7 +42,7 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   pos_item_mappings: ["connection_id", "external_item_id", "external_variation_id"],
   pos_catalog_variations: ["connection_id", "external_item_id", "external_variation_id"], pos_sale_expectations: ["sale_id"],
   pos_catalog_items: ["connection_id", "brand_id", "catalog_group"],
-  pos_catalog_ownership: ["connection_id", "format_id"],
+  pos_catalog_ownership: ["connection_id", "format_id", "brand_id"],
   catalog_categories: ["brewery_id", "name"],
 };
 const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
@@ -68,6 +68,7 @@ async function fixtures() {
   await put("styles", { name: "IPA" });
   await put("water_profiles", { name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 });
   const group = await put("price_groups", { name: "Standard", position: 1 });
+  await admin.from("brands").update({ price_group_id: group.id }).eq("id", cat.brandId);
   await put("catalog_categories", { name: "Lager" });
   const composed = await put("formats", { name: "Six cases", basis: "packaged", package_type: "can" });
   await put("format_components", { parent_format_id: composed.id, child_format_id: cat.formatId, qty: 6 });
@@ -131,7 +132,7 @@ async function fixtures() {
   await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id });
   const poured = await put("formats", { brand_id: cat.brandId, name: "Pint", basis: "poured", ounces: 16 });
   const menu = await put("pos_menus", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, bin_id: taps[0].binId, sale_channel_id: customer.saleChannelId });
-  await put("pos_menu_lines", { menu_id: menu.id, format_id: poured.id, price_override_cents: 700 });
+  await put("pos_menu_lines", { menu_id: menu.id, format_id: poured.id, brand_id: cat.brandId, price_override_cents: 700 });
   await put("pos_catalog_variations", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", external_item_name: "IPA", external_variation_name: "Can", source_version: 1 });
   await put("pos_catalog_items", { connection_id: pos.id, brand_id: cat.brandId, catalog_group: "poured", external_item_id: "I1", ownership: "adopted" });
   await put("pos_catalog_ownership", { connection_id: pos.id, brand_id: cat.brandId, catalog_group: "poured", format_id: poured.id, external_item_id: "I1", external_variation_id: "V1" });
@@ -353,7 +354,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
+  const readSignatures = ["get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
   const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());

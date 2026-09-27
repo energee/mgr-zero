@@ -3,13 +3,16 @@
 // edit (`groupId` rides in the input). Both draw the same PriceGroupView from
 // the same adapter, so the dialog reads the same whether the row exists yet. Delete calls
 // delete_price_group and shows its refusal ("price group is in use") inline,
-// the way delete-channel-button.tsx does.
+// the way delete-channel-button.tsx does. An existing group also adds pours
+// (PourForm) and removes them (delete_format) in the same error slot.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
+import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
@@ -36,9 +39,13 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <PriceGroupView
-          model={draft}
+          // Only the three fields are drafts; pours come from the refreshed model, so
+          // Add pour and Remove show up without reopening the dialog.
+          model={{ ...model, name: draft.name, position: draft.position, costCeilingInput: draft.costCeilingInput }}
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
+          addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
+          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }); }, form.busy)}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (

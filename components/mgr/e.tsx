@@ -168,9 +168,10 @@ export const E = {
     </Item>
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status.
-   *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out. */
-  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void) => (
-    <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} className={cn(
+   *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
+   *  `disabled` holds an in-place action while its command runs. */
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean) => (
+    <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} disabled={disabled} className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",

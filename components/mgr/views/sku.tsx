@@ -1,9 +1,9 @@
 // components/mgr/views/sku.tsx — SKU sheet drawing, shared by the inventory
-// record and by sku-form.tsx (create) and SkuEditForm (edit). The live forms
+// record, sku-form.tsx (create), SkuEditForm (edit) and pour-form.tsx (a pour, locked). The live forms
 // pass `controls` to take the fields over; everything visible is drawn here.
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +12,6 @@ import type { SkuViewModel } from "@/lib/mgr/sku-view";
 export type { SkuViewModel };
 
 type Controls = {
-  kind?: (value: "packaged" | "poured") => void;
   pourName?: (value: string) => void;
   ounces?: (value: string) => void;
   format?: (value: string) => void;
@@ -40,11 +39,11 @@ export function SkuView({
   messages?: ReactNode;
   footer?: ReactNode;
 }) {
-  const [localKind, setLocalKind] = useState(model.kind ?? "packaged");
-  const kind = controls.kind ? model.kind ?? "packaged" : localKind; // ponytail: preview-only state; live passes controls.kind
+  // New SKU is packaged; a pour is created and edited on its price group (PourForm, locked).
+  const kind = model.kind ?? "packaged";
   return (
     <>
-      {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : <RegistrySelect label="Type" value={kind} options={[{ value: "packaged", label: "Packaged" }, { value: "poured", label: "Pour" }]} onChange={(value) => (controls.kind ?? setLocalKind)(value === "poured" ? "poured" : "packaged")} />}
+      {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : null}
       {kind === "poured" ? <>
         {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { onChange: controls.ounces, inputMode: "decimal", required: Boolean(controls.ounces) })}
         <details open={model.pourName ? true : undefined}><summary className="cursor-pointer text-sm font-medium">Rename · optional</summary><div className="pt-3"><RegistryInput label="Name" value={model.pourName ?? ""} onChange={controls.pourName} placeholder={Number(model.ounces) > 0 ? `${Number(model.ounces)} oz pour` : "Pint"} /></div></details>

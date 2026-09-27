@@ -117,7 +117,7 @@ export function PosItemControl({ posLocationId, brandId, formatId, item }: {
   const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_item", { posLocationId, brandId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt);
   return <PosItemView item={item} busy={command.busy || publication.busy} error={command.error ?? publication.error}
     notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
-    onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, unitPriceCents: value === "" ? null : Math.round(Number(value) * 100) })}
-    onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, published })}
+    onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, brandId, unitPriceCents: value === "" ? null : Math.round(Number(value) * 100) })}
+    onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, brandId, published })}
     onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
 }

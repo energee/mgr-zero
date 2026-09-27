@@ -1276,6 +1276,7 @@ export type Database = {
           name: string
           ounces: number | null
           package_type: Database["public"]["Enums"]["package_type"] | null
+          price_group_id: string | null
           units_per_case: number | null
         }
         Insert: {
@@ -1289,6 +1290,7 @@ export type Database = {
           name: string
           ounces?: number | null
           package_type?: Database["public"]["Enums"]["package_type"] | null
+          price_group_id?: string | null
           units_per_case?: number | null
         }
         Update: {
@@ -1302,6 +1304,7 @@ export type Database = {
           name?: string
           ounces?: number | null
           package_type?: Database["public"]["Enums"]["package_type"] | null
+          price_group_id?: string | null
           units_per_case?: number | null
         }
         Relationships: [
@@ -1325,6 +1328,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "breweries"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formats_price_group_fk"
+            columns: ["price_group_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "price_groups"
+            referencedColumns: ["id", "brewery_id"]
           },
         ]
       }
@@ -3595,6 +3605,7 @@ export type Database = {
       }
       pos_menu_lines: {
         Row: {
+          brand_id: string
           brewery_id: string
           format_id: string
           menu_id: string
@@ -3603,6 +3614,7 @@ export type Database = {
           website_published_at: string | null
         }
         Insert: {
+          brand_id: string
           brewery_id: string
           format_id: string
           menu_id: string
@@ -3611,6 +3623,7 @@ export type Database = {
           website_published_at?: string | null
         }
         Update: {
+          brand_id?: string
           brewery_id?: string
           format_id?: string
           menu_id?: string
@@ -3619,6 +3632,20 @@ export type Database = {
           website_published_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pos_menu_lines_brand_fk"
+            columns: ["brand_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "pos_menu_lines_brand_fk"
+            columns: ["brand_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "product_volume_requirements"
+            referencedColumns: ["brand_id", "brewery_id"]
+          },
           {
             foreignKeyName: "pos_menu_lines_brewery_id_fkey"
             columns: ["brewery_id"]
@@ -7847,6 +7874,7 @@ export type Database = {
       }
       get_pos_menu_item: {
         Args: {
+          p_brand: string
           p_brewery: string
           p_external_location: string
           p_format: string
@@ -8687,6 +8715,7 @@ export type Database = {
       }
       set_pos_price_override: {
         Args: {
+          p_brand: string
           p_brewery: string
           p_external_location: string
           p_format: string
@@ -8697,6 +8726,7 @@ export type Database = {
       }
       set_pos_website_publication: {
         Args: {
+          p_brand: string
           p_brewery: string
           p_external_location: string
           p_format: string
@@ -9017,13 +9047,13 @@ export type Database = {
         Args: {
           p_basis: Database["public"]["Enums"]["format_basis"]
           p_bbl_per_unit: number
-          p_brand?: string
           p_brewery: string
           p_id: string
           p_keg_size: Database["public"]["Enums"]["keg_size"]
           p_name: string
           p_ounces?: number
           p_package_type: Database["public"]["Enums"]["package_type"]
+          p_price_group?: string
           p_request_id: string
           p_units_per_case: number
         }

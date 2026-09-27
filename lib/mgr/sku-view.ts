@@ -39,13 +39,9 @@ export function toSkuViewProps({ sku, formats }: SkuSnapshot): SkuViewModel {
   };
 }
 
-/** Sellable SKU creation preserves the existing stock/serving write boundaries. */
-export function skuCreateCommand(fields: {
-  kind: "packaged" | "poured"; brandId: string; formatId: string; name: string; upc: string; pourName: string; ounces: string;
-}) {
-  return fields.kind === "poured"
-    ? { name: "upsert_format", input: { brandId: fields.brandId, basis: "poured", name: pourSkuName(fields.pourName, fields.ounces), ounces: Number(fields.ounces) }, valid: Number(fields.ounces) > 0 && Number(fields.ounces) < 1000 }
-    : { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined }, valid: Boolean(fields.formatId) };
+/** New SKU is one brand in one packaged format; pours are added on the price group (PourForm). */
+export function skuCreateCommand(fields: { brandId: string; formatId: string; name: string; upc: string }) {
+  return { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined }, valid: Boolean(fields.formatId) };
 }
 
 export const pourSkuName = (name: string, ounces: string) => name.trim() || `${Number(ounces)} oz pour`;

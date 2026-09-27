@@ -78,7 +78,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Remove a price group no brand sits on and no cell prices
+Remove a price group no brand sits on, no pour belongs to and no cell prices
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -129,7 +129,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Brands with their style and SKUs, alphabetical
+Brands with their style, price group, SKUs and the pours that group owns, alphabetical
 
 Takes no input.
 

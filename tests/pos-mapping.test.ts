@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -74,8 +74,8 @@ describe("Square explicit mapping", () => {
     const connectionId = await connected(brewery.id);
     const location = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
     const brand = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5 });
-    const pint = (await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: brand.brandId, name: "Pint", basis: "poured", ounces: 16 }).select("id").single()).data!;
-    const half = (await admin.from("formats").insert({ brewery_id: brewery.id, brand_id: brand.brandId, name: "Half pint", basis: "poured", ounces: 8 }).select("id").single()).data!;
+    const pint = { id: await seedPour(brewery.id, { brandId: brand.brandId, name: "Pint", ounces: 16 }) };
+    const half = { id: await seedPour(brewery.id, { brandId: brand.brandId, name: "Half pint", ounces: 8 }) };
     expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connectionId,
       external_location_id: "L1", external_name: "Square Taproom", external_status: "ACTIVE" })).error).toBeNull();
     expect((await admin.from("pos_catalog_variations").insert([

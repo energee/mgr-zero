@@ -245,12 +245,12 @@ defineQuery({
 const MENU_ITEM_MISSING = new Set(["Menu is not configured", "Menu item not found"]);
 
 defineQuery({
-  name: "get_pos_menu_item", description: "Read one derived poured-format menu item and its location-specific price source",
-  input: z.object({ posLocationId, formatId: z.string().uuid() }), roles: [...menuRoles],
+  name: "get_pos_menu_item", description: "Read one beer's derived poured-format menu item and its location-specific price source",
+  input: z.object({ posLocationId, formatId: z.string().uuid(), brandId: z.string().uuid() }), roles: [...menuRoles],
   handler: async (ctx, input) => {
     try {
       return await unwrap(ctx.db.rpc("get_pos_menu_item", {
-        p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+        p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId, p_brand: input.brandId,
       }));
     } catch (e) {
       if (e instanceof CommandError && MENU_ITEM_MISSING.has(e.message)) throw new CommandError(e.message, 404, "not_found");
@@ -260,14 +260,14 @@ defineQuery({
 });
 
 defineCommand({
-  name: "set_pos_price_override", description: "Set or clear one nullable poured-format price override for one Square location",
+  name: "set_pos_price_override", description: "Set or clear one beer's nullable poured-format price override for one Square location",
   input: z.object({
-    posLocationId, formatId: z.string().uuid(),
+    posLocationId, formatId: z.string().uuid(), brandId: z.string().uuid(),
     unitPriceCents: cents.nullable(),
   }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_price_override", {
-    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId, p_brand: input.brandId,
     p_unit_price_cents: input.unitPriceCents, p_request_id: execution.requestId,
   })),
 });
@@ -303,11 +303,11 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_pos_website_publication", description: "Publish or unpublish one currently priced, stocked menu row on the brewery website feed",
-  input: z.object({ posLocationId, formatId: z.string().uuid(), published: z.boolean() }),
+  name: "set_pos_website_publication", description: "Publish or unpublish one beer's currently priced, stocked menu row on the brewery website feed",
+  input: z.object({ posLocationId, formatId: z.string().uuid(), brandId: z.string().uuid(), published: z.boolean() }),
   roles: [...menuRoles],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_website_publication", {
-    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId, p_brand: input.brandId,
     p_published: input.published, p_request_id: execution.requestId,
   })),
 });
