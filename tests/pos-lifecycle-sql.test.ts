@@ -57,4 +57,24 @@ describe("Square durable credential lifecycle", () => {
     expect((await admin.from("pos_connections").select("state,remote_revocation_state,last_error").eq("id", connection.data!.id).single()).data)
       .toEqual({ state: "recovery_required", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
   });
+
+  it("disconnects a recovery-required connection that still holds its credential (#620)", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connection = await admin.from("pos_connections").insert({ brewery_id: brewery.id, merchant_id: `merchant-${crypto.randomUUID()}`,
+      state: "connected", credential_version: 1, access_expires_at: "2026-01-01T00:00:00Z" }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','square','${connection.data!.id}','expired-access','expired-refresh',1)`);
+    expect((await admin.rpc("mark_square_authorization_failed", { p_brewery: brewery.id, p_connection: connection.data!.id,
+      p_actor: ctx.userId, p_expected_version: 1 })).data).toBe(true);
+
+    const revoke = vi.fn().mockResolvedValue(undefined);
+    await expect(disconnectSquare(ctx, connection.data!.id, revoke, crypto.randomUUID()))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
+    expect(revoke).toHaveBeenCalledWith("expired-access");
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='square'`)).toEqual(["0"]);
+    expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", connection.data!.id).single()).data)
+      .toEqual({ state: "disconnected", remote_revocation_state: "confirmed" });
+  });
 });

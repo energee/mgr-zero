@@ -20,6 +20,16 @@ export type RepackViewModel = {
   parentSkuId?: string; locationId?: string; binId?: string; lotId?: string;
 };
 
+/**
+ * The lot to preselect: the only lot of the parent in the bin, when the bin
+ * holds no untracked units of it (the RPC would refuse "Untracked stock" there
+ * anyway). Two lots, or a lot beside untracked units, is a real choice: "".
+ */
+export function soleRepackLot(stock: { kind: string; stock_id: string; bin_id: string; lot_id: string | null }[], parentSkuId: string, binId: string): string {
+  const rows = stock.filter((s) => s.kind === "sku" && s.stock_id === parentSkuId && s.bin_id === binId);
+  return rows.length === 1 && rows[0].lot_id ? rows[0].lot_id : "";
+}
+
 /** Why the commit is withheld when the parent is not a composed format with exactly one component row. */
 export const REPACK_UNAVAILABLE = "isn’t available yet: breaking a case has nowhere correct to land";
 

@@ -9,6 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
@@ -21,9 +22,11 @@ export function QboDefaultsForm({ allowAch, allowCard }: { allowAch: boolean; al
   return <QboDefaultsView allowAch={allowAch} allowCard={allowCard} busy={action.busy} error={action.error} onSave={(ach, card) => void action.run("set_qbo_push_defaults", { allowAch: ach, allowCard: card })} />;
 }
 
+/** Leaves for Connect only when QuickBooks confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
 export function QboDisconnectAction({ connectionId }: { connectionId: string }) {
   const action = useCommandAction(), router = useRouter();
-  return <DisconnectQuickBooksView busy={action.busy} error={action.error} onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, () => router.push("/settings/accounting/connect"))} />;
+  return <DisconnectQuickBooksView busy={action.busy} error={action.error}
+    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), undefined, { refresh: false })} />;
 }
 
 type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };

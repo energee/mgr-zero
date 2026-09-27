@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { AccountingViewModel } from "@/lib/mgr/accounting-view";
+import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
 
 export function QboSyncView({ busy = false, error, onSync }: { busy?: boolean; error?: string | null; onSync?: () => void }) {
   return <div className="flex flex-col items-end gap-2"><Button variant="outline" disabled={busy} onClick={onSync}>{busy ? "Syncing…" : "Sync QuickBooks"}</Button><CommandFormMessage error={error} /></div>;
@@ -38,7 +39,6 @@ export function AccountingView({ model, connection, defaults, messages }: { mode
     {E.row(model.company, model.status, model.canDisconnect ? E.act("Disconnect", "destructive", model.disconnectHref) : "", model.connected ? "ok" : "w", QuickBooksMark)}
     {model.error && E.note(`Last connection error: ${model.error}`)}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
-    {model.disconnectUnavailable && E.gated("Disconnect QuickBooks", "The disconnect command requires a connected state. Reconnect to recover this connection first.")}
     {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
     {model.connected && <>{E.fld("Company", model.company)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {E.ttl("Push defaults")}
@@ -53,11 +53,17 @@ export function ConnectQuickBooksView({ backHref, connection }: { backHref?: str
   return <>{E.back("Settings", "Connect QuickBooks", undefined, backHref)}{E.info("MGR reads customers, items, invoice status and payments. It creates wholesale invoices and credit memos.")}{E.note("QuickBooks remains the accounting record. Connecting does not push existing invoices.")}{connection !== undefined ? connection : <QboConnectionView />}</>;
 }
 
-export function DisconnectQuickBooksView({ connected = true, recoveryRequired = false, busy = false, error, onDisconnect }: { connected?: boolean; recoveryRequired?: boolean; busy?: boolean; error?: string | null; onDisconnect?: () => void }) {
+/** The disconnect confirmation; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
+export function DisconnectQuickBooksView({ status = "available", busy = false, error, onDisconnect }: { status?: DisconnectStatus; busy?: boolean; error?: string | null; onDisconnect?: () => void }) {
   return <>
     {E.note("Stops: invoice push, payment links and paid-date sync.")}
     {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings. Reconnecting the same company restores its mappings; a different company clears them.")}
-    {connected ? <Button type="button" variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect QuickBooks"}</Button> : recoveryRequired ? E.gated("Disconnect QuickBooks", "The existing command requires a connected state. Reconnect to recover this connection first.") : E.info("QuickBooks is already disconnected.")}
+    {status === "available" && <>
+      {E.info("MGR deletes its stored QuickBooks credential first, then asks QuickBooks to revoke it. If QuickBooks does not confirm, this page says so.")}
+      <Button type="button" variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect QuickBooks"}</Button>
+    </>}
+    {status === "unresolved" && E.note("MGR deleted its stored QuickBooks credential, but QuickBooks did not confirm revocation. Remove MGR's access in your QuickBooks company, or reconnect.")}
+    {status === "disconnected" && E.info("QuickBooks is already disconnected.")}
     <CommandFormMessage error={error} />
   </>;
 }
