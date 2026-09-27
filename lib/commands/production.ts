@@ -277,12 +277,30 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "cancel_batch", description: "Cancel an unstarted batch plan; retains history and refuses recorded physical work",
+  input: z.object({ batchId: z.string().uuid() }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "reschedule_batch", description: "Reschedule an unstarted batch plan; retains history and refuses recorded physical work",
+  input: z.object({ batchId: z.string().uuid(), plannedOn: isoDate }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reschedule_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_planned_on: i.plannedOn, p_request_id: execution.requestId,
+  })),
+});
+
 // Brand, recipe and vessel are resolved with follow-up reads rather than
 // embedded joins: every one of them is optional on a batch, and PostgREST
 // embeds through the composite foreign keys read far less clearly than this.
 type BatchRow = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
-  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null;
+  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null;
   completion_adjustment_id: string | null; note: string | null;
 };
 
@@ -334,7 +352,7 @@ defineQuery({
   input: z.object({}), roles: ["admin", "brewer"],
   handler: async (ctx) => {
     const batches = (await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, completion_adjustment_id, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as BatchRow[];
     if (batches.length === 0) return [];
 
@@ -359,7 +377,7 @@ defineQuery({
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, cancelled_at, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
     return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId)?.[0] ?? null };

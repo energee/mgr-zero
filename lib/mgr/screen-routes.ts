@@ -144,6 +144,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
   { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },
   { name: "Brew day", file: "app/(app)/batches/[id]/page.tsx" },
+  { name: "Packaging plan", file: "app/(app)/packaging/[id]/page.tsx" },
   { name: "Close packaging run", file: "app/(app)/packaging/[id]/page.tsx" },
   { name: "Run closed", file: "app/(app)/packaging/[id]/page.tsx" },
   { name: "Packaging runs", file: "app/(app)/packaging/page.tsx" },
