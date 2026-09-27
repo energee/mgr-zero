@@ -114,6 +114,23 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   the generated tables (`Bash` is absent from its allowlist — the workflow
   regenerates), and every PR it opens states whether the designed-operation
   count shrank or held.
+- **Keg deposit and Keg fleet Returned event stay separate records (2026-09-26
+  owner decision, issue #577, PR #605).** Reconciliation, not a merged write:
+  `kegDepositRows` (`lib/keg-deposits.ts`, pure) flags a customer × pool × size
+  row only once a deposit on it was refunded and kegs on deposit differ from
+  kegs out plus kegs lost at that customer (a lost keg keeps its deposit, so
+  it still counts as out). Shipping alone charges the deposit but posts no
+  keg event, so it never flags by itself — that gap is a Shipped event not yet
+  entered, not drift. Voided/written-off invoices still count toward deposits
+  held; that's a TODO.md follow-up, not fixed here.
+- **`upsert_*` commands replace the whole record (2026-09-26 owner decision,
+  issue #589, PR #606).** An omitted field may be cleared or reset to its
+  default; a command must say explicitly which fields instead keep their
+  saved value when omitted (`upsert_material`'s `purchaseUomFactor`,
+  `lotTracked`, `reorderPoint`, `extractPotential`) or clear only on an
+  explicit `null` (`upsert_brand_approval`, `upsert_state_registration`,
+  `upsert_brewery_state_license`). Stated in `content/docs/api/index.mdx`'s
+  Conventions section — read it before adding a new `upsert_*` command.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.

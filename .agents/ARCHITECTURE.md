@@ -37,6 +37,7 @@ never copy it into a second place.
 | `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`, `/portal/account`) — reads/writes only through the `portal.ts` customer-role commands above. |
 | `lib/order-form-rules.ts` | Pure "is the New Order form submittable" rule behind `app/(app)/orders/order-form.tsx` (customer + ship-to or to-location, from-location, one complete line), mirroring `create_order`'s input schema; also supplies the empty-catalog hint. |
 | `lib/portal-cart.ts` | Pure decisions behind the portal cart's Save draft/Submit buttons (`app/(portal)/portal/cart.tsx`): which command syncs the cart's current lines (`portal_create_order` vs `portal_update_draft_order`) and when the buttons are disabled. |
+| `lib/keg-deposits.ts` | Pure: `kegDepositRows` joins `keg_customer_balances` and `keg_deposit_balances` per customer × pool × size and flags a mismatch only once a deposit was refunded and kegs on deposit differ from kegs out plus kegs lost at that customer. The deposit refund (credit memo) and the Keg fleet Returned event stay separate records by design (#577); this reconciles them for Customer keg balance and Keg report. |
 | `components/mgr/views/`, `lib/mgr/*-view.ts`, `lib/mgr/fixtures/` | Shared screen drawings, their pure command-payload adapters, and inventory snapshots. Live pages supply existing controlled forms and explicit links; undefined slots keep fixture defaults, null suppresses them. Adapters preserve missing domain facts and do not give fixture frames live route destinations. `lib/mgr/screen-routes.ts` anchors routed screens at their public `page.tsx` entries, then parity checks follow thin adapters to the shared drawing; header/dialog-only screens name their mounted component. |
 | `lib/mgr/page-query.ts` | Staff server-page query adapter: checks the registry's actual role permission before reading and redirects denied deep links to the existing No access screen. Dedicated mutation pages call its permission guard without executing a write. API/command authorization stays in the registry/RPC. |
 | `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
@@ -254,7 +255,10 @@ a gap to close, not a convention to trust.
   complete. Tests force both lost Auth responses and real membership failures
   for staff and customers. Completed retries return the original user id without
   restoring revoked access. An unfinished request blocks its email only within
-  its own brewery; a failed request never blocks a new one. Existing Auth
+  its own brewery; a failed request never blocks a new one. A `pending_auth`
+  row older than 15 minutes for that email is marked failed before the next
+  claim inserts, so a crash between claim and completion doesn't block the
+  email forever (#580). Existing Auth
   emails are refused; attaching existing
   accounts needs a separate consent workflow. Team, first-run, and customer detail
   share invitation forms that retain request identity for an unchanged failed
