@@ -9,10 +9,12 @@ import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
 export type { ShipViewModel };
 
-export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, disabled = false }: {
+export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, disabled = false }: {
   model: ShipViewModel; sources?: ReactNode; footer?: ReactNode;
   fulfillmentOptions?: string[]; tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;
   quantities?: Record<string, string>; onQuantity?: (key: string, value: string) => void;
+  /** Shortage reason per line key; a line shipped below picked asks for one. */
+  reasons?: Record<string, string>; onReason?: (key: string, value: string) => void;
   carrier?: string; tracking?: string; onCarrier?: (value: string) => void; onTracking?: (value: string) => void;
   onInvoiceTiming?: (timing: "now" | "on_delivery") => void;
   messages?: ReactNode; submitting?: boolean; disabled?: boolean;
@@ -22,11 +24,12 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.pick("Fulfillment source", model.fulfillmentSource, ((fulfillmentOptions ?? [model.fulfillmentSource]).map(source => ({ value: source, label: source }))), { disabled: true })}
     {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
-      <OrderQuantity label={`${line.name} shipped quantity`} value={quantities?.[line.key] ?? line.qty} max={line.picked} step="0.01" required onChange={onQuantity && (value => onQuantity(line.key, value))} />, line.tone ?? "")}</div>)}
-    {model.shortNote && <>
-      {E.edit("Reason · required", "", "text", undefined, { disabled: true, placeholder: "Shortage reason recording is not available yet", "aria-label": "Reason" })}
-      {E.info(model.shortNote)}
-    </>}
+      <OrderQuantity label={`${line.name} shipped quantity`} value={quantities?.[line.key] ?? line.qty} max={line.picked} step="0.01" required onChange={onQuantity && (value => onQuantity(line.key, value))} />, line.tone ?? "")}
+      {line.tone === "w" && E.edit("Reason · required", reasons?.[line.key] ?? line.shortReason ?? "", "text", undefined, {
+        required: true, placeholder: "Why this line ships short", "aria-label": `${line.name} shortage reason`,
+        onChange: onReason && (value => onReason(line.key, value)),
+      })}</div>)}
+    {model.shortNote && E.info(model.shortNote)}
     {E.edit("Carrier", carrier, "text", undefined, { onChange: onCarrier, placeholder: "optional" })}
     {E.edit("Tracking", tracking, "text", undefined, { onChange: onTracking, placeholder: "optional" })}
     <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" value={onInvoiceTiming ? String(timing) : undefined} defaultValue={onInvoiceTiming ? undefined : String(timing)}
