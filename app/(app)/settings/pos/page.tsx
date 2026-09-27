@@ -1,11 +1,12 @@
 import { formatDateTime } from "@/lib/date-format";
 import { PointOfSaleView } from "@/components/mgr/views/pos";
 import { requireAdminContext } from "@/lib/brewery";
+import { disconnectStatus, type DisconnectHealth } from "@/lib/mgr/integration-disconnect";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { SquareSyncControls } from "@/components/mgr/views/pos-controls";
 
-type Health = { connected: boolean; state: string; merchantLabel: string | null; lastError: string | null; salesSyncedThrough?: string | null };
+type Health = DisconnectHealth & { connected: boolean; merchantLabel: string | null; lastError: string | null; salesSyncedThrough?: string | null };
 type Location = { mgrLocationId: string | null };
 
 export default async function PosPage() {
@@ -14,7 +15,7 @@ export default async function PosPage() {
   const locations = health.connected ? await runCommand("list_pos_locations", {}, ctx) as Location[] : [];
   const mapped = locations.filter(location => location.mgrLocationId).length;
   return <PointOfSaleView model={{
-    connected: health.connected, merchant: health.merchantLabel ?? "Square seller", state: health.state.replaceAll("_", " "),
+    connected: health.connected, canDisconnect: disconnectStatus(health) === "available", merchant: health.merchantLabel ?? "Square seller", state: health.state.replaceAll("_", " "),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
     lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough, brewery.timeZone) : "No complete sales coverage yet",
     error: health.lastError,

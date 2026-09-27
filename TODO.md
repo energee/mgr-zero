@@ -27,8 +27,7 @@ database or migration work while screens are the current focus.
 
 - [ ] Ship and invoice, Ship on delivery: persist the shortage reason.
 - [ ] Variance by brand: a brand-by-period trend projection.
-- [ ] Accounting: a missing-email count in connection health, and a recovery
-  disconnect that works when the connection is not in the connected state.
+- [ ] Accounting: a missing-email count in connection health.
 - [ ] Invoices: a verified Open in QuickBooks link and email delivery state.
 - [ ] Batches: the reading summary and direct reading action, which need
   occupancy and reading facts from `list_batches`.
