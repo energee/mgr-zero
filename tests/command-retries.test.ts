@@ -10,7 +10,7 @@ vi.mock("@/app/(app)/brewery-provider", () => ({
 }));
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { CommandRecovery } from "@/components/mgr/command-recovery";
-import { beginRecovery } from "@/lib/commands/recovery";
+import { beginRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { command } from "@/lib/commands/client";
 import { submitEvent } from "./helpers";
 let retrySaved: (id: string) => Promise<void>;
@@ -160,4 +160,35 @@ it("reloads after global recovery so mounted forms cannot resubmit stale fields"
   await retrySaved(saved.requestId);
   expect(reload).toHaveBeenCalledOnce();
   expect(fetch).toHaveBeenCalledOnce();
+});
+
+it.each([200, 403])("isolates concurrent commands on one page when the second returns %s", async (status) => {
+  const requests: { name: string; requestId: string }[] = [];
+  let releaseCatalog!: () => void;
+  const catalogPending = new Promise<void>(resolve => { releaseCatalog = resolve; });
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    if (request.name === "sync_square_catalog") await catalogPending;
+    if (request.name === "sync_square_sales" && status === 403) return { status, json: async () => ({ ok: false, error: { message: "Sales access denied" } }) };
+    return { status: 200, json: async () => ({ ok: true, data: {} }) };
+  }));
+  let catalog!: ReturnType<typeof useCommandAction>, sales!: ReturnType<typeof useCommandAction>;
+  function Harness() { catalog = useCommandAction(); sales = useCommandAction(); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  const inFlight = catalog.run("sync_square_catalog", {});
+  try {
+    expect(await sales.run("sync_square_sales", {})).toBe(status === 200);
+    expect(requests.map(request => request.name)).toEqual(["sync_square_catalog", "sync_square_sales"]);
+    expect(new Set(requests.map(request => request.requestId)).size).toBe(2);
+    // The independent result must not remove the catalog's still-pending recovery.
+    expect(readRecoveries(sessionStorage, renderedContext).map(attempt => attempt.name)).toEqual(["sync_square_catalog"]);
+    renderToStaticMarkup(createElement(Harness)); // Reload while catalog is still in flight.
+    expect(await catalog.run("sync_square_catalog", { changed: true })).toBe(false);
+    expect(requests).toHaveLength(2);
+  } finally {
+    releaseCatalog();
+    await inFlight;
+  }
+  expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
 });

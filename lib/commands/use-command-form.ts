@@ -33,7 +33,7 @@ export function useCommandAction() {
     let hadUnresolved = false;
     let attempt: RecoveryAttempt | undefined;
     try {
-      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => row.path === location.pathname || row.name === name);
+      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => row.name === name);
       attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, requestId);
       const data = await command(attempt.expectedContext.breweryId ?? breweryId, attempt.name, attempt.input, attempt.requestId, attempt.expectedContext);
       finishRecovery(sessionStorage, attempt);

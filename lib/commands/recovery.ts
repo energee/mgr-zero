@@ -27,9 +27,9 @@ function save(storage: RecoveryStorage, context: CommandContextExpectation, atte
 /** Save before sending: a reload during fetch is also an unknown outcome. */
 export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, requestId = crypto.randomUUID(), previewRows?: number[]): RecoveryAttempt {
   const attempts = readRecoveries(storage, context);
-  const previous = attempts.find(attempt => attempt.path === path || attempt.name === name);
+  const previous = attempts.find(attempt => attempt.name === name);
   if (previous) {
-    if (previous.name !== name || JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
+    if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
     return previous;
   }
   const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId, name, input, path, expectedContext: context, previewRows })));
