@@ -51,22 +51,17 @@ export const cellKey = (channelId: string, groupId: string, formatId: string) =>
 /** A format column's label: "Hazy · ½ bbl keg" when the format belongs to a brand. */
 export const formatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;
 
-export function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
+/** One column per packaged format, then one per pour name; `formatId` says which format a group's cell prices. */
+function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
   const packaged = formats.filter((f) => f.basis !== "poured");
-  const pourNames = [...new Set(formats.filter((f) => f.basis === "poured").map((f) => f.name))];
+  const pours = Map.groupBy(formats.filter((f) => f.basis === "poured"), (f) => f.name);
   return [
-    ...packaged.map((f) => ({ key: f.id, label: formatLabel(f), kind: "packaged" as const, name: f.name, formatId: f.id })),
-    ...pourNames.map((name) => ({ key: `pour:${name}`, label: name, kind: "poured" as const, name })),
+    ...packaged.map((f) => ({ label: formatLabel(f), formatId: (): string | null => f.id })),
+    ...[...pours].map(([name, group]) => ({
+      label: name,
+      formatId: (groupId: string) => group.find((f) => f.price_group_id === groupId)?.id ?? null,
+    })),
   ];
-}
-
-function formatIdForColumn(
-  column: ReturnType<typeof pricingColumns>[number],
-  groupId: string,
-  formats: PriceGroupsSnapshot["formats"],
-): string | null {
-  if (column.kind === "packaged") return column.formatId;
-  return formats.find((f) => f.basis === "poured" && f.price_group_id === groupId && f.name === column.name)?.id ?? null;
 }
 
 /** Map the four list_* pricing queries onto PriceGroupsView tables. */
@@ -80,7 +75,7 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells }: Pri
       id: channel.id,
       name: channel.name,
       rows: groups.map((group) => {
-        const formatIds = columns.map((column) => formatIdForColumn(column, group.id, formats));
+        const formatIds = columns.map((column) => column.formatId(group.id));
         return {
           id: group.id,
           name: group.name,

@@ -33,7 +33,7 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
                 {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : E.act("Remove", "destructive"))}
               </Fragment>
             ))}
-          {addPour !== undefined ? addPour : null}
+          {addPour}
         </>
       )}
       {messages}

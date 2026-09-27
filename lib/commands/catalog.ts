@@ -119,10 +119,12 @@ defineQuery({
     const groupId = i.brandId
       ? ((await unwrap(ctx.db.from("brands").select("price_group_id").eq("id", i.brandId).maybeSingle())) as { price_group_id: string | null } | null)?.price_group_id
       : undefined;
+    // A brand with no price group has no pours.
+    if (i.brandId && !groupId) return [];
     const [formats, volumes] = await Promise.all([completeRows("Format list", start => {
       let q = ctx.db.from("formats").select("*, price_groups(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
-      if (i.brandId) q = q.eq("price_group_id", groupId ?? "00000000-0000-4000-8000-000000000000");
+      if (i.brandId) q = q.eq("price_group_id", groupId!);
       return q.range(start, start + PAGE_SIZE - 1);
     }), completeRows("Format list", start => {
       let q = ctx.db.from("format_volumes").select("id, bbl_per_unit", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("id");
@@ -307,12 +309,7 @@ defineQuery({
       unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
-    const byGroup = new Map<string, unknown[]>();
-    for (const pour of pours as { price_group_id: string }[]) {
-      const list = byGroup.get(pour.price_group_id) ?? [];
-      list.push(pour);
-      byGroup.set(pour.price_group_id, list);
-    }
+    const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);
     return (brands as { price_group_id: string | null }[]).map((b) => ({ ...b, pours: b.price_group_id ? byGroup.get(b.price_group_id) ?? [] : [] }));
   },
 });

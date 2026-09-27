@@ -34,8 +34,8 @@ export default async function PricingPage() {
       createAction={<GroupForm model={toPriceGroupViewProps(snapshot)} />}
       renderGroup={(row) => <GroupForm groupId={row.id} model={groupModel.get(row.id)!} />}
       renderCell={(channel, row, col, label) => {
-        const formatId = row.formatIds[col];
-        if (!formatId) return null;
+        // PriceGroupsView only asks for cells that have a format.
+        const formatId = row.formatIds[col]!;
         const value = cents.get(cellKey(channel.id, row.id, formatId)) ?? null;
         return <PriceCellForm key={value ?? "empty"} saleChannelId={channel.id} priceGroupId={row.id} formatId={formatId} cents={value} label={label} groupName={row.name} formatName={model.formats[col]!} channelName={channel.name} />;
       }}
