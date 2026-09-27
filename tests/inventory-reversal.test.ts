@@ -14,6 +14,9 @@ async function setup() {
   }, ctx) as { id: string; qty: number; bbl: number };
   return { ctx, catalog, location, movement };
 }
+// #632: upsert_format refuses a volume edit on an in-use format; a direct write still proves the freeze
+const correctFormat = async (formatId: string) =>
+  expect((await admin.from("formats").update({ name: "Corrected", package_type: "bottle", keg_size: null, bbl_per_unit: 0.25 }).eq("id", formatId)).error).toBeNull();
 const reverse = (ctx: Ctx, movementId: string, note = "Entered twice", requestId = crypto.randomUUID()) =>
   runCommand("reverse_inventory_movement", { movementId, note }, ctx, { requestId, correlationId: requestId });
 
@@ -22,14 +25,14 @@ describe("exact standalone inventory reversal", () => {
     const { ctx, catalog, movement } = await setup();
     await movement(5);
     const before = sql(`select class from private.report_movements('${ctx.breweryId}', '2099-01-01')`);
-    await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected", basis: "packaged", packageType: "bottle", bblPerUnit: 0.25 }, ctx);
+    await correctFormat(catalog.formatId);
     expect(sql(`select class from private.report_movements('${ctx.breweryId}', '2099-01-01')`)).toEqual(before);
   });
 
   it("appends the exact frozen opposite and replays before lifecycle checks", async () => {
     const { ctx, catalog, movement } = await setup();
     const original = await movement(5);
-    await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected", basis: "packaged", packageType: "bottle", bblPerUnit: 0.25 }, ctx);
+    await correctFormat(catalog.formatId);
     const requestId = crypto.randomUUID();
     const result = await reverse(ctx, original.id, "Entered twice", requestId) as Record<string, unknown>;
     expect(result).toMatchObject({ compensates_id: original.id, qty: -5, bbl: -2.5, package_type: "keg", lot_id: null });
@@ -172,7 +175,7 @@ it("copies frozen package class on source-linked returns and damaged-return loss
   const base = { brewery_id: ctx.breweryId, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, created_by: ctx.userId };
   const channel = (await admin.from("sale_channels").select("id").eq("brewery_id", ctx.breweryId).eq("name", "Wholesale").single()).data!.id;
   const shipped = await ins("inventory_movements", { ...base, qty: -3, type: "sale_removal", sale_channel_id: channel, tax_treatment: "taxable", dest_state: "PA", ref: crypto.randomUUID() });
-  await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected", basis: "packaged", packageType: "bottle", bblPerUnit: 0.25 }, ctx);
+  await correctFormat(catalog.formatId);
   const ref = crypto.randomUUID();
   const returned = await ins("inventory_movements", { ...base, qty: 1, type: "return_in", source_movement_id: shipped.id, ref });
   const damage = await ins("inventory_movements", { ...base, qty: -1, type: "loss", source_movement_id: returned.id, ref });

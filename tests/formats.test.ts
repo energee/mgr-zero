@@ -49,6 +49,47 @@ describe("formats", () => {
     const switched = await runCommand("upsert_format", { id: unused.id, name: "Unused can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, ctx) as { basis: string };
     expect(switched.basis).toBe("packaged");
   });
+
+  // #632: readers compute from bbl_per_unit, units_per_case and ounces at read
+  // time (plans, order estimates, repack, pour math), so an in-use format keeps them.
+  it("a format in use keeps its volume fields; a rename saves; an unused format changes freely", async () => {
+    const can = { basis: "packaged", packageType: "can" } as const;
+    const skuFormat = await runCommand("upsert_format", { ...can, name: "Volume SKU can", bblPerUnit: 0.004 }, ctx) as { id: string };
+    const { data: brand } = await admin.from("brands").insert({ brewery_id: ctx.breweryId, name: "Volume IPA" }).select("id").single();
+    await runCommand("create_sku", { brandId: brand!.id, formatId: skuFormat.id }, ctx);
+    await expect(runCommand("upsert_format", { ...can, id: skuFormat.id, name: "Volume SKU can", bblPerUnit: 0.005 }, ctx))
+      .rejects.toThrow(/in use.*cannot change/);
+    const renamed = await runCommand("upsert_format", { ...can, id: skuFormat.id, name: "Renamed SKU can", bblPerUnit: 0.004 }, ctx) as { name: string; bbl_per_unit: string };
+    expect(renamed).toMatchObject({ name: "Renamed SKU can" });
+    expect(Number(renamed.bbl_per_unit)).toBe(0.004);
+
+    const child = await runCommand("upsert_format", { ...can, name: "Volume child case", bblPerUnit: 0.09677419, unitsPerCase: 24 }, ctx) as { id: string };
+    const parent = await runCommand("upsert_format", { ...can, name: "Volume pallet" }, ctx) as { id: string };
+    await runCommand("replace_format_components", { formatId: parent.id, components: [{ childFormatId: child.id, qty: 2 }] }, ctx);
+    await expect(runCommand("upsert_format", { ...can, id: child.id, name: "Volume child case", bblPerUnit: 0.09677419, unitsPerCase: 12 }, ctx))
+      .rejects.toThrow(/in use.*cannot change/);
+
+    const pourBrand = await runCommand("upsert_brand", { name: "Volume pour brand" }, ctx) as { id: string };
+    const pour = { basis: "poured", brandId: pourBrand.id } as const;
+    const pint = await runCommand("upsert_format", { ...pour, name: "Volume pint", ounces: 16 }, ctx) as { id: string };
+    // one POS connection per brewery; the #470 test above may have made it
+    const existing = await admin.from("pos_connections").select("id").eq("brewery_id", ctx.breweryId).maybeSingle();
+    const connectionId = existing.data?.id ?? (await admin.from("pos_connections").insert({
+      brewery_id: ctx.breweryId, merchant_id: `merchant-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+    }).select("id").single()).data!.id;
+    expect((await admin.from("pos_item_mappings").insert({
+      brewery_id: ctx.breweryId, connection_id: connectionId, external_item_id: "volume-pint", format_id: pint.id,
+    })).error).toBeNull();
+    await expect(runCommand("upsert_format", { ...pour, id: pint.id, name: "Volume pint", ounces: 20 }, ctx))
+      .rejects.toThrow(/in use.*cannot change/);
+
+    const loose = await runCommand("upsert_format", { ...can, name: "Volume loose case", bblPerUnit: 0.004, unitsPerCase: 24 }, ctx) as { id: string };
+    const changed = await runCommand("upsert_format", { ...can, id: loose.id, name: "Volume loose case", bblPerUnit: 0.005, unitsPerCase: 12 }, ctx) as { bbl_per_unit: string; units_per_case: number };
+    expect([Number(changed.bbl_per_unit), changed.units_per_case]).toEqual([0.005, 12]);
+    const loosePint = await runCommand("upsert_format", { ...pour, name: "Volume loose pint", ounces: 16 }, ctx) as { id: string };
+    const poured = await runCommand("upsert_format", { ...pour, id: loosePint.id, name: "Volume loose pint", ounces: 20 }, ctx) as { ounces: string };
+    expect(Number(poured.ounces)).toBe(20);
+  });
 });
 
 describe("format_components", () => {

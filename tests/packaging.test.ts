@@ -424,7 +424,8 @@ describe("closing the run", () => {
     expect(materialsBefore.error).toBeNull();
     expect(materialsBefore.data).toHaveLength(1);
     expect(Number(materialsBefore.data![0].qty)).toBe(-10);
-    await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected case", basis: "packaged", packageType: "can", bblPerUnit: 0.2 }, editor);
+    // #632: upsert_format refuses a volume edit on an in-use format; a direct write still proves the freeze
+    expect((await admin.from("formats").update({ name: "Corrected case", bbl_per_unit: 0.2 }).eq("id", catalog.formatId)).error).toBeNull();
     await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: tray, qtyPerUnit: 2 }] }, editor);
     expect((await admin.from("packaging_run_yields").select("*").eq("run_id", run.id).single()).data).toEqual(yieldBefore.data);
     expect((await ctx.db.from("material_movements").select("id,qty").in("id", movementIds)).data).toEqual(materialsBefore.data);
