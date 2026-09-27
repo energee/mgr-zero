@@ -267,12 +267,14 @@ describe("purchase orders: draft, mark sent, receive", () => {
 
 describe("planning: draft purchase orders from material gaps", () => {
   it("one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped", async () => {
+    // Dates relative to today (UTC, like the database's current_date), so buy-by never drifts into the past.
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
     const brewer = await makeStaffCtx(b.id, "admin");
     const cm = (await runCommand("upsert_vendor", { name: "Country Malt Group", leadTimeDays: 5 }, ctx)) as { id: string };
     const pale = (await runCommand("upsert_material", { name: "Pale malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const wheat = (await runCommand("upsert_material", { name: "Wheat malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const orphan = (await runCommand("upsert_material", { name: "Mystery yeast", category: "yeast", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
-    // 90 days out on a 2026-10-01 need: buy-by is already past, so it is out of reach.
+    // 90 days out on a need 30 days away: buy-by is already past, so it is out of reach.
     const slow = (await runCommand("upsert_vendor", { name: "Slow Boat Rice", leadTimeDays: 90 }, ctx)) as { id: string };
     const hulls = (await runCommand("upsert_material", { name: "Slow-boat rice hulls", category: "adjunct", baseUom: "lb", purchaseUom: "lb", defaultVendorId: slow.id }, ctx)) as { id: string };
 
@@ -287,7 +289,7 @@ describe("planning: draft purchase orders from material gaps", () => {
         { materialId: hulls.id, perBblQty: 1, stage: "mash" },
       ],
     }, brewer)) as { id: string };
-    await runCommand("schedule_batch", { recipeVersionId: version.id, plannedOn: "2026-10-01", plannedBbl: 10 }, brewer);
+    await runCommand("schedule_batch", { recipeVersionId: version.id, plannedOn: day(30), plannedBbl: 10 }, brewer);
     const wh = await seedLocation(b.id, { name: "Grain room" });
     await seedMovement(b.id, { materialId: pale.id, locationId: wh.id, binId: wh.binId, qty: 130, createdBy: ctx.userId });
 
@@ -296,9 +298,9 @@ describe("planning: draft purchase orders from material gaps", () => {
       vendor_id: string | null; vendor_name: string | null; lead_time_days: number | null; contract_id: string | null; purchase_units_short: number;
       buy_by: string | null; out_of_reach: boolean;
     }[];
-    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: "2026-10-01", vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9, buy_by: "2026-09-26", out_of_reach: false });
+    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: day(30), vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9, buy_by: day(25), out_of_reach: false });
     expect(reqs.find((r) => r.material_id === orphan.id)).toMatchObject({ short: 2, vendor_id: null, buy_by: null, out_of_reach: false });
-    expect(reqs.find((r) => r.material_id === hulls.id)).toMatchObject({ vendor_id: slow.id, buy_by: "2026-07-03", out_of_reach: true });
+    expect(reqs.find((r) => r.material_id === hulls.id)).toMatchObject({ vendor_id: slow.id, buy_by: day(-60), out_of_reach: true });
 
     // Out of reach and no vendor are both reported, never drafted (the RPC owns the rule, not the page).
     const drafted = (await runCommand("draft_purchase_order_from_requirements", { materialIds: [pale.id, wheat.id, orphan.id, hulls.id] }, ctx)) as {
