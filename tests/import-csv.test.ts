@@ -42,7 +42,10 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   const adapter = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
   expect(adapter).toContain("<ImportView");
   expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext }");
-  expect(adapter).toContain('"import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext');
+  expect(adapter).toContain('beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.previewRows)');
+  expect(adapter).toContain('command(action.expectedContext.breweryId ?? breweryId, "import_csv", saved.input, saved.requestId, action.expectedContext)');
+  expect(adapter).toContain("finishRecovery(sessionStorage, saved)");
+  expect(adapter).toContain('readRecoveries(sessionStorage, renderedContext).find(row => row.name === "import_csv")');
   expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
   const source = readFileSync("components/mgr/views/import.tsx", "utf8");
   expect(source).toMatch(/from "@\/components\/mgr\/e"/);
