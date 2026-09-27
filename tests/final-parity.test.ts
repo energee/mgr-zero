@@ -52,7 +52,8 @@ describe("final screen parity", () => {
     const b = await makeBrewery(), ctx = await makeStaffCtx(b.id), cat = await seedCatalog(b.id), wh = await seedLocation(b.id);
     const receipt = await runCommand("record_movement", { skuId: cat.skuId, locationId: wh.id, binId: wh.binId, qty: 2, type: "opening_balance", note: "receipt" }, ctx) as import("@/lib/supabase/database").Database["public"]["Tables"]["inventory_movements"]["Row"];
     const originalBbl = receipt.bbl;
-    await runCommand("upsert_format", { id: cat.formatId, name: "Updated format", basis: "packaged", packageType: "can", bblPerUnit: 0.5 }, ctx);
+    // #632: upsert_format refuses a volume edit on an in-use format; a direct write still proves the freeze
+    expect((await admin.from("formats").update({ name: "Updated format", bbl_per_unit: 0.5 }).eq("id", cat.formatId)).error).toBeNull();
     const stored = await runCommand("list_movements", { skuId: cat.skuId }, ctx) as import("@/lib/supabase/database").Database["public"]["Tables"]["inventory_movements"]["Row"][];
     expect(stored.find(r => r.id === receipt.id)?.bbl).toBe(originalBbl);
     expect(() => insertFixture("inventory_movements", Array.from({ length: 51 }, () => ({ brewery_id: b.id, sku_id: cat.skuId, location_id: wh.id, bin_id: wh.binId, qty: 1, type: "opening_balance", created_at: "2026-09-09T12:00:00Z", created_by: ctx.userId })))).not.toThrow();
