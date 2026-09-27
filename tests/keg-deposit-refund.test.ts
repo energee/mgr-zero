@@ -72,6 +72,56 @@ describe("keg deposit refund credit memo", () => {
   });
 });
 
+// #617: a voided, deleted, or written-off invoice is no longer owed, so the
+// deposit it charged is not held, and a refund of that deposit is not owed back.
+describe("keg deposit balance on voided and written-off invoices", () => {
+  let f: Awaited<ReturnType<typeof setup>>;
+  beforeEach(async () => { f = await setup(); });
+  const setState = async (id: string, patch: { qbo_remote_state?: "voided" | "deleted"; written_off_at?: string; written_off_reason?: string; written_off_by?: string }) =>
+    expect((await admin.from("invoices").update(patch).eq("id", id)).error).toBeNull();
+  const refundOne = async (invoiceId: string) => {
+    const deposit = (await admin.from("invoice_lines").select("id").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;
+    return (await runCommand("return_shipment", {
+      invoiceId, locationId: f.source.id, reason: "unsold", lines: [{ invoiceLineId: deposit.id, qty: 1 }],
+    }, f.adminCtx) as { credit_memo_id: string }).credit_memo_id;
+  };
+
+  it.each([
+    ["voided in QuickBooks", { qbo_remote_state: "voided" as const }],
+    ["deleted in QuickBooks", { qbo_remote_state: "deleted" as const }],
+    ["written off", { written_off_at: new Date().toISOString(), written_off_reason: "uncollectable" }],
+  ])("drops a deposit invoice %s, leaving the physical keg balance alone", async (_state, patch) => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = (await admin.from("invoice_lines").select("keg_pool_id,keg_size").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;
+    for (const [qty, reason] of [[2, "acquired"], [2, "shipped"]] as const) {
+      await runCommand("record_keg_event", {
+        poolId: deposit.keg_pool_id, kegSize: deposit.keg_size, qty, reason, locationId: f.source.id, binId: f.source.binId,
+        ...(reason === "shipped" ? { customerId: f.customer.customerId } : {}),
+      }, f.adminCtx);
+    }
+    expect(await balance(f)).toEqual({ kegs: 2, cents: 5000 });
+    await setState(invoiceId, "written_off_at" in patch ? { ...patch, written_off_by: f.adminCtx.userId } : patch);
+    expect(await balance(f)).toEqual({ kegs: 0, cents: 0 });
+    const kegs = await admin.from("keg_customer_balances").select("qty").eq("customer_id", f.customer.customerId);
+    expect(kegs.data?.map((r) => Number(r.qty))).toEqual([2]);
+  });
+
+  it("nets a partial refund, and drops the refund once its credit memo is voided", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const memo = await refundOne(invoiceId);
+    expect(await balance(f)).toEqual({ kegs: 1, cents: 2500 });
+    await setState(memo, { qbo_remote_state: "voided" });
+    expect(await balance(f)).toEqual({ kegs: 2, cents: 5000 });
+  });
+
+  it("drops a refund whose source deposit invoice was voided after the refund", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    await refundOne(invoiceId);
+    await setState(invoiceId, { qbo_remote_state: "voided" });
+    expect(await balance(f)).toEqual({ kegs: 0, cents: 0 });
+  });
+});
+
 async function setup() {
   const brewery = await makeBrewery();
   const adminCtx = await makeStaffCtx(brewery.id);
@@ -103,6 +153,7 @@ async function shipTwoKegs(f: Awaited<ReturnType<typeof setup>>) {
 async function balance(f: Awaited<ReturnType<typeof setup>>) {
   const rows = await admin.from("keg_deposit_balances").select("kegs_on_deposit,deposit_cents").eq("customer_id", f.customer.customerId);
   expect(rows.error).toBeNull();
-  expect(rows.data).toHaveLength(1);
-  return { kegs: rows.data![0].kegs_on_deposit, cents: rows.data![0].deposit_cents };
+  expect(rows.data!.length).toBeLessThanOrEqual(1);
+  const row = rows.data![0];
+  return { kegs: row?.kegs_on_deposit ?? 0, cents: row?.deposit_cents ?? 0 };
 }
