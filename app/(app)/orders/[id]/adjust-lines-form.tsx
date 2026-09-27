@@ -1,5 +1,6 @@
 // app/(app)/orders/[id]/adjust-lines-form.tsx — the live half of Adjust lines
-// (/orders/[id]/adjust): holds the edited lines and reason, draws them with the
+// (/orders/[id]/adjust): holds the edited lines and the required reason for the
+// change, draws them with the
 // shared AdjustLinesView, and sends adjust_order_lines; success returns to the order.
 "use client";
 
