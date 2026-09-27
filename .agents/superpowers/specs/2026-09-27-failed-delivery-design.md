@@ -1,10 +1,14 @@
 # Failed and partial delivery — design (#618)
 
 Decided 2026-09-27. It implements the agreed decisions D2, D17 and
-D18 and the adopted defaults in `2026-09-27-v1-completeness-audit.md`: a stop
-records an honest outcome, invoice-on-delivery bills only accepted quantities,
-refused quantities close on the order, and stock comes back only through a
-recorded physical check-in. The source of truth for the screens stays
+D18 and the adopted defaults in `2026-09-27-v1-completeness-audit.md`:
+
+- A stop records an honest outcome.
+- Invoice-on-delivery bills only accepted quantities.
+- Refused quantities close on the order.
+- Stock comes back only through a recorded physical check-in.
+
+The source of truth for the screens stays
 `components/mgr/screens.tsx`. This supersedes the "every stop delivered before
 return" rule in `plans/2026-09-07-backend-program-8-delivery-routes.md`.
 
@@ -37,10 +41,10 @@ return" rule in `plans/2026-09-07-backend-program-8-delivery-routes.md`.
 - `deliveries.refusal_reason text` (a key from decision 1) and `refusal_note text`.
   The reason is required when the outcome is `partial` or `refused`.
 - `order_lines.qty_refused numeric not null default 0`, with
-  `check (qty_refused >= 0 and qty_refused <= qty_shipped)`. One shipment per
-  order and one stop per shipment, so the order line is where ordered, shipped,
-  refused and (derived) accepted live side by side (D18). Accepted =
-  `qty_shipped − qty_refused`; it is not stored.
+  `check (qty_refused >= 0 and qty_refused <= qty_shipped)`. An order has one
+  shipment and a shipment has one stop. So the order line holds ordered, shipped
+  and refused side by side (D18). Accepted is derived as
+  `qty_shipped − qty_refused` and not stored.
 
 ### 2. `confirm_delivery` takes refused quantities
 
@@ -110,8 +114,8 @@ Good units go to the chosen bin and become available; damaged units post as a lo
 ## Decisions (2026-09-27)
 
 1. **Refusal reasons:** a pick list (*customer refused*, *closed / no access*,
-   *damaged in transit*, *wrong item*, *other*) plus an optional note. It is stored as
-   `refusal_reason` (the key) and `refusal_note`. The note is required for *other*.
+   *damaged in transit*, *wrong item*, *other*) plus an optional note. The note
+   is required for *other*.
 2. **Transfer stops:** they may close with outcome `refused` too, so the route
    can return. The transfer stays `in_transit` until **Cancel transfer** (#578)
    or a later receipt resolves it. No stock moves at the stop.
@@ -129,7 +133,7 @@ a test and the render with the browse skill. Migration:
 
 | # | Task | Test first | Depends |
 |---|---|---|---|
-| 1 | Migration: `deliveries.outcome`, `refusal_reason`, backfill; `order_lines.qty_refused` with its check | `tests/delivery.test.ts`: columns, backfill, check refuses refused > shipped | — |
+| 1 | Migration: `deliveries.outcome`, `refusal_reason`, `refusal_note`, backfill; `order_lines.qty_refused` with its check | `tests/delivery.test.ts`: columns, backfill, check refuses refused > shipped | — |
 | 2 | `confirm_delivery_impl`: refused input, outcome derivation, accepted-only invoice and deposit lines, order event | `tests/orders-fulfillment.test.ts`: 10 shipped / 2 refused → invoice for 8; full refusal → no invoice; retry replays; no stock movement | 1 |
 | 3 | `return_route`: every stop has an outcome | `tests/delivery.test.ts`: replace the :187 "blocks return" test with "returns with a refused stop"; still refuses an open stop | 1 |
 | 4 | `check_in_refused_return` RPC + command (warehouse/admin), damaged → loss, outstanding cap, replay | `tests/delivery-returns.test.ts` (new): partial check-in, damaged, over-return refused, lot preserved, duplicate retry harmless | 2 |
@@ -142,5 +146,4 @@ a test and the render with the browse skill. Migration:
 | 11 | Portal: order shows refused units and the invoice only accepted | `portal-order-view` test | 2 |
 | 12 | Docs: staff guide delivery sections (:388, :393, :476–488), portal guide, screens.tsx Route spec | `tests/docs.test.ts`, `tests/design-docs.test.ts` | 7–11 |
 
-Tasks 1–3 are sequential. Once 2 lands, 4–6 can run in parallel, and 7–11 can run in parallel once
-their dependencies land.
+Tasks whose dependencies have landed can run in parallel.
