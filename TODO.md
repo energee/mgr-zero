@@ -2,8 +2,8 @@
 
 Refreshed 2026-09-26 against `main` at `45eabd41`. Counts are derived from
 `SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 174 MGR screens: 173 ungated and mapped, 1 gated, and 0 ungated without a live route.
-Ten live screens carry a partial `SCHEMA-GATE`: nine are listed below, and
-Team's taproom role is being dropped in a separate PR.
+Nine live screens carry a partial `SCHEMA-GATE`, listed below. Team's tenth
+was a stale note (the taproom role is live) and PR #604 removes it.
 
 Audit sources: `components/mgr/screens.tsx`, `lib/mgr/screen-routes.ts`,
 `tests/app-screen-parity.test.ts`, and `tests/screen-command-gates.test.ts`.
