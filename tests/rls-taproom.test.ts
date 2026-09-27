@@ -392,6 +392,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     read_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id], finish_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id,R(),0],
     begin_qbo_disconnect: [B,R(),f.taproom.id,R()], cas_integration_tokens: [B,"qbo",R(),f.taproom.id,1,"fixture-access","fixture-refresh",now,3600,3600,3600],
     read_portal_qbo_payment: [B,f.customer.customerId,f.invoice.id,f.taproom.id],
+    mark_qbo_authorization_failed: [B,R(),f.taproom.id,1,null,null],
     cas_portal_qbo_payment_tokens: [B,f.customer.customerId,f.invoice.id,f.taproom.id,R(),"fixture-realm","fixture-id",["com.intuit.quickbooks.accounting"],1,"fixture-access","fixture-refresh",now,3600,3600,3600],
     confirm_portal_qbo_payment: [B,f.customer.customerId,f.invoice.id,f.taproom.id,R(),"fixture-realm","fixture-id",1,["com.intuit.quickbooks.accounting"]],
     claim_qbo_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/qbo/callback"], complete_qbo_invoice_sync: [B,f.taproom.id,R(),R(),"fixture-realm",[]],

@@ -8,6 +8,7 @@ import {
   completeQboInvoiceSync,
   confirmPortalInvoicePayment,
   finishQboPush,
+  markQboAuthorizationFailed,
   readPortalInvoicePayment,
   readVersionedIntegrationTokens,
   type QboInvoiceObservation,
@@ -135,8 +136,15 @@ async function refreshPortalInvoicePayment(
   claim: PortalInvoicePaymentClaim,
   client: QboOAuthClient,
 ) {
-  if (isPast(claim.refreshExpiresAt) || isPast(claim.refreshHardExpiresAt)) return null;
-  const next = await client.refresh(claim.refreshToken).catch(() => null);
+  if (isPast(claim.refreshExpiresAt) || isPast(claim.refreshHardExpiresAt)) {
+    await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    return null;
+  }
+  const next = await client.refresh(claim.refreshToken).catch(async (error) => {
+    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    // A failed provider refresh keeps the buyer on Payment unavailable.
+    return null;
+  });
   if (!next || !await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next)) return null;
   return readPortalInvoicePayment(ctx, invoiceId);
 }
@@ -191,9 +199,13 @@ function isPast(value: string | null) {
 async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
   const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
   if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
+    await markQboAuthorizationFailed(ctx, current);
     throw new Error("QuickBooks is unavailable");
   }
-  const next = await client.refresh(current.refreshToken).catch((error) => { throw new Error(sanitizeQboError(error)); });
+  const next = await client.refresh(current.refreshToken).catch(async (error) => {
+    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
+    throw new Error(sanitizeQboError(error));
+  });
   try {
     await compareAndSwapQboTokens(ctx, current, next);
   } catch (error) {
@@ -386,6 +398,8 @@ const cents = (value: unknown) => {
   const result = Math.round(value * 100);
   return Number.isSafeInteger(result) ? result : null;
 };
+
+class QboInvalidGrantError extends Error {}
 
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
@@ -661,7 +675,17 @@ export class QboOAuthClient {
       redirect: "error",
     });
     const receivedAt = new Date().toISOString();
-    if (!response.ok) throw new Error("QuickBooks token request failed");
+    if (!response.ok) {
+      if (response.status === 400) {
+        // Only OAuth's definitive invalid_grant changes connection health.
+        // Malformed/transient responses remain retryable provider failures.
+        const failure: unknown = await response.json().catch(() => null);
+        if (failure && typeof failure === "object" && "error" in failure && failure.error === "invalid_grant") {
+          throw new QboInvalidGrantError("QuickBooks token request failed");
+        }
+      }
+      throw new Error("QuickBooks token request failed");
+    }
     return parseTokens(await response.json(), receivedAt);
   }
 }

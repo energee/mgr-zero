@@ -225,6 +225,14 @@ describe("QuickBooks portal payment link", () => {
     await expect(resolvePortalInvoicePayment(
       ctx, invoice.data.id, new QboOAuthClient(config, refreshTransport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "redirect", url: paymentUrl });
+    expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
+      .eq("id", connection.data.id)).error).toBeNull();
+    const rejectedRefresh = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ error: "invalid_grant", error_description: "private-provider-detail" }, { status: 400 }));
+    await expect(resolvePortalInvoicePayment(ctx, invoice.data.id, new QboOAuthClient(config, rejectedRefresh)))
+      .resolves.toEqual({ kind: "unavailable", reason: "provider_unavailable" });
+    expect((await admin.from("qbo_connections").select("state,last_error").eq("id", connection.data.id).single()).data)
+      .toEqual({ state: "recovery_required", last_error: "QuickBooks authorization expired or was revoked" });
     expect(refreshTransport).toHaveBeenCalledTimes(2);
     expect(sql(`select c.credential_version||':'||t.credential_version from public.qbo_connections c
       join private.integration_tokens t on t.brewery_id=c.brewery_id and t.connection_id=c.id
