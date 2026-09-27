@@ -559,6 +559,14 @@ export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (
   return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
 }
 
+export async function markQboAuthorizationFailed(ctx: Ctx, expected: VersionedIntegrationTokens, invoiceId?: string) {
+  const { error } = await createAdminClient().rpc("mark_qbo_authorization_failed", {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
+    p_expected_version: expected.credentialVersion, p_customer: ctx.customerId ?? null, p_invoice: invoiceId ?? null,
+  });
+  if (error) throw new Error("QuickBooks authorization health could not be updated");
+}
+
 export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedIntegrationTokens, next: import("@/lib/qbo").QboTokens) {
   const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
     p_brewery: ctx.breweryId, p_provider: "qbo", p_connection: expected.connectionId, p_actor: ctx.userId,
