@@ -110,22 +110,38 @@ defineQuery({
   }),
 });
 
+// Keg deposit refund quantities per customer × pool × size, for
+// kegDepositRows: a row is only reconciled once a deposit on it was refunded.
+// Paged by line id; `customerId` narrows it to one customer's credit memos.
+function refundRows(ctx: Ctx, customerId?: string) {
+  return completeRows("Keg deposit refunds", start => {
+    const q = ctx.db.from("invoice_lines").select("id, keg_pool_id, keg_size, qty, invoices!inner(customer_id)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("kind", "keg_deposit_refund");
+    return (customerId ? q.eq("invoices.customer_id", customerId) : q).order("id").range(start, start + PAGE_SIZE - 1);
+  }).then((lines) => (lines ?? []).map((l) => ({
+    customer_id: (l.invoices as unknown as { customer_id: string }).customer_id, pool_id: l.keg_pool_id as string, keg_size: l.keg_size as string, qty: Number(l.qty),
+  })));
+}
+
 // What one customer holds: net shipped − returned − lost per pool × size from
 // the ledger, and the deposit invoiced for those kegs from keg_deposit_balances
 // (zero when no deposit line was ever invoiced). The refund and the Returned
 // event are separate records (#577), so each row carries both counts and
-// kegDepositRows flags the ones that disagree; a deposit held with no keg out
-// is a row too.
+// kegDepositRows flags the refunded ones that disagree once kegs lost at the
+// customer are counted; a deposit held with no keg out is a row too.
 defineQuery({
   name: "get_customer_keg_balance", description: "Kegs a customer has out per pool and size, with the deposit held for them and whether the kegs on deposit disagree with the kegs out",
   input: z.object({ customerId: z.string().uuid() }), roles: ROLES,
   handler: async (ctx, i) => {
-    const [kegs, deposits, pools] = await Promise.all([
+    const [kegs, deposits, pools, lost, refunded] = await Promise.all([
       unwrap(ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId).eq("customer_id", i.customerId)),
       unwrap(ctx.db.from("keg_deposit_balances").select("customer_id, keg_pool_id, keg_size, kegs_on_deposit, deposit_cents").eq("brewery_id", ctx.breweryId).eq("customer_id", i.customerId)),
       listPools(ctx),
+      completeRows("Customer keg losses", start => ctx.db.from("keg_events").select("id, customer_id, pool_id, keg_size, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("customer_id", i.customerId).eq("reason", "lost").order("id").range(start, start + PAGE_SIZE - 1)),
+      refundRows(ctx, i.customerId),
     ]);
-    const rows = kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[]).map((r) => ({
+    const rows = kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[], { lost: (lost ?? []) as KegBalanceRow[], refunded }).map((r) => ({
       ...r, pool_name: pools?.find((p) => p.id === r.pool_id)?.name ?? "",
     })).sort((a, b) => a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size));
     return { rows, kegs_out: rows.reduce((n, r) => n + r.kegs_out, 0), deposit_cents: rows.reduce((n, r) => n + r.deposit_cents, 0) };
@@ -136,14 +152,14 @@ defineQuery({
 // customers over the fleet from keg_fleet_totals — and FIFO aging of what
 // customers still hold (lib/keg-aging.ts). Deposits are the pool's deposit per
 // unreturned keg, not what was invoiced; the balance page has that.
-// Mismatches are every customer × pool × size whose kegs on deposit disagree
-// with their kegs out (#577, kegDepositRows).
+// Mismatches are every customer × pool × size with a refunded deposit whose
+// kegs on deposit disagree with kegs out plus kegs lost (#577, kegDepositRows).
 const AGE_BUCKETS = [{ id: "0-30", max: 30 }, { id: "31-60", max: 60 }, { id: "61-90", max: 90 }, { id: "90+", max: Infinity }] as const;
 defineQuery({
   name: "get_keg_report", description: "Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, the customers holding kegs over 90 days, and customers whose kegs on deposit disagree with their kegs out",
   input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
-    const [pools, totals, events, customers, kegs, deposits] = await Promise.all([
+    const [pools, totals, events, customers, kegs, deposits, refunded] = await Promise.all([
       listPools(ctx),
       unwrap(ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
       // Every event, oldest first, paged past PostgREST's 1000-row cap (#455);
@@ -158,6 +174,7 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg report", start => ctx.db.from("keg_deposit_balances").select("customer_id, keg_pool_id, keg_size, kegs_on_deposit, deposit_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("keg_pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
+      refundRows(ctx),
     ]);
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));
     const customerName = new Map((customers ?? []).map((c) => [c.id as string, c.name as string]));
@@ -182,7 +199,9 @@ defineQuery({
       fleet: { out, total, utilization: total ? out / total : null }, bySize, aging,
       customers: [...byCustomer].map(([customer_id, c]) => ({ customer_id, name: customerName.get(customer_id) ?? "", ...c }))
         .sort((a, b) => b.over_90 - a.over_90 || a.name.localeCompare(b.name)),
-      mismatches: kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[]).filter((r) => r.mismatch)
+      mismatches: kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[], {
+        lost: ((events ?? []) as KegLedgerEvent[]).filter((e) => e.reason === "lost") as KegBalanceRow[], refunded,
+      }).filter((r) => r.mismatch)
         .map((r) => ({ customer_id: r.customer_id, name: customerName.get(r.customer_id) ?? "", pool_id: r.pool_id, pool_name: poolById.get(r.pool_id)?.name ?? "", keg_size: r.keg_size, kegs_out: r.kegs_out, kegs_on_deposit: r.kegs_on_deposit }))
         .sort((a, b) => a.name.localeCompare(b.name) || a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size)),
     };

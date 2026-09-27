@@ -40,7 +40,7 @@ describe("keg deposit refund credit memo", () => {
 
   // #577: the refund and the Returned keg event stay separate, so the balance
   // and the report flag a customer whose kegs on deposit disagree with kegs out.
-  it("flags a deposit whose kegs on deposit disagree with the customer's kegs out", async () => {
+  it("flags a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost", async () => {
     const invoiceId = await shipTwoKegs(f);
     const deposit = (await admin.from("invoice_lines").select("id,keg_pool_id,keg_size").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;
     const pool = deposit.keg_pool_id!, size = deposit.keg_size!;
@@ -55,8 +55,9 @@ describe("keg deposit refund credit memo", () => {
       return { balance: b.rows.map((x) => [x.kegs_out, x.kegs_on_deposit, x.mismatch]), report: r.mismatches.map((m) => [m.customer_id, m.kegs_out, m.kegs_on_deposit]) };
     };
 
-    // Two deposits invoiced, no keg recorded as shipped: a deposit-only row, flagged.
-    expect(await flagged()).toEqual({ balance: [[0, 2, true]], report: [[f.customer.customerId, 0, 2]] });
+    // Two deposits invoiced, no keg recorded as shipped: a deposit-only row, not
+    // flagged, since nothing was refunded; the Shipped event is just not entered yet.
+    expect(await flagged()).toEqual({ balance: [[0, 2, false]], report: [] });
     await keg(10, "acquired");
     await keg(2, "shipped");
     expect(await flagged()).toEqual({ balance: [[2, 2, false]], report: [] });
@@ -65,6 +66,9 @@ describe("keg deposit refund credit memo", () => {
     expect(await flagged()).toEqual({ balance: [[2, 1, true]], report: [[f.customer.customerId, 2, 1]] });
     await keg(1, "returned");
     expect(await flagged()).toEqual({ balance: [[1, 1, false]], report: [] });
+    // The last keg is lost at the customer: its deposit is kept, so still no flag.
+    await keg(1, "lost");
+    expect(await flagged()).toEqual({ balance: [[0, 1, false]], report: [] });
   });
 });
 

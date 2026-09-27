@@ -2148,7 +2148,7 @@ export const SCREENS: Screen[] = [
     reads: "get_keg_fleet · list_customers · list_locations · list_bins · list_vendors",
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
     states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"]],
-    spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts no keg event. The two stay separate records; Customer keg balance and Keg report flag a customer whose kegs on deposit disagree with their kegs out. No dirty/clean CIP status.",
+    spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts no keg event. The two stay separate records; Customer keg balance and Keg report flag a customer with a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost. No dirty/clean CIP status.",
     body: <KegFleetView model={toKegFleetViewProps(kegFleetMicrostar)} />,
   },
   {
@@ -2160,8 +2160,8 @@ export const SCREENS: Screen[] = [
     job: "See every keg pool one customer has out and the deposit exposure",
     reads: "get_customer_keg_balance · list_customers",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["mismatch", "kegs on deposit disagree with kegs out · flagged", 1], ["none", "no kegs currently out"]],
-    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was invoiced and the kegs on deposit differ from the kegs out is flagged; a deposit still held with no keg out is a row too.",
+    states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["mismatch", "a deposit was refunded and kegs on deposit disagree with kegs out plus kegs lost · flagged", 1], ["none", "no kegs currently out"]],
+    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was refunded and the kegs on deposit differ from kegs out plus kegs lost at the customer is flagged. A shipped order charges the deposit but records no keg event, so a row with no refund is never flagged; a deposit still held with no keg out is a row too.",
     body: <KegBalanceView model={toKegBalanceViewProps(kegBalanceRidgeline)} />,
   },
   {
@@ -2183,10 +2183,10 @@ export const SCREENS: Screen[] = [
     name: "Keg report",
     to: { "Ridgeline Tap Room": "Customer keg balance", "Al’s Bar": "Customer keg balance" },
     job: "Review unreturned aging and utilization across the keg fleet",
-    reads: "get_keg_report [utilization from keg_fleet_totals; aging is FIFO over keg_events, returns retire the oldest shipment first; deposit mismatches join keg_customer_balances and keg_deposit_balances]",
+    reads: "get_keg_report [utilization from keg_fleet_totals; aging is FIFO over keg_events, returns retire the oldest shipment first; deposit mismatches join keg_customer_balances, keg_deposit_balances, lost keg events, and keg deposit refund lines]",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "kegs on deposit disagree with kegs out, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
-    spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment. A deposit refund and the Returned keg event are separate records, so the report lists every customer, pool and size where an invoiced deposit count disagrees with the kegs out.",
+    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "after a refund, kegs on deposit disagree with kegs out plus kegs lost, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
+    spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment. A deposit refund and the Returned keg event are separate records, so the report lists every customer, pool and size with a refunded deposit whose deposit count disagrees with kegs out plus kegs lost.",
     body: <KegReportView model={toKegReportViewProps(kegReportOwned, DEMO_TIME_ZONE)} />,
   },
   {
