@@ -4,6 +4,20 @@ Execution index: [#658](https://github.com/energee/mgr-zero/issues/658).
 It owns wave order, dependencies, migration reservations, checkpoints and the
 status ledger. Refreshed 2026-09-27 against main at `11156878`.
 
+Inventory baseline: 174 MGR screens: 173 ungated and mapped, 1 gated, and 0 ungated without a live route.
+These counts describe route coverage, not finished workflow behavior.
+
+Local sources for implementation and verification:
+
+| Concern | Source |
+| --- | --- |
+| Product decisions | `.agents/superpowers/specs/2026-09-27-v1-completeness-audit.md` |
+| Concept ownership | `.agents/ARCHITECTURE.md` |
+| Inventory drawing | `components/mgr/screens.tsx` |
+| Live route mapping | `lib/mgr/screen-routes.ts` |
+| Executable inventory counts | `tests/app-screen-parity.test.ts` |
+| Local reference validation | `tests/todo-links.test.ts` |
+
 The user merges green PRs. Schema changes are authorized with local proof;
 required specifications still get independent review. Hosted changes,
 dependencies and unresolved product contradictions remain ask-first.
