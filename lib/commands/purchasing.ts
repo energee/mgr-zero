@@ -45,6 +45,7 @@ defineCommand({
     category: z.enum(MATERIAL_CATEGORIES),
     baseUom: z.enum(UOMS),
     purchaseUom: z.enum(UOMS),
+    // Omitted on an edit keeps the factor the material had (#589); a new material defaults to 1.
     purchaseUomFactor: z.number().positive().optional(),
     lotTracked: z.boolean().optional(),
     defaultVendorId: z.string().uuid().optional(),
