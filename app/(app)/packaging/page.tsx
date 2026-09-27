@@ -1,9 +1,10 @@
 // app/(app)/packaging/page.tsx — Work › Packaging: runs by planned date,
 // newest first (list_packaging_runs), each opening its own page to pick a
 // tank, start, or close. Schedule run is schedule-run-form.tsx →
-// schedule_packaging_run; Repack is repack-form.tsx → record_repack, a
-// shape change unrelated to any one run — admin/warehouse only (record_repack's
-// own roles), so it is hidden from a brewer rather than offered and refused.
+// schedule_packaging_run, fed the brands, open tanks and SKUs read here;
+// Repack is repack-form.tsx → record_repack, a shape change unrelated to any
+// one run — admin/warehouse only (record_repack's own roles), so it is hidden
+// from a brewer rather than offered and refused.
 // Repack's parents come from list_repack_parents: each composed SKU with the
 // child it breaks into, so the sheet derives the outbound leg.
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
@@ -13,6 +14,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import type { ScheduleRunData } from "@/lib/mgr/schedule-packaging-run-view";
 import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
 
@@ -22,10 +24,10 @@ type Run = {
   brand_name: string | null; vessel_name: string | null; qty_planned: number;
 };
 type Brand = { id: string; name: string };
-type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
+type Occupancy = ScheduleRunData["occupancies"][number];
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
-type Sku = { id: string; name: string; brands: { name: string } | null };
+type Sku = ScheduleRunData["skus"][number];
 
 export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string }> }) {
   const { repack } = await searchParams;
@@ -39,11 +41,9 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
     canRepack ? runCommand("list_locations", {}, ctx) : [], canRepack ? runCommand("list_bins", {}, ctx) : [],
     canRepack ? runCommand("list_repack_parents", {}, ctx) : [],
   ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[], RepackParent[]];
-  const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
-
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.role)}
-    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
   />;
 }
