@@ -59,6 +59,11 @@ describe("explorer parity", () => {
     expect(reading).not.toContain('from "@/components/mgr/e"');
     expect(reading).toContain("openByDefault");
   });
+
+  it("draws Adjust lines as its own page, not a dialog over the order", () => {
+    expect(SCREEN_ROUTES.find((route) => route.name === "Adjust lines")?.file).toBe("app/(app)/orders/[id]/adjust/page.tsx");
+    expect(SCREENS.find((screen) => screen.name === "Adjust lines")?.surface).toBeUndefined();
+  });
 });
 
 

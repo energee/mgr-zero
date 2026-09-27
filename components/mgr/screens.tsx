@@ -936,7 +936,6 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Work",
-    surface: "sheet",
     name: "Adjust lines",
     to: { "Save lines": "Order" },
     job: "Replace the lines on a confirmed or picked order and say why",
