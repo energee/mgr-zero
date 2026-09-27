@@ -36,7 +36,7 @@ describe("GET /api/public/menus/[publicId]", () => {
       posLocationId: "PRIVATE-SQUARE-ID", binId: location.binId, saleChannelId: channel,
     }, ctx, execution()) as { publicId: string };
     await runCommand("set_pos_website_publication", {
-      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, published: true,
+      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, brandId: keg.brandId, published: true,
     }, ctx, execution());
 
     const response = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`), {
@@ -77,7 +77,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     expect(unchanged.headers.get("Access-Control-Expose-Headers")).toBe("ETag");
 
     await runCommand("set_pos_price_override", {
-      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, unitPriceCents: 650,
+      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, brandId: keg.brandId, unitPriceCents: 650,
     }, ctx, execution());
     const changed = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`, {
       headers: { "If-None-Match": etag! },
@@ -96,7 +96,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     expect((await anon.rpc("get_published_pos_menu", { p_public_id: configured.publicId })).error?.code).toBe("42501");
 
     await runCommand("set_pos_website_publication", {
-      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, published: false,
+      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, brandId: keg.brandId, published: false,
     }, ctx, execution());
     const unpublished = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`), {
       params: Promise.resolve({ publicId: configured.publicId }),

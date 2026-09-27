@@ -248,18 +248,19 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-Read one derived poured-format menu item and its location-specific price source
+Read one beer's derived poured-format menu item and its location-specific price source
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `posLocationId` | string | yes |
 | `formatId` | uuid | yes |
+| `brandId` | uuid | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_menu_item", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_menu_item", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "brandId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## get_pos_sale [#get_pos_sale]
@@ -595,38 +596,40 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Set or clear one nullable poured-format price override for one Square location
+Set or clear one beer's nullable poured-format price override for one Square location
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `posLocationId` | string | yes |
 | `formatId` | uuid | yes |
+| `brandId` | uuid | yes |
 | `unitPriceCents` | integer or null | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_price_override", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_price_override", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "brandId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
 ```
 
 ## set_pos_website_publication [#set_pos_website_publication]
 
 `command` · admin, warehouse
 
-Publish or unpublish one currently priced, stocked menu row on the brewery website feed
+Publish or unpublish one beer's currently priced, stocked menu row on the brewery website feed
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `posLocationId` | string | yes |
 | `formatId` | uuid | yes |
+| `brandId` | uuid | yes |
 | `published` | boolean | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_website_publication", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "published": true } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_website_publication", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "formatId": "00000000-0000-0000-0000-000000000000", "brandId": "00000000-0000-0000-0000-000000000000", "published": true } }'
 ```
 
 ## set_qbo_customer_mapping [#set_qbo_customer_mapping]

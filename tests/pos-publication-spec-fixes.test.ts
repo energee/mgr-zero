@@ -10,7 +10,8 @@ const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secre
   redirectUri: "https://mgr.test/square", environment: "sandbox" as const };
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 
-async function fixture(twoBrands = false) {
+// sharedGroup puts the second brand on the first brand's price group, so both beers pour the same formats.
+async function fixture(twoBrands = false, sharedGroup = false) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "warehouse");
   const location = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
@@ -23,10 +24,11 @@ async function fixture(twoBrands = false) {
   expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connection.data!.id,
     external_location_id: "L1", external_name: "Taproom", available: true, location_id: location.id })).error).toBeNull();
   const channel = await channelId(brewery.id, "Taproom");
-  const addBrand = async (name: string) => {
-    const keg = await seedCatalog(brewery.id, { product: name, sku: `${name} half`, packageType: "keg", bblPerUnit: 0.5 });
-    const formats: string[] = [];
-    for (const [format, ounces, cents] of [["Pint", 16, 700], ["Taster", 5, 350]] as const) {
+  const addBrand = async (name: string, share?: { brandId: string; formats: string[] }) => {
+    const priceGroupId = share ? (await admin.from("brands").select("price_group_id").eq("id", share.brandId).single()).data!.price_group_id as string : undefined;
+    const keg = await seedCatalog(brewery.id, { product: name, sku: `${name} half`, packageType: "keg", bblPerUnit: 0.5, priceGroupId });
+    const formats: string[] = share ? [...share.formats] : [];
+    for (const [format, ounces, cents] of share ? [] : [["Pint", 16, 700], ["Taster", 5, 350]] as const) {
       const formatId = await seedPour(brewery.id, { brandId: keg.brandId, name: `${name} ${format}`, ounces });
       await priceSku(brewery.id, { saleChannelId: channel, brandId: keg.brandId, formatId, cents });
       formats.push(formatId);
@@ -36,9 +38,28 @@ async function fixture(twoBrands = false) {
     return { brandId: keg.brandId, formats };
   };
   const first = await addBrand("Hazy");
-  const second = twoBrands ? await addBrand("Pils") : null;
+  const second = twoBrands ? await addBrand("Pils", sharedGroup ? first : undefined) : null;
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
   return { brewery, ctx, connectionId: connection.data!.id, first, second };
+}
+
+// A Square that accepts every new item and assigns ITEM-n / ITEM-n-VAR-m ids.
+function createItemsFetch() {
+  const bodies: Array<SquareUpsert> = [];
+  const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
+    const body = squareUpsertSchema.parse(JSON.parse(String(init?.body))); bodies.push(body);
+    const itemId = `ITEM-${bodies.length}`;
+    const mappings = [{ client_object_id: body.object.id, object_id: itemId },
+      ...body.object.item_data.variations.map((variation, index) => ({
+        client_object_id: variation.id, object_id: `${itemId}-VAR-${index + 1}`,
+      }))];
+    return new Response(JSON.stringify({ catalog_object: { ...body.object, id: itemId, version: 2,
+      item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation, index) => ({
+        ...variation, id: `${itemId}-VAR-${index + 1}`, version: 2,
+        item_variation_data: { ...variation.item_variation_data, item_id: itemId },
+      })) } }, id_mappings: mappings }), { status: 200 });
+  });
+  return { bodies, fetch };
 }
 
 describe("Square parent-item publication corrections", () => {
@@ -62,26 +83,24 @@ describe("Square parent-item publication corrections", () => {
 
   it("publishes every derived brand as one item containing all of its format variations", async () => {
     const { brewery, ctx } = await fixture(true);
-    const bodies: Array<SquareUpsert> = [];
-    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
-      const body = squareUpsertSchema.parse(JSON.parse(String(init?.body))); bodies.push(body);
-      const itemId = `ITEM-${bodies.length}`;
-      const mappings = [{ client_object_id: body.object.id, object_id: itemId },
-        ...body.object.item_data.variations.map((variation, index) => ({
-          client_object_id: variation.id, object_id: `${itemId}-VAR-${index + 1}`,
-        }))];
-      return new Response(JSON.stringify({ catalog_object: { ...body.object, id: itemId, version: 2,
-        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation, index) => ({
-          ...variation, id: `${itemId}-VAR-${index + 1}`, version: 2,
-          item_variation_data: { ...variation.item_variation_data, item_id: itemId },
-        })) } }, id_mappings: mappings }), { status: 200 });
-    });
+    const { bodies, fetch } = createItemsFetch();
     await expect(publishSquareMenu(ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch)))
       .resolves.toMatchObject({ published: true, items: [expect.any(Object), expect.any(Object)] });
     expect(bodies).toHaveLength(2);
     expect(bodies.map((body) => body.object.item_data.variations.length)).toEqual([2, 2]);
     expect(sql(`select count(*) from public.pos_catalog_items where brewery_id='${brewery.id}';
       select count(*) from public.pos_catalog_ownership where brewery_id='${brewery.id}'`)).toEqual(["2", "4"]);
+  });
+
+  it("publishes two beers on one price group as separate items that each own the shared pours", async () => {
+    const { brewery, ctx, first, second } = await fixture(true, true);
+    const { bodies, fetch } = createItemsFetch();
+    await expect(publishSquareMenu(ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch)))
+      .resolves.toMatchObject({ published: true, items: [expect.any(Object), expect.any(Object)] });
+    expect(bodies.map((body) => body.object.item_data.variations.length)).toEqual([2, 2]);
+    // Each beer owns its own variation of each shared pour.
+    expect(sql(`select brand_id||':'||format_id from public.pos_catalog_ownership where brewery_id='${brewery.id}' order by 1`))
+      .toEqual([...first.formats.map((f) => `${first.brandId}:${f}`), ...first.formats.map((f) => `${second!.brandId}:${f}`)].sort());
   });
 
   it("terminally supersedes stale credential and catalog generations so current work can start", async () => {

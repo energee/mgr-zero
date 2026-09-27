@@ -156,7 +156,7 @@ async function posMenuFixture(role: StaffRole, configured = false) {
   await ins("inventory_movements", { brewery_id: brewery.id, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId, qty: 1, bbl: 0.5, type: "opening_balance", created_by: adminCtx.userId });
   await priceSku(brewery.id, { saleChannelId, brandId: catalog.brandId, formatId: poured.id, cents: 700 });
   if (configured) await runCommand("configure_pos_menu", { posLocationId: externalLocation, binId: location.binId, saleChannelId }, adminCtx);
-  return { externalLocation, location, formatId: poured.id };
+  return { externalLocation, location, formatId: poured.id, brandId: catalog.brandId };
 }
 
 async function draftOrder() {
@@ -245,14 +245,14 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "set_pos_price_override", rpc: "set_pos_price_override", allowed: ["admin", "warehouse"],
       input: async role => {
         const fixture = await posMenuFixture(role, true);
-        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, unitPriceCents: 725 }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_unit_price_cents: 725 } };
+        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, brandId: fixture.brandId, unitPriceCents: 725 }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_brand: fixture.brandId, p_unit_price_cents: 725 } };
       },
     },
     {
       command: "set_pos_website_publication", rpc: "set_pos_website_publication", allowed: ["admin", "warehouse"],
       input: async role => {
         const fixture = await posMenuFixture(role, true);
-        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, published: true }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_published: true } };
+        return { command: { posLocationId: fixture.externalLocation, formatId: fixture.formatId, brandId: fixture.brandId, published: true }, rpc: { p_brewery: brewery.id, p_external_location: fixture.externalLocation, p_format: fixture.formatId, p_brand: fixture.brandId, p_published: true } };
       },
     },
     {

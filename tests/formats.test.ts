@@ -90,6 +90,18 @@ describe("formats", () => {
     const poured = await runCommand("upsert_format", { ...pour, id: loosePint.id, name: "Volume loose pint", ounces: 20 }, ctx) as { ounces: string };
     expect(Number(poured.ounces)).toBe(20);
   });
+
+  // A pour's prices, menu lines and Square variations are all filed under its
+  // group; moving it would strand them, so a pour stays on the group it was made on.
+  it("a pour cannot move to another price group", async () => {
+    const from = await runCommand("upsert_price_group", { name: "Move from", position: 4 }, ctx) as { id: string };
+    const to = await runCommand("upsert_price_group", { name: "Move to", position: 5 }, ctx) as { id: string };
+    const pint = await runCommand("upsert_format", { basis: "poured", priceGroupId: from.id, name: "Moving pint", ounces: 16 }, ctx) as { id: string };
+    await expect(runCommand("upsert_format", { id: pint.id, basis: "poured", priceGroupId: to.id, name: "Moving pint", ounces: 16 }, ctx))
+      .rejects.toThrow(/cannot move to another price group/);
+    const renamed = await runCommand("upsert_format", { id: pint.id, basis: "poured", priceGroupId: from.id, name: "Staying pint", ounces: 16 }, ctx) as { name: string };
+    expect(renamed.name).toBe("Staying pint");
+  });
 });
 
 describe("format_components", () => {

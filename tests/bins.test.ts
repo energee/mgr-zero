@@ -101,7 +101,7 @@ describe("bins", () => {
     const catalog = await seedCatalog(ctx.breweryId, { product: "Menu bin beer", sku: "Menu bin keg", packageType: "keg" });
     const pouredId = await seedPour(ctx.breweryId, { brandId: catalog.brandId, name: "Menu bin pint", ounces: 16 });
     insertFixture("pos_menu_lines", { menu_id: menu.menuId, brewery_id: ctx.breweryId, format_id: pouredId,
-      price_override_cents: 700 });
+      brand_id: catalog.brandId, price_override_cents: 700 });
 
     await expect(runCommand("delete_bin", { binId: bins[0].id }, ctx))
       .rejects.toMatchObject({ message: expect.stringMatching(/POS menu/i) });

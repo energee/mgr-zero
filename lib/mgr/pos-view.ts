@@ -149,7 +149,7 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
     brandId: row.brandId, formatId: row.formatId, label: `${row.brand} · ${row.format}`,
     retail: price(row.priceCents), source: row.priceSource ?? "no price",
     destinations: `Square${row.websitePublished ? " · Website" : ""}`, available: Boolean(row.available),
-    reason: row.reason?.replaceAll("_", " "), href: `/menu/item/${row.formatId}?location=${encodeURIComponent(selectedLocationId)}`,
+    reason: row.reason?.replaceAll("_", " "), href: `/menu/item/${row.formatId}?brand=${row.brandId}&location=${encodeURIComponent(selectedLocationId)}`,
   });
   return {
     locations: locations.map(location => ({ ...location, id: location.externalLocationId, label: location.name, href: `/menu?location=${encodeURIComponent(location.externalLocationId)}` })),

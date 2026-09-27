@@ -2,6 +2,7 @@
 // while website readers see only explicitly published safe rows.
 import { describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
+import { toPosMenuModel, type PosMenuSnapshot } from "@/lib/mgr/pos-view";
 import "@/lib/commands/all";
 import {
   admin,
@@ -83,10 +84,10 @@ describe("derived POS menus", () => {
     }));
 
     await runCommand("set_pos_price_override", {
-      posLocationId: "L1", formatId: pintId, unitPriceCents: 650,
+      posLocationId: "L1", formatId: pintId, brandId: keg.brandId, unitPriceCents: 650,
     }, ctx, execution());
     await runCommand("set_pos_website_publication", {
-      posLocationId: "L1", formatId: pintId, published: true,
+      posLocationId: "L1", formatId: pintId, brandId: keg.brandId, published: true,
     }, ctx, execution());
 
     await admin.from("skus").update({ active: false }).eq("id", keg.skuId);
@@ -106,7 +107,7 @@ describe("derived POS menus", () => {
       sources: [],
       reason: "no_active_keg",
     });
-    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, ctx))
+    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId, brandId: keg.brandId }, ctx))
       .resolves.toEqual(inactive.excluded[0]);
   });
 
@@ -132,15 +133,47 @@ describe("derived POS menus", () => {
     await runCommand("configure_pos_menu", { posLocationId: "L1", binId: first.binId, saleChannelId: channel }, warehouseCtx, execution());
     await runCommand("configure_pos_menu", { posLocationId: "L2", binId: second.binId, saleChannelId: channel }, warehouseCtx, execution());
 
-    await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, unitPriceCents: 650 }, warehouseCtx, execution());
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as unknown))
+    await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, brandId: keg.brandId, unitPriceCents: 650 }, warehouseCtx, execution());
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId, brandId: keg.brandId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 650, priceSource: "override", priceOverrideCents: 650 });
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L2", formatId: pintId }, warehouseCtx) as unknown))
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L2", formatId: pintId, brandId: keg.brandId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 700, priceSource: "format", priceOverrideCents: null });
 
-    await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, unitPriceCents: null }, warehouseCtx, execution());
-    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, warehouseCtx) as unknown))
+    await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, brandId: keg.brandId, unitPriceCents: null }, warehouseCtx, execution());
+    expect((await runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId, brandId: keg.brandId }, warehouseCtx) as unknown))
       .toMatchObject({ priceCents: 700, priceSource: "format", priceOverrideCents: null });
+  });
+
+  it("keeps one beer's override and website publish on that beer when two beers share a pour", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const taproom = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
+    await connectedLocation(brewery.id, "L1", taproom.id);
+    const channel = await channelId(brewery.id, "Taproom");
+    const hazy = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5, format: "Half bbl" });
+    const pintId = await pouredFormat(brewery.id, hazy.brandId);
+    await priceSku(brewery.id, { saleChannelId: channel, brandId: hazy.brandId, formatId: pintId, cents: 700 });
+    const groupId = (await admin.from("brands").select("price_group_id").eq("id", hazy.brandId).single()).data!.price_group_id as string;
+    const pils = await seedCatalog(brewery.id, { product: "Pils", sku: "Pils half", packageType: "keg", bblPerUnit: 0.5, format: "Half bbl", priceGroupId: groupId });
+    for (const skuId of [hazy.skuId, pils.skuId]) {
+      await runCommand("record_movement", { skuId, locationId: taproom.id, binId: taproom.binId, qty: 1, type: "opening_balance" }, ctx, execution());
+    }
+    const menu = await runCommand("configure_pos_menu", { posLocationId: "L1", binId: taproom.binId, saleChannelId: channel }, ctx, execution()) as { publicId: string };
+
+    await runCommand("set_pos_price_override", { posLocationId: "L1", formatId: pintId, brandId: hazy.brandId, unitPriceCents: 650 }, ctx, execution());
+    await runCommand("set_pos_website_publication", { posLocationId: "L1", formatId: pintId, brandId: hazy.brandId, published: true }, ctx, execution());
+
+    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId, brandId: hazy.brandId }, ctx))
+      .resolves.toMatchObject({ brand: "Hazy", priceCents: 650, priceSource: "override", websitePublished: true });
+    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId, brandId: pils.brandId }, ctx))
+      .resolves.toMatchObject({ brand: "Pils", priceCents: 700, priceSource: "format", websitePublished: false });
+    const published = JSON.parse(sql(`select public.get_published_pos_menu('${menu.publicId}')::text`)[0]);
+    expect(published.items).toEqual([expect.objectContaining({ brand: "Hazy", format: "Pint", priceCents: 650 })]);
+    // Each beer's row opens its own item page.
+    const snapshot = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as PosMenuSnapshot;
+    expect(toPosMenuModel(snapshot, [{ externalLocationId: "L1", name: "Taproom" }], "L1").items.map((item) => item.href).sort()).toEqual([
+      `/menu/item/${pintId}?brand=${hazy.brandId}&location=L1`, `/menu/item/${pintId}?brand=${pils.brandId}&location=L1`,
+    ].sort());
   });
 
   it("keeps external rows separate and enforces tenant, role, and complete-read boundaries", async () => {

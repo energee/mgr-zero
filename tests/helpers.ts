@@ -122,10 +122,11 @@ export async function seedMaterial(breweryId: string, o: {
 // brand + packaged format + the sku that is their product (§16.1, §16.2).
 export async function seedCatalog(
   breweryId: string,
-  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number; format?: string } = {},
+  // priceGroupId puts the brand on an existing group, so it shares that group's pours.
+  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number; format?: string; priceGroupId?: string } = {},
 ) {
   const { data: b, error: be } = await admin.from("brands")
-    .insert({ brewery_id: breweryId, name: opts.product ?? "IPA" }).select("id").single();
+    .insert({ brewery_id: breweryId, name: opts.product ?? "IPA", price_group_id: opts.priceGroupId ?? null }).select("id").single();
   if (be) throw be;
   const formatName = opts.format ?? `${opts.packageType ?? "can"} ${opts.bblPerUnit ?? 0.0645} bbl`;
   const existing = await admin.from("formats").select("id").eq("brewery_id", breweryId).eq("name", formatName).eq("basis", "packaged").maybeSingle();

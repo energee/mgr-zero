@@ -16,13 +16,13 @@ function ctxRaising(message: string): Ctx {
 describe("get_pos_menu_item on a stale link", () => {
   for (const message of ["Menu item not found", "Menu is not configured"]) {
     it(`"${message}" is 404 not_found`, async () => {
-      await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: FORMAT }, ctxRaising(message)))
+      await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: FORMAT, brandId: FORMAT }, ctxRaising(message)))
         .rejects.toMatchObject({ status: 404, code: "not_found", message });
     });
   }
 
   it("other domain errors keep their 400", async () => {
-    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: FORMAT }, ctxRaising("something else")))
+    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: FORMAT, brandId: FORMAT }, ctxRaising("something else")))
       .rejects.toMatchObject({ status: 400, code: "bad_request" });
   });
 
