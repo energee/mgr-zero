@@ -675,7 +675,7 @@ export const SCREENS: Screen[] = [
     name: "Team",
     job: "Roster, single staff role, invitations and membership removal",
     reads: "list_team_members",
-    writes: "invite_staff [existing] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
+    writes: "invite_staff [existing] · update_staff_role · revoke_staff",
     states: [["last admin", "role change refused · keep one admin", 1], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, derived from their email. Admin invites one staff role and changes or removes other memberships. The roster does not distinguish pending acceptance. Existing accounts cannot be attached or reinvited; removing membership leaves the Auth account.",
     body: <TeamView model={teamRoster} />,

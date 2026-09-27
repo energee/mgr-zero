@@ -178,6 +178,21 @@ describe("durable invitations", () => {
     expect(sql(`select state || ':' || (auth_user_id is null)::text from private.invite_requests where request_id = '${first}'`)).toEqual(["failed:true"]);
     expect(sql(`select count(*) from auth.users where email = '${address}'`)).toEqual(["1"]);
   });
+  // #580: a crash before record_invite_failure left pending_auth forever. After
+  // 15 minutes a new claim in the same brewery marks it failed and proceeds.
+  it("a request stuck in pending_auth expires after 15 minutes in its own brewery only", async () => {
+    const other = await makeStaffCtx((await makeBrewery()).id);
+    const address = email(), stuck = crypto.randomUUID(), elsewhere = crypto.randomUUID();
+    expect((await claimOnly(ctx, address, stuck)).error).toBeNull(); // crashed before Auth
+    expect((await claimOnly(other, address, elsewhere)).error).toBeNull();
+    expect((await claimOnly(ctx, address, crypto.randomUUID())).error?.message).toBe("invitation already requested");
+    sql(`update private.invite_requests set created_at = now() - interval '16 minutes' where request_id in ('${stuck}', '${elsewhere}')`, true);
+    const retry = execution();
+    const { userId } = await runCommand("invite_staff", { email: address, role: "sales" }, ctx, retry) as { userId: string };
+    expect(sql(`select auth_user_id from private.invite_requests where request_id = '${retry.requestId}'`)).toEqual([userId]);
+    expect(sql(`select state || ':' || (auth_user_id is null)::text from private.invite_requests where request_id = '${stuck}'`)).toEqual(["failed:true"]);
+    expect(sql(`select state from private.invite_requests where request_id = '${elsewhere}'`)).toEqual(["pending_auth"]);
+  });
   it("rejects warehouse permissions before creating Auth", async () => {
     await expect(runCommand("invite_staff", { email: email(), role: "sales" }, warehouse)).rejects.toMatchObject({ code: "permission_denied" });
   });
