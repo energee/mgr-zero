@@ -1,7 +1,8 @@
 "use client";
 
-// Live adapter for a ConfirmDelete-style control: runs one delete command and
-// leaves the deleted record's page on success.
+// Live adapter for a ConfirmDelete-style control: runs one delete or revoke
+// command and navigates to `redirect` on success (the deleted record's list,
+// or the same page after removing one row).
 import { useRouter } from "next/navigation";
 import type { ComponentType } from "react";
 import { useCommandAction } from "@/lib/commands/use-command-form";

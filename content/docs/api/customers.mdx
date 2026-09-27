@@ -74,6 +74,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_customer_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "customerId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## list_customer_users [#list_customer_users]
+
+`query` · admin, sales
+
+One customer's portal users: user id, email and when access was granted
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_customer_users", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## list_customers [#list_customers]
 
 `query` · admin, sales, warehouse
@@ -89,6 +106,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_customers", "input": {} }'
+```
+
+## revoke_customer_user [#revoke_customer_user]
+
+`command` · admin, sales
+
+End one buyer's portal access to a customer (admin or sales); the sign-in account remains
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `userId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "revoke_customer_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "userId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## set_portal_fulfillment_source [#set_portal_fulfillment_source]

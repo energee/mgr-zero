@@ -2,8 +2,8 @@
 // kind, base and purchase units with the factor between them, lot tracking,
 // default vendor (what Planning drafts to when no contract covers the
 // material), and for malt and adjunct the extract potential recipe predictions
-// read (#430). Creates or edits; units are refused by the command once the
-// material has movements, and turning lot tracking on is refused while stock
+// read (#430). Creates or edits; units are refused by the command once
+// anything stores a quantity of the material (#614), and turning lot tracking on is refused while stock
 // without a lot is on hand (#452); the command's message explains a refusal.
 "use client";
 

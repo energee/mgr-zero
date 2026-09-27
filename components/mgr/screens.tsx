@@ -1171,10 +1171,10 @@ export const SCREENS: Screen[] = [
     name: "Customer detail",
     to: { Open: "Customer keg balance" },
     job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
-    reads: "get_customer",
-    writes: "upsert_customer · invite_customer_user · delete_customer [admin]",
+    reads: "get_customer · list_customer_users",
+    writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
     states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
-    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Edit stays beside the customer name; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion.",
+    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Edit stays beside the customer name; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account.",
     body: <CustomerView model={toCustomerViewProps(customerRidgeline)} />,
   },
   {
