@@ -316,6 +316,8 @@ Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**,
 
 Empty lists say **No customers yet** or **No ship-to addresses yet**. You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation, and a failed invitation for the same email can be sent again as a new one, and one interrupted before its email was sent stops blocking after 15 minutes. Existing sign-in accounts cannot be attached with this form.
 
+**Portal users** lists each buyer who can sign in for this customer, by email, and says **No portal users yet** when there are none. Admin and Sales can select **Remove access** beside a buyer and confirm. The buyer loses this customer's portal at once, even if they are signed in: their next page or action is refused. Their orders, invoices, and sign-in account stay. The invite form cannot give the same email access again, so remove access only when the buyer should no longer order for this customer.
+
 ## Price groups [#pricing]
 
 <Screen name="Price groups" />

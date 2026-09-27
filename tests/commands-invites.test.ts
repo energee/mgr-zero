@@ -1,7 +1,7 @@
 import type { Database } from "@/lib/supabase/database";
 import { assert } from "vitest";
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaffCtx, admin, seedCustomer, sql } from "./helpers";
+import { makeBrewery, makeStaffCtx, admin, seedCustomer, sql, seedLocation, seedCatalog, priceSku, makeCustomerUser, asUser } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { inviteStaff, inviteCustomerUser } from "@/lib/supabase/invites";
@@ -195,5 +195,81 @@ describe("durable invitations", () => {
   });
   it("rejects warehouse permissions before creating Auth", async () => {
     await expect(runCommand("invite_staff", { email: email(), role: "sales" }, warehouse)).rejects.toMatchObject({ code: "permission_denied" });
+  });
+});
+
+// #616: Admin and Sales list a customer's portal users and revoke one. The
+// membership row goes (the command ledger keeps it), the Auth user stays, and
+// a buyer whose session is still live loses portal reads and writes at once,
+// because RLS, the RPCs and the request context all read customer_users per
+// request rather than from the token.
+describe("portal user revocation", () => {
+  type PortalUser = { userId: string; email: string; createdAt: string };
+  let staff: Ctx, sales: Ctx, brewer: Ctx, customerId: string, shipToId: string, skuId: string;
+  beforeAll(async () => {
+    const b = await makeBrewery();
+    staff = await makeStaffCtx(b.id);
+    sales = await makeStaffCtx(b.id, "sales");
+    brewer = await makeStaffCtx(b.id, "brewer");
+    const warehouse = await seedLocation(b.id);
+    const cat = await seedCatalog(b.id);
+    skuId = cat.skuId;
+    let saleChannelId: string;
+    ({ customerId, shipToId, saleChannelId } = await seedCustomer(b.id));
+    await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 3600 });
+    await runCommand("set_portal_fulfillment_source", { locationId: warehouse.id }, staff);
+  });
+  const buyer = async () => {
+    const user = await makeCustomerUser(customerId);
+    const db = await asUser(user.email);
+    return { user, ctx: { db, userId: user.id, breweryId: staff.breweryId, role: "customer" as const, customerId } };
+  };
+  const list = (c: Ctx) => runCommand("list_customer_users", { customerId }, c) as Promise<PortalUser[]>;
+
+  it("lists a customer's portal users with email to Admin and Sales only", async () => {
+    const { user } = await buyer();
+    expect((await list(staff)).find((u) => u.userId === user.id)?.email).toBe(user.email);
+    expect((await list(sales)).some((u) => u.userId === user.id)).toBe(true);
+    await expect(list(brewer)).rejects.toMatchObject({ code: "permission_denied" });
+    // the definer RPC is granted to authenticated, so it applies the same rule
+    const { data } = await brewer.db.rpc("list_customer_users", { p_brewery: staff.breweryId, p_customer: customerId });
+    expect(data).toEqual([]);
+  });
+
+  it("revokes one buyer: a live session loses portal reads and writes, the Auth user stays", async () => {
+    const { user, ctx: live } = await buyer();
+    const order = { shipToId, lines: [{ skuId, qty: 1 }] };
+    await expect(runCommand("portal_create_order", order, live)).resolves.toHaveProperty("order_id");
+    expect((await live.db.from("customers").select("id")).data).toHaveLength(1);
+
+    await runCommand("revoke_customer_user", { customerId, userId: user.id }, sales);
+
+    expect((await list(staff)).some((u) => u.userId === user.id)).toBe(false);
+    expect((await admin.auth.admin.getUserById(user.id)).data.user?.id).toBe(user.id);
+    expect((await live.db.from("customers").select("id")).data).toEqual([]);
+    expect((await live.db.from("orders").select("id")).data).toEqual([]);
+    await expect(runCommand("portal_orders", {}, live)).resolves.toEqual([]);
+    await expect(runCommand("portal_create_order", order, live)).rejects.toMatchObject({ code: "permission_denied" });
+    // the next request resolves no membership, so the portal layout sends them away
+    expect(await createRequestAuthContext(async () => live.db).getCustomerMemberships()).toEqual([]);
+  });
+
+  it("replays the same request, and a second revoke finds no portal user", async () => {
+    const { user } = await buyer();
+    const ex = execution(), input = { customerId, userId: user.id };
+    const first = await runCommand("revoke_customer_user", input, staff, ex);
+    expect(await runCommand("revoke_customer_user", input, staff, ex)).toEqual(first);
+    await expect(runCommand("revoke_customer_user", input, staff)).rejects.toThrow(/portal user not found/);
+  });
+
+  it("refuses Warehouse, Brewer and another brewery; their memberships stay", async () => {
+    const { user } = await buyer();
+    const input = { customerId, userId: user.id };
+    await expect(runCommand("revoke_customer_user", input, brewer)).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("revoke_customer_user", input, { ...brewer, role: "admin" })).rejects.toMatchObject({ code: "permission_denied" });
+    const other = await makeStaffCtx((await makeBrewery()).id);
+    await expect(runCommand("revoke_customer_user", input, other)).rejects.toThrow(/portal user not found/);
+    await expect(runCommand("list_customer_users", { customerId }, other)).resolves.toEqual([]);
+    expect((await admin.from("customer_users").select("user_id").eq("user_id", user.id)).data).toHaveLength(1);
   });
 });
