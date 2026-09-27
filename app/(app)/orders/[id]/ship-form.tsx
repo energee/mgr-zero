@@ -15,9 +15,12 @@ import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 
 export type ShippingSnapshot = ShipSnapshot & { order: ShipSnapshot["order"] & { kind: string; to_location_id: string | null } };
 
-export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations, available: ShipSources) {
+/** The ship_order lines: quantities, chosen sources, and a trimmed reason for
+ *  each line shipped below picked (the server refuses one without). */
+export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations, available: ShipSources, reasons: Record<string, string> = {}) {
   return lines.map(line => ({
     lineId: line.id, qty: Number(qtys[line.id]),
+    shortReason: Number(qtys[line.id]) < Number(line.qty_picked ?? 0) ? reasons[line.id]?.trim() || undefined : undefined,
     sources: Number(qtys[line.id]) === 0 ? [] : (allocations[line.id] ?? []).map(row => {
       const source = available.stock.find(stock => `${stock.bin_id}:${stock.lot_id ?? ""}` === row.key && stock.stock_id === line.sku_id);
       return { binId: source?.bin_id, lotId: source?.lot_id ?? null, qty: Number(row.qty), toBinId: row.toBinId || undefined };
@@ -31,6 +34,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   const { busy, error, run } = useCommandAction();
   const [allocations, setAllocations] = useState<ShipmentAllocations>({});
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, String(line.qty_picked ?? 0)])));
+  const [reasons, setReasons] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, line.short_reason ?? ""])));
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [invoiceTiming, setInvoiceTiming] = useState<"now" | "on_delivery">("now");
@@ -52,7 +56,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
     if (busy || disabled) return;
     void run("ship_order", {
       orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming,
-      ship: buildShipLines(snapshot.lines, qtys, allocations, available),
+      ship: buildShipLines(snapshot.lines, qtys, allocations, available, reasons),
     }, data => {
       if (transfer) { router.push(`/orders/${snapshot.order.id}`); return; }
       const invoiceId = (data as { invoice_id: string | null }).invoice_id;
@@ -61,7 +65,8 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   }}>
     {transfer
       ? <CompleteTransferView model={toCompleteTransferViewProps(proposed)} quantities={qtys} onQuantity={onQuantity} sources={sources} messages={messages} submitting={busy} disabled={disabled} />
-      : <ShipView model={toShipViewProps(proposed)} quantities={qtys} onQuantity={onQuantity} carrier={carrier} tracking={tracking}
+      : <ShipView model={toShipViewProps(proposed)} quantities={qtys} onQuantity={onQuantity}
+          reasons={reasons} onReason={(id, value) => setReasons(prev => ({ ...prev, [id]: value }))} carrier={carrier} tracking={tracking}
           onCarrier={setCarrier} onTracking={setTracking} onInvoiceTiming={setInvoiceTiming} sources={sources} messages={messages} submitting={busy} disabled={disabled} />}
   </form>;
 }

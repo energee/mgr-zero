@@ -42,6 +42,12 @@ it("preserves explicit bin/lot identities, decimals, transfer destinations and h
   expect(buildShipLines(lines, { a: "1", b: "0" }, { a: [{ key: "wrong:", qty: "1", toBinId: "" }] }, available)[0].sources[0].binId).toBeUndefined();
 });
 
+it("sends a trimmed reason only for a line shipped below picked (#624)", () => {
+  const built = buildShipLines(lines, { a: "1", b: "2" }, { a: [{ key: "bin:", qty: "1", toBinId: "" }], b: [{ key: "wrong:", qty: "2", toBinId: "" }] }, available, { a: " one can dented ", b: "ignored" });
+  expect(built.map(line => line.shortReason)).toEqual(["one can dented", undefined]);
+  expect(buildShipLines(lines, { a: "1", b: "2" }, {}, available, { a: "  " })[0].shortReason).toBeUndefined();
+});
+
 it("guards both shipment pages before reading data", async () => {
   permission.mockImplementation(() => { throw new Error("denied"); });
   await expect(ShipPage({ params })).rejects.toThrow("denied");

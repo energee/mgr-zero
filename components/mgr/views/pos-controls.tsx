@@ -9,6 +9,7 @@ import {
 } from "@/components/mgr/views/pos";
 import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, type ExactCommandAttempt, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 function useExactCommand() {
@@ -35,9 +36,11 @@ export function SquareConnectControl({ configured, reconnect = false }: { config
   return <ConnectSquareView configured={configured} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
+/** Leaves for Connect only when Square confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
 export function SquareDisconnectControl({ connectionId }: { connectionId: string }) {
   const action = useCommandAction(), router = useRouter();
-  return <DisconnectSquareView busy={action.busy} error={action.error} onDisconnect={() => void action.run("disconnect_square", { connectionId }, () => router.push("/settings/pos/connect"))} />;
+  return <DisconnectSquareView busy={action.busy} error={action.error}
+    onDisconnect={() => void action.run("disconnect_square", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/pos/connect") : router.refresh(), undefined, { refresh: false })} />;
 }
 
 export function SquareSyncControls() {

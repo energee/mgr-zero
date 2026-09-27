@@ -221,6 +221,9 @@ export const INERT: (string | RegExp)[] = [
   "Adjust selected",
   "August 31, 2027",
   "Avery Stone",
+  // Customer detail → Portal users rows: a buyer is named, not opened.
+  "jordan@ridgelinetap.com",
+  "orders@ridgelinetap.com",
   "Buyer asked about this invoice",
   "Casey Lin",
   "Change",

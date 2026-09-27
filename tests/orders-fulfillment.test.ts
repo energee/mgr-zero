@@ -53,7 +53,7 @@ describe("pick and ship", () => {
     });
     const shipped = await staffDb.rpc("ship_order", {
       p_order: id,
-      p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+      p_ship: [{ line_id: line.id, qty_shipped: 4, short_reason: "two kegs dented" }],
       p_carrier: "self",
       p_tracking: null,
       p_request_id: crypto.randomUUID(),
@@ -91,7 +91,7 @@ describe("pick and ship", () => {
       const [ship, adjust] = await Promise.all([
         shipperDb.rpc("ship_order", {
           p_order: id,
-          p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+          p_ship: [{ line_id: line.id, qty_shipped: 4, short_reason: "two kegs dented" }],
           p_carrier: null,
           p_tracking: null,
           p_request_id: crypto.randomUUID(),
@@ -380,7 +380,7 @@ describe("confirm_restock", () => {
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
     await staffDb.rpc("ship_order", {
-      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 1 }],
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 1, short_reason: "two kegs dented" }],
       p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
     });
     expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
@@ -512,7 +512,7 @@ describe("ship invoice timing", () => {
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
     const { error } = await staffDb.rpc("ship_order", {
-      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 9 }],
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 9, short_reason: "one keg dented" }],
       p_carrier: null, p_tracking: null, p_invoice_timing: "now",
       p_request_id: crypto.randomUUID(),
     });

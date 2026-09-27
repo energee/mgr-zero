@@ -160,6 +160,17 @@ describe("Ship view", () => {
     expect(markup).toContain('data-variant="irreversible"');
   });
 
+  it("asks each short line for its reason, prefilled from the stored one (#624)", () => {
+    const lines = orderShipInvoice.lines.map(line => line.id === "l-pils" ? { ...line, short_reason: "short in pick face" } : line);
+    const model = toShipViewProps({ ...orderShipInvoice, lines });
+    expect(model.lines.map(line => line.shortReason)).toEqual([undefined, "short in pick face"]);
+    const markup = html(createElement(ShipView, { model }));
+    expect(markup).toContain('aria-label="Pils · 16 oz case shortage reason"');
+    expect(markup).toContain('value="short in pick face"');
+    expect(markup).not.toContain("Hazy IPA · ½ bbl keg shortage reason");
+    expect(html(createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery) }))).not.toMatch(/shortage reason/);
+  });
+
   it("maps all-as-picked onto deferred invoice tape", () => {
     const model = toShipViewProps(orderShipOnDelivery);
     expect(model.invoiceTiming).toBe("on_delivery");
