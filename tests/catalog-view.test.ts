@@ -467,6 +467,13 @@ describe("Package BOM view", () => {
     expect(html).toMatch(/Case tray/);
   });
 
+  it("draws no row verb unless the caller passes one", () => {
+    const model = toPackageBomViewProps(packageBomCase);
+    expect(htmlOf(createElement(PackageBomView, { model }))).not.toMatch(/data-row-action/);
+    expect(htmlOf(screen("Package BOM").body)).toMatch(/data-row-action[^>]*>Edit</);
+    expect(readFileSync("app/(app)/catalog/formats/[id]/page.tsx", "utf8")).not.toMatch(/rowAction=/);
+  });
+
   it("the Package BOM inventory record is PackageBomView", () => {
     const body = screen("Package BOM").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(PackageBomView);

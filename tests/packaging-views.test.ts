@@ -10,6 +10,7 @@ import { SchedulePackagingRunView } from "../components/mgr/views/schedule-packa
 import { packagingRuns, repackCase, schedulePackagingRun } from "../lib/mgr/fixtures/packaging";
 import { DEMO_TIME_ZONE } from "../lib/mgr/fixtures/settings";
 import { toPackagingRunsViewProps } from "../lib/mgr/packaging-runs-view";
+import { toSchedulePackagingRunView } from "../lib/mgr/schedule-packaging-run-view";
 const screen = (name: string) => SCREENS.find((entry) => entry.name === name)!;
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -59,5 +60,34 @@ describe("packaging views", () => {
     }], DEMO_TIME_ZONE).recent;
     expect(recent.detail).toMatch(/^closed Sep 4, 2026/);
     expect(recent.detail).not.toContain("2026-09-01");
+  });
+
+  it("builds the live Schedule run model from the page's reads, gating what they cannot say", () => {
+    const data = {
+      brands: [{ id: "b1", name: "Pils" }, { id: "b2", name: "Stout" }],
+      occupancies: [{ occupancy_id: "o1", vessel_name: "FV1", brand_name: "Pils", batch_no: 12, bbl: 20 }],
+      skus: [
+        { id: "s1", name: "Pils ½ bbl", brand_id: "b1", format_volume: { bbl_per_unit: 0.5 } },
+        { id: "s2", name: "Pils case", brand_id: "b1", format_volume: null },
+        { id: "s3", name: "Stout ½ bbl", brand_id: "b2", format_volume: { bbl_per_unit: 0.5 } },
+      ],
+    };
+    const empty = toSchedulePackagingRunView(data, { brandId: "", occupancyId: "", plannedOn: "", qty: {} });
+    expect(empty.outputs).toEqual([]);
+    expect(empty.sourceOptions[0]).toEqual({ value: "", label: "No source yet" });
+    expect(empty.source).toBe("");
+    expect(empty.leftInSource).toBeUndefined();
+    // No shortfall read exists, so the model never claims a materials table.
+    expect(empty.materials).toBeUndefined();
+
+    const model = toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "2026-10-01", qty: { s1: "10", s3: "4" } });
+    expect(model.outputs.map((o) => o.key)).toEqual(["s1", "s2"]);
+    expect(model.outputs[0]).toEqual({ key: "s1", title: "Pils ½ bbl", detail: "5 bbl", qty: "10" });
+    expect(model.outputs[1].detail).toBe("");
+    expect(model.source).toBe("FV1 · Pils");
+    expect(model.sourceDetail).toBe("B-0012 · 20 bbl");
+    expect(model).toMatchObject({ leftLabel: "Left in FV1", leftInSource: "15 bbl" });
+    // A planned SKU with no known barrels per unit leaves the remainder unknown, not guessed.
+    expect(toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "", qty: { s2: "3" } }).leftInSource).toBeUndefined();
   });
 });
