@@ -651,6 +651,14 @@ operation's field table rather than assuming a volume field takes a string.
 
 **`limit` defaults to 50 and caps at 200** on every operation that takes one.
 
+**An `upsert_*` edit replaces the whole record.** Send every field you want to
+keep. An optional field you leave out may be cleared or set back to its
+default. A few fields keep their saved value when omitted, such as `active`
+and `upsert_material`'s `purchaseUomFactor`, `lotTracked`, `reorderPoint`, and
+`extractPotential`; sending a field is the only way to be sure. `upsert_brand_approval`, `upsert_state_registration`, and
+`upsert_brewery_state_license` keep any omitted field and clear one only when
+you send it as `null`.
+
 ### Fields the server computes [#computed]
 
 Some values are derived and must not be sent. `bbl` on an inventory movement is
