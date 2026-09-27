@@ -97,7 +97,8 @@ defineCommand({
 // exactly one `format_components` row; `childQty` is pinned to
 // `parentQty ×` that row's quantity. The parent format's BOM decides what
 // happens to the packaging that came off — consumed, or returned to the
-// shelf.
+// shelf. A repack of lotted cases names the lot (`lotId`); both legs carry
+// it, so the lot's balance drops and its trace reaches the child units (#613).
 defineCommand({
   name: "record_repack",
   description:
@@ -111,12 +112,15 @@ defineCommand({
     parentQty: z.number().positive(),
     childSkuId: z.string().uuid(),
     childQty: z.number().positive(),
+    // The finished-goods lot the cases come out of; the child units keep it.
+    // Omit only for lot-less stock: a bin holding lotted cases refuses a repack without one.
+    lotId: z.string().uuid().optional(),
   }),
   handler: async (ctx, i, execution) => {
     const r = (await unwrap(ctx.db.rpc("record_repack", {
       p_brewery: ctx.breweryId, p_location: i.locationId, p_bin: i.binId,
       p_parent_sku: i.parentSkuId, p_parent_qty: i.parentQty,
-      p_child_sku: i.childSkuId, p_child_qty: i.childQty,
+      p_child_sku: i.childSkuId, p_child_qty: i.childQty, p_lot: i.lotId ?? null,
       p_request_id: execution.requestId,
     }))) as { ref: string; parent_qty: number; child_qty: number };
     return { ref: r.ref, parentQty: r.parent_qty, childQty: r.child_qty };
