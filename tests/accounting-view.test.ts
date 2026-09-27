@@ -13,7 +13,7 @@ it("keeps disconnected and missing accounting facts distinct from configured def
   const recovery = toAccountingViewProps({ connected: false, state: "recovery_required", connectionId: "actual", realmLabel: "Actual company", lastError: "Refresh refused", allowAch: false, allowCard: true });
   expect(recovery.defaults).toEqual({ allowAch: false, allowCard: true });
   expect(recovery.reconnect).toBe(true);
-  expect(recovery.canDisconnect).toBe(false);
+  expect(recovery.canDisconnect).toBe(true);
 });
 
 it("preserves unavailable setup, errors, and explicit payment settings", () => {
@@ -27,9 +27,9 @@ it("preserves unavailable setup, errors, and explicit payment settings", () => {
   expect(defaults).toContain("Save push defaults");
 });
 
-it("does not call recovery-required disconnected or leak fixture paths", () => {
-  const html = renderToStaticMarkup(createElement(DisconnectQuickBooksView, { connected: false, recoveryRequired: true }));
-  expect(html).toContain("requires a connected state");
+it("offers the disconnect action by default and does not leak fixture paths", () => {
+  const html = renderToStaticMarkup(createElement(DisconnectQuickBooksView, { status: "available" }));
+  expect(html).toContain("Disconnect QuickBooks");
   expect(html).not.toContain("already disconnected");
   const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null });
   const account = renderToStaticMarkup(createElement(AccountingView, { model, connection: null, defaults: null }));

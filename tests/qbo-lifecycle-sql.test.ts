@@ -410,4 +410,23 @@ describe("QuickBooks durable lifecycle", () => {
     await expect(lateRefresh).rejects.toThrow("QuickBooks is unavailable");
     expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
   });
+
+  it("disconnects a recovery-required connection: purges locally and records the revocation outcome (#620)", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connection = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: `recovery-${crypto.randomUUID()}`, state: "recovery_required", credential_version: 1,
+      access_expires_at: "2026-01-01T00:00:00Z",
+    }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection.data!.id}','recovery-access','recovery-refresh',1)`);
+    const revoke = vi.fn().mockResolvedValue(undefined);
+    await expect(disconnectQbo(ctx, connection.data!.id, revoke, crypto.randomUUID()))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
+    expect(revoke).toHaveBeenCalledWith("recovery-refresh");
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
+    expect((await admin.from("qbo_connections").select("state,remote_revocation_state").eq("id", connection.data!.id).single()).data)
+      .toEqual({ state: "disconnected", remote_revocation_state: "confirmed" });
+  });
 });
