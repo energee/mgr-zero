@@ -13,7 +13,7 @@ import "@/lib/commands/all";
 it("offers sales and fulfillment actions only to their registered roles", () => {
   function render(role: Ctx["role"], status: "submitted" | "picked") {
     const ctx = { role } as Ctx;
-    return renderToStaticMarkup(createElement(LifecycleButtons, { orderId: "order", status, lines: [], skus: [], pickLines: [], canSell: canRun(ctx, "confirm_order"), canFulfill: canRun(ctx, "record_pick") }));
+    return renderToStaticMarkup(createElement(LifecycleButtons, { orderId: "order", status, lines: [], canSell: canRun(ctx, "confirm_order"), canFulfill: canRun(ctx, "record_pick") }));
   }
   expect(render("warehouse", "submitted")).not.toContain("Confirm");
   expect(render("warehouse", "picked")).not.toContain("Adjust lines");

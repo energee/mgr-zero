@@ -73,7 +73,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Confirm order", file: "app/(app)/orders/[id]/confirm/page.tsx" },
   { name: "Complete transfer", file: "app/(app)/orders/[id]/complete/page.tsx" },
   { name: "Order", file: "app/(app)/orders/[id]/page.tsx" },
-  { name: "Adjust lines", file: "app/(app)/orders/[id]/adjust-lines-form.tsx" },
+  { name: "Adjust lines", file: "app/(app)/orders/[id]/adjust/page.tsx" },
   { name: "Short pick", file: "app/(app)/orders/[id]/short-pick/page.tsx" },
   { name: "Pick", file: "app/(app)/orders/[id]/pick/page.tsx" },
   { name: "Ship and invoice", file: "app/(app)/orders/[id]/ship/page.tsx" },

@@ -13,7 +13,6 @@ import { toShipViewProps, type ShipSnapshot } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps, type ShipmentDoneViewModel } from "@/lib/mgr/shipment-done-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 
-export type ShipLine = { id: string; skuId: string; skuName: string; qtyPicked: number | null };
 export type ShippingSnapshot = ShipSnapshot & { order: ShipSnapshot["order"] & { kind: string; to_location_id: string | null } };
 
 export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations, available: ShipSources) {
