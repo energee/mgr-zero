@@ -114,6 +114,23 @@ describe("keg deposit balance on voided and written-off invoices", () => {
     expect(await balance(f)).toEqual({ kegs: 2, cents: 5000 });
   });
 
+  it("stops treating a row as refunded once the refund's credit memo is voided", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = (await admin.from("invoice_lines").select("keg_pool_id,keg_size").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;
+    for (const [qty, reason] of [[2, "acquired"], [1, "shipped"]] as const) {
+      await runCommand("record_keg_event", {
+        poolId: deposit.keg_pool_id, kegSize: deposit.keg_size, qty, reason, locationId: f.source.id, binId: f.source.binId,
+        ...(reason === "shipped" ? { customerId: f.customer.customerId } : {}),
+      }, f.adminCtx);
+    }
+    const mismatch = async () => ((await runCommand("get_customer_keg_balance", { customerId: f.customer.customerId }, f.adminCtx)) as { rows: { mismatch: boolean }[] }).rows.map((r) => r.mismatch);
+    const memo = await refundOne(invoiceId);
+    expect(await mismatch()).toEqual([false]); // 1 out, 1 on deposit
+    await setState(memo, { qbo_remote_state: "voided" });
+    // 1 out, 2 on deposit again, but no live refund: not flagged, like before any refund.
+    expect(await mismatch()).toEqual([false]);
+  });
+
   it("drops a refund whose source deposit invoice was voided after the refund", async () => {
     const invoiceId = await shipTwoKegs(f);
     await refundOne(invoiceId);
