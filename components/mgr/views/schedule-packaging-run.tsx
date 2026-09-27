@@ -1,40 +1,39 @@
+// components/mgr/views/schedule-packaging-run.tsx — the Schedule packaging run
+// sheet body, one drawing for the inventory and the live form: the live form
+// passes callbacks in `controls` and its error and submit in `messages`/`footer`.
 "use client";
 
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { NONE } from "@/components/ui/select";
 import type { SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
 
-type LiveControls = {
-  brands: { id: string; name: string }[]; brandId: string; onBrand: (value: string) => void;
-  occupancies: { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number }[]; occupancyId: string; onOccupancy: (value: string) => void;
-  plannedOn: string; onPlannedOn: (value: string) => void;
-  skus: { id: string; label: string }[]; lines: { skuId: string; qtyPlanned: string }[];
-  onSku: (index: number, value: string) => void; onQty: (index: number, value: string) => void; onAddLine: () => void;
-  messages?: ReactNode; footer?: ReactNode;
+export type SchedulePackagingRunControls = Partial<Record<"plannedOn" | "brand" | "source", (value: string) => void>> & {
+  qty?: (key: string, value: string) => void;
 };
 
-export function SchedulePackagingRunView({ model, controls }: { model: SchedulePackagingRunViewModel; controls?: LiveControls }) {
-  if (controls) return <>
-    {E.pick("Brand", controls.brandId, controls.brands.map(brand => ({ value: brand.id, label: brand.name })), { onChange: controls.onBrand, placeholder: "Brand", id: "sr-brand" })}
-    {E.pick("Source tank · optional", controls.occupancyId || NONE, [{ value: NONE, label: "No source yet" }, ...(controls.occupancies.map((o) => ({ value: o.occupancy_id, label: (o.vessel_name ?? "—") + " · " + (o.brand_name ?? "no brand") + " · " + (Number(o.bbl)) + " bbl" })))], { onChange: value => controls.onOccupancy(value === NONE ? "" : value) })}
-    {E.edit("Planned date", controls.plannedOn, "date", undefined, { onChange: (nextValue: string) => controls.onPlannedOn(nextValue), id: "sr-date", required: true })}
-    <div className="flex flex-col gap-2"><Label>Planned outputs</Label>{controls.lines.map((line, index) => <div key={index} className="flex gap-2">{E.pick(`Line ${index + 1} SKU`, line.skuId, controls.skus.map(sku => ({ value: sku.id, label: sku.label })), { onChange: value => controls.onSku(index, value), placeholder: "SKU", hideLabel: true })}{E.edit(`Line ${index + 1} qty`, line.qtyPlanned, "number", undefined, { onChange: (nextValue: string) => controls.onQty(index, nextValue), min: "0", step: "any", hideLabel: true })}</div>)}<Button type="button" variant="ghost" size="sm" className="w-fit" onClick={controls.onAddLine}>Add line</Button></div>
-    {controls.messages}{controls.footer}
-  </>;
+export function SchedulePackagingRunView({ model, controls = {}, messages, footer }: {
+  model: SchedulePackagingRunViewModel; controls?: SchedulePackagingRunControls; messages?: ReactNode; footer?: ReactNode;
+}) {
+  const { qty } = controls;
   return <>
-    {E.edit("Planned date", model.plannedOn, "date")}
+    {E.edit("Planned date", model.plannedOn, "date", undefined, { onChange: controls.plannedOn, required: Boolean(controls.plannedOn) })}
     {E.ttl("Source")}
-    {E.nav(model.source, model.sourceDetail)}
+    {E.pick("Brand", model.brandId, model.brandOptions, { onChange: controls.brand, placeholder: "Brand", required: Boolean(controls.brand) })}
+    {E.pick("Source tank · optional", model.occupancyId, model.sourceOptions, { onChange: controls.source, forward: true, displayValue: model.source || undefined })}
+    {model.sourceDetail ? E.fld("In the tank", model.sourceDetail) : null}
     {E.ttl("Planned outputs")}
-    {model.outputs.map((row) => <div key={row.key}>{E.row(row.title, row.detail, <>{E.stq(row.qty)}{E.sw(row.listed, "On the wholesale list")}</>)}</div>)}
-    {E.fld(model.leftLabel, model.leftInSource)}
+    {model.outputs.length
+      ? model.outputs.map((row) => <div key={row.key}>{E.row(row.title, row.detail, <>
+        {E.stq(Number(row.qty) || 0, `${row.title} quantity`, qty ? { value: row.qty, onChange: (value) => qty(row.key, value), required: false } : undefined)}
+        {row.listed === undefined ? null : E.sw(row.listed, "On the wholesale list")}
+      </>)}</div>)
+      : E.info(model.brandId ? "This brand has no packages yet." : "Pick a brand to plan its packages.")}
+    {model.leftInSource ? E.fld(model.leftLabel, model.leftInSource) : null}
     {E.ttl("Materials")}
-    {E.tbl(["need", "have", "short"], model.materials)}
+    {model.materials ? E.tbl(["need", "have", "short"], model.materials) : E.gated("Material shortfalls", "The plan can’t preview materials yet.")}
     {model.warning ? E.note(model.warning) : null}
-    {E.btn("Save run plan")}
+    {messages}
+    {footer !== undefined ? footer : E.btn("Save run plan")}
     {E.info("Nothing moves until the run closes. Saving writes the run and its planned outputs together.")}
   </>;
 }

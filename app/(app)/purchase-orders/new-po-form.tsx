@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { poLineCounts } from "@/lib/mgr/new-po-view";
 
 type Vendor = { id: string; name: string };
 type Material = { id: string; name: string; purchase_uom: string; lot_tracked: boolean };
@@ -15,15 +16,15 @@ export function NewPoForm({ vendors, materials }: { vendors: Vendor[]; materials
   const [vendorId, setVendorId] = useState("");
   const [expectedOn, setExpectedOn] = useState("");
   const [lines, setLines] = useState<Line[]>([EMPTY]);
-  const valid = lines.filter(line => line.materialId && Number(line.qty) > 0);
+  const ready = Boolean(vendorId) && lines.every(poLineCounts);
   const action = useCommandAction();
   const set = (index: number, patch: Partial<Line>) => setLines(prev => prev.map((line, i) => i === index ? { ...line, ...patch } : line));
   return <form className="flex flex-col gap-3" onSubmit={event => {
     event.preventDefault();
-    if (action.busy || !vendorId || !valid.length) return;
+    if (action.busy || !ready) return;
     void action.run("create_purchase_order", {
       vendorId, expectedOn: expectedOn || undefined,
-      lines: valid.map(line => ({
+      lines: lines.map(line => ({
         materialId: line.materialId, qtyOrdered: Number(line.qty),
         unitCostCents: line.cost === "" ? undefined : Math.round(Number(line.cost) * 100),
         expectedLotCode: line.lot.trim() || undefined,
@@ -41,6 +42,7 @@ export function NewPoForm({ vendors, materials }: { vendors: Vendor[]; materials
       material: (index, materialId) => set(index, { materialId, lot: "" }),
       quantity: (index, qty) => set(index, { qty }), cost: (index, cost) => set(index, { cost }), lot: (index, lot) => set(index, { lot }),
       add: () => setLines(prev => [...prev, EMPTY]),
-    }} submitting={action.busy} disabled={!vendorId || !valid.length} messages={<CommandFormMessage error={action.error} />} />
+      remove: index => setLines(prev => prev.filter((_, i) => i !== index)),
+    }} submitting={action.busy} disabled={!ready} messages={<CommandFormMessage error={action.error} />} />
   </form>;
 }
