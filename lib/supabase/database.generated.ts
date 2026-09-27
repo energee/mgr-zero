@@ -152,6 +152,7 @@ export type Database = {
           batch_no: number | null
           brewed_on: string | null
           brewery_id: string
+          cancelled_at: string | null
           closed_at: string | null
           completion_adjustment_id: string | null
           created_at: string
@@ -167,6 +168,7 @@ export type Database = {
           batch_no?: number | null
           brewed_on?: string | null
           brewery_id: string
+          cancelled_at?: string | null
           closed_at?: string | null
           completion_adjustment_id?: string | null
           created_at?: string
@@ -182,6 +184,7 @@ export type Database = {
           batch_no?: number | null
           brewed_on?: string | null
           brewery_id?: string
+          cancelled_at?: string | null
           closed_at?: string | null
           completion_adjustment_id?: string | null
           created_at?: string
@@ -3125,6 +3128,7 @@ export type Database = {
           bbl_drawn: number | null
           brand_id: string
           brewery_id: string
+          cancelled_at: string | null
           closed_at: string | null
           created_at: string
           created_by: string
@@ -3139,6 +3143,7 @@ export type Database = {
           bbl_drawn?: number | null
           brand_id: string
           brewery_id: string
+          cancelled_at?: string | null
           closed_at?: string | null
           created_at?: string
           created_by: string
@@ -3153,6 +3158,7 @@ export type Database = {
           bbl_drawn?: number | null
           brand_id?: string
           brewery_id?: string
+          cancelled_at?: string | null
           closed_at?: string | null
           created_at?: string
           created_by?: string
@@ -7252,8 +7258,16 @@ export type Database = {
         Args: { p_destination: string; p_reason: string }
         Returns: undefined
       }
+      cancel_batch: {
+        Args: { p_batch: string; p_brewery: string; p_request_id: string }
+        Returns: Json
+      }
       cancel_order: {
         Args: { p_order: string; p_reason: string; p_request_id: string }
+        Returns: Json
+      }
+      cancel_packaging_run: {
+        Args: { p_brewery: string; p_request_id: string; p_run: string }
         Returns: Json
       }
       cancel_stock_transfer: {
@@ -8494,6 +8508,24 @@ export type Database = {
           p_components: Json
           p_format: string
           p_request_id: string
+        }
+        Returns: Json
+      }
+      reschedule_batch: {
+        Args: {
+          p_batch: string
+          p_brewery: string
+          p_planned_on: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      reschedule_packaging_run: {
+        Args: {
+          p_brewery: string
+          p_planned_on: string
+          p_request_id: string
+          p_run: string
         }
         Returns: Json
       }
