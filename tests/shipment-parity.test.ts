@@ -56,6 +56,15 @@ it("confirms only the reason ship_order was sent, not a leftover one on a full l
   expect(tape[1]).not.toMatch(/short:/);
 });
 
+it("keeps the saved short-pick reason when shipping the full picked amount", () => {
+  const pickedLines = [{ ...lines[0], qty_ordered: 5, short_reason: "two cans unavailable" }];
+  const ship = buildShipLines(pickedLines, { a: "3" }, {}, available, { a: "typed, then raised back to full" });
+  const immediate = toShipmentDoneViewProps({ order, invoice: null, lines: shippedLines(pickedLines, ship) });
+  const reloaded = toShipmentDoneViewProps({ order, invoice: null, lines: [{ ...pickedLines[0], qty_shipped: 3 }] });
+  expect(immediate.tape).toEqual(reloaded.tape);
+  expect(immediate.tape[0][0]).toMatch(/· short: two cans unavailable$/);
+});
+
 it("guards both shipment pages before reading data", async () => {
   permission.mockImplementation(() => { throw new Error("denied"); });
   await expect(ShipPage({ params })).rejects.toThrow("denied");

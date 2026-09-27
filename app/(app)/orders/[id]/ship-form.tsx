@@ -28,10 +28,10 @@ export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<st
   }));
 }
 
-/** The Shipment done lines: what ship_order was sent, so the tape never names
- *  a reason that was typed and then dropped (a line raised back to full). */
+/** Match ship_order: save a submitted shortage reason, otherwise keep the
+ *  persisted short-pick reason rather than an unsaved edit. */
 export function shippedLines(lines: ShippingSnapshot["lines"], ship: ReturnType<typeof buildShipLines>) {
-  return lines.map((line, i) => ({ ...line, qty_shipped: ship[i].qty, short_reason: ship[i].shortReason ?? null }));
+  return lines.map((line, i) => ({ ...line, qty_shipped: ship[i].qty, short_reason: ship[i].shortReason ?? line.short_reason ?? null }));
 }
 
 export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; available: ShipSources }) {
