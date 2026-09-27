@@ -50,6 +50,14 @@ database or migration work while screens are the current focus.
   - A backup before each migration, and a tested restore.
   - SMTP sending domain: parked until there are pilot users.
 
+## Keg deposit follow-ups from the PR #605 review
+
+- [ ] Exclude voided and written-off invoices from `keg_deposit_balances`.
+  The view sums every deposit line whatever the invoice's state, so a
+  deposit on an invoice voided in QuickBooks or written off still counts as
+  held, in the balance's dollars and in the #577 mismatch flag, which then
+  never clears. Rare; fixing it is a new migration to the view.
+
 ## Parity follow-ups from the PR #336 review
 
 Found reviewing the non-Catalog parity conversion. The P1s and the behavior

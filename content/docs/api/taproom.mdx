@@ -98,7 +98,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-Kegs a customer has out per pool and size, with the deposit held for them
+Kegs a customer has out per pool and size, with the deposit held for them and whether the kegs on deposit disagree with the kegs out
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, and the customers holding kegs over 90 days
+Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, the customers holding kegs over 90 days, and customers whose kegs on deposit disagree with their kegs out
 
 Takes no input.
 

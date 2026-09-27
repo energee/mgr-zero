@@ -37,6 +37,39 @@ describe("keg deposit refund credit memo", () => {
     }, f.adminCtx)).rejects.toThrow(/whole kegs/);
     expect(await balance(f)).toEqual({ kegs: 1, cents: 2500 });
   });
+
+  // #577: the refund and the Returned keg event stay separate, so the balance
+  // and the report flag a customer whose kegs on deposit disagree with kegs out.
+  it("flags a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = (await admin.from("invoice_lines").select("id,keg_pool_id,keg_size").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;
+    const pool = deposit.keg_pool_id!, size = deposit.keg_size!;
+    const wh = await makeStaffCtx(f.brewery.id, "warehouse");
+    const keg = (qty: number, reason: string) => runCommand("record_keg_event", {
+      poolId: pool, kegSize: size, qty, reason, locationId: f.source.id, binId: f.source.binId,
+      ...(reason === "acquired" ? {} : { customerId: f.customer.customerId }),
+    }, wh);
+    const flagged = async () => {
+      const b = await runCommand("get_customer_keg_balance", { customerId: f.customer.customerId }, wh) as { rows: { kegs_out: number; kegs_on_deposit: number; mismatch: boolean }[] };
+      const r = await runCommand("get_keg_report", {}, wh) as { mismatches: { customer_id: string; kegs_out: number; kegs_on_deposit: number }[] };
+      return { balance: b.rows.map((x) => [x.kegs_out, x.kegs_on_deposit, x.mismatch]), report: r.mismatches.map((m) => [m.customer_id, m.kegs_out, m.kegs_on_deposit]) };
+    };
+
+    // Two deposits invoiced, no keg recorded as shipped: a deposit-only row, not
+    // flagged, since nothing was refunded; the Shipped event is just not entered yet.
+    expect(await flagged()).toEqual({ balance: [[0, 2, false]], report: [] });
+    await keg(10, "acquired");
+    await keg(2, "shipped");
+    expect(await flagged()).toEqual({ balance: [[2, 2, false]], report: [] });
+    // One deposit refunded while both kegs are still out.
+    await runCommand("return_shipment", { invoiceId, locationId: f.source.id, reason: "unsold", lines: [{ invoiceLineId: deposit.id, qty: 1 }] }, f.adminCtx);
+    expect(await flagged()).toEqual({ balance: [[2, 1, true]], report: [[f.customer.customerId, 2, 1]] });
+    await keg(1, "returned");
+    expect(await flagged()).toEqual({ balance: [[1, 1, false]], report: [] });
+    // The last keg is lost at the customer: its deposit is kept, so still no flag.
+    await keg(1, "lost");
+    expect(await flagged()).toEqual({ balance: [[0, 1, false]], report: [] });
+  });
 });
 
 async function setup() {

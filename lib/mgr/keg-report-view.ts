@@ -1,6 +1,7 @@
 // lib/mgr/keg-report-view.ts — view-model for Keg report: the words for
 // get_keg_report's numbers (utilization, age buckets with deposits at risk,
-// customers holding kegs over 90 days, utilization per pool × size). The
+// customers holding kegs over 90 days, utilization per pool × size, and
+// customers whose kegs out disagree with their kegs on deposit, #577). The
 // inventory fixture is a KegReport too, so both render through this adapter.
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
@@ -12,6 +13,7 @@ export type KegReport = {
   bySize: { pool_id: string; pool_name: string; keg_size: string; out: number; total: number }[];
   aging: { bucket: string; kegs: number; deposit_cents: number }[];
   customers: { customer_id: string; name: string; over_90: number; oldest_at: string | null }[];
+  mismatches: { customer_id: string; name: string; pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number }[];
 };
 
 export type KegReportViewModel = {
@@ -21,6 +23,8 @@ export type KegReportViewModel = {
   /** `href` is set by the live page only; the inventory leaves rows unlinked. */
   customers: { key: string; href?: string; title: string; detail: string; overdue: boolean }[];
   sizes: { key: string; title: string; detail: string; trailing: string }[];
+  /** Deposit mismatches; `href` as for customers. */
+  mismatches: { key: string; href?: string; title: string; detail: string }[];
   empty?: EmptyState;
 };
 
@@ -36,6 +40,10 @@ export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: 
     customers: r.customers.map((c) => ({
       key: c.customer_id, href: backHref === undefined ? undefined : `/kegs/customers/${c.customer_id}`, title: c.name, overdue: c.over_90 > 0,
       detail: `${c.over_90 || "none"} over 90 days${c.oldest_at ? ` · oldest shipped ${formatDate(c.oldest_at, timeZone)}` : ""}`,
+    })),
+    mismatches: r.mismatches.map((m) => ({
+      key: `${m.customer_id}-${m.pool_id}-${m.keg_size}`, href: backHref === undefined ? undefined : `/kegs/customers/${m.customer_id}`, title: m.name,
+      detail: `${m.pool_name} ${SIZE_LABEL[m.keg_size] ?? m.keg_size} · ${m.kegs_out} out · ${m.kegs_on_deposit} on deposit`,
     })),
     sizes: r.bySize.map((s) => ({ key: `${s.pool_id}-${s.keg_size}`, title: `${s.pool_name} ${SIZE_LABEL[s.keg_size] ?? s.keg_size}`, detail: `${s.out} of ${s.total} out`, trailing: `${pct(s.out, s.total)} utilized` })),
     empty: r.bySize.length ? undefined : { title: "No owned keg pools", description: "Add a keg pool and record kegs acquired to see utilization." },
