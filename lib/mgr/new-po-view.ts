@@ -17,3 +17,9 @@ export type NewPoViewModel = {
   expected: string;
   lines: NewPoLineView[];
 };
+
+/** Which New PO rows count: a material and a quantity above zero. The view
+ *  flags a row that falls short and the form saves only when every row counts,
+ *  so the two read one rule instead of each keeping its own. */
+export const poLineCounts = (line: Pick<NewPoLineView, "materialId" | "qty">) =>
+  Boolean(line.materialId) && Number(line.qty) > 0;
