@@ -208,6 +208,13 @@ describe("Shipment done view", () => {
     expect(model.invoice).toBe("No invoice was created");
     expect(model.tape.flat().join(" ")).not.toContain("invoiced now");
   });
+  it("names the shortage reason on a line shipped short (#624)", () => {
+    const lines = orderShipmentDone.lines.map((l, i) => (i === 0 ? { ...l, short_reason: "one keg dented" } : l));
+    const model = toShipmentDoneViewProps({ ...orderShipmentDone, lines });
+    expect(model.tape[0][0]).toMatch(/· short: one keg dented$/);
+    expect(model.tape[1][0]).not.toMatch(/short:/);
+    expect(html(createElement(ShipmentDoneView, { model }))).toContain("short: one keg dented");
+  });
   it("maps INV-1042 onto the assigned invoice field", () => {
     const model = toShipmentDoneViewProps(orderShipmentDone);
     expect(model.backTo).toBe("ORD-0231");

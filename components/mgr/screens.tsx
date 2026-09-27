@@ -1005,7 +1005,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_invoice",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"]],
-    spec: "Post-commit of Ship and invoice. A tape means recorded. Return shipment is the correction.",
+    spec: "Post-commit of Ship and invoice. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
