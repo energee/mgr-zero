@@ -5,6 +5,7 @@ import { SquareMark } from "@/components/mgr/brand-icons";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
+import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
 import { reconcileBooleanChange, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 const SelectField = ({ id, label, value, options, onChange }: {
@@ -25,7 +26,7 @@ export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalog
 }
 
 export function PointOfSaleView({ model, syncAction, paths }: {
-  model: { connected: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null };
+  model: { connected: boolean; canDisconnect?: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null };
   syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; mapping?: string; menu?: string; connector?: string };
 }) {
   return <>
@@ -33,7 +34,7 @@ export function PointOfSaleView({ model, syncAction, paths }: {
     {E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
     {model.connected
       ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
-      : E.row("Square", model.state, E.act("Connect", "primary", paths?.connect), "w", SquareMark)}
+      : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", paths?.connect)}</>, "w", SquareMark)}
     {model.error && E.note(`Last connection error: ${model.error}`)}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
@@ -91,13 +92,20 @@ export function SquareConnectorView({ accountingHref }: { accountingHref?: strin
   </>;
 }
 
-export function DisconnectSquareView({ connected = true, busy = false, error, onDisconnect }: {
-  connected?: boolean; busy?: boolean; error?: string | null; onDisconnect?: () => void;
+/** The disconnect confirmation; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
+export function DisconnectSquareView({ status = "available", busy = false, error, onDisconnect }: {
+  status?: DisconnectStatus; busy?: boolean; error?: string | null; onDisconnect?: () => void;
 }) {
   return <>
     {E.note("Stops: menu publishing, availability updates, and sales sync.")}
     {E.info("Stays: MGR stock, location mappings, sales history, and published item identities.")}
-    {connected ? <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect Square"}</Button> : E.info("Square is already disconnected.")}
+    {status === "available" && <>
+      {E.info("MGR deletes its stored Square credential first, then asks Square to revoke it. If Square does not confirm, this page says so.")}
+      <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect Square"}</Button>
+    </>}
+    {status === "unresolved" && E.note("MGR deleted its stored Square credential, but Square did not confirm revocation. Remove MGR's access in your Square account, or reconnect.")}
+    {status === "pending" && E.note("A disconnect started but its Square revocation outcome was not recorded. MGR no longer holds a usable credential.")}
+    {status === "disconnected" && E.info("Square is already disconnected.")}
     <CommandFormMessage error={error ?? null} />
   </>;
 }

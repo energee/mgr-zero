@@ -59,6 +59,7 @@ export type OrderSnapshot = {
     qty_picked: number | null;
     qty_shipped: number | null;
     unit_price_cents: number;
+    short_reason?: string | null;
     skus: { name: string } | null;
   }[];
   events: {
@@ -94,12 +95,14 @@ function lineDetail(
   shipped: number | null,
   unitPriceCents: number,
   atp?: number,
+  shortReason?: string | null,
 ): string {
   const bits = [`ordered ${ordered}`];
   if (picked !== null) bits.push(`picked ${picked}`);
   if (shipped !== null) bits.push(`shipped ${shipped}`);
   bits.push(`${money(unitPriceCents)} each`);
   if (atp !== undefined) bits.push(`ATP ${atp}`);
+  if (shortReason) bits.push(`short: ${shortReason}`);
   return bits.join(" · ");
 }
 
@@ -146,7 +149,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       return {
         key: l.id,
         name: l.skus?.name ?? "Line",
-        detail: lineDetail(ordered, picked, shipped, Number(l.unit_price_cents), qtyAtp),
+        detail: lineDetail(ordered, picked, shipped, Number(l.unit_price_cents), qtyAtp, l.short_reason),
         tone: lineTone(picked, ordered, qtyAtp),
       };
     }),

@@ -1,10 +1,12 @@
 // components/mgr/views/customer.tsx — Customer detail drawing. Inventory
 // paints edits + Save. Live passes a detail slot for flds + ship-tos with
-// CustomerForm in the header and ShipToForm rows in that slot.
+// CustomerForm in the header and ShipToForm rows in that slot, and the
+// InviteForm and Remove access verbs for the portal users the model lists.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
+import { RevokePortalUserControl } from "./revoke-portal-user";
 
 export type { CustomerViewModel };
 
@@ -13,8 +15,10 @@ export type CustomerDetailSlot = {
   addShipTo?: ReactNode;
   kegHref?: string;
   ordersHref?: string;
-  /** Live sales/admin: InviteForm. `null` hides the gated placeholder. */
+  /** Live sales/admin: InviteForm. `null` hides the whole Portal users section. */
   portalUsers?: ReactNode;
+  /** Live sales/admin: the Remove access verb for one portal user row. */
+  revokePortalUser?: (user: { key: string; email: string }) => ReactNode;
 };
 
 export function CustomerView({
@@ -65,14 +69,21 @@ export function CustomerView({
               </div>}
             </div> : E.nav("Ship-tos", model.shipTos)}
           </section>
-          {detail?.portalUsers !== null && <section aria-label="Portal users" className="flex flex-wrap items-center justify-between gap-4 py-5">
-            <div className="min-w-0">
-              <h2 className="font-heading text-xl font-semibold">Portal users</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Buyer access to orders and invoices.</p>
+          {detail?.portalUsers !== null && <section aria-label="Portal users" className="py-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="font-heading text-xl font-semibold">Portal users</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Buyer access to orders and invoices.</p>
+              </div>
+              {detail
+                ? ("portalUsers" in detail ? detail.portalUsers : E.gated("Portal users", "invitations aren’t available yet"))
+                : E.act("Invite")}
             </div>
-            {detail
-              ? ("portalUsers" in detail ? detail.portalUsers : E.gated("Portal users", "invitations aren’t available yet"))
-              : E.row("Portal users", model.portalUsers, E.act("Invite"))}
+            {model.portalUsers.length ? <div className="flex flex-col gap-3">
+              {model.portalUsers.map(u => <div key={u.key}>
+                {E.row(u.email, "", detail ? detail.revokePortalUser?.(u) : <RevokePortalUserControl name={u.email} />)}
+              </div>)}
+            </div> : <p className="py-6 text-sm font-medium">No portal users yet</p>}
           </section>}
         </div>
         <div className="flex min-w-0 flex-col gap-6">

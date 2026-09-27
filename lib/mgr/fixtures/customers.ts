@@ -45,7 +45,10 @@ export const customerRidgeline: CustomerSnapshot = {
     tax_treatment: null,
   },
   shipTos: [{ label: "Main" }, { label: "Dock" }],
-  portalUserCount: 2,
+  portalUsers: [
+    { userId: "00000000-0000-4000-8000-0000000000d1", email: "jordan@ridgelinetap.com" },
+    { userId: "00000000-0000-4000-8000-0000000000d2", email: "orders@ridgelinetap.com" },
+  ],
   kegs: { out: 38, depositCents: 114000 },
   orders: { open: 3, total: 42 },
 };

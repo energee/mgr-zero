@@ -58,5 +58,10 @@
   "20260927010000_expire_stuck_invite_requests.sql": "b7da4d1490cd3c1c54e609f593cdcd70f81cf2b20f05c4ca7654a7c1375c562c",
   "20260927020000_material_keep_uom_factor.sql": "deae37df327bfcd56329246b3d6b08468e1064216d0c906a628fc518f6a3ab0f",
   "20260927040000_repack_keeps_lot.sql": "50bb0708b9a6a972f8aaa917911dfeedf64e592b5dda37e96694496dfc65e3e9",
+  "20260927050000_material_units_guard_references.sql": "e0edbbc234f81700142d6e2a089fe6fbaa2629999ecae994f68ee59ede2bba78",
+  "20260927060000_keg_deposits_exclude_void.sql": "d1990a7cd2959bbaabd1932ff9bd106caf6f98003dfe6418143c512583d58628",
+  "20260927070000_revoke_customer_user.sql": "9e19445f4bbe77a2ea9b0fbf88914542fd41c3efbf4f75241d2d3da1eaaa664f",
+  "20260927080000_ship_short_reason.sql": "b6a1373debacb7edf71c6c2e99c47c114ad2a0c90670d79fe65ac5d9ffa4918c",
+  "20260927090000_recovery_disconnect.sql": "b9376a18733c22728f4368c66a52b3a639d5e8fdee4c6f451e04b3032d06f290",
   "20260927100000_format_volume_guard.sql": "74f5cd31f1ce622778a325e801ddc7c97e8f3267f666f212cace1e187b1b3704"
 }
