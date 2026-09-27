@@ -152,8 +152,12 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])
         .order("at").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("keg_deposit_balances").select("customer_id, keg_pool_id, keg_size, kegs_on_deposit, deposit_cents").eq("brewery_id", ctx.breweryId)),
+      // Brewery-wide balances for the mismatch list, paged like the events above;
+      // each view has one row per customer × pool × size, so that order is total.
+      completeRows("Keg report", start => ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Keg report", start => ctx.db.from("keg_deposit_balances").select("customer_id, keg_pool_id, keg_size, kegs_on_deposit, deposit_cents", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("customer_id").order("keg_pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
     ]);
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));
     const customerName = new Map((customers ?? []).map((c) => [c.id as string, c.name as string]));
