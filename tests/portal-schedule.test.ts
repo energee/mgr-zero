@@ -17,9 +17,9 @@ const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * DAY);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const nextWeek = new Date(monday.getTime() + 7 * DAY), inFiveWeeks = new Date(monday.getTime() + 35 * DAY);
 
-async function planBatches(breweryId: string, rows: { brand: string | null; plannedOn: string; brewedOn?: string }[]) {
+async function planBatches(breweryId: string, rows: { brand: string | null; plannedOn: string; brewedOn?: string; cancelledAt?: string }[]) {
   const staff = await makeStaff(breweryId, "brewer");
-  const { error } = await admin.from("batches").insert(rows.map((r) => ({ brewery_id: breweryId, intended_brand_id: r.brand, planned_on: r.plannedOn, planned_bbl: 20, brewed_on: r.brewedOn ?? null, created_by: staff.id })));
+  const { error } = await admin.from("batches").insert(rows.map((r) => ({ brewery_id: breweryId, intended_brand_id: r.brand, planned_on: r.plannedOn, planned_bbl: 20, brewed_on: r.brewedOn ?? null, cancelled_at: r.cancelledAt ?? null, created_by: staff.id })));
   if (error) throw error;
 }
 
@@ -37,6 +37,7 @@ beforeAll(async () => {
     { brand: saison, plannedOn: iso(new Date(inFiveWeeks.getTime() + 2 * DAY)) }, // priced for no channel: not yet listed
     { brand: hazy, plannedOn: past, brewedOn: past },                             // brewed: not upcoming
     { brand: saison, plannedOn: past },                                           // slipped, never brewed: not upcoming (#477)
+    { brand: hazy, plannedOn: iso(inFiveWeeks), cancelledAt: new Date().toISOString() }, // cancelled: never upcoming
     { brand: null, plannedOn: iso(nextWeek) },                                    // no brand yet: nothing to show a buyer
   ]);
   const other = await makeBrewery();

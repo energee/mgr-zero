@@ -1,6 +1,7 @@
 // components/mgr/views/close-packaging-run.tsx — Close packaging run.
 // Shared planned facts and copper review; live supplies only the next action.
 import type { ReactNode } from "react";
+import { PlanActions } from "./plan-actions";
 import { E } from "@/components/mgr/e";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
@@ -9,9 +10,11 @@ export type { ClosePackagingRunViewModel };
 export function ClosePackagingRunView({
   model,
   action,
+  planActions,
 }: {
   model: ClosePackagingRunViewModel;
   action?: ReactNode;
+  planActions?: ReactNode;
 }) {
   return (
     <>
@@ -19,7 +22,8 @@ export function ClosePackagingRunView({
       {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
       {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
       {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
-      {model.showCloseReview !== false ? (
+      {model.cancelledAt ? E.info("Cancelled. This plan remains in history and no longer creates demand.") : model.planEditable && model.plannedOn ? (planActions ?? <PlanActions plannedOn={model.plannedOn} />) : null}
+      {!model.cancelledAt && model.showCloseReview !== false ? (
           <>
             {E.fld("Packaging source", model.source ?? "")}
             {E.tbl(["need", "have", "short"], (model.needRows ?? []).map(([need, have, short]) => [
@@ -36,7 +40,7 @@ export function ClosePackagingRunView({
             {E.btn("Close packaging run", "irr")}
           </>
         ) : null}
-      {action}
+      {!model.cancelledAt && action}
     </>
   );
 }
