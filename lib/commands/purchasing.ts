@@ -38,7 +38,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material",
-  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements exist",
+  description: "Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor, extract potential. Units are refused once movements, recipe ingredients, format BOM lines, PO lines, contracts or transfer lines use the material",
   input: z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),

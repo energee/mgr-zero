@@ -5,7 +5,6 @@ export type PackageBomRowView = {
   key: string;
   title: string;
   detail: string;
-  href: string;
 };
 
 export type PackageBomViewModel = {
@@ -34,7 +33,6 @@ export function toPackageBomViewProps({ format, lines }: PackageBomSnapshot): Pa
       key: line.id ?? line.material?.id ?? String(i),
       title: line.material?.name ?? "—",
       detail: `quantity ${line.qty_per_unit}${line.on_break ? ` · ${line.on_break.replaceAll("_", " ")}` : ""}`,
-      href: "/catalog",
     })),
   };
 }

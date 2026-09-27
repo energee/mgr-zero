@@ -8,8 +8,6 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import { toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
 
-export type PickLine = { id: string; skuName: string; qtyOrdered: number; qtyPicked: number | null };
-
 export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   const router = useRouter();
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, String(line.qty_picked ?? line.qty_ordered)])));

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { Children, isValidElement, type ReactNode } from "react";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -46,6 +46,29 @@ function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
 
 function sourceFile(path: string) {
   return ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+/** `file:line` of every `if (…) return <jsx>` in a file: a view choosing a
+ * second layout from inside, which the mounted-component walk cannot see
+ * because both trees mount the same view. `return null` draws no layout. */
+function earlyLayoutReturns(path: string): string[] {
+  const file = sourceFile(path);
+  const out: string[] = [];
+  const isJsx = (node: ts.Expression): boolean => ts.isParenthesizedExpression(node)
+    ? isJsx(node.expression)
+    : ts.isJsxElement(node) || ts.isJsxFragment(node) || ts.isJsxSelfClosingElement(node);
+  function inIf(node: ts.Node) {
+    if (ts.isReturnStatement(node) && node.expression && isJsx(node.expression)) {
+      out.push(`${relative(process.cwd(), path)}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`);
+    }
+    if (!ts.isFunctionLike(node)) ts.forEachChild(node, inIf); // a nested callback's return is its own
+  }
+  function walk(node: ts.Node) {
+    if (ts.isIfStatement(node)) inIf(node);
+    else ts.forEachChild(node, walk);
+  }
+  walk(file);
+  return out;
 }
 
 /** Follow function-component exports, not every sibling in an imported module.
@@ -150,6 +173,12 @@ describe("screen/live component parity", () => {
       return mountedComponents(file).has(surface) ? [] : [`${screen.name}: ${surface} <- ${file}`];
     });
     expect(bypasses).toEqual(KNOWN_SURFACE_DEBT);
+  });
+
+  it("draws each shared view as one JSX tree: no early return into a second layout", () => {
+    expect(earlyLayoutReturns("tests/fixtures/screen-parity/early-return.tsx")).toEqual(["tests/fixtures/screen-parity/early-return.tsx:5"]);
+    const views = readdirSync("components/mgr/views").filter(name => name.endsWith(".tsx"));
+    expect(views.flatMap(name => earlyLayoutReturns(join("components/mgr/views", name)))).toEqual([]);
   });
 
   it("follows mounted components and ignores unused view imports", () => {
