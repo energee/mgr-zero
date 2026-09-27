@@ -1,115 +1,94 @@
-# TODO — work still gated from `/docs/screens-explore`
+# TODO — remaining v1 work
 
-Refreshed 2026-09-26 against `main` at `45eabd41`. Counts are derived from
-`SCREENS`, `isUngated`, and `SCREEN_ROUTES`: 174 MGR screens: 173 ungated and mapped, 1 gated, and 0 ungated without a live route.
-Nine live screens carry a partial `SCHEMA-GATE`, listed below. Team's tenth
-was a stale note (the taproom role is live) and PR #604 removes it.
+Execution index: [#658](https://github.com/energee/mgr-zero/issues/658).
+It owns wave order, dependencies, migration reservations, checkpoints and the
+status ledger. Refreshed 2026-09-27 against main at `11156878`.
 
-Audit sources: `components/mgr/screens.tsx`, `lib/mgr/screen-routes.ts`,
-`tests/app-screen-parity.test.ts`, and `tests/screen-command-gates.test.ts`.
+The user merges green PRs. Schema changes are authorized with local proof;
+required specifications still get independent review. Hosted changes,
+dependencies and unresolved product contradictions remain ask-first.
 
-An item leaves this file when its owner issue closes or a merged PR names its
-unique checklist text with `TODO: <text>`. Completed programs and resolved
-drift do not remain here; merged work is recorded by the dreaming workflow in
-`.agents/PROGRESS.md`.
+Each checklist item has an issue owner. A feature PR may name its exact,
+unique checklist text in a `TODO: <text>` line; the dreaming workflow removes
+completed items after merge. Screen mapping alone does not prove completion.
 
-## Screen gates
+## Wave 1 — pilot correctness and onboarding
 
-The one gated screen is Schedule packaging run: its `get_material_shortfalls`
-read is not a registered view yet. Its live dialog is tracked under the
-PR #336 follow-ups below.
+- [ ] [#615](https://github.com/energee/mgr-zero/issues/615) — Preserve consequential command identity across edits, retries and reloads.
+- [ ] [#621](https://github.com/energee/mgr-zero/issues/621) — Page staff and portal order and invoice histories.
+- [ ] [#641](https://github.com/energee/mgr-zero/issues/641) — Move failed QuickBooks refreshes into recovery_required.
+- [ ] [#619](https://github.com/energee/mgr-zero/issues/619) — Cancel and reschedule unstarted batches and packaging runs.
+- [ ] [#625](https://github.com/energee/mgr-zero/issues/625) — Deliver durable buyer order-confirmation email.
+- [ ] [#580](https://github.com/energee/mgr-zero/issues/580) — Accept existing-account invitations with explicit consent.
+- [ ] [#646](https://github.com/energee/mgr-zero/issues/646) — Show manual QuickBooks sync operator, last success and errors.
 
-## Partial schema gates
+Buyer email and existing-account invitations are pilot requirements. Build and
+test locally; actual delivery awaits user-owned sending-domain/SMTP setup.
+Pause after the user merges the wave and report the pilot-path status.
 
-These screens are live, but one part of each carries a `SCHEMA-GATE` tag in
-`components/mgr/screens.tsx`. Each waits for backend work; do not start
-database or migration work while screens are the current focus.
+## Waves 2a–2b — reviewed production specs and implementation
 
-- [ ] Ship and invoice, Ship on delivery: persist the shortage reason.
-- [ ] Variance by brand: a brand-by-period trend projection.
-- [ ] Accounting: a missing-email count in connection health.
-- [ ] Invoices: a verified Open in QuickBooks link and email delivery state.
-- [ ] Batches: the reading summary and direct reading action, which need
-  occupancy and reading facts from `list_batches`.
-- [ ] Brew day: lot consumption and a frozen process sheet.
-- [ ] Receive PO: recent material lot suggestions from the purchase-order query.
-- [ ] Cycle count: a lot allocation preview (the read returns bin totals only)
-  and roll conversion (counts accept base units only).
+- [ ] [#618](https://github.com/energee/mgr-zero/issues/618) — Record failed or partially accepted delivery and physical returns.
+- [ ] [#622](https://github.com/energee/mgr-zero/issues/622) — Record actual brew-day ingredients and a frozen process sheet with corrections.
+- [ ] [#623](https://github.com/energee/mgr-zero/issues/623) — Record packaging actual usage, unused returns and loss with authoritative planning data.
+- [ ] [#647](https://github.com/energee/mgr-zero/issues/647) — Correct purchase receipts and PO balances while preserving stock history.
 
-## Release gate
+#622, #623 and #647 each need a reviewed specification and v1 cross-check.
+Implement them in that order so later corrections reuse the reviewed pattern.
+#618 has a merged spec and may proceed alongside the specification work.
+There is no separate user schema-approval pause. Pause after Wave 2b merges.
 
-- [ ] Issue #311 — map and complete the connected adversarial walkthrough,
-  from `.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`,
-  then perform hosted release readiness. Hosted Supabase, Vercel, integration
-  credentials, advisors, pruning, and scheduler setup remain ask-first.
-  Owner-side dashboard tasks still open:
-  - AI Gateway credits for Ask MGR (Issue #329).
-  - Leaked-password protection in Supabase Auth.
-  - Production deploys from `main` only.
-  - A backup before each migration, and a tested restore.
-  - SMTP sending domain: parked until there are pilot users.
+Schedule packaging's shared drawing is already merged in #610. Remaining
+planned-material/shortfall data belongs to #623; route presence is not proof
+that every inventory fact is available live.
 
-## Keg deposit follow-ups from the PR #605 review
+## Wave 3 — reporting
 
-- [ ] Exclude voided and written-off invoices from `keg_deposit_balances`.
-  The view sums every deposit line whatever the invoice's state, so a
-  deposit on an invoice voided in QuickBooks or written off still counts as
-  held, in the balance's dollars and in the #577 mismatch flag, which then
-  never clears. Rare; fixing it is a new migration to the view.
+- [ ] [#626](https://github.com/energee/mgr-zero/issues/626) — Reconcile destination-state totals and transaction export with returns and corrections.
 
-## Parity follow-ups from the PR #336 review
+Depends on the retained return/correction facts from Wave 2. State tax forms
+remain external; current tank values must stay labeled current.
 
-Found reviewing the non-Catalog parity conversion. The P1s and the behavior
-losses were fixed on that branch; these were left because each needs a design
-decision, not a repair.
+## Wave 4 — required screen work
 
-- [ ] Rebuild the live Schedule packaging run dialog on the shared model.
-  `components/mgr/views/schedule-packaging-run.tsx` early-returns into a second
-  JSX tree when `controls` is present, and `app/(app)/packaging/schedule-run-form.tsx`
-  mounts it with a wholly empty model, so the live dialog shows none of the
-  planned outputs, short materials, warning note, or closing info the explorer
-  draws. The parity contract rejects a branch that selects an alternate layout.
-  Because the fork is inside the view rather than a slot,
-  `tests/screen-view-composition.test.ts` cannot see it and reports the screen
-  as converted; the guard needs to reject in-view early returns too. The screen
-  itself is still gated on `get_material_shortfalls` (see Screen gates).
-- [ ] Settle the surface for Adjust lines. `components/mgr/views/adjust-lines.tsx`
-  opens with a screen back-header, but `app/(app)/orders/[id]/adjust-lines-form.tsx`
-  mounts it in a dialog, so the modal shows the title twice and offers a back
-  link inside itself, while the inventory renders the same view full-page.
-  Every comparable flow in that conversion became a full route instead.
-  Decided (Ted, 2026-09-26): Adjust lines becomes a full route,
-  `/orders/[id]/adjust`, like the other flows.
-- [ ] Give New PO a way to remove a line, and let one owner decide which rows
-  count. `components/mgr/views/new-po.tsx` requires a row once any field is
-  touched, while `app/(app)/purchase-orders/new-po-form.tsx` submits only rows
-  with a material and a positive quantity — so a row with just a unit cost is
-  required but unsubmittable, and a row with quantity 0 is neither. The
-  conditional `required` is a workaround for there being no Remove control;
-  whether the explorer draws one is a screen-parity design call.
-  Decided (Ted, 2026-09-26): add a per-row Remove control, and one shared
-  "row counts" check that both the view and the form use.
-- [ ] Batch the Cellar landing's reading lookup. `app/(app)/cellar/page.tsx`
-  issues one `list_fermentation_readings` per open occupancy to fill a tile
-  subtitle, unbounded by tank count; there is no latest-reading-per-occupancy
-  query in `lib/commands/production.ts`.
-## Cleanup follow-ups from the PR #404 review
+- [ ] [#648](https://github.com/energee/mgr-zero/issues/648) — Preview exact material-count lot adjustments before confirmation.
+- [ ] [#649](https://github.com/energee/mgr-zero/issues/649) — Show Batches readings and a direct recording action.
+- [ ] [#650](https://github.com/energee/mgr-zero/issues/650) — Link invoices to verified QuickBooks destinations.
+- [ ] [#651](https://github.com/energee/mgr-zero/issues/651) — Count and review customers missing email addresses.
+- [ ] [#652](https://github.com/energee/mgr-zero/issues/652) — Link Settings to the existing Water profiles screen.
+- [ ] [#653](https://github.com/energee/mgr-zero/issues/653) — Use role-appropriate Open and Pick actions on Orders.
+- [ ] [#654](https://github.com/energee/mgr-zero/issues/654) — Show recoverable portal-payment and Square OAuth failures.
+- [ ] [#655](https://github.com/energee/mgr-zero/issues/655) — Close the named Settings, customer and Units surface-parity gaps.
 
-- [ ] Move fixture-only state out of the shared views. `FormatView`,
-  `SkuView`, and `CatalogCategoriesControl` each carry a second, preview-only
-  implementation selected by a missing control; the preview wrapper in
-  `components/mgr/screens.tsx` should own that state and the views take controls as props.
-- [ ] Add a flat variant to `E.row` so `components/mgr/views/customer.tsx`
-  stops restyling E internals with descendant selectors.
-- [ ] Replace the `data-chat-preview`, `data-work-filter`, and
-  `data-preview-action` explorer markers with one attribute stamped by
-  `CommandForm`, and treat everything inside a dialog or sheet as in-place.
-- [ ] Scope the raw-control lint to `app/**` and `components/mgr/views/**`
-  so `components/mgr/qty.tsx` and `components/mgr/venue.tsx` need no inline disables, then retire the
-  overlapping half of `tests/field-primitives.test.ts`.
-- [ ] Merge `app/(app)/catalog/pour-form.tsx` into `SkuForm` so pour create and edit share one
-  command choice and one validation path.
-- [ ] Widen `format_volumes` (or add a catalog view) so `list_formats` is one
-  read and `effective_bbl_per_unit` goes away. Waits for the backend push.
-- [ ] Let `PackageBomView` render without a row verb by default so the format
-  page drops `rowAction={null}`.
+Use shared inventory/live views and E controls. Pause after the user merges
+this wave and report source-based parity plus rendered proof.
+
+## Wave 5 and release — integrations and user-owned hosted acceptance
+
+- [ ] [#640](https://github.com/energee/mgr-zero/issues/640) — Resolve Square remote-revocation recovery with provider evidence.
+- [ ] [#311](https://github.com/energee/mgr-zero/issues/311) — Complete connected provider acceptance and hosted release verification.
+- [ ] [#329](https://github.com/energee/mgr-zero/issues/329) — Add approved AI Gateway credits and verify the hosted composer.
+
+#625 and #580 implementation moved to Wave 1; real email acceptance remains
+here. The sending domain is required for the pilot, not parked indefinitely.
+#311 owns the user's domain/SMTP, password protection and signup decision,
+main-only production deploys, backup/restore proof, provider credentials,
+Square D7 acceptance, QuickBooks/Slack verification and scheduler/pruning.
+Agents prepare checklists and verify read-only after the user's changes.
+Hosted writes and deploys wait for the user.
+
+## Wave 6 — documentation reconciliation
+
+- [ ] [#656](https://github.com/energee/mgr-zero/issues/656) — Reconcile guides, README and deferred v1 claims with shipped behavior.
+
+Each feature PR updates its guides too. The final pass checks cross-feature
+claims and reports local proof separately from real provider acceptance.
+
+## Outside the release waves
+
+- [ ] [#657](https://github.com/energee/mgr-zero/issues/657) — Reassess optional screen and query cleanup after v1 prioritization.
+
+D8 defers live water-salt suggestions. D9 defers purchase-unit count conversion.
+D11 defers historical brand trends. D12 defers recent receiving-lot suggestions.
+D14 defers imported QuickBooks invoice-email delivery status. These are not
+active v1 gates; #656 owns removal of remaining stale promises and gate text.
