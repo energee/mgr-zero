@@ -8345,6 +8345,7 @@ export type Database = {
           p_child_qty: number
           p_child_sku: string
           p_location: string
+          p_lot?: string
           p_parent_qty: number
           p_parent_sku: string
           p_request_id: string

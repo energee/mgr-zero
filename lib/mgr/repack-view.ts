@@ -3,7 +3,8 @@
 // leg from the parent's composition through toRepackView, so nobody types both
 // halves and the two legs cannot disagree on volume. Like the cycle-count
 // model, the option lists and selected ids ride on the model when the sheet is
-// live; the fixture leaves them off and the view draws plain fields.
+// live; the fixture leaves them off and the view draws plain fields. `lot` is
+// the finished-goods lot the cases come out of (#613); the four-packs keep it.
 export type RepackOption = { id: string; name: string };
 export type RepackViewModel = {
   parent: string;
@@ -14,8 +15,9 @@ export type RepackViewModel = {
   preview: string;
   damaged: string;
   unavailable?: string;
-  parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[];
-  parentSkuId?: string; locationId?: string; binId?: string;
+  lot?: string;
+  parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[]; lots?: RepackOption[];
+  parentSkuId?: string; locationId?: string; binId?: string; lotId?: string;
 };
 
 /** Why the commit is withheld when the parent is not a composed format with exactly one component row. */
