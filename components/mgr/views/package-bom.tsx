@@ -1,5 +1,6 @@
-// components/mgr/views/package-bom.tsx — Package BOM sheet. Inventory draws
-// Edit on each material and Replace BOM; live slots the replace form in footer.
+// components/mgr/views/package-bom.tsx — Package BOM sheet. Rows carry no verb
+// unless the caller passes `rowAction` (the inventory passes Edit); inventory
+// draws Replace BOM, live suppresses it with footer={null}.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PackageBomViewModel } from "@/lib/mgr/package-bom-view";
@@ -16,8 +17,9 @@ export function PackageBomView({
   model: PackageBomViewModel;
   createAction?: ReactNode;
   footer?: ReactNode;
-  /** Live: Edit is a link. Inventory leaves it an unlabeled tap. */
+  /** Live: the Format row is a link. Inventory leaves it an unlabeled tap. */
   linkRows?: boolean;
+  /** The verb on each material row; none by default. */
   rowAction?: ReactNode;
 }) {
   return (
@@ -28,7 +30,7 @@ export function PackageBomView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, rowAction !== undefined ? rowAction : E.act("Edit", "primary", linkRows ? row.href : undefined))}
+            {E.row(row.title, row.detail, rowAction)}
           </Fragment>
         ))}
       {footer !== undefined ? footer : E.btn("Replace BOM")}

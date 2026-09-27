@@ -1,11 +1,9 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions:
 // Submit (draft), Confirm (submitted — surfaces confirm_order's ATP soft
-// warnings inline via atp-warnings.tsx), Adjust lines (confirmed/picked, via adjust-lines-form.tsx),
-// Record pick (confirmed/picked, via pick-form.tsx; a short count opens
-// short-pick-form.tsx), Ship (picked, via
-// ship-form.tsx), Cancel with reason (any pre-ship status). Calls commands
-// directly rather than through useCommandForm since these aren't
-// single-field command forms.
+// warnings inline via atp-warnings.tsx), and Cancel with reason (any pre-ship
+// status) run here. Adjust lines, Record pick and Ship / Complete transfer are
+// links to their own pages under /orders/[id]/. Calls commands directly rather
+// than through useCommandForm since these aren't single-field command forms.
 "use client";
 
 import { useState } from "react";
@@ -16,20 +14,14 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { AdjustLinesForm } from "./adjust-lines-form";
 import { AtpWarnings, atpWarnings, type AtpWarning } from "./atp-warnings";
-import type { PickLine } from "./pick-form";
-import type { ShipLine } from "./ship-form";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 
 export function LifecycleButtons({
   orderId,
-  orderNo,
   status,
   lines,
-  skus,
-  pickLines,
   transfer = false,
   canSell,
   canFulfill,
@@ -38,11 +30,8 @@ export function LifecycleButtons({
   canSell: boolean;
   canFulfill: boolean;
   orderId: string;
-  orderNo?: number | null;
   status: OrderStatus;
-  lines: { skuId: string; skuName: string; qty: number }[];
-  skus: { id: string; label: string }[];
-  pickLines: (PickLine & ShipLine)[];
+  lines: { skuId: string; skuName: string }[];
 }) {
   const router = useRouter();
   const { busy, error, setError, run: runAction } = useCommandAction();
@@ -84,7 +73,7 @@ export function LifecycleButtons({
           </Button>
         )}
         {canSell && (status === "confirmed" || status === "picked") && (
-          <AdjustLinesForm orderId={orderId} orderNo={orderNo} currentLines={lines.map((l) => ({ skuId: l.skuId, qty: l.qty, qtyPicked: pickLines.find(pick => pick.skuId === l.skuId)?.qtyPicked }))} skus={skus} />
+          <Button size="sm" variant="outline" asChild><Link href={`/orders/${orderId}/adjust`}>Adjust lines</Link></Button>
         )}
         {canFulfill && (status === "confirmed" || status === "picked") && (
           <Button size="sm" asChild><Link href={`/orders/${orderId}/pick`}>Record pick</Link></Button>

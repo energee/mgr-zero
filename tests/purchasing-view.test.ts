@@ -28,6 +28,7 @@ import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
+import { poLineCounts } from "../lib/mgr/new-po-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -268,24 +269,49 @@ describe("Vendors", () => {
   });
 });
 
-it("does not require the fields of a New PO line the user has not begun", () => {
-  // new-po-form submits only lines with a material and a positive qty, so a
-  // blank appended row must not trip native validation: there is no control to
-  // remove it, and the submit button stays enabled while other lines are valid.
-  const noop = () => {};
-  const controls = { vendor: noop, expected: noop, material: noop, quantity: noop, cost: noop, lot: noop, add: noop };
-  const html = renderToStaticMarkup(createElement(NewPoView, {
-    model: {
+describe("New PO lines", () => {
+  // One check decides which rows count: the view flags a row that falls short
+  // and the form saves only when every row counts, so the two cannot disagree.
+  it("a line counts only with a material and a positive quantity", () => {
+    expect(poLineCounts({ materialId: "malt", qty: "4" })).toBe(true);
+    expect(poLineCounts({ materialId: "malt", qty: 0.5 })).toBe(true);
+    expect(poLineCounts({ materialId: "malt", qty: "0" })).toBe(false);
+    expect(poLineCounts({ materialId: "malt", qty: "" })).toBe(false);
+    expect(poLineCounts({ materialId: "", qty: "4" })).toBe(false);
+    expect(poLineCounts({ qty: 4 })).toBe(false);
+  });
+
+  it("every row is required, removable when there is more than one, and a zero quantity is flagged", () => {
+    const noop = () => {};
+    const remove = vi.fn();
+    const model = {
       backHref: "/purchase-orders", vendor: "vendor", vendors: [{ id: "vendor", name: "Country Malt" }],
       materials: [{ id: "malt", name: "2-row", purchase_uom: "bag", lot_tracked: false }], expected: "",
       lines: [
         { key: "0", materialId: "malt", title: "2-row", detail: "", qty: "4", cost: "" },
-        { key: "1", materialId: "", title: "", detail: "", qty: "", cost: "" },
+        { key: "1", materialId: "malt", title: "2-row", detail: "", qty: "0", cost: "" },
       ],
-    },
-    controls,
-  }));
-  const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
-  expect(line(1)).toContain("required");
-  expect(line(2)).not.toContain("required");
+    };
+    const html = renderToStaticMarkup(createElement(NewPoView, { model, controls: { material: noop, quantity: noop, remove } }));
+    const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
+    expect(line(1)).toContain("required");
+    expect(line(1)).not.toContain('aria-invalid="true"');
+    expect(line(2)).toContain('aria-invalid="true"');
+    expect(html.match(/>Remove</g)).toHaveLength(2);
+    const single = renderToStaticMarkup(createElement(NewPoView, { model: { ...model, lines: model.lines.slice(0, 1) }, controls: { remove } }));
+    expect(single).not.toContain(">Remove<");
+  });
+
+  it("the inventory New PO draws Remove on its lines too, and none is flagged", () => {
+    const html = htmlOf(createElement(NewPoView, { model: newPoCountryMalt }));
+    expect(html.match(/>Remove</g)).toHaveLength(newPoCountryMalt.lines.length);
+    expect(html).not.toContain('aria-invalid="true"');
+  });
+
+  it("the live form saves only when every line counts, through the shared check", () => {
+    const form = src("app/(app)/purchase-orders/new-po-form.tsx");
+    expect(form).toContain("lines.every(poLineCounts)");
+    expect(form).toMatch(/remove: index =>/);
+    expect(src("components/mgr/views/new-po.tsx")).not.toMatch(/const started\b/);
+  });
 });

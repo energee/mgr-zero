@@ -13,12 +13,16 @@ export const packagingRuns: PackagingRunSnapshot[] = [
 
 export const schedulePackagingRun: SchedulePackagingRunViewModel = {
   plannedOn: "2026-09-05",
+  brandId: "hazy",
+  brandOptions: [{ value: "hazy", label: "Hazy IPA" }, { value: "pils", label: "Pils" }],
+  occupancyId: "fv3",
+  sourceOptions: [{ value: "", label: "No source yet" }, { value: "fv3", label: "FV3 · Hazy IPA · 42 bbl" }, { value: "fv1", label: "FV1 · Pils · 38 bbl" }],
   source: "FV3 · Hazy IPA",
   sourceDetail: "B-0416 · 42.0 bbl · gravity 2.1 · ready",
   outputs: [
-    { key: "case", title: "Hazy · case · 24×16 oz", detail: "39.6 bbl · on the wholesale list", qty: 118, listed: true },
-    { key: "half", title: "Hazy · ½ bbl keg", detail: "2.0 bbl · on the wholesale list", qty: 4, listed: true },
-    { key: "sixth", title: "Hazy · ⅙ bbl keg", detail: "not listed this run", qty: 0, listed: false },
+    { key: "case", title: "Hazy · case · 24×16 oz", detail: "39.6 bbl · on the wholesale list", qty: "118", listed: true },
+    { key: "half", title: "Hazy · ½ bbl keg", detail: "2.0 bbl · on the wholesale list", qty: "4", listed: true },
+    { key: "sixth", title: "Hazy · ⅙ bbl keg", detail: "not listed this run", qty: "0", listed: false },
   ],
   leftInSource: "0.4 bbl · loss at close unless held",
   leftLabel: "Left in FV3",
