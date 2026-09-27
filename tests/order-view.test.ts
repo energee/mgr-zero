@@ -28,6 +28,13 @@ describe("Order view loop", () => {
     expect(String(model.events.at(-1)?.[0])).toMatch(/lines adjusted/);
   });
 
+  it("shows a line's shortage reason to staff (#624)", () => {
+    const lines = orderPickedRestock.lines.map((l) => l.id === "l-pils" ? { ...l, short_reason: "one case crushed" } : l);
+    const model = toOrderViewProps({ ...orderPickedRestock, lines });
+    expect(model.lines[1]?.detail).toMatch(/ · short: one case crushed$/);
+    expect(model.lines[0]?.detail).not.toMatch(/short/);
+  });
+
   it("the Order inventory record is OrderView painted from that fixture", () => {
     const screen = SCREENS.find((s) => s.name === "Order");
     expect(isValidElement(screen!.body)).toBe(true);

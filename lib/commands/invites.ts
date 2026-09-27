@@ -41,3 +41,20 @@ defineCommand({
   input: z.object({ userId: z.string().uuid() }), roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_staff", { p_brewery: ctx.breweryId, p_user: i.userId, p_request_id: execution.requestId })),
 });
+
+export type PortalUser = { userId: string; email: string; createdAt: string };
+
+defineQuery({
+  name: "list_customer_users", description: "One customer's portal users: user id, email and when access was granted",
+  input: z.object({ customerId: z.string().uuid() }), roles: ["admin", "sales"],
+  handler: async (ctx, i): Promise<PortalUser[]> => {
+    const rows = await unwrap(ctx.db.rpc("list_customer_users", { p_brewery: ctx.breweryId, p_customer: i.customerId })) as { user_id: string; email: string; created_at: string }[];
+    return rows.map((r) => ({ userId: r.user_id, email: r.email, createdAt: r.created_at }));
+  },
+});
+
+defineCommand({
+  name: "revoke_customer_user", description: "End one buyer's portal access to a customer (admin or sales); the sign-in account remains",
+  input: z.object({ customerId: z.string().uuid(), userId: z.string().uuid() }), roles: ["admin", "sales"], requiresConfirmation: true,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_customer_user", { p_brewery: ctx.breweryId, p_customer: i.customerId, p_user: i.userId, p_request_id: execution.requestId })),
+});

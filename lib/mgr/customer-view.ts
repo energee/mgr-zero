@@ -17,7 +17,8 @@ export type CustomerViewModel = {
   taxTreatment: string;
   taxOptions: string[];
   shipTos: string;
-  portalUsers: string;
+  /** Buyers with portal access, by email. */
+  portalUsers: { key: string; email: string }[];
   kegBalance: string;
   orders: string;
 };
@@ -44,7 +45,8 @@ export type CustomerSnapshot = {
     tax_treatment?: string | null;
   };
   shipTos: { label: string }[];
-  portalUserCount?: number;
+  /** list_customer_users rows. */
+  portalUsers?: { userId: string; email: string }[];
   kegs?: { out: number; depositCents: number };
   orders?: { open: number; total: number };
   backHref?: string;
@@ -53,7 +55,7 @@ export type CustomerSnapshot = {
 export function toCustomerViewProps({
   customer,
   shipTos,
-  portalUserCount,
+  portalUsers,
   kegs,
   orders,
   backHref,
@@ -73,7 +75,7 @@ export function toCustomerViewProps({
     taxTreatment: tax,
     taxOptions: TAX,
     shipTos: shipTos.map((s) => s.label).join(" · ") || "none",
-    portalUsers: portalUserCount == null ? "none" : `${portalUserCount} active`,
+    portalUsers: (portalUsers ?? []).map((u) => ({ key: u.userId, email: u.email })),
     kegBalance: kegs
       ? `${kegs.out} out · ${money(kegs.depositCents)} deposits held`
       : "kegs out and deposits held",
