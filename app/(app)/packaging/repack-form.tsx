@@ -5,7 +5,8 @@
 // list_repack_parents (the parent format's single composition row), which is
 // the only ratio the RPC accepts as volume-neutral. The Lot picker offers the
 // parent's lots in the chosen bin (get_bin_move_stock, as Record movement
-// does); both legs are written to that lot (#613).
+// does); both legs are written to that lot (#613). A bin holding one lot of
+// the parent and no untracked units starts on that lot.
 "use client";
 
 import { useEffect, useId, useState } from "react";
@@ -16,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { repackFooter, RepackView } from "@/components/mgr/views/repack";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toRepackView } from "@/lib/mgr/repack-view";
+import { soleRepackLot, toRepackView } from "@/lib/mgr/repack-view";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -35,9 +36,11 @@ export function RepackForm({ locations, bins, parents, autoOpen = false }: { aut
   const [stockError, setStockError] = useState<string | null>(null);
   const parent = parents.find((p) => p.id === parentSkuId);
   const child = parent?.child ?? null;
+  // An explicit pick wins; otherwise the bin's only lot (soleRepackLot).
+  const chosenLot = lotId || soleRepackLot(stock, parentSkuId, binId);
   const form = useCommandForm("record_repack", {
     defaultOpen: autoOpen,
-    build: () => ({ locationId, binId, parentSkuId, parentQty: Number(qty), childSkuId: child?.skuId ?? "", childQty: Number(qty) * (child?.quantity ?? 0), lotId: lotId || undefined }),
+    build: () => ({ locationId, binId, parentSkuId, parentQty: Number(qty), childSkuId: child?.skuId ?? "", childQty: Number(qty) * (child?.quantity ?? 0), lotId: chosenLot || undefined }),
     reset: () => { setLocationId(""); setBinId(""); setParentSkuId(""); setLotId(""); setQty(""); setStock([]); setStockError(null); },
   });
   useEffect(() => {
@@ -55,7 +58,7 @@ export function RepackForm({ locations, bins, parents, autoOpen = false }: { aut
     }),
     parents: parents.map((p) => ({ id: p.id, name: p.label })),
     locations, bins: bins.filter((b) => b.location_id === locationId), lots,
-    parentSkuId, locationId, binId, lotId,
+    parentSkuId, locationId, binId, lotId: chosenLot,
   };
   const disabled = !locationId || !binId || !child || !(Number(qty) > 0);
   return (
