@@ -7,6 +7,7 @@ const report = {
   bySize: [{ pool_id: "p", pool_name: "Owned", keg_size: "sixth_bbl", out: 18, total: 36 }],
   aging: [{ bucket: "0-30", kegs: 96, deposit_cents: 288000 }, { bucket: "90+", kegs: 9, deposit_cents: 27000 }],
   customers: [{ customer_id: "c", name: "Ridgeline Tap Room", over_90: 9, oldest_at: "2026-05-12T16:00:00+00:00" }],
+  mismatches: [],
 };
 
 describe("toKegReportViewProps", () => {
@@ -19,8 +20,15 @@ describe("toKegReportViewProps", () => {
     expect(m.sizes).toEqual([{ key: "p-sixth_bbl", title: "Owned ⅙ bbl", detail: "18 of 36 out", trailing: "50% utilized" }]);
     expect(m.empty).toBeUndefined();
   });
+  it("lists each deposit mismatch as a flagged row opening that customer's balance (#577)", () => {
+    const mismatches = [{ customer_id: "c", name: "Al’s Bar", pool_id: "p", pool_name: "Owned", keg_size: "half_bbl", kegs_out: 3, kegs_on_deposit: 2 }];
+    expect(toKegReportViewProps({ ...report, mismatches }, "America/New_York").mismatches).toEqual([
+      { key: "c-p-half_bbl", href: undefined, title: "Al’s Bar", detail: "Owned ½ bbl · 3 out · 2 on deposit" },
+    ]);
+    expect(toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs").mismatches[0].href).toBe("/kegs/customers/c");
+  });
   it("an empty fleet is the empty state", () => {
-    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [] }, "America/New_York");
+    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [] }, "America/New_York");
     expect(m.headline).toEqual(["—", "0 of 0 kegs out"]);
     expect(m.empty?.title).toBe("No owned keg pools");
   });

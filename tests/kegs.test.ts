@@ -98,7 +98,8 @@ describe("customer keg balance", () => {
     const balance = (await runCommand("get_customer_keg_balance", { customerId }, ctx)) as {
       rows: { pool_id: string; keg_size: string; kegs_out: number; deposit_cents: number }[];
     };
-    expect(balance.rows).toEqual([{ pool_id: pool.id, pool_name: "House", keg_size: "half_bbl", kegs_out: 3, deposit_cents: 0 }]);
+    // Never invoiced a deposit: nothing to reconcile, so no mismatch (#577).
+    expect(balance.rows).toEqual([{ customer_id: customerId, pool_id: pool.id, pool_name: "House", keg_size: "half_bbl", kegs_out: 3, kegs_on_deposit: 0, deposit_cents: 0, mismatch: false }]);
 
     // Shipping and returning do not change the fleet; they move kegs to and
     // from the customer. The bin, though, physically holds 7.

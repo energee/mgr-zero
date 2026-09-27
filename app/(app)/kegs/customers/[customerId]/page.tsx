@@ -1,6 +1,7 @@
 // app/(app)/kegs/customers/[customerId]/page.tsx — Customer keg balance
 // (screen record Customer keg balance): kegs one customer has out per pool
 // and size with the deposit invoiced for them, from get_customer_keg_balance.
+// A row whose kegs on deposit disagree with its kegs out is flagged (#577).
 // Reachable from Keg fleet; history filtered to this customer is one tap.
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,7 +15,10 @@ import "@/lib/commands/all";
 import { money } from "@/lib/mgr/money";
 import { SIZE_LABEL } from "../../keg-labels";
 
-type Balance = { rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; deposit_cents: number }[]; kegs_out: number; deposit_cents: number };
+type Balance = {
+  rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number; deposit_cents: number; mismatch: boolean }[];
+  kegs_out: number; deposit_cents: number;
+};
 
 export default async function CustomerKegBalancePage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params;
@@ -34,8 +38,9 @@ export default async function CustomerKegBalancePage({ params }: { params: Promi
         rows: balance.rows.map((r) => ({
           key: `${r.pool_id}-${r.keg_size}`,
           title: `${r.pool_name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size}`,
-          detail: `${r.kegs_out} out`,
+          detail: r.mismatch ? `${r.kegs_out} out · ${r.kegs_on_deposit} on deposit` : `${r.kegs_out} out`,
           trailing: money(r.deposit_cents),
+          warning: r.mismatch,
         })),
       })}
       footer={<Link href={`/kegs/history?customer=${customerId}`}>{E.nav("Keg event history", "this customer's events")}</Link>}
