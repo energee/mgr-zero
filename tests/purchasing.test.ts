@@ -229,6 +229,17 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(Number(edited.reorder_point)).toBe(200);
   });
 
+  // #589: an omitted factor reset to 1, which also tripped the units guard
+  // once the material had movements.
+  it("editing a material without a purchase factor keeps the factor it had, even with movements", async () => {
+    const wh = await seedLocation(b.id, { name: "Sack room" });
+    const base = { category: "malt", baseUom: "lb", purchaseUom: "each" } as const;
+    const m = (await runCommand("upsert_material", { name: "Golden Promise", ...base, purchaseUomFactor: 55 }, ctx)) as { id: string };
+    await seedMovement(b.id, { materialId: m.id, locationId: wh.id, binId: wh.binId, qty: 110, createdBy: ctx.userId });
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Golden Promise (Simpsons)", ...base }, ctx)) as { purchase_uom_factor: number };
+    expect(Number(edited.purchase_uom_factor)).toBe(55);
+  });
+
   // #430: nothing wrote extract_potential, so every recipe predicted OG 0.
   it("stores a material's extract potential, keeps it on an edit that omits it, and bounds it", async () => {
     const base = { category: "malt", baseUom: "lb", purchaseUom: "lb" } as const;
