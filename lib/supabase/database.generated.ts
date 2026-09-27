@@ -7765,6 +7765,16 @@ export type Database = {
         Args: { p_actor: string; p_state_hash: string }
         Returns: Json
       }
+      finish_order_email: {
+        Args: {
+          p_delivery: string
+          p_error: string
+          p_lease: string
+          p_provider_id: string
+          p_retry: boolean
+        }
+        Returns: boolean
+      }
       finish_portal_quote_tax: {
         Args: {
           p_actor: string
@@ -7866,6 +7876,10 @@ export type Database = {
       }
       get_loss_review: {
         Args: { p_brewery: string; p_end: string; p_start: string }
+        Returns: Json
+      }
+      get_order_email_status: {
+        Args: { p_brewery: string; p_order: string }
         Returns: Json
       }
       get_pos_menu: {
@@ -7971,6 +7985,7 @@ export type Database = {
           provider: string
         }[]
       }
+      lease_order_emails: { Args: { p_from: string }; Returns: Json }
       lease_square_publication: {
         Args: { p_actor: string; p_brewery: string; p_publication: string }
         Returns: {

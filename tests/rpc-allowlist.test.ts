@@ -59,6 +59,7 @@ const AUTHENTICATED_RPCS = [
   "complete_batch(uuid,uuid,uuid)",
   "confirm_delivery(uuid,text,uuid)",
   "confirm_order(uuid,uuid)",
+  "get_order_email_status(uuid,uuid)",
   "confirm_restock(uuid,uuid)",
   "consume_chat_link_proof(uuid,text,uuid)",
   "create_bin(uuid,uuid,text,uuid)",
