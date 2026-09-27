@@ -26,6 +26,7 @@ async function query(name: string, input?: { basis?: string }) {
     case "list_channel_prices": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
     case "get_customer": return { customer, shipTos: [shipTo] };
+    case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];
     case "list_customers": return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
@@ -77,16 +78,18 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(render(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
   expect(render(customers)).not.toContain("Add customer");
 });
-it("customer view keeps tax edit prefill, default ship-to, filtered Orders and Invite", async () => {
+it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
   expect(page.type).toBe(CustomerView);
   expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
+  expect(page.props.detail.revokePortalUser({ key: "user", email: "jo@buyer.test" }).props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
-  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user"]) expect(html).toContain(text);
-  state.role = "warehouse";
+  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
+  state.role = "warehouse"; state.calls = [];
   const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
-  expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren/);
+  expect(state.calls).not.toContain("list_customer_users");
+  expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
   expect(readonly).toContain("Research");
 });
 it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {

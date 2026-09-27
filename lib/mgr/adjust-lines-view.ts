@@ -1,4 +1,4 @@
-// lib/mgr/adjust-lines-view.ts — view-model for the Adjust lines sheet.
+// lib/mgr/adjust-lines-view.ts — view-model for the Adjust lines page.
 import { docNo } from "./doc-no";
 
 export type AdjustLinesLineView = {

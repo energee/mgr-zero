@@ -9,6 +9,8 @@ export type ShipLineView = {
   qty: number;
   picked: number;
   tone?: "" | "w" | "ok";
+  /** The line's stored short reason, which prefills the Reason field. */
+  shortReason?: string;
 };
 
 export type ShipViewModel = {
@@ -37,6 +39,7 @@ export type ShipSnapshot = {
     qty_picked: number | null;
     qty_shipped: number | null;
     bbl_per_unit?: number;
+    short_reason?: string | null;
     skus: { name: string } | null;
   }[];
   locations: { id: string; name: string }[];
@@ -83,6 +86,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming = "now"
         qty,
         picked,
         tone: qty < picked ? "w" : "ok",
+        shortReason: l.short_reason ?? undefined,
       };
     }),
     shortNote: short

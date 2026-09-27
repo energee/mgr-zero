@@ -7968,6 +7968,14 @@ export type Database = {
       list_chat_conversations: { Args: { p_brewery: string }; Returns: Json }
       list_chat_scan_targets: { Args: never; Returns: string[] }
       list_chat_user_links: { Args: { p_brewery: string }; Returns: Json }
+      list_customer_users: {
+        Args: { p_brewery: string; p_customer: string }
+        Returns: {
+          created_at: string
+          email: string
+          user_id: string
+        }[]
+      }
       list_open_taps: {
         Args: { p_brewery: string; p_location: string }
         Returns: Json
@@ -8355,6 +8363,7 @@ export type Database = {
           p_child_qty: number
           p_child_sku: string
           p_location: string
+          p_lot?: string
           p_parent_qty: number
           p_parent_sku: string
           p_request_id: string
@@ -8492,6 +8501,15 @@ export type Database = {
           p_movement: string
           p_note: string
           p_request_id: string
+        }
+        Returns: Json
+      }
+      revoke_customer_user: {
+        Args: {
+          p_brewery: string
+          p_customer: string
+          p_request_id: string
+          p_user: string
         }
         Returns: Json
       }

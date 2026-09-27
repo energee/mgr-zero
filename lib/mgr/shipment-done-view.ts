@@ -26,6 +26,8 @@ export type ShipmentDoneSnapshot = {
     id: string;
     qty_shipped: number | null;
     bbl_per_unit?: number;
+    /** The shortage reason saved on the line (#624), named on its tape row. */
+    short_reason?: string | null;
     skus: { name: string } | null;
   }[];
 };
@@ -39,7 +41,8 @@ export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoi
     const qty = Number(l.qty_shipped ?? 0);
     if (qty <= 0) continue;
     const name = l.skus?.name ?? "Line";
-    tape.push([`−${qty} ${name} · sale removal · ${dest}`, saleVolume(qty, l.bbl_per_unit)]);
+    const short = l.short_reason ? ` · short: ${l.short_reason}` : "";
+    tape.push([`−${qty} ${name} · sale removal · ${dest}${short}`, saleVolume(qty, l.bbl_per_unit)]);
   }
   if (invoice) tape.push([inv, "invoiced now"]);
   return {

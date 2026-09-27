@@ -68,10 +68,17 @@ begin
     insert into public.formats (brewery_id, name, basis, package_type, keg_size, units_per_case, bbl_per_unit, ounces, price_group_id)
     values (p_brewery, p_name, p_basis, p_package_type, p_keg_size, p_units_per_case, p_bbl_per_unit, p_ounces, p_price_group) returning * into v_row;
   else
+    select * into v_row from public.formats where id = p_id and brewery_id = p_brewery for update;
+    if v_row.id is null then raise exception 'format not found'; end if;
+    -- #632's in-use volume lock (20260927100000), kept through this redefinition.
+    if v_row.basis = p_basis
+       and (v_row.bbl_per_unit, v_row.units_per_case, v_row.ounces) is distinct from (p_bbl_per_unit, p_units_per_case, p_ounces)
+       and (private.format_used_as_packaged(p_id) or private.format_used_as_poured(p_id)) then
+      raise exception 'format is in use: its bbl per unit, units per case and ounces cannot change';
+    end if;
     update public.formats set name = p_name, basis = p_basis, package_type = p_package_type, keg_size = p_keg_size,
       units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit, ounces = p_ounces, price_group_id = p_price_group
-    where id = p_id and brewery_id = p_brewery returning * into v_row;
-    if v_row.id is null then raise exception 'format not found'; end if;
+    where id = p_id returning * into v_row;
   end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;

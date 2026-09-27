@@ -63,7 +63,6 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     <PackageBomView
       model={bomModel}
       createAction={E.hd("Packaging materials", "Optional · managed in Edit format")}
-      rowAction={null}
       footer={null}
     />
     {!writable ? E.info("Admin or Sales can replace components and packaging materials.") : null}

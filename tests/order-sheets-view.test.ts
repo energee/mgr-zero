@@ -160,6 +160,17 @@ describe("Ship view", () => {
     expect(markup).toContain('data-variant="irreversible"');
   });
 
+  it("asks each short line for its reason, prefilled from the stored one (#624)", () => {
+    const lines = orderShipInvoice.lines.map(line => line.id === "l-pils" ? { ...line, short_reason: "short in pick face" } : line);
+    const model = toShipViewProps({ ...orderShipInvoice, lines });
+    expect(model.lines.map(line => line.shortReason)).toEqual([undefined, "short in pick face"]);
+    const markup = html(createElement(ShipView, { model }));
+    expect(markup).toContain('aria-label="Pils · 16 oz case shortage reason"');
+    expect(markup).toContain('value="short in pick face"');
+    expect(markup).not.toContain("Hazy IPA · ½ bbl keg shortage reason");
+    expect(html(createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery) }))).not.toMatch(/shortage reason/);
+  });
+
   it("maps all-as-picked onto deferred invoice tape", () => {
     const model = toShipViewProps(orderShipOnDelivery);
     expect(model.invoiceTiming).toBe("on_delivery");
@@ -196,6 +207,13 @@ describe("Shipment done view", () => {
     const model = toShipmentDoneViewProps({ ...orderShipmentDone, invoice: null });
     expect(model.invoice).toBe("No invoice was created");
     expect(model.tape.flat().join(" ")).not.toContain("invoiced now");
+  });
+  it("names the shortage reason on a line shipped short (#624)", () => {
+    const lines = orderShipmentDone.lines.map((l, i) => (i === 0 ? { ...l, short_reason: "one keg dented" } : l));
+    const model = toShipmentDoneViewProps({ ...orderShipmentDone, lines });
+    expect(model.tape[0][0]).toMatch(/· short: one keg dented$/);
+    expect(model.tape[1][0]).not.toMatch(/short:/);
+    expect(html(createElement(ShipmentDoneView, { model }))).toContain("short: one keg dented");
   });
   it("maps INV-1042 onto the assigned invoice field", () => {
     const model = toShipmentDoneViewProps(orderShipmentDone);

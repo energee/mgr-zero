@@ -27,9 +27,9 @@ export const newPoCountryMalt: NewPoViewModel = {
   vendor: "Country Malt",
   expected: "2026-09-10",
   lines: [
-    { key: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: 40, cost: "$28.50", lot: "CM-26-4410" },
-    { key: "citra", title: "Citra · 44 lb boxes", detail: "lot-tracked", qty: 4, cost: "$9.40", lot: "2026-CIT-77" },
-    { key: "hulls", title: "Rice hulls · 50 lb", detail: "not lot-tracked", qty: 6, cost: "$0.62" },
+    { key: "malt", materialId: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: 40, cost: "$28.50", lot: "CM-26-4410" },
+    { key: "citra", materialId: "citra", title: "Citra · 44 lb boxes", detail: "lot-tracked", qty: 4, cost: "$9.40", lot: "2026-CIT-77" },
+    { key: "hulls", materialId: "hulls", title: "Rice hulls · 50 lb", detail: "not lot-tracked", qty: 6, cost: "$0.62" },
   ],
 };
 

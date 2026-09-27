@@ -109,16 +109,17 @@ defineCommand({
 });
 
 defineCommand({
-  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock",
+  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason)",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
     ship: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative().multipleOf(0.01),
       sources: z.array(z.object({ binId: z.string().uuid(), lotId: z.string().uuid().nullable(), qty: z.number().positive().multipleOf(0.01), toBinId: z.string().uuid().optional() })).optional(),
+      shortReason: z.string().trim().min(1).optional(),
     })).min(1), invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
-    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty, ...(s.sources === undefined ? {} : { sources: s.sources.map(a => ({ bin_id: a.binId, lot_id: a.lotId, qty: a.qty, to_bin_id: a.toBinId ?? null })) }) })),
+    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty, ...(s.shortReason === undefined ? {} : { short_reason: s.shortReason }), ...(s.sources === undefined ? {} : { sources: s.sources.map(a => ({ bin_id: a.binId, lot_id: a.lotId, qty: a.qty, to_bin_id: a.toBinId ?? null })) }) })),
     p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_invoice_timing: i.invoiceTiming, p_request_id: execution.requestId,
   })),
 });

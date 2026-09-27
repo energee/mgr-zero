@@ -7,6 +7,23 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-09-27 — Keg deposit/keg-count reconciliation shipped (#577, PR #605,
+  revised after review): Customer keg balance and Keg report flag a mismatch
+  only once a deposit was refunded, counting kegs lost at the customer as
+  still on deposit; the deposit refund and Keg fleet Returned event stay
+  separate records by owner decision. Voided/written-off invoices still count
+  toward deposits held — left as a TODO.md follow-up.
+- 2026-09-27 — `upsert_material` stopped resetting an omitted
+  `purchaseUomFactor` to 1 (#589, PR #606); the API reference now states the
+  general rule — an `upsert_*` edit replaces the whole record, so a caller
+  must resend a field to keep it unless the operation names an exception.
+- 2026-09-27 — Stuck `pending_auth` invite requests now expire after 15
+  minutes within their brewery, unblocking the email for a retry (#580
+  partial, PR #603).
+- 2026-09-27 — TODO.md refreshed against main and
+  `.claude/project-remainder.plan.md` retired (its waves are done, closed, or
+  owned by #311); Team's stale taproom-role SCHEMA-GATE note removed, the
+  role stays offered (PRs #602, #604).
 - 2026-09-25 — Adversarial-walkthrough remediation wave (issue #311) closed roughly 90 numbered findings across packaging, compliance, orders, inventory, purchasing, production, catalog, chat, and auth (PRs #480–#600): overfill/overdraw/oversell/overcount guards on packaging runs, transfers, bin moves and picks; TTB period, removal-total, and filing-window fixes; keg-deposit charging on submit, keg-loss/customer-balance and credit-memo correctness; list reads paged past PostgREST's 1000-row cap; a new `cancel_stock_transfer` command (#600, closes #578); FEFO lot draws and rounded BOM checks on packaging close/repack (#599, closes #436, #588). Release readiness still not signed off — see `docs/operations/release-readiness-2026-09-18.md` (tracks #311).
 - 2026-09-20 — Ask MGR's hosted 503 fixed: `isChatConfigured()` also accepts `VERCEL=1`, since a deployed function never sees `VERCEL_OIDC_TOKEN` (only local `vercel env pull` sets it); closes the hosted retest of #329 (PR #412).
 - 2026-09-18 — Code-quality audit: one owner each for cents-as-text (`lib/mgr/money.ts`), sale-volume formatting, and tax-treatment labels; `lib/mgr/enums.ts` stops client-bundled forms from pulling in server-only command modules (`tests/boundary.test.ts`); five swallowed errors now surface or log their cause; `any` removed from the Supabase-boundary types (PRs #407, #408, #409). Hosted release readiness recorded and decided (Ted, 2026-09-18): pilot scope J01/J02/J06, Preview reuses Supabase project `ugzhwxzictzvrzlacjmv`, Auth SMTP via Resend (parked on a sending domain), the 171-function authenticated-executable RPC advisor accepted as designed (PRs #410, #411).

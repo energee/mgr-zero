@@ -185,6 +185,7 @@ Break a composed SKU into its component SKU at one bin: paired volume-neutral le
 | `parentQty` | number | yes |
 | `childSkuId` | uuid | yes |
 | `childQty` | number | yes |
+| `lotId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -273,7 +274,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (priceGroupId and positive finite ounces required; no package facts, never stock). A format in use keeps its basis: one used by a SKU, component or BOM stays packaged; one used by a POS mapping, menu or sale stays poured. The same use also fixes its bblPerUnit, unitsPerCase and ounces; a rename still saves
 
 | Field | Type | Required |
 | --- | --- | --- |

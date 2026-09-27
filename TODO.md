@@ -27,8 +27,7 @@ database or migration work while screens are the current focus.
 
 - [ ] Ship and invoice, Ship on delivery: persist the shortage reason.
 - [ ] Variance by brand: a brand-by-period trend projection.
-- [ ] Accounting: a missing-email count in connection health, and a recovery
-  disconnect that works when the connection is not in the connected state.
+- [ ] Accounting: a missing-email count in connection health.
 - [ ] Invoices: a verified Open in QuickBooks link and email delivery state.
 - [ ] Batches: the reading summary and direct reading action, which need
   occupancy and reading facts from `list_batches`.
@@ -49,6 +48,14 @@ database or migration work while screens are the current focus.
   - Production deploys from `main` only.
   - A backup before each migration, and a tested restore.
   - SMTP sending domain: parked until there are pilot users.
+
+## Keg deposit follow-ups from the PR #605 review
+
+- [ ] Exclude voided and written-off invoices from `keg_deposit_balances`.
+  The view sums every deposit line whatever the invoice's state, so a
+  deposit on an invoice voided in QuickBooks or written off still counts as
+  held, in the balance's dollars and in the #577 mismatch flag, which then
+  never clears. Rare; fixing it is a new migration to the view.
 
 ## Parity follow-ups from the PR #336 review
 

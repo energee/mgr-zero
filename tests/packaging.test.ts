@@ -19,6 +19,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
+import type { BinMoveStock } from "@/lib/commands/inventory";
 import "@/lib/commands/all";
 
 let b: { id: string };
@@ -423,7 +424,8 @@ describe("closing the run", () => {
     expect(materialsBefore.error).toBeNull();
     expect(materialsBefore.data).toHaveLength(1);
     expect(Number(materialsBefore.data![0].qty)).toBe(-10);
-    await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected case", basis: "packaged", packageType: "can", bblPerUnit: 0.2 }, editor);
+    // #632: upsert_format refuses a volume edit on an in-use format; a direct write still proves the freeze
+    expect((await admin.from("formats").update({ name: "Corrected case", bbl_per_unit: 0.2 }).eq("id", catalog.formatId)).error).toBeNull();
     await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: tray, qtyPerUnit: 2 }] }, editor);
     expect((await admin.from("packaging_run_yields").select("*").eq("run_id", run.id).single()).data).toEqual(yieldBefore.data);
     expect((await ctx.db.from("material_movements").select("id,qty").in("id", movementIds)).data).toEqual(materialsBefore.data);
@@ -774,6 +776,54 @@ describe("record_repack", () => {
     }, warehouseCtx)).rejects.toThrow(/on hand/i);
   });
 
+  it("breaks cases out of the chosen lot and keeps that lot on the four-packs (#613)", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    const adminCtx = await makeStaffCtx(b.id, "admin");
+    const brand = await insert("brands", { brewery_id: b.id, name: "Lot IPA" });
+    const packFormat = await insert("formats", { brewery_id: b.id, name: "Lot 4-pack", basis: "packaged", package_type: "can", bbl_per_unit: FOUR_PACK_BBL });
+    const caseFormat = await insert("formats", { brewery_id: b.id, name: "Lot case", basis: "packaged", package_type: "can" });
+    await ins("format_components", { brewery_id: b.id, parent_format_id: caseFormat, child_format_id: packFormat, qty: PER_CASE });
+    const caseSku = await insert("skus", { brewery_id: b.id, brand_id: brand, format_id: caseFormat, name: "Lot IPA case" });
+    const packSku = await insert("skus", { brewery_id: b.id, brand_id: brand, format_id: packFormat, name: "Lot IPA 4-pack" });
+    const wh = await seedLocation(b.id, { name: "Lot repack WH" });
+
+    // Package 10 cases into lot AUDIT-LOT at that bin.
+    const { occupancyId } = await brewInto("FV-LOT", brand, 10, "2026-11-20");
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: brand, plannedOn: "2026-12-20", occupancyId, outputs: [{ skuId: caseSku, qtyPlanned: 10 }],
+    }, ctx)) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-20T14:00:00Z" }, ctx);
+    await runCommand("close_packaging_run", {
+      runId: run.id, bblDrawn: 4, outputs: [{ skuId: caseSku, qtyActual: 10 }],
+      lotCode: "AUDIT-LOT", packagedOn: "2026-12-20", locationId: wh.id, binId: wh.binId,
+    }, ctx);
+    const [lotId] = sql(`select id from lots where brewery_id = '${b.id}' and code = 'AUDIT-LOT'`);
+
+    const repack = (qty: number, lot?: string) => runCommand("record_repack", {
+      locationId: wh.id, binId: wh.binId, parentSkuId: caseSku, parentQty: qty,
+      childSkuId: packSku, childQty: qty * PER_CASE, ...(lot ? { lotId: lot } : {}),
+    }, warehouseCtx);
+
+    // The bin holds only lotted cases, so a repack must say which lot.
+    await expect(repack(1)).rejects.toThrow(/choose the recorded lot/);
+    // The lot holds 10; 11 is refused.
+    await expect(repack(11, lotId)).rejects.toThrow(/insufficient selected bin and lot stock: 10 on hand/);
+
+    await repack(1, lotId);
+    const lotBalance = (sku: string) => sql(`select trim_scale(qty) from lot_on_hand where lot_id = '${lotId}' and sku_id = '${sku}'`);
+    expect(lotBalance(caseSku)).toEqual(["9"]);
+    expect(lotBalance(packSku)).toEqual([String(PER_CASE)]);
+
+    // The ship picker offers what the bin holds of the lot, no more.
+    const stock = (await runCommand("get_bin_move_stock", { locationId: wh.id }, warehouseCtx)) as BinMoveStock[];
+    expect(stock.filter((s) => s.kind === "sku").map((s) => [s.stock_id, s.lot_id, Number(s.qty)]).sort())
+      .toEqual([[caseSku, lotId, 9], [packSku, lotId, PER_CASE]].sort());
+
+    // Recall trace from the lot reaches the four-packs.
+    const trace = (await runCommand("trace_lot", { lotId }, adminCtx)) as { balances: { sku_id: string; qty: number }[] };
+    expect(trace.balances.find((x) => x.sku_id === packSku)?.qty).toBe(PER_CASE);
+  });
+
   it("waits for a concurrent reversal before reading stock, then rolls back the losing repack", async () => {
     const brewery = await makeBrewery();
     const warehouse = await makeStaffCtx(brewery.id, "warehouse");
@@ -808,7 +858,7 @@ describe("record_repack", () => {
       const winner = await a.query("select public.reverse_inventory_movement($1,$2,'Concurrent correction',$3) result",
         [brewery.id, original.id, winnerRequest]);
       await a.query("commit");
-      await expect(pending).rejects.toThrow(/only 0(?:\.0+)? on hand/i);
+      await expect(pending).rejects.toThrow(/insufficient selected bin and lot stock: 0 on hand/i);
       const replay = await warehouse.db.rpc("reverse_inventory_movement", {
         p_brewery: brewery.id, p_movement: original.id, p_note: "Concurrent correction", p_request_id: winnerRequest,
       });
