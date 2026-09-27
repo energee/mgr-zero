@@ -6,7 +6,8 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermiss
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(href); } }));
 import ShipPage from "@/app/(app)/orders/[id]/ship/page";
 import CompleteTransferPage from "@/app/(app)/orders/[id]/complete/page";
-import { ShipForm, buildShipLines, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { ShipForm, buildShipLines, shippedLines, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
 import type { ShipSources } from "@/lib/commands/orders";
 
@@ -46,6 +47,22 @@ it("sends a trimmed reason only for a line shipped below picked (#624)", () => {
   const built = buildShipLines(lines, { a: "1", b: "2" }, { a: [{ key: "bin:", qty: "1", toBinId: "" }], b: [{ key: "wrong:", qty: "2", toBinId: "" }] }, available, { a: " one can dented ", b: "ignored" });
   expect(built.map(line => line.shortReason)).toEqual(["one can dented", undefined]);
   expect(buildShipLines(lines, { a: "1", b: "2" }, {}, available, { a: "  " })[0].shortReason).toBeUndefined();
+});
+
+it("confirms only the reason ship_order was sent, not a leftover one on a full line", () => {
+  const ship = buildShipLines(lines, { a: "1", b: "2" }, {}, available, { a: " one can dented ", b: "typed, then raised back to full" });
+  const tape = toShipmentDoneViewProps({ order, invoice: null, lines: shippedLines(lines, ship) }).tape.map(row => row[0]);
+  expect(tape[0]).toMatch(/· short: one can dented$/);
+  expect(tape[1]).not.toMatch(/short:/);
+});
+
+it("keeps the saved short-pick reason when shipping the full picked amount", () => {
+  const pickedLines = [{ ...lines[0], qty_ordered: 5, short_reason: "two cans unavailable" }];
+  const ship = buildShipLines(pickedLines, { a: "3" }, {}, available, { a: "typed, then raised back to full" });
+  const immediate = toShipmentDoneViewProps({ order, invoice: null, lines: shippedLines(pickedLines, ship) });
+  const reloaded = toShipmentDoneViewProps({ order, invoice: null, lines: [{ ...pickedLines[0], qty_shipped: 3 }] });
+  expect(immediate.tape).toEqual(reloaded.tape);
+  expect(immediate.tape[0][0]).toMatch(/· short: two cans unavailable$/);
 });
 
 it("guards both shipment pages before reading data", async () => {

@@ -28,6 +28,12 @@ export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<st
   }));
 }
 
+/** Match ship_order: save a submitted shortage reason, otherwise keep the
+ *  persisted short-pick reason rather than an unsaved edit. */
+export function shippedLines(lines: ShippingSnapshot["lines"], ship: ReturnType<typeof buildShipLines>) {
+  return lines.map((line, i) => ({ ...line, qty_shipped: ship[i].qty, short_reason: ship[i].shortReason ?? line.short_reason ?? null }));
+}
+
 export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; available: ShipSources }) {
   const router = useRouter();
   const transfer = snapshot.order.kind === "taproom_transfer";
@@ -39,7 +45,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   const [tracking, setTracking] = useState("");
   const [invoiceTiming, setInvoiceTiming] = useState<"now" | "on_delivery">("now");
   const [result, setResult] = useState<ShipmentDoneViewModel | null>(null);
-  const proposed = { ...snapshot, invoiceTiming, lines: snapshot.lines.map(line => ({ ...line, qty_shipped: Number(qtys[line.id]), short_reason: reasons[line.id] || line.short_reason })) };
+  const proposed = { ...snapshot, invoiceTiming, lines: snapshot.lines.map(line => ({ ...line, qty_shipped: Number(qtys[line.id]) })) };
   const sources = <ShipmentSourcesView lines={snapshot.lines.map(line => ({
     key: line.id, name: line.skus?.name ?? "Line", qty: Number(qtys[line.id]),
     options: available.stock.filter(stock => stock.stock_id === line.sku_id).map(stock => ({
@@ -54,13 +60,13 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     if (busy || disabled) return;
+    const ship = buildShipLines(snapshot.lines, qtys, allocations, available, reasons);
     void run("ship_order", {
-      orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming,
-      ship: buildShipLines(snapshot.lines, qtys, allocations, available, reasons),
+      orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming, ship,
     }, data => {
       if (transfer) { router.push(`/orders/${snapshot.order.id}`); return; }
       const invoiceId = (data as { invoice_id: string | null }).invoice_id;
-      setResult(toShipmentDoneViewProps({ ...proposed, invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
+      setResult(toShipmentDoneViewProps({ ...proposed, lines: shippedLines(snapshot.lines, ship), invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
     });
   }}>
     {transfer
