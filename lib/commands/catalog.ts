@@ -287,12 +287,12 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_price_group", description: "Remove a price group no brand sits on and no cell prices",
+  name: "delete_price_group", description: "Remove a price group no brand sits on, no pour belongs to and no cell prices",
   roles: ["admin", "sales"],
   input: z.object({ priceGroupId: z.string().uuid() }),
   handler: async (ctx, i, execution) => {
     const result = await ctx.db.rpc("delete_price_group", { p_brewery: ctx.breweryId, p_id: i.priceGroupId, p_request_id: execution.requestId });
-    // brands and channel_prices reference the group `on delete restrict`, so a
+    // brands, pours and channel_prices reference the group without a cascade, so a
     // group still in use comes back as a raw foreign-key violation; say it in
     // product terms rather than letting it fall through to a generic 500.
     if (result.error?.code === "23503") throw new CommandError("price group is in use");
@@ -302,11 +302,11 @@ defineCommand({
 
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
-  name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
+  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const [brands, pours] = await Promise.all([
-      unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);

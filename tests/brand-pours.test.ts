@@ -20,6 +20,11 @@ const rpc = (extra = {}) => ctx.db.rpc("upsert_format", {
   p_price_group: groupId, p_ounces: 16, p_request_id: crypto.randomUUID(), ...extra,
 });
 
+it("list_brands names each brand's price group, which owns its pours", async () => {
+  const brands = await runCommand("list_brands", {}, ctx) as { id: string; price_groups: { name: string } | null }[];
+  expect(brands.find((b) => b.id === brandId)?.price_groups).toEqual({ name: "1" });
+});
+
 it("rejects trimmed-name collisions and ounces at or above 1000", async () => {
   const name = `Trim ${crypto.randomUUID()}`;
   expect((await rpc({ p_name: name })).error).toBeNull();

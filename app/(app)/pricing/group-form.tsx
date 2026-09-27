@@ -39,11 +39,13 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <PriceGroupView
-          model={draft}
+          // Only the three fields are drafts; pours come from the refreshed model, so
+          // Add pour and Remove show up without reopening the dialog.
+          model={{ ...model, name: draft.name, position: draft.position, costCeilingInput: draft.costCeilingInput }}
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
-          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }); })}
+          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }); }, form.busy)}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (
