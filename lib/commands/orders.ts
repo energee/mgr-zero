@@ -374,3 +374,10 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as ReturnSource[];
   },
 });
+
+defineQuery({
+  name: "get_order_email_status", description: "Read buyer confirmation email states for an order; provider acceptance does not prove inbox delivery",
+  roles: ["admin", "sales"],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_order_email_status", { p_brewery: ctx.breweryId, p_order: i.orderId })),
+});

@@ -4,8 +4,7 @@
 // log either value.
 import { createHash, timingSafeEqual } from "node:crypto";
 
-export function authorizeJob(request: Request): boolean {
-  const secret = process.env.CHAT_JOB_SECRET;
+export function authorizeJob(request: Request, secret = process.env.CHAT_JOB_SECRET): boolean {
   const header = request.headers.get("authorization") ?? "";
   const [scheme, token, extra] = header.split(" ");
   if (!secret || !token || extra || scheme.toLowerCase() !== "bearer") return false;
