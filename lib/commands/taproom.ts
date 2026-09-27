@@ -113,10 +113,13 @@ defineQuery({
 // Keg deposit refund quantities per customer × pool × size, for
 // kegDepositRows: a row is only reconciled once a deposit on it was refunded.
 // Paged by line id; `customerId` narrows it to one customer's credit memos.
+// Only live credit memos count, the same test keg_deposit_balances applies
+// (#617): a voided or written-off refund reconciles nothing.
 function refundRows(ctx: Ctx, customerId?: string) {
   return completeRows("Keg deposit refunds", start => {
     const q = ctx.db.from("invoice_lines").select("id, keg_pool_id, keg_size, qty, invoices!inner(customer_id)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).eq("kind", "keg_deposit_refund");
+      .eq("brewery_id", ctx.breweryId).eq("kind", "keg_deposit_refund")
+      .eq("invoices.qbo_remote_state", "live").is("invoices.written_off_at", null);
     return (customerId ? q.eq("invoices.customer_id", customerId) : q).order("id").range(start, start + PAGE_SIZE - 1);
   }).then((lines) => (lines ?? []).map((l) => ({
     customer_id: (l.invoices as unknown as { customer_id: string }).customer_id, pool_id: l.keg_pool_id as string, keg_size: l.keg_size as string, qty: Number(l.qty),
