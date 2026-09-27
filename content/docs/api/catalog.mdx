@@ -6,11 +6,14 @@ description: "Brands, formats, SKUs, sale channels, price groups and prices."
 A brand is the beer's sellable identity — name, style, ABV. A
 format is the physical package (keg, can, bottle); it owns `unitsPerCase` and
 `bblPerUnit`. A poured format (a pint, a taster) never holds stock: it is a
-ratio back to the keg it pours from, and never becomes a SKU. A SKU is one
-brand × one packaged format, with an optional UPC.
+ratio back to the keg it pours from, belongs to a price group rather than a
+brand, and never becomes a SKU. A SKU is one brand × one packaged format,
+with an optional UPC.
 
 Prices live on a grid, not on SKUs. A price group is a row of that grid and a
-brand sits on one; a sale channel is the column and a customer sits on one.
+brand sits on one; it also owns the poured formats that become columns on the
+grid, shared by every brand on it. A sale channel is the column and a
+customer sits on one.
 `set_channel_price` fills one cell — sale channel × price group × format —
 with an integer `unitPriceCents`, and every SKU of that group and format sells
 at it on that channel. `clear_channel_price` empties the cell, which unprices
