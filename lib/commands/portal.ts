@@ -1,6 +1,7 @@
 // lib/commands/portal.ts — customer-portal commands. role: "customer" only;
 // ctx.customerId scopes everything. Mutations call request-ledger-backed RPCs
 // that derive the caller's tenant and role inside the database.
+import { historyInput, historyBefore } from "./history";
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
@@ -150,8 +151,13 @@ defineQuery({
 defineQuery({
   name: "portal_orders", description: "Portal: the caller's orders, newest first",
   roles: "customer",
-  input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("orders").select("*, order_lines(*, skus(name))").eq("customer_id", requireCustomer(ctx)).order("created_at", { ascending: false })),
+  input: z.object(historyInput),
+  handler: (ctx, i) => {
+    let q = ctx.db.from("orders").select("*, order_lines(*, skus(name))").eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx))
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(i.limit);
+    if (i.cursor) q = q.or(historyBefore(i.cursor));
+    return unwrap(q);
+  },
 });
 
 defineQuery({
@@ -173,8 +179,13 @@ defineQuery({
 defineQuery({
   name: "portal_invoices", description: "Portal: the caller's invoices and credit memos",
   roles: "customer",
-  input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("invoices").select("*, invoice_lines(*, skus(name))").eq("customer_id", requireCustomer(ctx)).order("created_at", { ascending: false })),
+  input: z.object(historyInput),
+  handler: (ctx, i) => {
+    let q = ctx.db.from("invoices").select("*, invoice_lines(*, skus(name))").eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx))
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(i.limit);
+    if (i.cursor) q = q.or(historyBefore(i.cursor));
+    return unwrap(q);
+  },
 });
 
 defineQuery({

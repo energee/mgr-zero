@@ -1,3 +1,4 @@
+import { historyPage, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 // app/(portal)/portal/orders/page.tsx — Order history (screen record): the
 // caller's orders (portal_orders), newest first, each opening Order detail.
 // No cancel: the portal is read-only after submit, and the page says whom
@@ -17,12 +18,16 @@ type Order = {
   order_lines: { id: string; qty_ordered: number; qty_shipped: number | null; unit_price_cents?: number | null; skus?: { name: string } | null }[];
 };
 
-export default async function PortalOrdersPage() {
+export default async function PortalOrdersPage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
+  const { cursor } = await searchParams;
   const customer = await getActiveCustomer();
-  const orders = (await runCommand("portal_orders", {}, await buildContext(customer.breweryId))) as Order[];
+  const records = (await runCommand("portal_orders", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, await buildContext(customer.breweryId))) as (Order & HistoryRow)[];
+  const page = historyPage(records, "/portal/orders");
+  const orders = page.rows;
   return (
     <PortalOrdersView
       model={toPortalOrdersViewProps({ customerName: customer.customerName, breweryName: customer.breweryName, orders })}
+      pagination={{ moreHref: page.moreHref, firstHref: cursor ? page.firstHref : undefined }}
       linkRows
     />
   );

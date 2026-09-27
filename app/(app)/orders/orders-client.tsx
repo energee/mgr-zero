@@ -10,12 +10,14 @@ import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
 import { type OrderStatus } from "@/lib/mgr/order-status";
+import { historyPage, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
-export function OrdersClient({ role, status, customerId }: { role: StaffRole; status?: string; customerId?: string }) {
-  const result = useCommandQuery<OrdersListSnapshot["orders"]>("list_orders", { status, customerId });
-  const orders = result.data ?? [];
+export function OrdersClient({ role, status, customerId, cursor }: { role: StaffRole; status?: string; customerId?: string; cursor?: string }) {
+  const result = useCommandQuery<(OrdersListSnapshot["orders"][number] & HistoryRow)[]>("list_orders", { status, customerId, cursor, limit: HISTORY_PAGE_SIZE + 1 });
+  const page = historyPage(result.data ?? [], "/orders", { status, customerId });
+  const orders = page.rows;
   const canWrite = role === "admin" || role === "sales";
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
@@ -29,6 +31,7 @@ export function OrdersClient({ role, status, customerId }: { role: StaffRole; st
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
       listStatus={!result.data ? <QueryFeedback error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
       feedback={result.data ? <QueryFeedback error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
+      pagination={{ moreHref: page.moreHref, firstHref: cursor ? page.firstHref : undefined }}
       linkRows
       filters={(
         <>

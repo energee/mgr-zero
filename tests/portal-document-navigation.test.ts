@@ -31,7 +31,7 @@ it.each([{ kind: "invoice" as const, paid: false, status: "Unpaid" }, { kind: "i
   }
 });
 it("keeps each history detail link alongside exact draft and short-shipped reorder actions", async () => {
-  const html = renderToStaticMarkup(await OrdersPage());
+  const html = renderToStaticMarkup(await OrdersPage({ searchParams: Promise.resolve({}) }));
   for (const [id, action] of [["draft", "draft"], ["shipped", "reorder"]]) {
     expect(html).toContain(`href="/portal/orders/${id}"`);
     expect(html).toContain(`href="/portal?${action}=${id}"`);

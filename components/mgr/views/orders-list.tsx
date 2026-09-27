@@ -1,3 +1,4 @@
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 // components/mgr/views/orders-list.tsx — Work → Orders list. Live passes
 // OrderForm as createAction and LinkTabs as filters; inventory uses the
 // fixture verbs and E.tabs.
@@ -12,12 +13,14 @@ const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked",
 
 export function OrdersView({
   model,
+  pagination,
   createAction,
   filters,
   linkRows,
   listStatus,
   feedback,
 }: {
+  pagination?: HistoryNavigationProps;
   model: OrdersListViewModel;
   createAction?: ReactNode;
   filters?: ReactNode;
@@ -43,6 +46,7 @@ export function OrdersView({
             {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
           </Fragment>
         )))}
+      <HistoryNavigation {...pagination} />
     </>
   );
 }

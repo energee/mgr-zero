@@ -5,9 +5,9 @@ import { requirePagePermission } from "@/lib/mgr/page-query";
 import { OrdersClient } from "./orders-client";
 import "@/lib/commands/all";
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; customerId?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; customerId?: string; cursor?: string }> }) {
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "list_orders", "Orders");
-  return <OrdersClient role={brewery.role} status={params.status} customerId={params.customerId} />;
+  return <OrdersClient role={brewery.role} status={params.status} customerId={params.customerId} cursor={params.cursor} />;
 }

@@ -1,6 +1,7 @@
 // lib/commands/orders.ts — order lifecycle commands. Every mutation delegates
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
+import { historyInput, historyBefore } from "./history";
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
@@ -220,12 +221,13 @@ defineCommand({
 defineQuery({
   name: "list_orders", description: "Orders newest-first, optionally by status and customer",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), ...historyInput }),
   handler: (ctx, i) => {
     let q = ctx.db.from("orders").select("*, customers(name)")
-      .eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false }).limit(i.limit);
+      .eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(i.limit);
     if (i.status) q = q.eq("status", i.status);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
+    if (i.cursor) q = q.or(historyBefore(i.cursor));
     return unwrap(q);
   },
 });
@@ -293,11 +295,12 @@ defineQuery({
 defineQuery({
   name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ customerId: z.string().uuid().optional(), ...historyInput }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId)
-      .order("created_at", { ascending: false }).limit(i.limit);
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(i.limit);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
+    if (i.cursor) q = q.or(historyBefore(i.cursor));
     const invoices = (await unwrap(q)) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
     const ids = invoices.map(inv => inv.id);
     const [totals, pendingPushes] = ids.length ? await Promise.all([
