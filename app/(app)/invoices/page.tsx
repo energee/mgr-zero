@@ -1,3 +1,4 @@
+import { toQboSyncViewProps, type QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { toInvoiceListRow, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
@@ -12,9 +13,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canManage = brewery.role === "admin" || brewery.role === "sales";
-  const [records, health] = await Promise.all([
+  const [records, health, syncStatus] = await Promise.all([
     runCommand("list_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, ctx) as Promise<(InvoiceListRecord & HistoryRow)[]>,
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<{ connected: boolean; state: string; realmLabel: string | null }> : null,
+    canManage ? runCommand("get_qbo_sync_status", {}, ctx) as Promise<QboSyncStatus> : null,
   ]);
   const page = historyPage(records, "/invoices", cursor);
   return <InvoicesView pagination={page.pagination} backHref="/more" rows={page.rows.map(invoice => ({
@@ -22,5 +24,5 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `connected · ${health.realmLabel ?? "verified company"}` : health.state.replaceAll("_", " "),
     canConnect: brewery.role === "admin", connectHref: "/settings/accounting/connect",
-  } : undefined} sync={<QboSyncButton />} />;
+  } : undefined} sync={canManage ? <QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} disabled={!health?.connected} /> : null} />;
 }

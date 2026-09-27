@@ -6,6 +6,7 @@ import {
   compareAndSwapPortalInvoicePaymentTokens,
   compareAndSwapQboTokens,
   completeQboInvoiceSync,
+  recordQboInvoiceSyncFailure,
   confirmPortalInvoicePayment,
   finishQboPush,
   markQboAuthorizationFailed,
@@ -345,47 +346,52 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   }
   const start = await beginQboInvoiceSync(ctx, requestId);
   if ("replayResult" in start) return start.replayResult;
-  if (start.targets.length === 0) {
-    return completeQboInvoiceSync(ctx, {
-      actorId: start.actorId, connectionId: start.connectionId, realmId: start.realmId,
-      requestId, observations: [],
-    });
-  }
-  let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
-  if (tokens.connectionId !== start.connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
-  if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
-
-  const observations: QboInvoiceObservation[] = [];
-  const paymentCache: QboPaymentCache = new Map();
-  for (const target of start.targets) {
-    let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
-      .catch(() => { throw new Error("QuickBooks is unavailable"); });
-    if (!read.ok && read.status === 401) {
-      tokens = await refreshQboCredentials(ctx, client, tokens);
-      if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
-      read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
-        .catch(() => { throw new Error("QuickBooks is unavailable"); });
+  try {
+    if (start.targets.length === 0) {
+      return await completeQboInvoiceSync(ctx, {
+        actorId: start.actorId, connectionId: start.connectionId, realmId: start.realmId,
+        requestId, observations: [],
+      });
     }
-    if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
-    const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
-      ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
-    const remoteState = read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
-      && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
-    observations.push({
-      invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
-      syncToken: read.ok ? read.syncToken : null,
-      taxCents: read.ok ? read.taxCents : null,
-      totalCents: read.ok ? read.totalCents : null,
-      balanceCents: read.ok ? read.balanceCents : null,
-      contentMatches: read.ok && meaningfulInvoiceContentMatches(JSON.parse(target.requestBody), read.content),
-      cashCollectedCents: read.ok ? read.cashCollectedCents : 0,
-      paidAt: read.ok ? read.paidAt : null,
+    let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+    if (tokens.connectionId !== start.connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+    if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
+
+    const observations: QboInvoiceObservation[] = [];
+    const paymentCache: QboPaymentCache = new Map();
+    for (const target of start.targets) {
+      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+        .catch(() => { throw new Error("QuickBooks is unavailable"); });
+      if (!read.ok && read.status === 401) {
+        tokens = await refreshQboCredentials(ctx, client, tokens);
+        if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
+        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+          .catch(() => { throw new Error("QuickBooks is unavailable"); });
+      }
+      if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
+      const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
+        ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
+      const remoteState = read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
+        && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
+      observations.push({
+        invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
+        syncToken: read.ok ? read.syncToken : null,
+        taxCents: read.ok ? read.taxCents : null,
+        totalCents: read.ok ? read.totalCents : null,
+        balanceCents: read.ok ? read.balanceCents : null,
+        contentMatches: read.ok && meaningfulInvoiceContentMatches(JSON.parse(target.requestBody), read.content),
+        cashCollectedCents: read.ok ? read.cashCollectedCents : 0,
+        paidAt: read.ok ? read.paidAt : null,
+      });
+    }
+    return await completeQboInvoiceSync(ctx, {
+      actorId: start.actorId, connectionId: start.connectionId, realmId: start.realmId,
+      requestId, observations,
     });
+  } catch (error) {
+    await recordQboInvoiceSyncFailure(ctx, requestId);
+    throw error;
   }
-  return completeQboInvoiceSync(ctx, {
-    actorId: start.actorId, connectionId: start.connectionId, realmId: start.realmId,
-    requestId, observations,
-  });
 }
 
 // The one reading of a QuickBooks money field. MGR stores money as integer

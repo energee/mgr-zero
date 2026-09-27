@@ -28,6 +28,12 @@ defineQuery({
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getQboHealth(ctx),
 });
 
+defineQuery({
+  name: "get_qbo_sync_status", description: "Read the manual QuickBooks sync operator, last successful batch, latest failure, and the current operator's saved retry request",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: (ctx) => unwrap(ctx.db.rpc("get_qbo_sync_status", { p_brewery: ctx.breweryId })),
+});
+
 defineCommand({
   name: "set_qbo_customer_mapping", description: "Bind a customer to a QuickBooks customer in the current company",
   input: z.object({ customerId: z.string().uuid(), qboCustomerId: z.string().trim().min(1) }), roles: ["admin", "sales"],

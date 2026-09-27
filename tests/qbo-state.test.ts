@@ -109,6 +109,57 @@ function multiInvoicePaymentResponse(id: string, cash: number) {
 }
 
 describe("QuickBooks current invoice state", () => {
+  it("retains successful sync history and a separate safe failure with operator-owned retry", async () => {
+    const f = await stateFixture();
+    const successId = crypto.randomUUID();
+    const transport = vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse());
+    await syncQboInvoices(f.ctx, successId, new QboOAuthClient(config, transport));
+    const readStatus = () => runCommand("get_qbo_sync_status", {}, f.ctx) as Promise<{
+      lastSuccess: { at: string; operator: string }; latestFailure: { error: string } | null;
+      retryRequestId: string | null;
+    }>;
+    const success = await readStatus();
+    expect(success.lastSuccess.at).toBeTruthy();
+    expect(success.lastSuccess.operator).toBeTruthy();
+    expect(success.latestFailure).toBeNull();
+    const failedId = crypto.randomUUID();
+    transport.mockRejectedValue(new Error("secret provider response"));
+    await expect(syncQboInvoices(f.ctx, failedId, new QboOAuthClient(config, transport))).rejects.toThrow("QuickBooks is unavailable");
+    const failed = await readStatus();
+    expect(failed.lastSuccess).toEqual(success.lastSuccess);
+    expect(failed.latestFailure?.error).toMatch(/not completed/);
+    expect(JSON.stringify(failed)).not.toContain("secret");
+    expect(failed.retryRequestId).toBe(failedId);
+    const colleague = await makeStaffCtx(f.brewery.id, "sales");
+    expect(await runCommand("get_qbo_sync_status", {}, colleague)).toMatchObject({ retryRequestId: null });
+    const stranger = await stateFixture();
+    expect(await runCommand("get_qbo_sync_status", {}, stranger.ctx)).toMatchObject({ lastSuccess: null, latestFailure: null, retryRequestId: null });
+    const warehouse = await makeStaffCtx(f.brewery.id, "warehouse");
+    await expect(runCommand("get_qbo_sync_status", {}, warehouse)).rejects.toThrow(/permission/i);
+    transport.mockResolvedValue(invoiceResponse());
+    await syncQboInvoices(f.ctx, failedId, new QboOAuthClient(config, transport));
+    transport.mockClear();
+    await syncQboInvoices(f.ctx, failedId, new QboOAuthClient(config, transport));
+    expect(transport).not.toHaveBeenCalled();
+    expect(await readStatus()).toMatchObject({ retryRequestId: null });
+    const supersededId = crypto.randomUUID();
+    await beginQboInvoiceSync(f.ctx, supersededId);
+    expect(await readStatus()).toMatchObject({ retryRequestId: supersededId });
+    await beginQboInvoiceSync(colleague, crypto.randomUUID());
+    expect(await readStatus()).toMatchObject({ retryRequestId: supersededId });
+    const beforeSuperseded = await readStatus();
+    transport.mockClear();
+    expect(await syncQboInvoices(f.ctx, supersededId, new QboOAuthClient(config, transport))).toEqual({ superseded: true });
+    expect(await syncQboInvoices(f.ctx, supersededId, new QboOAuthClient(config, transport))).toEqual({ superseded: true });
+    expect(transport).not.toHaveBeenCalled();
+    expect(await readStatus()).toMatchObject({ lastSuccess: beforeSuperseded.lastSuccess, retryRequestId: null, latest: { superseded: true } });
+    transport.mockResolvedValue(invoiceResponse());
+    const fresh = await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, transport));
+    expect(fresh).toMatchObject({ synced: 1 });
+    expect((await warehouse.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
+    expect((await stranger.ctx.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
+  });
+
   it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
     const f = await stateFixture();
     const fetch = vi.fn<typeof globalThis.fetch>()

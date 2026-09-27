@@ -5,7 +5,7 @@ import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import type { AccountingViewModel } from "@/lib/mgr/accounting-view";
+import type { AccountingViewModel, QboSyncStatus } from "@/lib/mgr/accounting-view";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
 
@@ -15,8 +15,20 @@ export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | 
     : E.gated("Open in QuickBooks", link?.reason ?? "A verified provider link is unavailable. Open QuickBooks separately to find this document.");
 }
 
-export function QboSyncView({ busy = false, error, onSync }: { busy?: boolean; error?: string | null; onSync?: () => void }) {
-  return <div className="flex flex-col items-end gap-2"><Button variant="outline" disabled={busy} onClick={onSync}>{busy ? "Syncing…" : "Sync QuickBooks"}</Button><CommandFormMessage error={error} /></div>;
+export function QboSyncView({ busy = false, disabled = false, error, notice, onSync, status }: { busy?: boolean; disabled?: boolean; error?: string | null; notice?: string | null; onSync?: () => void; status?: QboSyncStatus }) {
+  // Stored sync errors are fixed generic copy, not diagnostics; current retry guidance follows the saved identity.
+  return <div className="flex flex-col gap-2">
+    {E.ttl("Manual payment sync")}
+    {E.fld("Last successful sync", status?.lastSuccess ? `${status.lastSuccess.at} · ${status.lastSuccess.operator}` : "No successful sync recorded")}
+    {status?.latest && E.fld("Latest sync activity", `${status.latest.at} · ${status.latest.operator} · ${status.latest.superseded ? "superseded · no payment changes applied" : status.latest.completed ? "completed" : "not completed"}`)}
+    {notice && E.info(notice)}
+    {status?.latest?.superseded && !notice && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.")}
+    {status?.latestFailure && E.note(`Latest failed attempt: ${status.latestFailure.at} · ${status.latestFailure.operator}. Sync not completed for that attempt.`)}
+    {status?.retryRequestId && E.info(disabled ? "QuickBooks must be reconnected before you retry the saved batch." : "Retry saved sync keeps your original invoice set and request identity.")}
+    {E.info("Payment status may be stale until you complete a manual sync. No automatic reconciliation runs.")}
+    {E.btn(busy ? "Syncing…" : status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", busy || disabled ? "g disabled" : "g", undefined, onSync)}
+    <CommandFormMessage error={error} />
+  </div>;
 }
 
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
@@ -39,7 +51,7 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
   </form>;
 }
 
-export function AccountingView({ model, connection, defaults, messages }: { model: AccountingViewModel; connection?: ReactNode; defaults?: ReactNode; messages?: ReactNode }) {
+export function AccountingView({ model, connection, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
   return <>
     {E.back("Settings", "Accounting", undefined, model.backHref)}
     {E.ttl("QuickBooks")}{messages}
@@ -48,6 +60,7 @@ export function AccountingView({ model, connection, defaults, messages }: { mode
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
     {model.connected && <>{E.fld("Company", model.company)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
+    {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Push defaults", "Connect QuickBooks to read and save the company's payment options.")}
     {E.row("Customers missing an email", model.missingEmails === undefined ? "Count unavailable · review customer email addresses" : `${model.missingEmails} · cannot be pushed`, E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}

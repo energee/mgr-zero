@@ -9,6 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 
@@ -45,9 +46,17 @@ function QboMappingFields({ kind, localId, label, currentId, context = "accounti
   </QboMappingSheetView>;
 }
 
-export function QboSyncButton() {
-  const action = useCommandAction();
-  return <QboSyncView busy={action.busy} error={action.error} onSync={() => void action.run("sync_qbo_payments", {})} />;
+export function QboSyncButton({ status, disabled = false }: { status?: QboSyncStatus; disabled?: boolean }) {
+  const action = useCommandAction(), router = useRouter();
+  const [notice, setNotice] = useState<string | null>(null);
+  const sync = async () => {
+    setNotice(null);
+    await action.run("sync_qbo_payments", {}, result => {
+      if ((result as { superseded?: boolean }).superseded) setNotice("The saved batch was superseded. No payment changes were applied. Start a new manual sync.");
+    }, status?.retryRequestId ?? undefined, { refresh: false });
+    router.refresh();
+  };
+  return <QboSyncView status={status} notice={notice} disabled={disabled} busy={action.busy} error={action.error} onSync={() => void sync()} />;
 }
 
 export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoiceId: string; invoiceLabel: string; actions: QboInvoiceAction[] }) {
