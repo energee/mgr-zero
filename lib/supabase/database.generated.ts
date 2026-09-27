@@ -8019,6 +8019,17 @@ export type Database = {
         Args: { p_failure_code: string; p_installation: string }
         Returns: undefined
       }
+      mark_qbo_authorization_failed: {
+        Args: {
+          p_actor: string
+          p_brewery: string
+          p_connection: string
+          p_customer?: string
+          p_expected_version: number
+          p_invoice?: string
+        }
+        Returns: boolean
+      }
       mark_square_authorization_failed: {
         Args: {
           p_actor: string
