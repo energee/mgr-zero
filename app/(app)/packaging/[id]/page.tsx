@@ -42,7 +42,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging", backHref: "/packaging" }}
+        model={{ title, backTo: "Packaging runs", backHref: "/packaging" }}
         fields={
           <>
             {E.fld("Barrels drawn", run.bbl_drawn === null ? "—" : Number(run.bbl_drawn))}
@@ -56,7 +56,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   return (
     <ClosePackagingRunView
       model={{
-        title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—",
+        title, backTo: "Packaging runs", backHref: "/packaging", brand: run.brand_name ?? "—",
         plannedOn: run.planned_on, cancelledAt: run.cancelled_at, planEditable: !run.started_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
         plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "Not recorded" : Number(o.qty_actual)]),
       }}
