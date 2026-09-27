@@ -33,6 +33,7 @@ export const schedulePackagingRun: SchedulePackagingRunViewModel = {
 export const repackCase: RepackViewModel = {
   parent: "Hazy IPA · case · 24×16oz",
   location: "Warehouse · Walk-in",
+  lot: "L-260901-HZ · 12 available",
   qty: "1",
   unit: "case",
   tape: [["−1 case · repack", "0.096774 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]],
