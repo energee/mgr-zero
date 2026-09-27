@@ -39,7 +39,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   const [tracking, setTracking] = useState("");
   const [invoiceTiming, setInvoiceTiming] = useState<"now" | "on_delivery">("now");
   const [result, setResult] = useState<ShipmentDoneViewModel | null>(null);
-  const proposed = { ...snapshot, invoiceTiming, lines: snapshot.lines.map(line => ({ ...line, qty_shipped: Number(qtys[line.id]) })) };
+  const proposed = { ...snapshot, invoiceTiming, lines: snapshot.lines.map(line => ({ ...line, qty_shipped: Number(qtys[line.id]), short_reason: reasons[line.id] || line.short_reason })) };
   const sources = <ShipmentSourcesView lines={snapshot.lines.map(line => ({
     key: line.id, name: line.skus?.name ?? "Line", qty: Number(qtys[line.id]),
     options: available.stock.filter(stock => stock.stock_id === line.sku_id).map(stock => ({
