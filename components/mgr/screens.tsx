@@ -754,7 +754,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
-    spec: "One logical row is atomic; siblings commit independently. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry returns original results; correction starts only blocked rows with a new identity. Keep the page open for retry recovery; reopening has no automatic batch recovery.",
+    spec: "One logical row is atomic; siblings commit independently. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -895,12 +895,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     name: "Unresolved requests",
-    to: { "Retry saved request": "Unresolved requests" },
+    to: { "Retry saved request": "Unresolved requests", "Discard saved request": "Unresolved requests", "Confirm discard": "Unresolved requests", "Keep saved request": "Unresolved requests" },
     job: "Recover the result of a form submission whose response was lost",
     reads: "sessionStorage [original actor, brewery, customer and frozen request]",
     writes: "none [explicit retry replays the original command identity]",
-    states: [["reload", "Saved input survives in the same browser tab"], ["edited", "Resolve the saved request before submitting changes", 1], ["other account", "Requests remain isolated to the original account and brewery", 1]],
-    spec: "Shared command forms save an unresolved request before transport. An uncertain response freezes its input and identity until exact recovery succeeds. Retry is explicit, never automatic. Invitations use the same lifecycle. CSV imports recover on Import; specialized portal, count, completion and composer recovery remain separate.",
+    states: [["reload", "Saved input survives in the same browser tab"], ["edited", "Resolve the saved request before submitting the same action on the same record", 1], ["other row", "A row action (price, invoice push, menu item, delete) on a different row proceeds"], ["discard", "After a confirming step the saved request is dropped and nothing is sent", 1], ["other account", "Requests remain isolated to the original account and brewery", 1]],
+    spec: "Shared command forms save an unresolved request before transport. A saved request blocks the same command on the same record. Row actions (prices, invoice pushes, menu items, deletes, edits to an existing row) name their row, so other rows proceed; other commands wait until the saved request is retried or discarded. A request still being sent from this tab is not listed, so it cannot be discarded mid-flight. Reads and one-time link proofs are never saved. An uncertain response freezes its input and identity until exact recovery succeeds or the user discards it. Retry is explicit, never automatic. Discard asks for confirmation, sends nothing, and tells the user to check the result first. Invitations use the same lifecycle. CSV imports recover on Import; specialized portal, count, completion and composer recovery remain separate.",
     body: <CommandRecoveryView rows={[{ requestId: "saved-request", name: "record_movement", input: { qty: 2, note: "Opening stock" }, path: "/inventory" }]} />,
   },
   {
@@ -2100,7 +2100,7 @@ export const SCREENS: Screen[] = [
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
+    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {

@@ -39,3 +39,10 @@ it("retains exact-batch recovery identity and does not claim uncertain writes fa
   expect(html).toContain("Retry same batch");
   expect(html).not.toContain("Correct blocked rows in a new batch");
 });
+
+it("offers Discard for an unresolved batch only after a confirming step (#615)", () => {
+  const unresolved = { ...importPreview, step: 3, batchId: "frozen-request", error: "Some rows may have committed" };
+  expect(renderToStaticMarkup(createElement(ImportView, { model: unresolved, onDiscard: vi.fn() }))).toContain("Discard saved request");
+  expect(renderToStaticMarkup(createElement(ImportView, { model: { ...unresolved, result: { committed: 1, blocked: 0, outcomes: [] } }, onDiscard: vi.fn() }))).not.toContain("Discard saved request");
+  expect(renderToStaticMarkup(createElement(ImportView, { model: { ...unresolved, busy: true }, onDiscard: vi.fn() }))).not.toContain("Discard saved request");
+});

@@ -22,6 +22,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
   const form = useCommandForm("upsert_sale_channel", {
     build: () => ({ ...(isEdit ? { id: channel.id } : {}), name, taxTreatment }),
     reset: () => { setName(channel?.name ?? ""); setTaxTreatment(channel?.taxTreatment ?? "taxable"); },
+    target: channel?.id,
   });
 
   return (
