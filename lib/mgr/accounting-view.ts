@@ -27,10 +27,6 @@ export type QboSyncStatus = {
 
 /** Format the three independent sync facts in the active brewery's time zone. */
 export function toQboSyncViewProps(status: QboSyncStatus, timeZone: string): QboSyncStatus {
-  return {
-    ...status,
-    latest: status.latest && { ...status.latest, at: formatDateTime(status.latest.at, timeZone) },
-    lastSuccess: status.lastSuccess && { ...status.lastSuccess, at: formatDateTime(status.lastSuccess.at, timeZone) },
-    latestFailure: status.latestFailure && { ...status.latestFailure, at: formatDateTime(status.latestFailure.at, timeZone) },
-  };
+  const local = <T extends { at: string }>(fact: T | null) => fact && { ...fact, at: formatDateTime(fact.at, timeZone) };
+  return { ...status, latest: local(status.latest), lastSuccess: local(status.lastSuccess), latestFailure: local(status.latestFailure) };
 }
