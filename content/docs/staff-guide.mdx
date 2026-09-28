@@ -876,3 +876,8 @@ The [screen explorer](/docs/screens-explore) is a drawing of MGR, including scre
 In **Settings**, Admin can see the current **Portal fulfillment warehouse**, select **Change warehouse**, choose a warehouse, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
 
 For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.
+
+
+For a material **Cycle count**, choose the location and bin and enter the counted quantity in the material's base unit. Select **Preview count** to see every affected lot, its before-and-after quantity, and the signed adjustment. Shortages use earliest best-by lots first; overages go to the newest lot. **Record count** saves exactly that reviewed allocation. A matching count still records the observation without adjustment movements.
+
+Editing the quantity or bin clears the preview. If stock or lot details change, preview again before recording. A busy stock message means another inventory operation is active; retry the preview. If recording receives no trustworthy response, the form freezes its quantity and allocation. Use **Retry unchanged count** to recover the original result. Counts do not convert rolls, cases or other purchase units, and lot allocation cannot be edited manually.

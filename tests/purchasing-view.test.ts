@@ -160,10 +160,10 @@ describe("Materials", () => {
     expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
   });
 
-  it("count keeps real bin identities, decimal input, unavailable allocation and nullable footer", () => {
+  it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {
     const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
-      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }], lotPreviewUnavailable: true },
+      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }] },
       submitting: true, messages: "Count failed", footer: null,
     }));
     expect(pick).toHaveBeenCalledWith("Bin", "bin-id", expect.arrayContaining([{ value: "bin-id", label: "Actual bin" }]), expect.anything());
@@ -171,7 +171,7 @@ describe("Materials", () => {
     expect(html).toContain('value="0.5"');
     expect(html).toContain('step="any"');
     expect(html).toContain("Count failed");
-    expect(html).toContain("Lot allocation preview");
+    expect(html).toContain("Preview count");
     expect(html).toContain("disabled");
     expect(html).not.toContain("Record count");
     expect(html).not.toContain("L-0774");
@@ -314,4 +314,30 @@ describe("New PO lines", () => {
     expect(form).toMatch(/remove: index =>/);
     expect(src("components/mgr/views/new-po.tsx")).not.toMatch(/const started\b/);
   });
+});
+
+
+it("shows exact signed lot adjustments with base units before material-count confirmation", () => {
+  const markup = htmlOf(createElement(CycleCountView, { model: {
+    material: "Hops", qty: "45", units: ["lb"], unitIndex: 0, preview: "system 60 · variance -15",
+    adjustments: [
+      { key: "lot-1", lot: "S-24", expected: 10, counted: 0, delta: -10, unit: "lb" },
+      { key: "lot-2", lot: "S-25", expected: 20, counted: 15, delta: -5, unit: "lb" },
+    ],
+  }, footer: null }));
+  expect(markup).toContain("S-24");
+  expect(markup).toContain("S-25");
+  expect(markup).toContain("-10 lb");
+  expect(markup).toContain("before 20 · after 15 lb");
+  expect(markup).not.toContain("allocation preview");
+});
+
+
+it("preserves four-decimal base quantities in the exact count preview", () => {
+  const markup = renderToStaticMarkup(createElement(CycleCountView, { model: {
+    material: "Hops", qty: "1.0001", units: ["lb"], unitIndex: 0, preview: "system 1",
+    adjustments: [{ key: "tiny", lot: "Lot tiny", expected: 1, counted: 1.0001, delta: 0.0001, unit: "lb" }],
+  } }));
+  expect(markup).toContain("after 1.0001 lb");
+  expect(markup).toContain("adjustment +0.0001 lb");
 });

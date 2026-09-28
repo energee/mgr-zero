@@ -51,6 +51,25 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "draft_purchase_order_from_requirements", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "materialIds": [ "00000000-0000-0000-0000-000000000000" ] } }'
 ```
 
+## get_material_count_preview [#get_material_count_preview]
+
+`query` · admin, warehouse, brewer
+
+Preview exact base-unit lot adjustments and the stock revision required to record a material count
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_material_count_preview", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 ## get_material_on_hand [#get_material_on_hand]
 
 `query` · admin, warehouse, brewer
@@ -206,7 +225,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Cycle count at one bin: one number per material; the count is always recorded and only the variance posts as count_adjustment movements (a shortage from the earliest best-by lots, an overage onto the newest)
+Record the previewed material count at one bin; reject changed stock and post exactly the reviewed lot adjustments
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -214,6 +233,7 @@ Cycle count at one bin: one number per material; the count is always recorded an
 | `binId` | uuid | yes |
 | `lines` | array of object | yes |
 | `countedOn` | date (YYYY-MM-DD) | no |
+| `revision` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

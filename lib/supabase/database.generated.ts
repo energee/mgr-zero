@@ -7868,6 +7868,15 @@ export type Database = {
         Args: { p_brewery: string; p_end: string; p_start: string }
         Returns: Json
       }
+      get_material_count_preview: {
+        Args: {
+          p_bin: string
+          p_brewery: string
+          p_lines: Json
+          p_location: string
+        }
+        Returns: Json
+      }
       get_pos_menu: {
         Args: { p_brewery: string; p_external_location: string }
         Returns: Json
@@ -8378,6 +8387,7 @@ export type Database = {
           p_lines: Json
           p_location: string
           p_request_id: string
+          p_revision?: string
         }
         Returns: Json
       }
