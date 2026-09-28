@@ -56,7 +56,7 @@ export function ChatDisconnect({ installationId, cleanupPending = false }: { ins
 
 export function ChatLinkedPeople({ people }: { people: ChatLinkedPerson[] }) {
   const action = useCommandAction();
-  return <ChatLinkedPeopleView people={people} backHref="/settings/chat" linkHref="/settings/chat/link" busy={action.busy} error={action.error} onUnlink={linkId => void action.run("unlink_chat_user", { linkId })} />;
+  return <ChatLinkedPeopleView people={people} backHref="/settings/chat" linkHref="/settings/chat/link" busy={action.busy} error={action.error} onUnlink={linkId => void action.run("unlink_chat_user", { linkId }, undefined, undefined, { target: linkId })} />;
 }
 
 export function ChatDisable({ installationId }: { installationId: string }) {

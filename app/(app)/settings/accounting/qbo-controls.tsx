@@ -58,7 +58,7 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
   const confirmation = pendingPush ? qboPushConfirmation(pendingPush, invoiceLabel) : null;
   const push = async (action: QboRemoteCreateAction) => {
     const newAttemptReason = action === "corrected_push" ? "corrected" : action === "repush" ? "remote_deleted" : undefined;
-    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) })) setPendingPush(null);
+    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) }, undefined, undefined, { target: invoiceId })) setPendingPush(null);
   };
   return <div className="flex flex-wrap justify-end gap-2">
     {actions.includes("fix_mapping") && <Button variant="outline" asChild><a href={`/invoices/${invoiceId}/mapping`}>Fix mapping</a></Button>}

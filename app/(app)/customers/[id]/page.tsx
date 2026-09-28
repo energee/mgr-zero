@@ -34,7 +34,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   return <CustomerView
     model={toCustomerViewProps({ customer, shipTos, portalUsers, backHref: "/customers" })}
     headerAction={edit}
-    deleteAction={brewery.role === "admin" ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} name={customer.name} redirect="/customers" /> : null}
+    deleteAction={brewery.role === "admin" ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} target={customer.id} name={customer.name} redirect="/customers" /> : null}
     detail={{
       shipTos: shipTos.map(s => ({
         key: s.id,
@@ -44,7 +44,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       })),
       addShipTo: canWrite ? <ShipToForm customerId={customer.id} /> : null,
       portalUsers: canWrite ? <InviteForm customerId={customer.id} /> : null,
-      revokePortalUser: (u) => <DeleteCommandButton control={RevokePortalUserControl} command="revoke_customer_user" input={{ customerId: customer.id, userId: u.key }} name={u.email} redirect={`/customers/${customer.id}`} />,
+      revokePortalUser: (u) => <DeleteCommandButton control={RevokePortalUserControl} command="revoke_customer_user" input={{ customerId: customer.id, userId: u.key }} target={`${customer.id}:${u.key}`} name={u.email} redirect={`/customers/${customer.id}`} />,
       kegHref: `/kegs/customers/${customer.id}`,
       ordersHref: `/orders?customerId=${customer.id}`,
     }}

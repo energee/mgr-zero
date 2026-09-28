@@ -45,7 +45,7 @@ function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: Imp
     const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
     try {
-      const saved = beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.previewRows);
+      const saved = beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, { requestId: action.requestId, previewRows: action.previewRows });
       const recovered = await command(action.expectedContext.breweryId ?? breweryId, "import_csv", saved.input, saved.requestId, action.expectedContext) as ImportResult;
       setResult(recovered);
       finishRecovery(sessionStorage, saved);

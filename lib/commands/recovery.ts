@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { CommandContextExpectation } from "./registry";
 
 const attemptSchema = z.object({
-  previewRows: z.array(z.number().int().positive()).optional(),
+  previewRows: z.array(z.number().int().positive()).optional(), target: z.string().optional(),
   requestId: z.string(), name: z.string(), input: z.unknown(), path: z.string(),
   expectedContext: z.object({ actorId: z.string(), breweryId: z.string().optional(), customerId: z.string().optional() }),
 });
@@ -25,24 +25,24 @@ function save(storage: RecoveryStorage, context: CommandContextExpectation, atte
   if (notify && typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED));
 }
 /**
- * Which saved request an input belongs to: the command plus its id fields
- * (`id`, `ids`, and every top-level key ending in `Id` or `Ids`), sorted.
- * Ids name the record a command changes, so another record proceeds while an
- * edit to the same record (a changed note or price) waits for recovery.
+ * Which saved request a submit belongs to: the command plus the row it acts on.
+ * Only a caller that runs one command against several existing rows (a price
+ * cell, an invoice push, a menu item, a delete) passes `target`; ids inside a
+ * create's input are choices, not the record, so without a target the lock
+ * stays per command and a changed submit cannot become a duplicate.
  */
-export function recoveryKey(name: string, input: unknown) {
-  const ids = input && typeof input === "object" ? Object.entries(input).filter(([key]) => /^ids?$|Ids?$/.test(key)).sort(([a], [b]) => a.localeCompare(b)) : [];
-  return JSON.stringify([name, ids]);
+export function recoveryKey(name: string, target?: string) {
+  return JSON.stringify([name, target ?? null]);
 }
 /** Save before sending: a reload during fetch is also an unknown outcome. */
-export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, requestId = crypto.randomUUID(), previewRows?: number[]): RecoveryAttempt {
+export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId = crypto.randomUUID(), previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): RecoveryAttempt {
   const attempts = readRecoveries(storage, context);
-  const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.input) === recoveryKey(name, input));
+  const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.target) === recoveryKey(name, target));
   if (previous) {
     if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
     return previous;
   }
-  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId, name, input, path, expectedContext: context, previewRows })));
+  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId, name, input, path, expectedContext: context, previewRows, target })));
   save(storage, context, [...attempts, attempt], false);
   return attempt;
 }

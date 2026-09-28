@@ -194,7 +194,7 @@ it.each([200, 403])("isolates concurrent commands on one page when the second re
   expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
 });
 
-it("keeps an unknown outcome on one record from blocking the same command on another record (#615)", async () => {
+it("keeps an unknown outcome on one targeted row from blocking the same command on another row (#615)", async () => {
   const requests: { requestId: string; input: { invoiceId: string } }[] = [];
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
     const request = JSON.parse(init.body);
@@ -205,13 +205,13 @@ it("keeps an unknown outcome on one record from blocking the same command on ano
   let action!: ReturnType<typeof useCommandAction>;
   function Harness() { action = useCommandAction(); return null; }
   renderToStaticMarkup(createElement(Harness));
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a" })).toBe(false);
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-b" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a" }, undefined, undefined, { target: "invoice-a" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-b" }, undefined, undefined, { target: "invoice-b" })).toBe(false);
   expect(requests.map(request => request.input.invoiceId)).toEqual(["invoice-a", "invoice-b"]);
   expect(requests[1].requestId).not.toBe(requests[0].requestId);
   // B's definitive rejection clears B only; A's unknown outcome stays saved.
   expect(readRecoveries(sessionStorage, renderedContext).map(attempt => attempt.input)).toEqual([{ invoiceId: "invoice-a" }]);
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a", memo: "edited" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a", memo: "edited" }, undefined, undefined, { target: "invoice-a" })).toBe(false);
   expect(requests).toHaveLength(2);
 });
 

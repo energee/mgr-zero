@@ -11,7 +11,7 @@ export function CommandRecoveryView({ rows, busy, error, onRetry, onDiscard }: {
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!rows.length && !error) return null;
   return <section aria-label="Unresolved requests" className="space-y-3 rounded-xl border p-4">
-    {E.note("An earlier request may have completed. Retry its saved input before submitting changes to that record. Recovery stays in this browser tab across reloads; nothing is sent automatically.")}
+    {E.note("An earlier request may have completed. Retry or discard it before submitting that action again. Recovery stays in this browser tab across reloads; nothing is sent automatically.")}
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {rows.map(row => <div key={row.requestId} className="space-y-2">
       <p>{sentenceCase(row.name.replace(/^upsert_/, "save_"))} · {row.path}</p>
