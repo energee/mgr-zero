@@ -913,7 +913,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Orders",
-    to: { Pick: "Pick", Finish: "Order", "Put back": "Put back" },
+    to: { Open: "Order", Pick: "Pick", Finish: "Order", "Put back": "Put back" },
     job: "Find every order by state and take its next valid action",
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",

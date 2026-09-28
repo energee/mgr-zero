@@ -23,13 +23,26 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
 
 describe("Orders list view loop", () => {
+  it.each([
+    ["sales", ["Finish", "Confirm", "Open", "Open", "Open", "Open", "Open"]],
+    ["warehouse", ["Open", "Open", "Pick", "Ship", "Put back", "Open", "Open"]],
+    ["admin", ["Finish", "Confirm", "Pick", "Ship", "Put back", "Open", "Open"]],
+  ])("offers only authorized actions for %s", (role, verbs) => {
+    const states = ["draft", "submitted", "confirmed", "picked", "picked", "shipped", "cancelled"] as const;
+    const rows = toOrdersListViewProps({ role, orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
+    expect(rows.map(r => r.verb)).toEqual(verbs);
+    for (const [i, row] of rows.entries()) {
+      expect(row.href).toBe(`/orders/${i}${row.verb === "Confirm" ? "/confirm" : row.verb === "Put back" ? "/restock" : ""}`);
+    }
+  });
+
   it("maps list_orders-shaped rows through nextAction", () => {
     const model = toOrdersListViewProps(ordersWorkList);
     expect(model.subtitle).toBe("sales default");
-    expect(model.rows.map((r) => r.verb)).toEqual(["Confirm", "Put back", "Pick", "Finish"]);
+    expect(model.rows.map((r) => r.verb)).toEqual(["Confirm", "Open", "Open", "Finish"]);
     expect(model.rows[0]?.title).toMatch(/^ORD-0231 ·/);
     expect(model.rows[1]?.warning).toBe(true);
-    expect(model.rows[1]?.verb).toBe("Put back");
+    expect(model.rows[1]?.verb).toBe("Open");
   });
 
   it("names an empty filtered list without inventing rows", () => {
@@ -50,8 +63,8 @@ describe("Orders list view loop", () => {
     expect(html("Orders")).toMatch(/>Orders</);
     expect(html("Orders")).toMatch(/>New order</);
     expect(html("Orders")).toMatch(/>Confirm</);
-    expect(html("Orders")).toMatch(/>Put back</);
-    expect(html("Orders")).toMatch(/>Pick</);
+    expect(html("Orders")).not.toMatch(/>Put back</);
+    expect(html("Orders")).not.toMatch(/>Pick</);
     expect(html("Orders")).toMatch(/>Finish</);
   });
 

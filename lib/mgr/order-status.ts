@@ -15,7 +15,9 @@ const ACTION: Record<OrderStatus, [string, ActionTone, string]> = {
 };
 
 /** The verb a staff list offers on this order, and where it goes. */
-export function nextAction(status: OrderStatus, needsRestock: boolean, id: string): { verb: string; tone: ActionTone; href: string } {
+export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, role: string): { verb: string; tone: ActionTone; href: string } {
+  const canAct = role === "admin" || ((status === "draft" || status === "submitted") ? role === "sales" : role === "warehouse");
+  if (!canAct) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
   if (status === "picked" && needsRestock) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
   const [verb, tone, path] = ACTION[status];
   return { verb, tone, href: `/orders/${id}${path}` };
