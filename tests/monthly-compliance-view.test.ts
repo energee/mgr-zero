@@ -57,7 +57,7 @@ it("exports the same retained facts and never invents an export for an older fil
   const model = toMonthlyComplianceViewProps(monthlyComplianceAugust);
   expect(model.stateExport?.facts.map(row => row.sourceId)).toContain("shipment-PA");
   expect(model.stateRows.find(row => row[0] === "PA")?.at(-1)).toBe("$24,600.00");
-  const legacy = { ...monthlyComplianceAugust, report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, stateTransactions: undefined, stateTotals: undefined } } };
+  const legacy = { ...monthlyComplianceAugust, report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, stateTransactions: undefined } } };
   expect(toMonthlyComplianceViewProps(legacy).stateExport).toBeUndefined();
   expect(htmlOf(createElement(MonthlyComplianceView, { model }))).toContain("Export state transactions");
 });

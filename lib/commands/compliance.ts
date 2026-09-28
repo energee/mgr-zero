@@ -75,9 +75,10 @@ defineQuery({
 
 export type ReportLine = { class: "keg" | "can" | "bottle"; begin: number; in: number; out: number; end: number };
 export type StateTransaction = { state: string; kind: string; eventDate: string; sourceId: string; originalSourceId: string | null; volumeBbl: number; salesCents: number; sourceStatus: string };
+/** Per-state sums of the facts; computed by destinationStateTotals, not returned by the report. */
 export type StateTotal = { state: string; volumeBbl: number; outwardBbl: number; returnedBbl: number; adjustmentBbl: number; invoicedCents: number; creditedCents: number; salesCents: number };
 export type Report = {
-  figures: { stateTransactions?: StateTransaction[]; stateTotals?: StateTotal[]; jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
+  figures: { stateTransactions?: StateTransaction[]; jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
   warnings: string[];
   externalMappingRequired: string[];
 };
@@ -96,7 +97,7 @@ const positiveBblNumber = z.number().finite().positive()
 const exactPositiveBbl = z.union([positiveBblText, positiveBblNumber]);
 
 defineQuery({
-  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts with reconciled volume and beer-sales totals; nothing is stored",
+  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored",
   roles: [...ROLES], input: period,
   handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
 });

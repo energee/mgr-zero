@@ -1,4 +1,5 @@
 import type { Filing, LossReview, Report, StateTransaction } from "@/lib/commands/compliance";
+import { destinationStateTotals } from "./destination-state-export";
 import { money } from "./money";
 import { sentenceCase } from "./labels";
 
@@ -62,7 +63,7 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     packaged: bbl(figures.packaged),
     removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
     cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: exactBbl(value) })),
-    stateRows: (figures.stateTotals ?? []).map(row => [row.state, exactBbl(row.outwardBbl), exactBbl(row.returnedBbl), exactBbl(row.adjustmentBbl), exactBbl(row.volumeBbl), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
+    stateRows: destinationStateTotals(figures.stateTransactions ?? []).map(row => [row.state, exactBbl(row.outwardBbl), exactBbl(row.returnedBbl), exactBbl(row.adjustmentBbl), exactBbl(row.volumeBbl), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
     stateExport: figures.stateTransactions ? { periodStart: figures.periodStart, periodEnd: figures.periodEnd, facts: figures.stateTransactions } : undefined,
     byState: Object.entries(figures.byState).map(([key, value]) => ({ key, title: `Taxpaid to ${key}`, bbl: bbl(value) })),
   };

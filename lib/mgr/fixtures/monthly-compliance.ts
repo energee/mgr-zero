@@ -23,10 +23,6 @@ export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
         { state: "OH", kind: "sale_removal", eventDate: "2026-08-16", sourceId: "shipment-OH", originalSourceId: null, volumeBbl: 3.1, salesCents: 0, sourceStatus: "posted" },
         { state: "PA", kind: "invoice", eventDate: "2026-08-15", sourceId: "invoice-PA", originalSourceId: null, volumeBbl: 0, salesCents: 2460000, sourceStatus: "live" },
       ],
-      stateTotals: [
-        { state: "OH", volumeBbl: 3.1, outwardBbl: 3.1, returnedBbl: 0, adjustmentBbl: 0, invoicedCents: 0, creditedCents: 0, salesCents: 0 },
-        { state: "PA", volumeBbl: 38.1, outwardBbl: 38.1, returnedBbl: 0, adjustmentBbl: 0, invoicedCents: 2460000, creditedCents: 0, salesCents: 2460000 },
-      ],
       byState: { PA: 38.1, OH: 3.1 },
     },
     warnings: [],
