@@ -51,7 +51,7 @@ export function brewPlanActuals(plan: BrewPlan, volume: number, sources: BrewMat
 }
 
 export function canRecordBrewDay(model: BrewDayViewModel) {
-  if (model.recorded || model.cancelledAt || !model.vessels.some(vessel => vessel.id === model.vesselId) || !Number.isFinite(Number(model.initialBbl)) || Number(model.initialBbl) <= 0 || !model.brewedOn) return false;
+  if (model.recorded || model.cancelled || !model.vessels.some(vessel => vessel.id === model.vesselId) || !Number.isFinite(Number(model.initialBbl)) || Number(model.initialBbl) <= 0 || !model.brewedOn) return false;
   if (model.correctionRecordId && !model.correctionReason?.trim()) return false;
   const actuals = model.actuals ?? [];
   if (!actuals.length) return Boolean(model.confirmEmpty);
