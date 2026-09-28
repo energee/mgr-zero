@@ -4,7 +4,7 @@
 // action for its state (po-actions.tsx): Mark sent on a draft, Receive on a
 // sent or partially received one.
 import { ReceiptView } from "@/components/mgr/views/receipt";
-import { toPostedReceiptViewProps } from "@/lib/mgr/receipt-view";
+import { toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -19,7 +19,8 @@ type Po = {
   id: string; po_no: number; vendor_id: string; status: string; ordered_on: string | null; expected_on: string | null;
   sent_via: string | null; note: string | null; vendor: { name: string; email: string | null } | null;
   lines: PoLine[];
-  receipts: { id: string; received_on: string; receipt_lines: { po_line_id: string; qty_expected: number; qty_counted: number; variance: number; lot_id?: string | null }[] }[];
+  receipts: ReceiptSnapshot[];
+  correction_receipt: ReceiptSnapshot | null; correction_lines: PoLine[];
 };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -33,12 +34,17 @@ function statusLine(po: Po) {
   return `${sent}${expected}${po.status === "partially_received" ? " · partially received" : po.status === "received" ? " · received" : ""}`;
 }
 
-export default async function PurchaseOrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ receipt?: string }> }) {
+export default async function PurchaseOrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ receipt?: string; correctReceipt?: string }> }) {
   const { id } = await params;
-  const { receipt } = await searchParams;
+  const { receipt, correctReceipt } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const po = await orNotFound(runCommand("get_purchase_order", { poId: id }, ctx)) as Po;
+  const po = await orNotFound(runCommand("get_purchase_order", { poId: id, correctionReceiptId: correctReceipt }, ctx)) as Po;
+  if (correctReceipt && po.correction_receipt) {
+    return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
+      lines={po.correction_lines} locations={[]} bins={[]} today={po.correction_receipt.received_on}
+      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${po.correction_receipt.received_on}`, backHref: `/purchase-orders/${po.id}?receipt=${encodeURIComponent(correctReceipt)}` }} />;
+  }
   if (receipt) {
     const model = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`);
     if (!model) notFound();
@@ -49,11 +55,11 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
     history: po.receipts.map(receipt => ({
-      key: receipt.id, label: `Received ${receipt.received_on}`, href: `/purchase-orders/${po.id}?receipt=${encodeURIComponent(receipt.id)}`,
+      key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: `/purchase-orders/${po.id}?receipt=${encodeURIComponent(receipt.id)}`,
       detail: receipt.receipt_lines.map(count => {
         const line = po.lines.find(line => line.id === count.po_line_id);
         const variance = Number(count.variance);
-        return `${line?.material?.name ?? "line"} ${count.qty_counted}${variance === 0 ? "" : variance > 0 ? ` (over ${variance})` : ` (short ${-variance})`}`;
+        return `${count.material_name ?? line?.material?.name ?? "line"} ${count.qty_counted}${variance === 0 ? "" : variance > 0 ? ` (over ${variance})` : ` (short ${-variance})`}`;
       }).join(" · "),
     })),
   }} />;

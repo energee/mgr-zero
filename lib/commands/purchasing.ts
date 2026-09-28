@@ -190,15 +190,29 @@ defineCommand({
   })),
 });
 
+const receiptCountLine = z.object({
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
+  lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
+});
+
+defineCommand({
+  name: "correct_purchase_receipt",
+  description: "Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically",
+  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), lines: z.array(receiptCountLine).min(1) }),
+  roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
+    p_brewery: ctx.breweryId, p_receipt: i.receiptId, p_reason: i.reason,
+    p_lines: i.lines.map(l => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
+    p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "receive_purchase_order",
   description: "Count what arrived against a sent purchase order at one bin: receipt, lines (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts",
   input: z.object({
     poId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), receivedOn: isoDate.optional(),
-    lines: z.array(z.object({
-      poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
-      lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
-    })).min(1),
+    lines: z.array(receiptCountLine).min(1),
   }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("receive_purchase_order", {
@@ -234,24 +248,38 @@ defineQuery({
 // knows which lines ask for a lot; receipts list what has posted so far.
 defineQuery({
   name: "get_purchase_order", description: "One purchase order with vendor, lines (ordered, received so far, still open), and its receipts",
-  input: z.object({ poId: z.string().uuid() }), roles: [...PO_ROLES],
+  input: z.object({ poId: z.string().uuid(), correctionReceiptId: z.string().uuid().optional() }), roles: [...PO_ROLES],
   handler: async (ctx, i) => {
     const [po, lines, balances, receipts] = await Promise.all([
       unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
       unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("brewery_id", ctx.breweryId).eq("po_id", i.poId)),
       unwrap(ctx.db.from("po_open_balances").select("po_line_id, qty_received, qty_open").eq("po_id", i.poId)),
-      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id)").eq("po_id", i.poId).order("received_on")),
+      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
     ]);
     if (!po) throw new CommandError("purchase order not found", 404, "not_found");
     const balance = new Map((balances ?? []).map((b) => [b.po_line_id as string, b]));
     const { vendors, ...header } = po;
+    const correction = i.correctionReceiptId ? receipts?.find(receipt => receipt.id === i.correctionReceiptId) : null;
+    if (i.correctionReceiptId && !correction) throw new CommandError("receipt not found", 404, "not_found");
     return {
       ...header, vendor: vendors as unknown as { name: string; email: string | null } | null,
       lines: (lines ?? []).map(({ materials, ...l }) => ({
         ...l, qty_ordered: Number(l.qty_ordered), material: materials as unknown as { name: string; purchase_uom: string; purchase_uom_factor: number; base_uom: string; lot_tracked: boolean } | null,
         qty_received: Number(balance.get(l.id as string)?.qty_received ?? 0), qty_open: Number(balance.get(l.id as string)?.qty_open ?? l.qty_ordered),
       })),
-      receipts: receipts ?? [],
+      correction_receipt: correction ?? null,
+      correction_lines: correction?.receipt_lines.map(count => {
+        const line = lines?.find(line => line.id === count.po_line_id);
+        return { ...line, qty_counted: Number(count.qty_counted), recorded_best_by: count.lot_best_by,
+          qty_received: Number(balance.get(count.po_line_id)?.qty_received ?? 0), qty_open: Math.max(Number(line?.qty_ordered ?? 0) - (Number(balance.get(count.po_line_id)?.qty_received ?? 0) - Number(count.qty_counted)), 0),
+          expected_lot_code: count.lot_code,
+          material: { name: count.material_name ?? "Original material name not captured", purchase_uom: count.purchase_uom ?? "purchase units",
+            purchase_uom_factor: count.purchase_uom_factor, base_uom: count.base_uom, lot_tracked: Boolean(line?.materials?.lot_tracked) },
+        };
+      }) ?? [],
+      receipts: (receipts ?? []).map(receipt => ({ ...receipt,
+        corrected_by_receipt_id: receipts?.find(next => next.corrects_receipt_id === receipt.id)?.id ?? null,
+      })),
     };
   },
 });

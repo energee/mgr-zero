@@ -20,6 +20,7 @@ export type ReceivePoViewModel = {
   tape?: [string, string][];
   info?: string;
   state?: string;
+  correctionReason?: string;
   note?: string;
   locationId?: string;
   binId?: string;

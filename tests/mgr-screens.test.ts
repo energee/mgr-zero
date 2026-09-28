@@ -325,6 +325,7 @@ describe("SCREENS", () => {
 
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
+      "Correct receipt",
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",

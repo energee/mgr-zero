@@ -196,7 +196,7 @@ import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
-  newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -1796,13 +1796,23 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders" },
+    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt" },
     job: "What posted after a receive, including over, short and what is still owed",
     reads: "get_purchase_order [ordered less counted per line]",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
     body: <ReceiptView model={receiptPoCountryMalt} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Correct receipt",
+    to: { "Correct receipt": "Receipt" },
+    job: "Correct an unused receipt without erasing its original facts",
+    reads: "get_purchase_order [frozen receipt quantities, units and lot facts]",
+    writes: "correct_purchase_receipt [exact material reversal and immutable replacement receipt in one transaction]",
+    states: [["permission", "warehouse or admin", 1], ["ready", "reason and corrected counts"], ["blocked", "subsequent stock use or shared lot metadata prevents correction", 1], ["stale", "receipt already replaced; open its latest revision", 1], ["success", "replacement receipt and current balance"]],
+    spec: "Reuse Receive PO fields with a required correction reason and the original receiving location. Preserve the original receipt, append exact reversal movements, and record replacement counted quantities and lot facts. Only the latest revision contributes to the PO balance. Used stock and shared lot metadata can prevent correction; no generic stock adjustment bypass is offered.",
+    body: <ReceivePoView model={correctReceiptCountryMalt} />,
   },
   {
     step: 7,
