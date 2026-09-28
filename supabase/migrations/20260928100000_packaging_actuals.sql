@@ -7,7 +7,7 @@ create table public.packaging_material_records (
   unique(id,brewery_id),
   foreign key(run_id,brewery_id) references public.packaging_runs(id,brewery_id),
   foreign key(corrects_id,brewery_id) references public.packaging_material_records(id,brewery_id),
-  check ((corrects_id is null and correction_reason is null) or (corrects_id is not null and length(trim(correction_reason))>0))
+  check ((corrects_id is null and correction_reason is null) or (corrects_id is not null and correction_reason is not null and length(trim(correction_reason))>0))
 );
 create unique index packaging_material_records_original on public.packaging_material_records(run_id) where corrects_id is null;
 create index packaging_material_records_run on public.packaging_material_records(brewery_id,run_id,created_at);
