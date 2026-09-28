@@ -22,6 +22,7 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
   const form = useCommandForm("upsert_ship_to", {
     build: () => ({ ...fields, id: shipTo?.id, customerId, address2: fields.address2 || undefined, state: fields.state.toUpperCase() }),
     reset: () => setFields(initial),
+    target: shipTo?.id,
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Ship-to form"
