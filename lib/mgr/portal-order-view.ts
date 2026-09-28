@@ -53,6 +53,7 @@ export type PortalOrderSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_shipped: number | null;
+    qty_refused?: number;
     short_reason?: string | null;
     unit_price_cents: number;
     skus: { name: string } | null;
@@ -102,9 +103,9 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
       return {
         key: l.id,
         name: l.skus?.name ?? "Item",
-        detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}` : `ordered ${ordered}`,
+        detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}${l.qty_refused ? ` · refused ${l.qty_refused} · accepted ${shipped - l.qty_refused}` : ""}` : `ordered ${ordered}`,
         amount: money(Number(l.unit_price_cents) * qty),
-        warning: shipped !== null && shipped < ordered,
+        warning: Boolean(l.qty_refused) || (shipped !== null && shipped < ordered),
       };
     }),
     adjusted: events.some((e) => e.event === "lines_adjusted")

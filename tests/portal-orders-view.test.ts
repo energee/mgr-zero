@@ -188,3 +188,10 @@ describe("inventory and live portal orders", () => {
     expect(detail).not.toMatch(/from "@\/components\/mgr\/e"/);
   });
 });
+
+
+it("shows refused and accepted quantities on portal order lines", () => {
+  const model = toPortalOrderViewProps({ ...portalOrderShipped, lines: portalOrderShipped.lines.map((l) => ({ ...l, qty_shipped: 4, qty_refused: 2 })) });
+  expect(model.lines[0].detail).toContain("refused 2 · accepted 2");
+  expect(model.lines[0].warning).toBe(true);
+});

@@ -38,6 +38,7 @@ const TODAY_VERB: Record<TodayItem["reason"], [string, NonNullable<TodayRowView[
   pick_due: ["Pick", "info"],
   restock_due: ["Put back", "attention"],
   delivery_next: ["Resume", "info"],
+  refused_return: ["Check in", "attention"],
   fermentation_reading_overdue: ["Record", "info"],
   invoice_question: ["Answer", "info"],
 };

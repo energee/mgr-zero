@@ -15,12 +15,13 @@ export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "ro
 export type WorkRow = { kind: WorkKind; id: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
-  submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
+  submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", refused_return: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
 };
 /** The verb and tone each Today reason offers; Today and Work read the same table. */
 export const TODAY_VERB: Record<TodayItem["reason"], [string, WorkRow["tone"]]> = {
   submitted_order: ["Confirm", "success"], pick_due: ["Pick", "info"], restock_due: ["Put back", "attention"],
-  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"], invoice_question: ["Answer", "info"],
+  delivery_next: ["Resume", "info"],
+  refused_return: ["Check in", "attention"], fermentation_reading_overdue: ["Record", "info"], invoice_question: ["Answer", "info"],
 };
 
 /** The Work chips a role opens by default; an explicit chip choice is remembered on the client. */

@@ -47,7 +47,9 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
           stops: route.stops.map((s) => ({
             key: s.id,
             title: `Stop ${s.stop_no} · ${s.label}`,
-            detail: s.delivered_at ? `delivered ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
+            outstanding: s.outstanding_qty,
+            returnHref: `/work/deliveries/${s.id}/return`,
+            detail: s.delivered_at ? `${s.outcome ?? "delivered"} ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
           })),
         }}
         action={action}
@@ -65,7 +67,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
         stops: route.stops.map((s) => {
           const isNext = s.id === next?.id;
           if (s.delivered_at) {
-            return { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `delivered ${formatTime(s.delivered_at, brewery.timeZone)}`, trailing: "done", ok: true };
+            return { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${s.outcome ?? "delivered"} ${formatTime(s.delivered_at, brewery.timeZone)}`, trailing: s.outstanding_qty ? `${s.outstanding_qty} awaiting check-in` : "done", verb: s.outstanding_qty ? "Check in" : undefined, href: s.outstanding_qty ? `/work/deliveries/${s.id}/return` : undefined, ok: !s.outstanding_qty, warning: Boolean(s.outstanding_qty) };
           }
           return {
             key: s.id,

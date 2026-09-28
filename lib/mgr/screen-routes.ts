@@ -183,6 +183,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Route", file: "app/(app)/routes/[id]/page.tsx", additionalFiles: ["app/(app)/routes/new/page.tsx"] },
   { name: "Return route", file: "app/(app)/routes/[id]/page.tsx" },
   { name: "Driver route", file: "app/(app)/routes/[id]/page.tsx" },
+  { name: "Check in refused beer", file: "app/(app)/work/deliveries/[id]/return/page.tsx" },
   { name: "Confirm delivery", file: "app/(app)/work/deliveries/[id]/page.tsx" },
   { name: "Sale channels", file: "app/(app)/settings/channels/page.tsx" },
   { name: "Channel", file: "app/(app)/settings/channels/page.tsx" },

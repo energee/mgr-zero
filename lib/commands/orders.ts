@@ -93,10 +93,18 @@ defineCommand({
 });
 
 defineCommand({
-  name: "confirm_delivery", description: "Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock",
+  name: "confirm_delivery", description: "Close a stop with accepted and refused quantities; invoice only accepted goods on delivery, never restore stock",
   roles: [...warehouseRoles], requiresConfirmation: true,
-  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().min(1) }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", { p_delivery: i.deliveryId, p_signed_by: i.signedBy, p_request_id: execution.requestId })),
+  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().optional(),
+    refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive() })).default([]),
+    reason: z.enum(["customer_refused", "closed", "damaged", "wrong_item", "other"]).optional(),
+    note: z.string().optional(), transferRefused: z.boolean().default(false),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", {
+    p_delivery: i.deliveryId, p_signed_by: i.signedBy ?? "", p_request_id: execution.requestId,
+    p_refused: i.refused.map((l) => ({ order_line_id: l.orderLineId, qty: l.qty })),
+    p_reason: i.reason ?? null, p_note: i.note ?? null, p_transfer_refused: i.transferRefused,
+  })),
 });
 
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
@@ -383,9 +391,11 @@ defineQuery({
 export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
 defineQuery({
   name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
-  roles: [...salesRoles], input: z.object({ invoiceId: z.string().uuid() }),
+  roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional() }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
   handler: async (ctx, i) => {
-    const invoice = await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single());
+    const invoice = i.deliveryId
+      ? await unwrap(ctx.db.from("deliveries").select("shipment_id").eq("id", i.deliveryId).eq("brewery_id", ctx.breweryId).single())
+      : await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId!).eq("brewery_id", ctx.breweryId).single());
     if (!invoice?.shipment_id) return [];
     const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
     if (!shipment) throw new Error("Shipment not found");
