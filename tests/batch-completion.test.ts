@@ -32,7 +32,7 @@ async function brew(initialBbl: number, startedAt = "2026-09-01T00:00:00Z") {
   const batch = await runCommand("schedule_batch", {
     intendedBrandId: brandId, plannedOn: "2026-09-01", plannedBbl: initialBbl,
   }, ctx) as { id: string };
-  const day = await runCommand("record_brew_day", {
+  const day = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true,
     batchId: batch.id, vesselId: vessel.id, initialBbl, brewedOn: "2026-09-01",
   }, ctx) as { occupancy: { id: string } };
   sql(`update vessel_occupancies set started_at = '${startedAt}' where id = '${day.occupancy.id}'`, true);

@@ -36,7 +36,7 @@ async function brewInto(vesselName: string, brand: string | null, bbl: number, o
   const batch = (await runCommand("schedule_batch",
     { plannedOn: on, plannedBbl: bbl, ...(brand ? { intendedBrandId: brand } : {}) }, ctx)) as { id: string };
   const day = (await runCommand("record_brew_day",
-    { batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn: on }, ctx)) as {
+    { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn: on }, ctx)) as {
       occupancy: { id: string };
     };
   return { occupancyId: day.occupancy.id, batchId: batch.id, vesselId: vessel.id };
@@ -286,7 +286,7 @@ describe("what the brewhouse still has to brew", () => {
     const batch = (await runCommand("schedule_batch",
       { plannedOn: today, plannedBbl: 25, intendedBrandId: cat.brandId }, freshCtx)) as { id: string };
     await runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: today }, freshCtx);
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: today }, freshCtx);
 
     const after = sql(
       `select round(supply_bbl,3), round(brew_bbl,3)
@@ -912,7 +912,7 @@ describe("packaging refuses other tenants and other roles", () => {
     const batch = (await runCommand("schedule_batch",
       { intendedBrandId: otherBrandId, plannedOn: "2026-11-02", plannedBbl: 20 }, otherCtx)) as { id: string };
     otherOccupancyId = ((await runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-11-02" }, otherCtx)) as {
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-11-02" }, otherCtx)) as {
         occupancy: { id: string };
       }).occupancy.id;
   });
