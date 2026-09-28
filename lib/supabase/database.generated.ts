@@ -4672,33 +4672,66 @@ export type Database = {
       }
       receipt_lines: {
         Row: {
+          base_uom: Database["public"]["Enums"]["uom"] | null
           brewery_id: string
+          cost_order_id: string | null
+          cost_recorded_at: string | null
           id: string
+          lot_best_by: string | null
+          lot_code: string | null
           lot_id: string | null
+          lot_received_on: string | null
+          material_id: string | null
+          material_name: string | null
           movement_id: string | null
           po_line_id: string
+          purchase_unit_cost_cents: number | null
+          purchase_uom: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor: number | null
           qty_counted: number
           qty_expected: number
           receipt_id: string
           variance: number | null
         }
         Insert: {
+          base_uom?: Database["public"]["Enums"]["uom"] | null
           brewery_id: string
+          cost_order_id?: string | null
+          cost_recorded_at?: string | null
           id?: string
+          lot_best_by?: string | null
+          lot_code?: string | null
           lot_id?: string | null
+          lot_received_on?: string | null
+          material_id?: string | null
+          material_name?: string | null
           movement_id?: string | null
           po_line_id: string
+          purchase_unit_cost_cents?: number | null
+          purchase_uom?: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor?: number | null
           qty_counted: number
           qty_expected: number
           receipt_id: string
           variance?: number | null
         }
         Update: {
+          base_uom?: Database["public"]["Enums"]["uom"] | null
           brewery_id?: string
+          cost_order_id?: string | null
+          cost_recorded_at?: string | null
           id?: string
+          lot_best_by?: string | null
+          lot_code?: string | null
           lot_id?: string | null
+          lot_received_on?: string | null
+          material_id?: string | null
+          material_name?: string | null
           movement_id?: string | null
           po_line_id?: string
+          purchase_unit_cost_cents?: number | null
+          purchase_uom?: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor?: number | null
           qty_counted?: number
           qty_expected?: number
           receipt_id?: string
@@ -4717,6 +4750,13 @@ export type Database = {
             columns: ["lot_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "material_lots"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "receipt_lines_material_id_brewery_id_fkey"
+            columns: ["material_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
             referencedColumns: ["id", "brewery_id"]
           },
           {
@@ -4751,27 +4791,39 @@ export type Database = {
       }
       receipts: {
         Row: {
+          bin_id: string | null
           brewery_id: string
+          correction_reason: string | null
+          corrects_receipt_id: string | null
           created_at: string
           id: string
+          location_id: string | null
           note: string | null
           po_id: string
           received_by: string
           received_on: string
         }
         Insert: {
+          bin_id?: string | null
           brewery_id: string
+          correction_reason?: string | null
+          corrects_receipt_id?: string | null
           created_at?: string
           id?: string
+          location_id?: string | null
           note?: string | null
           po_id: string
           received_by: string
           received_on?: string
         }
         Update: {
+          bin_id?: string | null
           brewery_id?: string
+          correction_reason?: string | null
+          corrects_receipt_id?: string | null
           created_at?: string
           id?: string
+          location_id?: string | null
           note?: string | null
           po_id?: string
           received_by?: string
@@ -4779,11 +4831,32 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "receipts_bin_id_location_id_brewery_id_fkey"
+            columns: ["bin_id", "location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id", "location_id", "brewery_id"]
+          },
+          {
             foreignKeyName: "receipts_brewery_id_fkey"
             columns: ["brewery_id"]
             isOneToOne: false
             referencedRelation: "breweries"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_corrects_receipt_id_brewery_id_po_id_fkey"
+            columns: ["corrects_receipt_id", "brewery_id", "po_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id", "brewery_id", "po_id"]
+          },
+          {
+            foreignKeyName: "receipts_location_id_brewery_id_fkey"
+            columns: ["location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "brewery_id"]
           },
           {
             foreignKeyName: "receipts_po_id_brewery_id_fkey"
@@ -7899,6 +7972,16 @@ export type Database = {
           p_brewery: string
           p_reason: string
           p_record: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      correct_purchase_receipt: {
+        Args: {
+          p_brewery: string
+          p_lines: Json
+          p_reason: string
+          p_receipt: string
           p_request_id: string
         }
         Returns: Json

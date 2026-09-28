@@ -1,7 +1,7 @@
 # Purchase receipt corrections (#647)
 
-Status: technically reviewed. Implementation follows #622 and #623 on
-main. Migration reservation: `20260928110000`–`20260928115959`.
+Status: technically reviewed. Implementation stacks on #622 with explicit
+user approval; it shares the material compensation contract. Migration reservation: `20260928110000`–`20260928115959`.
 
 ## Existing owners and v1 cross-check
 
