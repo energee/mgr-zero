@@ -53,6 +53,7 @@ export type PortalOrderSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_shipped: number | null;
+    qty_refused?: number;
     short_reason?: string | null;
     unit_price_cents: number;
     skus: { name: string } | null;
@@ -65,6 +66,7 @@ export type PortalOrderSnapshot = {
   }[];
   shipment: {
     id: string;
+    invoice_timing?: "now" | "on_delivery";
     invoices: {
       id: string;
       invoice_no: number | null;
@@ -98,13 +100,13 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const shipped = l.qty_shipped === null ? null : Number(l.qty_shipped);
-      const qty = shipped ?? ordered;
+      const qty = shipped !== null && shipment?.invoice_timing === "on_delivery" ? shipped - Number(l.qty_refused ?? 0) : shipped ?? ordered;
       return {
         key: l.id,
         name: l.skus?.name ?? "Item",
-        detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}` : `ordered ${ordered}`,
+        detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}${l.qty_refused ? ` · refused ${l.qty_refused} · accepted ${shipped - l.qty_refused}` : ""}` : `ordered ${ordered}`,
         amount: money(Number(l.unit_price_cents) * qty),
-        warning: shipped !== null && shipped < ordered,
+        warning: Boolean(l.qty_refused) || (shipped !== null && shipped < ordered),
       };
     }),
     adjusted: events.some((e) => e.event === "lines_adjusted")

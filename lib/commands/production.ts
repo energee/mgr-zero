@@ -258,22 +258,77 @@ defineCommand({
   })),
 });
 
+const brewActual = z.object({
+  materialId: z.string().uuid(), recipeIngredientId: z.string().uuid().optional(), stage: z.enum(INGREDIENT_STAGES),
+  locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable().optional(),
+  qty: z.number().positive().multipleOf(0.0001),
+});
+const brewProcess = processInput.extend({
+  boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
+  spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
+});
+function brewActualRows(actuals: z.infer<typeof brewActual>[]) {
+  return actuals.map(a => ({ material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null, stage: a.stage,
+    location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty }));
+}
+
+defineQuery({
+  name: "get_brew_day_plan", description: "Pinned recipe plan and available exact material sources for actual brew-day confirmation",
+  roles: ["admin", "brewer"], input: z.object({ batchId: z.string().uuid() }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_brew_day_plan", { p_brewery: ctx.breweryId, p_batch: i.batchId })),
+});
+defineQuery({
+  name: "get_brew_record", description: "Frozen brew record revisions and their confirmed source-linked material additions",
+  roles: ["admin", "brewer"], input: z.object({ batchId: z.string().uuid() }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_brew_record", { p_brewery: ctx.breweryId, p_batch: i.batchId })),
+});
+
 // One call: it stamps batches.brewed_on and opens the vessel occupancy that
 // makes the beer findable. Brewing into a vessel whose occupancy overlaps the
 // brew day is refused — including a backdated day that falls inside a stretch
 // the vessel was full but has since been emptied.
 defineCommand({
-  name: "record_brew_day", description: "Record that a scheduled batch was brewed: stamps the brew date and moves it into a vessel that is not already occupied",
+  name: "record_brew_day", description: "Record actual ingredient sources, confirmed process and a frozen brew sheet with the batch date and knockout occupancy",
   input: z.object({
     batchId: z.string().uuid(),
     vesselId: z.string().uuid(),
     initialBbl: z.number().positive(),
-    brewedOn: isoDate,
+    brewedOn: isoDate, actuals: z.array(brewActual).optional(), process: brewProcess.optional(), confirmEmpty: z.boolean().optional(),
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_brew_day", {
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId,
+    p_actuals: i.actuals && brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty,
     p_initial_bbl: i.initialBbl, p_brewed_on: i.brewedOn, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "correct_brew_record", description: "Correct an unused brew record with linked material reversals, replacement actuals and a measurement delta",
+  input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), initialBbl: z.number().positive().multipleOf(0.001),
+    actuals: z.array(brewActual), process: brewProcess.default({}), confirmEmpty: z.boolean().default(false) }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_brew_record", {
+    p_brewery: ctx.breweryId, p_record: i.recordId, p_reason: i.reason, p_initial_bbl: i.initialBbl,
+    p_actuals: brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "cancel_batch", description: "Cancel an unstarted batch plan; retains history and refuses recorded physical work",
+  input: z.object({ batchId: z.string().uuid() }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "reschedule_batch", description: "Reschedule an unstarted batch plan; retains history and refuses recorded physical work",
+  input: z.object({ batchId: z.string().uuid(), plannedOn: isoDate }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reschedule_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_planned_on: i.plannedOn, p_request_id: execution.requestId,
   })),
 });
 
@@ -282,7 +337,7 @@ defineCommand({
 // embeds through the composite foreign keys read far less clearly than this.
 type BatchRow = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
-  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null;
+  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null;
   completion_adjustment_id: string | null; note: string | null;
 };
 
@@ -339,7 +394,7 @@ defineQuery({
   input: z.object({ readings: z.boolean().optional().describe("Add each open occupancy's latest fermentation reading") }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batches = (await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, completion_adjustment_id, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as BatchRow[];
     if (batches.length === 0) return [];
 
@@ -364,7 +419,7 @@ defineQuery({
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, cancelled_at, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
     return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId)?.[0] ?? null };

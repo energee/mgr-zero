@@ -1,31 +1,29 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
-import { paymentTermLabel, PAYMENT_TERM_LABEL, sentenceCase } from "./labels";
-import { TAX_TREATMENTS } from "./tax-treatments";
+import { paymentTermLabel, sentenceCase } from "./labels";
+
+/** The stored values the shared Customer detail form edits and saves. */
+export type CustomerEditValues = { name: string; type: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
 
 export type CustomerViewModel = {
   backHref?: string;
   name: string;
   state: string;
   type: string;
-  typeOptions: string[];
   license: string;
   terms: string;
-  termsOptions: string[];
   channel: string;
-  channelOptions: string[];
+  /** Sale channels the edit form offers, by id. */
+  channelOptions: { id: string; name: string }[];
   taxTreatment: string;
-  taxOptions: string[];
+  /** Stored values seeding the edit form, built from the raw row, not the labels above. */
+  editValues: CustomerEditValues;
   shipTos: string;
-  /** Buyers with portal access, by email. */
+  /** Buyers with portal access, by email; `key` is the portal user's userId. */
   portalUsers: { key: string; email: string }[];
   kegBalance: string;
   orders: string;
 };
-
-const TYPES = ["Retailer", "Distributor"];
-const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
-const TAX = ["Inherit from channel", ...TAX_TREATMENTS.map(sentenceCase)];
 
 function titleType(type: string): string {
   if (type === "retailer") return "Retailer";
@@ -41,10 +39,13 @@ export type CustomerSnapshot = {
     state: string;
     license_no: string | null;
     payment_terms: string | null;
+    sale_channel_id: string;
     sale_channels: { name: string } | null;
     tax_treatment?: string | null;
   };
   shipTos: { label: string }[];
+  /** list_sale_channels rows. */
+  channels: { id: string; name: string }[];
   /** list_customer_users rows. */
   portalUsers?: { userId: string; email: string }[];
   kegs?: { out: number; depositCents: number };
@@ -55,6 +56,7 @@ export type CustomerSnapshot = {
 export function toCustomerViewProps({
   customer,
   shipTos,
+  channels,
   portalUsers,
   kegs,
   orders,
@@ -66,14 +68,15 @@ export function toCustomerViewProps({
     name: customer.name,
     state: customer.state,
     type: titleType(customer.type),
-    typeOptions: TYPES,
     license: customer.license_no ?? "",
     terms: customer.payment_terms ? paymentTermLabel(customer.payment_terms) : "",
-    termsOptions: Object.values(PAYMENT_TERM_LABEL),
     channel: customer.sale_channels?.name ?? "",
-    channelOptions: CHANNELS,
+    channelOptions: channels,
     taxTreatment: tax,
-    taxOptions: TAX,
+    editValues: {
+      name: customer.name, type: customer.type, state: customer.state, saleChannelId: customer.sale_channel_id,
+      licenseNumber: customer.license_no ?? "", paymentTerms: customer.payment_terms ?? "net30", taxTreatment: customer.tax_treatment ?? "",
+    },
     shipTos: shipTos.map((s) => s.label).join(" · ") || "none",
     portalUsers: (portalUsers ?? []).map((u) => ({ key: u.userId, email: u.email })),
     kegBalance: kegs

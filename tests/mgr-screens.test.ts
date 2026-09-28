@@ -32,9 +32,11 @@ const body = (name: string) => {
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
-  it("gives brew day the sheet to follow and no new capture", () => {
+  it("gives brew day its pinned sheet and explicit actual confirmation", () => {
     const brew = text("Brew day");
-    expect(brew).toMatch(/Brew sheet · Hazy IPA v4/);
+    expect(brew).toMatch(/Pinned recipe plan/);
+    expect(brew).toMatch(/Confirm actual ingredients/);
+    expect(brew).toMatch(/Confirmed process observations/);
     expect(brew).not.toMatch(/Actual mash|Mash actual/i);
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
@@ -216,7 +218,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(192);
+    expect(SCREENS).toHaveLength(197);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -323,7 +325,8 @@ describe("SCREENS", () => {
 
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
+      "Correct receipt",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
@@ -350,6 +353,8 @@ describe("SCREENS", () => {
       for (const [, tag, link] of html.matchAll(/(<a [^>]*>)(.*?)<\/a>/g)) {
         if (/href="https:\/\//.test(tag)) continue;
         const target = tag.match(/data-to="([^"]*)"/)?.[1] ?? link.replace(/<[^>]*>/g, "");
+        // Provider navigation stays inert in inventory fixtures; live views receive the verified URL.
+        if (target === "Open in QuickBooks" && /href="#"/.test(tag)) continue;
         expect.soft(
           screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
           `${s.name}: unresolved back target ${target}`,
@@ -867,10 +872,16 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO"]) {
+    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
-    for (const s of SCREENS) expect.soft(renderToStaticMarkup(createElement("div", null, s.body)), s.name).not.toMatch(/type="date"/);
+    for (const s of SCREENS) {
+      // DatePicker keeps a non-tabbable hidden input for native required validation.
+      for (const [input] of html(s.name).matchAll(/<input[^>]*type="date"[^>]*>/g)) {
+        expect.soft(input, s.name).toContain('class="sr-only"');
+        expect.soft(input, s.name).toContain('tabindex="-1"');
+      }
+    }
     // No ToggleGroup is left with a single option.
     for (const s of SCREENS) {
       const groups = renderToStaticMarkup(createElement("div", null, s.body)).match(/data-slot="toggle-group"[\s\S]*?(?=data-slot="toggle-group"|$)/g) ?? [];

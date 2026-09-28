@@ -23,8 +23,8 @@ export function buildReturnLines(lines: ReturnLine[], qtys: Record<string, strin
   }));
 }
 
-export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locations, sources, bins }: {
-  invoiceId: string; invoiceNo: number | null; shipmentId: string | null;
+export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDeliveryId, refusedQuantities, lines, locations, sources, bins }: {
+  invoiceId: string; invoiceNo: number | null; shipmentId: string | null; refusedDeliveryId?: string; refusedQuantities?: Record<string, number>;
   lines: (ReturnLine & { unitPriceCents: number })[];
   locations: { id: string; name: string }[]; sources: ReturnSource[];
   bins: { id: string; name: string; location_id: string }[];
@@ -40,13 +40,13 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, lines, locati
   const returningBeer = beerLines.some(line => Number(qtys[line.id]) > 0);
   const disabled = !reason || !locationId || (shipmentId !== null && returningBeer && !binId) || !lines.some(line => Number(qtys[line.id]) > 0);
   const model = toReturnCreditViewProps({
-    invoice: { invoice_no: invoiceNo }, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
-    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
+    invoice: { invoice_no: invoiceNo }, refusedDeliveryId, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
+    lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returnable: refusedQuantities && line.kind === "sku" ? refusedQuantities[line.skuId] ?? 0 : undefined, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
   });
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     if (busy || disabled) return;
-    void run("return_shipment", { invoiceId, locationId, reason, lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId) },
+    void run("return_shipment", { invoiceId, refusedDeliveryId, locationId, reason, lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId) },
       () => router.push(`/invoices/${invoiceId}`));
   }}>
     <ReturnCreditView model={model} quantities={qtys} onQuantity={(id, value) => setQtys(prev => ({ ...prev, [id]: value }))}

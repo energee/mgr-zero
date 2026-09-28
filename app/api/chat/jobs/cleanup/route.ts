@@ -2,11 +2,11 @@
 // Chat SDK state tables (locks, cache, lists, queues; never subscriptions)
 // through the restricted pool. Bearer-authenticated internal job.
 import { NextResponse } from "next/server";
-import { authorizeJob } from "@/lib/chat/job-auth";
+import { authorizeJob } from "@/lib/jobs/auth";
 import { cleanupChatState } from "@/lib/chat/jobs";
 
 export async function POST(request: Request) {
-  if (!authorizeJob(request)) return NextResponse.json({ ok: false }, { status: 401 });
+  if (!authorizeJob(request, process.env.CHAT_JOB_SECRET)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     return NextResponse.json({ ok: true, ...(await cleanupChatState()) });
   } catch (e) {

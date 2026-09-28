@@ -12,3 +12,8 @@ export function stepQuantity(value: string, direction: -1 | 1, min = -Infinity, 
  *  cleared field must not submit as an explicit zero (#433). */
 export const isNumber = (s: string) => s.trim() !== "" && Number.isFinite(Number(s));
 export const isPositive = (s: string) => Number(s) > 0;
+
+/** Material quantities are numeric with 4 decimals in the database; add and
+ *  compare them as integer ten-thousandths so float sums never drift. */
+export const toTicks = (qty: number) => Math.round(qty * 10000);
+export const fromTicks = (ticks: number) => ticks / 10000;

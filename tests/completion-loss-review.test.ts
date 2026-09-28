@@ -1,3 +1,4 @@
+import { closeWithConfirmedMaterials } from "./packaging-fixture";
 import { rawDatabase } from "./raw-database";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
@@ -51,7 +52,7 @@ async function exactCompletion() {
   const batch = await runCommand("schedule_batch", {
     intendedBrandId: brandId, plannedOn: fixtureDate, plannedBbl: 1,
   }, brewerCtx) as { id: string };
-  const brewed = await runCommand("record_brew_day", {
+  const brewed = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true,
     batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: fixtureDate,
   }, brewerCtx) as { occupancy: { id: string } };
   const run = await runCommand("schedule_packaging_run", {
@@ -59,7 +60,7 @@ async function exactCompletion() {
     outputs: [{ skuId, qtyPlanned: 1 }],
   }, brewerCtx) as { id: string };
   await runCommand("update_packaging_run", { runId: run.id, startedAt: `${fixtureDate}T00:00:00Z` }, brewerCtx);
-  await runCommand("close_packaging_run", {
+  await closeWithConfirmedMaterials({
     runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }],
     lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);
@@ -98,7 +99,7 @@ describe("completion loss review", () => {
     const batch = await runCommand("schedule_batch", {
       intendedBrandId: brandId, plannedOn: futureStart, plannedBbl: 1,
     }, futureBrewer) as { id: string };
-    await runCommand("record_brew_day", {
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true,
       batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: futureStart,
     }, futureBrewer);
     const completed = await runCommand("complete_batch", { batchId: batch.id }, futureBrewer) as { adjustmentId: string; closedAt: string };

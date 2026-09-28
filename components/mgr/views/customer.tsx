@@ -1,14 +1,23 @@
-// components/mgr/views/customer.tsx — Customer detail drawing. Inventory
-// paints edits + Save. Live passes a detail slot for flds + ship-tos with
-// CustomerForm in the header and ShipToForm rows in that slot, and the
-// InviteForm and Remove access verbs for the portal users the model lists.
-import type { ReactNode } from "react";
+"use client";
+
+// Customer detail shares inline account and trading-term edits. Live supplies
+// persisted values, permission, command callbacks, and authorized activity slots.
+import { useState, useId, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { CommandFormMessage } from "@/components/mgr/command-form";
+import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
+import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E } from "@/components/mgr/e";
-import type { CustomerViewModel } from "@/lib/mgr/customer-view";
+import type { CustomerEditValues, CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
-export type { CustomerViewModel };
+export type { CustomerEditValues, CustomerViewModel };
+
+const TYPE_OPTIONS = CUSTOMER_TYPES.map(value => ({ value, label: sentenceCase(value) }));
+const TERMS_OPTIONS = PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] }));
+const TAX_OPTIONS = [{ value: "", label: "Inherit from channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
 
 export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
@@ -17,43 +26,48 @@ export type CustomerDetailSlot = {
   ordersHref?: string;
   /** Live sales/admin: InviteForm. `null` hides the whole Portal users section. */
   portalUsers?: ReactNode;
-  /** Live sales/admin: the Remove access verb for one portal user row. */
-  revokePortalUser?: (user: { key: string; email: string }) => ReactNode;
+  /** Live sales/admin: the Remove access verb per portal user, keyed by userId
+   *  (the model's portalUsers `key`). A map, not a callback, because this view
+   *  is a client component and the page renders the verbs on the server. */
+  revokePortalUser?: Record<string, ReactNode>;
 };
 
 export function CustomerView({
   model,
-  headerAction,
   footer,
   detail,
   deleteAction,
+  canWrite = true, busy = false, error = null, onSave,
 }: {
   model: CustomerViewModel;
-  headerAction?: ReactNode;
   footer?: ReactNode;
-  /** Live: flds + ship-tos. Inventory omits this and draws the edit tree. */
+  /** Live activity and access controls around the shared edit fields. */
   detail?: CustomerDetailSlot;
   deleteAction?: ReactNode;
+  canWrite?: boolean;
+  busy?: boolean;
+  error?: string | null;
+  onSave?: (values: CustomerEditValues) => void;
 }) {
+  const formId = useId();
+  const [values, setValues] = useState(model.editValues);
+  const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: value })) });
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
   return (
     <div className="@container flex min-w-0 flex-col gap-6 [&_[data-slot=item]]:rounded-none [&_[data-slot=item]]:border-0 [&_[data-slot=item]]:border-b [&_[data-slot=item]]:px-0">
       <header className="[&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
-        {E.back("Customers", model.name, headerAction, model.backHref)}
+        {E.back("Customers", model.name, undefined, model.backHref)}
       </header>
       <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
           <section aria-label="Account details" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
-            {detail ? <div className="divide-y">
-              {E.fld("Type", model.type)}
-              {E.fld("State", model.state)}
-              {E.fld("License number", model.license || "Not provided")}
-            </div> : <div className="flex flex-col gap-4">
-              {E.edit("Customer name", model.name)}
-              {E.pick("Type", model.type, model.typeOptions)}
-              {E.edit("License number", model.license)}
-            </div>}
+            <div className="flex flex-col gap-4">
+              {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true })}
+              {E.pick("Type", values.type, TYPE_OPTIONS, controls("type"))}
+              {E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
+              {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
+            </div>
           </section>
           <section aria-label="Ship-tos" className="py-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -81,7 +95,7 @@ export function CustomerView({
             </div>
             {model.portalUsers.length ? <div className="flex flex-col gap-3">
               {model.portalUsers.map(u => <div key={u.key}>
-                {E.row(u.email, "", detail ? detail.revokePortalUser?.(u) : <RevokePortalUserControl name={u.email} />)}
+                {E.row(u.email, "", detail ? detail.revokePortalUser?.[u.key] : <RevokePortalUserControl name={u.email} />)}
               </div>)}
             </div> : <p className="py-6 text-sm font-medium">No portal users yet</p>}
           </section>}
@@ -89,15 +103,11 @@ export function CustomerView({
         <div className="flex min-w-0 flex-col gap-6">
           <section aria-label="Trading terms" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
-            {detail ? <div className="divide-y">
-              {E.fld("Sale channel", model.channel)}
-              {E.fld("Terms", model.terms || "Not provided")}
-              {E.fld("Tax treatment", model.taxTreatment)}
-            </div> : <div className="flex flex-col gap-4">
-              {E.pick("Sale channel", model.channel, model.channelOptions)}
-              {E.pick("Terms", model.terms, model.termsOptions)}
-              {E.pick("Tax treatment", model.taxTreatment, model.taxOptions)}
-            </div>}
+            <div className="flex flex-col gap-4">
+              {E.pick("Sale channel", values.saleChannelId, model.channelOptions.map(channel => ({ value: channel.id, label: channel.name })), { ...controls("saleChannelId"), required: true })}
+              {E.pick("Terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
+              {E.pick("Tax treatment", values.taxTreatment, TAX_OPTIONS, controls("taxTreatment"))}
+            </div>
           </section>
           <section aria-label="Customer activity" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-semibold">Customer activity</h2>
@@ -106,7 +116,10 @@ export function CustomerView({
           </section>
         </div>
       </div>
-      {footer !== undefined ? footer : (detail ? null : <div className="flex justify-end">{E.btn("Save customer")}</div>)}
+      <form id={formId} onSubmit={event => { event.preventDefault(); onSave?.(values); }}>
+        <CommandFormMessage error={error} />
+        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end"><Button disabled={busy}>{busy ? "Saving…" : "Save customer"}</Button></div> : null}
+      </form>
       {removal && <section aria-label="Delete customer" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
         <div>
           <h2 className="text-sm font-medium">Delete customer</h2>

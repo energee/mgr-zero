@@ -41,6 +41,7 @@ never copy it into a second place.
 | `components/mgr/views/`, `lib/mgr/*-view.ts`, `lib/mgr/fixtures/` | Shared screen drawings, their pure command-payload adapters, and inventory snapshots. Live pages supply existing controlled forms and explicit links; undefined slots keep fixture defaults, null suppresses them. Adapters preserve missing domain facts and do not give fixture frames live route destinations. `lib/mgr/screen-routes.ts` anchors routed screens at their public `page.tsx` entries, then parity checks follow thin adapters to the shared drawing; header/dialog-only screens name their mounted component. |
 | `lib/mgr/page-query.ts` | Staff server-page query adapter: checks the registry's actual role permission before reading and redirects denied deep links to the existing No access screen. Dedicated mutation pages call its permission guard without executing a write. API/command authorization stays in the registry/RPC. |
 | `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
+| `lib/email/jobs.ts`, `lib/email/transport.ts` | Buyer order-confirmation delivery. The confirmation transaction snapshots linked customer users and order facts in private delivery rows. Only the email job service boundary leases and finishes those rows; it sends immutable Resend requests within their deduplication window. `get_order_email_status` exposes tenant-authorized Admin/Sales diagnostics. |
 | `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. Service access is limited to integration state: OAuth/link lifecycle, callback receipts and action intents, occurrence scan/fan-out, delivery leases/results, App Home reads, destination proofs, and `chat_sdk` cleanup; it never executes domain commands or impersonates staff. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
@@ -152,7 +153,7 @@ a gap to close, not a convention to trust.
    permissive policy.
 4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
    `lib/supabase/invites.ts`, `lib/supabase/provision.ts`, `lib/supabase/public-menu.ts`,
-   and `lib/chat/jobs.ts`.**
+   `lib/chat/jobs.ts`, and `lib/email/jobs.ts`.**
    The token boundary is the sole credential path: each operation admits only its named roles,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
@@ -184,6 +185,10 @@ a gap to close, not a convention to trust.
    service-only function accepts an opaque public id and returns location name,
    safe labels, prices, serving sizes, and availability for rows
    explicitly published to the website. It cannot expose tenant or provider ids.
+   `lib/email/jobs.ts` may call only `lease_order_emails` and
+   `finish_order_email`. These service-only RPCs expose frozen confirmation
+   deliveries, check recipient membership, and require the current lease token
+   when recording provider outcomes. The job cannot execute domain commands.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one
@@ -258,9 +263,11 @@ a gap to close, not a convention to trust.
   its own brewery; a failed request never blocks a new one. A `pending_auth`
   row older than 15 minutes for that email is marked failed before the next
   claim inserts, so a crash between claim and completion doesn't block the
-  email forever (#580). Existing Auth
-  emails are refused; attaching existing
-  accounts needs a separate consent workflow. Team, first-run, and customer detail
+  email forever (#580). Existing Auth accounts receive a pending-consent invitation.
+  The signed-in recipient accepts through the identity-bound pre-tenant command;
+  acceptance rechecks expiry, confirmed email and current inviter authority.
+  Completed replay never restores revoked membership; a new invitation does.
+  Team, first-run, and customer detail
   share the command recovery lifecycle: frozen input and request identity survive
   reloads in the same browser tab, scoped to the original actor and tenant.
 - **CSV exemption stops between logical rows.** `import_csv` may continue after

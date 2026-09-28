@@ -2,11 +2,11 @@
 // active chat installation for new/stale occurrences and creates deliveries.
 // Never posts messages. Bearer-authenticated internal job (CHAT_JOB_SECRET).
 import { NextResponse } from "next/server";
-import { authorizeJob } from "@/lib/chat/job-auth";
+import { authorizeJob } from "@/lib/jobs/auth";
 import { runChatScan } from "@/lib/chat/jobs";
 
 export async function POST(request: Request) {
-  if (!authorizeJob(request)) return NextResponse.json({ ok: false }, { status: 401 });
+  if (!authorizeJob(request, process.env.CHAT_JOB_SECRET)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     return NextResponse.json({ ok: true, ...(await runChatScan()) });
   } catch (e) {

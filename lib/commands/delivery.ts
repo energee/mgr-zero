@@ -30,7 +30,7 @@ defineCommand({
 type ShipmentRow = { id: string; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: { label: string } | null } | null };
 type TransferRow = { id: string; transfer_no: number | null; to_location: { name: string } | null };
 type RouteRow = { id: string; name: string | null; delivery_date: string; driver_user_id: string | null; vehicle: string | null; note: string | null; departed_at: string | null; returned_at: string | null };
-export type DeliveryRow = { id: string; route_id: string; stop_no: number; delivered_at: string | null; shipment_id: string | null; stock_transfer_id: string | null };
+export type DeliveryRow = { id: string; route_id: string; stop_no: number; outcome?: string | null; outstanding_qty?: number; delivered_at: string | null; shipment_id: string | null; stock_transfer_id: string | null };
 /** A document a stop can deliver, with its one line of copy: "ORD-0012 · Ridgeline · Dock" / "TRF-0003 · Storage". */
 export type StopDoc = { id: string; label: string; kind: "shipment" | "transfer" };
 
@@ -63,15 +63,20 @@ defineQuery({
       breweryToday(ctx),
     ]);
     const routeIds = routes.map((r) => r.id);
-    const deliveries = await inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
+    const [deliveries, outstanding] = await Promise.all([inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
       .select(`*, shipments(id, ${SHIPMENT_LABEL}), stock_transfers(id, ${TRANSFER_LABEL})`, { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).in("route_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<StopRow[]>);
+      .eq("brewery_id", ctx.breweryId).in("route_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<StopRow[]>),
+    inChunks(routeIds, (chunk) => completeRows("Route returns", (start) => ctx.db.from("refused_delivery_returns")
+      .select("delivery_id, outstanding_qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("route_id", chunk).gt("outstanding_qty", 0)
+      .order("order_line_id").range(start, start + PAGE_SIZE - 1)))]);
+    const outstandingByStop = new Map<string | null, number>();
+    for (const r of outstanding) outstandingByStop.set(r.delivery_id, (outstandingByStop.get(r.delivery_id) ?? 0) + Number(r.outstanding_qty));
     deliveries.sort((a, b) => a.stop_no - b.stop_no);
     return {
       routes: routes.map((r) => ({
         ...r,
         stops: deliveries.filter((d) => d.route_id === r.id).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
-          ...d, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
+          ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),
       unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
@@ -87,17 +92,17 @@ defineQuery({
   input: z.object({ deliveryId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
-      .select("id, stop_no, delivered_at, signed_by, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
+      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
     const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string } } | null; stock_transfers: { id: string } | null };
     // lines are {id, name, qty} whichever document the stop delivers
     if (shipments) {
       const [lines, invoice] = await Promise.all([
-        rows<{ id: string; qty_shipped: number; skus: { name: string } | null }>(ctx.db.from("order_lines").select("id, qty_shipped, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
+        rows<{ id: string; qty_shipped: number; qty_refused: number; skus: { name: string } | null }>(ctx.db.from("order_lines").select("id, qty_shipped, qty_refused, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
         unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle()),
       ]);
-      return { delivery, lines: lines.map((l) => ({ id: l.id, name: l.skus?.name ?? "Line", qty: Number(l.qty_shipped) })), invoice };
+      return { delivery, lines: lines.map((l) => ({ id: l.id, name: l.skus?.name ?? "Line", qty: Number(l.qty_shipped), refused: Number(l.qty_refused) })), invoice };
     }
     const picked = await rows<{ id: string; qty_picked: number | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }>(
       ctx.db.from("stock_transfer_lines").select("id, qty_picked, skus(name), materials(name), keg_pools(name)").eq("transfer_id", stock_transfers!.id));
@@ -114,7 +119,30 @@ defineCommand({
 });
 
 defineCommand({
-  name: "return_route", description: "Stamp the route's return as its driver or an admin, once it has departed and every stop is delivered",
+  name: "return_route", description: "Stamp the route's return as its driver or an admin, once it has departed and every stop has an outcome",
   roles: [...ROLES], input: routeInput,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_route", { p_route: i.routeId, p_request_id: execution.requestId })),
+});
+
+defineCommand({
+  name: "check_in_refused_return", description: "Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",
+  roles: [...ROLES],
+  input: z.object({ deliveryId: z.string().uuid(), locationId: z.string().uuid(), lines: z.array(z.object({
+    orderLineId: z.string().uuid(), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().int().positive(), damaged: z.boolean() })).min(1),
+  })).min(1) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("check_in_refused_return", {
+    p_delivery: i.deliveryId, p_location: i.locationId, p_request_id: execution.requestId,
+    p_lines: i.lines.map((l) => ({ order_line_id: l.orderLineId, sources: l.sources.map((s) => ({ movement_id: s.movementId, bin_id: s.binId, qty: s.qty, damaged: s.damaged })) })),
+  })),
+});
+
+defineQuery({
+  name: "list_refused_returns", description: "Outstanding refused beer, including returned routes, awaiting physical check-in or Return and credit",
+  roles: [...READ], input: z.object({ deliveryId: z.string().uuid().optional(), routeId: z.string().uuid().optional() }),
+  handler: (ctx, i) => completeRows("Refused beer", (start) => {
+    let q = ctx.db.from("refused_delivery_returns").select("*", { count: "exact" }).eq("brewery_id", ctx.breweryId).gt("outstanding_qty", 0);
+    if (i.deliveryId) q = q.eq("delivery_id", i.deliveryId);
+    if (i.routeId) q = q.eq("route_id", i.routeId);
+    return q.order("order_line_id").range(start, start + PAGE_SIZE - 1);
+  }),
 });
