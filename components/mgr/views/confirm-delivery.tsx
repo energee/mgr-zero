@@ -5,6 +5,11 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
+import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+
+const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
+  customer_refused: "Customer refused", closed: "Closed / no access", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
+};
 
 export type { ConfirmDeliveryViewModel };
 
@@ -52,7 +57,7 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
       {E.fld("Accepted", String(Number(l.qty) - (refused[l.key] ?? 0)))}
     </Fragment>)}
     {hasRefusal && <>
-      {E.pick("Refusal reason", reason, [{ value: "customer_refused", label: "Customer refused" }, { value: "closed", label: "Closed / no access" }, { value: "damaged", label: "Damaged in transit" }, { value: "wrong_item", label: "Wrong item" }, { value: "other", label: "Other" }], { onChange: setReason, required: true })}
+      {E.pick("Refusal reason", reason, REFUSAL_REASONS.map((value) => ({ value, label: REFUSAL_LABEL[value] })), { onChange: setReason, required: true })}
       {E.edit("Refusal note", note, "text", undefined, { onChange: setNote, required: reason === "other" })}
       {E.note("Refused beer closes on this order. Stock returns only after a physical check-in. Redelivery needs a new order.")}
     </>}

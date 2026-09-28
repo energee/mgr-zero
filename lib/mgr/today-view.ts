@@ -31,9 +31,9 @@ const SUBJECT_ICON: Record<TodayItem["subjectType"], TodayIcon> = {
   invoice: "invoice",
 };
 
-/** Same table as TODAY_VERB in lib/commands/landings.ts — kept here so the
- *  inventory import of this adapter does not register commands. */
-const TODAY_VERB: Record<TodayItem["reason"], [string, NonNullable<TodayRowView["tone"]>]> = {
+/** The verb and tone each Today reason offers. Today and Work (lib/commands/landings.ts)
+ *  both read this table; it lives here so the inventory import does not register commands. */
+export const TODAY_VERB: Record<TodayItem["reason"], [string, "info" | "attention" | "success"]> = {
   submitted_order: ["Confirm", "success"],
   pick_due: ["Pick", "info"],
   restock_due: ["Put back", "attention"],

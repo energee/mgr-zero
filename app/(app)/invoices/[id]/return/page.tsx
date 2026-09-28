@@ -29,9 +29,11 @@ export default async function ReturnPage({ params, searchParams }: { params: Pro
   if (invoice.kind !== "invoice") redirect(`/invoices/${invoice.id}`);
   let refusedQuantities: Record<string, number> | undefined;
   if (refusedDeliveryId) {
-    const stop = await orNotFound(runPageQuery("get_delivery_stop", { deliveryId: refusedDeliveryId }, ctx)) as { invoice: { id: string } | null };
+    const [stop, outstanding] = await Promise.all([
+      orNotFound(runPageQuery("get_delivery_stop", { deliveryId: refusedDeliveryId }, ctx)) as Promise<{ invoice: { id: string } | null }>,
+      runPageQuery("list_refused_returns", { deliveryId: refusedDeliveryId }, ctx) as Promise<{ sku_id: string; outstanding_qty: number }[]>,
+    ]);
     if (stop.invoice?.id !== invoice.id) notFound();
-    const outstanding = await runPageQuery("list_refused_returns", { deliveryId: refusedDeliveryId }, ctx) as { sku_id: string; outstanding_qty: number }[];
     refusedQuantities = Object.fromEntries(outstanding.map(line => [line.sku_id, Number(line.outstanding_qty)]));
   }
   return <CreditMemoForm refusedDeliveryId={refusedDeliveryId} refusedQuantities={refusedQuantities} invoiceId={invoice.id} invoiceNo={invoice.invoice_no} shipmentId={invoice.shipment_id}

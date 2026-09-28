@@ -7,6 +7,7 @@ import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, t
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
+import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
@@ -97,7 +98,7 @@ defineCommand({
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().optional(),
     refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive() })).default([]),
-    reason: z.enum(["customer_refused", "closed", "damaged", "wrong_item", "other"]).optional(),
+    reason: z.enum(REFUSAL_REASONS).optional(),
     note: z.string().optional(), transferRefused: z.boolean().default(false),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", {

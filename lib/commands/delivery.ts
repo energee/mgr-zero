@@ -63,18 +63,20 @@ defineQuery({
       breweryToday(ctx),
     ]);
     const routeIds = routes.map((r) => r.id);
-    const deliveries = await inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
+    const [deliveries, outstanding] = await Promise.all([inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
       .select(`*, shipments(id, ${SHIPMENT_LABEL}), stock_transfers(id, ${TRANSFER_LABEL})`, { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).in("route_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<StopRow[]>);
-    const outstanding = await inChunks(routeIds, (chunk) => completeRows("Route returns", (start) => ctx.db.from("refused_delivery_returns")
+      .eq("brewery_id", ctx.breweryId).in("route_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<StopRow[]>),
+    inChunks(routeIds, (chunk) => completeRows("Route returns", (start) => ctx.db.from("refused_delivery_returns")
       .select("delivery_id, outstanding_qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("route_id", chunk).gt("outstanding_qty", 0)
-      .order("order_line_id").range(start, start + PAGE_SIZE - 1)));
+      .order("order_line_id").range(start, start + PAGE_SIZE - 1)))]);
+    const outstandingByStop = new Map<string | null, number>();
+    for (const r of outstanding) outstandingByStop.set(r.delivery_id, (outstandingByStop.get(r.delivery_id) ?? 0) + Number(r.outstanding_qty));
     deliveries.sort((a, b) => a.stop_no - b.stop_no);
     return {
       routes: routes.map((r) => ({
         ...r,
         stops: deliveries.filter((d) => d.route_id === r.id).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
-          ...d, outstanding_qty: outstanding.filter((r) => r.delivery_id === d.id).reduce((sum, r) => sum + Number(r.outstanding_qty), 0), label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
+          ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),
       unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
@@ -121,7 +123,6 @@ defineCommand({
   roles: [...ROLES], input: routeInput,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_route", { p_route: i.routeId, p_request_id: execution.requestId })),
 });
-
 
 defineCommand({
   name: "check_in_refused_return", description: "Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",

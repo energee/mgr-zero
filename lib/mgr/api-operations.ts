@@ -36,7 +36,7 @@ export const API_AREAS = [
   { slug: "catalog", title: "Catalog & pricing", match: /^(?!get_inventory_sku$)(?!set_pos_price_override$).*(product|sku|brand|price|catalog_categor|sale_channel|sales_channel)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_|format|repack|occupanc)/ },
   { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|tap_history|replenishment)/ },
-  { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart)|^(check_in_refused_return|list_refused_returns)$/ },
+  { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart|refused)/ },
   { slug: "orders", title: "Orders & invoicing", match: /(order|invoice|pick|allocation|credit_memo|restock)/ },
   { slug: "customers", title: "Customers", match: /^(?!set_qbo_customer_mapping$).*(customer|ship_to|portal_fulfillment)/ },
   { slug: "inventory", title: "Inventory & locations", match: /^(?!list_pos_locations$)(?!set_pos_location_mapping$)(?!.*_invitation$).*(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
