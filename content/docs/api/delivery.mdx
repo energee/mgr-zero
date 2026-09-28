@@ -5,8 +5,10 @@ description: "Routes, stops, departure, delivery and return."
 
 A route groups a driver's shipped orders and picked stock transfers into one
 run. It is built, saved, departed, and returned. Each stop is confirmed as
-delivered along the way, and `return_route` refuses until every stop on the
-route has been confirmed delivered.
+closed with `confirm_delivery` along the way (delivered, partly refused, or
+fully refused), and `return_route` refuses until every stop on the route has
+an outcome. Refused beer stays outstanding until `check_in_refused_return`
+puts it back, even after the route has returned.
 
 {/* ops:delivery */}
 
