@@ -1,4 +1,4 @@
-import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
+import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { toInvoiceListRow, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -13,7 +13,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const ctx = await buildContext(brewery.id);
   const canManage = brewery.role === "admin" || brewery.role === "sales";
   const [records, health] = await Promise.all([
-    runCommand("list_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, ctx) as Promise<(InvoiceListRecord & HistoryRow)[]>,
+    runCommand("list_invoices", { cursor }, ctx) as Promise<HistoryPage<InvoiceListRecord & HistoryRow>>,
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<{ connected: boolean; state: string; realmLabel: string | null }> : null,
   ]);
   const page = historyPage(records, "/invoices", cursor);

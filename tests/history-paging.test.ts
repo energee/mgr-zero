@@ -31,12 +31,15 @@ for (const name of ["list_orders", "list_invoices", "portal_orders", "portal_inv
   it(`${name} traverses tied timestamps without duplicates and keeps customer scope`, async () => {
     const ctx = name.startsWith("portal") ? buyer : staff;
     const input = name.startsWith("portal") ? {} : { customerId, ...(name === "list_orders" ? { status: "draft" } : {}) };
-    const first = await runCommand(name, { ...input, limit: 50 }, ctx) as Row[];
-    expect(first.map(row => row.id)).toEqual(ids.toReversed().slice(0, 50));
-    const last = first.at(-1)!;
-    const next = await runCommand(name, { ...input, limit: 50, cursor: `${last.created_at}~${last.id}` }, ctx) as Row[];
-    expect(next.map(row => row.id)).toEqual(ids.toReversed().slice(50));
-    expect([...first, ...next].every(row => row.customer_id === customerId)).toBe(true);
+    type Page = { rows: Row[]; nextCursor: string | null };
+    const first = await runCommand(name, { ...input, limit: 50 }, ctx) as Page;
+    expect(first.rows.map(row => row.id)).toEqual(ids.toReversed().slice(0, 50));
+    const last = first.rows.at(-1)!;
+    expect(first.nextCursor).toBe(`${last.created_at}~${last.id}`);
+    const next = await runCommand(name, { ...input, limit: 50, cursor: first.nextCursor }, ctx) as Page;
+    expect(next.rows.map(row => row.id)).toEqual(ids.toReversed().slice(50));
+    expect(next.nextCursor).toBeNull();
+    expect([...first.rows, ...next.rows].every(row => row.customer_id === customerId)).toBe(true);
     for (const invalid of [{ cursor: "bad),customer_id.not.is.null" }, { limit: 0 }, { limit: 201 }]) {
       await expect(runCommand(name, { ...input, ...invalid }, ctx)).rejects.toThrow(/validation/);
     }

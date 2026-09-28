@@ -8,7 +8,7 @@ vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: async (name: string) => {
   if (name === "portal_invoice") return { invoice: { id: "invoice", invoice_no: 42, kind: state.kind, issued_on: "2026-09-08", due_on: "2026-10-08", paid_at: state.paid ? "2026-09-09T12:00:00Z" : null, total_cents: state.kind === "credit_memo" ? -500 : 500 }, lines: [], brewery: { name: "Brewery", customer_phone: null } };
-  if (name === "portal_orders") return ["draft", "shipped"].map(status => ({ id: status, order_no: 42, status, requested_ship_date: null, order_lines: [{ id: "line", qty_ordered: 4, qty_shipped: status === "shipped" ? 2 : null }] }));
+  if (name === "portal_orders") return { nextCursor: null, rows: ["draft", "shipped"].map(status => ({ id: status, order_no: 42, status, requested_ship_date: null, order_lines: [{ id: "line", qty_ordered: 4, qty_shipped: status === "shipped" ? 2 : null }] })) };
   throw new Error(name);
 } }));
 import InvoicePage from "@/app/(portal)/portal/invoices/[id]/page";
