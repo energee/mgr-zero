@@ -27,7 +27,7 @@ export const schedulePackagingRun: SchedulePackagingRunViewModel = {
   leftInSource: "0.4 bbl · loss at close unless held",
   leftLabel: "Left in FV3",
   materials: [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", "432"], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]],
-  warning: "432 ends short. Save the plan now; Start stays disabled until the shortage is resolved or overridden on the run.",
+  warning: "432 ends short. Save the plan now; closing requires enough stock for confirmed used plus lost quantities.",
 };
 
 export const repackCase: RepackViewModel = {

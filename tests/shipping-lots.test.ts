@@ -1,3 +1,4 @@
+import { closeWithConfirmedMaterials } from "./packaging-fixture";
 import { toJson } from "@/lib/supabase/json";
 import { buildReturnLines } from "@/app/(app)/invoices/[id]/credit-memo-form";
 import { beforeAll, expect, it } from "vitest";
@@ -21,7 +22,7 @@ beforeAll(async () => {
   for (let n = 0; n < 2; n++) {
     const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2026-09-02", occupancyId: day.occupancy.id, outputs: [{ skuId: cat.skuId, qtyPlanned: 20 }] }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T14:00:00Z" }, ctx);
-    await runCommand("close_packaging_run", { runId: run.id, bblDrawn: 10, outputs: [{ skuId: cat.skuId, qtyActual: 20 }], lotCode: `TRACE-${n}`, packagedOn: "2026-09-02", locationId: loc.id, binId: n ? loc.binId : bin }, ctx);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 10, outputs: [{ skuId: cat.skuId, qtyActual: 20 }], lotCode: `TRACE-${n}`, packagedOn: "2026-09-02", locationId: loc.id, binId: n ? loc.binId : bin }, ctx);
     lots.push((await admin.from("lots").select("id").eq("packaging_run_id", run.id).single()).data!.id);
   }
 });

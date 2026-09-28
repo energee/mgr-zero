@@ -6,4 +6,6 @@ export type RunClosedViewModel = {
   lot?: string;
   output?: string;
   yield?: string;
+  records?: import("./packaging-actuals").PackagingMaterialRecord[];
+  correction?: Pick<import("./close-packaging-run-view").PackagingCloseFieldsModel,"plan" | "locations" | "bins"> & { rows: import("./packaging-actuals").PackagingActualDraft[]; reason: string };
 };

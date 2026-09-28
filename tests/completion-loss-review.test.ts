@@ -1,3 +1,4 @@
+import { closeWithConfirmedMaterials } from "./packaging-fixture";
 import { rawDatabase } from "./raw-database";
 import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
@@ -59,7 +60,7 @@ async function exactCompletion() {
     outputs: [{ skuId, qtyPlanned: 1 }],
   }, brewerCtx) as { id: string };
   await runCommand("update_packaging_run", { runId: run.id, startedAt: `${fixtureDate}T00:00:00Z` }, brewerCtx);
-  await runCommand("close_packaging_run", {
+  await closeWithConfirmedMaterials({
     runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }],
     lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);

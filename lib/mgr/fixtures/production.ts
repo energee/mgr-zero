@@ -87,35 +87,25 @@ export const vesselFv3: VesselDetailViewModel = {
   capacity: "15",
 };
 
+const packagingPlan = {
+  revision: "fixture-plan", planned: [{ materialId: "cans", name: "Cans", unit: "each", lotTracked: false, qty: 2832, onHand: 3100, onOrder: 0, short: 0 }],
+  materials: [{ id: "cans", name: "Cans", unit: "each", lotTracked: false }], lots: [],
+  sources: [{ materialId: "cans", locationId: "warehouse", binId: "dry", lotId: null, qty: 3100 }],
+};
+
 export const closePackagingRunHazy: ClosePackagingRunViewModel = {
   title: "RUN-0031 · started",
+  closeFields: { bblDrawn: "40", outputs: [{ id: "cases", name: "Hazy cases", qty: "118" }], lotCode: "L-260905-HZ", packagedOn: "2026-09-05", bestBy: "", locationId: "warehouse", binId: "dry",
+    locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "dry", location_id: "warehouse", name: "Dry" }], plan: packagingPlan,
+    actuals: [{ key: "cans", materialId: "cans", locationId: "warehouse", binId: "dry", lotId: null, used: "2832", loss: "6", unused: "12" }] },
   source: "FV3 · B-0416",
-  needRows: [
-    ["cans 2,880", "3,100", "0"],
-    ["ends 2,880", "2,400", "480"],
-    ["labels 2,880", "5,000", "0"],
-  ],
-  shortNote: "480 ends short · resolve or explicitly override before starting.",
-  packaged: "118 cases",
-  lot: "L-240905-HZ",
-  lotOptions: ["L-240905-HZ", "new lot"],
-  destination: "Warehouse · selected",
-  destinationOptions: ["Warehouse · selected", "Taproom"],
-  labelsDamaged: "6",
-  endsDamaged: "0",
-  writeOff: "Warehouse · packaging bin",
-  writeOffOptions: ["Warehouse · packaging bin", "Cellar · packaging bin"],
-  tape: [
-    ["FV3 · B-0416", "source checked"],
-    ["+118 cases · production in", "Warehouse · new lot"],
-    ["−2,832 cans + ends · consumption", "derived from 118 cases"],
-    ["−6 labels · damage", "Warehouse · packaging bin"],
-    ["Beer loss · 0.30 bbl", "yield 97.9%"],
-  ],
+
 };
 
 export const runClosedHazy: RunClosedViewModel = {
   title: "RUN-0031 · closed",
+  records: [{ id: "material-record", created_at: "2026-09-05", corrects_id: null, correction_reason: null, planned: packagingPlan.planned, actuals: [{ material_id: "cans", material_name: "Cans", unit: "each", location_id: "warehouse", location_name: "Warehouse", bin_id: "dry", bin_name: "Dry", lot_id: null, lot_code: null, qty_used: 2832, qty_loss: 6, qty_unused: 12 }] }],
+  correction: { plan: packagingPlan, locations: closePackagingRunHazy.closeFields!.locations, bins: closePackagingRunHazy.closeFields!.bins, rows: closePackagingRunHazy.closeFields!.actuals, reason: "" },
   lot: "L-240905-HZ",
   output: "118 cases · Warehouse",
   yield: "97.9% · 0.30 bbl loss",

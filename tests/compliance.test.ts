@@ -1,3 +1,4 @@
+import { closeWithConfirmedMaterials } from "./packaging-fixture";
 // tests/compliance.test.ts — Program 9: the compliance registry (brand
 // approvals, state registrations, brewery licenses), the period report
 // generated from the movement ledger, the immutable filed snapshot, and the
@@ -275,7 +276,7 @@ describe("trace_lot", () => {
     const dayOut = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2025-11-01" }, brewer) as { occupancy: { id: string } };
     const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2025-12-01", occupancyId: dayOut.occupancy.id, outputs: [{ skuId: cat.skuId, qtyPlanned: 400 }] }, brewer) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2025-12-01T14:00:00Z" }, brewer);
-    await runCommand("close_packaging_run", { runId: run.id, bblDrawn: 25, outputs: [{ skuId: cat.skuId, qtyActual: 396 }], lotCode: "L-261201-TP", packagedOn: "2025-12-01", locationId: loc.id, binId: loc.binId }, brewer);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 25, outputs: [{ skuId: cat.skuId, qtyActual: 396 }], lotCode: "L-261201-TP", packagedOn: "2025-12-01", locationId: loc.id, binId: loc.binId }, brewer);
     const { data: lot } = await admin.from("lots").select("id").eq("packaging_run_id", run.id).single();
     // a sample pulled from the lot is a ledger row that names it
     insertFixture("inventory_movements", { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: loc.binId, qty: -2, type: "sample", dest_state: "PA", lot_id: lot!.id, created_by: brewer.userId });
