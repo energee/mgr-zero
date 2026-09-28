@@ -29,6 +29,13 @@ type PostedReceiptSnapshot = {
   receipts: ReceiptSnapshot[];
 };
 
+/** Links from a purchase order page (`base`) to one receipt, or to its correction form. */
+export const receiptHref = (base: string, receiptId: string) => `${base}?receipt=${encodeURIComponent(receiptId)}`;
+export const correctReceiptHref = (base: string, receiptId: string) => `${base}?correctReceipt=${encodeURIComponent(receiptId)}`;
+
+/** "over 2 bags" / "short 1"; the caller handles a zero variance. */
+export const formatVariance = (variance: number, uom?: string | null) => `${variance > 0 ? "over" : "short"} ${Math.abs(variance)}${uom ? ` ${uom}` : ""}`;
+
 /** Read one committed receipt, not the form's uncommitted counts. */
 export function toPostedReceiptViewProps(po: PostedReceiptSnapshot, receiptId: string, backHref?: string): ReceiptViewModel | undefined {
   const receipt = po.receipts.find(item => item.id === receiptId);
@@ -46,14 +53,14 @@ export function toPostedReceiptViewProps(po: PostedReceiptSnapshot, receiptId: s
         `+${quantity} ${frozen ? count.base_uom : "purchase units"} ${count.material_name ?? `Line ${count.po_line_id}`} · receipt`,
         [frozen ? undefined : "Original units and name were not captured",
           count.lot_code ? `Lot ${count.lot_code}${count.lot_best_by ? ` · best by ${count.lot_best_by}` : ""}` : count.lot_id ? `Lot reference ${count.lot_id} · original lot metadata not captured` : undefined,
-          variance === 0 ? "as expected" : `${variance > 0 ? "over" : "short"} ${Math.abs(variance)}${count.purchase_uom ? ` ${count.purchase_uom}` : ""}`].filter(Boolean).join(" · "),
+          variance === 0 ? "as expected" : formatVariance(variance, count.purchase_uom)].filter(Boolean).join(" · "),
       ];
     }),
     info: `Received ${receipt.received_on}.${receipt.corrected_by_receipt_id ? " This receipt is superseded; its original facts are retained." : " Only counted quantities posted."}${receipt.correction_reason ? ` Correction reason: ${receipt.correction_reason}.` : ""} Still owed reflects effective receipts on this purchase order.`,
-    correction: !receipt.corrected_by_receipt_id && po.status !== "cancelled" ? { href: backHref ? `${backHref}?correctReceipt=${encodeURIComponent(receipt.id)}` : undefined } : undefined,
+    correction: !receipt.corrected_by_receipt_id && po.status !== "cancelled" ? { href: backHref && correctReceiptHref(backHref, receipt.id) } : undefined,
     revisions: [
-      ...(receipt.corrects_receipt_id ? [{ label: "Original receipt", href: backHref ? `${backHref}?receipt=${encodeURIComponent(receipt.corrects_receipt_id)}` : undefined }] : []),
-      ...(receipt.corrected_by_receipt_id ? [{ label: "Corrected receipt", href: backHref ? `${backHref}?receipt=${encodeURIComponent(receipt.corrected_by_receipt_id)}` : undefined }] : []),
+      ...(receipt.corrects_receipt_id ? [{ label: "Original receipt", href: backHref && receiptHref(backHref, receipt.corrects_receipt_id) }] : []),
+      ...(receipt.corrected_by_receipt_id ? [{ label: "Corrected receipt", href: backHref && receiptHref(backHref, receipt.corrected_by_receipt_id) }] : []),
     ],
   };
 }

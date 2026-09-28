@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
-import type { ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { receiptHref } from "@/lib/mgr/receipt-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
 export type PoLine = {
@@ -17,9 +18,10 @@ type Bin = { id: string; location_id: string; name: string };
 /** `today` is the brewery's day (breweryToday on the server page), the received-on default. */
 export function ReceiveForm({ poId, lines, locations, bins, today, model, correctionReceiptId }: { correctionReceiptId?: string; poId: string; lines: PoLine[]; locations: Location[]; bins: Bin[]; today: string; model: ReceivePoViewModel }) {
   const router = useRouter();
-  const correcting = Boolean(correctionReceiptId);
-  const receiving = model.state === "sent" || model.state === "partially_received" || correcting;
-  const open = receiving && !correcting ? lines.filter(line => line.qty_open > 0) : lines;
+  const mode = receiveMode(model.state);
+  const correcting = mode === "correct";
+  const receiving = mode === "receive" || correcting;
+  const open = mode === "receive" ? lines.filter(line => line.qty_open > 0) : lines;
   const [counts, setCounts] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, String(line.qty_counted ?? line.qty_open)])));
   const [lots, setLots] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.expected_lot_code ?? ""])));
   const [bestBy, setBestBy] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.recorded_best_by ?? ""])));
@@ -36,14 +38,14 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
   return <form className="flex flex-col gap-3" onSubmit={event => {
     event.preventDefault();
     if (busy) return;
-    if (model.state === "draft") { void run("send_purchase_order", { poId, sentVia: via }); return; }
+    if (mode === "draft") { void run("send_purchase_order", { poId, sentVia: via }); return; }
     if (!receiving || !ready) return;
     const countedLines = counted.map(line => ({ poLineId: line.id, qtyCounted: Number(counts[line.id]), lotCode: lots[line.id]?.trim() || undefined, bestBy: bestBy[line.id] || undefined }));
     void run(correcting ? "correct_purchase_receipt" : "receive_purchase_order", correcting
       ? { receiptId: correctionReceiptId, reason, lines: countedLines }
       : { poId, locationId, binId, receivedOn, lines: countedLines }, data => {
       const receiptId = (data as { receipt_id?: string }).receipt_id;
-      if (receiptId) router.push(`/purchase-orders/${poId}?receipt=${encodeURIComponent(receiptId)}`);
+      if (receiptId) router.push(receiptHref(`/purchase-orders/${poId}`, receiptId));
     });
   }}>
     <ReceivePoView model={{
@@ -62,7 +64,7 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
         return [`+${quantity} ${line.material?.base_uom ?? line.material?.purchase_uom ?? "purchase units"} ${line.material?.name ?? `Line ${line.id}`} · preview`,
           [line.material?.lot_tracked ? `lot ${lots[line.id]?.trim() || "required"}` : undefined, difference === 0 ? "as expected" : `${difference > 0 ? "over" : "short"} ${Math.abs(difference)}`].filter(Boolean).join(" · ")];
       }),
-      info: correcting ? "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Subsequent stock use or shared lot changes can prevent correction." : "Only what you count posts. Over and short are both recorded; the order becomes partially received until every line is met.",
+      info: correcting ? CORRECTION_INFO : "Only what you count posts. Over and short are both recorded; the order becomes partially received until every line is met.",
     }} controls={{
       quantity: (id, value) => setCounts(prev => ({ ...prev, [id]: value })),
       lot: (id, value) => setLots(prev => ({ ...prev, [id]: value })),

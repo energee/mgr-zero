@@ -4,7 +4,7 @@
 // action for its state (po-actions.tsx): Mark sent on a draft, Receive on a
 // sent or partially received one.
 import { ReceiptView } from "@/components/mgr/views/receipt";
-import { toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
+import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -43,7 +43,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   if (correctReceipt && po.correction_receipt) {
     return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
       lines={po.correction_lines} locations={[]} bins={[]} today={po.correction_receipt.received_on}
-      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${po.correction_receipt.received_on}`, backHref: `/purchase-orders/${po.id}?receipt=${encodeURIComponent(correctReceipt)}` }} />;
+      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${po.correction_receipt.received_on}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
   }
   if (receipt) {
     const model = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`);
@@ -51,15 +51,16 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
     return <ReceiptView model={model} />;
   }
   const [locations, bins, today] = await Promise.all([runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), breweryToday(ctx)]) as [Location[], Bin[], string];
+  const lineById = new Map(po.lines.map(line => [line.id, line]));
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
     history: po.receipts.map(receipt => ({
-      key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: `/purchase-orders/${po.id}?receipt=${encodeURIComponent(receipt.id)}`,
+      key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: receiptHref(`/purchase-orders/${po.id}`, receipt.id),
       detail: receipt.receipt_lines.map(count => {
-        const line = po.lines.find(line => line.id === count.po_line_id);
+        const line = lineById.get(count.po_line_id);
         const variance = Number(count.variance);
-        return `${count.material_name ?? line?.material?.name ?? "line"} ${count.qty_counted}${variance === 0 ? "" : variance > 0 ? ` (over ${variance})` : ` (short ${-variance})`}`;
+        return `${count.material_name ?? line?.material?.name ?? "line"} ${count.qty_counted}${variance === 0 ? "" : ` (${formatVariance(variance)})`}`;
       }).join(" · "),
     })),
   }} />;

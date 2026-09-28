@@ -9,7 +9,7 @@ import type { MaterialsOnHandSnapshot } from "@/lib/mgr/materials-on-hand-view";
 import type { NewPoViewModel } from "@/lib/mgr/new-po-view";
 import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
-import type { ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CORRECTION_INFO, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import type { VendorViewModel } from "@/lib/mgr/vendor-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
@@ -77,7 +77,7 @@ export const correctReceiptCountryMalt: ReceivePoViewModel = {
   lines: receivePoCountryMalt.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
     detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
   tape: [["+2,200 lb 2-row · replacement preview", "Lot CM-26-4410"], ["+132 lb Citra · replacement preview", "Lot 2026-CIT-91"], ["+300 lb rice hulls · replacement preview", "untracked"]],
-  info: "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Subsequent stock use or shared lot changes can prevent correction.",
+  info: CORRECTION_INFO,
 };
 
 export const materialsOnHandList: MaterialsOnHandSnapshot = {

@@ -259,6 +259,8 @@ defineQuery({
     if (!po) throw new CommandError("purchase order not found", 404, "not_found");
     const balance = new Map((balances ?? []).map((b) => [b.po_line_id as string, b]));
     const { vendors, ...header } = po;
+    const lineById = new Map((lines ?? []).map(line => [line.id as string, line]));
+    const correctedBy = new Map((receipts ?? []).filter(r => r.corrects_receipt_id).map(r => [r.corrects_receipt_id as string, r.id as string]));
     const correction = i.correctionReceiptId ? receipts?.find(receipt => receipt.id === i.correctionReceiptId) : null;
     if (i.correctionReceiptId && !correction) throw new CommandError("receipt not found", 404, "not_found");
     return {
@@ -269,17 +271,17 @@ defineQuery({
       })),
       correction_receipt: correction ?? null,
       correction_lines: correction?.receipt_lines.map(count => {
-        const line = lines?.find(line => line.id === count.po_line_id);
+        const line = lineById.get(count.po_line_id);
+        const received = Number(balance.get(count.po_line_id)?.qty_received ?? 0);
         return { ...line, qty_counted: Number(count.qty_counted), recorded_best_by: count.lot_best_by,
-          qty_received: Number(balance.get(count.po_line_id)?.qty_received ?? 0), qty_open: Math.max(Number(line?.qty_ordered ?? 0) - (Number(balance.get(count.po_line_id)?.qty_received ?? 0) - Number(count.qty_counted)), 0),
+          // Open before this receipt: its own count is added back.
+          qty_received: received, qty_open: Math.max(Number(line?.qty_ordered ?? 0) - (received - Number(count.qty_counted)), 0),
           expected_lot_code: count.lot_code,
           material: { name: count.material_name ?? "Original material name not captured", purchase_uom: count.purchase_uom ?? "purchase units",
             purchase_uom_factor: count.purchase_uom_factor, base_uom: count.base_uom, lot_tracked: Boolean(line?.materials?.lot_tracked) },
         };
       }) ?? [],
-      receipts: (receipts ?? []).map(receipt => ({ ...receipt,
-        corrected_by_receipt_id: receipts?.find(next => next.corrects_receipt_id === receipt.id)?.id ?? null,
-      })),
+      receipts: (receipts ?? []).map(receipt => ({ ...receipt, corrected_by_receipt_id: correctedBy.get(receipt.id) ?? null })),
     };
   },
 });
