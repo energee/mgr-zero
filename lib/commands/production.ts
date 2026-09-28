@@ -359,7 +359,7 @@ async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
 // all of them, oldest first, so the brew-day tank (created first) leads. Ids go
 // 100 per read so the URL stays bounded (#469); a batch's rows all land in one
 // chunk, so the per-chunk order is the per-batch order. withReadings embeds each
-// occupancy's newest fermentation reading; only the Batches list asks for it.
+// occupancy's newest fermentation reading; the Batches list and Cellar map ask for it.
 type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string; latest_reading?: VesselReading | null };
 type OpenRow = { id: string; batch_id: string; vessel_id: string; initial_bbl: number; started_at: string; fermentation_readings?: VesselReading[] };
 async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {

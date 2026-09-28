@@ -1,3 +1,6 @@
+import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
+import type { GravityUnit } from "./gravity-unit";
+
 export type CellarMapViewModel = {
   backHref?: string; addHref?: string; readingHref?: string | null; brewHref?: string;
   tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string }[];
@@ -16,4 +19,12 @@ export function toCellarMapViewProps(vessels: { id: string; name: string; capaci
     const capacity = Number(vessel.capacity_bbl);
     return { name: vessel.name, detail: `${occupancy ? occupancy.brand_name ?? "No brand yet" : "Empty"} · ${quantity} / ${capacity} bbl`, reading: occupancy ? readings[occupancy.occupancy_id] ?? "No readings yet" : "available", fill: capacity > 0 ? quantity / capacity * 100 : undefined, href: hrefs[vessel.id] };
   }) };
+}
+
+// Each open occupancy's latest reading, keyed by occupancy id, from one
+// list_batches({ readings: true }) read — the batch list already embeds the
+// newest reading per open occupancy, so the cellar map never asks per tank (#700).
+export function cellarReadings(batches: { active_occupancies: { id: string; latest_reading?: VesselReading | null }[] }[], unit: GravityUnit, timeZone: string): Record<string, string> {
+  return Object.fromEntries(batches.flatMap(batch => batch.active_occupancies)
+    .map(occupancy => [occupancy.id, formatLatestReading(occupancy.latest_reading, unit, timeZone)]));
 }

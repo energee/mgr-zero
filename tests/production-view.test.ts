@@ -23,7 +23,7 @@ import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/
 import { canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
-import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
+import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -259,4 +259,23 @@ it("only offers the cellar Reading shortcut when one tank could be meant", () =>
   expect(toCellarMapViewProps(vessels, [], {}, {}, reading).readingHref).toBeNull();
   // Without a caller-supplied path the adapter invents none.
   expect(toCellarMapViewProps(vessels, one).readingHref).toBeUndefined();
+});
+
+describe("cellar readings (#700)", () => {
+  it("formats each open occupancy's latest reading from one list_batches read", () => {
+    const reading = { id: "r1", at: "2026-09-01T15:00:00Z", temp_f: 66, gravity_plato: 4.5, ph: null, note: null };
+    const readings = cellarReadings([
+      { active_occupancies: [{ id: "o1", latest_reading: reading }, { id: "o2", latest_reading: null }] },
+      { active_occupancies: [] },
+    ], "plato", "UTC");
+    expect(Object.keys(readings)).toEqual(["o1", "o2"]);
+    expect(readings.o1).toContain("2026");
+    expect(readings.o2).toBe("No readings yet");
+  });
+
+  it("the cellar page asks list_batches for readings instead of one call per occupancy", () => {
+    const page = readFileSync("app/(app)/cellar/page.tsx", "utf8");
+    expect(page).not.toContain("list_fermentation_readings");
+    expect(page).toContain('runCommand("list_batches", { readings: true }, ctx)');
+  });
 });
