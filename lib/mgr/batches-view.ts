@@ -57,7 +57,7 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
   };
 }
 
-export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading: VesselReading | null }[] };
+export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading?: VesselReading | null }[] };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
