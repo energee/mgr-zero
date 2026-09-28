@@ -10,11 +10,15 @@ Your login starts with an invitation from the brewery. Open the email, enter **Y
 
 <Screen name="Portal sign in" />
 
-Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**. **Forgot password?** opens **Reset password**: enter your email and select **Send reset link**; the page says a link is on its way whenever that email is on an account, and the link opens **Set new password**.
+Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**, or **Invitations** first if a pending invitation is waiting for you; see below. **Forgot password?** opens **Reset password**: enter your email and select **Send reset link**; the page says a link is on its way whenever that email is on an account, and the link opens **Set new password**.
 
 <Screen name="Portal forgot password" />
 
-A used, expired, or wrong-audience invitation opens **Invite expired**. Sign in if you already joined, or select **Reset password**. Contact brewery staff if your customer access is missing. The brewery can remove your access to a customer. From your next page or action, even if you are signed in, MGR no longer shows or accepts that customer's orders; the orders and invoices you placed stay with the customer. If you already have a sign-in account, the brewery can invite you again. Sign in and open [Invitations](/invitations), review the brewery and customer account, then select **Accept invitation**. Access starts only after you consent. Pending invitations expire after seven days. Accepting opens the invited customer account. If you belong to several customer accounts, open **Me**, choose **Customer account**, and select **Switch account**. An old accepted invitation cannot restore removed access; ask for a new one. Entry cards sit near the bottom of a phone screen and center on wider screens.
+A used, expired, or wrong-audience invitation opens **Invite expired**. Sign in if you already joined, or select **Reset password**. Contact brewery staff if your customer access is missing. The brewery can remove your access to a customer. From your next page or action, even if you are signed in, MGR no longer shows or accepts that customer's orders; the orders and invoices you placed stay with the customer. Entry cards sit near the bottom of a phone screen and center on wider screens.
+
+<Screen name="Account invitations" />
+
+If you already have an MGR sign-in and the brewery invites that email to a customer account, signing in sends you to **Invitations** first; you can also open it yourself at `/invitations`. The page reminds you that joining grants access to the customer account shown and does not change your password. Each pending invitation names the brewery and the customer account offered; select **Accept invitation** to join. Access starts only after you consent, and accepting opens that customer account. Consent expires seven days after the invitation is sent; an expired or revoked invitation needs a new one from the brewery. An old accepted invitation cannot restore removed access; ask for a new one. With nothing pending, the page says **No pending invitations. Ask the brewery for a new invitation if yours expired.** If acceptance fails, MGR asks you to check you're signed in with the invited email and ask the brewery whether it expired or was revoked. If you belong to several customer accounts, open **Me**, choose **Customer account**, and select **Switch account**.
 
 <Screen name="Portal set password" />
 
@@ -126,7 +130,3 @@ In the [screen explorer](/docs/screens-explore), sign in and password recovery l
 If an invoice question loses its response, use **Retry saved request** in **Unresolved requests**. It sends the saved input with its original identity. Another question waits until the saved one is retried or discarded. If you have confirmed with the brewery that the question arrived, or that it did not, select **Discard saved request**, then **Confirm discard**. Nothing is sent, and you can ask again. Reloading the same browser tab preserves it; changing accounts hides it until you return to the original account. Nothing is sent automatically. Keep the tab open until the outcome is recovered.
 
 If a payment link cannot open, MGR returns you to the invoice, says online payment isn’t available, and keeps **Question this invoice** available; contact the brewery to arrange payment.
-
-### Refused delivery quantities
-
-Order detail shows refused and accepted quantities when a delivery is partly or fully refused. Refused units close on that order; place a new order for redelivery. When the brewery invoices on delivery, its invoice covers only accepted beer and deposits. A full refusal creates no on-delivery invoice. An invoice issued at ship remains until the brewery records the physical return and credit.
