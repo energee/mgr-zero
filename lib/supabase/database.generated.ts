@@ -7692,6 +7692,19 @@ export type Database = {
           retry_after: number
         }[]
       }
+      correct_brew_record: {
+        Args: {
+          p_actuals: Json
+          p_brewery: string
+          p_confirm_empty: boolean
+          p_initial_bbl: number
+          p_process: Json
+          p_reason: string
+          p_record: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       correct_taproom_count: {
         Args: {
           p_brewery: string

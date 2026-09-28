@@ -86,6 +86,44 @@ describe("actual brew-day record (#622)", () => {
     expect((await admin.from("material_movements").select("id").eq("brewery_id", f.brewery.id).not("compensates_id", "is", null).throwOnError()).data).toEqual([]);
   });
 
+  it("rolls back correction compensation when replacement stock or vessel capacity fails", async () => {
+    const f = await plannedBrew();
+    const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string } };
+    const input = { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: [{ ...f.input.actuals[0], qty: 201 }] };
+    await expect(runCommand("correct_brew_record", input, f.brewer)).rejects.toThrow(/stock/i);
+    await expect(runCommand("correct_brew_record", { ...input, initialBbl: 11, actuals: f.input.actuals }, f.brewer)).rejects.toThrow(/capacity|holds|fit/i);
+    expect((await admin.from("brew_records").select("id").eq("batch_id", f.batch.id).throwOnError()).data).toHaveLength(1);
+    expect((await admin.from("material_movements").select("id").eq("brewery_id", f.brewery.id).not("compensates_id", "is", null).throwOnError()).data).toEqual([]);
+  });
+
+  it.each(["transfer", "packaging", "closed occupancy", "filed report"])("refuses correction after %s", async dependency => {
+    const f = await plannedBrew();
+    const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string }; occupancy: { id: string } };
+    if (dependency === "transfer") {
+      const target = await runCommand("upsert_vessel", { name: "Target", kind: "brite", capacityBbl: 10 }, f.brewer) as { id: string };
+      await runCommand("record_cellar_transfer", { fromOccupancyId: original.occupancy.id, toVesselId: target.id, volumeBbl: 1 }, f.brewer);
+    } else if (dependency === "packaging") {
+      const brand = await ins("brands", { brewery_id: f.brewery.id, name: "Test brand" });
+      await ins("packaging_runs", { brewery_id: f.brewery.id, brand_id: brand.id, occupancy_id: original.occupancy.id, planned_on: "2026-10-01", started_at: "2026-10-01T12:00:00Z", created_by: f.brewer.userId });
+    } else if (dependency === "closed occupancy") {
+      await admin.from("vessel_occupancies").update({ ended_at: "2026-10-02T12:00:00Z" }).eq("id", original.occupancy.id).throwOnError();
+    } else {
+      await ins("report_filings", { brewery_id: f.brewery.id, jurisdiction: "TTB", period_start: "2026-10-01", period_end: "2026-10-31", figures: {}, filed_at: "2026-11-01T12:00:00Z", filed_by: f.brewer.userId });
+    }
+    await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: f.input.actuals }, f.brewer)).rejects.toThrow(/transfer|packaging|closed|filed report/i);
+    expect((await admin.from("brew_records").select("id").eq("batch_id", f.batch.id).throwOnError()).data).toHaveLength(1);
+  });
+
+  it("keeps brew records and corrections within the authorized brewery", async () => {
+    const f = await plannedBrew();
+    const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string } };
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    await expect(runCommand("get_brew_record", { batchId: f.batch.id }, foreign)).rejects.toThrow(/not found/i);
+    await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: f.input.actuals }, foreign)).rejects.toThrow(/not found/i);
+    const sales = await makeStaffCtx(f.brewery.id, "sales");
+    await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: f.input.actuals }, sales)).rejects.toThrow(/role|permission|allowed|forbidden/i);
+  });
+
   it("consumes confirmed quantities from the exact lot once, independent of recipe theory", async () => {
     const f = await plannedBrew();
     const requestId = crypto.randomUUID();
