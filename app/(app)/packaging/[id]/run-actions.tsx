@@ -5,7 +5,7 @@
 // finished-goods location + bin).
 "use client";
 
-import { PackagingSource, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
+import { PackagingSourcePicker, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -22,14 +22,18 @@ type Bin = { id: string; location_id: string; name: string };
 
 export function PickTankForm({ runId, occupancies }: { runId: string; occupancies: Occupancy[] }) {
   const { busy, error, run } = useCommandAction();
-  return <PackagingSource occupancies={occupancies} busy={busy} error={error}
+  return <PackagingSourcePicker occupancies={occupancies} busy={busy} error={error}
     onPick={occupancyId => { void run("update_packaging_run", { runId, occupancyId }); }} />;
 }
 
 export function StartRunButton({ runId }: { runId: string }) {
   const { busy, error, run } = useCommandAction();
-  return <PackagingSource sourcePicked busy={busy} error={error}
-    onStart={() => { void run("update_packaging_run", { runId, startedAt: new Date().toISOString() }); }} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <CommandFormMessage error={error} />
+      <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("update_packaging_run", { runId, startedAt: new Date().toISOString() })}>Start</Button>
+    </div>
+  );
 }
 
 /** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */

@@ -55,7 +55,7 @@ it("vessel readings preserve optional measurements and do not invent actors", ()
 
 describe("Batches view", () => {
   it("groups returned lifecycle facts without inventing readings or hiding closed batches", () => {
-    const base: BatchListRow = { id: "planned", batch_no: null, planned_on: "2026-09-12", planned_bbl: 12.5, brewed_on: null, closed_at: null, brand_name: null, recipe_name: null, vessel_name: null };
+    const base: BatchListRow = { id: "planned", batch_no: null, planned_on: "2026-09-12", planned_bbl: 12.5, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null };
     expect(batchesFromQuery([base], []).planned?.[0].href).toBeUndefined();
     const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: "Actual tank" }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12" }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
     expect(model.planned[0]).toMatchObject({ verb: "Brew", href: "/batches/planned" });

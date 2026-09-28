@@ -30,17 +30,15 @@ export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCa
 
 export type PackagingSourceOccupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 
-/** The unstarted run's source picker and Start action, shared with its inventory frame. */
-export function PackagingSource({ occupancies = [], sourcePicked = false, busy = false, error, onPick, onStart }: {
-  occupancies?: PackagingSourceOccupancy[]; sourcePicked?: boolean; busy?: boolean; error?: string | null;
-  onPick?: (occupancyId: string) => void; onStart?: () => void;
+/** The unstarted run's source-tank picker, shared with its inventory frame. */
+export function PackagingSourcePicker({ occupancies, busy = false, error, onPick }: {
+  occupancies: PackagingSourceOccupancy[]; busy?: boolean; error?: string | null;
+  onPick?: (occupancyId: string) => void;
 }) {
   const [occupancyId, setOccupancyId] = useState("");
   return <div className="flex flex-col gap-3">
-    {!sourcePicked && E.pick("Source tank", occupancyId, occupancies.map(occupancy => ({ value: occupancy.occupancy_id, label: `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand"} · ${Number(occupancy.bbl)} bbl` })), { onChange: setOccupancyId, disabled: busy, required: true, placeholder: "Choose tank" })}
+    {E.pick("Source tank", occupancyId, occupancies.map(occupancy => ({ value: occupancy.occupancy_id, label: `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand"} · ${Number(occupancy.bbl)} bbl` })), { onChange: setOccupancyId, disabled: busy, required: true, placeholder: "Choose tank" })}
     <CommandFormMessage error={error} />
-    {sourcePicked
-      ? E.act("Start", "primary", undefined, onStart, busy)
-      : E.act("Pick source", "primary", undefined, () => onPick?.(occupancyId), busy || !occupancyId)}
+    {E.act("Pick source", "primary", undefined, () => onPick?.(occupancyId), busy || !occupancyId)}
   </div>;
 }

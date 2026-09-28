@@ -1,5 +1,5 @@
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
-import { PackagingSource, PlanActions } from "@/components/mgr/views/plan-actions";
+import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -1685,7 +1685,7 @@ export const SCREENS: Screen[] = [
     writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
     states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
     spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
-    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging runs", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSource occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
+    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging runs", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
   },
   {
     step: 7,

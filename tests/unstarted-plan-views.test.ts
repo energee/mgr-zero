@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { PlanActions, PackagingSource } from "@/components/mgr/views/plan-actions";
+import { PlanActions, PackagingSourcePicker } from "@/components/mgr/views/plan-actions";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -23,12 +23,12 @@ it("shares plan controls across inventory and live views and hides them for canc
   const controls = renderToStaticMarkup(createElement(PlanActions, { plannedOn: "2026-09-28", busy: true, error: "Plan already started" }));
   expect(controls).toContain("Plan already started");
   expect(controls).toContain("disabled");
-  expect(renderToStaticMarkup(createElement(PackagingSource, { sourcePicked: true, busy: true, error: "Tank emptied" }))).toContain("Tank emptied");
+  expect(renderToStaticMarkup(createElement(PackagingSourcePicker, { occupancies: [], busy: true, error: "Tank emptied" }))).toContain("Tank emptied");
   const sourceWrapper = readFileSync("app/(app)/packaging/[id]/run-actions.tsx", "utf8");
-  expect(sourceWrapper.match(/<PackagingSource/g)).toHaveLength(2);
+  expect(sourceWrapper.match(/<PackagingSourcePicker/g)).toHaveLength(1);
   for (const element of [
-    createElement(BrewDayView, { model: { ...brewDayHazy, cancelledAt: "2026-09-27" }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
-    createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28", cancelledAt: "2026-09-27" }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
+    createElement(BrewDayView, { model: { ...brewDayHazy, cancelled: true }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
+    createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28", cancelled: true }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
   ]) {
     const html = renderToStaticMarkup(element);
     expect(html).toContain("Cancelled");

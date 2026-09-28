@@ -8,7 +8,7 @@ export type PackagingRunSnapshot = {
   planned_on: string;
   started_at: string | null;
   closed_at: string | null;
-  cancelled_at?: string | null;
+  cancelled_at: string | null;
   brand_name: string | null;
   vessel_name: string | null;
   qty_planned: number;
@@ -56,10 +56,13 @@ function row(run: PackagingRunSnapshot, timeZone: string, href?: string): Packag
 }
 
 /** `timeZone` is breweries.timezone: a closed run is dated by the brewery's day, not closed_at's UTC prefix (#442). */
+/** A closed or cancelled run is history; everything else is still upcoming. */
+const finished = (run: PackagingRunSnapshot) => !!(run.closed_at || run.cancelled_at);
+
 export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone: string, hrefFor?: (id: string) => string): PackagingRunsViewModel {
   return {
-    upcoming: runs.filter((run) => !run.closed_at && !run.cancelled_at).map((run) => row(run, timeZone, hrefFor?.(run.id))),
-    recent: runs.filter((run) => run.closed_at || run.cancelled_at).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    recent: runs.filter(finished).map((run) => row(run, timeZone, hrefFor?.(run.id))),
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };

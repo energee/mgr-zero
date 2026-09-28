@@ -53,14 +53,14 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
     completed: s.completed,
     cancelled: s.cancelled,
     vessels: s.vessels,
-    empty: s.empty ?? (planned.length === 0 && active.length === 0 && !s.completed?.length && !s.cancelled?.length ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
+    empty: s.empty ?? ([planned, active, s.completed, s.cancelled].every(rows => !rows?.length) ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 3,
     workTabs: WORK_TABS,
   };
 }
 
-export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at?: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies?: { id: string; vessel_name: string; latest_reading: VesselReading | null }[] };
+export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies?: { id: string; vessel_name: string; latest_reading: VesselReading | null }[] };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {

@@ -58,7 +58,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
     <ClosePackagingRunView
       model={{
         title, backTo: "Packaging runs", backHref: "/packaging", brand: run.brand_name ?? "—",
-        plannedOn: run.planned_on, cancelledAt: run.cancelled_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
+        plannedOn: run.planned_on, cancelled: !!run.cancelled_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
         plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "Not recorded" : Number(o.qty_actual)]),
       }}
       planActions={!run.started_at ? <ChangePlan kind="packaging_run" id={run.id} plannedOn={run.planned_on} /> : undefined}

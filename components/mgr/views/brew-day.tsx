@@ -21,12 +21,15 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
   const change = (patch: Partial<BrewDayViewModel>) => { setDraft({ ...value, ...patch }); onChange?.(patch); };
   const vessel = value.vessels.find(item => item.id === value.vesselId);
   const ready = canRecordBrewDay(value);
-  return <>
+  const header = <>
     {E.back("Batches", model.title, undefined, model.backHref)}
     {model.planned && E.fld("Planned", model.planned)}
     {model.note && E.fld("Note", model.note)}
-    {model.cancelledAt ? <PlanCancelled /> : <>
-    {!model.recorded && planActions}
+  </>;
+  if (model.cancelled) return <>{header}<PlanCancelled /></>;
+  return <>
+    {header}
+    {planActions}
     <section data-gated className="flex flex-col gap-3" aria-label="Material consumption unavailable">
       {E.note("Material consumption unavailable here. Record brew day records the brew date and knockout occupancy only.")}
       {(model.lots ?? []).map(lot => <Fragment key={lot.key}>{E.nav(lot.title, lot.detail)}</Fragment>)}
@@ -48,6 +51,5 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
       <CommandFormMessage error={error} />
       <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit" disabled={busy || !ready}>Record brew day</Button>
     </form>}
-    </>}
   </>;
 }
