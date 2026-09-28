@@ -1,3 +1,4 @@
+import { CommandRecovery } from "@/components/mgr/command-recovery";
 // app/(app)/layout.tsx — staff chrome: the shared AppShell fed the
 // staff manifest (lib/mgr/nav.ts) with planned areas and the role's hidden
 // entries removed, and a Me sheet with the
@@ -46,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </>
           }
         >
+          <CommandRecovery />
           {children}
         </AppShell>
         <Toaster />

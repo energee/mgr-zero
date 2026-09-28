@@ -1,12 +1,15 @@
 import { expect, it } from "vitest";
-import { invitationRequest } from "@/lib/invite-form";
+import { beginRecovery, finishRecovery, readRecoveries } from "@/lib/commands/recovery";
 
-it("keeps a failed invitation identity only for the same brewery, command and input", () => {
-  const input = { email: "buyer@example.com", customerId: "customer-a" };
-  const first = invitationRequest(null, "brewery-a", "invite_customer_user", input);
-  expect(invitationRequest(first, "brewery-a", "invite_customer_user", input)).toBe(first);
-  expect(invitationRequest(first, "brewery-b", "invite_customer_user", input).requestId).not.toBe(first.requestId);
-  expect(invitationRequest(first, "brewery-a", "invite_staff", input).requestId).not.toBe(first.requestId);
-  expect(invitationRequest(first, "brewery-a", "invite_customer_user", { ...input, email: "other@example.com" }).requestId).not.toBe(first.requestId);
-  expect(invitationRequest(null, "brewery-a", "invite_customer_user", input).requestId).not.toBe(first.requestId);
+it("shares frozen invitation identity between Team and first-run, including reload", () => {
+  const values = new Map<string, string>();
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
+  const context = { actorId: "admin", breweryId: "brewery" };
+  const input = { email: "buyer@example.com", role: "sales" };
+  const first = beginRecovery(storage, context, "/settings/team", "invite_staff", input);
+  expect(beginRecovery(storage, context, "/onboarding", "invite_staff", input)).toEqual(first);
+  expect(() => beginRecovery(storage, context, "/onboarding", "invite_staff", { ...input, email: "other@example.com" })).toThrow("Retry saved request");
+  expect(readRecoveries(storage, context)[0].input).toEqual(input);
+  finishRecovery(storage, first);
+  expect(beginRecovery(storage, context, "/settings/team", "invite_staff", input).requestId).not.toBe(first.requestId);
 });

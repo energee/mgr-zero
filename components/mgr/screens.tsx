@@ -1,3 +1,4 @@
+import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -877,6 +878,19 @@ export const SCREENS: Screen[] = [
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
     ]} />,
+  },
+  {
+    step: 4,
+    slice: 1,
+    group: "Global",
+    name: "Unresolved requests",
+    to: { "Retry saved request": "Unresolved requests" },
+    job: "Recover the result of a form submission whose response was lost",
+    reads: "sessionStorage [original actor, brewery, customer and frozen request]",
+    writes: "none [explicit retry replays the original command identity]",
+    states: [["reload", "Saved input survives in the same browser tab"], ["edited", "Resolve the saved request before submitting changes", 1], ["other account", "Requests remain isolated to the original account and brewery", 1]],
+    spec: "Shared command forms save an unresolved request before transport. An uncertain response freezes its input and identity until exact recovery succeeds. Retry is explicit, never automatic. Invitations use the same lifecycle. CSV imports recover on Import; specialized portal, count, completion and composer recovery remain separate.",
+    body: <CommandRecoveryView rows={[{ requestId: "saved-request", name: "record_movement", input: { qty: 2, note: "Opening stock" }, path: "/inventory" }]} />,
   },
   {
     step: 4,

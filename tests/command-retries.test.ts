@@ -1,7 +1,7 @@
 // tests/command-retries.test.ts — Shared command transport retains failed submission identity and resets new intent.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 let renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
 vi.mock("@/app/(app)/brewery-provider", () => ({
@@ -9,11 +9,24 @@ vi.mock("@/app/(app)/brewery-provider", () => ({
   useCommandContext: () => renderedContext,
 }));
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { CommandRecovery } from "@/components/mgr/command-recovery";
+import { beginRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { command } from "@/lib/commands/client";
 import { submitEvent } from "./helpers";
+let retrySaved: (id: string) => Promise<void>;
+vi.mock("@/components/mgr/views/command-recovery", () => ({
+  CommandRecoveryView: (props: { onRetry: typeof retrySaved }) => { retrySaved = props.onRetry; return null; },
+}));
+beforeEach(() => {
+  renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
+  const values = new Map<string, string>();
+  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("sessionStorage", { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
+  vi.stubGlobal("location", { pathname: "/test-form" });
+});
 afterEach(() => vi.unstubAllGlobals());
 
-it("retains a failed submission ID and rendered context, resets changed intent, and resets after success", async () => {
+it("retains a failed submission ID and rendered context, blocks changed intent, and resets after success", async () => {
   const requests: { requestId: string; expectedContext: unknown }[] = [];
   let fail = true;
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
@@ -31,14 +44,14 @@ it("retains a failed submission ID and rendered context, resets changed intent, 
   expect(requests[0].requestId).toBe(requests[1].requestId);
   expect(requests[0].expectedContext).toEqual({ actorId: "actor-a", breweryId: "brewery-a" });
   expect(requests[1].expectedContext).toEqual(requests[0].expectedContext);
-  expect(requests[2].requestId).not.toBe(requests[1].requestId);
+  expect(requests).toHaveLength(2); // Edited intent must not issue another write while the outcome is unknown.
   fail = false;
+  await action!.run("set_brewery_quiet_hours", { start: "21:00" });
   await action!.run("set_brewery_quiet_hours", { start: "22:00" });
-  await action!.run("set_brewery_quiet_hours", { start: "22:00" });
-  expect(requests[3].requestId).toBe(requests[2].requestId);
-  expect(requests[4].requestId).not.toBe(requests[3].requestId);
+  expect(requests[2].requestId).toBe(requests[1].requestId);
+  expect(requests[3].requestId).not.toBe(requests[2].requestId);
   await command("brewery-a", "unchanged_three_argument_caller", {});
-  expect(requests[5].requestId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(requests[4].requestId).toMatch(/^[0-9a-f-]{36}$/);
   renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
 });
 
@@ -95,4 +108,87 @@ it("clears every sheet error on close: secondary actions share the form's slot, 
   }
   expect(src("settings/team/invite-form.tsx")).toContain("if (!next) action.setError(null)");
   expect(src("inventory/movement-form.tsx")).toMatch(/reset: \(\) => \{ setStockError\(null\);/);
+});
+
+it("persists a dropped response before fetch, survives reload and auth rejection, and replays the frozen input", async () => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("sessionStorage", { getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => values.set(k, v), removeItem: (k: string) => values.delete(k) });
+  vi.stubGlobal("location", { pathname: "/inventory" });
+  const requests: { requestId: string; input: unknown }[] = [];
+  let response: "dropped" | "denied" | "ok" = "dropped";
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    expect(values.size).toBe(1);
+    requests.push(JSON.parse(init.body));
+    if (response === "dropped") throw new Error("committed, response lost");
+    if (response === "denied") return { status: 403, json: async () => ({ ok: false, error: { message: "membership changed" } }) };
+    return { status: 200, json: async () => ({ ok: true, data: { id: "original" } }) };
+  }));
+  let action: ReturnType<typeof useCommandAction>;
+  function Harness() { action = useCommandAction(); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  await action!.run("record_movement", { qty: 2, note: "original" });
+  renderToStaticMarkup(createElement(Harness)); // Reload: no retained hook refs.
+  expect(await action!.run("record_movement", { qty: 3, note: "edited" })).toBe(false);
+  expect(requests).toHaveLength(1);
+  response = "denied";
+  location.pathname = "/another-entry"; // Same operation from a sibling entry point.
+  renderToStaticMarkup(createElement(Harness));
+  await action!.run("record_movement", { qty: 2, note: "original" });
+  expect(values.size).toBe(1);
+  response = "ok";
+  await action!.run("record_movement", { qty: 2, note: "original" });
+  expect(requests.map(row => row.requestId)).toEqual(Array(3).fill(requests[0].requestId));
+  expect(requests.map(row => row.input)).toEqual(Array(3).fill({ qty: 2, note: "original" }));
+  expect(values.size).toBe(0);
+});
+
+it("reloads after global recovery so mounted forms cannot resubmit stale fields", async () => {
+  const values = new Map<string, string>();
+  const storage = { getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => values.set(k, v), removeItem: (k: string) => values.delete(k) };
+  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal("sessionStorage", storage);
+  const reload = vi.fn(() => expect(values.size).toBe(0));
+  vi.stubGlobal("location", { pathname: "/orders", reload });
+  const saved = beginRecovery(storage, renderedContext, "/orders", "create_order", { note: "original" });
+  const fetch = vi.fn(async (_url, init) => {
+    expect(JSON.parse(init.body)).toMatchObject({ requestId: saved.requestId, input: { note: "original" } });
+    return { status: 200, json: async () => ({ ok: true, data: { id: "existing-order" } }) };
+  });
+  vi.stubGlobal("fetch", fetch);
+  renderToStaticMarkup(createElement(CommandRecovery));
+  await retrySaved(saved.requestId);
+  expect(reload).toHaveBeenCalledOnce();
+  expect(fetch).toHaveBeenCalledOnce();
+});
+
+it.each([200, 403])("isolates concurrent commands on one page when the second returns %s", async (status) => {
+  const requests: { name: string; requestId: string }[] = [];
+  let releaseCatalog!: () => void;
+  const catalogPending = new Promise<void>(resolve => { releaseCatalog = resolve; });
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    if (request.name === "sync_square_catalog") await catalogPending;
+    if (request.name === "sync_square_sales" && status === 403) return { status, json: async () => ({ ok: false, error: { message: "Sales access denied" } }) };
+    return { status: 200, json: async () => ({ ok: true, data: {} }) };
+  }));
+  let catalog!: ReturnType<typeof useCommandAction>, sales!: ReturnType<typeof useCommandAction>;
+  function Harness() { catalog = useCommandAction(); sales = useCommandAction(); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  const inFlight = catalog.run("sync_square_catalog", {});
+  try {
+    expect(await sales.run("sync_square_sales", {})).toBe(status === 200);
+    expect(requests.map(request => request.name)).toEqual(["sync_square_catalog", "sync_square_sales"]);
+    expect(new Set(requests.map(request => request.requestId)).size).toBe(2);
+    // The independent result must not remove the catalog's still-pending recovery.
+    expect(readRecoveries(sessionStorage, renderedContext).map(attempt => attempt.name)).toEqual(["sync_square_catalog"]);
+    renderToStaticMarkup(createElement(Harness)); // Reload while catalog is still in flight.
+    expect(await catalog.run("sync_square_catalog", { changed: true })).toBe(false);
+    expect(requests).toHaveLength(2);
+  } finally {
+    releaseCatalog();
+    await inFlight;
+  }
+  expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
 });

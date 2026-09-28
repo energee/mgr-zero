@@ -1,22 +1,38 @@
 "use client";
-import { useMemo, useState } from "react";
+import { z } from "zod";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ImportView } from "@/components/mgr/views/import";
+import { beginRecovery, finishRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { command } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
-import { IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_KINDS, IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
   const renderedContext = useCommandContext();
-  const [kind, setKind] = useState<ImportKind>("customers");
+  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+  return hydrated ? <ImportSession key={JSON.stringify(renderedContext)} breweryId={breweryId} lookups={lookups} /> : null;
+}
+
+function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
+  const renderedContext = useCommandContext();
+  const [recovery] = useState(() => {
+    try {
+      const saved = readRecoveries(sessionStorage, renderedContext).find(row => row.name === "import_csv");
+      if (saved) saved.input = z.object({ kind: z.enum(IMPORT_KINDS), rows: z.array(z.record(z.string(), z.string())) }).parse(saved.input);
+      return { saved, error: null };
+    }
+    catch (cause) { return { saved: undefined, error: cause instanceof Error ? cause.message : "Saved import could not be read." }; }
+  });
+  const savedInput = recovery.saved?.input as { kind: ImportKind; rows: Record<string, string>[] } | undefined;
+  const [kind, setKind] = useState<ImportKind>(savedInput?.kind ?? "customers");
   const [csv, setCsv] = useState<ReturnType<typeof parseCsv> | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
-  const [step, setStep] = useState(0);
-  // ponytail: batch state lasts while this page stays open; persist it for reload recovery.
-  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[]; previewRows: number[]; expectedContext: CommandContextExpectation } | null>(null);
+  const [step, setStep] = useState(recovery.saved ? 3 : 0);
+  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[]; previewRows: number[]; expectedContext: CommandContextExpectation } | null>(recovery.saved && savedInput ? { requestId: recovery.saved.requestId, ...savedInput, previewRows: recovery.saved.previewRows ?? savedInput.rows.map((_, index) => index + 1), expectedContext: recovery.saved.expectedContext } : null);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(recovery.error);
   const [busy, setBusy] = useState(false);
   const fields = IMPORT_FIELDS[kind];
   const rows = useMemo(() => csv ? mapCsvRows(csv.rows, mapping) : [], [csv, mapping]);
@@ -28,7 +44,12 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
   async function commit() {
     const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
-    try { setResult(await command(action.expectedContext.breweryId ?? breweryId, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext) as ImportResult); }
+    try {
+      const saved = beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.previewRows);
+      const recovered = await command(action.expectedContext.breweryId ?? breweryId, "import_csv", saved.input, saved.requestId, action.expectedContext) as ImportResult;
+      setResult(recovered);
+      finishRecovery(sessionStorage, saved);
+    }
     catch (err) { setError(`${err instanceof Error ? err.message : "Import failed"}. Some rows may have committed. Retry this same batch to recover their results.`); }
     finally { setBusy(false); }
   }

@@ -4,7 +4,7 @@ Execution index: [#658](https://github.com/energee/mgr-zero/issues/658).
 It owns wave order, dependencies, migration reservations, checkpoints and the
 status ledger. Refreshed 2026-09-27 against main at `11156878`.
 
-Inventory baseline: 174 MGR screens: 173 ungated and mapped, 1 gated, and 0 ungated without a live route.
+Inventory baseline: 175 MGR screens: 174 ungated and mapped, 1 gated, and 0 ungated without a live route.
 These counts describe route coverage, not finished workflow behavior.
 
 Local sources for implementation and verification:
