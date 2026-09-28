@@ -5,6 +5,7 @@
 // finished-goods location + bin).
 "use client";
 
+import { PackagingSource, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -15,37 +16,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { closeRunReady } from "@/lib/mgr/close-packaging-run-view";
 
-type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
 export function PickTankForm({ runId, occupancies }: { runId: string; occupancies: Occupancy[] }) {
-  const [occupancyId, setOccupancyId] = useState("");
   const { busy, error, run } = useCommandAction();
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="pt-source">Source tank</Label>
-        <Select value={occupancyId} onValueChange={setOccupancyId}>
-          <SelectTrigger id="pt-source"><SelectValue placeholder="Choose tank" /></SelectTrigger>
-          <SelectContent>{occupancies.map((o) => <SelectItem key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <CommandFormMessage error={error} />
-      <Button className="w-full md:w-fit" disabled={busy || !occupancyId} onClick={() => run("update_packaging_run", { runId, occupancyId })}>Pick source</Button>
-    </div>
-  );
+  return <PackagingSource occupancies={occupancies} busy={busy} error={error}
+    onPick={occupancyId => { void run("update_packaging_run", { runId, occupancyId }); }} />;
 }
 
 export function StartRunButton({ runId }: { runId: string }) {
   const { busy, error, run } = useCommandAction();
-  return (
-    <div className="flex flex-col gap-2">
-      <CommandFormMessage error={error} />
-      <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("update_packaging_run", { runId, startedAt: new Date().toISOString() })}>Start</Button>
-    </div>
-  );
+  return <PackagingSource sourcePicked busy={busy} error={error}
+    onStart={() => { void run("update_packaging_run", { runId, startedAt: new Date().toISOString() }); }} />;
 }
 
 /** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */

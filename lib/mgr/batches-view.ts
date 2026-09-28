@@ -20,6 +20,7 @@ export type BatchesViewModel = {
   planned: BatchesRowView[];
   active: BatchesRowView[];
   completed?: BatchesRowView[];
+  cancelled?: BatchesRowView[];
   vessels?: BatchesRowView[];
   readingUnavailable?: boolean;
   empty?: EmptyState;
@@ -34,6 +35,7 @@ export type BatchesSnapshot = {
   planned?: BatchesRowView[];
   active?: BatchesRowView[];
   completed?: BatchesRowView[];
+  cancelled?: BatchesRowView[];
   vessels?: BatchesRowView[];
   readingUnavailable?: boolean;
   empty?: EmptyState;
@@ -48,23 +50,25 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
     planned,
     active,
     completed: s.completed,
+    cancelled: s.cancelled,
     vessels: s.vessels,
     readingUnavailable: s.readingUnavailable,
-    empty: s.empty ?? (planned.length === 0 && active.length === 0 && !s.completed?.length ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
+    empty: s.empty ?? (planned.length === 0 && active.length === 0 && !s.completed?.length && !s.cancelled?.length ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 3,
     workTabs: WORK_TABS,
   };
 }
 
-export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null };
+export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at?: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string }): BatchesSnapshot {
-  const snapshot: BatchesSnapshot = { title: "Work", subtitle: "brewed and planned", planned: [], active: [], completed: [], readingUnavailable: batches.some(batch => batch.brewed_on && !batch.closed_at), vessels: vessels.map(vessel => ({ key: vessel.id, title: vessel.name, detail: `${vessel.kind} · ${Number(vessel.capacity_bbl)} bbl${vessel.active ? "" : " · inactive"}`, verb: "Edit", tone: "info", href: hrefs?.vessel(vessel.id) })) };
+  const snapshot: BatchesSnapshot = { title: "Work", subtitle: "brewed and planned", planned: [], active: [], completed: [], cancelled: [], readingUnavailable: batches.some(batch => batch.brewed_on && !batch.closed_at), vessels: vessels.map(vessel => ({ key: vessel.id, title: vessel.name, detail: `${vessel.kind} · ${Number(vessel.capacity_bbl)} bbl${vessel.active ? "" : " · inactive"}`, verb: "Edit", tone: "info", href: hrefs?.vessel(vessel.id) })) };
   for (const batch of batches) {
-    const row: BatchesRowView = { key: batch.id, title: batNo(batch.batch_no), detail: `${batch.brand_name ?? "no brand yet"} · ${batch.recipe_name ?? "no recipe"} · ${Number(batch.planned_bbl)} bbl · ${formatDate(batch.planned_on)}${batch.vessel_name ? ` · ${batch.vessel_name}` : ""}`, verb: batch.brewed_on || batch.closed_at ? "Open" : "Brew", tone: batch.brewed_on || batch.closed_at ? "primary" : "info", href: hrefs?.batch(batch.id) };
-    (batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!.push(row);
+    const brewable = !batch.brewed_on && !batch.closed_at && !batch.cancelled_at;
+    const row: BatchesRowView = { key: batch.id, title: batNo(batch.batch_no), detail: `${batch.brand_name ?? "no brand yet"} · ${batch.recipe_name ?? "no recipe"} · ${Number(batch.planned_bbl)} bbl · ${formatDate(batch.planned_on)}${batch.vessel_name ? ` · ${batch.vessel_name}` : ""}`, verb: brewable ? "Brew" : "Open", tone: brewable ? "info" : "primary", href: hrefs?.batch(batch.id) };
+    (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!.push(row);
   }
   return snapshot;
 }

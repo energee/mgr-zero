@@ -6,6 +6,7 @@ export type ClosePackagingRunViewModel = {
   title: string;
   brand?: string;
   plannedOn?: string;
+  cancelledAt?: string | null;
   plannedOutputs?: [string, string | number, string | number][];
   showCloseReview?: boolean;
   source?: string;

@@ -1,6 +1,9 @@
 // app/(app)/packaging/[id]/page.tsx — one packaging run: planned facts and
 // its planned outputs, with the one next action for its state (run-actions.tsx):
-// pick a tank, start, or close. get_packaging_run is the read.
+// pick a tank, start, or close; before it starts, reschedule or cancel the
+// plan (plan-actions.tsx). get_packaging_run is the read.
+import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
+import { ChangePlan } from "../../plan-actions";
 import { E } from "@/components/mgr/e";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
@@ -15,11 +18,10 @@ import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
-  started_at: string | null; closed_at: string | null; bbl_drawn: number | null; note: string | null;
+  cancelled_at: string | null; started_at: string | null; closed_at: string | null; bbl_drawn: number | null; note: string | null;
   brand_name: string | null; vessel_name: string | null;
 };
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
-type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
@@ -28,7 +30,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
-  const picking = !run.closed_at && !run.occupancy_id;
+  const picking = !run.cancelled_at && !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
   const [occupancies, locations, bins, today] = (await Promise.all([
     picking ? runCommand("list_occupancies", {}, ctx) : [],
@@ -41,7 +43,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging", backHref: "/packaging" }}
+        model={{ title, backTo: "Packaging runs", backHref: "/packaging" }}
         fields={
           <>
             {E.fld("Barrels drawn", run.bbl_drawn === null ? "—" : Number(run.bbl_drawn))}
@@ -55,10 +57,11 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   return (
     <ClosePackagingRunView
       model={{
-        title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—",
-        plannedOn: run.planned_on, source: run.vessel_name ?? "no source yet", showCloseReview: false,
-        plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "—" : Number(o.qty_actual)]),
+        title, backTo: "Packaging runs", backHref: "/packaging", brand: run.brand_name ?? "—",
+        plannedOn: run.planned_on, cancelledAt: run.cancelled_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
+        plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "Not recorded" : Number(o.qty_actual)]),
       }}
+      planActions={!run.started_at ? <ChangePlan kind="packaging_run" id={run.id} plannedOn={run.planned_on} /> : undefined}
       action={
         <>
           {E.sp()}
