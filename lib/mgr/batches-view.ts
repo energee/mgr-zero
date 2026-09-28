@@ -68,7 +68,7 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
   for (const batch of batches) {
     const brewable = !batch.brewed_on && !batch.closed_at && !batch.cancelled_at;
     const row: BatchesRowView = { key: batch.id, title: batNo(batch.batch_no), detail: `${batch.brand_name ?? "no brand yet"} · ${batch.recipe_name ?? "no recipe"} · ${Number(batch.planned_bbl)} bbl · ${formatDate(batch.planned_on)}${batch.vessel_name ? ` · ${batch.vessel_name}` : ""}`, verb: brewable ? "Brew" : "Open", tone: brewable ? "info" : "primary", href: hrefs?.batch(batch.id) };
-    if (batch.brewed_on && !batch.closed_at && !batch.cancelled_at) {
+    if (batch.brewed_on && !batch.closed_at) {
       row.readings = (batch.active_occupancies ?? []).map(occupancy => ({
         key: occupancy.id, title: occupancy.vessel_name,
         detail: occupancy.latest_reading ? `${formatVesselReading(occupancy.latest_reading, display.unit)} · ${formatDateTime(occupancy.latest_reading.at, display.timeZone)}` : "No readings yet",
