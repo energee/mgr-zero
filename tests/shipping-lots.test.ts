@@ -17,7 +17,7 @@ beforeAll(async () => {
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   const vessel = await runCommand("upsert_vessel", { name: "Trace tank", kind: "fermenter", capacityBbl: 60 }, ctx) as { id: string };
   const batch = await runCommand("schedule_batch", { plannedOn: "2026-09-01", plannedBbl: 30, intendedBrandId: cat.brandId }, ctx) as { id: string };
-  const day = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-09-01" }, ctx) as { occupancy: { id: string } };
+  const day = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-09-01" }, ctx) as { occupancy: { id: string } };
   for (let n = 0; n < 2; n++) {
     const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2026-09-02", occupancyId: day.occupancy.id, outputs: [{ skuId: cat.skuId, qtyPlanned: 20 }] }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T14:00:00Z" }, ctx);
