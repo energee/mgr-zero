@@ -41,3 +41,10 @@ it("shares plan controls across inventory and live views and hides them for canc
   // Inventory frames pass the same PlanActions the live pages bind.
   expect(readFileSync("components/mgr/screens.tsx", "utf8").match(/planActions=\{<PlanActions /g)).toHaveLength(2);
 });
+
+it("confirms plan cancellation with the shared destructive confirm sheet", () => {
+  const source = readFileSync("components/mgr/views/plan-actions.tsx", "utf8");
+  expect(source).toContain("<ConfirmDeleteControl");
+  expect(source).not.toContain("setConfirming");
+  expect(readFileSync("components/mgr/views/confirm-delete.tsx", "utf8")).toMatch(/busyLabel/);
+});

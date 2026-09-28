@@ -1,12 +1,13 @@
 "use client";
 
 // Shared confirm-delete sheet: one destructive trigger, two lines of copy, a
-// Cancel/Delete footer. Entity controls (customer, format) supply the copy.
+// Cancel/Delete footer. Entity controls (customer, format) and plan
+// cancellation supply the copy; the footer labels default to a delete.
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 
-export function ConfirmDeleteControl({ title, name, warning, busy = false, error, onDelete, size }: {
+export function ConfirmDeleteControl({ title, name, warning, busy = false, error, onDelete, size, dismissLabel = "Cancel", busyLabel = "Deleting…" }: {
   /** Sheet title and trigger label, e.g. "Delete customer". */
   title: string;
   /** What is being deleted; the first sentence, may hold `<strong>`. */
@@ -18,6 +19,10 @@ export function ConfirmDeleteControl({ title, name, warning, busy = false, error
   /** Resolves true when the delete succeeded and the sheet may close. */
   onDelete?: () => Promise<boolean>;
   size?: "sm";
+  /** Footer button that closes the sheet without acting. */
+  dismissLabel?: string;
+  /** Confirm button label while the action runs. */
+  busyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return <CommandForm open={open} onOpenChange={next => { if (!busy) setOpen(next); }} title={title}
@@ -31,8 +36,8 @@ export function ConfirmDeleteControl({ title, name, warning, busy = false, error
       <p className="text-sm text-muted-foreground">{warning}</p>
       <CommandFormMessage error={error} />
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
-        <Button type="submit" variant="destructive" disabled={busy}>{busy ? "Deleting…" : title}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>{dismissLabel}</Button>
+        <Button type="submit" variant="destructive" disabled={busy}>{busy ? busyLabel : title}</Button>
       </div>
     </form>
   </CommandForm>;

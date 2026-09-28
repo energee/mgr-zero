@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { ConfirmDeleteControl } from "./confirm-delete";
 
 /** The one notice a cancelled batch or packaging plan shows in place of its actions. */
 export function PlanCancelled() {
@@ -11,20 +12,17 @@ export function PlanCancelled() {
 /** Date changes and cancellation share the same controls for batch and packaging plans. */
 export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCancel }: {
   plannedOn: string; busy?: boolean; error?: string | null;
-  onReschedule?: (date: string) => void; onCancel?: () => void;
+  onReschedule?: (date: string) => void; onCancel?: () => Promise<boolean>;
 }) {
   const [date, setDate] = useState(plannedOn);
-  const [confirming, setConfirming] = useState(false);
   return <section className="flex flex-col gap-3" aria-label="Change plan">
     {E.ttl("Change plan")}
     {E.edit("Planned date", date, "date", undefined, { onChange: setDate, disabled: busy, required: true })}
     <CommandFormMessage error={error} />
     {E.act("Reschedule", "primary", undefined, () => onReschedule?.(date), busy || !date || date === plannedOn)}
-    {confirming ? <>
-      {E.note("Cancel this plan? The record stays in history. No stock or beer is moved.")}
-      {E.act("Confirm cancellation", "destructive", undefined, onCancel, busy)}
-      {E.act("Keep plan", "info", undefined, () => setConfirming(false), busy)}
-    </> : E.act("Cancel plan", "destructive", undefined, () => setConfirming(true), busy)}
+    <ConfirmDeleteControl title="Cancel plan" name="Cancel this plan? The record stays in history."
+      warning="No stock or beer is moved. Plans with recorded physical work cannot be cancelled."
+      busy={busy} error={error} onDelete={onCancel} dismissLabel="Keep plan" busyLabel="Cancelling…" />
   </section>;
 }
 

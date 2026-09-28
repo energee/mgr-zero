@@ -14,5 +14,5 @@ export function ChangePlan({ kind, id, plannedOn }: { kind: keyof typeof COMMAND
   const { reschedule, cancel, idKey } = COMMANDS[kind];
   return <PlanActions plannedOn={plannedOn} busy={busy} error={error}
     onReschedule={date => { void run(reschedule, { [idKey]: id, plannedOn: date }); }}
-    onCancel={() => { void run(cancel, { [idKey]: id }); }} />;
+    onCancel={() => run(cancel, { [idKey]: id })} />;
 }
