@@ -20,8 +20,8 @@ const matrix = {
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
-  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", packaging_runs: "deny",
-  lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
+  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", packaging_runs: "deny",
+  lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
@@ -97,6 +97,7 @@ async function fixtures() {
   const vessel2 = await put("vessels", { name: "FV2", kind: "fermenter", capacity_bbl: 10 });
   const batch = await put("batches", { planned_on: day, planned_bbl: 10, intended_brand_id: cat.brandId, created_by: owner.id });
   const occupancy = await put("vessel_occupancies", { vessel_id: vessel.id, batch_id: batch.id, initial_bbl: 10 });
+  await put("brew_records", { batch_id: batch.id, occupancy_id: occupancy.id, brewed_on: day, initial_bbl: 10, plan_snapshot: {}, process: {}, created_by: owner.id });
   const occupancy2 = await put("vessel_occupancies", { vessel_id: vessel2.id, batch_id: batch.id });
   await put("transfers", { from_occupancy_id: occupancy.id, to_occupancy_id: occupancy2.id, bbl: 1, created_by: owner.id });
   await put("volume_adjustments", { occupancy_id: occupancy.id, bbl: -1, reason: "loss", created_by: owner.id });
@@ -107,6 +108,8 @@ async function fixtures() {
   await put("lots", { packaging_run_id: run.id, brand_id: cat.brandId, code: "PRIVATE-LOT", packaged_on: day });
   await put("packaging_run_outputs", { run_id: run.id, sku_id: cat.skuId, qty_planned: 1 });
   await put("packaging_run_consumptions", { run_id: run.id, movement_id: consumption.id });
+  const packagingRecord = await put("packaging_material_records", { run_id: run.id, planned: [], created_by: owner.id });
+  await put("packaging_material_actuals", { record_id: packagingRecord.id, material_id: material.id, location_id: wh.id, bin_id: wh.binId, material_name: "Fixture material", unit: "lb", location_name: "Warehouse", bin_name: "Default", qty_used: 1, qty_loss: 0, qty_unused: 0, used_movement_id: consumption.id });
   await put("material_contracts", { vendor_id: vendor.id, material_id: material.id, qty_committed: 100 });
   const po = await put("purchase_orders", { vendor_id: vendor.id, status: "sent", sent_via: "external", created_by: owner.id });
   const poLine = await put("purchase_order_lines", { po_id: po.id, material_id: material.id, qty_ordered: 1 });
@@ -314,7 +317,12 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     begin_square_menu_publication: [B,"L1",false,R()],
     begin_square_publication: [B,"L1",BRAND,null,null,false,"publish_pos_item",R(),null],
     begin_square_sales_sync: [B,R()],
-    close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R()],
+    packaging_material_plan: [B,[{sku_id:SKU,qty_planned:1}]],
+    get_packaging_material_plan: [B,[{sku_id:SKU,qty_planned:1}]],
+    get_packaging_close_plan: [B,readyRun.id],
+    get_packaging_material_record: [B,readyRun.id],
+    correct_packaging_material_record: [B,R(),"Correction",[],R()],
+    close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R(),[],"reviewed"],
     complete_batch: [B,f.batch.id,R()],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
@@ -325,7 +333,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],
     portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
-    record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R()], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
+    record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R(),[],{},true],
+    correct_brew_record: [B,R(),"Test correction",1,[],{},true,R()],
+    get_brew_day_plan: [B,plannedBatch.id], get_brew_record: [B,plannedBatch.id], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
     record_batch_addition: [B,f.occupancy.id,MAT,"dry_hop",null,1,null,R()],
     record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R()],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R(),null], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],

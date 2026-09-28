@@ -4,6 +4,7 @@
 // plan (plan-actions.tsx). get_packaging_run is the read.
 import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { ChangePlan } from "../../plan-actions";
+import type { PackagingClosePlan, PackagingMaterialRecord } from "@/lib/mgr/packaging-actuals";
 import { E } from "@/components/mgr/e";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
@@ -14,6 +15,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runNo } from "@/lib/mgr/doc-no";
+import { MaterialCorrection } from "./material-correction";
 import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
 
 type Run = {
@@ -32,25 +34,30 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
   const picking = !run.cancelled_at && !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
-  const [occupancies, locations, bins, today] = (await Promise.all([
+  const needsMaterials = closing || !!run.closed_at;
+  const [occupancies, locations, bins, today, closePlan, materialHistory] = (await Promise.all([
     picking ? runCommand("list_occupancies", {}, ctx) : [],
-    closing ? runCommand("list_locations", {}, ctx) : [],
-    closing ? runCommand("list_bins", {}, ctx) : [],
+    needsMaterials ? runCommand("list_locations", {}, ctx) : [],
+    needsMaterials ? runCommand("list_bins", {}, ctx) : [],
     closing ? breweryToday(ctx) : "",
-  ])) as [Occupancy[], Location[], Bin[], string];
-
+    closing ? runCommand("get_packaging_close_plan", { runId: id }, ctx) : null,
+    run.closed_at ? runCommand("get_packaging_material_record", { runId: id }, ctx) : { records: [] },
+  ])) as [Occupancy[], Location[], Bin[], string, PackagingClosePlan | null, { records: PackagingMaterialRecord[] }];
+  const latest = materialHistory.records.at(-1);
+  // A closed run needs the current plan only to correct its latest record.
+  const correctionPlan = latest ? await runCommand("get_packaging_close_plan", { runId: id }, ctx) as PackagingClosePlan : null;
   const title = runNo(run.run_no);
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging runs", backHref: "/packaging" }}
+        model={{ title, backTo: "Packaging runs", backHref: "/packaging", records: materialHistory.records }}
         fields={
           <>
             {E.fld("Barrels drawn", run.bbl_drawn === null ? "—" : Number(run.bbl_drawn))}
-            {E.info("Closed: lot, finished goods and material consumption are on the ledger.")}
+            {E.info("Closed: lot, finished goods and confirmed material usage are on the ledger.")}
           </>
         }
-        action={null}
+        action={latest && correctionPlan ? <MaterialCorrection key={latest.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );
   }
@@ -69,7 +76,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
             ? <PickTankForm runId={run.id} occupancies={occupancies} />
             : !run.started_at
               ? <StartRunButton runId={run.id} />
-              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} />}
+              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={closePlan!} />}
         </>
       }
     />

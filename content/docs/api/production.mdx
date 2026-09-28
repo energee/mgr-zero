@@ -46,6 +46,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "complete_batch", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## correct_brew_record [#correct_brew_record]
+
+`command` · admin, brewer
+
+Correct an unused brew record with linked material reversals, replacement actuals and a measurement delta
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `recordId` | uuid | yes |
+| `reason` | string | yes |
+| `initialBbl` | number | yes |
+| `actuals` | array of object | yes |
+| `process` | object | no |
+| `confirmEmpty` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "correct_brew_record", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recordId": "00000000-0000-0000-0000-000000000000", "reason": "string", "initialBbl": 1, "actuals": [ { "materialId": "00000000-0000-0000-0000-000000000000", "stage": "mash", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 ## create_recipe [#create_recipe]
 
 `command` · admin, brewer
@@ -124,6 +146,40 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brew_day", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_brew_day_plan [#get_brew_day_plan]
+
+`query` · admin, brewer
+
+Pinned recipe plan and available exact material sources for actual brew-day confirmation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brew_day_plan", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_brew_record [#get_brew_record]
+
+`query` · admin, brewer
+
+Frozen brew record revisions and their confirmed source-linked material additions
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brew_record", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## get_recipe [#get_recipe]
@@ -246,7 +302,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Record that a scheduled batch was brewed: stamps the brew date and moves it into a vessel that is not already occupied
+Record actual ingredient sources, confirmed process and a frozen brew sheet with the batch date and knockout occupancy
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -254,6 +310,9 @@ Record that a scheduled batch was brewed: stamps the brew date and moves it into
 | `vesselId` | uuid | yes |
 | `initialBbl` | number | yes |
 | `brewedOn` | date (YYYY-MM-DD) | yes |
+| `actuals` | array of object | no |
+| `process` | object | no |
+| `confirmEmpty` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -391,7 +450,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-20 of the 21 operations in this area are available today; the 1 below are not.
+23 of the 24 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

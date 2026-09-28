@@ -6,13 +6,16 @@
 // components/mgr/command-form.tsx), and hands back its `run` so a sheet's
 // secondary verb (Remove, Delete, Clear) shares the one error slot that closing
 // clears (#447). Forms own only their fields and how to build the command input.
+// useRetainedCommand is for one irreversible write whose outcome can be unknown:
+// it keeps the exact request (id, input, context) and resends it unchanged.
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
 import { beginRecovery, finishRecovery, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
-import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
+import { classifyCommandFailure, command, CommandResponseError, type CommandFailureDetail } from "./client";
+import { canRetireCommandFailure } from "./failure";
 
 export function useCommandAction() {
   const breweryId = useBrewery();
@@ -100,4 +103,34 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
   }
 
   return { open, setOpen, error, failure, submitting: running === name, busy: running !== null, submit, run };
+}
+
+/** One irreversible command whose exact request is kept after an uncertain
+ *  failure (`phase: "unknown"`), so Retry resends it unchanged instead of
+ *  creating a second write. A definitive refusal (canRetireCommandFailure, or
+ *  `retire` for a caller-specific code) drops the request so edits can resume. */
+export function useRetainedCommand(name: string, { fallback, retire }: { fallback: string; retire?: (cause: CommandResponseError) => boolean }) {
+  const breweryId = useBrewery();
+  const context = useCommandContext();
+  const router = useRouter();
+  const [phase, setPhase] = useState<"idle" | "busy" | "unknown">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const attempt = useRef<{ requestId: string; input: unknown; context: typeof context } | null>(null);
+
+  /** `build` runs only for a fresh attempt; a retry reuses the retained input. */
+  async function submit(build: () => unknown) {
+    if (phase === "busy") return;
+    const retrying = phase === "unknown";
+    if (!attempt.current) attempt.current = { requestId: crypto.randomUUID(), input: build(), context };
+    setPhase("busy"); setError(null);
+    try {
+      await command(breweryId, name, attempt.current.input, attempt.current.requestId, attempt.current.context);
+      attempt.current = null; setPhase("idle"); router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : fallback);
+      if (cause instanceof CommandResponseError && (retire?.(cause) || canRetireCommandFailure(cause.status, retrying, cause.code))) { attempt.current = null; setPhase("idle"); }
+      else setPhase("unknown");
+    }
+  }
+  return { phase, setPhase, error, setError, submit };
 }

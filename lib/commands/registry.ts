@@ -176,6 +176,9 @@ function rpcError(error: { message: string; code?: string }): CommandError {
       console.error("database error 42501:", error.message);
       return new CommandError("permission denied", 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    // A reviewed plan (packaging close) changed underneath the form: nothing
+    // was written, so the client may drop its retained request.
+    case "MG412": return new CommandError(error.message, 409, "stale_plan");
     case "23505":
       console.error("database error 23505:", error.message);
       return new CommandError("That already exists. Use a different name or value.", 409, "conflict");

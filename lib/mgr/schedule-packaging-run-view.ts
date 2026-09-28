@@ -23,8 +23,9 @@ export type SchedulePackagingRunViewModel = {
   /** Absent with no source, or when a planned package's volume is unknown. */
   leftLabel?: string;
   leftInSource?: string;
-  /** Absent until a material-shortfall read exists; the sheet draws it gated. */
+  /** Current material requirement projection for the draft outputs. */
   materials?: (string | number)[][];
+  materialsMessage?: string;
   warning?: string;
 };
 
