@@ -302,8 +302,9 @@ async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id:
       .eq("brewery_id", ctx.breweryId).eq("connection_id", connection.connectionId!).eq("realm_id", connection.realmId!)
       .eq("status", "pushed").eq("entity_type", "Invoice").in("invoice_id", invoices.map(invoice => invoice.id))
       .order("id").range(start, start + PAGE_SIZE - 1)) as (QboPushedIdentity & { invoice_id: string })[] : [];
+  const pushByEntity = new Map(pushes.map(push => [`${push.invoice_id}:${push.qbo_entity_id}`, push]));
   return new Map(invoices.map(invoice => [invoice.id, qboStaffInvoiceLink(invoice, ctx.role, connection,
-    pushes.find(push => push.invoice_id === invoice.id && push.qbo_entity_id === invoice.qbo_invoice_id))]));
+    pushByEntity.get(`${invoice.id}:${invoice.qbo_invoice_id}`))]));
 }
 
 defineQuery({
@@ -315,11 +316,12 @@ defineQuery({
     if (i.customerId) q = q.eq("customer_id", i.customerId);
     const invoices = (await unwrap(newestFirst(q, i.cursor))) as (QboInvoiceIdentity & { id: string; qbo_total_cents: number | null })[];
     const ids = invoices.map(inv => inv.id);
+    const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
     const [totals, pendingPushes] = ids.length ? await Promise.all([
       unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
       unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
     ]) : [[], []];
-    const staffLinks = await invoiceStaffLinks(ctx, invoices);
+    const staffLinks = await staffLinksPromise;
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
     const pending = new Set(pendingPushes.map(push => push.invoice_id));
     return invoices.map(inv => {
