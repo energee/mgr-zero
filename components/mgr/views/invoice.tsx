@@ -43,6 +43,7 @@ export function InvoiceView({
       ))}
       {qbo !== undefined ? qbo : (typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate)}
       {qbo === undefined && quickbooks && E.row("QuickBooks", `${quickbooks.detail}${quickbooks.balanceCents != null && quickbooks.balanceCents > 0 && !quickbooks.detail.includes(money(quickbooks.balanceCents)) ? ` · ${money(quickbooks.balanceCents)} balance` : ""}`, "", quickbooks.healthy ? "ok" : "w")}
+      {qbo === undefined && (quickbooks || !!mappingRows?.length) && E.gated("Open in QuickBooks", "A verified provider link is unavailable. Open QuickBooks separately and find this invoice in the connected company.")}
       {mappingRows?.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : E.act("Fix", "attention", row.href), row.tone ?? "")}</Fragment>
       ))}

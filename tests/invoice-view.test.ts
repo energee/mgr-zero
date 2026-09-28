@@ -115,3 +115,11 @@ describe("Invoice view", () => {
     expect(src).toMatch(/invoiceIsCreditable\(invoice\) && canRun\(ctx, "return_shipment"\)/);
   });
 });
+
+
+it.each(["Not pushed", "Disconnected", "Deleted in QuickBooks", "Pushed to QuickBooks"])("keeps staff navigation unavailable for %s without a verified destination", detail => {
+  const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail, balanceCents: null, healthy: detail === "Pushed to QuickBooks" } }));
+  expect(html).toContain("Open in QuickBooks");
+  expect(html).toContain("A verified provider link is unavailable");
+  expect(html).not.toMatch(/href="https:\/\/(?:qbo|sandbox|connect)\.intuit/);
+});
