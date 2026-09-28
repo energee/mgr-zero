@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { historyPage } from "@/lib/mgr/history-page";
+import { historyPage, pageCursor } from "@/lib/mgr/history-page";
 import { HistoryNavigation } from "@/components/mgr/views/history-navigation";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { InvoicesView } from "@/components/mgr/views/invoices";
@@ -43,4 +43,10 @@ it("all four inventory/live views mount the same continuation control", () => {
     expect(html).toContain('href="/next"');
     expect(html).toContain('href="/newest"');
   }
+});
+
+it("reads only a well-formed single cursor from the URL; anything else opens the newest page", () => {
+  const cursor = "2026-09-20T12:00:00.123456+00:00~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10";
+  expect(pageCursor(cursor)).toBe(cursor);
+  for (const bad of [undefined, "", "garbage", "2026-09-20~not-a-uuid", [cursor, cursor]]) expect(pageCursor(bad)).toBeUndefined();
 });

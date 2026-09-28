@@ -1,4 +1,4 @@
-import { historyPage, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
+import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { toInvoiceListRow, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -7,8 +7,8 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboSyncButton } from "@/app/(app)/settings/accounting/qbo-controls";
 
-export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
-  const { cursor } = await searchParams;
+export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
+  const cursor = pageCursor((await searchParams).cursor);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canManage = brewery.role === "admin" || brewery.role === "sales";

@@ -1,4 +1,13 @@
+import { historyInput } from "@/lib/commands/history";
+
 export const HISTORY_PAGE_SIZE = 50;
+
+/** The URL's cursor when it is one well-formed value. A hand-edited or repeated
+ *  cursor opens the newest page: the app only ever links valid ones, and the
+ *  newest page is what Newest would show anyway. */
+export function pageCursor(value: unknown) {
+  return historyInput.cursor.safeParse(value).data;
+}
 export type HistoryRow = { id: string; created_at: string };
 
 /** The extra query row proves another page exists; it is displayed on that next page. */
