@@ -44,7 +44,7 @@ describe("order commands", () => {
     }, adminCtx)).rejects.toThrow(/validation failed/);
   });
   it("list_orders filters by status", async () => {
-    const rows = await runCommand("list_orders", { status: "confirmed" }, adminCtx) as { status: string }[];
+    const { rows } = await runCommand("list_orders", { status: "confirmed" }, adminCtx) as { rows: { status: string }[] };
     expect(rows.every(r => r.status === "confirmed")).toBe(true);
   });
 });

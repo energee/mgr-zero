@@ -30,8 +30,20 @@ type HistoryQuery<Q> = {
 };
 
 /** Newest first, after the cursor. The cursor depends on this exact created_at, id order.
- *  Callers keep `.limit(i.limit)` beside `.from(` so tests/unpaged-reads.test.ts sees the bound. */
+ *  Callers keep `.limit(i.limit + 1)` beside `.from(` so tests/unpaged-reads.test.ts sees the
+ *  bound; the extra row is the lookahead historyResult reads. */
 export function newestFirst<Q extends HistoryQuery<Q>>(q: Q, cursor: string | undefined): Q {
   const ordered = q.order("created_at", { ascending: false }).order("id", { ascending: false });
   return cursor ? ordered.or(historyBefore(cursor)) : ordered;
+}
+
+/** What every history query returns: one page, and the cursor for the next one
+ *  (null on the last page). */
+export type HistoryPage<T> = { rows: T[]; nextCursor: string | null };
+
+/** Turns `limit + 1` fetched rows into one page: the extra row only proves
+ *  another page exists, and the next page starts with it. */
+export function historyResult<T extends HistoryRow>(fetched: T[], limit: number): HistoryPage<T> {
+  const rows = fetched.slice(0, limit);
+  return { rows, nextCursor: fetched.length > limit ? historyCursor(rows.at(-1)!) : null };
 }

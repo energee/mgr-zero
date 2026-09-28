@@ -1,7 +1,7 @@
 // lib/commands/orders.ts — order lifecycle commands. Every mutation delegates
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
-import { historyInput, newestFirst } from "./history";
+import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
@@ -222,11 +222,11 @@ defineQuery({
   name: "list_orders", description: "Orders newest-first, optionally by status and customer",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), ...historyInput }),
-  handler: (ctx, i) => {
-    let q = ctx.db.from("orders").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit);
+  handler: async (ctx, i) => {
+    let q = ctx.db.from("orders").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.status) q = q.eq("status", i.status);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    return unwrap(newestFirst(q, i.cursor));
+    return historyResult(await unwrap(newestFirst(q, i.cursor)) as HistoryRow[], i.limit);
   },
 });
 
@@ -295,9 +295,10 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), ...historyInput }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit);
+    let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    const invoices = (await unwrap(newestFirst(q, i.cursor))) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
+    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) as (HistoryRow & { kind: "invoice" | "credit_memo"; qbo_total_cents: number | null })[], i.limit);
+    const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);
     const [totals, pendingPushes] = ids.length ? await Promise.all([
       unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
@@ -305,10 +306,10 @@ defineQuery({
     ]) : [[], []];
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
     const pending = new Set(pendingPushes.map(push => push.invoice_id));
-    return invoices.map(inv => {
+    return { ...page, rows: invoices.map(inv => {
       const subtotal_cents = subtotalById.get(inv.id) ?? 0;
       return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id) };
-    });
+    }) };
   },
 });
 

@@ -428,14 +428,14 @@ describe("portal commands", () => {
     const { error } = await admin.from("orders").insert({ brewery_id: b.id, kind: "wholesale", customer_id: otherCustomer.customerId, ship_to_id: otherCustomer.shipToId, from_location_id: warehouseId, sale_channel_id: otherCustomer.saleChannelId, created_by: adminCtx.userId });
     expect(error).toBeNull();
 
-    const orders = await runCommand("portal_orders", {}, custCtx) as { customer_id: string }[];
+    const { rows: orders } = await runCommand("portal_orders", {}, custCtx) as { rows: { customer_id: string }[] };
     expect(orders.length).toBeGreaterThan(0);
     expect(orders.every(o => o.customer_id === customerId)).toBe(true);
 
     const { data: inv } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: customerId, kind: "invoice" }).select().single();
     await admin.from("invoices").insert({ brewery_id: b.id, customer_id: otherCustomer.customerId, kind: "invoice" });
 
-    const invoices = await runCommand("portal_invoices", {}, custCtx) as { id: string; customer_id: string }[];
+    const { rows: invoices } = await runCommand("portal_invoices", {}, custCtx) as { rows: { id: string; customer_id: string }[] };
     expect(invoices.some(i => i.id === inv!.id)).toBe(true);
     expect(invoices.every(i => i.customer_id === customerId)).toBe(true);
   });

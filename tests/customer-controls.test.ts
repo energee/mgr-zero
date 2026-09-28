@@ -93,7 +93,7 @@ describe("customer controls", () => {
       const row = await admin.from("orders").insert({ brewery_id: breweryId, kind: "wholesale", customer_id: customerId, ship_to_id: ship.id, from_location_id: loc.data.id, sale_channel_id: channel, created_by: ctx.userId, status });
       expect(row.error).toBeNull();
     }
-    const orders = await runCommand("list_orders", { customerId: a.id, status: "draft" }, ctx) as { customer_id: string; status: string }[];
+    const { rows: orders } = await runCommand("list_orders", { customerId: a.id, status: "draft" }, ctx) as { rows: { customer_id: string; status: string }[] };
     expect(orders).toHaveLength(1);
     expect(orders[0]).toMatchObject({ customer_id: a.id, status: "draft" });
   });

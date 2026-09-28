@@ -248,7 +248,7 @@ describe("portal user revocation", () => {
     expect((await admin.auth.admin.getUserById(user.id)).data.user?.id).toBe(user.id);
     expect((await live.db.from("customers").select("id")).data).toEqual([]);
     expect((await live.db.from("orders").select("id")).data).toEqual([]);
-    await expect(runCommand("portal_orders", {}, live)).resolves.toEqual([]);
+    await expect(runCommand("portal_orders", {}, live)).resolves.toEqual({ rows: [], nextCursor: null });
     await expect(runCommand("portal_create_order", order, live)).rejects.toMatchObject({ code: "permission_denied" });
     // the next request resolves no membership, so the portal layout sends them away
     expect(await createRequestAuthContext(async () => live.db).getCustomerMemberships()).toEqual([]);
