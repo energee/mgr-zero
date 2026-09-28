@@ -1,6 +1,3 @@
-import "@/lib/commands/all";
-import { runCommand } from "@/lib/commands/registry";
-import type { AccountInvitation } from "@/lib/mgr/account-invitations";
 import type { Database } from "@/lib/supabase/database";
 // app/(auth)/auth/confirm/route.ts — where a Supabase Auth email link lands
 // (password recovery today). Exchanges the one-time code for a session cookie,
@@ -8,7 +5,7 @@ import type { Database } from "@/lib/supabase/database";
 // on Expired reset copy at /reset instead of opening the password form.
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { inviteAudience, safeNextUrl } from "@/lib/auth/invite";
+import { hasPendingInvitations, inviteAudience, safeNextUrl } from "@/lib/auth/invite";
 import { publicEnv } from "@/lib/env/public";
 
 function authClient(req: NextRequest) {
@@ -47,17 +44,9 @@ export async function GET(req: NextRequest) {
   }
   if (code) {
     const { db, redirect } = authClient(req);
-    const { error } = await db.auth.exchangeCodeForSession(code);
+    const { data, error } = await db.auth.exchangeCodeForSession(code);
     if (!error) {
-      if (new URL(next).pathname === "/") {
-        const { data } = await db.auth.getUser();
-        if (data.user) {
-          const pending = await runCommand("list_my_invitations", {}, {
-            db, userId: data.user.id, breweryId: null, role: null,
-          }) as AccountInvitation[];
-          if (pending.length) return redirect("/invitations");
-        }
-      }
+      if (new URL(next).pathname === "/" && await hasPendingInvitations(db, data.user.id)) return redirect("/invitations");
       return redirect(next);
     }
     return redirect("/reset?expired=1");

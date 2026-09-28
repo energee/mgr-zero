@@ -3,8 +3,7 @@
 // rechecks ownership, balance and QuickBooks state before redirecting.
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { Button } from "@/components/ui/button";
-import { getActiveCustomer } from "@/lib/portal";
-import { buildContext } from "@/lib/commands/context";
+import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -14,8 +13,7 @@ import { QuestionForm } from "./question-form";
 export default async function PortalInvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ payment?: string }> }) {
   const { id } = await params;
   const failedPayment = (await searchParams).payment === "unavailable";
-  const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId, customer.customerId);
+  const { customer, ctx } = await getPortalContext();
   const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
   const model = toPortalInvoiceViewProps({ ...snapshot, backHref: "/portal/invoices" });
   // The Pay route redirects here with ?payment=unavailable when QuickBooks

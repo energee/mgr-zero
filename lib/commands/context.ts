@@ -1,5 +1,5 @@
-import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/database";
+import { pickedCustomerId } from "@/lib/portal";
 // lib/commands/context.ts — resolves a command caller's verified identity and brewery membership.
 import { cache } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -110,7 +110,9 @@ export const buildContext = cache(cookieContext);
 
 // Route handlers have no React Server Component cache, so compose explicitly.
 export async function buildRouteContext(breweryId?: string, expected?: CommandContextExpectation): Promise<OperationCtx> {
-  const customerId = expected?.customerId ? (await cookies()).get("customer")?.value ?? expected.customerId : undefined;
+  // A buyer's request resolves the customer they currently have selected, so a
+  // stale tab expecting another account fails assertExpectedContext.
+  const customerId = expected?.customerId ? await pickedCustomerId() ?? expected.customerId : undefined;
   return buildCookieContext(breweryId, createRequestAuthContext(), expected, customerId);
 }
 

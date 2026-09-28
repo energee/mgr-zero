@@ -59,7 +59,6 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_customer_user", { p_brewery: ctx.breweryId, p_customer: i.customerId, p_user: i.userId, p_request_id: execution.requestId })),
 });
 
-
 definePreTenantQuery({
   name: "list_my_invitations", description: "List pending invitations for this signed-in account.",
   input: z.object({}), handler: ctx => unwrap(ctx.db.rpc("list_my_invitations")),

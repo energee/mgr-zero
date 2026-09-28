@@ -19,7 +19,9 @@ export function InviteForm({ customerId }: { customerId?: string }) {
     const name = customerId ? "invite_customer_user" : "invite_staff";
     const input = customerId ? { email, customerId } : { email, role };
     await action.run(name, input, data => {
-      setEmail(""); setRole("warehouse"); setOpen(false); setSent(data && typeof data === "object" && "state" in data && data.state === "pending_consent"
+      const pending = (data as { state?: string } | null)?.state === "pending_consent";
+      setEmail(""); setRole("warehouse"); setOpen(false);
+      setSent(pending
         ? "Invitation pending. Ask the recipient to sign in and open Invitations to accept with their existing account."
         : "Invite sent. The recipient can set their name and password from the email.");
     });

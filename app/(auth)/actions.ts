@@ -8,12 +8,14 @@
 import "@/lib/commands/all";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand, CommandError } from "@/lib/commands/registry";
-import type { AccountInvitation } from "@/lib/mgr/account-invitations";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
-import { acceptInviteErrorPath, inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
+
+/** The brewery and customer selection cookies share these options. */
+const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
 
 /** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
 async function home(auth: ReturnType<typeof createRequestAuthContext>) {
@@ -34,8 +36,8 @@ export async function login(form: FormData) {
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
   if (!identity) redirect(`${back}?error=1`);
-  const pending = await runCommand("list_my_invitations", {}, { db, userId: identity.userId, breweryId: null, role: null }) as AccountInvitation[];
-  redirect(pending.length ? "/invitations" : await home(auth));
+  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), home(auth)]);
+  redirect(pending ? "/invitations" : destination);
 }
 
 /** Passwordless sign-in: the shared staff entry view's secondary action. */
@@ -91,24 +93,26 @@ export async function acceptInvite(form: FormData) {
 
 /** Me: operate as another of the caller's breweries. lib/brewery.ts reads the cookie. */
 export async function switchBrewery(form: FormData) {
-  (await cookies()).set("brewery", String(form.get("breweryId")), { path: "/", sameSite: "lax" });
+  (await cookies()).set("brewery", String(form.get("breweryId")), SELECTION_COOKIE);
   redirect("/");
 }
 
 /** The invitation id is also the stable acceptance request id across reloads. */
 export async function acceptAccountInvitation(form: FormData) {
   const inviteId = String(form.get("inviteId") ?? "");
-  let result: { breweryId: string; kind: string; customerId: string | null };
+  type Accepted = { breweryId: string; kind: string; customerId: string | null };
+  let result: Accepted;
   try {
     result = await runCommand("accept_account_invitation", { inviteId }, await buildContext(), {
       requestId: inviteId, correlationId: crypto.randomUUID(),
-    }) as { breweryId: string; kind: string; customerId: string | null };
+    }) as Accepted;
   } catch (error) {
     if (!(error instanceof CommandError)) throw error;
     redirect("/invitations?error=1");
   }
-  if (result.kind === "staff") (await cookies()).set("brewery", result.breweryId, { path: "/", sameSite: "lax" });
-  if (result.customerId) (await cookies()).set("customer", result.customerId, { path: "/", sameSite: "lax" });
+  const jar = await cookies();
+  if (result.kind === "staff") jar.set("brewery", result.breweryId, SELECTION_COOKIE);
+  if (result.customerId) jar.set("customer", result.customerId, SELECTION_COOKIE);
   redirect(result.kind === "staff" ? "/" : "/portal");
 }
 
@@ -118,6 +122,6 @@ export async function switchCustomer(form: FormData) {
   if (!(await auth.getCustomerMemberships()).some(m => m.customerId === customerId)) {
     throw new CommandError("permission denied", 403, "permission_denied");
   }
-  (await cookies()).set("customer", customerId, { path: "/", sameSite: "lax" });
+  (await cookies()).set("customer", customerId, SELECTION_COOKIE);
   redirect("/portal");
 }
