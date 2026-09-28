@@ -314,16 +314,27 @@ defineCommand({
   })),
 });
 
+const materialCountInput = z.object({
+  locationId: z.string().uuid(), binId: z.string().uuid(),
+  lines: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().nonnegative() })).min(1),
+});
+
+defineQuery({
+  name: "get_material_count_preview", description: "Preview exact base-unit lot adjustments and the stock revision required to record a material count",
+  input: materialCountInput, roles: [...PURCHASING],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_material_count_preview", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_bin: i.binId,
+    p_lines: i.lines.map(line => ({ material_id: line.materialId, qty: line.qty })),
+  })),
+});
+
 defineCommand({
   name: "record_material_count",
-  description: "Cycle count at one bin: one number per material; the count is always recorded and only the variance posts as count_adjustment movements (a shortage from the earliest best-by lots, an overage onto the newest)",
-  input: z.object({
-    locationId: z.string().uuid(), binId: z.string().uuid(), countedOn: isoDate.optional(),
-    lines: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().nonnegative() })).min(1),
-  }),
+  description: "Record the previewed material count at one bin; reject changed stock and post exactly the reviewed lot adjustments",
+  input: materialCountInput.extend({ countedOn: isoDate.optional(), revision: z.string().min(1).optional().describe("Preview revision; omitted only to replay a completed legacy request") }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_material_count", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_bin: i.binId, p_counted_on: i.countedOn ?? null,
-    p_lines: i.lines.map((l) => ({ material_id: l.materialId, qty: l.qty })), p_request_id: execution.requestId,
+    p_lines: i.lines.map((l) => ({ material_id: l.materialId, qty: l.qty })), p_request_id: execution.requestId, p_revision: i.revision,
   })),
 });
