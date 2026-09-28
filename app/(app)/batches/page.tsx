@@ -1,5 +1,5 @@
-import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 // Batches and vessel reads remain at their existing authorized command boundary.
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";

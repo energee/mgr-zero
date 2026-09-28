@@ -1,4 +1,3 @@
-import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 // lib/commands/production.ts — recipes and their immutable versions, the
 // vessels beer sits in, and the batches that fill them. A recipe
 // is a name; how it is brewed lives on a version, and a version is never
@@ -8,6 +7,7 @@ import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 // material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
+import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 import { defineCommand, defineQuery, inChunks, unwrap, CommandError, type Ctx, latestOf } from "./registry";
@@ -349,7 +349,7 @@ defineQuery({
       brand_name: b.intended_brand_id ? brands.get(b.intended_brand_id) ?? null : null,
       recipe_name: b.recipe_version_id ? recipes.get(b.recipe_version_id) ?? null : null,
       vessel_name: vessels.get(b.id)?.map((v) => v.vessel_name).join(", ") || null,
-      active_occupancies: b.brewed_on && !b.closed_at ? vessels.get(b.id) ?? [] : [],
+      active_occupancies: vessels.get(b.id) ?? [],
     }));
   },
 });
