@@ -91,7 +91,7 @@ describe("SCREENS", () => {
     expect(mash).toContain("Saccharification");
     expect(mash).toContain("152 °F");
     expect(mash).toContain("Total 85 min");
-    expect(mash).toMatch(/feeds the prediction/);
+    expect(mash).toMatch(/recorded mash temperature; the gravity prediction does not use it/);
     expect(mash).toContain("Add step");
   });
 

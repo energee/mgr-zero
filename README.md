@@ -1,12 +1,13 @@
 # MGR
 
-MGR is a multi-tenant brewery operations system: catalog, immutable
-inventory ledger, allocations/ATP, CSV import, and staff/customer
-invitations, built on Next.js (App Router, TypeScript) and Supabase
-(Postgres, Auth, RLS). This repo currently covers **Slice 1A — Foundation**
-(tenancy, ledger, catalog; import and invites registered but fail closed) and **Slice 1B — Orders**
-(orders, shipments, invoicing, customer portal). QBO integration and AI
-chat are Slice 1C.
+MGR is a multi-tenant brewery operations system built on Next.js (App
+Router, TypeScript) and Supabase (Postgres, Auth, RLS): catalog, immutable
+inventory ledger, allocations/ATP, staged CSV import, staff and buyer
+invitations (existing accounts accept a pending invitation after signing in),
+orders, shipments, invoicing, the customer portal, brewing, purchasing,
+compliance, QuickBooks (manual payment sync), Square POS, Slack notifications,
+and Ask MGR chat. The staff and portal guides under `content/docs/` describe
+what exists today.
 
 - Documentation: [`content/docs/`](content/docs/) — Fumadocs MDX served at `/docs` (`index.mdx` chooses between the staff and customer-portal guides and the HTTP API reference at `/docs/api`, whose operations are generated from the command registry and the screens by `bun run docs:api`; search at `/api/search`)
 - Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
@@ -22,9 +23,9 @@ and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
 
-Requires Node.js 22.x and Bun 1.3.x. The repository pins Node in `.node-version`
+Requires Node.js 24.x and Bun 1.3.x. The repository pins Node in `.node-version`
 and `package.json`, and Bun in `.bun-version` / `packageManager`; use Bun for
-installs and scripts, and Node 22 as the Next.js runtime.
+installs and scripts, and Node 24 as the Next.js runtime.
 
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
@@ -51,8 +52,9 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract; nothing else is needed in `.env.local`. Rate
-limiting on `/api/command`: not yet implemented (authz audit A1).
+modern environment contract; nothing else is needed in `.env.local`.
+`/api/command` refuses excess requests with `429 rate_limited` and a
+`Retry-After` header.
 
 `VERCEL_ENV` is optional; when set it must be `production`, `preview`, or
 `development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
@@ -131,11 +133,11 @@ never used outside local development). A customer-only account (a
 `customer_users` row with no `brewery_users` row) lands on `/portal` instead
 of `/` after login — that's the wholesale customer portal, not a bug.
 
-Working in a worktree (`.agents/worktrees/<branch>`): `.env.local` is
-gitignored and **not** inherited from the main checkout — copy it in
-(`cp ../../../.env.local .env.local` or similar) before running `bun run test`
-or `bun run dev` there, or Supabase calls fail with `supabaseKey is
-required`.
+Working in a worktree: create it with `scripts/worktree.sh <branch> [base]`.
+It checks out `.agents/worktrees/<branch>`, symlinks the gitignored
+`.env.local` and `.env.test.local` from the main checkout, and runs
+`bun install`. A plain `git worktree add` has neither, so Supabase calls fail
+with `supabaseKey is required`.
 
 ```bash
 bun run dev   # http://localhost:3000
@@ -164,14 +166,14 @@ the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
-Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` prove those commands stay blocked.
+Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` cover staged import rows and staff/buyer invitations.
 
 Tests run against a real local Supabase stack (not a mock), but **their own
 throwaway one**: `bash scripts/test-db.sh` starts a second stack (project
 `mgr_test`, config in `tests/supabase/`, API 54351 / DB 54352, same baseline
 via a migrations symlink), resets its database, and writes `.env.test.local`,
-which vitest pins over inherited Bun/app settings. Local tests fail before setup unless this file names localhost ports 54351/54352 and test credentials. Re-run the script after editing
-`supabase/migrations/00001_baseline.sql`. The app stack (`bunx supabase start`,
+which vitest pins over inherited Bun/app settings. Local tests fail before setup unless this file names localhost ports 54351/54352 and test credentials. Re-run the script after adding a
+migration; it resets automatically when the migrations change. The app stack (`bunx supabase start`,
 5434x) is never touched by tests, so the brewery you are clicking in `next dev`
 survives a test run and stale test rows (see `chat-jobs`) cannot pile up there.
 Without `.env.test.local`, local vitest refuses to run. CI keeps its separately provisioned disposable configuration.

@@ -39,13 +39,13 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
     {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
     {chemistry === "gated"
-      ? E.gated("Suggest additions", "arrives with the material salt field")
+      ? E.gated("Suggest additions", "salt suggestions are not part of this release")
       : E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}
     {chemistry === "ready" && <>
       {E.ttl("Against target")}
       {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
     </>}
-    {chemistry === "gated" && target && source && E.gated("Ion read-out", "arrives with the material salt field")}
+    {chemistry === "gated" && target && source && E.gated("Ion read-out", "salt suggestions are not part of this release")}
   </>;
 }
 
