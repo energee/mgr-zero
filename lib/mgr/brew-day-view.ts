@@ -14,6 +14,8 @@ export type BrewDayViewModel = {
   brewedOn: string;
   vessels: BrewDayVessel[];
   recorded?: boolean;
+  /** A cancelled plan shows only its planned facts and the cancelled notice. */
+  cancelled?: boolean;
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };

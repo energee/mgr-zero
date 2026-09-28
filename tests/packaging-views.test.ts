@@ -55,7 +55,7 @@ describe("packaging views", () => {
 
   it("dates a closed run by when it closed, not when it was planned (#439)", () => {
     const [recent] = toPackagingRunsViewProps([{
-      id: "r", run_no: 7, planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", closed_at: "2026-09-04T18:30:00Z",
+      id: "r", run_no: 7, planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", closed_at: "2026-09-04T18:30:00Z", cancelled_at: null,
       brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
     }], DEMO_TIME_ZONE).recent;
     expect(recent.detail).toMatch(/^closed Sep 4, 2026/);

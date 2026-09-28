@@ -216,7 +216,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(192);
+    expect(SCREENS).toHaveLength(193);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -323,7 +323,7 @@ describe("SCREENS", () => {
 
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
@@ -869,10 +869,16 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO"]) {
+    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
-    for (const s of SCREENS) expect.soft(renderToStaticMarkup(createElement("div", null, s.body)), s.name).not.toMatch(/type="date"/);
+    for (const s of SCREENS) {
+      // DatePicker keeps a non-tabbable hidden input for native required validation.
+      for (const [input] of html(s.name).matchAll(/<input[^>]*type="date"[^>]*>/g)) {
+        expect.soft(input, s.name).toContain('class="sr-only"');
+        expect.soft(input, s.name).toContain('tabindex="-1"');
+      }
+    }
     // No ToggleGroup is left with a single option.
     for (const s of SCREENS) {
       const groups = renderToStaticMarkup(createElement("div", null, s.body)).match(/data-slot="toggle-group"[\s\S]*?(?=data-slot="toggle-group"|$)/g) ?? [];
