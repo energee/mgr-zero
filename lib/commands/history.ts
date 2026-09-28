@@ -14,3 +14,20 @@ export function historyBefore(cursor: string) {
   const [createdAt, id] = cursor.split("~");
   return `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`;
 }
+
+/** The cursor for the last displayed row, read back by historyBefore. */
+export function historyCursor(row: { created_at: string; id: string }) {
+  return `${row.created_at}~${row.id}`;
+}
+
+type HistoryQuery<Q> = {
+  order(column: "created_at" | "id", options: { ascending: false }): Q;
+  or(filter: string): Q;
+};
+
+/** Newest first, after the cursor. The cursor depends on this exact created_at, id order.
+ *  Callers keep `.limit(i.limit)` beside `.from(` so tests/unpaged-reads.test.ts sees the bound. */
+export function newestFirst<Q extends HistoryQuery<Q>>(q: Q, cursor: string | undefined): Q {
+  const ordered = q.order("created_at", { ascending: false }).order("id", { ascending: false });
+  return cursor ? ordered.or(historyBefore(cursor)) : ordered;
+}

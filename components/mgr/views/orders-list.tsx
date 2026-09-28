@@ -1,7 +1,7 @@
-import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 // components/mgr/views/orders-list.tsx — Work → Orders list. Live passes
 // OrderForm as createAction and LinkTabs as filters; inventory uses the
 // fixture verbs and E.tabs.
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { OrdersListViewModel } from "@/lib/mgr/orders-list-view";

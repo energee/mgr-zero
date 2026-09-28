@@ -16,8 +16,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     runCommand("list_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, ctx) as Promise<(InvoiceListRecord & HistoryRow)[]>,
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<{ connected: boolean; state: string; realmLabel: string | null }> : null,
   ]);
-  const page = historyPage(records, "/invoices");
-  return <InvoicesView pagination={{ moreHref: page.moreHref, firstHref: cursor ? page.firstHref : undefined }} backHref="/more" rows={page.rows.map(invoice => ({
+  const page = historyPage(records, "/invoices", cursor);
+  return <InvoicesView pagination={page.pagination} backHref="/more" rows={page.rows.map(invoice => ({
     ...toInvoiceListRow(invoice, brewery.role, Boolean(health?.connected), brewery.timeZone), href: `/invoices/${invoice.id}`,
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `connected · ${health.realmLabel ?? "verified company"}` : health.state.replaceAll("_", " "),

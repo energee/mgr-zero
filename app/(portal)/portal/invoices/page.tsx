@@ -1,9 +1,9 @@
-import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 // app/(portal)/portal/invoices/page.tsx — Invoice history (screen record):
 // the caller's invoices and credit memos (portal_invoices). portal_invoices
 // returns raw invoice_lines rather than a subtotal column (unlike staff's
 // list_invoices. The adapter uses the synchronized QuickBooks total when one
 // exists and otherwise sums frozen local lines. A row opens portal_invoice.
+import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
@@ -17,12 +17,11 @@ export default async function PortalInvoicesPage({ searchParams }: { searchParam
   const cursor = pageCursor((await searchParams).cursor);
   const customer = await getActiveCustomer();
   const records = (await runCommand("portal_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, await buildContext(customer.breweryId))) as (Invoice & HistoryRow)[];
-  const page = historyPage(records, "/portal/invoices");
-  const invoices = page.rows;
+  const page = historyPage(records, "/portal/invoices", cursor);
   return (
     <PortalInvoicesView
-      model={toPortalInvoicesViewProps({ customerName: customer.customerName, invoices })}
-      pagination={{ moreHref: page.moreHref, firstHref: cursor ? page.firstHref : undefined }}
+      model={toPortalInvoicesViewProps({ customerName: customer.customerName, invoices: page.rows })}
+      pagination={page.pagination}
       linkRows
     />
   );

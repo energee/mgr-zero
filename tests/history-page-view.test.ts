@@ -10,19 +10,21 @@ import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 
 it("offers More only with a lookahead row, keeps filters and timestamp precision", () => {
   const rows = Array.from({ length: 51 }, (_, n) => ({ id: String(n), created_at: "2026-09-20T12:00:00.123456+00:00" }));
-  const page = historyPage(rows, "/orders", { status: "draft", customerId: "buyer", unused: undefined });
+  const open = `${rows[0].created_at}~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10`;
+  const page = historyPage(rows, "/orders", open, { status: "draft", customerId: "buyer", unused: undefined });
   expect(page.rows).toEqual(rows.slice(0, 50));
-  const url = new URL(page.moreHref!, "http://localhost");
+  const url = new URL(page.pagination.moreHref!, "http://localhost");
   expect(url.searchParams.get("cursor")).toBe(`${rows[49].created_at}~49`);
   expect(url.searchParams.get("status")).toBe("draft");
   expect(url.searchParams.get("customerId")).toBe("buyer");
-  expect(page.firstHref).toBe("/orders?status=draft&customerId=buyer");
+  expect(page.pagination.firstHref).toBe("/orders?status=draft&customerId=buyer");
+  expect(historyPage(rows, "/orders", undefined).pagination.firstHref).toBeUndefined();
   for (const count of [0, 5, 50]) {
-    const last = historyPage(rows.slice(0, count), "/orders");
-    expect(last.moreHref).toBeUndefined();
-    expect(renderToStaticMarkup(createElement(HistoryNavigation, { moreHref: last.moreHref }))).toBe("");
+    const last = historyPage(rows.slice(0, count), "/orders", undefined);
+    expect(last.pagination.moreHref).toBeUndefined();
+    expect(renderToStaticMarkup(createElement(HistoryNavigation, last.pagination))).toBe("");
   }
-  const html = renderToStaticMarkup(createElement(HistoryNavigation, page));
+  const html = renderToStaticMarkup(createElement(HistoryNavigation, page.pagination));
   expect(html).toContain("History pages");
   expect(html).toContain("Newest");
   expect(html).toContain("More");

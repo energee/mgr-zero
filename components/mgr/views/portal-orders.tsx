@@ -1,6 +1,6 @@
-import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 // components/mgr/views/portal-orders.tsx — portal Order history. Live passes
 // linkRows so verbs/nav are real links; inventory leaves taps unlabeled.
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import Link from "next/link";
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";

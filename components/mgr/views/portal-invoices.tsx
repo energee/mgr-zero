@@ -1,7 +1,7 @@
-import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 // components/mgr/views/portal-invoices.tsx — Portal Invoice history. Live
 // passes linkRows so unpaid totals are the invoice link; inventory leaves
 // Pay unlabeled. Rows come from toPortalInvoicesViewProps(portal_invoices).
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalInvoicesViewModel } from "@/lib/mgr/portal-invoices-view";
