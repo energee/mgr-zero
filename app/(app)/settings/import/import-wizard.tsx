@@ -53,6 +53,16 @@ function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: Imp
     catch (err) { setError(`${err instanceof Error ? err.message : "Import failed"}. Some rows may have committed. Retry this same batch to recover their results.`); }
     finally { setBusy(false); }
   }
+  // The user checked the result: drop the saved batch (nothing is sent) and
+  // return to the preview, or to upload after a reload lost the staged CSV.
+  function discard() {
+    if (!batch) return;
+    try {
+      const saved = readRecoveries(sessionStorage, batch.expectedContext).find(row => row.requestId === batch.requestId);
+      if (saved) finishRecovery(sessionStorage, saved); // Absent means it already finished; there is nothing left to remove.
+    } catch (cause) { return setError(cause instanceof Error ? cause.message : "The saved batch could not be discarded."); }
+    setBatch(null); setResult(null); setError(null); setStep(csv ? 2 : 0);
+  }
   function correctBlocked() {
     if (!batch || !result) return;
     const blocked = result.outcomes.filter(row => row.status === "blocked").map(row => batch.rows[row.row - 1]);
@@ -74,6 +84,6 @@ function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: Imp
       values[rowIndex][headers.indexOf(field)] = value;
       stage({ headers, rows: values });
     }}
-    onCommit={() => void commit()} onCorrectBlocked={correctBlocked}
+    onCommit={() => void commit()} onCorrectBlocked={correctBlocked} onDiscard={discard}
   />;
 }

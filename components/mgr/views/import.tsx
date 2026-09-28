@@ -16,12 +16,14 @@ export type ImportViewModel = {
   previewRows?: number[];
 };
 
-export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked }: {
+/** onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start. */
+export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked, onDiscard }: {
   model: ImportViewModel; onKind?: (kind: ImportKind) => void; onFile?: (file?: File) => void; onStep?: (step: number) => void;
   onMapping?: (field: string, column: number) => void; onEdit?: (row: number, field: string, value: string) => void;
-  onCommit?: () => void; onCorrectBlocked?: () => void;
+  onCommit?: () => void; onCorrectBlocked?: () => void; onDiscard?: () => void;
 }) {
   const { kind, step, mapping, lookups, result, busy } = model;
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [draft, setDraft] = useState<Pick<ImportViewModel, "rows" | "validation"> | null>(null);
   const { rows, validation } = onEdit ? model : draft ?? model;
   const edit = (index: number, field: string, value: string) => {
@@ -80,6 +82,11 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
+      {!result && !busy && onDiscard && (confirmDiscard ? <>
+        {E.note("MGR will stop offering this retry and will not send the batch. Check the result first: open the imported records and confirm which rows were saved.")}
+        {E.btn("Confirm discard", "del", undefined, () => { setConfirmDiscard(false); onDiscard(); })}
+        {E.btn("Keep saved request", "g", undefined, () => setConfirmDiscard(false))}
+      </> : E.btn("Discard saved request", "g", undefined, () => setConfirmDiscard(true)))}
     </>}
   </>;
 }

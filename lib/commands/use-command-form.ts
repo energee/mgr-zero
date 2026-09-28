@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
-import { beginRecovery, finishRecovery, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
+import { beginRecovery, finishRecovery, readRecoveries, RECOVERY_CHANGED, recoveryKey, type RecoveryAttempt } from "./recovery";
 import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 
 export function useCommandAction() {
@@ -33,7 +33,8 @@ export function useCommandAction() {
     let hadUnresolved = false;
     let attempt: RecoveryAttempt | undefined;
     try {
-      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => row.name === name);
+      // Only this record's own earlier attempt keeps a rejection from clearing it.
+      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => recoveryKey(row.name, row.input) === recoveryKey(name, input));
       attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, requestId);
       const data = await command(attempt.expectedContext.breweryId ?? breweryId, attempt.name, attempt.input, attempt.requestId, attempt.expectedContext);
       finishRecovery(sessionStorage, attempt);
