@@ -36,7 +36,7 @@ export function CommandRecovery() {
   function discard(requestId: string) {
     setError(null);
     try {
-      if (!discardRecovery(sessionStorage, context, requestId)) throw new Error("This request is no longer pending in this account.");
+      if (!discardRecovery(sessionStorage, context, requestId)) setError("This request is no longer pending in this account.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The saved request could not be discarded."); }
   }
   return <CommandRecoveryView rows={rows} busy={busy} error={error} onRetry={retry} onDiscard={discard} />;
