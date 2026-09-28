@@ -303,6 +303,17 @@ defineCommand({
 });
 
 defineCommand({
+  name: "correct_brew_record", description: "Correct an unused brew record with linked material reversals, replacement actuals and a measurement delta",
+  input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), initialBbl: z.number().positive().multipleOf(0.001),
+    actuals: z.array(brewActual), process: brewProcess.default({}), confirmEmpty: z.boolean().default(false) }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_brew_record", {
+    p_brewery: ctx.breweryId, p_record: i.recordId, p_reason: i.reason, p_initial_bbl: i.initialBbl,
+    p_actuals: brewActualRows(i.actuals)!, p_process: i.process, p_confirm_empty: i.confirmEmpty, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "cancel_batch", description: "Cancel an unstarted batch plan; retains history and refuses recorded physical work",
   input: z.object({ batchId: z.string().uuid() }),
   roles: ["admin", "brewer"],
