@@ -17,10 +17,9 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
       {([["Planned", model.planned], ["Active", model.active], ["Completed", model.completed ?? []]] as const).map(([title, rows]) => {
         return rows.length ? <Fragment key={title}>
           {E.ttl(title)}
-          {rows.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}</Fragment>)}
+          {rows.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}{row.readings?.map(reading => <Fragment key={reading.key}>{E.row(reading.title, reading.detail, E.act("Reading", "info", reading.href))}</Fragment>)}</Fragment>)}
         </Fragment> : null;
       })}
-      {model.readingUnavailable && <div data-gated>{E.note("Reading details unavailable in this list. Open the batch or Cellar for current vessel work.")}</div>}
     </>}
     {model.vessels !== undefined && <>
       {E.sp()}{E.ttl("Vessels")}

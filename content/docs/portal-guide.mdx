@@ -75,6 +75,8 @@ From a shipped order, **Reorder** starts a new cart with still-active, currently
 
 When the brewery confirms your order, MGR queues an email to each buyer linked to your customer account. Email delivery depends on the brewery's sending setup and may be delayed or blocked. Check the order here for its current status; an email reflects the details when it was confirmed.
 
+Order history shows up to 50 records, newest first. **More** opens older records when available; **Newest** returns to the latest page.
+
 <Screen name="Order history" />
 <Screen name="Order detail" />
 
@@ -83,6 +85,8 @@ When the brewery confirms your order, MGR queues an email to each buyer linked t
 Brewery line adjustments show the quantities before and after, plus the reason. Cancellation reasons show up too. A short shipment shows ordered and shipped quantities, the shortage reason the brewery recorded at picking or shipping, the final invoice amount, and explains that the unshipped quantity was cancelled when the order closed, so no units remain to ship. The linked invoice separately shows whether its balance is unpaid, paid, settled, or written off. Order details remain available from every history row. Drafts also offer **Continue / edit**, and shipped orders offer **Reorder**, including short shipments; these actions open the cart. Submitted orders cannot be edited or cancelled in the portal. With no orders, the page says **No orders yet**. A new draft with no events says **No events yet**.
 
 ## Invoices and credits [#invoices]
+
+Invoice history uses the same **More** and **Newest** controls to reach older invoices and credits.
 
 <Screen name="Invoice history" />
 <Screen name="Pay invoice" />
@@ -118,3 +122,5 @@ If the application and this guide disagree, report the page, action, and exact m
 ## Screen walkthrough [#walkthrough]
 
 In the [screen explorer](/docs/screens-explore), sign in and password recovery lead to Shop. The buyer is Jordan Lee throughout. Product rows stay in the portal. Orders and Invoices open their customer detail screens, and Reorder returns to Shop. Account addresses are read-only. Me offers Change password. Pay invoice stands in for a QuickBooks payment link; the walkthrough does not open a payment session.
+
+If an invoice question loses its response, use **Retry saved request** in **Unresolved requests**. It sends the saved input with its original identity. Edited input waits for recovery. Reloading the same browser tab preserves it; changing accounts hides it until you return to the original account. Nothing is sent automatically. Keep the tab open until the outcome is recovered.

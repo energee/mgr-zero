@@ -316,7 +316,7 @@ Customers with orders, invoices, keg records, portal access, invitations, or a Q
 
 Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address**, **City**, **State** (a two-letter US state code, uppercased), and **Postal code** (a 5-digit ZIP code or ZIP+4, such as 97201-1234). **Address 2 (optional)** holds a suite or second address line. **Default ship-to** selects this address for new staff and portal orders. Select **Save ship-to** to save. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
-Empty lists say **No customers yet** or **No ship-to addresses yet**. You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation, and a failed invitation for the same email can be sent again as a new one, and one interrupted before its email was sent stops blocking after 15 minutes. Existing sign-in accounts cannot be attached with this form.
+Empty lists say **No customers yet** or **No ship-to addresses yet**. You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an uncertain response, use **Retry saved request** to recover the original invitation. Changing the email waits until that request is recovered; reloading the same browser tab preserves it. A definitive first rejection allows a corrected new invitation. An invitation interrupted before its email was sent stops blocking after 15 minutes. Existing sign-in accounts cannot be attached with this form.
 
 **Portal users** lists each buyer who can sign in for this customer, by email, and says **No portal users yet** when there are none. Admin and Sales can select **Remove access** beside a buyer and confirm. The buyer loses this customer's portal at once, even if they are signed in: their next page or action is refused. Their orders, invoices, and sign-in account stay. The invite form cannot give the same email access again, so remove access only when the buyer should no longer order for this customer.
 
@@ -340,6 +340,8 @@ Opening an existing group also shows a **Prices** line summarizing where it's pr
 A cost ceiling is dollars per barrel of recipe cost. It sorts the rows and lets a brand’s page suggest a group (see [Catalog](#catalog)); nobody is moved automatically. A brewery with no groups yet says **Add a price group, then put each brand on one from Catalog.**
 
 ## Staff orders [#orders]
+
+Orders show up to 50 records per page, newest first. **More** opens older orders only when another one exists; **Newest** returns to the latest page. Status and customer filters remain applied while paging. Changing a filter starts at its newest orders.
 
 <Screen name="Orders" />
 
@@ -412,6 +414,8 @@ Open **Pick** to see confirmed and picked orders grouped by requested ship date.
 Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **Nothing confirmed to pick**.
 
 ## Invoices and credit memos [#invoices]
+
+Invoices show up to 50 records per page, newest first. **More** opens older invoices only when another one exists; **Newest** returns to the latest page.
 
 <Screen name="Invoices" />
 <Screen name="Invoice" />
@@ -601,6 +605,8 @@ Only mash-stage ingredients predict gravity, and only when every one of them has
 
 ## Batches [#batches]
 
+Active batches show the latest reading for each open tank, using your gravity unit. **Reading** opens that exact tank’s recording form; **Open** keeps the batch available. Empty reading history says “No readings yet.” A batch without an open tank has no recording shortcut.
+
 <Screen name="Batches" />
 
 <Screen name="Schedule batch" />
@@ -707,7 +713,7 @@ The invitation and member sheets use the same **Role** selector, including Tapro
 <Screen name="Team" />
 <Screen name="Team member" />
 
-Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. Success says **Invite sent**. The roster shows memberships, without a pending-acceptance status. After an error, keep the page open and retry unchanged details to finish the same invitation. Editing the email or role starts a new request; a successful invite clears the form. Closing and reopening the form on this page preserves a failed attempt, but reloading the page does not recover it; send the same email again as a new invitation. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts cannot be attached, and there is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
+Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. Success says **Invite sent**. The roster shows memberships, without a pending-acceptance status. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts cannot be attached, and there is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
 
 ## Settings [#settings]
 
@@ -812,7 +818,7 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 
 **A form reports an error.** Read the message, fix the visible fields, and submit again. Your entries stay until the form succeeds or you close it. Permission errors need an administrator. **That already exists** means another record already uses that name or value (for example, a second location with the same name, or a second SKU for the same brand and format); change it or edit the existing record. **A number is out of range** means a figure is too large or too small for its field; enter a realistic value. A number larger than MGR can store, such as a water ion above 999,999.9 ppm or a price or cost above $21,474,836.47, is refused with a message that names the field and its limit.
 
-**MGR says there are too many requests.** Wait for the stated retry time, then retry. Ask MGR messages count toward the same limit as other actions; after the stated time, select **Try again** in the drawer. If the action's result was uncertain, keep the form unchanged so MGR reuses the same request ID and can recover the original result safely.
+**MGR says there are too many requests.** Wait for the stated retry time, then retry. Ask MGR messages count toward the same limit as other actions; after the stated time, select **Try again** in the drawer. If the action's result was uncertain, use **Retry saved request** to recover the frozen input and original request ID safely. Edited submissions wait until the original outcome is recovered.
 
 **Your signed-in account or brewery changed while an action was pending.** MGR refuses the action before it writes anything. If the earlier response was uncertain, return to the original account and brewery and use the unchanged retry; do not start a replacement request until you have checked the record.
 
@@ -850,7 +856,7 @@ Use lookup IDs for references, including the format. Create missing formats firs
 
 The shared preview keeps the horizontal upload/map/preview/commit steps and a compact row/record/match/state table. Expand **Edit row** to correct that row's fields on either phone or desktop, or go back to mapping. The import kind is fixed after upload; go **Back to upload** to choose another kind. **Import ready rows** (or **Post opening balances**) stays disabled if every row is invalid. Only rows the preview marks ready are sent; rows it marks blocked stay out of the batch, so fix them before importing or import them later. Each sent row commits independently, and a row the server still refuses comes back blocked with its error. Results number each row as the preview did, so skipped blocked rows leave gaps in the numbering. A failed product/SKU row leaves none of its new dependent records behind.
 
-Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch** returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows into a fresh editable preview. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading or closing the page loses the wizard's retry state; there is no automatic recovery after reload.
+Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch** returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows into a fresh editable preview. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading this browser tab restores the unresolved batch and its original row numbers. Retry is always explicit. Closing the tab clears its recovery data.
 
 ## Actions not yet available [#unavailable]
 
@@ -878,3 +884,7 @@ The [screen explorer](/docs/screens-explore) is a drawing of MGR, including scre
 In **Settings**, Admin can see the current **Portal fulfillment warehouse**, select **Change warehouse**, choose a warehouse, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
 
 For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.
+
+### Recover an uncertain form submission
+
+If a response is lost, **Unresolved requests** shows the saved input and **Retry saved request**. This includes staff and buyer invitations. Retry recovers the original operation; it does not submit subsequent field edits. Independent actions on the same page can still run while a request is unresolved. Reloading the same browser tab preserves recovery. Return to the original signed-in account and brewery to recover its requests. Nothing is sent automatically. Keep the tab open until recovery finishes. CSV imports use **Retry same batch** on the Import page. Existing order, count, completion and Ask MGR recovery controls retain their own workflows.

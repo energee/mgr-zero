@@ -22,6 +22,13 @@ quantities and order prices. A credit memo reverses
 part of an invoice as negative lines at the original prices plus return-in
 movements. Invoices are never edited.
 
+Order and invoice history queries return arrays ordered by `created_at` and `id`, both descending.
+Pass `cursor: "<created_at>~<id>"` from the last displayed row to continue, keeping
+its timestamp exactly as returned. `limit` defaults to 50 and accepts 1–200.
+To show a reliable continuation control, request one extra row, display all but
+that lookahead row, and continue from the last displayed row. Keep the same filters
+when continuing. New records appear when restarting from the newest page.
+
 {/* ops:orders */}
 
 ## adjust_order_lines [#adjust_order_lines]
@@ -269,6 +276,7 @@ Invoices and credit memos with current total plus frozen local subtotal, newest 
 | --- | --- | --- |
 | `customerId` | uuid | no |
 | `limit` | integer | no |
+| `cursor` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -288,6 +296,7 @@ Orders newest-first, optionally by status and customer
 | `customerId` | uuid | no |
 | `status` | draft or submitted or confirmed or picked or shipped or cancelled | no |
 | `limit` | integer | no |
+| `cursor` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

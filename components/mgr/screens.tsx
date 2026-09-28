@@ -1,3 +1,4 @@
+import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -882,6 +883,19 @@ export const SCREENS: Screen[] = [
     step: 4,
     slice: 1,
     group: "Global",
+    name: "Unresolved requests",
+    to: { "Retry saved request": "Unresolved requests" },
+    job: "Recover the result of a form submission whose response was lost",
+    reads: "sessionStorage [original actor, brewery, customer and frozen request]",
+    writes: "none [explicit retry replays the original command identity]",
+    states: [["reload", "Saved input survives in the same browser tab"], ["edited", "Resolve the saved request before submitting changes", 1], ["other account", "Requests remain isolated to the original account and brewery", 1]],
+    spec: "Shared command forms save an unresolved request before transport. An uncertain response freezes its input and identity until exact recovery succeeds. Retry is explicit, never automatic. Invitations use the same lifecycle. CSV imports recover on Import; specialized portal, count, completion and composer recovery remain separate.",
+    body: <CommandRecoveryView rows={[{ requestId: "saved-request", name: "record_movement", input: { qty: 2, note: "Opening stock" }, path: "/inventory" }]} />,
+  },
+  {
+    step: 4,
+    slice: 1,
+    group: "Global",
     name: "Offline outbox",
     to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading", Dismiss: "Offline outbox" },
     job: "Retry an exact captured reading without broadening offline writes",
@@ -1612,11 +1626,11 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Batches",
-    to: { Start: "Brew day", Edit: "Vessel detail", "New vessel": "Vessel detail", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Vessel detail", "B-0413 \u00b7 Stout": "Vessel detail" },
+    to: { Start: "Brew day", Open: "Brew day", Edit: "Vessel detail", "New vessel": "Vessel detail", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Brew day", "B-0413 \u00b7 Stout": "Brew day" },
     job: "See planned and active batches with the next brew or cellar action",
-    reads: "list_batches · list_vessels · list_brands · list_recipes",
-    writes: "none [scheduling happens on Schedule batch; recording on Brew day; existing commands] · SCHEMA-GATE: reading summary and direct reading action require occupancy and reading facts not returned by list_batches",
-    states: [["planned", "Start is the next action; live Brew opens the same brew-day page"], ["active", "Open preserves access when the list has no authoritative reading or occupancy facts"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"]],
+    reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
+    writes: "none [scheduling happens on Schedule batch; recording on Brew day or Record reading; existing commands]",
+    states: [["planned", "Start is the next action; live Brew opens the same brew-day page"], ["active", "Open preserves batch access; each open occupancy shows its latest reading and Reading action"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
   },

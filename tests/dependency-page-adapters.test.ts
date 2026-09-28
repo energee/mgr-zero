@@ -43,14 +43,14 @@ it("does not fetch customer options when Orders has no customer filter", async (
   const page = await OrdersPage({ searchParams: Promise.resolve({}) });
   expect(state.calls).toEqual([]);
   OrdersClient(page.props);
-  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined }]]);
+  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined, cursor: undefined, limit: 51 }]]);
 });
 
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];
   const readonly = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) })).props);
   expect(readonly.props.createAction).toBeNull();
-  expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft" }]);
+  expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined, limit: 51 }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
   // New order is its own route now; the list only links to it, and the route

@@ -1,3 +1,4 @@
+import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 // lib/commands/production.ts — recipes and their immutable versions, the
 // vessels beer sits in, and the batches that fill them. A recipe
 // is a name; how it is brewed lives on a version, and a version is never
@@ -303,11 +304,14 @@ async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
 // all of them, oldest first, so the brew-day tank (created first) leads. Ids go
 // 100 per read so the URL stays bounded (#469); a batch's rows all land in one
 // chunk, so the per-chunk order is the per-batch order.
-type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
+type OpenVessel = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string; latest_reading: VesselReading | null };
 async function openVessels(ctx: Ctx, batchIds: string[]) {
   const rows = await inChunks(batchIds, async chunk => (await unwrap(ctx.db.from("vessel_occupancies")
-    .select("id, batch_id, vessel_id, initial_bbl, started_at").in("batch_id", chunk).is("ended_at", null)
-    .order("created_at").order("id"))) ?? []);
+    .select("id, batch_id, vessel_id, initial_bbl, started_at, fermentation_readings(id,at,temp_f,gravity_plato,ph,note)").in("batch_id", chunk).is("ended_at", null)
+    .order("created_at").order("id")
+    .order("at", { referencedTable: "fermentation_readings", ascending: false })
+    .order("id", { referencedTable: "fermentation_readings", ascending: false })
+    .limit(1, { referencedTable: "fermentation_readings" }))) ?? []);
   const byBatch = new Map<string, OpenVessel[]>();
   if (rows.length === 0) return byBatch;
   const vessels = await inChunks([...new Set(rows.map((r) => r.vessel_id as string))],
@@ -318,6 +322,7 @@ async function openVessels(ctx: Ctx, batchIds: string[]) {
     list.push({
       id: r.id as string, vessel_id: r.vessel_id as string, initial_bbl: num(r.initial_bbl),
       started_at: r.started_at as string, vessel_name: names.get(r.vessel_id as string) ?? "",
+      latest_reading: r.fermentation_readings[0] ?? null,
     });
     byBatch.set(r.batch_id as string, list);
   }
@@ -325,7 +330,7 @@ async function openVessels(ctx: Ctx, batchIds: string[]) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels (comma-separated when split across tanks) when any is open",
+  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each active occupancy’s latest fermentation reading",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: async (ctx) => {
     const batches = (await unwrap(ctx.db.from("batches")
@@ -344,6 +349,7 @@ defineQuery({
       brand_name: b.intended_brand_id ? brands.get(b.intended_brand_id) ?? null : null,
       recipe_name: b.recipe_version_id ? recipes.get(b.recipe_version_id) ?? null : null,
       vessel_name: vessels.get(b.id)?.map((v) => v.vessel_name).join(", ") || null,
+      active_occupancies: b.brewed_on && !b.closed_at ? vessels.get(b.id) ?? [] : [],
     }));
   },
 });
