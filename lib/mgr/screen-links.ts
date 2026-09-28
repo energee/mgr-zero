@@ -313,7 +313,6 @@ export const INERT: (string | RegExp)[] = [
   "Square \u00b7 Demo Brewing LLC",
   "Status",
   "Sync Square sales",
-  "Retry saved sync",
   "Taproom standing",
   "Totals",
   "Transfer to",
