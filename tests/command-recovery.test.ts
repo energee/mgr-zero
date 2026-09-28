@@ -25,14 +25,14 @@ it("refuses to send when durable storage fails", () => {
   expect(() => beginRecovery(disk, context, "/inventory", "record_movement", {})).toThrow("Storage full");
 });
 
-it("restores the original CSV manifest and preview row numbers", () => {
+it("restores the original CSV manifest and the owning screen's own data (preview row numbers)", () => {
   const disk = storage();
   const input = { kind: "opening_balances", rows: [{ qty: "3", binId: "bin" }, { qty: "4", binId: "bin" }] };
-  const original = beginRecovery(disk, context, "/settings/import", "import_csv", input, { requestId: "batch-id", previewRows: [2, 5] }).attempt;
+  const original = beginRecovery(disk, context, "/settings/import", "import_csv", input, { requestId: "batch-id", owner: { id: "import", data: [2, 5] } }).attempt;
   input.rows[0].qty = "9";
   expect(readRecoveries(disk, context)).toEqual([original]);
   expect(original.input).toEqual({ kind: "opening_balances", rows: [{ qty: "3", binId: "bin" }, { qty: "4", binId: "bin" }] });
-  expect(original.previewRows).toEqual([2, 5]);
+  expect(original.owner).toEqual({ id: "import", data: [2, 5] });
 });
 
 it("scopes an unresolved request to the caller's target: another row proceeds, an edit to the same row waits (#615)", () => {

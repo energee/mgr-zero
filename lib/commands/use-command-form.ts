@@ -11,11 +11,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
-import { beginRecovery, finishRecovery, inFlightRequests, RECOVERY_CHANGED } from "./recovery";
+import { beginRecovery, finishRecovery, inFlightRequests, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
 import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 
 /** Options for useCommandAction's run; see the comment on run. */
-export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; onSent?: (requestId: string) => void };
+export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; owner?: RecoveryAttempt["owner"]; onSent?: (requestId: string) => void };
 
 export function useCommandAction() {
   const breweryId = useBrewery();
@@ -34,13 +34,14 @@ export function useCommandAction() {
   // passes `requestId` only to start a deliberate new exact attempt, and reads
   // the id actually sent (it may be a resumed saved attempt) from `onSent`.
   // `durable: false` skips the saved request for a read or a one-time secret.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, { requestId, refresh = true, target, durable = true, onSent }: CommandRunOptions = {}) {
+  // `owner` marks a saved request that its own screen recovers (see recovery.ts).
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, { requestId, refresh = true, target, durable = true, owner, onSent }: CommandRunOptions = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
     let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
-      if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
+      if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner });
       const sent = saved?.attempt ?? { name, input, requestId: requestId ?? crypto.randomUUID(), expectedContext };
       onSent?.(sent.requestId);
       inFlightRequests.add(sent.requestId);

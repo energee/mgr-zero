@@ -2,7 +2,11 @@ import { z } from "zod";
 import type { CommandContextExpectation } from "./registry";
 
 const attemptSchema = z.object({
-  previewRows: z.array(z.number().int().positive()).optional(), target: z.string().optional(),
+  target: z.string().optional(),
+  // A screen that shows its own recovery (the import wizard) marks its saved
+  // requests: the shared panel skips them, and `data` is whatever that screen
+  // needs to redraw the request, validated by the screen itself.
+  owner: z.object({ id: z.string(), data: z.unknown() }).optional(),
   requestId: z.string(), name: z.string(), input: z.unknown(), path: z.string(),
   expectedContext: z.object({ actorId: z.string(), breweryId: z.string().optional(), customerId: z.string().optional() }),
 });
@@ -44,14 +48,14 @@ export const inFlightRequests = new Set<string>();
  * `resumed` says the attempt was already saved, so its first send may have
  * applied and a later rejection must not clear it.
  */
-export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): { attempt: RecoveryAttempt; resumed: boolean } {
+export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, target, owner }: { requestId?: string; target?: string; owner?: RecoveryAttempt["owner"] } = {}): { attempt: RecoveryAttempt; resumed: boolean } {
   const attempts = readRecoveries(storage, context);
   const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.target) === recoveryKey(name, target));
   if (previous && (!requestId || requestId === previous.requestId)) {
     if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
     return { attempt: previous, resumed: true };
   }
-  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId: requestId ?? crypto.randomUUID(), name, input, path, expectedContext: context, previewRows, target })));
+  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId: requestId ?? crypto.randomUUID(), name, input, path, expectedContext: context, target, owner })));
   save(storage, context, [...attempts.filter(item => item !== previous), attempt], false);
   return { attempt, resumed: false };
 }

@@ -11,7 +11,7 @@ export function CommandRecovery() {
   const { busy, error, setError, run } = useCommandAction();
   useEffect(() => {
     const refresh = () => {
-      try { setRows(readRecoveries(sessionStorage, context).filter(row => row.name !== "import_csv" && !inFlightRequests.has(row.requestId))); setError(null); }
+      try { setRows(readRecoveries(sessionStorage, context).filter(row => !row.owner && !inFlightRequests.has(row.requestId))); setError(null); }
       catch (cause) { setError(cause instanceof Error ? cause.message : "Saved requests could not be read."); }
     };
     refresh(); window.addEventListener(RECOVERY_CHANGED, refresh);
