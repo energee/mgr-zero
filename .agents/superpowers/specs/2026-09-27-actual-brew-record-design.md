@@ -1,6 +1,7 @@
 # Actual brew record and material corrections (#622)
 
-Status: technically reviewed. Implementation waits for #619 on main.
+Status: technically reviewed. User authorized stacking on #619 (PR #665).
+Retain its cancelled-batch guard and regression in the expanded brew command.
 Migration reservation: `20260928090000`–`20260928095959`.
 
 This implements D3 and D19 from the v1 completeness audit. A completed brew-day
