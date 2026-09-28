@@ -510,7 +510,11 @@ describe("a batch split across tanks", () => {
 
     await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-01T12:00:00Z", tempF: 65 }, ctx);
     await runCommand("record_fermentation_reading", { occupancyId: first.occupancy.id, at: "2026-10-02T12:00:00Z", tempF: 68 }, ctx);
-    const listed = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading: { temp_f: number } | null }[] }[];
+    const plain = (await runCommand("list_batches", {}, ctx)) as { id: string; active_occupancies: object[] }[];
+    expect(plain.find((r) => r.id === batch.id)!.active_occupancies[0]).not.toHaveProperty("latest_reading");
+    const brewDay = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: object };
+    expect(brewDay.occupancy).not.toHaveProperty("latest_reading");
+    const listed = (await runCommand("list_batches", { readings: true }, ctx)) as { id: string; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading: { temp_f: number } | null }[] }[];
     const result = listed.find((r) => r.id === batch.id)!;
     expect(result.vessel_name).toBe(`${fv.name}, ${bt.name}`);
     expect(result.active_occupancies).toHaveLength(2);

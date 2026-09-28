@@ -2,9 +2,9 @@
 import type { EmptyState } from "./empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { batNo } from "@/lib/mgr/doc-no";
-import { formatVesselReading, type VesselReading } from "./vessel-detail-view";
+import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
-import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatDate } from "@/lib/date-format";
 
 export type BatchesRowView = {
   key: string;
@@ -60,7 +60,7 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
   };
 }
 
-export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies?: { id: string; vessel_name: string; latest_reading: VesselReading | null }[] };
+export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading?: VesselReading | null }[] };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
@@ -69,9 +69,9 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
     const brewable = !batch.brewed_on && !batch.closed_at && !batch.cancelled_at;
     const row: BatchesRowView = { key: batch.id, title: batNo(batch.batch_no), detail: `${batch.brand_name ?? "no brand yet"} · ${batch.recipe_name ?? "no recipe"} · ${Number(batch.planned_bbl)} bbl · ${formatDate(batch.planned_on)}${batch.vessel_name ? ` · ${batch.vessel_name}` : ""}`, verb: brewable ? "Brew" : "Open", tone: brewable ? "info" : "primary", href: hrefs?.batch(batch.id) };
     if (batch.brewed_on && !batch.closed_at) {
-      row.readings = (batch.active_occupancies ?? []).map(occupancy => ({
+      row.readings = batch.active_occupancies.map(occupancy => ({
         key: occupancy.id, title: occupancy.vessel_name,
-        detail: occupancy.latest_reading ? `${formatVesselReading(occupancy.latest_reading, display.unit)} · ${formatDateTime(occupancy.latest_reading.at, display.timeZone)}` : "No readings yet",
+        detail: formatLatestReading(occupancy.latest_reading, display.unit, display.timeZone),
         href: hrefs?.reading?.(occupancy.id),
       }));
       if (!row.readings.length) row.detail += " · No open occupancy";
