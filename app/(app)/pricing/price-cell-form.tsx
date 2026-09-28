@@ -22,9 +22,12 @@ export function PriceCellForm({
   const initial = dollarsInput(cents);
   // The page keys this form on `cents`, so a save or clear remounts it fresh.
   const [dollars, setDollars] = useState(initial);
+  // One grid page holds many cells: an unresolved save locks only this cell.
+  const cell = `${saleChannelId}:${priceGroupId}:${formatId}`;
   const form = useCommandForm("set_channel_price", {
     build: () => ({ saleChannelId, priceGroupId, formatId, unitPriceCents: Math.round(Number(dollars) * 100) }),
     reset: () => setDollars(initial),
+    target: cell,
   });
 
   return (
@@ -46,7 +49,7 @@ export function PriceCellForm({
               type="button"
               variant="ghost"
               disabled={form.busy}
-              onClick={() => form.run("clear_channel_price", { saleChannelId, priceGroupId, formatId })}
+              onClick={() => form.run("clear_channel_price", { saleChannelId, priceGroupId, formatId }, undefined, { target: cell })}
             >
               Clear
             </Button>

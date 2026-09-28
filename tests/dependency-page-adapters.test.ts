@@ -2,7 +2,10 @@ import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
-vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
+vi.mock("@/lib/portal", () => {
+  const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
+  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { role: state.role } }) };
+});
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: string, input: unknown) => {

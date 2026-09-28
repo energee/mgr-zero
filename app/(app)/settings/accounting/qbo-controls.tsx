@@ -27,7 +27,7 @@ export function QboDefaultsForm({ allowAch, allowCard }: { allowAch: boolean; al
 export function QboDisconnectAction({ connectionId }: { connectionId: string }) {
   const action = useCommandAction(), router = useRouter();
   return <DisconnectQuickBooksView busy={action.busy} error={action.error}
-    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), undefined, { refresh: false })} />;
+    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), { refresh: false })} />;
 }
 
 type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
@@ -50,7 +50,7 @@ export function QboSyncButton({ status, disabled = false }: { status?: QboSyncSt
   const action = useCommandAction(), router = useRouter();
   // A superseded result needs no local notice: the refreshed stored status already shows it.
   const sync = async () => {
-    await action.run("sync_qbo_payments", {}, undefined, status?.retryRequestId ?? undefined, { refresh: false });
+    await action.run("sync_qbo_payments", {}, undefined, { requestId: status?.retryRequestId ?? undefined, refresh: false });
     router.refresh();
   };
   return <QboSyncView status={status} disabled={disabled} busy={action.busy} error={action.error} onSync={() => void sync()} />;
@@ -64,7 +64,7 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
   const confirmation = pendingPush ? qboPushConfirmation(pendingPush, invoiceLabel) : null;
   const push = async (action: QboRemoteCreateAction) => {
     const newAttemptReason = action === "corrected_push" ? "corrected" : action === "repush" ? "remote_deleted" : undefined;
-    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) })) setPendingPush(null);
+    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) }, undefined, { target: invoiceId })) setPendingPush(null);
   };
   return <div className="flex flex-wrap justify-end gap-2">
     {actions.includes("fix_mapping") && <Button variant="outline" asChild><a href={`/invoices/${invoiceId}/mapping`}>Fix mapping</a></Button>}

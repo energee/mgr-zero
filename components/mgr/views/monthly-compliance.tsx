@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { DestinationStateExport } from "./destination-state-export";
 import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
 import type { MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
@@ -26,7 +27,13 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {E.row("Packaged", "production into finished goods", model.packaged)}
     {model.removals.map((row) => <Fragment key={row.key}>{row.key === "loss" ? E.fld(row.title, row.bbl) : E.row(row.title, "", row.bbl)}</Fragment>)}
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · non-additive breakdown`, row.bbl)}</Fragment>)}</> : null}
-    {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "destination state", row.bbl)}</Fragment>)}
+    {E.ttl("Destination-state totals")}
+    {model.stateExport ? <>
+      {E.tbl(["state", "outward BBL", "returned BBL", "adjustment BBL", "net BBL", "sales", "credits", "net sales"], model.stateRows)}
+      {E.info("Physical movement and invoiced beer sales have separate event dates. Returns reduce outward volume. Credits reduce beer sales; keg deposits are excluded. Unassigned facts have no recorded destination. Exported facts reconcile to these totals. State taxes and filing forms remain external.")}
+      <DestinationStateExport {...model.stateExport} />
+    </> : E.info("Supporting destination-state facts were not captured in this snapshot.")}
+    {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "gross taxable shipments · before returns", row.bbl)}</Fragment>)}
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
     {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
