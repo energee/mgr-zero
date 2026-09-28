@@ -118,10 +118,10 @@ describe("Invoice view", () => {
 
 
 it.each(["Not pushed", "Disconnected", "Deleted in QuickBooks", "Pushed to QuickBooks"])("keeps staff navigation unavailable for %s without a verified destination", detail => {
-  const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail, balanceCents: null, healthy: detail === "Pushed to QuickBooks" } }));
+  const html = htmlOf(createElement(InvoiceView, { model: { ...toInvoiceViewProps(invoiceFailedAls), mappings: [] }, quickbooks: { detail, balanceCents: null, healthy: detail === "Pushed to QuickBooks" } }));
   expect(html).toContain("Open in QuickBooks");
   expect(html).toContain("A verified provider link is unavailable");
-  expect(html).not.toMatch(/href="https:\/\/(?:qbo|sandbox|connect)\.intuit/);
+  expect(html).not.toMatch(/href="https:\/\/[^"]*intuit\.com/);
 });
 
 it("renders a verified staff destination through the shared invoice view", () => {
