@@ -11,7 +11,7 @@ vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: string, input: unknown) => {
   state.calls.push([name, input]);
   return { data: name === "list_customers" ? [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }]
-    : name === "list_skus" ? [{ id: "active", name: "Keg", active: true }, { id: "inactive", active: false }] : [], error: null, refetch() {} };
+    : name === "list_skus" ? [{ id: "active", name: "Keg", active: true }, { id: "inactive", active: false }] : name === "list_orders" ? { rows: [], nextCursor: null } : [], error: null, refetch() {} };
 } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
@@ -20,7 +20,7 @@ async function query(name: string, input: unknown) {
   state.calls.push([name, input]);
   switch (name) {
     case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
-    case "list_orders": return [];
+    case "list_orders": return { rows: [], nextCursor: null };
     case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
     case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
@@ -46,14 +46,14 @@ it("does not fetch customer options when Orders has no customer filter", async (
   const page = await OrdersPage({ searchParams: Promise.resolve({}) });
   expect(state.calls).toEqual([]);
   OrdersClient(page.props);
-  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined, cursor: undefined, limit: 51 }]]);
+  expect(state.calls).toEqual([["list_orders", { status: undefined, customerId: undefined, cursor: undefined }]]);
 });
 
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];
   const readonly = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) })).props);
   expect(readonly.props.createAction).toBeNull();
-  expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined, limit: 51 }]);
+  expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
   // New order is its own route now; the list only links to it, and the route

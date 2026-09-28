@@ -684,6 +684,14 @@ default. A few fields keep their saved value when omitted instead: `active`;
 `upsert_state_registration`, and `upsert_brewery_state_license` keep any
 omitted field and clear one only when you send it as `null`.
 
+### History paging [#history-paging]
+
+`list_orders`, `list_invoices`, `portal_orders`, and `portal_invoices` return
+`{ rows, nextCursor }`, with rows ordered by `created_at` and `id`, both
+descending. `nextCursor` is null on the last page. Otherwise pass it back as
+`cursor`, unchanged and with the same filters, to read the next page. New
+records appear when restarting from the newest page.
+
 ### Fields the server computes [#computed]
 
 Some values are derived and must not be sent. `bbl` on an inventory movement is

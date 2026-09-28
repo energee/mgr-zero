@@ -327,7 +327,7 @@ describe("QuickBooks current invoice state", () => {
     await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config,
       vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse({ TotalAmt: 105 }))));
     const detail = await runCommand("get_invoice", { invoiceId: f.invoice.id }, f.ctx) as Parameters<typeof toInvoiceViewProps>[0];
-    const list = await runCommand("list_invoices", {}, f.ctx) as { id: string; subtotal_cents: number; total_cents: number }[];
+    const { rows: list } = await runCommand("list_invoices", {}, f.ctx) as { rows: { id: string; subtotal_cents: number; total_cents: number }[] };
     expect(list.find((row) => row.id === f.invoice.id)).toMatchObject({ subtotal_cents: 10000, total_cents: 10500 });
     const invoice = detail.invoice;
     const lines = detail.lines;
@@ -340,7 +340,7 @@ describe("QuickBooks current invoice state", () => {
       role: "customer" as const, customerId: f.customer.customerId,
     };
     const portalDetail = await runCommand("portal_invoice", { invoiceId: f.invoice.id }, portalCtx) as Parameters<typeof toPortalInvoiceViewProps>[0];
-    const portalList = await runCommand("portal_invoices", {}, portalCtx) as Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"];
+    const { rows: portalList } = await runCommand("portal_invoices", {}, portalCtx) as { rows: Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"] };
     expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: false, paid: false, status: "Review" });
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: portalList }).rows[0])
       .toMatchObject({ total: "$105.00", unpaid: true });

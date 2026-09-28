@@ -43,7 +43,7 @@ describe("search_entities", () => {
         fromLocationId: base.data!.from_location_id!, lines: [{ skuId, qty: 1 }],
       }, adminCtx);
     }
-    const newest = await runCommand("list_orders", {}, adminCtx) as { id: string }[];
+    const { rows: newest } = await runCommand("list_orders", {}, adminCtx) as { rows: { id: string }[] };
     expect(newest).toHaveLength(50);
     expect(newest.map((row) => row.id)).not.toContain(orderId);
 

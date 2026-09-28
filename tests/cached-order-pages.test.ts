@@ -5,7 +5,7 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
   state.calls.push([name, input]);
   const data = name === "list_customers" ? [{ id: "customer", name: "Buyer", shipTos: [{ id: "dock", label: "Dock", is_default: true }] }]
     : name === "list_skus" ? [{ id: "sku", name: "Keg", active: true, brands: { name: "Brand" } }, { id: "old", active: false }]
-    : [];
+    : name === "list_orders" ? { rows: [], nextCursor: null } : [];
   return { data: state.pending ? undefined : data, error: state.error, isPending: state.pending, isFetching: state.fetching, isPaused: state.paused, dataUpdatedAt: state.pending ? 0 : Date.parse("2026-09-13T12:00:00Z"), refetch: vi.fn() };
 } }));
 import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
@@ -53,7 +53,7 @@ it("does not describe a cold cache as empty data or render skeletons", () => {
 
 it("preserves customer filters and read-only Warehouse controls", () => {
   const html = renderToStaticMarkup(OrdersClient({ role: "warehouse", status: "draft", customerId: "buyer" }));
-  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined, limit: 51 }]]);
+  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined }]]);
   expect(html).toContain("customerId=buyer");
   expect(html).not.toContain("New order");
 });

@@ -24,7 +24,7 @@ describe("staff invoice link query boundaries", () => {
     const f = await fixture();
     const d = await detail(f);
     expect(d.quickbooksLink?.href).toBe(`https://app.qbo.intuit.com/app/invoice?txnId=34&companyId=${f.realm}`);
-    const list = await runCommand("list_invoices", {}, f.ctx) as { id: string; quickbooks_link: Link }[];
+    const { rows: list } = await runCommand("list_invoices", {}, f.ctx) as { rows: { id: string; quickbooks_link: Link }[] };
     expect(list.find(row => row.id === f.invoice.id)?.quickbooks_link).toEqual(d.quickbooksLink);
     expect(JSON.stringify([d, list])).not.toContain("private-request");
     const sales = await makeStaffCtx(f.brewery.id, "sales");
@@ -54,7 +54,7 @@ describe("staff invoice link query boundaries", () => {
     const other = await makeBrewery();
     await ins("brewery_users", { brewery_id: other.id, user_id: f.ctx.userId, role: "admin" });
     await expect(runCommand("get_invoice", { invoiceId: f.invoice.id }, { ...f.ctx, breweryId: other.id })).rejects.toThrow();
-    const list = await runCommand("list_invoices", {}, { ...f.ctx, breweryId: other.id }) as unknown[];
+    const { rows: list } = await runCommand("list_invoices", {}, { ...f.ctx, breweryId: other.id }) as { rows: unknown[] };
     expect(list).toEqual([]);
     const brewer = await makeStaffCtx(f.brewery.id, "brewer");
     await expect(runCommand("get_invoice", { invoiceId: f.invoice.id }, brewer)).rejects.toThrow(/permission denied/i);

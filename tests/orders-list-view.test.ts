@@ -8,7 +8,7 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "sales" }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn() }));
-vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: ordersWorkList.orders, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
 import OrdersPage from "@/app/(app)/orders/page";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { QueryFeedback } from "@/components/mgr/query-feedback";

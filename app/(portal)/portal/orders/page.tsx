@@ -2,7 +2,7 @@
 // caller's orders (portal_orders), newest first, each opening Order detail.
 // No cancel: the portal is read-only after submit, and the page says whom
 // to call.
-import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
+import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
@@ -20,7 +20,7 @@ type Order = {
 export default async function PortalOrdersPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
   const cursor = pageCursor((await searchParams).cursor);
   const { customer, ctx } = await getPortalContext();
-  const records = (await runCommand("portal_orders", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, ctx)) as (Order & HistoryRow)[];
+  const records = (await runCommand("portal_orders", { cursor }, ctx)) as HistoryPage<Order & HistoryRow>;
   const page = historyPage(records, "/portal/orders", cursor);
   return (
     <PortalOrdersView

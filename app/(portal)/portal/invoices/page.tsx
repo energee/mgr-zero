@@ -3,7 +3,7 @@
 // returns raw invoice_lines rather than a subtotal column (unlike staff's
 // list_invoices. The adapter uses the synchronized QuickBooks total when one
 // exists and otherwise sums frozen local lines. A row opens portal_invoice.
-import { historyPage, pageCursor, HISTORY_PAGE_SIZE, type HistoryRow } from "@/lib/mgr/history-page";
+import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
 import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
@@ -15,7 +15,7 @@ type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credi
 export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
   const cursor = pageCursor((await searchParams).cursor);
   const { customer, ctx } = await getPortalContext();
-  const records = (await runCommand("portal_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, ctx)) as (Invoice & HistoryRow)[];
+  const records = (await runCommand("portal_invoices", { cursor }, ctx)) as HistoryPage<Invoice & HistoryRow>;
   const page = historyPage(records, "/portal/invoices", cursor);
   return (
     <PortalInvoicesView
