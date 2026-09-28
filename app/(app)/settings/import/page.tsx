@@ -17,5 +17,5 @@ export default async function ImportPage() {
     const brand = (f as typeof f & { brands?: { name: string } | null }).brands;
     return { ...f, name: brand ? `${brand.name} · ${f.name}` : f.name };
   });
-  return <ImportWizard breweryId={brewery.id} lookups={lookups} />;
+  return <ImportWizard lookups={lookups} />;
 }
