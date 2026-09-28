@@ -1629,7 +1629,7 @@ export const SCREENS: Screen[] = [
     to: { Start: "Brew day", Open: "Brew day", Edit: "Vessel detail", "New vessel": "Vessel detail", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Brew day", "B-0413 \u00b7 Stout": "Brew day" },
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
-    writes: "none [scheduling happens on Schedule batch; recording on Brew day or Record reading; existing commands]",
+    writes: "none [scheduling happens on Schedule batch; recording on Brew day or Fermentation reading; existing commands]",
     states: [["planned", "Start is the next action; live Brew opens the same brew-day page"], ["active", "Open preserves batch access; each open occupancy shows its latest reading and Reading action"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
