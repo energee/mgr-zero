@@ -2,7 +2,10 @@ import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { formatDate } from "@/lib/date-format";
 const state = vi.hoisted(() => ({ kind: "invoice" as "invoice" | "credit_memo", paid: false }));
-vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
+vi.mock("@/lib/portal", () => {
+  const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
+  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { role: "customer" } }) };
+});
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "customer" }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }) }));
