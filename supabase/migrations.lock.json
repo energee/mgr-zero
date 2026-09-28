@@ -74,5 +74,6 @@
   "20260928100000_packaging_actuals.sql": "04e7c5f7b543e5e964e70b61909a92bea4c60df0a5dc88cb33b23a594e8286e5",
   "20260928100100_packaging_actuals_tenant_index.sql": "94e505cd0f3a3054d39ddfc72250e27e1b2c40a0d4c072bdb46126911ce7bf50",
   "20260928220000_unstarted_plans_efficiency.sql": "668298363be7275abaea1bbd17891347396fbd03e394169ecdc7d48928f0a07f",
+  "20260928220300_packaging_stale_plan_code.sql": "3dc954ccdb55120b9235d522db82115e93e35bf989ffc5835c9bda81751f53b9",
   "20260928233000_qbo_sync_status_operator_name.sql": "87b8a9cec5757dbc4ecde117c41cf2e70f3b84a8be0b274ef39696a20362d557"
 }

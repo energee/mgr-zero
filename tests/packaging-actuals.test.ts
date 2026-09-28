@@ -71,6 +71,8 @@ it("rejects changed BOM plans and keeps the invoker requirements view tenant-sco
   expect(direct.error).not.toBeNull();
   await admin.from("format_bom").update({ qty_per_unit: 2 }).eq("format_id", f.catalog.formatId);
   await expect(runCommand("close_packaging_run", f.input, f.ctx)).rejects.toThrow("plan changed");
+  // The client retires a retained close on this code, never on message text.
+  await expect(runCommand("close_packaging_run", f.input, f.ctx)).rejects.toMatchObject({ status: 409, code: "stale_plan" });
 });
 
 it("appends a correction and exact compensations without rewriting outputs or tank draw", async () => {
