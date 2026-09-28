@@ -8,12 +8,26 @@ every operation in this reference lists the roles allowed to call it. A membersh
 user to a brewery. Revoking one ends access without deleting the history that
 member wrote.
 
-`invite_staff` assigns one role and returns `{ userId }`. Invitation requests
-retain their Auth identity through interrupted completion; retry unchanged
-requests with the same ID. Changing the email, role, customer, actor, or brewery
-is different intent. Existing accounts cannot be attached, and completed replay
-does not restore revoked membership. The inviter must still have permission
-when membership is completed.
+`invite_staff` assigns one role; `invite_customer_user` links one customer. An
+email with no confirmed Auth account is sent an Auth invitation and the
+command returns `{ userId }` once membership completes. An email that already
+has a confirmed Auth account instead gets a pending invitation: the command
+returns `{ inviteId, state: "pending_consent" }`, and membership is granted
+only when that account's owner signs in and calls
+`accept_account_invitation`; consent expires after seven days. Invitation
+requests retain their Auth identity through interrupted completion; retry
+unchanged requests with the same ID. Changing the email, role, customer,
+actor, or brewery is different intent. Completed replay does not restore
+revoked membership. The inviter must still have permission when membership is
+completed, including at consent time for a pending invitation.
+
+`list_my_invitations` and `accept_account_invitation` omit `breweryId`; they
+act on the signed-in caller's own pending invitations, not a named brewery.
+`accept_account_invitation` returns `{ breweryId, kind, customerId }`
+(`customerId` is `null` for a staff invitation); replay after the granted
+membership is later removed does not restore it, and a new invitation is
+required. `revoke_account_invitation` returns `{ inviteId }` and only affects
+an invitation still `pending_consent`.
 
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
