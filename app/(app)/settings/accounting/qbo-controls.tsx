@@ -48,15 +48,12 @@ function QboMappingFields({ kind, localId, label, currentId, context = "accounti
 
 export function QboSyncButton({ status, disabled = false }: { status?: QboSyncStatus; disabled?: boolean }) {
   const action = useCommandAction(), router = useRouter();
-  const [notice, setNotice] = useState<string | null>(null);
+  // A superseded result needs no local notice: the refreshed stored status already shows it.
   const sync = async () => {
-    setNotice(null);
-    await action.run("sync_qbo_payments", {}, result => {
-      if ((result as { superseded?: boolean }).superseded) setNotice("The saved batch was superseded. No payment changes were applied. Start a new manual sync.");
-    }, status?.retryRequestId ?? undefined, { refresh: false });
+    await action.run("sync_qbo_payments", {}, undefined, status?.retryRequestId ?? undefined, { refresh: false });
     router.refresh();
   };
-  return <QboSyncView status={status} notice={notice} disabled={disabled} busy={action.busy} error={action.error} onSync={() => void sync()} />;
+  return <QboSyncView status={status} disabled={disabled} busy={action.busy} error={action.error} onSync={() => void sync()} />;
 }
 
 export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoiceId: string; invoiceLabel: string; actions: QboInvoiceAction[] }) {

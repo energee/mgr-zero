@@ -51,7 +51,7 @@ it("returns terminal superseded disposition without reconciling or reading the p
 
 it("keeps the original failure when its failure record cannot be saved", async () => {
   boundary.readVersionedIntegrationTokens.mockResolvedValue({ connectionId: "replaced", accessToken: "token" });
-  boundary.recordQboInvoiceSyncFailure.mockRejectedValue(new Error("QuickBooks sync failed and its failure could not be recorded; retry the same request"));
+  boundary.recordQboInvoiceSyncFailure.mockRejectedValue(new Error("database unavailable"));
   vi.spyOn(console, "error").mockImplementation(() => {});
   await expect(syncQboInvoices(ctx, requestId, client)).rejects.toMatchObject({ message: "QuickBooks connection changed", status: 409 });
 });

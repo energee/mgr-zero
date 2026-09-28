@@ -21,7 +21,7 @@ export function toAccountingViewProps(health: QboHealth): AccountingViewModel {
 export type QboSyncStatus = {
   latest: { at: string; operator: string; completed: boolean; superseded?: boolean } | null;
   lastSuccess: { at: string; operator: string } | null;
-  latestFailure: { at: string; operator: string; error: string } | null;
+  latestFailure: { at: string; operator: string } | null;
   retryRequestId: string | null;
 };
 

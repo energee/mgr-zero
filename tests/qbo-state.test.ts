@@ -115,7 +115,7 @@ describe("QuickBooks current invoice state", () => {
     const transport = vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse());
     await syncQboInvoices(f.ctx, successId, new QboOAuthClient(config, transport));
     const readStatus = () => runCommand("get_qbo_sync_status", {}, f.ctx) as Promise<{
-      lastSuccess: { at: string; operator: string }; latestFailure: { error: string } | null;
+      lastSuccess: { at: string; operator: string }; latestFailure: { at: string; operator: string } | null;
       retryRequestId: string | null;
     }>;
     const success = await readStatus();
@@ -127,7 +127,7 @@ describe("QuickBooks current invoice state", () => {
     await expect(syncQboInvoices(f.ctx, failedId, new QboOAuthClient(config, transport))).rejects.toThrow("QuickBooks is unavailable");
     const failed = await readStatus();
     expect(failed.lastSuccess).toEqual(success.lastSuccess);
-    expect(failed.latestFailure?.error).toMatch(/not completed/);
+    expect(failed.latestFailure?.at).toBeTruthy();
     expect(JSON.stringify(failed)).not.toContain("secret");
     expect(failed.retryRequestId).toBe(failedId);
     const colleague = await makeStaffCtx(f.brewery.id, "sales");

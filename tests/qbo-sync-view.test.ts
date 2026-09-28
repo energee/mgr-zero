@@ -7,7 +7,7 @@ it("keeps last success distinct from a newer failed attempt and offers the saved
   const html = renderToStaticMarkup(createElement(QboSyncView, { status: {
     latest: { at: "2026-09-28T12:00:00Z", operator: "buyer@example.test", completed: false },
     lastSuccess: { at: "2026-09-27T12:00:00Z", operator: "admin@example.test" },
-    latestFailure: { at: "2026-09-28T12:01:00Z", operator: "buyer@example.test", error: "Sync not completed" },
+    latestFailure: { at: "2026-09-28T12:01:00Z", operator: "buyer@example.test" },
     retryRequestId: "saved-request",
   } }));
   expect(html).toContain("Last successful sync");
@@ -26,7 +26,7 @@ it.each([{ completed: true }, { completed: false, superseded: true }])("keeps re
   const html = renderToStaticMarkup(createElement(QboSyncView, { status: {
     latest: { at: "Sep 28, 2026, 8:00 AM", operator: "admin@example.test", ...latest },
     lastSuccess: { at: "Sep 27, 2026, 8:00 AM", operator: "admin@example.test" },
-    latestFailure: { at: "Sep 27, 2026, 9:00 AM", operator: "admin@example.test", error: "Sync not completed. Retry the saved batch; reconnect QuickBooks if authorization requires recovery." },
+    latestFailure: { at: "Sep 27, 2026, 9:00 AM", operator: "admin@example.test" },
     retryRequestId: null,
   } }));
   expect(html).toContain("Latest failed attempt");

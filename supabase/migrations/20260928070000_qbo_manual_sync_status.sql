@@ -2,10 +2,9 @@
 alter table private.qbo_invoice_sync_batches
   add column completed_at timestamptz,
   add column superseded_at timestamptz,
-  add column failed_at timestamptz,
-  add column last_error text;
+  add column failed_at timestamptz;
 create index qbo_invoice_sync_batches_brewery_history
-  on private.qbo_invoice_sync_batches(brewery_id, connection_id, created_at desc);
+  on private.qbo_invoice_sync_batches(brewery_id, created_at desc);
 
 create or replace function public.begin_qbo_invoice_sync(p_brewery uuid, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -191,8 +190,7 @@ begin
     raise insufficient_privilege using message='permission denied';
   end if;
   -- A late failed response cannot overwrite a concurrently committed success.
-  update private.qbo_invoice_sync_batches set failed_at=now(),
-    last_error='Sync not completed. Payment status may be stale. Retry the saved batch; reconnect QuickBooks if authorization requires recovery.'
+  update private.qbo_invoice_sync_batches set failed_at=now()
     where brewery_id=p_brewery and actor_id=p_actor and request_id=p_request_id and completed_at is null and superseded_at is null;
 end $$;
 revoke all on function public.record_qbo_invoice_sync_failure(uuid,uuid,uuid) from public, anon, authenticated;
@@ -215,7 +213,7 @@ begin
       from history order by greatest(created_at,completed_at,failed_at,superseded_at) desc,request_id desc limit 1),
     'lastSuccess', (select jsonb_build_object('at',completed_at,'operator',operator)
       from history where completed_at is not null order by completed_at desc,request_id desc limit 1),
-    'latestFailure', (select jsonb_build_object('at',failed_at,'operator',operator,'error',last_error)
+    'latestFailure', (select jsonb_build_object('at',failed_at,'operator',operator)
       from history where failed_at is not null order by failed_at desc,request_id desc limit 1),
     'retryRequestId', (select request_id from history
       where actor_id=v_actor and completed_at is null and superseded_at is null

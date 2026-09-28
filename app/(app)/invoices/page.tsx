@@ -24,5 +24,5 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `connected · ${health.realmLabel ?? "verified company"}` : health.state.replaceAll("_", " "),
     canConnect: brewery.role === "admin", connectHref: "/settings/accounting/connect",
-  } : undefined} sync={canManage ? <QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} disabled={!health?.connected} /> : null} />;
+  } : undefined} sync={<QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} disabled={!health?.connected} />} />;
 }

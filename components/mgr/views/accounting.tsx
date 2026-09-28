@@ -15,14 +15,13 @@ export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | 
     : E.gated("Open in QuickBooks", link?.reason ?? "A verified provider link is unavailable. Open QuickBooks separately to find this document.");
 }
 
-export function QboSyncView({ busy = false, disabled = false, error, notice, onSync, status }: { busy?: boolean; disabled?: boolean; error?: string | null; notice?: string | null; onSync?: () => void; status?: QboSyncStatus }) {
-  // Stored sync errors are fixed generic copy, not diagnostics; current retry guidance follows the saved identity.
+export function QboSyncView({ busy = false, disabled = false, error, onSync, status }: { busy?: boolean; disabled?: boolean; error?: string | null; onSync?: () => void; status?: QboSyncStatus }) {
+  // Failure history stores only time and operator; the view writes its own copy, and retry guidance follows the saved identity.
   return <div className="flex flex-col gap-2">
     {E.ttl("Manual payment sync")}
     {E.fld("Last successful sync", status?.lastSuccess ? `${status.lastSuccess.at} · ${status.lastSuccess.operator}` : "No successful sync recorded")}
     {status?.latest && E.fld("Latest sync activity", `${status.latest.at} · ${status.latest.operator} · ${status.latest.superseded ? "superseded · no payment changes applied" : status.latest.completed ? "completed" : "not completed"}`)}
-    {notice && E.info(notice)}
-    {status?.latest?.superseded && !notice && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.")}
+    {status?.latest?.superseded && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.")}
     {status?.latestFailure && E.note(`Latest failed attempt: ${status.latestFailure.at} · ${status.latestFailure.operator}. Sync not completed for that attempt.`)}
     {status?.retryRequestId && E.info(disabled ? "QuickBooks must be reconnected before you retry the saved batch." : "Retry saved sync keeps your original invoice set and request identity.")}
     {E.info("Payment status may be stale until you complete a manual sync. No automatic reconciliation runs.")}

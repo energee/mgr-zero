@@ -784,11 +784,11 @@ export async function confirmPortalInvoicePayment(ctx: Ctx, invoiceId: string, c
   return !error && data === true;
 }
 
-/** Persist only the fixed safe failure message; provider response bodies never enter history. */
+/** Record when a sync attempt failed; provider response bodies never enter history. */
 export async function recordQboInvoiceSyncFailure(ctx: Ctx, requestId: string) {
   requireIntegrationRole(ctx);
   const { error } = await createAdminClient().rpc("record_qbo_invoice_sync_failure", {
     p_brewery: ctx.breweryId, p_actor: ctx.userId, p_request_id: requestId,
   });
-  if (error) throw new Error("QuickBooks sync failed and its failure could not be recorded; retry the same request");
+  if (error) throw error;
 }
