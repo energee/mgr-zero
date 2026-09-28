@@ -26,7 +26,7 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {bin ? (
-              <Button type="button" variant="destructive" disabled={form.busy} onClick={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false), bin.id)}>
+              <Button type="button" variant="destructive" disabled={form.busy} onClick={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false), { target: bin.id })}>
                 Remove
               </Button>
             ) : null}

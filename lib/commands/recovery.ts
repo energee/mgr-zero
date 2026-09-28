@@ -41,19 +41,32 @@ export const inFlightRequests = new Set<string>();
  * A saved attempt for the same key is resumed, unless the caller names a
  * different `requestId`: only callers that manage exact identity do, and they
  * do it to start a deliberate new attempt, which replaces the saved one.
+ * `resumed` says the attempt was already saved, so its first send may have
+ * applied and a later rejection must not clear it.
  */
-export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): RecoveryAttempt {
+export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): { attempt: RecoveryAttempt; resumed: boolean } {
   const attempts = readRecoveries(storage, context);
   const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.target) === recoveryKey(name, target));
   if (previous && (!requestId || requestId === previous.requestId)) {
     if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
-    return previous;
+    return { attempt: previous, resumed: true };
   }
   const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId: requestId ?? crypto.randomUUID(), name, input, path, expectedContext: context, previewRows, target })));
   save(storage, context, [...attempts.filter(item => item !== previous), attempt], false);
-  return attempt;
+  return { attempt, resumed: false };
 }
 /** Removes a saved request: after its outcome is known, or when the user discards it having checked the result. */
 export function finishRecovery(storage: RecoveryStorage, attempt: RecoveryAttempt) {
   save(storage, attempt.expectedContext, readRecoveries(storage, attempt.expectedContext).filter(item => item.requestId !== attempt.requestId));
+}
+/**
+ * The user checked the result and drops a saved request; nothing is sent.
+ * Refuses one still being sent, since a changed resubmit could then apply
+ * twice. Returns false when nothing was saved under that id.
+ */
+export function discardRecovery(storage: RecoveryStorage, context: CommandContextExpectation, requestId: string) {
+  if (inFlightRequests.has(requestId)) throw new Error("This request is still being sent. Wait for its outcome.");
+  const attempt = readRecoveries(storage, context).find(row => row.requestId === requestId);
+  if (attempt) finishRecovery(storage, attempt);
+  return Boolean(attempt);
 }

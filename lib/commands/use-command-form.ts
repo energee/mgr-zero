@@ -11,8 +11,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
-import { beginRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, recoveryKey, type RecoveryAttempt } from "./recovery";
+import { beginRecovery, finishRecovery, inFlightRequests, RECOVERY_CHANGED } from "./recovery";
 import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
+
+/** Options for useCommandAction's run; see the comment on run. */
+export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; onSent?: (requestId: string) => void };
 
 export function useCommandAction() {
   const breweryId = useBrewery();
@@ -31,34 +34,28 @@ export function useCommandAction() {
   // passes `requestId` only to start a deliberate new exact attempt, and reads
   // the id actually sent (it may be a resumed saved attempt) from `onSent`.
   // `durable: false` skips the saved request for a read or a one-time secret.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string,
-    { refresh = true, target, durable = true, onSent }: { refresh?: boolean; target?: string; durable?: boolean; onSent?: (requestId: string) => void } = {}) {
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, { requestId, refresh = true, target, durable = true, onSent }: CommandRunOptions = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
-    let hadUnresolved = false;
-    let attempt: RecoveryAttempt | undefined;
+    let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
-      if (durable) {
-        const saved = readRecoveries(sessionStorage, expectedContext).find(row => recoveryKey(row.name, row.target) === recoveryKey(name, target));
-        // Only this row's resumed attempt keeps a rejection from clearing it; a new explicit id replaces it.
-        hadUnresolved = Boolean(saved) && (!requestId || saved?.requestId === requestId);
-        attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
-      }
-      const sent = attempt ?? { name, input, requestId: requestId ?? crypto.randomUUID(), expectedContext };
+      if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
+      const sent = saved?.attempt ?? { name, input, requestId: requestId ?? crypto.randomUUID(), expectedContext };
       onSent?.(sent.requestId);
       inFlightRequests.add(sent.requestId);
       let data: unknown;
       try { data = await command(sent.expectedContext.breweryId ?? breweryId, sent.name, sent.input, sent.requestId, sent.expectedContext); }
       finally { inFlightRequests.delete(sent.requestId); }
-      if (attempt) finishRecovery(sessionStorage, attempt);
+      if (saved) finishRecovery(sessionStorage, saved.attempt);
       onSuccess?.(data);
       if (refresh) router.refresh();
       return true;
     } catch (err) {
       const detail = classifyCommandFailure(err);
-      if (!hadUnresolved && detail.kind === "definitive" && attempt) finishRecovery(sessionStorage, attempt);
-      if (typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED));
+      // A resumed attempt may already have applied, so only a first send's rejection clears it.
+      if (saved && !saved.resumed && detail.kind === "definitive") finishRecovery(sessionStorage, saved.attempt);
+      else if (saved && typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED)); // finishRecovery already notifies.
       setFailure(detail);
       setError(detail.message === "command failed" ? `${name} failed` : detail.message);
       return false;
@@ -94,10 +91,10 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
 
-  /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot; `target` as in useCommandAction. */
-  async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void, target?: string) {
+  /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot; options as in useCommandAction's run. */
+  async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void, options?: CommandRunOptions) {
     setRunning(command);
-    try { return await runAction(command, input, onSuccess, undefined, { target }); } finally { setRunning(null); }
+    try { return await runAction(command, input, onSuccess, options); } finally { setRunning(null); }
   }
 
   function setOpen(next: boolean) {
@@ -111,7 +108,7 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     // A sheet is a form in a dialog portal; React bubbles its submit through
     // the tree, so an enclosing page form must never see it.
     e.stopPropagation();
-    await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, opts.target);
+    await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, { target: opts.target });
   }
 
   return { open, setOpen, error, failure, submitting: running === name, busy: running !== null, submit, run };

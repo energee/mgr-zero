@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { ImportView } from "@/components/mgr/views/import";
-import { beginRecovery, finishRecovery, readRecoveries } from "@/lib/commands/recovery";
+import { beginRecovery, discardRecovery, finishRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { command } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
@@ -45,7 +45,7 @@ function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: Imp
     const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
     try {
-      const saved = beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, { requestId: action.requestId, previewRows: action.previewRows });
+      const { attempt: saved } = beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, { requestId: action.requestId, previewRows: action.previewRows });
       const recovered = await command(action.expectedContext.breweryId ?? breweryId, "import_csv", saved.input, saved.requestId, action.expectedContext) as ImportResult;
       setResult(recovered);
       finishRecovery(sessionStorage, saved);
@@ -58,8 +58,7 @@ function ImportSession({ breweryId, lookups }: { breweryId: string; lookups: Imp
   function discard() {
     if (!batch) return;
     try {
-      const saved = readRecoveries(sessionStorage, batch.expectedContext).find(row => row.requestId === batch.requestId);
-      if (saved) finishRecovery(sessionStorage, saved); // Absent means it already finished; there is nothing left to remove.
+      discardRecovery(sessionStorage, batch.expectedContext, batch.requestId); // False means it already finished; nothing is left to remove.
     } catch (cause) { return setError(cause instanceof Error ? cause.message : "The saved batch could not be discarded."); }
     setBatch(null); setResult(null); setError(null); setStep(csv ? 2 : 0);
   }

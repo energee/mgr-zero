@@ -45,11 +45,11 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
-          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }, undefined, pour.id); }, form.busy)}
+          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id }); }, form.busy)}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (
-              <Button type="button" variant="ghost" disabled={form.busy} onClick={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, groupId)}>Delete</Button>
+              <Button type="button" variant="ghost" disabled={form.busy} onClick={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })}>Delete</Button>
             )}
             <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price group"}</Button>
           </CommandFormFooter>}

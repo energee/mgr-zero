@@ -26,7 +26,7 @@ export function QboDefaultsForm({ allowAch, allowCard }: { allowAch: boolean; al
 export function QboDisconnectAction({ connectionId }: { connectionId: string }) {
   const action = useCommandAction(), router = useRouter();
   return <DisconnectQuickBooksView busy={action.busy} error={action.error}
-    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), undefined, { refresh: false })} />;
+    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), { refresh: false })} />;
 }
 
 type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
@@ -58,7 +58,7 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
   const confirmation = pendingPush ? qboPushConfirmation(pendingPush, invoiceLabel) : null;
   const push = async (action: QboRemoteCreateAction) => {
     const newAttemptReason = action === "corrected_push" ? "corrected" : action === "repush" ? "remote_deleted" : undefined;
-    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) }, undefined, undefined, { target: invoiceId })) setPendingPush(null);
+    if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) }, undefined, { target: invoiceId })) setPendingPush(null);
   };
   return <div className="flex flex-wrap justify-end gap-2">
     {actions.includes("fix_mapping") && <Button variant="outline" asChild><a href={`/invoices/${invoiceId}/mapping`}>Fix mapping</a></Button>}

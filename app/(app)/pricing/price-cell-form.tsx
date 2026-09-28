@@ -49,7 +49,7 @@ export function PriceCellForm({
               type="button"
               variant="ghost"
               disabled={form.busy}
-              onClick={() => form.run("clear_channel_price", { saleChannelId, priceGroupId, formatId }, undefined, cell)}
+              onClick={() => form.run("clear_channel_price", { saleChannelId, priceGroupId, formatId }, undefined, { target: cell })}
             >
               Clear
             </Button>
