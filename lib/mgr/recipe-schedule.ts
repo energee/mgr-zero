@@ -1,6 +1,7 @@
 // lib/mgr/recipe-schedule.ts — a recipe version's mash schedule is an ordered
 // step list, and its screen states a total in the footer. saccharificationRest
-// names the step the prediction reads: Recipe no longer carries a Mash temp
+// names the step recorded as mash_temp_f (lib/recipe-gravity.ts does not read
+// it; it is reserved for a later efficiency model): Recipe no longer carries a Mash temp
 // scalar (spec D4), so the schedule is the only place that number lives and
 // the footer has to point at it. The RPC in 20260917100000_recipe_process_spec
 // derives mash_temp_f with the same range and tie-break; SQL is authoritative

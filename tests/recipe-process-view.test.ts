@@ -20,7 +20,7 @@ describe("schedule drafts", () => {
     expect(upsertAt(mash, 1, { ...mash[1], minutes: 45 })[1].minutes).toBe(45);
   });
   it("the longest in-range rest wins over the first, as the RPC derives mash_temp_f", () => {
-    expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min · the 158 °F rest feeds the prediction.");
+    expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min · the 158 °F rest is the recorded mash temperature; the gravity prediction does not use it.");
   });
   it("reads a cut version's process facts out, skipping what it does not carry", () => {
     const names = (id: string | null) => (id === "hazy" ? "Hazy target" : null);
@@ -28,9 +28,9 @@ describe("schedule drafts", () => {
       ["Pre-boil volume", "12.5 bbl"], ["Whirlpool", "20 min at 180 °F"], ["Source profile", "Brewery default"], ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
     ]);
   });
-  it("summaries name the rest that feeds the prediction and the total days", () => {
-    expect(mashSummary(mash)).toBe("Total 85 min · the 152 °F rest feeds the prediction.");
-    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no rest between 144 and 162 °F, so the prediction has no mash temperature.");
+  it("summaries name the recorded mash-temperature rest and the total days", () => {
+    expect(mashSummary(mash)).toBe("Total 85 min · the 152 °F rest is the recorded mash temperature; the gravity prediction does not use it.");
+    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no rest between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
     expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");

@@ -53,7 +53,7 @@ export const removeAt = <T>(list: readonly T[], index: number): T[] => list.filt
 
 export function mashSummary(steps: readonly MashStep[]): string {
   const rest = saccharificationRest(steps);
-  return `Total ${totalMinutes(steps)} min · ${rest ? `the ${rest.tempF} °F rest feeds the prediction.` : "no rest between 144 and 162 °F, so the prediction has no mash temperature."}`;
+  return `Total ${totalMinutes(steps)} min · ${rest ? `the ${rest.tempF} °F rest is the recorded mash temperature; the gravity prediction does not use it.` : "no rest between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
 /** Total days, and where a dry hop on day N lands: day 4 is the last day of a 4-day Primary. */
