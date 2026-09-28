@@ -6,6 +6,40 @@ alter table public.batches add constraint cancelled_batch_is_unstarted check
 alter table public.packaging_runs add constraint cancelled_run_is_unstarted check
   (cancelled_at is null or (started_at is null and closed_at is null and bbl_drawn is null));
 
+-- One lock-and-check per plan kind, so cancel and reschedule share one
+-- definition of "unstarted". Takes the cellar lock, then the plan row.
+create function private.lock_unstarted_batch(p_brewery uuid, p_batch uuid) returns public.batches
+language plpgsql security definer set search_path = '' as $$
+declare v_row public.batches;
+begin
+  perform private.lock_cellar_workflow(p_brewery);
+  select * into v_row from public.batches where brewery_id = p_brewery and id = p_batch for update;
+  if v_row.id is null then raise exception 'batch not found'; end if;
+  if v_row.cancelled_at is not null then raise exception 'batch is cancelled'; end if;
+  if v_row.brewed_on is not null or v_row.closed_at is not null
+    or exists (select 1 from public.vessel_occupancies where brewery_id = p_brewery and batch_id = p_batch)
+    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  return v_row;
+end $$;
+revoke all on function private.lock_unstarted_batch(uuid, uuid) from public, anon, authenticated, service_role;
+
+create function private.lock_unstarted_packaging_run(p_brewery uuid, p_run uuid) returns public.packaging_runs
+language plpgsql security definer set search_path = '' as $$
+declare v_row public.packaging_runs;
+begin
+  perform private.lock_cellar_workflow(p_brewery);
+  select * into v_row from public.packaging_runs where brewery_id = p_brewery and id = p_run for update;
+  if v_row.id is null then raise exception 'packaging run not found'; end if;
+  if v_row.cancelled_at is not null then raise exception 'packaging run is cancelled'; end if;
+  if v_row.started_at is not null or v_row.closed_at is not null or v_row.bbl_drawn is not null
+    or exists (select 1 from public.packaging_run_outputs where brewery_id = p_brewery and run_id = p_run and (qty_actual is not null or movement_id is not null))
+    or exists (select 1 from public.packaging_run_consumptions where brewery_id = p_brewery and run_id = p_run)
+    or exists (select 1 from public.lots where brewery_id = p_brewery and packaging_run_id = p_run)
+    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  return v_row;
+end $$;
+revoke all on function private.lock_unstarted_packaging_run(uuid, uuid) from public, anon, authenticated, service_role;
+
 create function public.cancel_batch(p_brewery uuid, p_batch uuid, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.batches;
@@ -14,13 +48,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'cancel_batch', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'batch', p_batch));
   if v_replay is not null then return v_replay; end if;
-  perform private.lock_cellar_workflow(p_brewery);
-  select * into v_row from public.batches where brewery_id = p_brewery and id = p_batch for update;
-  if v_row.id is null then raise exception 'batch not found'; end if;
-  if v_row.cancelled_at is not null then raise exception 'batch is cancelled'; end if;
-  if v_row.brewed_on is not null or v_row.closed_at is not null
-    or exists (select 1 from public.vessel_occupancies where brewery_id = p_brewery and batch_id = p_batch)
-    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  perform private.lock_unstarted_batch(p_brewery, p_batch);
   update public.batches set cancelled_at = now() where id = p_batch returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
@@ -35,13 +63,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'reschedule_batch', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'batch', p_batch, 'planned_on', p_planned_on));
   if v_replay is not null then return v_replay; end if;
-  perform private.lock_cellar_workflow(p_brewery);
-  select * into v_row from public.batches where brewery_id = p_brewery and id = p_batch for update;
-  if v_row.id is null then raise exception 'batch not found'; end if;
-  if v_row.cancelled_at is not null then raise exception 'batch is cancelled'; end if;
-  if v_row.brewed_on is not null or v_row.closed_at is not null
-    or exists (select 1 from public.vessel_occupancies where brewery_id = p_brewery and batch_id = p_batch)
-    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  perform private.lock_unstarted_batch(p_brewery, p_batch);
   if p_planned_on is null then raise exception 'planned date is required'; end if;
   update public.batches set planned_on = p_planned_on where id = p_batch returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
@@ -57,15 +79,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'cancel_packaging_run', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'run', p_run));
   if v_replay is not null then return v_replay; end if;
-  perform private.lock_cellar_workflow(p_brewery);
-  select * into v_row from public.packaging_runs where brewery_id = p_brewery and id = p_run for update;
-  if v_row.id is null then raise exception 'packaging run not found'; end if;
-  if v_row.cancelled_at is not null then raise exception 'packaging run is cancelled'; end if;
-  if v_row.started_at is not null or v_row.closed_at is not null or v_row.bbl_drawn is not null
-    or exists (select 1 from public.packaging_run_outputs where brewery_id = p_brewery and run_id = p_run and (qty_actual is not null or movement_id is not null))
-    or exists (select 1 from public.packaging_run_consumptions where brewery_id = p_brewery and run_id = p_run)
-    or exists (select 1 from public.lots where brewery_id = p_brewery and packaging_run_id = p_run)
-    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  perform private.lock_unstarted_packaging_run(p_brewery, p_run);
   update public.packaging_runs set cancelled_at = now() where id = p_run returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
@@ -80,15 +94,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'reschedule_packaging_run', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'run', p_run, 'planned_on', p_planned_on));
   if v_replay is not null then return v_replay; end if;
-  perform private.lock_cellar_workflow(p_brewery);
-  select * into v_row from public.packaging_runs where brewery_id = p_brewery and id = p_run for update;
-  if v_row.id is null then raise exception 'packaging run not found'; end if;
-  if v_row.cancelled_at is not null then raise exception 'packaging run is cancelled'; end if;
-  if v_row.started_at is not null or v_row.closed_at is not null or v_row.bbl_drawn is not null
-    or exists (select 1 from public.packaging_run_outputs where brewery_id = p_brewery and run_id = p_run and (qty_actual is not null or movement_id is not null))
-    or exists (select 1 from public.packaging_run_consumptions where brewery_id = p_brewery and run_id = p_run)
-    or exists (select 1 from public.lots where brewery_id = p_brewery and packaging_run_id = p_run)
-    then raise exception 'physical work is already recorded; this plan cannot be cancelled or rescheduled'; end if;
+  perform private.lock_unstarted_packaging_run(p_brewery, p_run);
   if p_planned_on is null then raise exception 'planned date is required'; end if;
   update public.packaging_runs set planned_on = p_planned_on where id = p_run returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));

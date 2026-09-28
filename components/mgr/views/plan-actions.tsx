@@ -3,6 +3,11 @@ import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
+/** The one notice a cancelled batch or packaging plan shows in place of its actions. */
+export function PlanCancelled() {
+  return E.info("Cancelled. This plan remains in history and no longer creates demand.");
+}
+
 /** Date changes and cancellation share the same controls for batch and packaging plans. */
 export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCancel }: {
   plannedOn: string; busy?: boolean; error?: string | null;

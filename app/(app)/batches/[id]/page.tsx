@@ -35,7 +35,7 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   const model = {
     title: batNo(batch.batch_no), backHref: "/batches",
     planned: Number(batch.planned_bbl) + " bbl · " + batch.planned_on, note: batch.note ?? undefined,
-    recorded, cancelledAt: batch.cancelled_at, plannedOn: batch.planned_on, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
+    recorded, cancelledAt: batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),
   };

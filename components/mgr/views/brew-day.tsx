@@ -6,7 +6,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { canRecordBrewDay, type BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 
-import { PlanActions } from "./plan-actions";
+import { PlanCancelled } from "./plan-actions";
 
 export type { BrewDayViewModel };
 
@@ -25,8 +25,8 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
     {E.back("Batches", model.title, undefined, model.backHref)}
     {model.planned && E.fld("Planned", model.planned)}
     {model.note && E.fld("Note", model.note)}
-    {model.cancelledAt ? E.info("Cancelled. This plan remains in history and no longer creates demand.") : <>
-    {!model.recorded && model.plannedOn && (planActions ?? <PlanActions plannedOn={model.plannedOn} />)}
+    {model.cancelledAt ? <PlanCancelled /> : <>
+    {!model.recorded && planActions}
     <section data-gated className="flex flex-col gap-3" aria-label="Material consumption unavailable">
       {E.note("Material consumption unavailable here. Record brew day records the brew date and knockout occupancy only.")}
       {(model.lots ?? []).map(lot => <Fragment key={lot.key}>{E.nav(lot.title, lot.detail)}</Fragment>)}
