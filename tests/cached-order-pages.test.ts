@@ -53,7 +53,7 @@ it("does not describe a cold cache as empty data or render skeletons", () => {
 
 it("preserves customer filters and read-only Warehouse controls", () => {
   const html = renderToStaticMarkup(OrdersClient({ role: "warehouse", status: "draft", customerId: "buyer" }));
-  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer" }]]);
+  expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined, limit: 51 }]]);
   expect(html).toContain("customerId=buyer");
   expect(html).not.toContain("New order");
 });
