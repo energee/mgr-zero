@@ -34,16 +34,23 @@ function save(storage: RecoveryStorage, context: CommandContextExpectation, atte
 export function recoveryKey(name: string, target?: string) {
   return JSON.stringify([name, target ?? null]);
 }
-/** Save before sending: a reload during fetch is also an unknown outcome. */
-export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId = crypto.randomUUID(), previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): RecoveryAttempt {
+/** Request ids this tab is sending right now: their outcome is still coming, so the panel neither shows nor discards them. */
+export const inFlightRequests = new Set<string>();
+/**
+ * Save before sending: a reload during fetch is also an unknown outcome.
+ * A saved attempt for the same key is resumed, unless the caller names a
+ * different `requestId`: only callers that manage exact identity do, and they
+ * do it to start a deliberate new attempt, which replaces the saved one.
+ */
+export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, previewRows, target }: { requestId?: string; previewRows?: number[]; target?: string } = {}): RecoveryAttempt {
   const attempts = readRecoveries(storage, context);
   const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.target) === recoveryKey(name, target));
-  if (previous) {
+  if (previous && (!requestId || requestId === previous.requestId)) {
     if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
     return previous;
   }
-  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId, name, input, path, expectedContext: context, previewRows, target })));
-  save(storage, context, [...attempts, attempt], false);
+  const attempt = attemptSchema.parse(JSON.parse(JSON.stringify({ requestId: requestId ?? crypto.randomUUID(), name, input, path, expectedContext: context, previewRows, target })));
+  save(storage, context, [...attempts.filter(item => item !== previous), attempt], false);
   return attempt;
 }
 /** Removes a saved request: after its outcome is known, or when the user discards it having checked the result. */

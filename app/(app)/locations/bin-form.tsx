@@ -14,6 +14,7 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
   const form = useCommandForm(bin ? "update_bin" : "create_bin", {
     build: () => (bin ? { binId: bin.id, name } : { locationId, name }),
     reset: () => setName(bin?.name ?? ""),
+    target: bin?.id,
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Bin"
