@@ -3,6 +3,8 @@
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { historyInput, newestFirst } from "./history";
 import { z } from "zod";
+import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
+import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
@@ -290,6 +292,20 @@ defineQuery({
   },
 });
 
+// Both invoice reads use the same current connection and exact successful push provenance.
+async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id: string })[]) {
+  if (!invoices.length || (ctx.role !== "admin" && ctx.role !== "sales")) return new Map(invoices.map(invoice => [invoice.id, null]));
+  const connection = await runCommand("get_qbo_connection", {}, ctx) as QboStaffConnection;
+  const pushes = connection.connected && connection.connectionId && connection.realmId
+    ? await completeRows("Invoice provider identities", start => ctx.db.from("qbo_pushes")
+      .select("id,invoice_id,connection_id,realm_id,qbo_entity_id", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("connection_id", connection.connectionId!).eq("realm_id", connection.realmId!)
+      .eq("status", "pushed").eq("entity_type", "Invoice").in("invoice_id", invoices.map(invoice => invoice.id))
+      .order("id").range(start, start + PAGE_SIZE - 1)) as (QboPushedIdentity & { invoice_id: string })[] : [];
+  return new Map(invoices.map(invoice => [invoice.id, qboStaffInvoiceLink(invoice, ctx.role, connection,
+    pushes.find(push => push.invoice_id === invoice.id && push.qbo_entity_id === invoice.qbo_invoice_id))]));
+}
+
 defineQuery({
   name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
   roles: [...readRoles],
@@ -297,17 +313,18 @@ defineQuery({
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    const invoices = (await unwrap(newestFirst(q, i.cursor))) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
+    const invoices = (await unwrap(newestFirst(q, i.cursor))) as (QboInvoiceIdentity & { id: string; qbo_total_cents: number | null })[];
     const ids = invoices.map(inv => inv.id);
     const [totals, pendingPushes] = ids.length ? await Promise.all([
       unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
       unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
     ]) : [[], []];
+    const staffLinks = await invoiceStaffLinks(ctx, invoices);
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
     const pending = new Set(pendingPushes.map(push => push.invoice_id));
     return invoices.map(inv => {
       const subtotal_cents = subtotalById.get(inv.id) ?? 0;
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id) };
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
     });
   },
 });
@@ -318,11 +335,13 @@ defineQuery({
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [invoice, invLines, pendingPush] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).single()),
-      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId)),
+      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
     ]);
-    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush) };
+    if (!invoice) throw new Error("Invoice not found");
+    const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
+    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush), quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },
 });
 

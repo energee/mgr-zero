@@ -16,7 +16,7 @@ import { invoiceMappingRows, toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MarkAnswered } from "./mark-answered";
-import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
+import { qboInvoicePresentation, type QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
 
@@ -28,11 +28,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ invoice, lines, hasPendingPush }, questions, health] = (await Promise.all([
+  const [{ invoice, lines, hasPendingPush, quickbooksLink }, questions, health] = (await Promise.all([
     orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)),
     brewery.role === "warehouse" ? [] : runCommand("list_invoice_questions", { invoiceId: id }, ctx),
     brewery.role === "admin" || brewery.role === "sales" ? runCommand("get_qbo_connection", {}, ctx) : null,
-  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null } | null];
+  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
   const memo = invoiceIsCreditable(invoice) && canRun(ctx, "return_shipment")
     ? <Button size="sm" variant="outline" asChild><Link href={`/invoices/${invoice.id}/return`}>Return</Link></Button>
@@ -47,6 +47,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   return (
     <InvoiceView
       model={model}
+      staffLink={quickbooksLink}
       headerAction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
       quickbooks={{ detail: presentation.detail, balanceCents: invoice.qbo_balance_cents, healthy: invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift }}

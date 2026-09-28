@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { AccountingViewModel } from "@/lib/mgr/accounting-view";
+import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
+
+export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | null | undefined }) {
+  if (link === null) return null;
+  return link?.href ? E.act("Open in QuickBooks", "primary", link.href)
+    : E.gated("Open in QuickBooks", link?.reason ?? "A verified provider link is unavailable. Open QuickBooks separately to find this document.");
+}
 
 export function QboSyncView({ busy = false, error, onSync }: { busy?: boolean; error?: string | null; onSync?: () => void }) {
   return <div className="flex flex-col items-end gap-2"><Button variant="outline" disabled={busy} onClick={onSync}>{busy ? "Syncing…" : "Sync QuickBooks"}</Button><CommandFormMessage error={error} /></div>;

@@ -123,3 +123,9 @@ it.each(["Not pushed", "Disconnected", "Deleted in QuickBooks", "Pushed to Quick
   expect(html).toContain("A verified provider link is unavailable");
   expect(html).not.toMatch(/href="https:\/\/(?:qbo|sandbox|connect)\.intuit/);
 });
+
+it("renders a verified staff destination through the shared invoice view", () => {
+  const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail: "Pushed", balanceCents: 12000, healthy: true }, staffLink: { href: "https://app.qbo.intuit.com/app/invoice?txnId=34&companyId=4620000000000000", reason: null } }));
+  expect(html).toContain('href="https://app.qbo.intuit.com/app/invoice?txnId=34&amp;companyId=4620000000000000"');
+  expect(html).not.toContain("verified provider link is unavailable");
+});
