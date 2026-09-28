@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, STAFF_ROLES, type StaffRole } from "./registry";
+import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuery, unwrap, STAFF_ROLES, type StaffRole } from "./registry";
 
 // Metadata is also read by docs tooling; load the server-only Auth boundary only on execution.
 
@@ -57,4 +57,25 @@ defineCommand({
   name: "revoke_customer_user", description: "End one buyer's portal access to a customer (admin or sales); the sign-in account remains",
   input: z.object({ customerId: z.string().uuid(), userId: z.string().uuid() }), roles: ["admin", "sales"], requiresConfirmation: true,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("revoke_customer_user", { p_brewery: ctx.breweryId, p_customer: i.customerId, p_user: i.userId, p_request_id: execution.requestId })),
+});
+
+
+definePreTenantQuery({
+  name: "list_my_invitations", description: "List pending invitations for this signed-in account.",
+  input: z.object({}), handler: ctx => unwrap(ctx.db.rpc("list_my_invitations")),
+});
+definePreTenantCommand({
+  name: "accept_account_invitation", description: "Consent to join the brewery or customer account in an invitation.",
+  input: z.object({ inviteId: z.uuid() }),
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("accept_account_invitation", {
+    p_invite: input.inviteId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "revoke_account_invitation", description: "Revoke a pending existing-account invitation.",
+  roles: ["admin", "sales"], input: z.object({ inviteId: z.uuid() }),
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("revoke_account_invitation", {
+    p_brewery: ctx.breweryId, p_invite: input.inviteId, p_request_id: execution.requestId,
+  })),
 });

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { selectCustomerMembership } from "@/lib/portal";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { QboOAuthClient, qboConfig, resolvePortalInvoicePayment } from "@/lib/qbo";
@@ -20,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const auth = createRequestAuthContext();
   const identity = await auth.getIdentity();
   if (!identity) return new Response(null, { status: 303, headers: { ...responseHeaders, Location: new URL("/login", request.url).href } });
-  const membership = (await auth.getCustomerMemberships())[0];
+  const membership = selectCustomerMembership(await auth.getCustomerMemberships(), (await cookies()).get("customer")?.value);
   if (!membership) return new Response(null, { status: 303, headers: { ...responseHeaders, Location: new URL("/no-membership", request.url).href } });
   const ctx: Ctx = {
     db: await auth.getScopedSupabaseClient({

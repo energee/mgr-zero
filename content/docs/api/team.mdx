@@ -50,6 +50,23 @@ location. Prices are nonnegative integer cents, at most 2147483647.
 
 {/* ops:team */}
 
+## accept_account_invitation [#accept_account_invitation]
+
+`command` · authenticated pre-tenant
+
+Consent to join the brewery or customer account in an invitation.
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `inviteId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "name": "accept_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## configure_pos_menu [#configure_pos_menu]
 
 `command` · admin, warehouse
@@ -346,6 +363,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
 ```
 
+## list_my_invitations [#list_my_invitations]
+
+`query` · authenticated pre-tenant
+
+List pending invitations for this signed-in account.
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "name": "list_my_invitations", "input": {} }'
+```
+
 ## list_pos_locations [#list_pos_locations]
 
 `query` · admin, warehouse
@@ -462,6 +494,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string" } }'
+```
+
+## revoke_account_invitation [#revoke_account_invitation]
+
+`command` · admin, sales
+
+Revoke a pending existing-account invitation.
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `inviteId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "revoke_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## revoke_staff [#revoke_staff]

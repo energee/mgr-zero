@@ -28,6 +28,9 @@ const AUTHENTICATED_RPCS = [
 
   "begin_csv_import(uuid,text,jsonb,uuid)",
   "import_csv_row(uuid,uuid,integer)",
+  "accept_account_invitation(uuid,uuid)",
+  "list_my_invitations()",
+  "revoke_account_invitation(uuid,uuid,uuid)",
   "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
   "complete_invite_membership(uuid)",
   "record_invite_failure(uuid)",

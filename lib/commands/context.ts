@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/database";
 // lib/commands/context.ts — resolves a command caller's verified identity and brewery membership.
 import { cache } from "react";
@@ -22,7 +23,7 @@ export const isUuid = (value: string | undefined): value is string => value !== 
 // db_error rather than being mistaken for "not a member" (403). A malformed
 // breweryId is rejected up front (Postgres would raise 22P02 → db_error) and
 // still reads as not_member, the contract tests/api-command.test.ts pins.
-export async function ctxForBearer(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<Ctx> {
+export async function ctxForBearer(db: SupabaseClient<Database>, userId: string, breweryId: string, customerId?: string): Promise<Ctx> {
   if (!isUuid(breweryId)) {
     throw new CommandError("not a member of this brewery", 403, "not_member");
   }
@@ -32,14 +33,16 @@ export async function ctxForBearer(db: SupabaseClient<Database>, userId: string,
     .eq("brewery_id", breweryId)
     .eq("user_id", userId)
     .maybeSingle());
-  if (staff) return { db, userId, breweryId, role: staff.role };
+  if (staff && !customerId) return { db, userId, breweryId, role: staff.role };
 
-  const customer = await unwrap(db
+  let customerQuery = db
     .from("customer_users")
     .select("customer_id, customers!inner(brewery_id)")
     .eq("user_id", userId)
     .eq("customers.brewery_id", breweryId)
-    .limit(1));
+    .limit(1);
+  if (customerId) customerQuery = customerQuery.eq("customer_id", customerId);
+  const customer = await unwrap(customerQuery);
   if (customer?.length) {
     return { db, userId, breweryId, role: "customer", customerId: customer[0].customer_id };
   }
@@ -64,7 +67,7 @@ function scopeHeaders(ctx: OperationCtx): Record<string, string> {
   };
 }
 
-async function buildCookieContext(breweryId: string | undefined, request: RequestAuthContext, expected?: CommandContextExpectation): Promise<OperationCtx> {
+async function buildCookieContext(breweryId: string | undefined, request: RequestAuthContext, expected?: CommandContextExpectation, customerId?: string): Promise<OperationCtx> {
   const identity = await request.getIdentity();
   if (!identity) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
@@ -74,14 +77,14 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
-  const staff = await request.getStaffMembership(breweryId);
+  const staff = customerId ? null : await request.getStaffMembership(breweryId);
   if (staff) {
     const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role: staff.role } satisfies Ctx;
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
 
-  const customer = await request.getCustomerMembership(breweryId);
+  const customer = await request.getCustomerMembership(breweryId, customerId);
   if (customer) {
     const discovered = {
       db: discoveryDb,
@@ -98,16 +101,17 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
 }
 
 // Server Components share React's request cache through the RSC composition.
-function cookieContext(breweryId: string): Promise<Ctx>;
+function cookieContext(breweryId: string, customerId?: string): Promise<Ctx>;
 function cookieContext(breweryId?: undefined): Promise<PreTenantCtx>;
-function cookieContext(breweryId?: string): Promise<OperationCtx> {
-  return buildCookieContext(breweryId, getRequestAuthContext());
+function cookieContext(breweryId?: string, customerId?: string): Promise<OperationCtx> {
+  return buildCookieContext(breweryId, getRequestAuthContext(), undefined, customerId);
 }
 export const buildContext = cache(cookieContext);
 
 // Route handlers have no React Server Component cache, so compose explicitly.
 export async function buildRouteContext(breweryId?: string, expected?: CommandContextExpectation): Promise<OperationCtx> {
-  return buildCookieContext(breweryId, createRequestAuthContext(), expected);
+  const customerId = expected?.customerId ? (await cookies()).get("customer")?.value ?? expected.customerId : undefined;
+  return buildCookieContext(breweryId, createRequestAuthContext(), expected, customerId);
 }
 
 // API clients supply a bearer token. Its validation and RLS-bound client are
@@ -130,7 +134,7 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
   });
   const discovered = breweryId === undefined
     ? ({ db: discoveryDb, userId, breweryId: null, role: null } satisfies PreTenantCtx)
-    : await ctxForBearer(discoveryDb, userId, breweryId);
+    : await ctxForBearer(discoveryDb, userId, breweryId, expected?.customerId);
   assertExpectedContext(discovered, expected);
   const db = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },

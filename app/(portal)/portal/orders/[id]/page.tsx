@@ -14,7 +14,7 @@ import "@/lib/commands/all";
 export default async function PortalOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId);
+  const ctx = await buildContext(customer.breweryId, customer.customerId);
   const snapshot = await orNotFound(
     runCommand("portal_order", { orderId: id }, ctx) as Promise<PortalOrderSnapshot>,
   );

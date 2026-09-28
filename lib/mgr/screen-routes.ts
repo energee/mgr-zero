@@ -18,6 +18,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Invite portal user", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Import", file: "app/(app)/settings/import/page.tsx" },
   { name: "Create brewery", file: "app/(auth)/create-brewery/page.tsx" },
+  { name: "Account invitations", file: "app/(auth)/invitations/page.tsx" },
   { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
   { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
   { name: "Expired reset", file: "app/(auth)/reset/page.tsx" },

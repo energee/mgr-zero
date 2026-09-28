@@ -6,6 +6,7 @@ import { E } from "@/components/mgr/e";
 // Exact control exceptions, never a whole-file exemption.
 const allowlist: { file: string; match: string; reason: string }[] = [
 {"file":"format-rows.tsx","match":"<input type=\"checkbox\" checked={confirmClear} onChange={event => onConfirmClear(event.target.checked)} />","reason":"Explicit confirmation of clearing all contents or materials, not a persistent on/off setting."},
+{"file":"account-invitations.tsx","match":"<input type=\"hidden\" name=\"inviteId\" value={invite.id} />","reason":"Hidden invitation identity submitted by the explicit consent form."},
 {"file":"me.tsx","match":"<input type=\"hidden\" name=\"breweryId\" value={brewery.id} />","reason":"Hidden brewery identity submitted by the switch form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"requestId\" value={requestId} />","reason":"Hidden actor/request identity submitted by the creation form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"actorId\" value={actorId} />","reason":"Hidden actor/request identity submitted by the creation form."},

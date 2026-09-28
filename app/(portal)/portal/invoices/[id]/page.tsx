@@ -15,7 +15,7 @@ export default async function PortalInvoicePage({ params, searchParams }: { para
   const { id } = await params;
   const failedPayment = (await searchParams).payment === "unavailable";
   const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId);
+  const ctx = await buildContext(customer.breweryId, customer.customerId);
   const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
   const model = toPortalInvoiceViewProps({ ...snapshot, backHref: "/portal/invoices" });
   // The Pay route redirects here with ?payment=unavailable when QuickBooks

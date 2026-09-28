@@ -16,7 +16,7 @@ type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credi
 export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
   const cursor = pageCursor((await searchParams).cursor);
   const customer = await getActiveCustomer();
-  const records = (await runCommand("portal_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, await buildContext(customer.breweryId))) as (Invoice & HistoryRow)[];
+  const records = (await runCommand("portal_invoices", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, await buildContext(customer.breweryId, customer.customerId))) as (Invoice & HistoryRow)[];
   const page = historyPage(records, "/portal/invoices", cursor);
   return (
     <PortalInvoicesView

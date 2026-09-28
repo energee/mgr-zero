@@ -291,9 +291,9 @@ export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): Quer
   return definition;
 }
 
-/** The sole bootstrap operation accepts authenticated identity without a tenant role. */
+/** Authenticated operations that do not require an existing membership. */
 export function definePreTenantCommand<In, Out>(definition: {
-  name: "provision_brewery";
+  name: "provision_brewery" | "accept_account_invitation";
   description: string;
   input: ZodType<In>;
   handler: (ctx: PreTenantCtx, input: In, execution: CommandExecution) => Promise<Out>;
@@ -305,6 +305,22 @@ export function definePreTenantCommand<In, Out>(definition: {
       if (ctx.breweryId !== null) throw new CommandError("pre-tenant context required", 403, "permission_denied");
       if (!execution) throw new CommandError("command execution metadata is required", 500, "missing_execution");
       return definition.handler(ctx, parsed as In, execution);
+    },
+  });
+}
+
+export function definePreTenantQuery<In, Out>(definition: {
+  name: "list_my_invitations";
+  description: string;
+  input: ZodType<In>;
+  handler: (ctx: PreTenantCtx, input: In) => Promise<Out>;
+}) {
+  requireUnusedName(definition.name);
+  registry.set(definition.name, {
+    ...definition, kind: "query", scope: "pretenant", roles: "any", aiExposed: false, offlineReplay: false,
+    execute: (ctx, parsed) => {
+      if (ctx.breweryId !== null) throw new CommandError("pre-tenant context required", 403, "permission_denied");
+      return definition.handler(ctx, parsed as In);
     },
   });
 }

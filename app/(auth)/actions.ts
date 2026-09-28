@@ -5,6 +5,10 @@
 // post-login identity and membership composition.
 "use server";
 
+import "@/lib/commands/all";
+import { buildContext } from "@/lib/commands/context";
+import { runCommand, CommandError } from "@/lib/commands/registry";
+import type { AccountInvitation } from "@/lib/mgr/account-invitations";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
@@ -12,8 +16,7 @@ import { acceptInviteErrorPath, inviteAudience, inviteLanding } from "@/lib/auth
 import { createServerClient } from "@/lib/supabase/server";
 
 /** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
-async function home(db: Awaited<ReturnType<typeof createServerClient>>) {
-  const auth = createRequestAuthContext(() => Promise.resolve(db));
+async function home(auth: ReturnType<typeof createRequestAuthContext>) {
   if (!(await auth.getIdentity())) return "/login?error=1";
   if ((await auth.getStaffMemberships()).length) return "/";
   if ((await auth.getCustomerMemberships()).length) return "/portal";
@@ -28,7 +31,11 @@ export async function login(form: FormData) {
   });
   const back = form.get("portal") ? "/portal/login" : "/login";
   if (error) redirect(`${back}?error=1`);
-  redirect(await home(db));
+  const auth = createRequestAuthContext(() => Promise.resolve(db));
+  const identity = await auth.getIdentity();
+  if (!identity) redirect(`${back}?error=1`);
+  const pending = await runCommand("list_my_invitations", {}, { db, userId: identity.userId, breweryId: null, role: null }) as AccountInvitation[];
+  redirect(pending.length ? "/invitations" : await home(auth));
 }
 
 /** Passwordless sign-in: the shared staff entry view's secondary action. */
@@ -62,7 +69,7 @@ export async function savePassword(form: FormData) {
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
   if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
-  redirect(await home(db));
+  redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
 }
 
 export async function acceptInvite(form: FormData) {
@@ -86,4 +93,31 @@ export async function acceptInvite(form: FormData) {
 export async function switchBrewery(form: FormData) {
   (await cookies()).set("brewery", String(form.get("breweryId")), { path: "/", sameSite: "lax" });
   redirect("/");
+}
+
+/** The invitation id is also the stable acceptance request id across reloads. */
+export async function acceptAccountInvitation(form: FormData) {
+  const inviteId = String(form.get("inviteId") ?? "");
+  let result: { breweryId: string; kind: string; customerId: string | null };
+  try {
+    result = await runCommand("accept_account_invitation", { inviteId }, await buildContext(), {
+      requestId: inviteId, correlationId: crypto.randomUUID(),
+    }) as { breweryId: string; kind: string; customerId: string | null };
+  } catch (error) {
+    if (!(error instanceof CommandError)) throw error;
+    redirect("/invitations?error=1");
+  }
+  if (result.kind === "staff") (await cookies()).set("brewery", result.breweryId, { path: "/", sameSite: "lax" });
+  if (result.customerId) (await cookies()).set("customer", result.customerId, { path: "/", sameSite: "lax" });
+  redirect(result.kind === "staff" ? "/" : "/portal");
+}
+
+export async function switchCustomer(form: FormData) {
+  const customerId = String(form.get("customerId") ?? "");
+  const auth = createRequestAuthContext();
+  if (!(await auth.getCustomerMemberships()).some(m => m.customerId === customerId)) {
+    throw new CommandError("permission denied", 403, "permission_denied");
+  }
+  (await cookies()).set("customer", customerId, { path: "/", sameSite: "lax" });
+  redirect("/portal");
 }

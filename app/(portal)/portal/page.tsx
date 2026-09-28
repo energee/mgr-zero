@@ -12,7 +12,7 @@ type ShipToRow = { id: string; label: string; city: string; state: string; is_de
 export default async function ShopPage({ searchParams }: { searchParams: Promise<{ draft?: string; reorder?: string }> }) {
   const query = await searchParams;
   const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId);
+  const ctx = await buildContext(customer.breweryId, customer.customerId);
   const [items, account] = await Promise.all([
     runCommand("portal_catalog", {}, ctx) as Promise<CatalogItem[]>,
     runCommand("get_portal_account", {}, ctx) as Promise<{ shipTos: ShipToRow[]; membership: { userId: string }; fulfillmentSource: { id: string; name: string } | null }>,

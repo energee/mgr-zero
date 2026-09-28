@@ -10,7 +10,7 @@ import "@/lib/commands/all";
 
 export default async function PortalAccountPage() {
   const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId);
+  const ctx = await buildContext(customer.breweryId, customer.customerId);
   const acct = (await runCommand("get_portal_account", {}, ctx)) as PortalAccountSnapshot;
   return <PortalAccountView model={toPortalAccountViewProps(acct)} />;
 }

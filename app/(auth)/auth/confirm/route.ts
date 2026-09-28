@@ -1,3 +1,6 @@
+import "@/lib/commands/all";
+import { runCommand } from "@/lib/commands/registry";
+import type { AccountInvitation } from "@/lib/mgr/account-invitations";
 import type { Database } from "@/lib/supabase/database";
 // app/(auth)/auth/confirm/route.ts — where a Supabase Auth email link lands
 // (password recovery today). Exchanges the one-time code for a session cookie,
@@ -45,7 +48,18 @@ export async function GET(req: NextRequest) {
   if (code) {
     const { db, redirect } = authClient(req);
     const { error } = await db.auth.exchangeCodeForSession(code);
-    if (!error) return redirect(next);
+    if (!error) {
+      if (new URL(next).pathname === "/") {
+        const { data } = await db.auth.getUser();
+        if (data.user) {
+          const pending = await runCommand("list_my_invitations", {}, {
+            db, userId: data.user.id, breweryId: null, role: null,
+          }) as AccountInvitation[];
+          if (pending.length) return redirect("/invitations");
+        }
+      }
+      return redirect(next);
+    }
     return redirect("/reset?expired=1");
   }
   return NextResponse.redirect(new URL("/reset?expired=1", req.url));

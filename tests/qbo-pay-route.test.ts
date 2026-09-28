@@ -5,12 +5,16 @@ const state = vi.hoisted(() => ({
   result: { kind: "unavailable", reason: "not_configured" } as
     { kind: "unavailable"; reason: string } | { kind: "redirect"; url: string },
   error: null as unknown,
+  customerId: "customer-1",
+  seenCustomer: "",
 }));
+
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: state.customerId }) }) }));
 
 vi.mock("@/lib/auth/request-context", () => ({
   createRequestAuthContext: () => ({
     getIdentity: async () => ({ userId: "actor-1", email: "buyer@test.local" }),
-    getCustomerMemberships: async () => [{ breweryId: "brewery-1", customerId: "customer-1" }],
+    getCustomerMemberships: async () => [{ breweryId: "brewery-1", customerId: "customer-1" }, { breweryId: "brewery-1", customerId: "customer-2" }],
     getScopedSupabaseClient: async () => ({ marker: "scoped" }),
   }),
 }));
@@ -18,7 +22,8 @@ vi.mock("@/lib/auth/request-context", () => ({
 vi.mock("@/lib/qbo", () => ({
   qboConfig: () => ({}),
   QboOAuthClient: class {},
-  resolvePortalInvoicePayment: async () => {
+  resolvePortalInvoicePayment: async (ctx: { customerId: string }) => {
+    state.seenCustomer = ctx.customerId;
     if (state.error) throw state.error;
     return state.result;
   },
@@ -30,6 +35,7 @@ describe("portal invoice Pay route", () => {
   afterEach(() => {
     state.result = { kind: "unavailable", reason: "not_configured" };
     state.error = null;
+    state.customerId = "customer-1";
     vi.restoreAllMocks();
   });
 
@@ -74,4 +80,10 @@ describe("portal invoice Pay route", () => {
     expect(response.status).toBe(404);
     expect(await response.text()).toBe("Invoice not found");
   });
+  it("pays from the selected verified customer account", async () => {
+    state.customerId = "customer-2";
+    await GET(new Request("https://mgr.test/portal/invoices/invoice-2/pay"), { params: Promise.resolve({ id: "invoice-2" }) });
+    expect(state.seenCustomer).toBe("customer-2");
+  });
+
 });

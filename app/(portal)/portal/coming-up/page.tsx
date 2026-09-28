@@ -11,6 +11,6 @@ import "@/lib/commands/all";
 
 export default async function ComingUpPage() {
   const customer = await getActiveCustomer();
-  const rows = (await runCommand("portal_schedule", {}, await buildContext(customer.breweryId))) as ScheduleRow[];
+  const rows = (await runCommand("portal_schedule", {}, await buildContext(customer.breweryId, customer.customerId))) as ScheduleRow[];
   return <ComingUpView model={toComingUpViewProps({ brewery: customer.breweryName, rows })} linkRows />;
 }
