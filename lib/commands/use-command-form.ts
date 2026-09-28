@@ -86,7 +86,7 @@ export const orUndef = (s: string) => s || undefined;
  * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
  */
 export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean; target?: string }) {
-  const { error, failure, setError, run: runAction } = useCommandAction();
+  const { error, setError, run: runAction } = useCommandAction();
   const [open, setOpenState] = useState(opts.defaultOpen ?? false);
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
@@ -111,5 +111,5 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, { target: opts.target });
   }
 
-  return { open, setOpen, error, failure, submitting: running === name, busy: running !== null, submit, run };
+  return { open, setOpen, error, submitting: running === name, busy: running !== null, submit, run };
 }

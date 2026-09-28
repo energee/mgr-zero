@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { E } from "@/components/mgr/e";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 
 /** Discard saved request, then a confirming step that shows `note`; `retry` sits beside Discard until then. */
 export function ConfirmDiscard({ note, busy, onDiscard, retry }: { note: string; busy?: boolean; onDiscard: () => void; retry?: React.ReactNode }) {
@@ -24,7 +25,7 @@ export function CommandRecoveryView({ rows, busy, error, onRetry, onDiscard }: {
   if (!rows.length && !error) return null;
   return <section aria-label="Unresolved requests" className="space-y-3 rounded-xl border p-4">
     {E.note("An earlier request may have completed. Retry or discard it before submitting that action again. Recovery stays in this browser tab across reloads; nothing is sent automatically.")}
-    {error && <p role="alert" className="text-destructive">{error}</p>}
+    <CommandFormMessage error={error} />
     {rows.map(row => <div key={row.requestId} className="space-y-2">
       <p>{sentenceCase(row.name.replace(/^upsert_/, "save_"))} · {row.path}</p>
       <details><summary>Saved request</summary><dl className="space-y-1 text-sm">{Object.entries(row.input && typeof row.input === "object" ? row.input : { input: row.input }).map(([key, value]) => <div key={key}>
