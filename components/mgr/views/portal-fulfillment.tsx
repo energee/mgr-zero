@@ -18,7 +18,7 @@ export function PortalFulfillmentView({ locations, currentId, onSave, busy = fal
 }) {
   const [locationId, setLocationId] = useState(currentId ?? "");
   return <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); onSave?.(locationId); }}>
-    {E.pick("Portal fulfillment warehouse", locationId, [{ value: "", label: "Choose warehouse" }, ...locations.map(location => ({ value: location.id, label: location.name }))], { id: "portal-warehouse", required: true, disabled: busy || !locations.length, onChange: setLocationId })}
+    {E.pick("Portal fulfillment warehouse", locationId, [{ value: "", label: "Choose warehouse", disabled: true }, ...locations.map(location => ({ value: location.id, label: location.name }))], { id: "portal-warehouse", required: true, disabled: busy || !locations.length, onChange: setLocationId })}
     {!locations.length && E.nav("Locations", "Add a warehouse before enabling portal orders.", "", undefined, locationsHref)}
     <CommandFormMessage error={error} />
     <Button variant="outline" disabled={busy || !locationId}>{busy ? "Saving…" : "Save warehouse"}</Button>

@@ -396,6 +396,10 @@ describe("Settings view", () => {
     expect(src("components/mgr/views/settings.tsx")).toContain("<PortalFulfillmentView");
     expect(fulfillmentForm).not.toMatch(/<select\b/);
   });
+
+  it("keeps the Choose warehouse placeholder unselectable (#671 review)", () => {
+    expect(src("components/mgr/views/portal-fulfillment.tsx")).toContain('{ value: "", label: "Choose warehouse", disabled: true }');
+  });
 });
 
 describe("Team view", () => {
