@@ -16,13 +16,13 @@ describe("order email job", () => {
     rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ id: "provider-id" })));
     await expect(runOrderEmailBatch()).resolves.toEqual({ accepted: 1, retry: 0, blocked: 0 });
-    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", { p_delivery: delivery.id, p_lease: delivery.lease_token, p_provider_id: "provider-id", p_error: null, p_retry: false });
+    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", { p_delivery: delivery.id, p_lease: delivery.lease_token, p_provider_id: "provider-id", p_error: null });
   });
   it("records a retry after uncertain transport without regenerating the message", async () => {
     rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("lost")));
     await expect(runOrderEmailBatch()).resolves.toEqual({ accepted: 0, retry: 1, blocked: 0 });
-    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_delivery: delivery.id, p_provider_id: null, p_retry: true, p_error: "provider_uncertain" }));
+    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_delivery: delivery.id, p_provider_id: null, p_error: "provider_uncertain" }));
   });
   it("does not classify a failed acceptance commit as a provider rejection", async () => {
     rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: null, error: { message: "database unavailable" } });
@@ -36,7 +36,7 @@ describe("order email job", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(runOrderEmailBatch()).resolves.toEqual({ accepted: 0, retry: 0, blocked: 1 });
     expect(fetch).not.toHaveBeenCalled();
-    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_retry: false, p_error: "retry_window_expired" }));
+    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_error: "retry_window_expired" }));
   });
   it("leaves recipient judgement to the provider so one unusual address cannot stall the batch", async () => {
     const odd = { ...delivery, id: crypto.randomUUID(), payload: { ...delivery.payload, to: "o&k@brewer.test" } };

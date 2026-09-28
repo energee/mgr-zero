@@ -69,13 +69,13 @@ it("freezes sender and recipient across uncertain retries, then prevents duplica
   const { deliveryId } = await confirmed();
   const first = (await lease(deliveryId))!;
   expect(first.payload.to).toBe(buyer.email);
-  expect((await rawDatabase(admin).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: first.lease_token, p_provider_id: null, p_error: "provider_uncertain", p_retry: true })).data).toBe(true);
+  expect((await rawDatabase(admin).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: first.lease_token, p_provider_id: null, p_error: "provider_uncertain" })).data).toBe(true);
   sql(`update private.order_email_deliveries set next_attempt_at=now() where id='${deliveryId}'`);
   const replay = (await lease(deliveryId, "Changed <changed@example.test>"))!;
   expect(replay.payload).toEqual(first.payload);
   expect(replay.lease_token).not.toBe(first.lease_token);
-  expect((await rawDatabase(admin).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: first.lease_token, p_provider_id: "stale", p_error: null, p_retry: false })).data).toBe(false);
-  const completion = { p_delivery: deliveryId, p_lease: replay.lease_token, p_provider_id: "provider-42", p_error: null, p_retry: false };
+  expect((await rawDatabase(admin).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: first.lease_token, p_provider_id: "stale", p_error: null })).data).toBe(false);
+  const completion = { p_delivery: deliveryId, p_lease: replay.lease_token, p_provider_id: "provider-42", p_error: null };
   expect((await rawDatabase(admin).rpc("finish_order_email", completion)).data).toBe(true);
   expect((await rawDatabase(admin).rpc("finish_order_email", completion)).data).toBe(false);
   expect(await lease(deliveryId)).toBeUndefined();
@@ -115,7 +115,7 @@ it("keeps missing recipients visible and enforces service and tenant boundaries"
   const buyerDb = await asUser(buyer.email);
   expect((await rawDatabase(buyerDb).rpc("get_order_email_status", { p_brewery: staff.breweryId, p_order: orderId })).error).not.toBeNull();
   expect((await rawDatabase(staff.db).rpc("lease_order_emails", { p_from: "orders@example.test" })).error?.code).toBe("42501");
-  expect((await rawDatabase(staff.db).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: crypto.randomUUID(), p_provider_id: "fake", p_error: null, p_retry: false })).error?.code).toBe("42501");
+  expect((await rawDatabase(staff.db).rpc("finish_order_email", { p_delivery: deliveryId, p_lease: crypto.randomUUID(), p_provider_id: "fake", p_error: null })).error?.code).toBe("42501");
 });
 
 

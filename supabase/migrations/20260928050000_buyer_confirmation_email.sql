@@ -23,7 +23,6 @@ create table private.order_email_deliveries (
 );
 alter table private.order_email_deliveries enable row level security;
 revoke all on private.order_email_deliveries from public, anon, authenticated, service_role;
-create index order_email_brewery_idx on private.order_email_deliveries(brewery_id, order_id);
 create index order_email_due_idx on private.order_email_deliveries(next_attempt_at, created_at)
   where state in ('pending','sending');
 
@@ -93,23 +92,24 @@ end $$;
 revoke all on function public.lease_order_emails(text) from public, anon, authenticated;
 grant execute on function public.lease_order_emails(text) to service_role;
 
-create function public.finish_order_email(p_delivery uuid,p_lease uuid,p_provider_id text,p_error text,p_retry boolean) returns boolean
+-- Exactly one of provider id or error. Only provider_uncertain retries; any other error blocks.
+create function public.finish_order_email(p_delivery uuid,p_lease uuid,p_provider_id text,p_error text) returns boolean
 language plpgsql security definer set search_path = '' as $$
 begin
-  if p_retry is null or (p_provider_id is null) = (p_error is null)
-    or (p_provider_id is not null and (btrim(p_provider_id)='' or p_retry))
+  if (p_provider_id is null) = (p_error is null)
+    or (p_provider_id is not null and btrim(p_provider_id)='')
     or (p_error is not null and p_error not in ('provider_uncertain','provider_rejected','retry_window_expired')) then
     raise exception 'invalid email outcome';
   end if;
   update private.order_email_deliveries set
-    state=case when p_provider_id is not null then 'accepted' when p_retry then 'pending' else 'blocked' end,
+    state=case when p_provider_id is not null then 'accepted' when p_error='provider_uncertain' then 'pending' else 'blocked' end,
     provider_id=p_provider_id,accepted_at=case when p_provider_id is not null then clock_timestamp() else null end,
     last_error=p_error,next_attempt_at=clock_timestamp()+interval '5 minutes',lease_token=null,lease_expires_at=null
   where id=p_delivery and lease_token=p_lease and state='sending' and lease_expires_at>clock_timestamp();
   return found;
 end $$;
-revoke all on function public.finish_order_email(uuid,uuid,text,text,boolean) from public, anon, authenticated;
-grant execute on function public.finish_order_email(uuid,uuid,text,text,boolean) to service_role;
+revoke all on function public.finish_order_email(uuid,uuid,text,text) from public, anon, authenticated;
+grant execute on function public.finish_order_email(uuid,uuid,text,text) to service_role;
 
 create function public.get_order_email_status(p_brewery uuid,p_order uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$

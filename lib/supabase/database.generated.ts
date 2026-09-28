@@ -7771,7 +7771,6 @@ export type Database = {
           p_error: string
           p_lease: string
           p_provider_id: string
-          p_retry: boolean
         }
         Returns: boolean
       }

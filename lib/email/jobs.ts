@@ -22,7 +22,6 @@ export async function runOrderEmailBatch() {
   const result = { accepted: 0, retry: 0, blocked: 0 };
   for (const lease of leases) {
     let providerId: string | null = null;
-    let retry = false;
     let error: string | null = null;
     if (Date.now() >= Date.parse(lease.lease_expires_at)) throw new Error("Order email lease expired before send");
     if (Date.now() >= Date.parse(lease.retry_before)) {
@@ -31,18 +30,18 @@ export async function runOrderEmailBatch() {
       try {
         providerId = await sendOrderEmail(lease.id, lease.payload, env.apiKey);
       } catch (e) {
-        retry = !(e instanceof EmailProviderError) || e.retryable;
-        error = retry ? "provider_uncertain" : "provider_rejected";
+        const uncertain = !(e instanceof EmailProviderError) || e.retryable;
+        error = uncertain ? "provider_uncertain" : "provider_rejected";
       }
     }
     // A database failure after acceptance must escape: the lease can replay the
     // same provider identity, but must not record a contradictory rejection.
     const recorded = await unwrap(db.rpc("finish_order_email", {
-      p_delivery: lease.id, p_lease: lease.lease_token, p_provider_id: providerId, p_error: error, p_retry: retry,
+      p_delivery: lease.id, p_lease: lease.lease_token, p_provider_id: providerId, p_error: error,
     }));
     if (!recorded) throw new Error("Order email lease no longer owned");
     if (providerId) result.accepted++;
-    else if (retry) result.retry++;
+    else if (error === "provider_uncertain") result.retry++;
     else result.blocked++;
   }
   return result;

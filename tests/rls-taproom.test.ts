@@ -387,7 +387,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const pos = (await admin.from("pos_connections").select("id").eq("brewery_id", B).single()).data!.id;
   const destination = (await admin.from("notification_destinations").select("id").eq("brewery_id", B).eq("user_id", f.taproom.id).single()).data!.id;
   const serviceCases: Record<string, unknown[]> = {
-    lease_order_emails: ["orders@example.test"], finish_order_email: [R(),R(),"provider-id",null,false],
+    lease_order_emails: ["orders@example.test"], finish_order_email: [R(),R(),"provider-id",null],
     store_integration_tokens: [B,"square",pos,f.owner.id,"fixture-access","fixture-refresh"], read_integration_tokens: [B,"square",pos,f.owner.id],
     read_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id], finish_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id,R(),0],
     begin_qbo_disconnect: [B,R(),f.taproom.id,R()], cas_integration_tokens: [B,"qbo",R(),f.taproom.id,1,"fixture-access","fixture-refresh",now,3600,3600,3600],
