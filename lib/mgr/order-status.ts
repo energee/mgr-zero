@@ -14,10 +14,20 @@ const ACTION: Record<OrderStatus, [string, ActionTone, string]> = {
   shipped: ["Open", "primary", ""], cancelled: ["Open", "primary", ""],
 };
 
-/** The verb a staff list offers on this order, and where it goes. */
+/** Who may run the order commands. lib/commands/orders.ts gates each command
+ * with these lists; they live here, a pure module, so client screens can ask
+ * the same question without importing server command code. */
+export const salesRoles = ["admin", "sales"] as const;
+export const warehouseRoles = ["admin", "warehouse"] as const;
+
+/** Whether `role` is in a command's role list. */
+export const hasRole = (roles: readonly string[], role: string) => roles.includes(role);
+
+/** The verb a staff list offers on this order, and where it goes. Only a role
+ * the next step's command allows gets the verb; anyone else gets Open. */
 export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, role: string): { verb: string; tone: ActionTone; href: string } {
-  const actor = status === "draft" || status === "submitted" ? "sales" : "warehouse";
-  if (role !== "admin" && role !== actor) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
+  const roles = status === "draft" || status === "submitted" ? salesRoles : warehouseRoles;
+  if (!hasRole(roles, role)) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
   if (status === "picked" && needsRestock) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
   const [verb, tone, path] = ACTION[status];
   return { verb, tone, href: `/orders/${id}${path}` };

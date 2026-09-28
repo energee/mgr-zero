@@ -6,11 +6,10 @@ import { z } from "zod";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
+import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
-const salesRoles = ["admin", "sales"] as const;
-const warehouseRoles = ["admin", "warehouse"] as const;
 const readRoles = ["admin", "sales", "warehouse"] as const;
 const toLines = (ls: z.infer<typeof lines>) => ls.map(l => ({ sku_id: l.skuId, qty: l.qty }));
 
