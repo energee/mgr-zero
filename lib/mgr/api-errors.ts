@@ -32,6 +32,8 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one." },
   { code: "conflict", status: 409, meaning: "A `requestId` was reused with a different payload, a confirmed preview changed before its first commit, or the write would duplicate a record that must be unique (such as a second location with the same name).",
     remedy: "Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. For a duplicate, change the name or value, or edit the existing record." },
+  { code: "stale_plan", status: 409, meaning: "The packaging material plan changed after `get_packaging_close_plan`; `close_packaging_run` wrote nothing.",
+    remedy: "Call `get_packaging_close_plan` again, review the actuals, and close with the new `planRevision` and a new requestId." },
   { code: "context_changed", status: 409, meaning: "The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation.",
     remedy: "Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request." },
   { code: "request_too_large", status: 413, meaning: "The JSON request body exceeded the 8 MiB transport limit.",

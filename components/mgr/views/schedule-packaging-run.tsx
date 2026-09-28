@@ -30,7 +30,7 @@ export function SchedulePackagingRunView({ model, controls = {}, messages, foote
       : E.info(model.brandId ? "This brand has no packages yet." : "Pick a brand to plan its packages.")}
     {model.leftInSource ? E.fld(model.leftLabel, model.leftInSource) : null}
     {E.ttl("Materials")}
-    {model.materials ? E.tbl(["need", "have", "short"], model.materials) : E.gated("Material shortfalls", "The plan can’t preview materials yet.")}
+    {model.materials ? E.tbl(["need", "have", "short"], model.materials) : E.info(model.materialsMessage ?? "Choose planned outputs to preview materials.")}
     {model.warning ? E.note(model.warning) : null}
     {messages}
     {footer !== undefined ? footer : E.btn("Save run plan")}

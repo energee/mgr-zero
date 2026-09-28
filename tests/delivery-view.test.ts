@@ -160,3 +160,12 @@ describe("Confirm delivery", () => {
     expect(page).not.toMatch(/E\.fld\("Invoice timing"/);
   });
 });
+
+
+it("shares the outcome fields between inventory and live submission", () => {
+  expect(src("components/mgr/views/confirm-delivery.tsx")).toMatch(/<DeliveryOutcomeForm\b/);
+  expect(src("app/(app)/work/deliveries/[id]/delivered-form.tsx")).toMatch(/<DeliveryOutcomeForm\b/);
+  const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
+  expect(html).toContain("refused");
+  expect(html).toContain("Accepted");
+});

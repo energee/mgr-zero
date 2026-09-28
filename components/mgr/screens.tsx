@@ -1,4 +1,7 @@
+import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
+import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
+import { RefusedReturnFormView } from "@/components/mgr/views/refused-return";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -163,7 +166,7 @@ import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
-import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
+import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
 import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
@@ -195,7 +198,7 @@ import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
-  newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -584,6 +587,14 @@ export const SCREENS: Screen[] = [
     body: <EntryView model={signIn} />,
   },
   {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Account invitations",
+    to: { "Accept invitation": "Today", "Continue": "Today" },
+    job: "Consent to join using an existing account", states: DEFAULT_STATES,
+    reads: "list_my_invitations", writes: "accept_account_invitation",
+    spec: "Existing accounts consent before membership is granted. Expired or revoked invitations cannot be accepted.",
+    body: <AccountInvitationsView invitations={[{ id: "example", breweryName: "Demo Brewing", kind: "staff", role: "sales", customerName: null, expiresAt: "2026-10-04" }]} />,
+  },
+  {
     step: 2,
     slice: 1,
     group: "Entry",
@@ -913,7 +924,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Orders",
-    to: { Pick: "Pick", Finish: "Order", "Put back": "Put back" },
+    to: { Open: "Order", Pick: "Pick", Finish: "Order", "Put back": "Put back" },
     job: "Find every order by state and take its next valid action",
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
@@ -1179,6 +1190,16 @@ export const SCREENS: Screen[] = [
     body: <CustomersView model={toCustomersViewProps(customersList)} />,
   },
   {
+    step: 5, slice: 1, tab: "More", name: "Customers missing email",
+    to: { Open: "Customer detail" },
+    job: "Review customer accounts without a current portal login email",
+    reads: "list_customers [missingPortalEmail]",
+    writes: "none [Invite and Remove access on Customer detail correct portal access]",
+    states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
+    spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} />,
+  },
+  {
     step: 5,
     slice: 1,
     tab: "More",
@@ -1188,7 +1209,7 @@ export const SCREENS: Screen[] = [
     reads: "get_customer · list_customer_users",
     writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
     states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
-    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Edit stays beside the customer name; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account.",
+    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Account details and trading terms save together inline; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account.",
     body: <CustomerView model={toCustomerViewProps(customerRidgeline)} />,
   },
   {
@@ -1223,12 +1244,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting" },
+    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
-    reads: "get_qbo_connection",
-    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults [existing commands] · Missing-email count [SCHEMA-GATE: connection health has no customer email count]",
+    reads: "get_qbo_connection · get_qbo_sync_status · count_customers_missing_portal_email",
+    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults · sync_qbo_payments",
     states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "the Pay route fails closed when QuickBooks returns no approved link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
-    spec: "Square already had Settings · Point of sale; QuickBooks had nothing, and Settings · Integrations dead-ended. This is the other half. It exists mainly to make three invisible preconditions visible before a customer meets them: QuickBooks Payments must be active on the company, AllowOnlineACHPayment / AllowOnlineCreditCardPayment must ride every push, and the customer must carry an email. Any one missing and Intuit generates no InvoiceLink, so the portal Pay button either never renders or lands on the unavailable page. Payment method is a money decision, not a checkbox: card runs a percentage fee, so on a four-figure keg invoice the method the customer picks is real money; the fee is visible in the QuickBooks Payment sidebar and MGR does not model it. Push defaults live here rather than per invoice, so an invoice cannot be born unpayable by omission.",
+    spec: "Accounting shows connection health and customer portal access readiness. The missing-email count means no current portal member has a nonblank login email; it does not establish QuickBooks billing-email or payment readiness. Review opens that same filtered customer set. Staff correct access through the existing Invite and Remove actions. QuickBooks Payments and invoice payment options remain separate provider concerns.",
     body: <AccountingView model={accountingExpired} />,
   },
   {
@@ -1308,10 +1329,10 @@ export const SCREENS: Screen[] = [
     name: "Invoices",
     to: { Review: "Invoice", Open: "Invoice", "Write off": "Invoice", "Re-push": "Invoice", "Sync QuickBooks": "Invoices", "Email delivery status": "Invoices" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
-    reads: "list_invoices · get_qbo_connection",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks and email delivery status [SCHEMA-GATE: invoice query returns no verified provider URL or delivery state]",
+    reads: "list_invoices · get_qbo_connection · get_qbo_sync_status",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks [verified company-bound invoice destination] · email delivery status [SCHEMA-GATE: invoice query returns no delivery state]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
-    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
+    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "connected · company 9341", canConnect: true }} />,
   },
   {
@@ -1325,7 +1346,7 @@ export const SCREENS: Screen[] = [
     writes: "push_invoice_to_qbo · resolve_invoice_question",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
     spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
-    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} />,
+    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
   },
   {
     step: 5,
@@ -1479,7 +1500,7 @@ export const SCREENS: Screen[] = [
     name: "Pay invoice",
     job: "One stable MGR link that resolves to QuickBooks at the moment it is clicked",
     reads: "portal_invoice",
-    writes: "none [Intuit takes the payment; paid_at returns through the sync job]",
+    writes: "none [Intuit takes the payment; paid_at returns on the next manual sync]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; the paid date came back from the sync"]],
     spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="pay" />,
@@ -1552,13 +1573,13 @@ export const SCREENS: Screen[] = [
     portal: "Account",
     surface: "sheet",
     name: "Portal Me",
-    to: { "Change password": "Portal set password", "Sign out": "Portal sign in" },
+    to: { "Change password": "Portal set password", "Sign out": "Portal sign in", "Switch account": "Shop" },
     job: "Who I am on this customer account, leave, change password",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
-    body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} />,
+    spec: "Opened from the portal header Me control. Accounts with multiple customer memberships can switch between them. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
+    body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} accounts={[{ value: "ridgeline", label: "Ridgeline · Demo Brewing" }, { value: "al", label: "Al’s Bar · Demo Brewing" }]} activeCustomerId="ridgeline" />,
   },
   {
     step: 7,
@@ -1629,7 +1650,7 @@ export const SCREENS: Screen[] = [
     to: { Start: "Brew day", Open: "Brew day", Edit: "Vessel detail", "New vessel": "Vessel detail", "B-0416 \u00b7 Hazy IPA v4": "Brew day", "B-0409 \u00b7 Pils": "Brew day", "B-0413 \u00b7 Stout": "Brew day" },
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
-    writes: "none [scheduling happens on Schedule batch; recording on Brew day or Record reading; existing commands]",
+    writes: "none [scheduling happens on Schedule batch; recording on Brew day or Fermentation reading; existing commands]",
     states: [["planned", "Start is the next action; live Brew opens the same brew-day page"], ["active", "Open preserves batch access; each open occupancy shows its latest reading and Reading action"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
@@ -1653,11 +1674,11 @@ export const SCREENS: Screen[] = [
     name: "Brew day",
     to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
     job: "Consume actual lots and set knockout baseline",
-    reads: "get_brew_day · list_vessels",
-    writes: "record_brew_day [existing commands: brew date + knockout occupancy] · SCHEMA-GATE: brew-day lot consumption and frozen process sheet are not supported by the existing command/read",
+    reads: "get_brew_day · get_brew_day_plan · get_brew_record · list_vessels",
+    writes: "cancel_batch, reschedule_batch, record_brew_day [confirmed actual sources + frozen sheet + knockout occupancy], correct_brew_record [unused revision with linked compensation]",
     states: permitted("brewer or admin required"),
     spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <BrewDayView model={brewDayHazy} />,
+    body: <BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} />,
   },
   {
     step: 7,
@@ -1674,16 +1695,29 @@ export const SCREENS: Screen[] = [
     body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
+    name: "Packaging plan",
+    to: { Packaging: "Packaging runs", "Pick source": "Packaging plan", Start: "Close packaging run" },
+    step: 7,
+    slice: 5,
+    tab: "Work",
+    job: "Reschedule or cancel an unstarted packaging plan",
+    reads: "get_packaging_run · list_occupancies",
+    writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
+    states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
+    spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
+    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging runs", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
+  },
+  {
     step: 7,
     slice: 5,
     tab: "Work",
     name: "Close packaging run",
     to: { "Close packaging run": "Run closed", Work: "Packaging runs" },
     job: "Plan a run separately, then create lot and movements on close",
-    reads: "get_packaging_run [revalidate selected source occupancy] · list_locations",
-    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs] · update_packaging_run [pick the tank, or stamp the run started: both require a tank] · close_packaging_run [one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
-    states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
-    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Label stock is reconciled in Cycle count using the stored base unit. Whole-roll counting remains a planned conversion and is gated; this screen does not claim that conversion is available. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
+    reads: "get_packaging_run · get_packaging_close_plan · list_locations · list_bins",
+    writes: "close_packaging_run [atomic lot, outputs, tank draw and explicit source material usage/loss]",
+    states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1]],
+    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry.",
     body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {
@@ -1693,10 +1727,10 @@ export const SCREENS: Screen[] = [
     name: "Run closed",
     to: { Work: "Packaging runs" },
     job: "Lot and labels after close; Print is the post-commit action",
-    reads: "get_packaging_run",
-    writes: "none",
+    reads: "get_packaging_run · get_packaging_material_record · get_packaging_close_plan",
+    writes: "correct_packaging_material_record",
     states: [["permission", "brewer or warehouse required", 1], ["closed", "lot assigned · labels ready"], ["print", "keg collar and lot labels"]],
-    spec: "Post-commit of Close packaging run. Print labels moves here; the close verb is gone.",
+    spec: "Frozen planned-versus-actual material history survives BOM edits. A reasoned material-only correction appends exact reversals and a replacement record. Downstream finished-goods use, batch completion and filed reports prevent correction. Outputs and tank draw never change.",
     body: <RunClosedView model={runClosedHazy} />,
   },
   {
@@ -1704,7 +1738,7 @@ export const SCREENS: Screen[] = [
     slice: 5,
     tab: "Work",
     name: "Packaging runs",
-    to: { Resolve: "Close packaging run", Start: "Close packaging run", "Pick source": "Schedule packaging run", "RUN-0030 \u00b7 Pils cans": "Run closed", "RUN-0029 \u00b7 Hazy \u00bd bbl": "Run closed", "RUN-0028 \u00b7 Helles cans": "Run closed" },
+    to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan", "RUN-0030 \u00b7 Pils cans": "Run closed", "RUN-0029 \u00b7 Hazy \u00bd bbl": "Run closed", "RUN-0028 \u00b7 Helles cans": "Run closed" },
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
@@ -1718,7 +1752,7 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     surface: "sheet",
     name: "Schedule packaging run",
-    to: { "Save run plan": "Close packaging run", "FV3 · Hazy IPA": "Entity picker" },
+    to: { "Save run plan": "Packaging plan", "FV3 · Hazy IPA": "Entity picker" },
     job: "Plan a run against one source occupancy and see shortages before the day",
     reads: "list_occupancies [open, with volume and contents] · list_formats [for the brand in the source] · get_material_shortfalls [view; preview for the planned outputs]",
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
@@ -1782,13 +1816,23 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders" },
+    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt" },
     job: "What posted after a receive, including over, short and what is still owed",
     reads: "get_purchase_order [ordered less counted per line]",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
     body: <ReceiptView model={receiptPoCountryMalt} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Correct receipt",
+    to: { "Correct receipt": "Receipt" },
+    job: "Correct an unused receipt without erasing its original facts",
+    reads: "get_purchase_order [frozen receipt quantities, units and lot facts]",
+    writes: "correct_purchase_receipt [exact material reversal and immutable replacement receipt in one transaction]",
+    states: [["permission", "warehouse or admin", 1], ["ready", "reason and corrected counts"], ["blocked", "subsequent stock use or shared lot metadata prevents correction", 1], ["stale", "receipt already replaced; open its latest revision", 1], ["success", "replacement receipt and current balance"]],
+    spec: "Reuse Receive PO fields with a required correction reason and the original receiving location. Preserve the original receipt, append exact reversal movements, and record replacement counted quantities and lot facts. Only the latest revision contributes to the PO balance. Used stock and shared lot metadata can prevent correction; no generic stock adjustment bypass is offered.",
+    body: <ReceivePoView model={correctReceiptCountryMalt} />,
   },
   {
     step: 7,
@@ -2011,8 +2055,8 @@ export const SCREENS: Screen[] = [
     job: "State the water a version starts from, aims at, and what goes in it",
     reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
     writes: "create_recipe_version [water values and the water additions are written with the version]",
-    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggested", "Suggest additions fills the salts from the solver; acids stay; every row is still editable"], ["off target", "an ion more than 20 ppm from target warns", 1]],
-    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Suggest additions runs the one shared water formula over total brewing water, mash plus sparge, and replaces only the salts; the six rows under Against target read the same formula back, so the preview and any server read agree. pH prediction is still not built.",
+    states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggested", "Suggest additions fills the salts from the solver; acids stay; every row is still editable"], ["off target", "an ion more than 20 ppm from target warns", 1]],
+    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Source water opens, and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Suggest additions runs the one shared water formula over total brewing water, mash plus sparge, and replaces only the salts; the six rows under Against target read the same formula back, so the preview and any server read agree. pH prediction is still not built.",
     body: (<>
       <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} chemistryKnown sourceDefault={WATER_PROFILE_OPTIONS.find((p) => p.id === "denver")!.ions} />
     </>),
@@ -2266,7 +2310,7 @@ export const SCREENS: Screen[] = [
     reads: "list_routes",
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows by the first characters of their id until staff have names.",
     body: <RouteView model={routeAPlan} />,
   },
   {
@@ -2274,12 +2318,12 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Return route",
-    to: { "Return route": "Routes" },
+    to: { "Return route": "Routes", "Check in": "Check in refused beer" },
     job: "Stamp the return once every stop is done",
     reads: "list_routes",
     writes: "return_route",
-    states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
-    spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
+    states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop has an outcome"], ["complete", "already returned: the return time replaces the button"]],
+    spec: "The departed state of a route once every stop has an outcome. Outstanding refused beer remains visible until physically checked in. Planned routes Depart on Route; this screen is only Return.",
     body: <ReturnRouteView model={returnRouteA} />,
   },
   {
@@ -2300,12 +2344,22 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Confirm delivery",
+    to: { "Check in refused beer": "Check in refused beer" },
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
-    spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
+    spec: "Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Check in refused beer",
+    job: "Record refused beer physically returned to a bin",
+    reads: "list_refused_returns + get_invoice_return_sources + list_locations + list_bins",
+    writes: "check_in_refused_return",
+    states: [["permission", "warehouse or admin for on-delivery shipments; admin or sales uses Return and credit for invoice-now", 1], ["damage", "return and loss posted together"], ["retry", "same request replays"]],
+    spec: "Refusal alone restores no stock. Check in actual received quantities against their shipped source lot. Outstanding returns remain visible after the route returns. Invoice-now refusals use Return and credit.",
+    body: <RefusedReturnFormView model={{ title: "Check in · Ridgeline", locationId: "warehouse", locations: [{ value: "warehouse", label: "Warehouse" }], bins: [{ value: "cold", label: "Cold room", locationId: "warehouse" }], lines: [{ id: "hazy", name: "Hazy IPA · ½ bbl keg", outstanding: 2, sources: [{ id: "source", label: "HZ-041 · Cold room", shipped: 4 }] }] }} />,
   },
   {
     step: 7,
@@ -2427,10 +2481,11 @@ export const SCREENS: Screen[] = [
     job: "Connect one POS provider and see both directions at a glance",
     reads: "get_pos_integration_health · list_pos_locations",
     writes: "sync_square_catalog · sync_square_sales · disconnect_square",
-    states: [["permission", "admin only", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["connector detected", "Square already posts taproom revenue to QuickBooks", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1]],
+    states: [["permission", "admin only", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["connector detected", "Square already posts taproom revenue to QuickBooks", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"]],
     spec: "Square is the sole POS provider in this slice. This page reports connection, mapping, and completed sync state without exposing token material. Square’s optional QuickBooks connector remains a separate accountant-reviewed revenue feed: MGR provides a note and Accounting deep link, but does not detect, configure, or synchronize it.",
     body: <PointOfSaleView model={{ connected: true, merchant: "Demo Brewing LLC", state: "connected", locations: "2 mapped · 1 needs mapping", lastSync: "Today · 6:58 PM" }} syncAction={<PosSyncActions />} />,
   },
+
   {
     step: 7,
     slice: 7,
@@ -2713,10 +2768,10 @@ export const SCREENS: Screen[] = [
     step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Payment", actions: "Edit" },
     name: "Payment",
     job: "The accountant records payment here; MGR never offers a Mark paid verb",
-    reads: "qbo sync job [design; writes invoices.paid_at]",
+    reads: "sync_qbo_payments [manual sync; writes invoices.paid_at]",
     writes: "none [no MGR user action]",
     states: [["paid", "the invoice's paid date is set on the next sync"], ["fee deducted", "the deposit is smaller than the payment", 1], ["partial", "balance drops; the AR row stays due", 1], ["sync lagging", "MGR AR shows the last synced balance", 1]],
-    spec: "This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. The paid date and the QuickBooks balance arrive from the sync job only, which is why the AR list stops showing an invoice as due without anyone in the brewery doing anything. It also carries a number MGR does not model: QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against the QuickBooks balance, not the deposit, and must not read the gap as a short payment.",
+    spec: "This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. The paid date and the QuickBooks balance arrive only when staff run the manual sync, which is why the AR list stops showing an invoice as due without anyone marking it paid. It also carries a number MGR does not model: QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against the QuickBooks balance, not the deposit, and must not read the gap as a short payment.",
     body: (<>
       {X.stat("Paid")}
       {X.amt("Amount paid", INV.major, INV.cents)}

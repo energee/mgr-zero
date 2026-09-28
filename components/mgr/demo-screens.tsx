@@ -2,6 +2,10 @@
 // chosen persona (lib/mgr/demo-personas.ts): Me, Slack preferences, and Permission denied for the screen the
 // persona was just refused. Demo only: the inventory keeps its fixture
 // drawings (Maria, "Invoices"); nothing under app/ imports this.
+import { cloneElement, type ReactElement, type ComponentProps } from "react";
+import { OrdersView } from "@/components/mgr/views/orders-list";
+import { ordersWorkList } from "@/lib/mgr/fixtures/orders";
+import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { E } from "@/components/mgr/e";
 import type { Screen } from "@/components/mgr/screens";
 import { UserAvatar } from "@/components/mgr/user-avatar";
@@ -14,6 +18,13 @@ const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "d
 
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {
+  if (screen.name === "Orders") {
+    const canWrite = persona.role === "admin" || persona.role === "sales";
+    const model = toOrdersListViewProps({ ...ordersWorkList, role: persona.role });
+    // createAction: undefined keeps OrdersView's default New order button; null hides it.
+    const body = screen.body as ReactElement<ComponentProps<typeof OrdersView>>;
+    return { ...screen, body: cloneElement(body, { model, createAction: canWrite ? undefined : null }) };
+  }
   if (screen.name === "My notification preferences") {
     return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={persona.role !== "taproom"} back={persona.role === "admin" ? "Chat" : "More"} /> };
   }

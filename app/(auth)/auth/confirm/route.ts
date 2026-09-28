@@ -5,7 +5,7 @@ import type { Database } from "@/lib/supabase/database";
 // on Expired reset copy at /reset instead of opening the password form.
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { inviteAudience, safeNextUrl } from "@/lib/auth/invite";
+import { hasPendingInvitations, inviteAudience, safeNextUrl } from "@/lib/auth/invite";
 import { publicEnv } from "@/lib/env/public";
 
 function authClient(req: NextRequest) {
@@ -44,8 +44,11 @@ export async function GET(req: NextRequest) {
   }
   if (code) {
     const { db, redirect } = authClient(req);
-    const { error } = await db.auth.exchangeCodeForSession(code);
-    if (!error) return redirect(next);
+    const { data, error } = await db.auth.exchangeCodeForSession(code);
+    if (!error) {
+      if (new URL(next).pathname === "/" && await hasPendingInvitations(db, data.user.id)) return redirect("/invitations");
+      return redirect(next);
+    }
     return redirect("/reset?expired=1");
   }
   return NextResponse.redirect(new URL("/reset?expired=1", req.url));

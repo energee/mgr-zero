@@ -247,12 +247,16 @@ omitted. They have no roles until they are built.
 {/* ops:roles */}
 | Operation | Area | admin | sales | warehouse | brewer | taproom | customer |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `accept_account_invitation` | Team & brewery settings |  |  |  |  |  |  |
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `append_chat_message` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `begin_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `begin_chat_reauthorization` | Today & notifications | ✓ |  |  |  |  |  |
+| `cancel_batch` | Production | ✓ |  |  | ✓ |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `cancel_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `cancel_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `check_in_refused_return` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `clear_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `close_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `complete_batch` | Production | ✓ |  |  | ✓ |  |  |
@@ -263,7 +267,11 @@ omitted. They have no roles until they are built.
 | `connect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `connect_square` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
+| `correct_brew_record` | Production | ✓ |  |  | ✓ |  |  |
+| `correct_packaging_material_record` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `correct_purchase_receipt` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
+| `count_customers_missing_portal_email` | Customers | ✓ | ✓ |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `create_chat_conversation` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `create_composed_format` | Packaging | ✓ | ✓ |  |  |  |  |
@@ -299,6 +307,8 @@ omitted. They have no roles until they are built.
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_brand_recipe_cost` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |  |
+| `get_brew_day_plan` | Production | ✓ |  |  | ✓ |  |  |
+| `get_brew_record` | Production | ✓ |  |  | ✓ |  |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_ai_model` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -315,7 +325,7 @@ omitted. They have no roles until they are built.
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_inventory_sku` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
-| `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
 | `get_keg_report` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
 | `get_loss_review` | Compliance | ✓ | ✓ |  |  |  |  |
@@ -325,7 +335,11 @@ omitted. They have no roles until they are built.
 | `get_notification_preferences` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
+| `get_order_email_status` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `get_order_ship_sources` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
+| `get_packaging_close_plan` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `get_packaging_material_plan` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `get_packaging_material_record` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  |  | ✓ |
 | `get_pos_integration_health` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -334,6 +348,7 @@ omitted. They have no roles until they are built.
 | `get_pos_sale` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
+| `get_qbo_sync_status` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -369,6 +384,7 @@ omitted. They have no roles until they are built.
 | `list_material_lots` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `list_materials` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
+| `list_my_invitations` | Team & brewery settings |  |  |  |  |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `list_open_taps` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
@@ -379,6 +395,7 @@ omitted. They have no roles until they are built.
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
 | `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |  |
+| `list_refused_returns` | Delivery & routes | ✓ | ✓ | ✓ |  |  |  |
 | `list_repack_parents` | Packaging | ✓ |  | ✓ |  |  |  |
 | `list_routes` | Delivery & routes | ✓ | ✓ | ✓ |  |  |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
@@ -429,11 +446,14 @@ omitted. They have no roles until they are built.
 | `replace_format_bom` | Packaging | ✓ | ✓ |  |  |  |  |
 | `replace_format_components` | Packaging | ✓ | ✓ |  |  |  |  |
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |  |
+| `reschedule_batch` | Production | ✓ |  |  | ✓ |  |  |
+| `reschedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `resolve_invoice_question` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `return_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |  |
 | `reverse_inventory_movement` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `revoke_account_invitation` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `revoke_customer_user` | Customers | ✓ | ✓ |  |  |  |  |
 | `revoke_staff` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `save_catalog_category` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
@@ -597,6 +617,7 @@ one value that ties what your client saw to what the server recorded.
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload, a confirmed preview changed before its first commit, or the write would duplicate a record that must be unique (such as a second location with the same name). | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. For a duplicate, change the name or value, or edit the existing record. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
+| 409 | `stale_plan` | The packaging material plan changed after `get_packaging_close_plan`; `close_packaging_run` wrote nothing. | Call `get_packaging_close_plan` again, review the actuals, and close with the new `planRevision` and a new requestId. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
 | 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |

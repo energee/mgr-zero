@@ -637,7 +637,7 @@ export async function finishQboPush(ctx: Ctx, input: {
   return data as { pushId: string; status: "pushed" | "push_failed"; remoteId: string | null };
 }
 
-export type QboInvoiceSyncResult = {
+export type QboInvoiceSyncResult = { superseded: true } | {
   synced: number;
   paid: number;
   voided: number;
@@ -782,4 +782,13 @@ export async function confirmPortalInvoicePayment(ctx: Ctx, invoiceId: string, c
     p_granted_scopes: claim.grantedScopes,
   });
   return !error && data === true;
+}
+
+/** Record when a sync attempt failed; provider response bodies never enter history. */
+export async function recordQboInvoiceSyncFailure(ctx: Ctx, requestId: string) {
+  requireIntegrationRole(ctx);
+  const { error } = await createAdminClient().rpc("record_qbo_invoice_sync_failure", {
+    p_brewery: ctx.breweryId, p_actor: ctx.userId, p_request_id: requestId,
+  });
+  if (error) throw error;
 }

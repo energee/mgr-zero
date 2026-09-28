@@ -15,12 +15,12 @@ import { DeliveredForm } from "./delivered-form";
 
 type Stop = {
   delivery: {
-    id: string; stop_no: number; delivered_at: string | null; signed_by: string | null;
+    id: string; stop_no: number; delivered_at: string | null; signed_by: string | null; outcome: string | null;
     routes: { id: string; name: string | null; delivery_date: string; driver_user_id: string | null; departed_at: string | null } | null;
     shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null } } | null;
     stock_transfers: { transfer_no: number | null; to_location: { name: string } | null } | null;
   };
-  lines: { id: string; name: string; qty: number }[];
+  lines: { id: string; name: string; qty: number; refused?: number }[];
   invoice: { id: string; invoice_no: number | null } | null;
 };
 
@@ -44,9 +44,12 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
         heading,
         shipTo: order?.ship_tos ? `${order.ship_tos.label} · ${order.ship_tos.city}, ${order.ship_tos.state}` : undefined,
         invoiceTiming: timing,
-        lines: lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) })),
+        lines: lines.map((l) => {
+          const refused = transfer && delivery.outcome === "refused" ? l.qty : (l.refused ?? 0);
+          return { key: l.id, title: l.name, qty: delivery.delivered_at ? `${l.qty - refused} accepted · ${refused} refused` : String(l.qty) };
+        }),
       }}
-      action={deliveryAction(delivery, ctx, invoice, transfer)}
+      action={deliveryAction(delivery, ctx, invoice, transfer, lines)}
     />
   );
 }
@@ -56,12 +59,15 @@ function deliveryAction(
   ctx: { role: string; userId: string },
   invoice: Stop["invoice"],
   transfer: Stop["delivery"]["stock_transfers"],
+  lines: Stop["lines"],
 ) {
   if (delivery.delivered_at) {
     return (
       <>
         {E.fld("Received by", delivery.signed_by ?? "")}
-        {E.status(transfer ? "Delivered · receive the transfer to move the stock" : docNo("INV", invoice?.invoice_no ?? null, "Delivered"), "ok")}
+        {E.fld("Outcome", delivery.outcome ?? "Delivered")}
+        {delivery.outcome && delivery.outcome !== "delivered" && !transfer && E.btn("Check in refused beer", "p", `/work/deliveries/${delivery.id}/return`)}
+        {E.status(transfer ? "Transfer remains in transit until received or cancelled" : docNo("INV", invoice?.invoice_no ?? null, "Delivered"), "ok")}
       </>
     );
   }
@@ -72,7 +78,7 @@ function deliveryAction(
   return (
     <>
       {E.sp()}
-      <DeliveredForm deliveryId={delivery.id} suggestions={[]} />
+      <DeliveredForm deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />
     </>
   );
 }

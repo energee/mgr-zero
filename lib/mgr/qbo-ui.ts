@@ -92,3 +92,25 @@ export function qboInvoicePresentation(input: {
     : { detail: "ready to push", actions: ["push"] };
   return { detail: "pushed to QuickBooks", actions: [] };
 }
+
+export type QboStaffInvoiceLink = { href: string | null; reason: string | null };
+export type QboInvoiceIdentity = { kind: "invoice" | "credit_memo"; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_remote_state: "live" | "voided" | "deleted"; qbo_invoice_id: string | null };
+export type QboStaffConnection = { connected: boolean; connectionId?: string; realmId?: string };
+export type QboPushedIdentity = { connection_id: string; realm_id: string; qbo_entity_id: string | null };
+
+/** Intuit's Projects Java sample supplies the invoice/company URL contract; see the pinned verification note. */
+export function qboStaffInvoiceLink(invoice: QboInvoiceIdentity, role: StaffRole | "customer", connection: QboStaffConnection, push?: QboPushedIdentity): QboStaffInvoiceLink | null {
+  if (role !== "admin" && role !== "sales") return null;
+  if (invoice.kind === "credit_memo") return { href: null, reason: "A supported staff destination for credit memos is unavailable. Find this credit memo in QuickBooks." };
+  if (!connection.connected) return { href: null, reason: "Connect QuickBooks before opening this invoice in its company." };
+  if (invoice.qbo_remote_state === "deleted") return { href: null, reason: "This invoice was deleted in QuickBooks." };
+  if (invoice.qbo_sync_status !== "pushed") return { href: null, reason: "This invoice has not been successfully pushed to QuickBooks." };
+  if (!invoice.qbo_invoice_id || !connection.connectionId || !connection.realmId || !push
+    || push.connection_id !== connection.connectionId || push.realm_id !== connection.realmId || push.qbo_entity_id !== invoice.qbo_invoice_id) {
+    return { href: null, reason: "The remote invoice identity is unavailable for the connected QuickBooks company." };
+  }
+  const url = new URL("https://app.qbo.intuit.com/app/invoice");
+  url.searchParams.set("txnId", invoice.qbo_invoice_id);
+  url.searchParams.set("companyId", connection.realmId);
+  return { href: url.toString(), reason: null };
+}

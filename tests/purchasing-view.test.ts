@@ -127,7 +127,7 @@ it("posted receipt uses counted quantities, captured lot references and current 
   const snapshot = {
     id: "po-id", po_no: 42, status: "partially_received",
     lines: [{ id: "line-id", qty_open: 1, material: { name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" } }],
-    receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id" }] }],
+    receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id", material_name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" }] }],
   };
   const model = toPostedReceiptViewProps(snapshot, "receipt-id")!;
   expect(model.title).toBe("PO-0042 · received");
@@ -340,4 +340,17 @@ it("preserves four-decimal base quantities in the exact count preview", () => {
   } }));
   expect(markup).toContain("after 1.0001 lb");
   expect(markup).toContain("adjustment +0.0001 lb");
+});
+
+it("receipt history uses frozen units and names and exposes explicit revision links", () => {
+  const snapshot = {
+    id: "po", po_no: 1, status: "partially_received",
+    lines: [{ id: "line", qty_open: 2, material: { name: "Renamed", purchase_uom: "kg", purchase_uom_factor: 99, base_uom: "kg" } }],
+    receipts: [{ id: "old", received_on: "2026-09-20", corrected_by_receipt_id: "new", correction_reason: null,
+      receipt_lines: [{ po_line_id: "line", qty_counted: 3, variance: -1, material_name: "Original malt", purchase_uom: "each", purchase_uom_factor: 5, base_uom: "lb", lot_code: "MALT-A", lot_best_by: "2027-01-01" }] }],
+  };
+  const model = toPostedReceiptViewProps(snapshot, "old", "/purchase-orders/po")!;
+  expect(model.tape[0][0]).toBe("+15 lb Original malt · receipt");
+  expect(model.tape[0][1]).toContain("MALT-A");
+  expect(model.info).toContain("superseded");
 });

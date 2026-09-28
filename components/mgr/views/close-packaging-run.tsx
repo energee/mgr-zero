@@ -1,42 +1,69 @@
+"use client";
+
 // components/mgr/views/close-packaging-run.tsx — Close packaging run.
 // Shared planned facts and copper review; live supplies only the next action.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { PlanCancelled } from "./plan-actions";
 import { E } from "@/components/mgr/e";
-import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
+import { PackagingMaterialActuals } from "./packaging-materials";
+import { Button } from "@/components/ui/button";
+import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
+import { packagingCloseReady, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
 export type { ClosePackagingRunViewModel };
 
 export function ClosePackagingRunView({
   model,
   action,
+  planActions,
 }: {
   model: ClosePackagingRunViewModel;
   action?: ReactNode;
+  planActions?: ReactNode;
 }) {
+  const header = <>
+    {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
+    {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
+    {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
+    {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
+  </>;
+  if (model.cancelled) return <>{header}<PlanCancelled /></>;
   return (
     <>
-      {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
-      {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
-      {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
-      {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
-      {model.showCloseReview !== false ? (
-          <>
-            {E.fld("Packaging source", model.source ?? "")}
-            {E.tbl(["need", "have", "short"], (model.needRows ?? []).map(([need, have, short]) => [
-              need, have, short === "0" ? short : <span className="text-warning-foreground">{short}</span>,
-            ]))}
-            {E.note(model.shortNote ?? "")}
-            {E.fld("Packaged", model.packaged ?? "")}
-            {E.pick("Lot", model.lot ?? "", model.lotOptions ?? [])}
-            {E.pick("Finished goods destination", model.destination ?? "", model.destinationOptions ?? [])}
-            {E.edit("Labels damaged · optional", model.labelsDamaged ?? "", "number")}
-            {E.edit("Ends damaged · optional", model.endsDamaged ?? "", "number")}
-            {E.pick("Write off to", model.writeOff ?? "", model.writeOffOptions ?? [])}
-            {E.tape(model.tape ?? [])}
-            {E.btn("Close packaging run", "irr")}
-          </>
-        ) : null}
+      {header}
+      {planActions}
+      {model.showCloseReview !== false && model.closeFields ? <PackagingCloseFields model={model.closeFields} /> : null}
       {action}
     </>
   );
+}
+
+export function PackagingCloseFields({ model, disabled, ready, retry, onField, onOutput, onActual, onAdd, onRemove, onSubmit, onRefresh, messages }: {
+  model: PackagingCloseFieldsModel; disabled?: boolean; ready?: boolean; retry?: boolean;
+  onField?: (field: "bblDrawn" | "lotCode" | "packagedOn" | "bestBy" | "locationId" | "binId", value: string) => void;
+  onOutput?: (id: string, value: string) => void; onActual?: (key: string, patch: Partial<PackagingActualDraft>) => void;
+  onAdd?: () => void; onRemove?: (key: string) => void; onSubmit?: () => void; onRefresh?: () => void; messages?: ReactNode;
+}) {
+  const [fixture, setFixture] = useState(model);
+  const view = onField ? model : fixture;
+  const changeField = onField ?? ((field, value) => setFixture(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) })));
+  const changeOutput = onOutput ?? ((id, value) => setFixture(previous => ({ ...previous, outputs: previous.outputs.map(row => row.id === id ? { ...row, qty: value } : row) })));
+  const changeActual = onActual ?? ((key, patch) => setFixture(previous => ({ ...previous, actuals: patchActual(previous.actuals, key, patch) })));
+  const addActual = onAdd ?? (() => setFixture(previous => ({ ...previous, actuals: [...previous.actuals, emptyPackagingActual()] })));
+  const dropActual = onRemove ?? ((key) => setFixture(previous => ({ ...previous, actuals: removeActual(previous.actuals, key) })));
+  const maySubmit = ready ?? packagingCloseReady(view);
+  return <div className="flex flex-col gap-3">
+    {E.edit("Barrels drawn", view.bblDrawn, "number", undefined, { min: 0, step: "any", disabled, required: true, onChange: value => changeField("bblDrawn", value) })}
+    {E.ttl("Actual outputs")}
+    {view.outputs.map(row => <div key={row.id}>{E.edit(`${row.name} actual`, row.qty, "number", undefined, { min: 0, step: "any", disabled, required: true, onChange: value => changeOutput(row.id, value) })}</div>)}
+    {E.edit("Lot code", view.lotCode, "text", undefined, { disabled, required: true, onChange: value => changeField("lotCode", value) })}
+    {E.edit("Packaged on", view.packagedOn, "date", undefined, { disabled, required: true, onChange: value => changeField("packagedOn", value) })}
+    {E.edit("Best by · optional", view.bestBy, "date", undefined, { disabled, onChange: value => changeField("bestBy", value) })}
+    {E.pick("Finished goods location", view.locationId, view.locations.map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("locationId", value) })}
+    {E.pick("Finished goods bin", view.binId, view.bins.filter(row => row.location_id === view.locationId).map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("binId", value) })}
+    <PackagingMaterialActuals plan={view.plan} rows={view.actuals} locations={view.locations} bins={view.bins} disabled={disabled} onChange={changeActual} onAdd={addActual} onRemove={dropActual} />
+    <Button type="button" variant="outline" disabled={disabled} onClick={onRefresh}>Review current material plan</Button>
+    {messages}
+    <Button type="button" data-variant="irreversible" disabled={!maySubmit || (disabled && !retry)} onClick={onSubmit}>{retry ? "Retry unchanged close" : "Close packaging run"}</Button>
+  </div>;
 }

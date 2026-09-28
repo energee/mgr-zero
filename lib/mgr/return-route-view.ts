@@ -3,6 +3,8 @@ export type ReturnRouteStopView = {
   key: string;
   title: string;
   detail: string;
+  returnHref?: string;
+  outstanding?: number;
 };
 
 export type ReturnRouteViewModel = {

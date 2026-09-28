@@ -36,7 +36,7 @@ export function ReturnCreditView({ model, sources, footer, tape, reason, quantit
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {model.lines.length === 0 && E.info("No returnable lines")}
     {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
-      <OrderQuantity label={`${line.name} return quantity`} value={quantities?.[line.key] ?? line.qty} max={line.shipped} step={line.step} onChange={onQuantity && (value => onQuantity(line.key, value))} />)}</div>)}
+      <OrderQuantity label={`${line.name} return quantity`} value={quantities?.[line.key] ?? line.qty} max={line.maxReturning} step={line.step} onChange={onQuantity && (value => onQuantity(line.key, value))} />)}</div>)}
     <ToggleGroup type="single" aria-label="Reason" variant="outline" size="sm" className="flex-wrap justify-start"
       value={onReason ? String(selectedReason) : undefined} defaultValue={onReason ? undefined : String(selectedReason)}
       onValueChange={value => { if (value !== "") onReason?.(Number(value)); }}>

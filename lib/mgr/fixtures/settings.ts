@@ -18,9 +18,8 @@ export const settingsDemo: SettingsViewModel = {
     { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
   ],
   deployment: "dedicated · read-only",
-  warehouse: "Warehouse",
-  warehouseOptions: ["Warehouse"],
-  sourceWater: "every recipe starts here unless it overrides",
+  warehouseId: "00000000-0000-4000-8000-0000000000f1",
+  warehouseOptions: [{ id: "00000000-0000-4000-8000-0000000000f1", name: "Warehouse" }],
   locations: "Warehouse · Taproom",
   team: "3 members · 1 pending invite",
 };

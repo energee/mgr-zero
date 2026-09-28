@@ -691,7 +691,7 @@ describe("registered staff mutation role × RPC matrix", () => {
         await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
         const { data: sh } = await admin.from("shipments").select("id").eq("order_id", orderId).single();
         const { data: route } = await admin.from("routes").insert({ brewery_id: brewery.id, delivery_date: "2026-09-09", name: "return", driver_user_id: contexts()[role].userId, departed_at: new Date().toISOString() }).select("id").single();
-        await admin.from("deliveries").insert({ brewery_id: brewery.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1, delivered_at: new Date().toISOString() });
+        await admin.from("deliveries").insert({ brewery_id: brewery.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1, delivered_at: new Date().toISOString(), outcome: "delivered" });
         return { command: { routeId: route!.id }, rpc: { p_route: route!.id } };
       },
     },

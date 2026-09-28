@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CommandError, unwrap, type Ctx, type CommandExecution, type StaffRole } from "@/lib/commands/registry";
 
 type InviteInput = { email: string } & ({ role: StaffRole; customerId?: never } | { customerId: string; role?: never });
-type InviteClaim = { email: string; authToken: string; userId: string | null; state: string };
+type InviteClaim = { id: string; email: string; authToken: string; userId: string | null; state: string };
 type Hooks = { afterAuth?: () => Promise<void> };
 
 // atomic-exempt: Auth and Postgres cannot share a client transaction. The Auth
@@ -15,6 +15,7 @@ async function invite(ctx: Ctx, input: InviteInput, execution: CommandExecution,
   })) as Promise<InviteClaim>;
   try {
     let request = await claim(); // Database derives the actor and checks current role before Auth.
+    if (request.state === "pending_consent") return { inviteId: request.id, state: request.state };
     if (!request.userId) {
       const { error } = await createAdminClient().auth.admin.inviteUserByEmail(request.email, {
         data: { mgr_invite_token: request.authToken, mgr_invite_kind: input.role ? "staff" : "customer" },

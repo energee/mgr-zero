@@ -6,7 +6,7 @@ import { BreweryProvider } from "@/app/(app)/brewery-provider";
 // tests render the page subtree on its own, so they supply it here.
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
-const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[] }));
+const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[], customerInput: {} as Record<string, unknown> }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
@@ -16,7 +16,7 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
 const customer = { id: "buyer", name: "Buyer", type: "retailer", state: "PA", sale_channel_id: "channel", license_no: "license", payment_terms: "net30", tax_treatment: "research", sale_channels: { name: "Wholesale" } };
 const shipTo = { id: "ship", label: "Dock", address1: "1 Main", address2: null, city: "Town", state: "PA", zip: "12345", is_default: true };
-async function query(name: string, input?: { basis?: string }) {
+async function query(name: string, input?: { basis?: string; missingPortalEmail?: boolean }) {
   state.calls.push(name);
   switch (name) {
     case "list_brands": return [brand];
@@ -27,7 +27,7 @@ async function query(name: string, input?: { basis?: string }) {
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
     case "get_customer": return { customer, shipTos: [shipTo] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];
-    case "list_customers": return [customer];
+    case "list_customers": state.customerInput = input ?? {}; return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
     case "get_bin_move_stock": return [{ skuId: "sku", qty: 4 }];
@@ -44,7 +44,7 @@ import PricingPage from "@/app/(app)/pricing/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
-import { CustomerView } from "@/components/mgr/views/customer";
+import { CustomerDetailForm } from "@/app/(app)/customers/customer-detail-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 beforeEach(() => { state.role = "admin"; state.calls = []; });
@@ -80,10 +80,10 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
-  expect(page.type).toBe(CustomerView);
-  expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
+  expect(page.type).toBe(CustomerDetailForm);
+  expect(page.props.model.editValues.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
-  expect(page.props.detail.revokePortalUser({ key: "user", email: "jo@buyer.test" }).props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
+  expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
   for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
   state.role = "warehouse"; state.calls = [];
@@ -124,4 +124,11 @@ it("converted inventory frames never navigate into the live catalog/customer/loc
     const html = render(createElement("div", null, screen.body));
     expect(html, name).not.toMatch(/href="\//);
   }
+});
+
+it("asks the registered customer query for the missing-email subset", async () => {
+  const page = await CustomersPage({ searchParams: Promise.resolve({ missingEmail: "1" }) });
+  expect(state.customerInput).toEqual({ missingPortalEmail: true });
+  expect(page.type).toBe(CustomersView);
+  expect(page.props.model.missingPortalEmail).toBe(true);
 });

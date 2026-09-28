@@ -40,7 +40,7 @@ export const returnRouteA: ReturnRouteViewModel = {
   departed: "8:10 AM",
   stops: [
     { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "delivered 8:42 AM" },
-    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "delivered 9:15 AM" },
+    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "partial 9:15 AM", outstanding: 2 },
     { key: "s3", title: "Stop 3 · TRF-0004 · Storage", detail: "delivered 10:03 AM" },
   ],
 };

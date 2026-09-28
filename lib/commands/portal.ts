@@ -165,7 +165,7 @@ defineQuery({
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("id, invoice_timing, invoices(id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
     ]);
     return { order, lines: ln, events, shipment };
   },

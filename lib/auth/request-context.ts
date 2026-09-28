@@ -45,7 +45,7 @@ export interface RequestAuthContext {
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
   getStaffMembership(breweryId: string): Promise<StaffMembership | null>;
-  getCustomerMembership(breweryId: string): Promise<CustomerMembership | null>;
+  getCustomerMembership(breweryId: string, customerId?: string): Promise<CustomerMembership | null>;
 }
 
 /**
@@ -126,8 +126,8 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     async getStaffMembership(breweryId) {
       return (await getStaffMemberships()).find((membership) => membership.breweryId === breweryId) ?? null;
     },
-    async getCustomerMembership(breweryId) {
-      return (await getCustomerMemberships()).find((membership) => membership.breweryId === breweryId) ?? null;
+    async getCustomerMembership(breweryId, customerId) {
+      return (await getCustomerMemberships()).find((membership) => membership.breweryId === breweryId && (!customerId || membership.customerId === customerId)) ?? null;
     },
   };
 }
