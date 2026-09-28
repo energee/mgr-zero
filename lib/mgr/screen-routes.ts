@@ -107,6 +107,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Disconnect QuickBooks", file: "app/(app)/settings/accounting/disconnect/page.tsx" },
   { name: "Fix mapping", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
   { name: "Customers", file: "app/(app)/customers/page.tsx" },
+  { name: "Customers missing email", file: "app/(app)/customers/page.tsx" },
   { name: "Customer detail", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Ship-to form", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Catalog", file: "app/(app)/catalog/page.tsx" },

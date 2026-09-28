@@ -37,3 +37,12 @@ it("offers the disconnect action by default and does not leak fixture paths", ()
   expect(account).not.toContain("Save push defaults");
   expect(account).not.toContain('href="/settings');
 });
+
+
+it("reports portal-email presence without claiming delivery or blocking push", () => {
+  const model = { ...toAccountingViewProps({ connected: false, state: "disconnected" as const, realmLabel: null, lastError: null }), missingEmails: 2, customersHref: "/customers?missingEmail=1" };
+  const markup = renderToStaticMarkup(createElement(AccountingView, { model }));
+  expect(markup).toContain("2 · no portal login email");
+  expect(markup).toContain('href="/customers?missingEmail=1"');
+  expect(markup).not.toContain("cannot be pushed");
+});

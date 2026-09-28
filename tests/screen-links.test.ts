@@ -106,7 +106,7 @@ describe("reported explorer flows", () => {
     ["Portal Me", "Change password", "Portal set password"],
     ["Set new password", "Save password", "Today"],
     ["Create brewery", "Create brewery", "First-run checklist"],
-    ["Accounting", "Review", "Customers"],
+    ["Accounting", "Review", "Customers missing email"],
     ["Mapping conflict", "Save mapping", "Accounting"],
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Connect QuickBooks"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],

@@ -906,6 +906,10 @@ For cross-location stock transfers, receiving shows the recorded lots at each so
 
 Customer account details and trading terms are edited directly on **Customer detail** with **Save customer**. Staff without edit permission see the same fields disabled. **Units** uses the shared choice buttons; selecting a unit saves it, and a failed save restores the previous choice.
 
+Accounting shows **Customers missing a portal login email**. **Review** lists only those accounts. An account is ready when at least one current portal user has a nonblank login email. This checks presence, not deliverability or sending, and does not change QuickBooks push eligibility.
+
+Open a listed customer and use **Invite portal user** to add the buyer's login address. Use **Remove access** to retire an obsolete login after the correct access is established. MGR does not change a person's global sign-in email from customer editing. Reload Accounting after correcting access to refresh the count.
+
 ### Recover an uncertain form submission
 
 If a response is lost, **Unresolved requests** shows the saved input and **Retry saved request**. This includes staff and buyer invitations. Retry recovers the original operation; it does not submit subsequent field edits. Independent actions on the same page can still run while a request is unresolved. Reloading the same browser tab preserves recovery. Return to the original signed-in account and brewery to recover its requests. Nothing is sent automatically. Keep the tab open until recovery finishes. CSV imports use **Retry same batch** on the Import page. Existing order, count, completion and Ask MGR recovery controls retain their own workflows.

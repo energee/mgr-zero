@@ -9,10 +9,11 @@ import { QboConnectionAction, QboDefaultsForm, QboSyncButton } from "./qbo-contr
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ connected?: string; error?: string }> }) {
   const { brewery, ctx } = await requireAdminContext("Accounting");
-  const [health, params, syncStatus] = await Promise.all([runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth>, searchParams, runCommand("get_qbo_sync_status", {}, ctx) as Promise<QboSyncStatus>]);
+  const [health, missingEmails, params, syncStatus] = await Promise.all([runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth>, runCommand("count_customers_missing_portal_email", {}, ctx) as Promise<number>, searchParams, runCommand("get_qbo_sync_status", {}, ctx) as Promise<QboSyncStatus>]);
   const model = toAccountingViewProps(health);
+  model.missingEmails = missingEmails;
   model.backHref = "/settings"; model.disconnectHref = "/settings/accounting/disconnect";
-  model.mappingsHref = "/settings/accounting/mappings"; model.customersHref = "/customers";
+  model.mappingsHref = "/settings/accounting/mappings"; model.customersHref = "/customers?missingEmail=1";
   return <AccountingView model={model}
     sync={<QboSyncButton status={toQboSyncViewProps(syncStatus, brewery.timeZone)} disabled={!model.connected} />}
     connection={<QboConnectionAction configured={isQboConfigured()} reconnect={model.reconnect} />}
