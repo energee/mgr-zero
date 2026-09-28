@@ -1,4 +1,6 @@
-import type { Filing, LossReview, Report } from "@/lib/commands/compliance";
+import type { Filing, LossReview, Report, StateTransaction } from "@/lib/commands/compliance";
+import { destinationStateTotals } from "./destination-state-export";
+import { money } from "./money";
 import { sentenceCase } from "./labels";
 
 export type MonthlyComplianceSnapshot = {
@@ -21,6 +23,8 @@ export type MonthlyComplianceViewModel = {
   packaged: string;
   removals: { key: string; title: string; bbl: string }[];
   cellarRemovals: { key: string; title: string; bbl: string }[];
+  stateRows: string[][];
+  stateExport?: { periodStart: string; periodEnd: string; facts: StateTransaction[] };
   byState: { key: string; title: string; bbl: string }[];
 };
 
@@ -30,7 +34,8 @@ const REMOVAL_LABEL: Record<string, string> = {
 };
 const CLASS_LABEL = { keg: "kegs", can: "cans", bottle: "bottles" } as const;
 const bbl = (value: number) => `${value.toFixed(2)} bbl`;
-const removalBbl = (key: string, value: number) => key === "loss" ? `${value.toLocaleString("en-US", { maximumFractionDigits: 8 })} bbl` : bbl(value);
+const exactBbl = (value: number) => `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 8 })} bbl`;
+const removalBbl = (key: string, value: number) => key === "loss" ? exactBbl(value) : bbl(value);
 const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
 
 export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot): MonthlyComplianceViewModel {
@@ -57,7 +62,9 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     inProcess: bbl(figures.inProcess),
     packaged: bbl(figures.packaged),
     removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
-    cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 8 })} bbl` })),
+    cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: exactBbl(value) })),
+    stateRows: destinationStateTotals(figures.stateTransactions ?? []).map(row => [row.state, exactBbl(row.outwardBbl), exactBbl(row.returnedBbl), exactBbl(row.adjustmentBbl), exactBbl(row.volumeBbl), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
+    stateExport: figures.stateTransactions ? { periodStart: figures.periodStart, periodEnd: figures.periodEnd, facts: figures.stateTransactions } : undefined,
     byState: Object.entries(figures.byState).map(([key, value]) => ({ key, title: `Taxpaid to ${key}`, bbl: bbl(value) })),
   };
 }

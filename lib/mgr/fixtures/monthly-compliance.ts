@@ -18,6 +18,11 @@ export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
       inProcess: 120.4, packaged: 48.5,
       removals: { taxable: 41.2, export: 6.9, loss: 0.05741935 },
       cellarRemovals: { loss: 0.05741935 },
+      stateTransactions: [
+        { state: "PA", kind: "sale_removal", eventDate: "2026-08-15", sourceId: "shipment-PA", originalSourceId: null, volumeBbl: 38.1, salesCents: 0, sourceStatus: "posted" },
+        { state: "OH", kind: "sale_removal", eventDate: "2026-08-16", sourceId: "shipment-OH", originalSourceId: null, volumeBbl: 3.1, salesCents: 0, sourceStatus: "posted" },
+        { state: "PA", kind: "invoice", eventDate: "2026-08-15", sourceId: "invoice-PA", originalSourceId: null, volumeBbl: 0, salesCents: 2460000, sourceStatus: "live" },
+      ],
       byState: { PA: 38.1, OH: 3.1 },
     },
     warnings: [],

@@ -16,6 +16,7 @@ export function LicenseForm({ license }: { license?: License }) {
   const form = useCommandForm("upsert_brewery_state_license", {
     build: () => licenseInput(v),
     reset,
+    target: license?.id,
   });
   const model = {
     state: v.state, kind: v.kind, licenseNo: v.licenseNo, expiresOn: v.expiresOn,

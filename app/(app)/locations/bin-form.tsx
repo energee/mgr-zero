@@ -14,6 +14,7 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
   const form = useCommandForm(bin ? "update_bin" : "create_bin", {
     build: () => (bin ? { binId: bin.id, name } : { locationId, name }),
     reset: () => setName(bin?.name ?? ""),
+    target: bin?.id,
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Bin"
@@ -25,7 +26,7 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {bin ? (
-              <Button type="button" variant="destructive" disabled={form.busy} onClick={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false))}>
+              <Button type="button" variant="destructive" disabled={form.busy} onClick={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false), { target: bin.id })}>
                 Remove
               </Button>
             ) : null}

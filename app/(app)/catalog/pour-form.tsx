@@ -16,6 +16,7 @@ export function PourForm({ priceGroupId, groupName, pour }: {
   const form = useCommandForm("upsert_format", {
     build: () => ({ id: pour?.id, name: pourSkuName(name, ounces), basis: "poured", priceGroupId, ounces: Number(ounces) }),
     reset: () => { setName(pour?.name ?? ""); setOunces(pour ? String(pour.ounces) : ""); },
+    target: pour?.id,
   });
   return <CommandForm open={form.open} onOpenChange={form.setOpen} title={groupName ? `${verb} · ${groupName}` : verb} trigger={<Button variant="outline" size="sm">{verb}</Button>}>
     <form onSubmit={form.submit} className="flex flex-col gap-4">
