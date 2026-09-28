@@ -31,11 +31,10 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
     {model.planned && E.fld("Planned", model.planned)}
     {model.note && E.fld("Note", model.note)}
   </>;
-  if (model.cancelled) return <>{header}<PlanCancelled /></>;
   return <>
     {header}
-    {!value.recorded && !value.correctionRecordId && planActions}
-    {value.recorded ? <>
+    {!model.cancelled && !value.recorded && !value.correctionRecordId && planActions}
+    {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
       {E.fld("Brewed on", model.brewedOn || "Unavailable")}

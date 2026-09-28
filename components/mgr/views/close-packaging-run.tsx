@@ -27,13 +27,14 @@ export function ClosePackagingRunView({
     {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
     {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
   </>;
-  if (model.cancelled) return <>{header}<PlanCancelled /></>;
   return (
     <>
       {header}
-      {planActions}
-      {model.showCloseReview !== false && model.closeFields ? <PackagingCloseFields model={model.closeFields} /> : null}
-      {action}
+      {model.cancelled ? <PlanCancelled /> : <>
+        {planActions}
+        {model.showCloseReview !== false && model.closeFields ? <PackagingCloseFields model={model.closeFields} /> : null}
+        {action}
+      </>}
     </>
   );
 }
