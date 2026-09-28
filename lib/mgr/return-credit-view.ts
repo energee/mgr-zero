@@ -8,6 +8,7 @@ export type ReturnCreditLineView = {
   detail: string;
   qty: number;
   shipped: number;
+  maxReturning: number;
   /** Quantity step: 0.01 for beer, 1 for a keg deposit (whole kegs). */
   step: string;
 };
@@ -28,6 +29,7 @@ export type ReturnCreditViewModel = {
 };
 
 export type ReturnCreditSnapshot = {
+  refusedDeliveryId?: string;
   backHref?: string;
   order?: {
     id: string;
@@ -40,6 +42,7 @@ export type ReturnCreditSnapshot = {
     id: string;
     qty_shipped: number | null;
     qty_returning: number;
+    qty_returnable?: number;
     unit_price_cents: number;
     skus: { name: string } | null;
     /** A keg_deposit invoice line refunds its deposit (whole kegs, no
@@ -65,7 +68,7 @@ export const RETURN_REASONS = [
  *  lines come back as stock (and, when damaged, go to loss); keg deposit lines
  *  refund whole kegs' deposits in the same credit memo and move no stock. */
 export function toReturnCreditViewProps({
-  order, invoice, lines, locations, reason = "damaged", backHref, returnLocationId }: ReturnCreditSnapshot): ReturnCreditViewModel {
+  order, invoice, lines, locations, reason = "damaged", backHref, returnLocationId, refusedDeliveryId }: ReturnCreditSnapshot): ReturnCreditViewModel {
   const destinationId = returnLocationId ?? order?.from_location_id ?? "";
   const from = locations.find((l) => l.id === destinationId);
   const returnToOptions = locations.map(l => ({ id: l.id, label: l.id === order?.from_location_id ? `${l.name} · original fulfillment source` : l.name }));
@@ -95,6 +98,7 @@ export function toReturnCreditViewProps({
       detail: l.kind === "keg_deposit" ? `deposit on ${Number(l.qty_shipped ?? 0)} kegs · refunding` : `shipped ${Number(l.qty_shipped ?? 0)} · returning`,
       qty: Number(l.qty_returning),
       shipped: Number(l.qty_shipped ?? 0),
+      maxReturning: Number(l.qty_returnable ?? l.qty_shipped ?? 0),
       step: l.kind === "keg_deposit" ? "1" : "0.01",
     })),
     reasons: RETURN_REASONS.map(entry => entry.label),
@@ -104,6 +108,6 @@ export function toReturnCreditViewProps({
     reason: RETURN_REASONS.findIndex(entry => entry.id === reason),
     creditInfo: `Credited at the price on ${inv}, not today’s price group.`,
     tape: reason ? tape : [],
-    note: "Empty-keg asset returns are a different Keg fleet command.",
+    note: refusedDeliveryId ? "Check in only refused beer here. Return accepted beer separately from the invoice. Empty-keg asset returns are a different Keg fleet command." : "Empty-keg asset returns are a different Keg fleet command.",
   };
 }

@@ -19,13 +19,13 @@ beforeEach(() => {
 
 it("guards deep links before loading invoice, sources and bins", async () => {
   permission.mockImplementation(() => { throw new Error("denied"); });
-  await expect(ReturnPage({ params })).rejects.toThrow("denied");
+  await expect(ReturnPage({ params, searchParams: Promise.resolve({}) })).rejects.toThrow("denied");
   expect(permission).toHaveBeenCalledWith({ breweryId: "brewery" }, "return_shipment");
   expect(query).not.toHaveBeenCalled();
 });
 
 it("binds invoice identities and captured prices without fabricated order data", async () => {
-  const page = await ReturnPage({ params });
+  const page = await ReturnPage({ params, searchParams: Promise.resolve({}) });
   expect(page.type).toBe(CreditMemoForm);
   expect(page.props.lines).toEqual([
     { id: "line", kind: "sku", skuId: "sku", label: "Actual line", qty: 2, unitPriceCents: 101 },
@@ -37,7 +37,7 @@ it("binds invoice identities and captured prices without fabricated order data",
 
 it("refuses returning a credit memo", async () => {
   query.mockImplementation(async name => name === "get_invoice" ? { invoice: { ...invoice, kind: "credit_memo" }, lines: [] } : []);
-  await expect(ReturnPage({ params })).rejects.toThrow("/invoices/invoice");
+  await expect(ReturnPage({ params, searchParams: Promise.resolve({}) })).rejects.toThrow("/invoices/invoice");
 });
 
 it("keeps explicit shipped movement IDs, and omits sources only for legacy invoices", () => {

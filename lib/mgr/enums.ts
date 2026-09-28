@@ -19,6 +19,9 @@ export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
 /** The reasons staff record by hand; transferred_in/out come from transfers and bin moves in pairs. */
 export const KEG_EVENT_REASONS = ["acquired", "retired", "shipped", "returned", "lost", "found"] as const;
 
+// Why a stop's goods were refused (lib/commands/orders.ts confirm_delivery).
+export const REFUSAL_REASONS = ["customer_refused", "closed", "damaged", "wrong_item", "other"] as const;
+
 // The process spec (recipe-builder spec D2, D6, D7), from lib/commands/production.ts:
 // ordered mash steps and fermentation stages, each with a type and a name, and
 // water additions carrying one stage.

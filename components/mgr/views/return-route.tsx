@@ -18,7 +18,7 @@ export function ReturnRouteView({
       {E.fld("Driver · vehicle", model.driverVehicle)}
       {E.fld("Departed", model.departed)}
       {model.stops.map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, row.detail, "done", "ok")}</Fragment>
+        <Fragment key={row.key}>{E.row(row.title, row.outstanding ? `${row.detail} · ${row.outstanding} awaiting check-in` : row.detail, row.outstanding ? E.act("Check in", "attention", row.returnHref) : "done", row.outstanding ? "w" : "ok")}</Fragment>
       ))}
       {E.sp()}
       {action !== undefined ? action : E.btn("Return route")}

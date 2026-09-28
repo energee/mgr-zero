@@ -10,22 +10,45 @@ route has been confirmed delivered.
 
 {/* ops:delivery */}
 
-## confirm_delivery [#confirm_delivery]
+## check_in_refused_return [#check_in_refused_return]
 
 `command` · admin, warehouse
 
-Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock
+Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `deliveryId` | uuid | yes |
-| `signedBy` | string | yes |
+| `locationId` | uuid | yes |
+| `lines` | array of object | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_delivery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000", "signedBy": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "check_in_refused_return", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "orderLineId": "00000000-0000-0000-0000-000000000000", "sources": [ { "movementId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "damaged": true } ] } ] } }'
+```
+
+## confirm_delivery [#confirm_delivery]
+
+`command` · admin, warehouse
+
+Close a stop with accepted and refused quantities; invoice only accepted goods on delivery, never restore stock
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryId` | uuid | yes |
+| `signedBy` | string | no |
+| `refused` | array of object | no |
+| `reason` | customer_refused or closed or damaged or wrong_item or other | no |
+| `note` | string | no |
+| `transferRefused` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_delivery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## depart_route [#depart_route]
@@ -62,6 +85,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_delivery_stop", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## list_refused_returns [#list_refused_returns]
+
+`query` · admin, warehouse, sales
+
+Outstanding refused beer, including returned routes, awaiting physical check-in or Return and credit
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `deliveryId` | uuid | no |
+| `routeId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_refused_returns", "input": {} }'
+```
+
 ## list_routes [#list_routes]
 
 `query` · admin, warehouse, sales
@@ -84,7 +125,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Stamp the route's return as its driver or an admin, once it has departed and every stop is delivered
+Stamp the route's return as its driver or an admin, once it has departed and every stop has an outcome
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -109,6 +150,7 @@ Return shipped beer: credit memo at the invoiced price + return_in at the destin
 | `locationId` | uuid | yes |
 | `reason` | damaged or wrong_item or unsold | yes |
 | `lines` | array of object | yes |
+| `refusedDeliveryId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

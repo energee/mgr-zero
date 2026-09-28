@@ -307,7 +307,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(sql(`select count(*) from private.command_requests where actor_id='${f.taproom.id}' and request_id='${importRequest}' and result->'rows' <> '[]'::jsonb`)).toEqual(["1"]);
   expect(sql(`select count(*) from private.invite_requests where actor_id='${f.taproom.id}' and request_id in ('${inviteRequest}','${failureRequest}')`)).toEqual(["2"]);
   const reversible = await ins("inventory_movements", { brewery_id: B, sku_id: SKU, location_id: W, bin_id: BIN, qty: 1, type: "adjustment", created_by: f.owner.id });
+  const refusedStop = (await admin.from("deliveries").select("id").eq("brewery_id", B).single()).data!.id;
   const cases: Record<string, unknown[]> = {
+    check_in_refused_return: [refusedStop,W,[],R()],
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
     set_brewery_operating_defaults: [B,24,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],

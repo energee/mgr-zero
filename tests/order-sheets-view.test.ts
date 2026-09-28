@@ -288,3 +288,15 @@ describe("inventory records mount the sheet views", () => {
     expect(body.props.model).toEqual(model);
   });
 });
+
+it("labels refused-delivery returns separately from accepted beer returns", () => {
+  const model = toReturnCreditViewProps({ ...orderReturnCredit, refusedDeliveryId: "delivery-id" });
+  expect(model.note).toContain("refused beer");
+  expect(model.note).toContain("accepted beer");
+});
+
+it("bounds refusal returns by the outstanding quantity without changing shipped facts", () => {
+  const model = toReturnCreditViewProps({ ...orderReturnCredit, lines: orderReturnCredit.lines.map(line => ({ ...line, qty_shipped: 4, qty_returnable: 2 })) });
+  expect(model.lines[0].shipped).toBe(4);
+  expect(model.lines[0].maxReturning).toBe(2);
+});

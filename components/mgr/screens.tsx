@@ -1,6 +1,7 @@
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
+import { RefusedReturnFormView } from "@/components/mgr/views/refused-return";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -2309,7 +2310,7 @@ export const SCREENS: Screen[] = [
     reads: "list_routes",
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows by the first characters of their id until staff have names.",
     body: <RouteView model={routeAPlan} />,
   },
   {
@@ -2317,12 +2318,12 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Return route",
-    to: { "Return route": "Routes" },
+    to: { "Return route": "Routes", "Check in": "Check in refused beer" },
     job: "Stamp the return once every stop is done",
     reads: "list_routes",
     writes: "return_route",
-    states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
-    spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
+    states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop has an outcome"], ["complete", "already returned: the return time replaces the button"]],
+    spec: "The departed state of a route once every stop has an outcome. Outstanding refused beer remains visible until physically checked in. Planned routes Depart on Route; this screen is only Return.",
     body: <ReturnRouteView model={returnRouteA} />,
   },
   {
@@ -2343,12 +2344,22 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Confirm delivery",
+    to: { "Check in refused beer": "Check in refused beer" },
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
-    spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
+    spec: "Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Check in refused beer",
+    job: "Record refused beer physically returned to a bin",
+    reads: "list_refused_returns + get_invoice_return_sources + list_locations + list_bins",
+    writes: "check_in_refused_return",
+    states: [["permission", "warehouse or admin for on-delivery shipments; admin or sales uses Return and credit for invoice-now", 1], ["damage", "return and loss posted together"], ["retry", "same request replays"]],
+    spec: "Refusal alone restores no stock. Check in actual received quantities against their shipped source lot. Outstanding returns remain visible after the route returns. Invoice-now refusals use Return and credit.",
+    body: <RefusedReturnFormView model={{ title: "Check in · Ridgeline", locationId: "warehouse", locations: [{ value: "warehouse", label: "Warehouse" }], bins: [{ value: "cold", label: "Cold room", locationId: "warehouse" }], lines: [{ id: "hazy", name: "Hazy IPA · ½ bbl keg", outstanding: 2, sources: [{ id: "source", label: "HZ-041 · Cold room", shipped: 4 }] }] }} />,
   },
   {
     step: 7,

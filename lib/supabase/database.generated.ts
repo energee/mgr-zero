@@ -1169,6 +1169,9 @@ export type Database = {
           delivered_at: string | null
           id: string
           note: string | null
+          outcome: string | null
+          refusal_note: string | null
+          refusal_reason: string | null
           route_id: string
           shipment_id: string | null
           signed_by: string | null
@@ -1180,6 +1183,9 @@ export type Database = {
           delivered_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
+          refusal_note?: string | null
+          refusal_reason?: string | null
           route_id: string
           shipment_id?: string | null
           signed_by?: string | null
@@ -1191,6 +1197,9 @@ export type Database = {
           delivered_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
+          refusal_note?: string | null
+          refusal_reason?: string | null
           route_id?: string
           shipment_id?: string | null
           signed_by?: string | null
@@ -1817,6 +1826,7 @@ export type Database = {
           qbo_sync_token: string | null
           qbo_tax_cents: number | null
           qbo_total_cents: number | null
+          refused_delivery_id: string | null
           shipment_id: string | null
           written_off_at: string | null
           written_off_by: string | null
@@ -1844,6 +1854,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1871,6 +1882,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1890,6 +1902,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "refused_delivery_returns"
+            referencedColumns: ["delivery_id", "brewery_id"]
           },
           {
             foreignKeyName: "invoices_shipment_id_brewery_id_fkey"
@@ -2950,6 +2976,7 @@ export type Database = {
           order_id: string
           qty_ordered: number
           qty_picked: number | null
+          qty_refused: number
           qty_shipped: number | null
           short_reason: string | null
           sku_id: string
@@ -2961,6 +2988,7 @@ export type Database = {
           order_id: string
           qty_ordered: number
           qty_picked?: number | null
+          qty_refused?: number
           qty_shipped?: number | null
           short_reason?: string | null
           sku_id: string
@@ -2972,6 +3000,7 @@ export type Database = {
           order_id?: string
           qty_ordered?: number
           qty_picked?: number | null
+          qty_refused?: number
           qty_shipped?: number | null
           short_reason?: string | null
           sku_id?: string
@@ -7324,6 +7353,39 @@ export type Database = {
           },
         ]
       }
+      refused_delivery_returns: {
+        Row: {
+          brewery_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          delivery_id: string | null
+          invoice_timing: string | null
+          order_id: string | null
+          order_line_id: string | null
+          order_no: number | null
+          outstanding_qty: number | null
+          qty_refused: number | null
+          route_id: string | null
+          sku_id: string | null
+          sku_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_route_id_brewery_id_fkey"
+            columns: ["route_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
       route_loads: {
         Row: {
           brewery_id: string | null
@@ -7762,6 +7824,15 @@ export type Database = {
         Args: { p_brewery: string; p_now: string; p_subject_id?: string }
         Returns: number
       }
+      check_in_refused_return: {
+        Args: {
+          p_delivery: string
+          p_lines: Json
+          p_location: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       claim_chat_callback_receipts: {
         Args: { p_limit: number; p_now: string }
         Returns: {
@@ -7912,7 +7983,15 @@ export type Database = {
         Returns: Json
       }
       confirm_delivery: {
-        Args: { p_delivery: string; p_request_id: string; p_signed_by: string }
+        Args: {
+          p_delivery: string
+          p_note?: string
+          p_reason?: string
+          p_refused?: Json
+          p_request_id: string
+          p_signed_by: string
+          p_transfer_refused?: boolean
+        }
         Returns: Json
       }
       confirm_order: {
@@ -9059,6 +9138,7 @@ export type Database = {
           p_lines: Json
           p_location: string
           p_reason: string
+          p_refused_delivery?: string
           p_request_id: string
         }
         Returns: Json
