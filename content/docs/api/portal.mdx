@@ -12,11 +12,7 @@ Portal orders are wholesale orders shipped from the brewery's warehouse, and
 they move through the same lifecycle staff orders do. A portal user drafts,
 updates, and submits. Confirming, picking, and shipping stay with the brewery.
 
-Order and invoice history queries return `{ rows, nextCursor }`, with rows ordered
-by `created_at` and `id`, both descending. `limit` defaults to 50 and accepts 1–200.
-`nextCursor` is null on the last page. Otherwise pass it back as `cursor`, unchanged
-and with the same filters, to read the next page. New records appear when restarting
-from the newest page.
+Order and invoice history queries page with a cursor; see [History paging](/docs/api#history-paging).
 
 {/* ops:portal */}
 
