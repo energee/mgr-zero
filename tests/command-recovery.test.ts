@@ -60,3 +60,15 @@ it("Discard removes the saved request so a changed submit proceeds with a new id
   finishRecovery(disk, first);
   expect(beginRecovery(disk, context, "/inventory", "record_movement", { binId: "bin", qty: 3 }).requestId).not.toBe(first.requestId);
 });
+
+it("lets an explicit new request id replace the saved attempt for its key: a deliberate new exact attempt (#615)", () => {
+  const disk = storage();
+  const first = beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", {}, { requestId: "old" });
+  expect(beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", {}, { requestId: "old" })).toEqual(first);
+  expect(() => beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", { changed: true }, { requestId: "old" })).toThrow("Retry saved request");
+  const corrected = beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", { retryConflict: true }, { requestId: "new" });
+  expect(corrected.requestId).toBe("new");
+  expect(readRecoveries(disk, context)).toEqual([corrected]);
+  // Without an explicit id the saved attempt still wins.
+  expect(beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", { retryConflict: true }).requestId).toBe("new");
+});

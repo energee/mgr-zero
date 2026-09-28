@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
-import { finishRecovery, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "@/lib/commands/recovery";
+import { finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "@/lib/commands/recovery";
 import { CommandRecoveryView } from "./views/command-recovery";
 
 export function CommandRecovery() {
@@ -12,7 +12,7 @@ export function CommandRecovery() {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const refresh = () => {
-      try { setRows(readRecoveries(sessionStorage, context).filter(row => row.name !== "import_csv")); setError(null); }
+      try { setRows(readRecoveries(sessionStorage, context).filter(row => row.name !== "import_csv" && !inFlightRequests.has(row.requestId))); setError(null); }
       catch (cause) { setError(cause instanceof Error ? cause.message : "Saved requests could not be read."); }
     };
     refresh(); window.addEventListener(RECOVERY_CHANGED, refresh);
@@ -38,6 +38,8 @@ export function CommandRecovery() {
     try {
       const attempt = readRecoveries(sessionStorage, context).find(row => row.requestId === requestId);
       if (!attempt) throw new Error("This request is no longer pending in this account.");
+      // Discarding a request still being sent would let a changed submit apply twice.
+      if (inFlightRequests.has(requestId)) throw new Error("This request is still being sent. Wait for its outcome.");
       finishRecovery(sessionStorage, attempt);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The saved request could not be discarded."); }
   }

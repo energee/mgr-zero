@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
-import { beginRecovery, finishRecovery, readRecoveries, RECOVERY_CHANGED, recoveryKey, type RecoveryAttempt } from "./recovery";
+import { beginRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, recoveryKey, type RecoveryAttempt } from "./recovery";
 import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 
 export function useCommandAction() {
@@ -27,19 +27,31 @@ export function useCommandAction() {
   // must keep its client state on screen (the Confirm order review, whose
   // server page redirects once the order is no longer submitted). `target`
   // names the row a per-row caller acts on, so an unresolved request blocks
-  // only that row (see recoveryKey); leave it out everywhere else.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string, { refresh = true, target }: { refresh?: boolean; target?: string } = {}) {
+  // only that row (see recoveryKey); leave it out everywhere else. A caller
+  // passes `requestId` only to start a deliberate new exact attempt, and reads
+  // the id actually sent (it may be a resumed saved attempt) from `onSent`.
+  // `durable: false` skips the saved request for a read or a one-time secret.
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string,
+    { refresh = true, target, durable = true, onSent }: { refresh?: boolean; target?: string; durable?: boolean; onSent?: (requestId: string) => void } = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
     let hadUnresolved = false;
     let attempt: RecoveryAttempt | undefined;
     try {
-      // Only this record's own earlier attempt keeps a rejection from clearing it.
-      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => recoveryKey(row.name, row.target) === recoveryKey(name, target));
-      attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
-      const data = await command(attempt.expectedContext.breweryId ?? breweryId, attempt.name, attempt.input, attempt.requestId, attempt.expectedContext);
-      finishRecovery(sessionStorage, attempt);
+      if (durable) {
+        const saved = readRecoveries(sessionStorage, expectedContext).find(row => recoveryKey(row.name, row.target) === recoveryKey(name, target));
+        // Only this row's resumed attempt keeps a rejection from clearing it; a new explicit id replaces it.
+        hadUnresolved = Boolean(saved) && (!requestId || saved?.requestId === requestId);
+        attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
+      }
+      const sent = attempt ?? { name, input, requestId: requestId ?? crypto.randomUUID(), expectedContext };
+      onSent?.(sent.requestId);
+      inFlightRequests.add(sent.requestId);
+      let data: unknown;
+      try { data = await command(sent.expectedContext.breweryId ?? breweryId, sent.name, sent.input, sent.requestId, sent.expectedContext); }
+      finally { inFlightRequests.delete(sent.requestId); }
+      if (attempt) finishRecovery(sessionStorage, attempt);
       onSuccess?.(data);
       if (refresh) router.refresh();
       return true;

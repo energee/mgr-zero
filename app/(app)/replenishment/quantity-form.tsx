@@ -67,7 +67,7 @@ export function QuantityForm({ locationId, skus, kind, values }: {
 }
 
 export function ReleaseAllocationForm({ allocationId, sku, qty }: { allocationId: string; sku: string; qty: number }) {
-  const form = useCommandForm("release_allocation", { build: () => ({ allocationId }), reset: () => {} });
+  const form = useCommandForm("release_allocation", { build: () => ({ allocationId }), reset: () => {}, target: allocationId });
   return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Release standing allocation"
     trigger={<Button variant="destructive" size="sm" aria-label={`Release ${sku} allocation`}>Release</Button>}>
     <form onSubmit={form.submit} className="flex flex-col gap-4">
