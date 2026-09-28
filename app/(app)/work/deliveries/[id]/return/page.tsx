@@ -15,7 +15,7 @@ export default async function ReturnPage({ params }: { params: Promise<{ id: str
   const stop = await orNotFound(runCommand("get_delivery_stop", { deliveryId: id }, ctx)) as { invoice: { id: string } | null };
   const lines = await runCommand("list_refused_returns", { deliveryId: id }, ctx) as Outstanding[];
   if (!lines.length) return E.status("No refused beer awaiting check-in", "ok");
-  if (lines[0].invoice_timing === "now") return <>{E.hd("Refused beer to check in")}{E.note("This shipment was invoiced at ship. Admin or Sales records Return and credit when the beer physically returns.")}{stop.invoice && E.btn("Return and credit", "p", `/invoices/${stop.invoice.id}/return`)}</>;
+  if (lines[0].invoice_timing === "now") return <>{E.hd("Refused beer to check in")}{E.note("This shipment was invoiced at ship. Admin or Sales records Return and credit when the beer physically returns.")}{stop.invoice && E.btn("Return and credit", "p", `/invoices/${stop.invoice.id}/return?refusedDeliveryId=${id}`)}</>;
   const [sources, locations, bins] = await Promise.all([
     runCommand("get_invoice_return_sources", { deliveryId: id }, ctx) as Promise<ReturnSource[]>,
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,

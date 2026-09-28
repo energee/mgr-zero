@@ -132,7 +132,7 @@ const AUTHENTICATED_RPCS = [
   "replace_format_bom(uuid,uuid,jsonb,uuid)",
   "replace_format_components(uuid,uuid,jsonb,uuid)",
   "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
-  "return_shipment(uuid,jsonb,uuid,text,uuid)",
+  "return_shipment(uuid,jsonb,uuid,text,uuid,uuid)",
   "reverse_inventory_movement(uuid,uuid,text,uuid)",
   "cancel_batch(uuid,uuid,uuid)",
   "reschedule_batch(uuid,uuid,date,uuid)",

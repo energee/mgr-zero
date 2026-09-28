@@ -66,6 +66,7 @@ export type PortalOrderSnapshot = {
   }[];
   shipment: {
     id: string;
+    invoice_timing?: "now" | "on_delivery";
     invoices: {
       id: string;
       invoice_no: number | null;
@@ -99,7 +100,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const shipped = l.qty_shipped === null ? null : Number(l.qty_shipped);
-      const qty = shipped ?? ordered;
+      const qty = shipped !== null && shipment?.invoice_timing === "on_delivery" ? shipped - Number(l.qty_refused ?? 0) : shipped ?? ordered;
       return {
         key: l.id,
         name: l.skus?.name ?? "Item",

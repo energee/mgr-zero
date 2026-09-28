@@ -195,3 +195,11 @@ it("shows refused and accepted quantities on portal order lines", () => {
   expect(model.lines[0].detail).toContain("refused 2 · accepted 2");
   expect(model.lines[0].warning).toBe(true);
 });
+
+it("prices on-delivery refusal lines at accepted quantities while invoice-now keeps shipped charges", () => {
+  const lines = portalOrderShipped.lines.map(l => ({ ...l, qty_shipped: 4, qty_refused: 2, unit_price_cents: 1000 }));
+  const onDelivery = { ...portalOrderShipped, lines, shipment: { ...portalOrderShipped.shipment!, invoice_timing: "on_delivery" as const } };
+  expect(toPortalOrderViewProps(onDelivery).lines[0].amount).toBe("$20.00");
+  expect(toPortalOrderViewProps({ ...onDelivery, lines: lines.map(l => ({ ...l, qty_refused: 4 })) }).lines[0].amount).toBe("$0.00");
+  expect(toPortalOrderViewProps({ ...onDelivery, shipment: { ...onDelivery.shipment, invoice_timing: "now" } }).lines[0].amount).toBe("$40.00");
+});

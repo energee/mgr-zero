@@ -150,6 +150,7 @@ Return shipped beer: credit memo at the invoiced price + return_in at the destin
 | `locationId` | uuid | yes |
 | `reason` | damaged or wrong_item or unsold | yes |
 | `lines` | array of object | yes |
+| `refusedDeliveryId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

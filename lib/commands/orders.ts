@@ -194,12 +194,12 @@ defineCommand({
   name: "return_shipment", description: "Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
-    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
+    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
     lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
-    p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
+    p_refused_delivery: i.refusedDeliveryId, p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
 

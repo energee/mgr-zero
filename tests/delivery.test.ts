@@ -3,7 +3,8 @@
 // replaces a route's stops in one RPC; depart/confirm/return walk the route
 // and Today's delivery_next follows the assigned driver.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
+import { Client } from "pg";
+import { DB, admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -210,17 +211,76 @@ describe("route edges", () => {
   });
 
   it("keeps invoice-now money until physical Return and credit clears the refusal", async () => {
-    const sh = await shipment(2, "now");
+    const sh = await shipment(4, "now");
     const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
     await runCommand("depart_route", { routeId }, adminCtx);
     const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
     const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[]; invoice: { id: string } };
-    await runCommand("confirm_delivery", { deliveryId: stop!.id, refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "customer_refused" }, adminCtx);
+    await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat", refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "customer_refused" }, adminCtx);
     const { data: billed } = await admin.from("invoice_lines").select("id, qty").eq("invoice_id", detail.invoice.id).eq("kind", "sku").single();
-    expect(billed!.qty).toBe(2);
+    expect(billed!.qty).toBe(4);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
-    await runCommand("return_shipment", { invoiceId: detail.invoice.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 2 }] }, adminCtx);
+    // An accepted unit returned later is distinct from the two refused units.
+    const acceptedInput = { invoiceId: detail.invoice.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1 }] };
+    const acceptedRequest = crypto.randomUUID();
+    const acceptedResult = await runCommand("return_shipment", acceptedInput, adminCtx, { requestId: acceptedRequest, correlationId: acceptedRequest });
+    // Preserve completed requests written by the original five-argument RPC.
+    sql(`update private.command_requests set payload_hash=extensions.digest(jsonb_build_object('invoice','${detail.invoice.id}'::uuid,'lines',jsonb_build_array(jsonb_build_object('invoice_line_id','${billed!.id}','qty',1)),'location','${whId}'::uuid,'reason','unsold')::text,'sha256') where actor_id='${adminCtx.userId}' and request_id='${acceptedRequest}'`);
+    expect(await runCommand("return_shipment", acceptedInput, adminCtx, { requestId: acceptedRequest, correlationId: acceptedRequest })).toEqual(acceptedResult);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    const input = { invoiceId: detail.invoice.id, refusedDeliveryId: stop!.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 2 }] };
+    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: crypto.randomUUID() }, adminCtx)).rejects.toThrow(/closed refused delivery/i);
+    const otherShipment = await shipment(1, "now");
+    const { data: otherInvoice } = await admin.from("invoices").select("id").eq("shipment_id", otherShipment).single();
+    await expect(runCommand("return_shipment", { ...input, invoiceId: otherInvoice!.id }, adminCtx)).rejects.toThrow(/does not belong to this invoice/i);
+    const foreignStaff = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await expect(runCommand("return_shipment", input, foreignStaff)).rejects.toThrow();
+    await expect(runCommand("return_shipment", { ...input, lines: [{ invoiceLineId: billed!.id, qty: 3 }] }, adminCtx)).rejects.toThrow(/outstanding refusal/i);
+    const requestId = crypto.randomUUID();
+    const result = await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId });
+    expect(await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId })).toEqual(result);
+    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: undefined }, adminCtx, { requestId, correlationId: requestId })).rejects.toThrow(/different payload/i);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toEqual([]);
+  });
+
+  it.each(["now", "on_delivery"] as const)("does not deadlock %s refusal check-in with an accepted return", async (invoiceTiming) => {
+    const sh = await shipment(4, invoiceTiming);
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[] };
+    await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat", refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "customer_refused" }, adminCtx);
+    const { data: invoice } = await admin.from("invoices").select("id").eq("shipment_id", sh).single();
+    const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", invoice!.id).eq("kind", "sku").single();
+    const sources = await runCommand("get_invoice_return_sources", { invoiceId: invoice!.id }, adminCtx) as { id: string }[];
+    const ordinary = new Client({ connectionString: DB });
+    const refusal = new Client({ connectionString: DB });
+    await Promise.all([ordinary.connect(), refusal.connect()]);
+    let pending: Promise<unknown> | undefined;
+    try {
+      await ordinary.query("begin; set local statement_timeout='8s'");
+      await ordinary.query("select id from public.invoices where id=$1 for update", [invoice!.id]);
+      await refusal.query("set statement_timeout='8s'; set role authenticated");
+      await refusal.query("select set_config('request.jwt.claim.sub',$1,false)", [adminCtx.userId]);
+      const pid = (await refusal.query("select pg_backend_pid() pid")).rows[0].pid;
+      pending = invoiceTiming === "now"
+        ? refusal.query("select public.return_shipment($1,$2::jsonb,$3,'unsold',$4,$5)", [invoice!.id, JSON.stringify([{ invoice_line_id: billed!.id, qty: 2 }]), whId, crypto.randomUUID(), stop!.id])
+        : refusal.query("select public.check_in_refused_return($1,$2,$3::jsonb,$4)", [stop!.id, whId, JSON.stringify([{ order_line_id: detail.lines[0].id, sources: [{ movement_id: sources[0].id, bin_id: whBinId, qty: 2, damaged: false }] }]), crypto.randomUUID()]);
+      // Observe the refusal waiting on our invoice, after it has locked the order.
+      pending.catch(() => {});
+      await expect.poll(async () => (await ordinary.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
+      await ordinary.query("select set_config('request.jwt.claim.sub',$1,true)", [adminCtx.userId]);
+      await ordinary.query("set local role authenticated");
+      // This inserts an order event, whose FK must coexist with the refusal lock.
+      await ordinary.query("select public.return_shipment($1,$2::jsonb,$3,'unsold',$4)", [invoice!.id, JSON.stringify([{ invoice_line_id: billed!.id, qty: 1 }]), whId, crypto.randomUUID()]);
+      await ordinary.query("commit");
+      await pending;
+      expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toEqual([]);
+    } finally {
+      // Roll back first so an unsuccessful assertion cannot strand the waiter.
+      await ordinary.query("rollback");
+      await Promise.allSettled([pending, ordinary.end(), refusal.end()]);
+    }
   });
 
   it("closes a refused transfer without receiving its stock", async () => {

@@ -1826,6 +1826,7 @@ export type Database = {
           qbo_sync_token: string | null
           qbo_tax_cents: number | null
           qbo_total_cents: number | null
+          refused_delivery_id: string | null
           shipment_id: string | null
           written_off_at: string | null
           written_off_by: string | null
@@ -1853,6 +1854,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1880,6 +1882,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1899,6 +1902,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "refused_delivery_returns"
+            referencedColumns: ["delivery_id", "brewery_id"]
           },
           {
             foreignKeyName: "invoices_shipment_id_brewery_id_fkey"
@@ -9121,6 +9138,7 @@ export type Database = {
           p_lines: Json
           p_location: string
           p_reason: string
+          p_refused_delivery?: string
           p_request_id: string
         }
         Returns: Json
