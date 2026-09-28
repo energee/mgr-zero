@@ -83,7 +83,7 @@ describe("persona", () => {
     if (process.env.ROLE_REPORT) writeFileSync(process.env.ROLE_REPORT, gaps.map((g) => `- ${g.name}: ${g.why}`).join("\n"));
   });
 
-  it("redraws Me and Permission denied for the person, leaving every other screen alone", () => {
+  it("redraws personal screens and Orders actions for the person", () => {
     const html = (name: string, refused?: string) =>
       renderToStaticMarkup(createElement("div", null, asPersona(by(name), personaFor("sales"), refused).body));
     expect(html("Me")).toContain("Ted");
@@ -93,7 +93,13 @@ describe("persona", () => {
     expect(denied).toContain("You do not have access to Pick sheet.");
     expect(denied).toContain("@ted · sales");
     expect(denied).toContain("admin or warehouse");
-    expect(asPersona(by("Orders"), personaFor("sales"))).toBe(by("Orders"));
+    expect(html("Orders")).not.toContain(">Pick<");
+    const warehouse = renderToStaticMarkup(createElement("div", null, asPersona(by("Orders"), personaFor("warehouse")).body));
+    expect(warehouse).toContain(">Pick<");
+    expect(warehouse).toContain(">Put back<");
+    expect(warehouse).not.toContain(">Confirm<");
+    expect(warehouse).not.toContain(">New order<");
+    expect(asPersona(by("Settings"), personaFor("admin"))).toBe(by("Settings"));
   });
   it("signs the portal frames in as the demo buyer, never a staff person", () => {
     const portal = SCREENS.find((s) => s.portal && !s.surface)!;
