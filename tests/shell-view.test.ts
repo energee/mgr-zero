@@ -365,8 +365,9 @@ describe("Settings view", () => {
     expect(html).not.toContain("aren’t available");
     const inventory = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
     expect(inventory).not.toContain('href="/catalog/water-profiles"');
-    expect(src("app/(app)/settings/page.tsx")).toContain('water: "/catalog/water-profiles"');
-    expect(src("app/(app)/settings/page.tsx")).toContain('brewery.role !== "admin"');
+    const page = src("app/(app)/settings/page.tsx");
+    expect(page).toContain('water: "/catalog/water-profiles"');
+    expect(page).toContain('brewery.role !== "admin"');
   });
 
   it("the Settings inventory record is SettingsView", () => {
