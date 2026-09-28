@@ -308,7 +308,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],
-    begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()],
+    begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()], get_qbo_sync_status: [B],
     begin_square_oauth: [B,"https://example.test/square/callback","state","connect",R(),["ITEMS_READ","ITEMS_WRITE","MERCHANT_PROFILE_READ","ORDERS_READ"]],
     begin_square_catalog_sync: [B,R()],
     begin_square_menu_publication: [B,"L1",false,R()],
@@ -367,7 +367,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(sharedDestination.error?.code).toBe("42501");
   const before = sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`);
-  const qboGenericPermission = new Set(["begin_qbo_oauth","begin_qbo_invoice_sync","set_qbo_customer_mapping","set_qbo_item_mapping","set_qbo_deposit_mapping","set_qbo_push_defaults","start_qbo_push","write_off_invoice"]);
+  const qboGenericPermission = new Set(["get_qbo_sync_status","begin_qbo_oauth","begin_qbo_invoice_sync","set_qbo_customer_mapping","set_qbo_item_mapping","set_qbo_deposit_mapping","set_qbo_push_defaults","start_qbo_push","write_off_invoice"]);
   for (const [name, args] of Object.entries(cases)) {
     const definition = catalog.filter(c => c.name === name);
     expect(definition, `${name} has one classified signature`).toHaveLength(1);
@@ -388,6 +388,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const destination = (await admin.from("notification_destinations").select("id").eq("brewery_id", B).eq("user_id", f.taproom.id).single()).data!.id;
   const serviceCases: Record<string, unknown[]> = {
     lease_order_emails: ["orders@example.test"], finish_order_email: [R(),R(),"provider-id",null],
+    record_qbo_invoice_sync_failure: [B,f.taproom.id,R()],
     store_integration_tokens: [B,"square",pos,f.owner.id,"fixture-access","fixture-refresh"], read_integration_tokens: [B,"square",pos,f.owner.id],
     read_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id], finish_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id,R(),0],
     begin_qbo_disconnect: [B,R(),f.taproom.id,R()], cas_integration_tokens: [B,"qbo",R(),f.taproom.id,1,"fixture-access","fixture-refresh",now,3600,3600,3600],

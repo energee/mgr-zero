@@ -7895,6 +7895,7 @@ export type Database = {
         Returns: Json
       }
       get_published_pos_menu: { Args: { p_public_id: string }; Returns: Json }
+      get_qbo_sync_status: { Args: { p_brewery: string }; Returns: Json }
       get_taproom_count: {
         Args: { p_brewery: string; p_count: string }
         Returns: Json
@@ -8398,6 +8399,10 @@ export type Database = {
       record_pick: {
         Args: { p_order: string; p_picks: Json; p_request_id: string }
         Returns: Json
+      }
+      record_qbo_invoice_sync_failure: {
+        Args: { p_actor: string; p_brewery: string; p_request_id: string }
+        Returns: undefined
       }
       record_repack: {
         Args: {

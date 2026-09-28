@@ -47,6 +47,7 @@ const AUTHENTICATED_RPCS = [
   "begin_square_publication(uuid,text,uuid,text,text,boolean,text,uuid,uuid)",
   "begin_square_sales_sync(uuid,uuid)",
   "begin_qbo_invoice_sync(uuid,uuid)",
+  "get_qbo_sync_status(uuid)",
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
   "set_qbo_deposit_mapping(uuid,text,uuid)",
