@@ -8,8 +8,8 @@ import "@/lib/commands/all";
 import { QboSyncButton } from "@/app/(app)/settings/accounting/qbo-controls";
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
-  const cursor = pageCursor((await searchParams).cursor);
-  const brewery = await getActiveBrewery();
+  const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
+  const cursor = pageCursor(params.cursor);
   const ctx = await buildContext(brewery.id);
   const canManage = brewery.role === "admin" || brewery.role === "sales";
   const [records, health] = await Promise.all([

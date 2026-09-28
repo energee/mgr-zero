@@ -19,8 +19,8 @@ type Order = {
 };
 
 export default async function PortalOrdersPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
-  const cursor = pageCursor((await searchParams).cursor);
-  const customer = await getActiveCustomer();
+  const [params, customer] = await Promise.all([searchParams, getActiveCustomer()]);
+  const cursor = pageCursor(params.cursor);
   const records = (await runCommand("portal_orders", { cursor, limit: HISTORY_PAGE_SIZE + 1 }, await buildContext(customer.breweryId))) as (Order & HistoryRow)[];
   const page = historyPage(records, "/portal/orders", cursor);
   return (
