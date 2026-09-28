@@ -171,6 +171,7 @@ const AUTHENTICATED_RPCS = [
   "update_staff_role(uuid,uuid,staff_role,uuid)",
   "revoke_staff(uuid,uuid,uuid)",
   "list_customer_users(uuid,uuid)",
+  "customers_missing_portal_email(uuid)",
   "revoke_customer_user(uuid,uuid,uuid,uuid)",
   "raise_invoice_question(uuid,uuid,text,uuid)",
   "reattribute_loss(uuid,uuid,numeric,cellar_removal_class,text,uuid)",

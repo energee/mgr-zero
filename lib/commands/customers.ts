@@ -2,7 +2,7 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { cents, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const roles = ["admin", "sales"] as const;
@@ -67,14 +67,30 @@ defineCommand({
 defineQuery({
   name: "list_customers", description: "Customers alphabetical with sale channel name",
   roles: ["admin", "sales", "warehouse"],
-  input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer") }),
+  input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer"), missingPortalEmail: z.boolean().optional().describe("Admin/Sales only: customers without a current portal login email") }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
-  handler: (ctx, i) => completeRows("Customer list", start => {
-    const query = ctx.db.from("customers")
-      .select(i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).order("name").order("id");
+  handler: (ctx, i) => {
+    if (i.missingPortalEmail && ctx.role !== "admin" && ctx.role !== "sales") throw new CommandError("permission denied", 403, "permission_denied");
+    return completeRows("Customer list", start => {
+    const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";
+    const query = (i.missingPortalEmail
+      ? ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact" }).select(columns)
+      : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId))
+      .order("name").order("id");
     return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
-  }),
+    });
+  },
+});
+
+defineQuery({
+  name: "count_customers_missing_portal_email", description: "Count customers without a current portal login email; presence does not imply deliverability or sending",
+  roles: [...roles], input: z.object({}),
+  handler: async ctx => {
+    const result = await ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact", head: true });
+    await unwrap(Promise.resolve(result));
+    if (result.count === null) throw new CommandError("Email readiness count unavailable", 500, "db_error");
+    return result.count;
+  },
 });
 
 defineQuery({

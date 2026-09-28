@@ -128,3 +128,19 @@ describe("Ship-to form", () => {
     expect(html(screen("Ship-to form").body)).toMatch(/>Save ship-to</);
   });
 });
+
+it("distinguishes a resolved missing-email review from an empty customer book", () => {
+  const model = toCustomersViewProps({ customers: [], missingPortalEmail: true });
+  expect(model.empty?.title).toBe("All customers have a portal login email");
+  const markup = html(createElement(CustomersView, { model, createAction: null, search: null }));
+  expect(markup).toContain("Invite");
+  expect(markup).toContain("presence");
+  expect(markup).not.toContain("No customers yet");
+});
+
+it("keeps Accounting Review in the shared filtered customer inventory", () => {
+  expect(screen("Accounting").to?.Review).toBe("Customers missing email");
+  const body = screen("Customers missing email").body as { type: unknown; props: { model: { missingPortalEmail?: boolean } } };
+  expect(body.type).toBe(CustomersView);
+  expect(body.props.model.missingPortalEmail).toBe(true);
+});

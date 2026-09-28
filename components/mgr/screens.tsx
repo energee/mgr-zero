@@ -165,7 +165,7 @@ import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
-import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
+import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
 import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
@@ -1189,6 +1189,16 @@ export const SCREENS: Screen[] = [
     body: <CustomersView model={toCustomersViewProps(customersList)} />,
   },
   {
+    step: 5, slice: 1, tab: "More", name: "Customers missing email",
+    to: { Open: "Customer detail" },
+    job: "Review customer accounts without a current portal login email",
+    reads: "list_customers [missingPortalEmail]",
+    writes: "none [Invite and Remove access on Customer detail correct portal access]",
+    states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
+    spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} />,
+  },
+  {
     step: 5,
     slice: 1,
     tab: "More",
@@ -1233,12 +1243,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
+    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
-    reads: "get_qbo_connection · get_qbo_sync_status",
-    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults · sync_qbo_payments [existing commands] · Missing-email count [SCHEMA-GATE: connection health has no customer email count]",
+    reads: "get_qbo_connection · get_qbo_sync_status · count_customers_missing_portal_email",
+    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults · sync_qbo_payments",
     states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "the Pay route fails closed when QuickBooks returns no approved link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
-    spec: "Square already had Settings · Point of sale; QuickBooks had nothing, and Settings · Integrations dead-ended. This is the other half. It exists mainly to make three invisible preconditions visible before a customer meets them: QuickBooks Payments must be active on the company, AllowOnlineACHPayment / AllowOnlineCreditCardPayment must ride every push, and the customer must carry an email. Any one missing and Intuit generates no InvoiceLink, so the portal Pay button either never renders or lands on the unavailable page. Payment method is a money decision, not a checkbox: card runs a percentage fee, so on a four-figure keg invoice the method the customer picks is real money; the fee is visible in the QuickBooks Payment sidebar and MGR does not model it. Push defaults live here rather than per invoice, so an invoice cannot be born unpayable by omission.",
+    spec: "Accounting shows connection health and customer portal access readiness. The missing-email count means no current portal member has a nonblank login email; it does not establish QuickBooks billing-email or payment readiness. Review opens that same filtered customer set. Staff correct access through the existing Invite and Remove actions. QuickBooks Payments and invoice payment options remain separate provider concerns.",
     body: <AccountingView model={accountingExpired} />,
   },
   {

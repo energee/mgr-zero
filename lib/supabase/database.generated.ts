@@ -8140,6 +8140,29 @@ export type Database = {
         }
         Returns: Json
       }
+      customers_missing_portal_email: {
+        Args: { p_brewery: string }
+        Returns: {
+          brewery_id: string
+          created_at: string
+          id: string
+          license_no: string | null
+          name: string
+          payment_terms: string
+          qbo_customer_id: string | null
+          qbo_realm_id: string | null
+          sale_channel_id: string
+          state: string
+          tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
+          type: Database["public"]["Enums"]["customer_type"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       delete_bin: {
         Args: { p_bin: string; p_brewery: string; p_request_id: string }
         Returns: Json

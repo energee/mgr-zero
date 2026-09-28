@@ -33,6 +33,11 @@ export const customersList: CustomersSnapshot = {
   ],
 };
 
+export const customersMissingEmail: CustomersSnapshot = {
+  missingPortalEmail: true,
+  customers: customersList.customers.map(({ portal_user_count: _, ...customer }) => customer),
+};
+
 /** Ridgeline account for Customer detail. */
 export const customerRidgeline: CustomerSnapshot = {
   customer: {

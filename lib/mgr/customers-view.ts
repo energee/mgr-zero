@@ -12,9 +12,11 @@ export type CustomersRowView = {
 export type CustomersViewModel = {
   rows: CustomersRowView[];
   empty?: EmptyState;
+  missingPortalEmail?: boolean;
 };
 
 export type CustomersSnapshot = {
+  missingPortalEmail?: boolean;
   customers: {
     id: string;
     name: string;
@@ -39,9 +41,12 @@ function detail(c: CustomersSnapshot["customers"][number]): string {
   return tail ? `${head} · ${tail}` : head;
 }
 
-export function toCustomersViewProps({ customers }: CustomersSnapshot): CustomersViewModel {
+export function toCustomersViewProps({ customers, missingPortalEmail }: CustomersSnapshot): CustomersViewModel {
   return {
-    empty: customers.length === 0 ? { title: "No customers yet", description: "Add the accounts you sell to so orders have somewhere to go." } : undefined,
+    missingPortalEmail,
+    empty: customers.length === 0 ? missingPortalEmail
+      ? { title: "All customers have a portal login email", description: "No customer accounts need an email added through portal access." }
+      : { title: "No customers yet", description: "Add the accounts you sell to so orders have somewhere to go." } : undefined,
     rows: customers.map((c) => ({
       key: c.id,
       title: c.name,
