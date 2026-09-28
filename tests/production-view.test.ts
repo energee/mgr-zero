@@ -136,7 +136,7 @@ describe("Brew day view", () => {
     expect(html).toContain('value="14.6"');
     expect(html).toContain("September 4, 2026");
     expect(html).toContain("disabled");
-    expect(html).toContain("Material consumption unavailable");
+    expect(html).toContain("Confirm actual ingredients");
     expect(html).not.toContain('href="/');
   });
   it("does not substitute a separate live form for the brew-day screen", () => {
@@ -157,10 +157,11 @@ describe("Brew day view", () => {
     expect(html).toMatch(/FV2/);
   });
 
-  it("the live batch page mounts BrewDayView and slots RecordBrewDayForm", () => {
+  it("the live batch page delegates both states through RecordBrewDayForm to BrewDayView", () => {
     const page = src("app/(app)/batches/[id]/page.tsx");
-    expect(page).toMatch(/from "@\/components\/mgr\/views\/brew-day"/);
-    expect(page).toMatch(/<BrewDayView\b/);
+    const form = src("app/(app)/batches/[id]/record-brew-day-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/brew-day"/);
+    expect(form).toMatch(/<BrewDayView\b/);
     expect(page).toMatch(/<RecordBrewDayForm\b/);
   });
 });
