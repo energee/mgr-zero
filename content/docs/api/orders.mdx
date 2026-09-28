@@ -178,14 +178,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 ## get_invoice_return_sources [#get_invoice_return_sources]
 
-`query` · admin, warehouse, sales
+`query` · admin, sales
 
 Original shipped movements available as explicit return identities
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `invoiceId` | uuid | no |
-| `deliveryId` | uuid | no |
+| `invoiceId` | uuid | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

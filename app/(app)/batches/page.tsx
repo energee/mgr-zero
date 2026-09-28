@@ -1,5 +1,5 @@
-import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 // Batches and vessel reads remain at their existing authorized command boundary.
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -16,7 +16,7 @@ export default async function BatchesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [batches, brands, recipes, vessels, gravity] = (await Promise.all([
-    runCommand("list_batches", {}, ctx), runCommand("list_brands", {}, ctx),
+    runCommand("list_batches", { readings: true }, ctx), runCommand("list_brands", {}, ctx),
     runCommand("list_recipes", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("get_gravity_unit", {}, ctx),
   ])) as [BatchListRow[], Brand[], Recipe[], BatchVessel[], { effective: GravityUnit }];
   const recipeVersions = recipes.flatMap(recipe =>

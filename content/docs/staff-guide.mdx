@@ -16,7 +16,7 @@ Number fields use shared **− / +** controls; you can also type an exact value,
 2. Select **Sign in**.
 3. MGR opens **Today** for the brewery you're a member of.
 
-Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, **Session expired** confirms that eligible queued readings remain on this device; select **Sign in to retry** as the original user and brewery. Without JavaScript, that URL shows the sign-in card directly. Open **Me** in the header when you want **Sign out**.
+Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signing in, by password or emailed link, opens **Invitations** first when a pending invitation is waiting for you; see [Accept an invitation](#getting-started). Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, **Session expired** confirms that eligible queued readings remain on this device; select **Sign in to retry** as the original user and brewery. Without JavaScript, that URL shows the sign-in card directly. Open **Me** in the header when you want **Sign out**.
 
 <Screen name="Reset password" />
 <Screen name="Set new password" />
@@ -27,7 +27,11 @@ Wrong credentials show **Incorrect email or password.** You can also select **Em
 
 <Screen name="Accept invite" />
 
-Open the invitation email, enter **Your name** and **Choose a password** (at least eight characters), then select **Join**. The shared entry card shows the verified brewery and your assigned role. Staff open Today; buyers open their customer portal. The link is single use. A used, expired, or wrong-audience link opens **Invite expired**, with **Reset password** and **Back to sign in**; contact the brewery if access is still missing. Validation keeps your entered name for correction without filling the password back in. An existing account receives a pending invitation instead of immediate access. Ask the recipient to sign in and open [Invitations](/invitations), review the brewery and role, and select **Accept invitation**. Consent expires after seven days; a new invitation is needed after expiry or revocation. Their password stays unchanged.
+Open the invitation email, enter **Your name** and **Choose a password** (at least eight characters), then select **Join**. The shared entry card shows the verified brewery and your assigned role. Staff open Today; buyers open their customer portal. The link is single use. A used, expired, or wrong-audience link opens **Invite expired**, with **Reset password** and **Back to sign in**; contact the brewery if access is still missing. Validation keeps your entered name for correction without filling the password back in. An existing account receives a pending invitation instead of immediate access; their password stays unchanged.
+
+<Screen name="Account invitations" />
+
+If you already have an MGR sign-in and someone invites that email to staff a brewery, signing in sends you to **Invitations** first; you can also open it yourself at `/invitations`. The page reminds you that joining grants access to the brewery shown and does not change your password. Each pending invitation names the brewery and the role offered; select **Accept invitation** to join. Accepting switches you to that brewery and opens Today with your new role active. Consent expires seven days after the invitation is sent; an expired or revoked invitation needs a new one from the brewery. Replaying an old accepted invitation never restores removed access. With nothing pending, the page says **No pending invitations. Ask the brewery for a new invitation if yours expired.** If acceptance fails, MGR asks you to check you're signed in with the invited email and ask the brewery whether it expired or was revoked.
 
 <Screen name="Create brewery" />
 
@@ -502,13 +506,7 @@ A departed route lists its stops with their delivered times. The lowest undelive
 
 <Screen name="Return route" />
 
-**Confirm delivery** shows shipped quantities and editable **Refused** quantities. Accepted quantities are the remainder. Choose **Customer refused**, **Closed / no access**, **Damaged in transit**, **Wrong item**, or **Other** when refusing beer; **Other** requires a note. Enter **Received by** whenever any goods are accepted. A full refusal needs no receiving name. Invoice-on-delivery bills only accepted beer and its keg deposits at the captured order prices; full refusal raises no invoice. An invoice created at ship stays unchanged until **Return and credit**. Refused quantities close on this order; redelivery is a new order.
-
-**Return route** is enabled once every stop has an outcome, including partial acceptance or refusal. Returning the route does not restore stock. A refused transfer remains in transit until **Receive** or **Cancel transfer** resolves it.
-
-<Screen name="Check in refused beer" />
-
-**Refused beer to check in** stays on Today after a route returns. Warehouse or Admin opens **Check in refused beer** for invoice-on-delivery shipments, selects the return location, shipped source lot, destination bin, actual received quantity, and whether it is damaged. Only this physical check-in restores stock; damaged units are checked in and posted as loss together. Partial check-ins leave the remainder outstanding. A retry with the same request records nothing twice. Invoice-now returns use the existing **Return and credit** flow, available to Admin and Sales, when the beer physically returns. Open it from **Refused beer to check in** to link the credit and stock receipt to the refusal. That form accepts only the outstanding refused quantities. Return accepted beer separately from the invoice; those returns do not clear the refused beer still awaiting check-in.
+**Return route** is enabled once every stop is delivered and stamps the return; the route then leaves the Deliveries list, and the return time replaces the button. A refused delivery has no screen yet: a departed route cannot change its stops or return with one open, so a stop that cannot be delivered on the day is confirmed when it is delivered later. Before departing, untick a stop to move it to another route.
 
 ## Compliance [#compliance]
 
@@ -748,7 +746,7 @@ The invitation and member sheets use the same **Role** selector, including Tapro
 <Screen name="Team" />
 <Screen name="Team member" />
 
-Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. Success says **Invite sent**. The roster shows memberships, without a pending-acceptance status. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts receive a pending consent invitation and appear in the roster only after accepting. Ask them to sign in and open [Invitations](/invitations); no new password is needed. There is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
+Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. A new email says **Invite sent**; an email with an existing MGR sign-in says **Invitation pending** instead, since that recipient must accept it themselves (see [Accept an invitation](#getting-started)). The roster shows memberships, without a pending-acceptance status. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts receive a pending consent invitation and appear in the roster only after accepting. Ask them to sign in and open [Invitations](/invitations); no new password is needed. There is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
 
 ## Settings [#settings]
 
@@ -898,7 +896,7 @@ Keep the page open until results are recovered. If the connection fails, some ro
 Do not hunt for hidden controls for these:
 
 - public account sign-up
-- attaching an existing sign-in account, resending or revoking an invitation, or assigning multiple staff roles
+- resending or revoking an invitation, or assigning multiple staff roles
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - deleting a customer that has history, a single ship-to, inventory history, orders, invoices, or credit memos
 - recording payments
@@ -920,11 +918,11 @@ In **Settings**, Admin can see the current **Portal fulfillment warehouse**, cho
 
 For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.
 
+For a material **Cycle count**, choose the location and bin and enter the counted quantity in the material's base unit. Select **Preview count** to see every affected lot, its before-and-after quantity, and the signed adjustment. Shortages use earliest best-by lots first; overages go to the newest lot. **Record count** saves exactly that reviewed allocation. A matching count still records the observation without adjustment movements.
+
+Editing the quantity or bin clears the preview. If stock or lot details change, preview again before recording. A busy stock message means another inventory operation is active; retry the preview. If recording receives no trustworthy response, the form freezes its quantity and allocation. Use **Retry unchanged count** to recover the original result. Counts do not convert rolls, cases or other purchase units, and lot allocation cannot be edited manually.
+
 Customer account details and trading terms are edited directly on **Customer detail** with **Save customer**. Staff without edit permission see the same fields disabled. **Units** uses the shared choice buttons; selecting a unit saves it, and a failed save restores the previous choice.
-
-Accounting shows **Customers missing a portal login email**. **Review** lists only those accounts. An account is ready when at least one current portal user has a nonblank login email. This checks presence, not deliverability or sending, and does not change QuickBooks push eligibility.
-
-Open a listed customer and use **Invite portal user** to add the buyer's login address. Use **Remove access** to retire an obsolete login after the correct access is established. MGR does not change a person's global sign-in email from customer editing. Reload Accounting after correcting access to refresh the count.
 
 ### Recover an uncertain form submission
 

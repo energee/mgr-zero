@@ -390,16 +390,20 @@ describe("planning: draft purchase orders from material gaps", () => {
 });
 
 describe("material cycle count", () => {
+  async function recordCount(input: { locationId: string; binId: string; lines: { materialId: string; qty: number }[] }) {
+    const plan = await runCommand("get_material_count_preview", input, ctx) as { revision: string };
+    return runCommand("record_material_count", { ...input, revision: plan.revision }, ctx);
+  }
   it("equal count writes only the header; a shortage posts one negative count_adjustment", async () => {
     const wh = await seedLocation(b.id, { name: "Packaging store" });
     const cans = (await runCommand("upsert_material", { name: "Cans 16 oz", category: "packaging", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
     await seedMovement(b.id, { materialId: cans.id, locationId: wh.id, binId: wh.binId, qty: 3100, createdBy: ctx.userId });
 
-    const same = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3100 }] }, ctx)) as { id: string; lines: { material_id: string; qty_expected: number; qty_counted: number; movement_ids: string[] }[] };
+    const same = (await recordCount({ locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3100 }] })) as { id: string; lines: { material_id: string; qty_expected: number; qty_counted: number; movement_ids: string[] }[] };
     expect(same.lines).toEqual([{ material_id: cans.id, qty_expected: 3100, qty_counted: 3100, movement_ids: [] }]);
     expect((await admin.from("material_counts").select("id, location_id, bin_id").eq("id", same.id)).data).toEqual([{ id: same.id, location_id: wh.id, bin_id: wh.binId }]);
 
-    const short = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3050 }] }, ctx)) as { lines: { movement_ids: string[] }[] };
+    const short = (await recordCount({ locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3050 }] })) as { lines: { movement_ids: string[] }[] };
     expect(short.lines[0].movement_ids).toHaveLength(1);
     const moves = await admin.from("material_movements").select("qty, type, lot_id").eq("material_id", cans.id).eq("type", "count_adjustment");
     expect(moves.data).toEqual([{ qty: -50, type: "count_adjustment", lot_id: null }]);
@@ -418,13 +422,13 @@ describe("material cycle count", () => {
     const fresh = await lot("S-26", null, "2026-09-01", 30);        // no best-by: behind those that have one; newest receipt
 
     // 60 on hand, counted 45: −10 from S-24 (all of it), −5 from S-25.
-    const short = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 45 }] }, ctx)) as { lines: { movement_ids: string[] }[] };
+    const short = (await recordCount({ locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 45 }] })) as { lines: { movement_ids: string[] }[] };
     expect(short.lines[0].movement_ids).toHaveLength(2);
     const after = await admin.from("material_movements").select("lot_id, qty").eq("material_id", hop.id).eq("type", "count_adjustment").order("qty");
     expect(after.data).toEqual([{ lot_id: old, qty: -10 }, { lot_id: mid, qty: -5 }]);
 
     // 45 on hand, counted 50: +5 on the newest lot.
-    await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 50 }] }, ctx);
+    await recordCount({ locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 50 }] });
     const over = await admin.from("material_movements").select("lot_id, qty").eq("material_id", hop.id).eq("type", "count_adjustment").gt("qty", 0);
     expect(over.data).toEqual([{ lot_id: fresh, qty: 5 }]);
   });

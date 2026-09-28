@@ -10,7 +10,7 @@ import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { brewDayHazy } from "@/lib/mgr/fixtures/production";
 
 it("retains cancelled plans as history without offering physical work", () => {
-  const batch = { id: "cancelled", batch_no: 7, planned_on: "2026-09-28", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: "2026-09-27", brand_name: null, recipe_name: null, vessel_name: null };
+  const batch = { id: "cancelled", batch_no: 7, planned_on: "2026-09-28", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: "2026-09-27", brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
   const batches = batchesFromQuery([batch], []);
   expect(batches.planned).toEqual([]);
   expect(batches.cancelled?.[0]).toMatchObject({ key: "cancelled", verb: "Open" });
