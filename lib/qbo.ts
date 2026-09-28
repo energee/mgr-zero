@@ -389,7 +389,13 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
       requestId, observations,
     });
   } catch (error) {
-    await recordQboInvoiceSyncFailure(ctx, requestId);
+    // The caller needs why the sync failed. A lost failure record only hides it
+    // from status; the batch stays incomplete, so the same request can retry.
+    try {
+      await recordQboInvoiceSyncFailure(ctx, requestId);
+    } catch (recordError) {
+      console.error(`qbo sync ${requestId} failure could not be recorded:`, recordError instanceof Error ? recordError.message : recordError);
+    }
     throw error;
   }
 }
