@@ -169,7 +169,7 @@ describe("Units view", () => {
   it("explains who each gravity choice affects, in inventory and live alike (#671 review)", () => {
     const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
     expect(html).toContain("What everyone here sees unless they choose otherwise below.");
-    expect(html).toContain("Yours alone — it changes nothing for anyone else.");
+    expect(html).toContain("Yours alone; it changes nothing for anyone else.");
     expect(html).toContain("Use brewery default (Plato)");
   });
 

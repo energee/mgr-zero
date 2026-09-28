@@ -20,7 +20,7 @@ export function GravityUnitControls({ model, canSetBrewery = true, busy = false,
     </>}
     {E.ttl("Your preference")}
     {E.chips(model.mineOptions, model.mineIndex, false, onMine ? { onChange: index => onMine(MINE_UNITS[index]), disabled: busy, label: "Your preference" } : undefined)}
-    <p className="text-sm text-muted-foreground">Yours alone — it changes nothing for anyone else.</p>
+    <p className="text-sm text-muted-foreground">Yours alone; it changes nothing for anyone else.</p>
   </>;
 }
 
