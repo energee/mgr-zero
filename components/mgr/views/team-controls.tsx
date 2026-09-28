@@ -23,7 +23,7 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
   return <form onSubmit={event => { event.preventDefault(); if (!busy) onSubmit?.(event); }} className="flex flex-col gap-4">
     {E.edit("Email", email ?? draftEmail, "email", undefined, { onChange: (nextValue: string) => { setEmail(nextValue); onEmailChange?.(nextValue); }, id, disabled: busy, required: true })}
     {buyer ? E.fld("Role", "Buyer") : <StaffRoleField value={role ?? draftRole} onChange={value => { setRole(value); onRoleChange?.(value); }} disabled={busy} />}
-    {E.note("Sending an invite emails the recipient and cannot be recalled. Existing accounts cannot be attached with this form. Keep this page open to retry unchanged details after an error.")}
+    {E.note("New accounts receive an email to set up their login. Existing accounts receive a pending invitation: ask them to sign in and accept it in Invitations. Access is granted only after consent. Keep this page open to retry unchanged details after an error.")}
     <CommandFormMessage error={error} />
     <CommandFormFooter><Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
   </form>;

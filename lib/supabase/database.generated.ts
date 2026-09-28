@@ -75,32 +75,53 @@ export type Database = {
         Row: {
           at: string
           batch_id: string
+          bin_name: string | null
+          brew_record_id: string | null
           brewery_id: string
+          confirmed_qty: number | null
           id: string
+          location_name: string | null
+          lot_code: string | null
+          material_name: string | null
           movement_id: string
           occupancy_id: string | null
           recipe_ingredient_id: string | null
           stage: Database["public"]["Enums"]["ingredient_stage"]
+          unit: string | null
         }
         Insert: {
           at?: string
           batch_id: string
+          bin_name?: string | null
+          brew_record_id?: string | null
           brewery_id: string
+          confirmed_qty?: number | null
           id?: string
+          location_name?: string | null
+          lot_code?: string | null
+          material_name?: string | null
           movement_id: string
           occupancy_id?: string | null
           recipe_ingredient_id?: string | null
           stage: Database["public"]["Enums"]["ingredient_stage"]
+          unit?: string | null
         }
         Update: {
           at?: string
           batch_id?: string
+          bin_name?: string | null
+          brew_record_id?: string | null
           brewery_id?: string
+          confirmed_qty?: number | null
           id?: string
+          location_name?: string | null
+          lot_code?: string | null
+          material_name?: string | null
           movement_id?: string
           occupancy_id?: string | null
           recipe_ingredient_id?: string | null
           stage?: Database["public"]["Enums"]["ingredient_stage"]
+          unit?: string | null
         }
         Relationships: [
           {
@@ -108,6 +129,13 @@ export type Database = {
             columns: ["batch_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_brew_record_id_brewery_id_fkey"
+            columns: ["brew_record_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "brew_records"
             referencedColumns: ["id", "brewery_id"]
           },
           {
@@ -152,6 +180,7 @@ export type Database = {
           batch_no: number | null
           brewed_on: string | null
           brewery_id: string
+          cancelled_at: string | null
           closed_at: string | null
           completion_adjustment_id: string | null
           created_at: string
@@ -167,6 +196,7 @@ export type Database = {
           batch_no?: number | null
           brewed_on?: string | null
           brewery_id: string
+          cancelled_at?: string | null
           closed_at?: string | null
           completion_adjustment_id?: string | null
           created_at?: string
@@ -182,6 +212,7 @@ export type Database = {
           batch_no?: number | null
           brewed_on?: string | null
           brewery_id?: string
+          cancelled_at?: string | null
           closed_at?: string | null
           completion_adjustment_id?: string | null
           created_at?: string
@@ -392,6 +423,107 @@ export type Database = {
             columns: ["style_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "styles"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
+      brew_records: {
+        Row: {
+          batch_id: string
+          brewed_on: string
+          brewery_id: string
+          correction_reason: string | null
+          corrects_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          initial_bbl: number
+          occupancy_id: string
+          plan_snapshot: Json
+          process: Json
+          recipe_version_id: string | null
+          volume_adjustment_id: string | null
+        }
+        Insert: {
+          batch_id: string
+          brewed_on: string
+          brewery_id: string
+          correction_reason?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          initial_bbl: number
+          occupancy_id: string
+          plan_snapshot: Json
+          process: Json
+          recipe_version_id?: string | null
+          volume_adjustment_id?: string | null
+        }
+        Update: {
+          batch_id?: string
+          brewed_on?: string
+          brewery_id?: string
+          correction_reason?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          initial_bbl?: number
+          occupancy_id?: string
+          plan_snapshot?: Json
+          process?: Json
+          recipe_version_id?: string | null
+          volume_adjustment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brew_records_batch_id_brewery_id_fkey"
+            columns: ["batch_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "brew_records_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brew_records_corrects_id_brewery_id_fkey"
+            columns: ["corrects_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "brew_records"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "brew_records_occupancy_id_brewery_id_fkey"
+            columns: ["occupancy_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "occupancy_volumes"
+            referencedColumns: ["occupancy_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "brew_records_occupancy_id_brewery_id_fkey"
+            columns: ["occupancy_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_occupancies"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "brew_records_recipe_version_id_brewery_id_fkey"
+            columns: ["recipe_version_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_versions"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "brew_records_volume_adjustment_id_brewery_id_fkey"
+            columns: ["volume_adjustment_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "volume_adjustments"
             referencedColumns: ["id", "brewery_id"]
           },
         ]
@@ -1037,6 +1169,9 @@ export type Database = {
           delivered_at: string | null
           id: string
           note: string | null
+          outcome: string | null
+          refusal_note: string | null
+          refusal_reason: string | null
           route_id: string
           shipment_id: string | null
           signed_by: string | null
@@ -1048,6 +1183,9 @@ export type Database = {
           delivered_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
+          refusal_note?: string | null
+          refusal_reason?: string | null
           route_id: string
           shipment_id?: string | null
           signed_by?: string | null
@@ -1059,6 +1197,9 @@ export type Database = {
           delivered_at?: string | null
           id?: string
           note?: string | null
+          outcome?: string | null
+          refusal_note?: string | null
+          refusal_reason?: string | null
           route_id?: string
           shipment_id?: string | null
           signed_by?: string | null
@@ -1685,6 +1826,7 @@ export type Database = {
           qbo_sync_token: string | null
           qbo_tax_cents: number | null
           qbo_total_cents: number | null
+          refused_delivery_id: string | null
           shipment_id: string | null
           written_off_at: string | null
           written_off_by: string | null
@@ -1712,6 +1854,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1739,6 +1882,7 @@ export type Database = {
           qbo_sync_token?: string | null
           qbo_tax_cents?: number | null
           qbo_total_cents?: number | null
+          refused_delivery_id?: string | null
           shipment_id?: string | null
           written_off_at?: string | null
           written_off_by?: string | null
@@ -1758,6 +1902,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "invoices_refused_delivery_fkey"
+            columns: ["refused_delivery_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "refused_delivery_returns"
+            referencedColumns: ["delivery_id", "brewery_id"]
           },
           {
             foreignKeyName: "invoices_shipment_id_brewery_id_fkey"
@@ -2268,6 +2426,7 @@ export type Database = {
         Row: {
           bin_id: string
           brewery_id: string
+          compensates_id: string | null
           created_at: string
           created_by: string
           id: string
@@ -2282,6 +2441,7 @@ export type Database = {
         Insert: {
           bin_id: string
           brewery_id: string
+          compensates_id?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -2296,6 +2456,7 @@ export type Database = {
         Update: {
           bin_id?: string
           brewery_id?: string
+          compensates_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -2321,6 +2482,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "breweries"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_movements_compensates_id_brewery_id_fkey"
+            columns: ["compensates_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_movements"
+            referencedColumns: ["id", "brewery_id"]
           },
           {
             foreignKeyName: "material_movements_location_id_brewery_id_fkey"
@@ -2808,6 +2976,7 @@ export type Database = {
           order_id: string
           qty_ordered: number
           qty_picked: number | null
+          qty_refused: number
           qty_shipped: number | null
           short_reason: string | null
           sku_id: string
@@ -2819,6 +2988,7 @@ export type Database = {
           order_id: string
           qty_ordered: number
           qty_picked?: number | null
+          qty_refused?: number
           qty_shipped?: number | null
           short_reason?: string | null
           sku_id: string
@@ -2830,6 +3000,7 @@ export type Database = {
           order_id?: string
           qty_ordered?: number
           qty_picked?: number | null
+          qty_refused?: number
           qty_shipped?: number | null
           short_reason?: string | null
           sku_id?: string
@@ -2972,6 +3143,192 @@ export type Database = {
             columns: ["to_location_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
+      packaging_material_actuals: {
+        Row: {
+          bin_id: string
+          bin_name: string
+          brewery_id: string
+          id: string
+          location_id: string
+          location_name: string
+          loss_movement_id: string | null
+          lot_code: string | null
+          lot_id: string | null
+          material_id: string
+          material_name: string
+          qty_loss: number
+          qty_unused: number
+          qty_used: number
+          record_id: string
+          unit: string
+          used_movement_id: string | null
+        }
+        Insert: {
+          bin_id: string
+          bin_name: string
+          brewery_id: string
+          id?: string
+          location_id: string
+          location_name: string
+          loss_movement_id?: string | null
+          lot_code?: string | null
+          lot_id?: string | null
+          material_id: string
+          material_name: string
+          qty_loss: number
+          qty_unused: number
+          qty_used: number
+          record_id: string
+          unit: string
+          used_movement_id?: string | null
+        }
+        Update: {
+          bin_id?: string
+          bin_name?: string
+          brewery_id?: string
+          id?: string
+          location_id?: string
+          location_name?: string
+          loss_movement_id?: string | null
+          lot_code?: string | null
+          lot_id?: string | null
+          material_id?: string
+          material_name?: string
+          qty_loss?: number
+          qty_unused?: number
+          qty_used?: number
+          record_id?: string
+          unit?: string
+          used_movement_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packaging_material_actuals_bin_id_location_id_brewery_id_fkey"
+            columns: ["bin_id", "location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id", "location_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_location_id_brewery_id_fkey"
+            columns: ["location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_loss_movement_id_brewery_id_fkey"
+            columns: ["loss_movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_movements"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_lot_id_brewery_id_fkey"
+            columns: ["lot_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_lots"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_material_id_brewery_id_fkey"
+            columns: ["material_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_record_id_brewery_id_fkey"
+            columns: ["record_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_material_records"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_used_movement_id_brewery_id_fkey"
+            columns: ["used_movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_movements"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
+      packaging_material_records: {
+        Row: {
+          brewery_id: string
+          correction_reason: string | null
+          corrects_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          planned: Json
+          run_id: string
+        }
+        Insert: {
+          brewery_id: string
+          correction_reason?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          planned: Json
+          run_id: string
+        }
+        Update: {
+          brewery_id?: string
+          correction_reason?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          planned?: Json
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packaging_material_records_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_material_records_corrects_id_brewery_id_fkey"
+            columns: ["corrects_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_material_records"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_records_run_id_brewery_id_fkey"
+            columns: ["run_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_run_requirements"
+            referencedColumns: ["run_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_records_run_id_brewery_id_fkey"
+            columns: ["run_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_run_yields"
+            referencedColumns: ["run_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_records_run_id_brewery_id_fkey"
+            columns: ["run_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_runs"
             referencedColumns: ["id", "brewery_id"]
           },
         ]
@@ -3125,6 +3482,7 @@ export type Database = {
           bbl_drawn: number | null
           brand_id: string
           brewery_id: string
+          cancelled_at: string | null
           closed_at: string | null
           created_at: string
           created_by: string
@@ -3139,6 +3497,7 @@ export type Database = {
           bbl_drawn?: number | null
           brand_id: string
           brewery_id: string
+          cancelled_at?: string | null
           closed_at?: string | null
           created_at?: string
           created_by: string
@@ -3153,6 +3512,7 @@ export type Database = {
           bbl_drawn?: number | null
           brand_id?: string
           brewery_id?: string
+          cancelled_at?: string | null
           closed_at?: string | null
           created_at?: string
           created_by?: string
@@ -4341,33 +4701,66 @@ export type Database = {
       }
       receipt_lines: {
         Row: {
+          base_uom: Database["public"]["Enums"]["uom"] | null
           brewery_id: string
+          cost_order_id: string | null
+          cost_recorded_at: string | null
           id: string
+          lot_best_by: string | null
+          lot_code: string | null
           lot_id: string | null
+          lot_received_on: string | null
+          material_id: string | null
+          material_name: string | null
           movement_id: string | null
           po_line_id: string
+          purchase_unit_cost_cents: number | null
+          purchase_uom: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor: number | null
           qty_counted: number
           qty_expected: number
           receipt_id: string
           variance: number | null
         }
         Insert: {
+          base_uom?: Database["public"]["Enums"]["uom"] | null
           brewery_id: string
+          cost_order_id?: string | null
+          cost_recorded_at?: string | null
           id?: string
+          lot_best_by?: string | null
+          lot_code?: string | null
           lot_id?: string | null
+          lot_received_on?: string | null
+          material_id?: string | null
+          material_name?: string | null
           movement_id?: string | null
           po_line_id: string
+          purchase_unit_cost_cents?: number | null
+          purchase_uom?: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor?: number | null
           qty_counted: number
           qty_expected: number
           receipt_id: string
           variance?: number | null
         }
         Update: {
+          base_uom?: Database["public"]["Enums"]["uom"] | null
           brewery_id?: string
+          cost_order_id?: string | null
+          cost_recorded_at?: string | null
           id?: string
+          lot_best_by?: string | null
+          lot_code?: string | null
           lot_id?: string | null
+          lot_received_on?: string | null
+          material_id?: string | null
+          material_name?: string | null
           movement_id?: string | null
           po_line_id?: string
+          purchase_unit_cost_cents?: number | null
+          purchase_uom?: Database["public"]["Enums"]["uom"] | null
+          purchase_uom_factor?: number | null
           qty_counted?: number
           qty_expected?: number
           receipt_id?: string
@@ -4386,6 +4779,13 @@ export type Database = {
             columns: ["lot_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "material_lots"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "receipt_lines_material_id_brewery_id_fkey"
+            columns: ["material_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
             referencedColumns: ["id", "brewery_id"]
           },
           {
@@ -4420,27 +4820,39 @@ export type Database = {
       }
       receipts: {
         Row: {
+          bin_id: string | null
           brewery_id: string
+          correction_reason: string | null
+          corrects_receipt_id: string | null
           created_at: string
           id: string
+          location_id: string | null
           note: string | null
           po_id: string
           received_by: string
           received_on: string
         }
         Insert: {
+          bin_id?: string | null
           brewery_id: string
+          correction_reason?: string | null
+          corrects_receipt_id?: string | null
           created_at?: string
           id?: string
+          location_id?: string | null
           note?: string | null
           po_id: string
           received_by: string
           received_on?: string
         }
         Update: {
+          bin_id?: string | null
           brewery_id?: string
+          correction_reason?: string | null
+          corrects_receipt_id?: string | null
           created_at?: string
           id?: string
+          location_id?: string | null
           note?: string | null
           po_id?: string
           received_by?: string
@@ -4448,11 +4860,32 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "receipts_bin_id_location_id_brewery_id_fkey"
+            columns: ["bin_id", "location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id", "location_id", "brewery_id"]
+          },
+          {
             foreignKeyName: "receipts_brewery_id_fkey"
             columns: ["brewery_id"]
             isOneToOne: false
             referencedRelation: "breweries"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_corrects_receipt_id_brewery_id_po_id_fkey"
+            columns: ["corrects_receipt_id", "brewery_id", "po_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id", "brewery_id", "po_id"]
+          },
+          {
+            foreignKeyName: "receipts_location_id_brewery_id_fkey"
+            columns: ["location_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id", "brewery_id"]
           },
           {
             foreignKeyName: "receipts_po_id_brewery_id_fkey"
@@ -6920,6 +7353,39 @@ export type Database = {
           },
         ]
       }
+      refused_delivery_returns: {
+        Row: {
+          brewery_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          delivery_id: string | null
+          invoice_timing: string | null
+          order_id: string | null
+          order_line_id: string | null
+          order_no: number | null
+          outstanding_qty: number | null
+          qty_refused: number | null
+          route_id: string | null
+          sku_id: string | null
+          sku_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_route_id_brewery_id_fkey"
+            columns: ["route_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
       route_loads: {
         Row: {
           brewery_id: string | null
@@ -7082,6 +7548,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_account_invitation: {
+        Args: { p_invite: string; p_request_id: string }
+        Returns: Json
+      }
       activate_chat_installation: {
         Args: {
           p_actor: string
@@ -7252,8 +7722,16 @@ export type Database = {
         Args: { p_destination: string; p_reason: string }
         Returns: undefined
       }
+      cancel_batch: {
+        Args: { p_batch: string; p_brewery: string; p_request_id: string }
+        Returns: Json
+      }
       cancel_order: {
         Args: { p_order: string; p_reason: string; p_request_id: string }
+        Returns: Json
+      }
+      cancel_packaging_run: {
+        Args: { p_brewery: string; p_request_id: string; p_run: string }
         Returns: Json
       }
       cancel_stock_transfer: {
@@ -7346,6 +7824,15 @@ export type Database = {
         Args: { p_brewery: string; p_now: string; p_subject_id?: string }
         Returns: number
       }
+      check_in_refused_return: {
+        Args: {
+          p_delivery: string
+          p_lines: Json
+          p_location: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       claim_chat_callback_receipts: {
         Args: { p_limit: number; p_now: string }
         Returns: {
@@ -7408,6 +7895,7 @@ export type Database = {
       }
       close_packaging_run: {
         Args: {
+          p_actuals?: Json
           p_bbl_drawn: number
           p_best_by: string
           p_bin: string
@@ -7416,6 +7904,7 @@ export type Database = {
           p_lot_code: string
           p_outputs: Json
           p_packaged_on: string
+          p_plan_revision?: string
           p_request_id: string
           p_run: string
         }
@@ -7494,7 +7983,15 @@ export type Database = {
         Returns: Json
       }
       confirm_delivery: {
-        Args: { p_delivery: string; p_request_id: string; p_signed_by: string }
+        Args: {
+          p_delivery: string
+          p_note?: string
+          p_reason?: string
+          p_refused?: Json
+          p_request_id: string
+          p_signed_by: string
+          p_transfer_refused?: boolean
+        }
         Returns: Json
       }
       confirm_order: {
@@ -7538,6 +8035,39 @@ export type Database = {
           allowed: boolean
           retry_after: number
         }[]
+      }
+      correct_brew_record: {
+        Args: {
+          p_actuals: Json
+          p_brewery: string
+          p_confirm_empty: boolean
+          p_initial_bbl: number
+          p_process: Json
+          p_reason: string
+          p_record: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      correct_packaging_material_record: {
+        Args: {
+          p_actuals: Json
+          p_brewery: string
+          p_reason: string
+          p_record: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      correct_purchase_receipt: {
+        Args: {
+          p_brewery: string
+          p_lines: Json
+          p_reason: string
+          p_receipt: string
+          p_request_id: string
+        }
+        Returns: Json
       }
       correct_taproom_count: {
         Args: {
@@ -7689,6 +8219,29 @@ export type Database = {
         }
         Returns: Json
       }
+      customers_missing_portal_email: {
+        Args: { p_brewery: string }
+        Returns: {
+          brewery_id: string
+          created_at: string
+          id: string
+          license_no: string | null
+          name: string
+          payment_terms: string
+          qbo_customer_id: string | null
+          qbo_realm_id: string | null
+          sale_channel_id: string
+          state: string
+          tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
+          type: Database["public"]["Enums"]["customer_type"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       delete_bin: {
         Args: { p_bin: string; p_brewery: string; p_request_id: string }
         Returns: Json
@@ -7765,6 +8318,15 @@ export type Database = {
         Args: { p_actor: string; p_state_hash: string }
         Returns: Json
       }
+      finish_order_email: {
+        Args: {
+          p_delivery: string
+          p_error: string
+          p_lease: string
+          p_provider_id: string
+        }
+        Returns: boolean
+      }
       finish_portal_quote_tax: {
         Args: {
           p_actor: string
@@ -7836,6 +8398,14 @@ export type Database = {
         Args: { p_batch: string; p_brewery: string }
         Returns: Json
       }
+      get_brew_day_plan: {
+        Args: { p_batch: string; p_brewery: string }
+        Returns: Json
+      }
+      get_brew_record: {
+        Args: { p_batch: string; p_brewery: string }
+        Returns: Json
+      }
       get_chat_delivery_context: {
         Args: { p_delivery: string; p_now?: string }
         Returns: Json
@@ -7868,6 +8438,22 @@ export type Database = {
         Args: { p_brewery: string; p_end: string; p_start: string }
         Returns: Json
       }
+      get_order_email_status: {
+        Args: { p_brewery: string; p_order: string }
+        Returns: Json
+      }
+      get_packaging_close_plan: {
+        Args: { p_brewery: string; p_run: string }
+        Returns: Json
+      }
+      get_packaging_material_plan: {
+        Args: { p_brewery: string; p_outputs: Json }
+        Returns: Json
+      }
+      get_packaging_material_record: {
+        Args: { p_brewery: string; p_run: string }
+        Returns: Json
+      }
       get_pos_menu: {
         Args: { p_brewery: string; p_external_location: string }
         Returns: Json
@@ -7882,6 +8468,7 @@ export type Database = {
         Returns: Json
       }
       get_published_pos_menu: { Args: { p_public_id: string }; Returns: Json }
+      get_qbo_sync_status: { Args: { p_brewery: string }; Returns: Json }
       get_taproom_count: {
         Args: { p_brewery: string; p_count: string }
         Returns: Json
@@ -7971,6 +8558,7 @@ export type Database = {
           provider: string
         }[]
       }
+      lease_order_emails: { Args: { p_from: string }; Returns: Json }
       lease_square_publication: {
         Args: { p_actor: string; p_brewery: string; p_publication: string }
         Returns: {
@@ -7994,6 +8582,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_my_invitations: { Args: never; Returns: Json }
       list_open_taps: {
         Args: { p_brewery: string; p_location: string }
         Returns: Json
@@ -8066,6 +8655,10 @@ export type Database = {
           qty: number
           sku_id: string
         }[]
+      }
+      packaging_material_plan: {
+        Args: { p_brewery: string; p_outputs: Json }
+        Returns: Json
       }
       portal_availability: {
         Args: { p_customer: string }
@@ -8288,10 +8881,13 @@ export type Database = {
       }
       record_brew_day: {
         Args: {
+          p_actuals?: Json
           p_batch: string
           p_brewed_on: string
           p_brewery: string
+          p_confirm_empty?: boolean
           p_initial_bbl: number
+          p_process?: Json
           p_request_id: string
           p_vessel: string
         }
@@ -8384,6 +8980,10 @@ export type Database = {
       record_pick: {
         Args: { p_order: string; p_picks: Json; p_request_id: string }
         Returns: Json
+      }
+      record_qbo_invoice_sync_failure: {
+        Args: { p_actor: string; p_brewery: string; p_request_id: string }
+        Returns: undefined
       }
       record_repack: {
         Args: {
@@ -8478,6 +9078,24 @@ export type Database = {
         }
         Returns: Json
       }
+      reschedule_batch: {
+        Args: {
+          p_batch: string
+          p_brewery: string
+          p_planned_on: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      reschedule_packaging_run: {
+        Args: {
+          p_brewery: string
+          p_planned_on: string
+          p_request_id: string
+          p_run: string
+        }
+        Returns: Json
+      }
       resolve_chat_actor: {
         Args: {
           p_external_installation_id: string
@@ -8520,6 +9138,7 @@ export type Database = {
           p_lines: Json
           p_location: string
           p_reason: string
+          p_refused_delivery?: string
           p_request_id: string
         }
         Returns: Json
@@ -8531,6 +9150,10 @@ export type Database = {
           p_note: string
           p_request_id: string
         }
+        Returns: Json
+      }
+      revoke_account_invitation: {
+        Args: { p_brewery: string; p_invite: string; p_request_id: string }
         Returns: Json
       }
       revoke_customer_user: {

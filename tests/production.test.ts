@@ -134,7 +134,7 @@ describe("vessels, scheduling and brew day", () => {
     expect(listed.find((r) => r.id === batch.id))
       .toMatchObject({ brand_name: null, recipe_name: null, planned_on: "2026-10-01", brewed_on: null, closed_at: null, vessel_name: null });
 
-    await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv, initialBbl: 29.5, brewedOn: "2026-10-01" }, ctx);
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv, initialBbl: 29.5, brewedOn: "2026-10-01" }, ctx);
 
     const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as {
       batch: { id: string; brewed_on: string };
@@ -145,12 +145,12 @@ describe("vessels, scheduling and brew day", () => {
 
     // The same batch cannot be brewed twice.
     await expect(runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: fv, initialBbl: 10, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/already brewed/);
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv, initialBbl: 10, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/already brewed/);
 
     // Nor can a second batch move into a vessel whose occupancy is still open.
     const second = (await runCommand("schedule_batch", { plannedOn: "2026-10-02", plannedBbl: 30 }, ctx)) as { id: string };
     await expect(runCommand("record_brew_day",
-      { batchId: second.id, vesselId: fv, initialBbl: 30, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/occupied/);
+      { actuals: [], confirmEmpty: true, batchId: second.id, vesselId: fv, initialBbl: 30, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/occupied/);
 
     // list_batches shows the open vessel on the brewed batch.
     const after = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null }[];
@@ -166,7 +166,7 @@ describe("brew day refuses more than the vessel holds", () => {
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 25 }, ctx)) as { id: string };
 
     await expect(runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: "2026-10-01" }, ctx))
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 25, brewedOn: "2026-10-01" }, ctx))
       .rejects.toThrow(/FV-CAP20 holds 20 bbl/);
     const refused = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as {
       batch: { brewed_on: string | null }; occupancy: unknown;
@@ -174,7 +174,7 @@ describe("brew day refuses more than the vessel holds", () => {
     expect(refused.batch.brewed_on).toBeNull();
     expect(refused.occupancy).toBeNull();
 
-    await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
     const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { initial_bbl: number } | null };
     expect(day.occupancy).toMatchObject({ initial_bbl: 20 });
   });
@@ -188,7 +188,7 @@ describe("brew day overlaps a closed occupancy", () => {
   it("refuses a backdated brew inside a closed stretch, and allows one after it", async () => {
     const vessel = (await runCommand("upsert_vessel", { name: "FV-BACKDATE", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 30 }, ctx)) as { id: string };
-    await runCommand("record_brew_day", { batchId: first.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-01" }, ctx);
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-01" }, ctx);
 
     // record_cellar_transfer closes an occupancy at now(), never at a chosen
     // past instant, so a *backdated* close is still a direct update: the
@@ -198,12 +198,12 @@ describe("brew day overlaps a closed occupancy", () => {
 
     const backdated = (await runCommand("schedule_batch", { plannedOn: "2026-10-03", plannedBbl: 30 }, ctx)) as { id: string };
     await expect(runCommand("record_brew_day",
-      { batchId: backdated.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-03" }, ctx))
+      { actuals: [], confirmEmpty: true, batchId: backdated.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-03" }, ctx))
       .rejects.toThrow(/occupied/);
 
     // A brew day after the stretch closed is fine, and leaves brewed_on unset
     // on the batch that was refused above.
-    await runCommand("record_brew_day", { batchId: backdated.id, vesselId: vessel.id, initialBbl: 28, brewedOn: "2026-10-06" }, ctx);
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: backdated.id, vesselId: vessel.id, initialBbl: 28, brewedOn: "2026-10-06" }, ctx);
     const day = (await runCommand("get_brew_day", { batchId: backdated.id }, ctx)) as {
       batch: { brewed_on: string }; occupancy: { initial_bbl: number } | null;
     };
@@ -221,7 +221,7 @@ describe("brew day overlaps a closed occupancy", () => {
     const brite = (await runCommand("upsert_vessel", { name: "BR-SAMEDAY", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
     const brewed = (await runCommand("record_brew_day",
-      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as { occupancy: { id: string } };
+      { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as { occupancy: { id: string } };
     const moved = (await runCommand("record_cellar_transfer",
       { fromOccupancyId: brewed.occupancy.id, toVesselId: brite.id, volumeBbl: 10 }, ctx)) as {
         from_occupancy: { ended_at: string | null };
@@ -230,7 +230,7 @@ describe("brew day overlaps a closed occupancy", () => {
 
     const second = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
     const again = (await runCommand("record_brew_day",
-      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as {
+      { actuals: [], confirmEmpty: true, batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as {
         batch: { brewed_on: string }; occupancy: { started_at: string };
       };
     expect(again.batch.brewed_on).toBe(today);
@@ -245,7 +245,7 @@ describe("brew day overlaps a closed occupancy", () => {
     const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-11-01", plannedBbl: 10 }, ctx)) as { id: string };
     const brewed = (await runCommand("record_brew_day",
-      { batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
+      { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
     // A first brew starts at the brewery's midnight, not UTC's (#582): still EDT until 02:00.
     expect(Date.parse(brewed.occupancy.started_at)).toBe(Date.parse("2026-11-01T04:00:00Z"));
     // 22:00 New York on 11-10 is 03:00 UTC on 11-11.
@@ -254,7 +254,7 @@ describe("brew day overlaps a closed occupancy", () => {
 
     const second = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 10 }, ctx)) as { id: string };
     const again = (await runCommand("record_brew_day",
-      { batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-10" }, ctx)) as {
+      { actuals: [], confirmEmpty: true, batchId: second.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-10" }, ctx)) as {
         occupancy: { started_at: string };
       };
     expect(Date.parse(again.occupancy.started_at)).toBe(Date.parse("2026-11-11T03:00:00Z"));
@@ -298,11 +298,11 @@ describe("vessels and batches refuse other tenants and other roles", () => {
 
     const mine = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 10 }, ctx)) as { id: string };
     await expect(runCommand("record_brew_day",
-      { batchId: mine.id, vesselId: otherVessel, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/vessel not found/);
+      { actuals: [], confirmEmpty: true, batchId: mine.id, vesselId: otherVessel, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/vessel not found/);
 
     const myVessel = (await runCommand("upsert_vessel", { name: "FV-TENANCY", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
     await expect(runCommand("record_brew_day",
-      { batchId: otherBatch, vesselId: myVessel.id, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/batch not found/);
+      { actuals: [], confirmEmpty: true, batchId: otherBatch, vesselId: myVessel.id, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/batch not found/);
 
     // Neither brewery's rows moved: the other batch is still unbrewed.
     const theirs = (await runCommand("get_brew_day", { batchId: otherBatch }, otherCtx)) as { batch: { brewed_on: string | null } };
@@ -316,7 +316,7 @@ describe("vessels and batches refuse other tenants and other roles", () => {
     await expect(runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 10 }, sales))
       .rejects.toThrow(/permission denied/);
     await expect(runCommand("record_brew_day",
-      { batchId: crypto.randomUUID(), vesselId: crypto.randomUUID(), initialBbl: 10, brewedOn: "2026-10-01" }, sales))
+      { actuals: [], confirmEmpty: true, batchId: crypto.randomUUID(), vesselId: crypto.randomUUID(), initialBbl: 10, brewedOn: "2026-10-01" }, sales))
       .rejects.toThrow(/permission denied/);
     await expect(runCommand("list_batches", {}, sales)).rejects.toThrow(/permission denied/);
   });
@@ -345,7 +345,7 @@ describe("cellar transfers", () => {
     const vessel = (await runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: brewedOn, plannedBbl: bbl }, ctx)) as { id: string };
     const day = (await runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn }, ctx)) as { occupancy: { id: string } };
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn }, ctx)) as { occupancy: { id: string } };
     return { vesselId: vessel.id, batchId: batch.id, occupancyId: day.occupancy.id };
   }
 
@@ -460,7 +460,7 @@ describe("fermentation readings", () => {
     const vessel = (await runCommand("upsert_vessel", { name: "READ-FV1", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 12 }, ctx)) as { id: string };
     const day = (await runCommand("record_brew_day",
-      { batchId: batch.id, vesselId: vessel.id, initialBbl: 12, brewedOn: "2026-11-10" }, ctx)) as { occupancy: { id: string } };
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 12, brewedOn: "2026-11-10" }, ctx)) as { occupancy: { id: string } };
     occupancyId = day.occupancy.id;
   });
 
@@ -504,7 +504,7 @@ describe("a batch split across tanks", () => {
     const fv = (await runCommand("upsert_vessel", { name: `FV-SPLIT ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string; name: string };
     const bt = (await runCommand("upsert_vessel", { name: `BT-SPLIT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 30 }, ctx)) as { id: string; name: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, ctx)) as { id: string };
-    await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
+    await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
     const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };
     await runCommand("record_cellar_transfer", { fromOccupancyId: first.occupancy.id, toVesselId: bt.id, volumeBbl: 5 }, ctx);
 

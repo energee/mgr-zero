@@ -235,3 +235,26 @@ Claude job has read-only GitHub permissions and may edit only those three MDX fi
 deterministic job rejects wider or active-content changes, then maintains one
 reviewable `documentation/user-guide` pull request; the bot never commits directly
 to `main`.
+
+### Buyer order-confirmation email
+
+Wholesale confirmation queues mail for the customer's currently linked portal
+buyers. No linked buyers produces a blocked `no_recipient` record. Admin/Sales
+can read order email states through the [Orders API](/docs/api/orders). The
+status `accepted` means Resend accepted it, not that it reached an inbox.
+
+The internal `POST /api/email/jobs/deliver` worker requires a bearer token
+matching `ORDER_EMAIL_JOB_SECRET`. It uses `RESEND_API_KEY` and
+`ORDER_EMAIL_FROM`; missing configuration refuses the job before any lease.
+Each call processes at most ten emails. A scheduler must call it regularly;
+this repository change does not configure one or enable hosted sending.
+Domain, provider credentials and scheduler setup require user approval (#311).
+Tests mock the provider and send no real mail.
+
+Retries preserve the original recipient, body, sender and provider key.
+[Resend retains idempotency keys for 24 hours](https://resend.com/changelog/idempotency-keys);
+MGR stops after 23 hours from the first attempt. A blocked uncertain delivery
+requires provider investigation and never automatically receives a new key.
+Removed buyers or changed addresses suppress pending mail. Existing historical
+confirmations are not backfilled, and a confirmed order is not undone by a
+failed email.

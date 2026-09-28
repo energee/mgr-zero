@@ -80,6 +80,7 @@ describe("HTTP API reference", () => {
   it("homes integration and cost operations by their owning area, not their nouns", () => {
     // PR #374: each of these matches an earlier area's noun regex (recipe,
     // price, location, customer) but belongs to the area that owns the flow.
+    expect(areaOf("count_customers_missing_portal_email")).toBe("customers");
     expect(areaOf("get_brand_recipe_cost")).toBe("catalog");
     expect(areaOf("set_pos_price_override")).toBe("team");
     expect(areaOf("list_pos_locations")).toBe("team");

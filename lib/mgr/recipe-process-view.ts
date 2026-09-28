@@ -11,6 +11,8 @@ export type { MashStep };
 /** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
 export const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
 export type IngredientStage = (typeof INGREDIENT_STAGES)[number];
+/** Stages whose materials are confirmed on brew day; later stages post from cellar additions. */
+export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies readonly IngredientStage[];
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));

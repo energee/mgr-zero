@@ -12,7 +12,26 @@ consumed. Closing is the step that moves beer out of a vessel and finished goods
 into inventory. No operation here previews a run's material shortfalls before
 scheduling — that read belongs to the Packaging screen, not this reference.
 
+Closing a run requires confirmed material `actuals` and the `planRevision` returned by `get_packaging_close_plan`; a plan that changed since then is refused with `409 stale_plan`. Omit them only to replay an already completed pre-upgrade request with its original request ID. Used plus lost quantities debit explicit sources; unused is an observation. The close stores the reviewed BOM and actuals atomically with outputs and tank draw. `correct_packaging_material_record` appends exact material reversals and replacement actuals, without changing finished output or tank volume. Downstream finished-goods use, completed batches and dependent filed reports prevent correction.
+
 {/* ops:packaging */}
+
+## cancel_packaging_run [#cancel_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Cancel an unstarted packaging run plan; retains history and refuses recorded physical work
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "cancel_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
 
 ## close_packaging_run [#close_packaging_run]
 
@@ -30,12 +49,33 @@ Close a started run: record the barrels drawn and the units actually filled, whi
 | `locationId` | uuid | yes |
 | `binId` | uuid | yes |
 | `bestBy` | date (YYYY-MM-DD) | no |
+| `actuals` | array of object | no |
+| `planRevision` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "close_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000", "bblDrawn": 1, "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyActual": 1 } ], "lotCode": "string", "packagedOn": "2026-01-31", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## correct_packaging_material_record [#correct_packaging_material_record]
+
+`command` · admin, brewer, warehouse
+
+Replace unused packaging material actuals with a reason; preserves history, finished outputs and tank draw
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `recordId` | uuid | yes |
+| `reason` | string | yes |
+| `actuals` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "correct_packaging_material_record", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recordId": "00000000-0000-0000-0000-000000000000", "reason": "string", "actuals": [ { "materialId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "lotId": "00000000-0000-0000-0000-000000000000", "used": 1, "loss": 1, "unused": 1 } ] } }'
 ```
 
 ## create_composed_format [#create_composed_format]
@@ -89,6 +129,57 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_format_composition", "input": { "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_packaging_close_plan [#get_packaging_close_plan]
+
+`query` · admin, brewer, warehouse
+
+Reviewed BOM revision, material requirements and exact source balances for a packaging run
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_packaging_close_plan", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_packaging_material_plan [#get_packaging_material_plan]
+
+`query` · admin, brewer, warehouse
+
+Planned packaging materials and stock shortages for unsaved output quantities
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `outputs` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_packaging_material_plan", "input": { "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyPlanned": 1 } ] } }'
+```
+
+## get_packaging_material_record [#get_packaging_material_record]
+
+`query` · admin, brewer, warehouse
+
+Frozen planned and actual packaging materials with append-only correction history
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_packaging_material_record", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## get_packaging_run [#get_packaging_run]
@@ -228,6 +319,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replace_format_components", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "formatId": "00000000-0000-0000-0000-000000000000", "components": [ { "childFormatId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+## reschedule_packaging_run [#reschedule_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Reschedule an unstarted packaging run plan; retains history and refuses recorded physical work
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+| `plannedOn` | date (YYYY-MM-DD) | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reschedule_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000", "plannedOn": "2026-01-31" } }'
 ```
 
 ## schedule_packaging_run [#schedule_packaging_run]

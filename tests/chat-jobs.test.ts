@@ -10,7 +10,7 @@ import pg from "pg";
 import { DB, admin, channelId, ins, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
 import { SLACK_CAPABILITIES } from "@/lib/chat/slack-transport";
-import { authorizeJob } from "@/lib/chat/job-auth";
+import { authorizeJob } from "@/lib/jobs/auth";
 import { cleanupChatState, runChatCallbackBatch, runChatDeliveryBatch, runChatScan } from "@/lib/chat/jobs";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -96,11 +96,11 @@ afterAll(async () => { await sql.end(); });
 describe("job authentication", () => {
   it("accepts only the exact bearer, in constant time, and never echoes it", () => {
     const req = (auth?: string) => new Request("https://mgr.test/api/chat/jobs/scan", { method: "POST", headers: auth ? { authorization: auth } : {} });
-    expect(authorizeJob(req("Bearer job-secret"))).toBe(true);
-    expect(authorizeJob(req("Bearer job-secre"))).toBe(false);
-    expect(authorizeJob(req("Bearer job-secret-longer"))).toBe(false);
-    expect(authorizeJob(req("Basic job-secret"))).toBe(false);
-    expect(authorizeJob(req())).toBe(false);
+    expect(authorizeJob(req("Bearer job-secret"), "job-secret")).toBe(true);
+    expect(authorizeJob(req("Bearer job-secre"), "job-secret")).toBe(false);
+    expect(authorizeJob(req("Bearer job-secret-longer"), "job-secret")).toBe(false);
+    expect(authorizeJob(req("Basic job-secret"), "job-secret")).toBe(false);
+    expect(authorizeJob(req(), "job-secret")).toBe(false);
   });
 });
 

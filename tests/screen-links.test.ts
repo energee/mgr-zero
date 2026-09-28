@@ -4,7 +4,7 @@
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { BACK, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { BACK, INERT, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
 
@@ -106,7 +106,7 @@ describe("reported explorer flows", () => {
     ["Portal Me", "Change password", "Portal set password"],
     ["Set new password", "Save password", "Today"],
     ["Create brewery", "Create brewery", "First-run checklist"],
-    ["Accounting", "Review", "Customers"],
+    ["Accounting", "Review", "Customers missing email"],
     ["Mapping conflict", "Save mapping", "Accounting"],
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Connect QuickBooks"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
@@ -171,5 +171,14 @@ describe("isInertOn", () => {
       ...(s.portal ? Object.keys(PORTAL) : []),
     ].filter((label) => isInertOn(s, label)).map((label) => `${s.name}: ${label}`));
     expect(swallowed).toEqual([]);
+  });
+
+  it("keeps the Accounting sync button on Accounting under either label", () => {
+    // The live view renders one button, labelled "Sync QuickBooks" or "Retry
+    // saved sync", that syncs in place. Both labels map to Accounting, so
+    // neither may also sit in INERT as a contradicting second answer.
+    expect(INERT).not.toContain("Retry saved sync");
+    expect(INERT).not.toContain("Sync QuickBooks");
+    expect(resolveTap(by("Accounting"), "Retry saved sync")).toBe("Accounting");
   });
 });

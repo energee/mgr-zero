@@ -7,7 +7,8 @@ import { CommandRecovery } from "@/components/mgr/command-recovery";
 // rail's collapsed state round-trips through the sidebar_state cookie exactly
 // as in the staff layout.
 import { getActiveCustomer } from "@/lib/portal";
-import { getRequestIdentity } from "@/lib/auth/request-context";
+import { switchCustomer } from "@/app/(auth)/actions";
+import { getCustomerMemberships, getRequestIdentity } from "@/lib/auth/request-context";
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
 import { PortalShell } from "@/components/mgr/app-shell";
@@ -16,7 +17,7 @@ import { PortalMeView } from "@/components/mgr/views/portal-me";
 import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const [customer, sidebarOpen, identity] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity()]);
+  const [customer, sidebarOpen, identity, memberships] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity(), getCustomerMemberships()]);
   return (
     <BreweryProvider id={customer.breweryId} actorId={identity!.userId} customerId={customer.customerId}>
       <PortalShell
@@ -26,6 +27,8 @@ export default async function PortalLayout({ children }: { children: React.React
           <MeSheet>
             <PortalMeView
               model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
+              accounts={memberships.map(m => ({ value: m.customerId, label: `${m.customerName} · ${m.breweryName}` }))}
+              activeCustomerId={customer.customerId} switchAction={switchCustomer}
               footer={<MeSheetActions />}
             />
           </MeSheet>

@@ -1,6 +1,6 @@
 // Return page: credit an invoice's beer lines (back to stock, or to loss when
 // damaged) and refund its keg deposit lines, in one return_shipment credit memo.
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
@@ -13,8 +13,10 @@ import "@/lib/commands/all";
 type Invoice = { id: string; invoice_no: number | null; shipment_id: string | null; kind: string };
 type Line = { id: string; kind: string; sku_id: string | null; keg_size: string | null; qty: number; unit_price_cents: number; description: string; skus: { name: string } | null };
 
-export default async function ReturnPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReturnPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ refusedDeliveryId?: string | string[] }> }) {
   const { id } = await params;
+  const { refusedDeliveryId } = await searchParams;
+  if (Array.isArray(refusedDeliveryId)) notFound();
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "return_shipment");
@@ -25,7 +27,16 @@ export default async function ReturnPage({ params }: { params: Promise<{ id: str
     runPageQuery("list_bins", {}, ctx) as Promise<{ id: string; name: string; location_id: string }[]>,
   ]);
   if (invoice.kind !== "invoice") redirect(`/invoices/${invoice.id}`);
-  return <CreditMemoForm invoiceId={invoice.id} invoiceNo={invoice.invoice_no} shipmentId={invoice.shipment_id}
+  let refusedQuantities: Record<string, number> | undefined;
+  if (refusedDeliveryId) {
+    const [stop, outstanding] = await Promise.all([
+      orNotFound(runPageQuery("get_delivery_stop", { deliveryId: refusedDeliveryId }, ctx)) as Promise<{ invoice: { id: string } | null }>,
+      runPageQuery("list_refused_returns", { deliveryId: refusedDeliveryId }, ctx) as Promise<{ sku_id: string; outstanding_qty: number }[]>,
+    ]);
+    if (stop.invoice?.id !== invoice.id) notFound();
+    refusedQuantities = Object.fromEntries(outstanding.map(line => [line.sku_id, Number(line.outstanding_qty)]));
+  }
+  return <CreditMemoForm refusedDeliveryId={refusedDeliveryId} refusedQuantities={refusedQuantities} invoiceId={invoice.id} invoiceNo={invoice.invoice_no} shipmentId={invoice.shipment_id}
     lines={lines.flatMap((line): (ReturnLine & { unitPriceCents: number })[] => line.kind === "sku" && line.sku_id
       ? [{ id: line.id, kind: "sku", skuId: line.sku_id, label: line.skus?.name ?? line.description, qty: Number(line.qty), unitPriceCents: Number(line.unit_price_cents) }]
       : line.kind === "keg_deposit"

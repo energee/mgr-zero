@@ -161,9 +161,16 @@ describe("Units view", () => {
     expect(model.backHref).toBeUndefined();
     expect(model.breweryOptions).toEqual(["Plato", "Specific gravity"]);
     expect(model.breweryIndex).toBe(0);
-    expect(model.mineOptions).toEqual(["Use brewery default", "Plato", "Specific gravity"]);
+    expect(model.mineOptions).toEqual(["Use brewery default (Plato)", "Plato", "Specific gravity"]);
     expect(model.mineIndex).toBe(0);
     expect(model.example).toBe(formatGravity(12.5, "plato"));
+  });
+
+  it("explains who each gravity choice affects, in inventory and live alike (#671 review)", () => {
+    const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
+    expect(html).toContain("What everyone here sees unless they choose otherwise below.");
+    expect(html).toContain("Yours alone; it changes nothing for anyone else.");
+    expect(html).toContain("Use brewery default (Plato)");
   });
 
   it("uses effective for the example when mine overrides brewery", () => {
@@ -216,8 +223,13 @@ describe("Units view", () => {
   });
 });
 
-it("puts a gravity select back on the stored unit when its save fails (#447)", () => {
+it("puts a gravity choice back on the stored unit when its save fails (#447)", () => {
   const src = readFileSync(new URL("../app/(app)/settings/units/gravity-unit-form.tsx", import.meta.url), "utf8");
-  expect(src).toContain('run("set_brewery_gravity_unit", { unit: v }).then((ok) => { if (!ok) setBreweryChoice(brewery); })');
-  expect(src).toContain('run("set_my_gravity_unit", { unit: v === NONE ? null : v }).then((ok) => { if (!ok) setMineChoice(mine ?? NONE); })');
+  expect(src).toContain('run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); })');
+  expect(src).toContain('run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); })');
+});
+
+it("shares Units controls between fixture and live adapters", () => {
+  expect(readFileSync("components/mgr/views/units.tsx", "utf8")).toContain("<GravityUnitControls");
+  expect(readFileSync("app/(app)/settings/units/gravity-unit-form.tsx", "utf8")).toContain("<GravityUnitControls");
 });

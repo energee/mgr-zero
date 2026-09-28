@@ -12,6 +12,8 @@ export function ReceiptView({ model }: { model: ReceiptViewModel }) {
       {E.fld("Still owed", model.stillOwed)}
       {E.tape(model.tape)}
       {E.info(model.info)}
+      {model.revisions?.map(revision => <div key={revision.label}>{E.nav(revision.label, "Receipt history", "", undefined, revision.href)}</div>)}
+      {model.correction && E.act("Correct receipt", "attention", model.correction.href)}
     </>
   );
 }

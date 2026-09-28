@@ -5,37 +5,25 @@
 // finished-goods location + bin).
 "use client";
 
+import { PackagingSourcePicker, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { useState } from "react";
-import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCommandAction } from "@/lib/commands/use-command-form";
-import { closeRunReady } from "@/lib/mgr/close-packaging-run-view";
+import { PackagingCloseFields } from "@/components/mgr/views/close-packaging-run";
+import { emptyPackagingActual, packagingActualPayload, patchActual, removeActual, suggestedPackagingActuals, type PackagingClosePlan } from "@/lib/mgr/packaging-actuals";
+import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { command } from "@/lib/commands/client";
+import { useCommandAction, useRetainedCommand } from "@/lib/commands/use-command-form";
+import { packagingCloseReady } from "@/lib/mgr/close-packaging-run-view";
 
-type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
 export function PickTankForm({ runId, occupancies }: { runId: string; occupancies: Occupancy[] }) {
-  const [occupancyId, setOccupancyId] = useState("");
   const { busy, error, run } = useCommandAction();
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="pt-source">Source tank</Label>
-        <Select value={occupancyId} onValueChange={setOccupancyId}>
-          <SelectTrigger id="pt-source"><SelectValue placeholder="Choose tank" /></SelectTrigger>
-          <SelectContent>{occupancies.map((o) => <SelectItem key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <CommandFormMessage error={error} />
-      <Button className="w-full md:w-fit" disabled={busy || !occupancyId} onClick={() => run("update_packaging_run", { runId, occupancyId })}>Pick source</Button>
-    </div>
-  );
+  return <PackagingSourcePicker occupancies={occupancies} busy={busy} error={error}
+    onPick={occupancyId => { void run("update_packaging_run", { runId, occupancyId }); }} />;
 }
 
 export function StartRunButton({ runId }: { runId: string }) {
@@ -48,66 +36,36 @@ export function StartRunButton({ runId }: { runId: string }) {
   );
 }
 
-/** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */
-export function CloseRunForm({ runId, outputs, locations, bins, today }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string }) {
-  const [bblDrawn, setBblDrawn] = useState("");
-  const [actuals, setActuals] = useState<Record<string, string>>(Object.fromEntries(outputs.map((o) => [o.sku_id, String(o.qty_planned)])));
-  const [lotCode, setLotCode] = useState("");
-  const [packagedOn, setPackagedOn] = useState(today);
-  const [bestBy, setBestBy] = useState("");
-  const [locationId, setLocationId] = useState("");
-  const [binId, setBinId] = useState("");
-  const { busy, error, run } = useCommandAction();
-  const ready = closeRunReady({ bblDrawn, actuals, lotCode, packagedOn, locationId, binId });
-  return (
-    <div className="flex flex-col gap-4">
-      {E.edit("Barrels drawn", bblDrawn, "number", undefined, { id: "cr-drawn", min: 0, step: "any", onChange: setBblDrawn })}
-      <div className="flex flex-col gap-2">
-        <Label>Actual outputs</Label>
-        {outputs.map((o) => (
-          <div key={o.id} className="flex items-center justify-between gap-2">
-            <span className="text-sm">{o.sku_name ?? o.sku_id.slice(0, 8)}</span>
-            <div className="w-36">{E.edit(`${o.sku_name ?? o.sku_id} actual`, actuals[o.sku_id] ?? "", "number", undefined, { hideLabel: true, min: 0, step: "any", onChange: qty => setActuals(prev => ({ ...prev, [o.sku_id]: qty })) })}</div>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cr-lot">Lot code</Label>
-        <Input id="cr-lot" value={lotCode} onChange={(e) => setLotCode(e.target.value)} required />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cr-packaged">Packaged on</Label>
-          <Input id="cr-packaged" type="date" value={packagedOn} onChange={(e) => setPackagedOn(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cr-bestby">Best by · optional</Label>
-          <Input id="cr-bestby" type="date" value={bestBy} onChange={(e) => setBestBy(e.target.value)} />
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cr-loc">Finished goods location</Label>
-        <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
-          <SelectTrigger id="cr-loc"><SelectValue placeholder="Location" /></SelectTrigger>
-          <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
-          <SelectTrigger aria-label="Bin"><SelectValue placeholder="Bin" /></SelectTrigger>
-          <SelectContent>{bins.filter((b) => b.location_id === locationId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <CommandFormMessage error={error} />
-      <Button
-        data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit"
-        disabled={busy || !ready}
-        onClick={() => run("close_packaging_run", {
-          runId, bblDrawn: Number(bblDrawn),
-          outputs: outputs.map((o) => ({ skuId: o.sku_id, qtyActual: Number(actuals[o.sku_id]) })),
-          lotCode, packagedOn, bestBy: bestBy || undefined, locationId, binId,
-        })}
-      >
-        Close packaging run
-      </Button>
-    </div>
-  );
+/** The binding supplies live state to the inventory's exact close controls. */
+export function CloseRunForm({ runId, outputs, locations, bins, today, initialPlan }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string; initialPlan: PackagingClosePlan }) {
+  const breweryId = useBrewery();
+  const context = useCommandContext();
+  const [fields, setFields] = useState({ bblDrawn: "", lotCode: "", packagedOn: today, bestBy: "", locationId: "", binId: "" });
+  const [quantities, setQuantities] = useState(Object.fromEntries(outputs.map(row => [row.sku_id, String(row.qty_planned)])));
+  const [plan, setPlan] = useState(initialPlan);
+  const [actuals, setActuals] = useState(() => suggestedPackagingActuals(initialPlan));
+  // A stale plan is a definitive refusal even on a retry: nothing was written.
+  const { phase, setPhase, error, setError, submit } = useRetainedCommand("close_packaging_run", { fallback: "Could not close packaging run", retire: cause => cause.code === "stale_plan" });
+  const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id] })), plan, actuals, locations, bins };
+  const ready = packagingCloseReady(model);
+  async function refreshPlan() {
+    if (phase !== "idle") return;
+    setPhase("busy"); setError(null);
+    try { setPlan(await command(breweryId, "get_packaging_close_plan", { runId }, undefined, context) as PackagingClosePlan); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not review material plan"); }
+    finally { setPhase("idle"); }
+  }
+  return <PackagingCloseFields model={model}
+    disabled={phase !== "idle"} retry={phase === "unknown"} ready={ready || phase === "unknown"}
+    onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) }))}
+    onOutput={(id, value) => setQuantities(previous => ({ ...previous, [id]: value }))}
+    onActual={(key, patch) => setActuals(previous => patchActual(previous, key, patch))}
+    onAdd={() => setActuals(previous => [...previous, emptyPackagingActual()])}
+    onRemove={key => setActuals(previous => removeActual(previous, key))}
+    onSubmit={() => { if (ready || phase === "unknown") void submit(() => ({
+      runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
+      outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
+      planRevision: plan.revision, actuals: packagingActualPayload(actuals),
+    })); }}
+    onRefresh={() => { void refreshPlan(); }} messages={<CommandFormMessage error={error} />} />;
 }
