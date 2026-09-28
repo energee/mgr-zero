@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendOrderEmail } from "@/lib/email/transport";
+import { EmailProviderError, sendOrderEmail } from "@/lib/email/transport";
 
 const message = { from: "MGR <orders@example.test>", to: "buyer@example.test", subject: "Order 42 confirmed", text: "Your order is confirmed." };
 afterEach(() => vi.unstubAllGlobals());
@@ -27,5 +27,14 @@ describe("buyer confirmation transport", () => {
       .mockResolvedValueOnce(Response.json({ unexpected: "ok" })));
     await expect(sendOrderEmail("delivery-42", message, "test-key")).rejects.toThrow("Email provider rejected request (429)");
     await expect(sendOrderEmail("delivery-42", message, "test-key")).rejects.toThrow("Email provider response has no id");
+  });
+
+  it("retries our own configuration errors but not a rejected message", async () => {
+    for (const [status, retryable] of [[401, true], [403, true], [422, false]] as const) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ name: "error" }, { status })));
+      const error = await sendOrderEmail("delivery-42", message, "test-key").catch((e: unknown) => e);
+      expect(error, String(status)).toBeInstanceOf(EmailProviderError);
+      expect((error as EmailProviderError).retryable, String(status)).toBe(retryable);
+    }
   });
 });

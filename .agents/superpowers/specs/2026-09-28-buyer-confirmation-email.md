@@ -25,7 +25,9 @@ key; retries wait five minutes. A lost response can replay the identical body.
 The worker stops retries 23 hours after the first lease. An uncertain message
 then stays blocked for operator investigation; it never gets a fresh identity
 automatically. This conservative margin also covers lease and request timeouts.
-Permanent provider rejection stays blocked. There is no automatic resend of a
+Permanent provider rejection stays blocked. A 401 or 403 is MGR's own key or
+sending domain, not the buyer, so it retries like a transport error until the
+configuration is fixed or the window ends. There is no automatic resend of a
 blocked confirmation and no replay of confirmations predating this migration.
 
 Admin and Sales can read delivery states for a tenant-visible order through

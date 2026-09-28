@@ -6,10 +6,13 @@ import { readOrderEmailEnv } from "@/lib/env/server-parser";
 import { unwrap } from "@/lib/commands/registry";
 import { EmailProviderError, sendOrderEmail } from "./transport";
 
+// `to` is only required, not re-validated: Auth already accepted the address
+// and a stricter check here would throw for the whole leased batch. The
+// provider rejects an undeliverable one, which blocks only that row.
 const leasesSchema = z.array(z.object({
   id: z.string().uuid(), lease_token: z.string().uuid(),
   lease_expires_at: z.string().datetime({ offset: true }), retry_before: z.string().datetime({ offset: true }),
-  payload: z.object({ from: z.string().min(1), to: z.string().email(), subject: z.string(), text: z.string() }),
+  payload: z.object({ from: z.string().min(1), to: z.string().min(1), subject: z.string(), text: z.string() }),
 }));
 
 export async function runOrderEmailBatch() {

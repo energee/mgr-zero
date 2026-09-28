@@ -38,6 +38,12 @@ describe("order email job", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_retry: false, p_error: "retry_window_expired" }));
   });
+  it("leaves recipient judgement to the provider so one unusual address cannot stall the batch", async () => {
+    const odd = { ...delivery, id: crypto.randomUUID(), payload: { ...delivery.payload, to: "o&k@brewer.test" } };
+    rpc.mockResolvedValueOnce({ data: [odd, delivery], error: null }).mockResolvedValue({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => Response.json({ id: "provider-id" })));
+    await expect(runOrderEmailBatch()).resolves.toEqual({ accepted: 2, retry: 0, blocked: 0 });
+  });
   it("fails closed before leasing when provider configuration is absent", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     await expect(runOrderEmailBatch()).rejects.toThrow("RESEND_API_KEY");
