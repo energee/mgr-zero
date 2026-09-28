@@ -69,15 +69,17 @@ defineQuery({
   roles: ["admin", "sales", "warehouse"],
   input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer"), missingPortalEmail: z.boolean().optional().describe("Admin/Sales only: customers without a current portal login email") }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
-  handler: (ctx, i) => completeRows("Customer list", start => {
+  handler: (ctx, i) => {
     if (i.missingPortalEmail && ctx.role !== "admin" && ctx.role !== "sales") throw new CommandError("permission denied", 403, "permission_denied");
+    return completeRows("Customer list", start => {
     const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";
     const query = (i.missingPortalEmail
       ? ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact" }).select(columns)
       : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId))
       .order("name").order("id");
     return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
-  }),
+    });
+  },
 });
 
 defineQuery({

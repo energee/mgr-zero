@@ -129,7 +129,6 @@ describe("Ship-to form", () => {
   });
 });
 
-
 it("distinguishes a resolved missing-email review from an empty customer book", () => {
   const model = toCustomersViewProps({ customers: [], missingPortalEmail: true });
   expect(model.empty?.title).toBe("All customers have a portal login email");
@@ -138,7 +137,6 @@ it("distinguishes a resolved missing-email review from an empty customer book", 
   expect(markup).toContain("presence");
   expect(markup).not.toContain("No customers yet");
 });
-
 
 it("keeps Accounting Review in the shared filtered customer inventory", () => {
   expect(screen("Accounting").to?.Review).toBe("Customers missing email");

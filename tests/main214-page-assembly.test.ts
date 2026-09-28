@@ -126,7 +126,6 @@ it("converted inventory frames never navigate into the live catalog/customer/loc
   }
 });
 
-
 it("asks the registered customer query for the missing-email subset", async () => {
   const page = await CustomersPage({ searchParams: Promise.resolve({ missingEmail: "1" }) });
   expect(state.customerInput).toEqual({ missingPortalEmail: true });

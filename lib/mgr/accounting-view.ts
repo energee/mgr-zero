@@ -7,14 +7,15 @@ export type AccountingViewModel = {
   defaults?: { allowAch: boolean; allowCard: boolean }; missingEmails?: number; remoteRevocationUnresolved: boolean;
   backHref?: string; disconnectHref?: string; mappingsHref?: string; customersHref?: string;
 };
-export function toAccountingViewProps(health: QboHealth): AccountingViewModel {
+/** missingEmails: count_customers_missing_portal_email, when the caller read it. */
+export function toAccountingViewProps(health: QboHealth, missingEmails?: number): AccountingViewModel {
   return {
     connected: health.connected && health.state === "connected", canDisconnect: disconnectStatus(health) === "available",
     company: health.realmLabel ?? "QuickBooks Online", status: `${health.state.replaceAll("_", " ")}${health.realmId ? ` · company ${health.realmId}` : ""}`,
     reconnect: Boolean(health.connectionId), error: health.lastError,
     access: health.accessExpiresAt ? `renews automatically · current token expires ${health.accessExpiresAt.slice(0, 10)}` : undefined,
     defaults: typeof health.allowAch === "boolean" && typeof health.allowCard === "boolean" ? { allowAch: health.allowAch, allowCard: health.allowCard } : undefined,
-    remoteRevocationUnresolved: disconnectStatus(health) === "unresolved",
+    missingEmails, remoteRevocationUnresolved: disconnectStatus(health) === "unresolved",
   };
 }
 

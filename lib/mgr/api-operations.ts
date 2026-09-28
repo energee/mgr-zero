@@ -38,8 +38,8 @@ export const API_AREAS = [
   { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|tap_history|replenishment)/ },
   { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart)/ },
   { slug: "orders", title: "Orders & invoicing", match: /(order|invoice|pick|allocation|credit_memo|restock)/ },
-  { slug: "inventory", title: "Inventory & locations", match: /^(?!list_pos_locations$)(?!set_pos_location_mapping$)(?!.*_invitation$)(?!count_customers_missing_portal_email$).*(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
   { slug: "customers", title: "Customers", match: /^(?!set_qbo_customer_mapping$).*(customer|ship_to|portal_fulfillment)/ },
+  { slug: "inventory", title: "Inventory & locations", match: /^(?!list_pos_locations$)(?!set_pos_location_mapping$)(?!.*_invitation$).*(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
   { slug: "team", title: "Team & brewery settings", match: /(staff|team|invite|invitation|brewery|provision|first_run|operating_defaults|import_csv|gravity_unit|qbo|square|pos_)/ },
   { slug: "today", title: "Today & notifications", match: /(today|work|notification|shortfall|search_entities|beer_overview|snooze|quiet_hours|chat|preview_command)/ },
 ] as const;

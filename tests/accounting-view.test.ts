@@ -8,6 +8,7 @@ it("keeps disconnected and missing accounting facts distinct from configured def
   const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null });
   expect(model.defaults).toBeUndefined();
   expect(model.missingEmails).toBeUndefined();
+  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, 3).missingEmails).toBe(3);
   expect(model.backHref).toBeUndefined();
   expect(model.connected).toBe(false);
   const recovery = toAccountingViewProps({ connected: false, state: "recovery_required", connectionId: "actual", realmLabel: "Actual company", lastError: "Refresh refused", allowAch: false, allowCard: true });
@@ -37,7 +38,6 @@ it("offers the disconnect action by default and does not leak fixture paths", ()
   expect(account).not.toContain("Save push defaults");
   expect(account).not.toContain('href="/settings');
 });
-
 
 it("reports portal-email presence without claiming delivery or blocking push", () => {
   const model = { ...toAccountingViewProps({ connected: false, state: "disconnected" as const, realmLabel: null, lastError: null }), missingEmails: 2, customersHref: "/customers?missingEmail=1" };
