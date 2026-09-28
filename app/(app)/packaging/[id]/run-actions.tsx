@@ -5,7 +5,7 @@
 // finished-goods location + bin).
 "use client";
 
-import { PackagingSource, type PackagingSourceOccupancy } from "@/components/mgr/views/plan-actions";
+import { PackagingSource, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { closeRunReady } from "@/lib/mgr/close-packaging-run-view";
 
-type Occupancy = PackagingSourceOccupancy;
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };

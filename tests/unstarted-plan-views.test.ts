@@ -1,3 +1,9 @@
+import { readFileSync } from "node:fs";
+import { PlanActions, PackagingSource } from "@/components/mgr/views/plan-actions";
+import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
+import { BrewDayView } from "@/components/mgr/views/brew-day";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 import { expect, it } from "vitest";
 import { batchesFromQuery } from "@/lib/mgr/batches-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
@@ -13,13 +19,7 @@ it("retains cancelled plans as history without offering physical work", () => {
   expect(runs.recent[0]).toMatchObject({ verb: "Open", detail: expect.stringContaining("Cancelled") });
 });
 
-it("shares plan controls across inventory and live views and hides them for cancelled work", async () => {
-  const { createElement } = await import("react");
-  const { renderToStaticMarkup } = await import("react-dom/server");
-  const { BrewDayView } = await import("@/components/mgr/views/brew-day");
-  const { ClosePackagingRunView } = await import("@/components/mgr/views/close-packaging-run");
-  const { PlanActions, PackagingSource } = await import("@/components/mgr/views/plan-actions");
-  const { readFileSync } = await import("node:fs");
+it("shares plan controls across inventory and live views and hides them for cancelled work", () => {
   const controls = renderToStaticMarkup(createElement(PlanActions, { plannedOn: "2026-09-28", busy: true, error: "Plan already started" }));
   expect(controls).toContain("Plan already started");
   expect(controls).toContain("disabled");
