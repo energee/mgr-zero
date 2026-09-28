@@ -9,7 +9,7 @@ import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
-import { type OrderStatus } from "@/lib/mgr/order-status";
+import { hasRole, salesRoles, type OrderStatus } from "@/lib/mgr/order-status";
 import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
@@ -17,7 +17,7 @@ const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "s
 export function OrdersClient({ role, status, customerId, cursor }: { role: StaffRole; status?: string; customerId?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
-  const canWrite = role === "admin" || role === "sales";
+  const canWrite = hasRole(salesRoles, role); // create_order's roles
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
     if (customerId) query.set("customerId", customerId);

@@ -1,4 +1,8 @@
+import "@/lib/commands/all";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RequestAuthContext } from "@/lib/auth/request-context";
+import { runCommand } from "@/lib/commands/registry";
+import type { Database } from "@/lib/supabase/database";
 
 export type InviteAudience = "staff" | "customer";
 
@@ -36,4 +40,10 @@ export async function inviteLanding(auth: RequestAuthContext, audience: InviteAu
 
   const [membership] = await auth.getCustomerMemberships();
   return membership && { audience, name: membership.breweryName, role: "customer", email: identity.email };
+}
+
+/** Sign-in landings send an account with consent invitations waiting to /invitations first. */
+export async function hasPendingInvitations(db: SupabaseClient<Database>, userId: string) {
+  const pending = await runCommand("list_my_invitations", {}, { db, userId, breweryId: null, role: null }) as unknown[];
+  return pending.length > 0;
 }

@@ -3,12 +3,12 @@ import type { RepackViewModel } from "@/lib/mgr/repack-view";
 import type { SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
 
 export const packagingRuns: PackagingRunSnapshot[] = [
-  { id: "run31", run_no: 31, planned_on: "Fri 9/5", started_at: null, closed_at: null, brand_name: "Hazy cans", vessel_name: "FV3", qty_planned: 118, planned_unit: "cases", material_shortfall: "480 ends short" },
-  { id: "run32", run_no: 32, planned_on: "Tue 9/9", started_at: null, closed_at: null, brand_name: "Pils ½ bbl", vessel_name: "FV1", qty_planned: 40, planned_unit: "kegs" },
-  { id: "run33", run_no: 33, planned_on: "Thu 9/11", started_at: null, closed_at: null, brand_name: "Stout cans", vessel_name: null, qty_planned: 0 },
-  { id: "run30", run_no: 30, planned_on: "Tue 9/2", started_at: "2026-09-02", closed_at: "2026-09-02", brand_name: "Pils cans", vessel_name: "FV1", qty_planned: 96, lot_code: "L-240902-PL", output_summary: "96 cases", yield_percent: 97 },
-  { id: "run29", run_no: 29, planned_on: "Fri 8/29", started_at: "2026-08-29", closed_at: "2026-08-29", brand_name: "Hazy ½ bbl", vessel_name: "FV3", qty_planned: 38, lot_code: "L-240829-HZ", output_summary: "38 kegs", yield_percent: 95 },
-  { id: "run28", run_no: 28, planned_on: "Wed 8/27", started_at: "2026-08-27", closed_at: "2026-08-27", brand_name: "Helles cans", vessel_name: "FV2", qty_planned: 110, lot_code: "L-240827-HL", output_summary: "110 cases", yield_percent: 92, loss_bbl: 2 },
+  { id: "run31", run_no: 31, planned_on: "Fri 9/5", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Hazy cans", vessel_name: "FV3", qty_planned: 118, planned_unit: "cases", material_shortfall: "480 ends short" },
+  { id: "run32", run_no: 32, planned_on: "Tue 9/9", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Pils ½ bbl", vessel_name: "FV1", qty_planned: 40, planned_unit: "kegs" },
+  { id: "run33", run_no: 33, planned_on: "Thu 9/11", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Stout cans", vessel_name: null, qty_planned: 0 },
+  { id: "run30", run_no: 30, planned_on: "Tue 9/2", started_at: "2026-09-02", closed_at: "2026-09-02", cancelled_at: null, brand_name: "Pils cans", vessel_name: "FV1", qty_planned: 96, lot_code: "L-240902-PL", output_summary: "96 cases", yield_percent: 97 },
+  { id: "run29", run_no: 29, planned_on: "Fri 8/29", started_at: "2026-08-29", closed_at: "2026-08-29", cancelled_at: null, brand_name: "Hazy ½ bbl", vessel_name: "FV3", qty_planned: 38, lot_code: "L-240829-HZ", output_summary: "38 kegs", yield_percent: 95 },
+  { id: "run28", run_no: 28, planned_on: "Wed 8/27", started_at: "2026-08-27", closed_at: "2026-08-27", cancelled_at: null, brand_name: "Helles cans", vessel_name: "FV2", qty_planned: 110, lot_code: "L-240827-HL", output_summary: "110 cases", yield_percent: 92, loss_bbl: 2 },
 ];
 
 export const schedulePackagingRun: SchedulePackagingRunViewModel = {
@@ -27,7 +27,7 @@ export const schedulePackagingRun: SchedulePackagingRunViewModel = {
   leftInSource: "0.4 bbl · loss at close unless held",
   leftLabel: "Left in FV3",
   materials: [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", "432"], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]],
-  warning: "432 ends short. Save the plan now; Start stays disabled until the shortage is resolved or overridden on the run.",
+  warning: "432 ends short. Save the plan now; closing requires enough stock for confirmed used plus lost quantities.",
 };
 
 export const repackCase: RepackViewModel = {

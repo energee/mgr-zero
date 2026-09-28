@@ -9,7 +9,8 @@ import { SquareSyncControls } from "@/components/mgr/views/pos-controls";
 type Health = DisconnectHealth & { connected: boolean; merchantLabel: string | null; lastError: string | null; salesSyncedThrough?: string | null };
 type Location = { mgrLocationId: string | null };
 
-export default async function PosPage() {
+export default async function PosPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const oauthFailed = (await searchParams).error === "oauth";
   const { brewery, ctx } = await requireAdminContext("Point of sale");
   const health = await runCommand("get_pos_integration_health", {}, ctx) as Health;
   const locations = health.connected ? await runCommand("list_pos_locations", {}, ctx) as Location[] : [];
@@ -18,6 +19,6 @@ export default async function PosPage() {
     connected: health.connected, canDisconnect: disconnectStatus(health) === "available", merchant: health.merchantLabel ?? "Square seller", state: health.state.replaceAll("_", " "),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
     lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough, brewery.timeZone) : "No complete sales coverage yet",
-    error: health.lastError,
+    error: health.lastError, oauthFailed,
   }} syncAction={health.connected ? <SquareSyncControls /> : undefined} paths={{ back: "/settings", connect: "/settings/pos/connect", disconnect: "/settings/pos/disconnect", locations: "/settings/pos/locations", mapping: "/settings/pos/mapping", menu: "/menu", connector: "/settings/pos/connector" }} />;
 }

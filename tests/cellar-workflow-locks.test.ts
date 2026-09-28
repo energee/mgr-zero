@@ -47,7 +47,7 @@ async function brew(bbl = 10) {
   const catalog = await seedCatalog(breweryId, { product: `Lock ${crypto.randomUUID()}`, bblPerUnit: 0.01 });
   const vessel = await runCommand("upsert_vessel", { name: `Lock FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100 }, brewer) as { id: string };
   const batch = await runCommand("schedule_batch", { intendedBrandId: catalog.brandId, plannedOn: "2026-09-01", plannedBbl: bbl }, brewer) as { id: string };
-  const day = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn: "2026-09-01" }, brewer) as { occupancy: { id: string } };
+  const day = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn: "2026-09-01" }, brewer) as { occupancy: { id: string } };
   return { batchId: batch.id, occupancyId: day.occupancy.id, vesselId: vessel.id, ...catalog };
 }
 
@@ -101,8 +101,9 @@ describe.sequential("cellar workflow serialization", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, brewer);
     const a = await client(brewer.userId, true);
     const b = await client(brewer.userId, false);
-    await a.query("select public.close_packaging_run($1,$2,9.95,$3::jsonb,$4,'2026-09-02',null,$5,$6,$7)", [
-      breweryId, run.id, JSON.stringify([{ sku_id: f.skuId, qty_actual: 995 }]), `LOCK-${crypto.randomUUID()}`, location.id, location.binId, crypto.randomUUID(),
+    const materialPlan = await runCommand("get_packaging_close_plan", { runId: run.id }, brewer) as { revision: string };
+    await a.query("select public.close_packaging_run($1,$2,9.95,$3::jsonb,$4,'2026-09-02',null,$5,$6,$7,'[]'::jsonb,$8)", [
+      breweryId, run.id, JSON.stringify([{ sku_id: f.skuId, qty_actual: 995 }]), `LOCK-${crypto.randomUUID()}`, location.id, location.binId, crypto.randomUUID(), materialPlan.revision,
     ]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;

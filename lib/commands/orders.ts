@@ -3,12 +3,14 @@
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import { z } from "zod";
+import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
+import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
+import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
+import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
-const salesRoles = ["admin", "sales"] as const;
-const warehouseRoles = ["admin", "warehouse"] as const;
 const readRoles = ["admin", "sales", "warehouse"] as const;
 const toLines = (ls: z.infer<typeof lines>) => ls.map(l => ({ sku_id: l.skuId, qty: l.qty }));
 
@@ -92,10 +94,18 @@ defineCommand({
 });
 
 defineCommand({
-  name: "confirm_delivery", description: "Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock",
+  name: "confirm_delivery", description: "Close a stop with accepted and refused quantities; invoice only accepted goods on delivery, never restore stock",
   roles: [...warehouseRoles], requiresConfirmation: true,
-  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().min(1) }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", { p_delivery: i.deliveryId, p_signed_by: i.signedBy, p_request_id: execution.requestId })),
+  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().optional(),
+    refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive() })).default([]),
+    reason: z.enum(REFUSAL_REASONS).optional(),
+    note: z.string().optional(), transferRefused: z.boolean().default(false),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", {
+    p_delivery: i.deliveryId, p_signed_by: i.signedBy ?? "", p_request_id: execution.requestId,
+    p_refused: i.refused.map((l) => ({ order_line_id: l.orderLineId, qty: l.qty })),
+    p_reason: i.reason ?? null, p_note: i.note ?? null, p_transfer_refused: i.transferRefused,
+  })),
 });
 
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
@@ -185,12 +195,12 @@ defineCommand({
   name: "return_shipment", description: "Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
-    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
+    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
     lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
-    p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
+    p_refused_delivery: i.refusedDeliveryId, p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
 
@@ -290,6 +300,21 @@ defineQuery({
   },
 });
 
+// Both invoice reads use the same current connection and exact successful push provenance.
+async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id: string })[]) {
+  if (!invoices.length || (ctx.role !== "admin" && ctx.role !== "sales")) return new Map(invoices.map(invoice => [invoice.id, null]));
+  const connection = await runCommand("get_qbo_connection", {}, ctx) as QboStaffConnection;
+  const pushes = connection.connected && connection.connectionId && connection.realmId
+    ? await completeRows("Invoice provider identities", start => ctx.db.from("qbo_pushes")
+      .select("id,invoice_id,connection_id,realm_id,qbo_entity_id", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("connection_id", connection.connectionId!).eq("realm_id", connection.realmId!)
+      .eq("status", "pushed").eq("entity_type", "Invoice").in("invoice_id", invoices.map(invoice => invoice.id))
+      .order("id").range(start, start + PAGE_SIZE - 1)) as (QboPushedIdentity & { invoice_id: string })[] : [];
+  const pushByEntity = new Map(pushes.map(push => [`${push.invoice_id}:${push.qbo_entity_id}`, push]));
+  return new Map(invoices.map(invoice => [invoice.id, qboStaffInvoiceLink(invoice, ctx.role, connection,
+    pushByEntity.get(`${invoice.id}:${invoice.qbo_invoice_id}`))]));
+}
+
 defineQuery({
   name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
   roles: [...readRoles],
@@ -297,18 +322,20 @@ defineQuery({
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) as (HistoryRow & { kind: "invoice" | "credit_memo"; qbo_total_cents: number | null })[], i.limit);
+    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) as (HistoryRow & QboInvoiceIdentity & { qbo_total_cents: number | null })[], i.limit);
     const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);
+    const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
     const [totals, pendingPushes] = ids.length ? await Promise.all([
       unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
       unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
     ]) : [[], []];
+    const staffLinks = await staffLinksPromise;
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
     const pending = new Set(pendingPushes.map(push => push.invoice_id));
     return { ...page, rows: invoices.map(inv => {
       const subtotal_cents = subtotalById.get(inv.id) ?? 0;
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id) };
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
 });
@@ -319,11 +346,13 @@ defineQuery({
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [invoice, invLines, pendingPush] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).single()),
-      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId)),
+      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
     ]);
-    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush) };
+    if (!invoice) throw new Error("Invoice not found");
+    const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
+    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush), quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },
 });
 
@@ -364,13 +393,22 @@ defineQuery({
 export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
 defineQuery({
   name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
-  roles: [...salesRoles], input: z.object({ invoiceId: z.string().uuid() }),
+  roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional() }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
   handler: async (ctx, i) => {
-    const invoice = await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single());
+    const invoice = i.deliveryId
+      ? await unwrap(ctx.db.from("deliveries").select("shipment_id").eq("id", i.deliveryId).eq("brewery_id", ctx.breweryId).single())
+      : await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId!).eq("brewery_id", ctx.breweryId).single());
     if (!invoice?.shipment_id) return [];
     const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
     if (!shipment) throw new Error("Shipment not found");
     return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as ReturnSource[];
   },
+});
+
+defineQuery({
+  name: "get_order_email_status", description: "Read buyer confirmation email states for an order; provider acceptance does not prove inbox delivery",
+  roles: ["admin", "sales"],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_order_email_status", { p_brewery: ctx.breweryId, p_order: i.orderId })),
 });

@@ -178,13 +178,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 ## get_invoice_return_sources [#get_invoice_return_sources]
 
-`query` · admin, sales
+`query` · admin, warehouse, sales
 
 Original shipped movements available as explicit return identities
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `invoiceId` | uuid | yes |
+| `invoiceId` | uuid | no |
+| `deliveryId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -208,6 +209,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## get_order_email_status [#get_order_email_status]
+
+`query` · admin, sales
+
+Read buyer confirmation email states for an order; provider acceptance does not prove inbox delivery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order_email_status", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## get_order_ship_sources [#get_order_ship_sources]

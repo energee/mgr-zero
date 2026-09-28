@@ -7,7 +7,7 @@ import { z } from "zod";
 import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
 
 export type TodayItem = {
-  reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "fermentation_reading_overdue" | "invoice_question";
+  reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "refused_return" | "fermentation_reading_overdue" | "invoice_question";
   subjectType: "order" | "delivery" | "occupancy" | "invoice";
   subjectId: string;
   sourceVersion: string;

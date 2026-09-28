@@ -4,8 +4,7 @@
 // to call.
 import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
-import { getActiveCustomer } from "@/lib/portal";
-import { buildContext } from "@/lib/commands/context";
+import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
 import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import "@/lib/commands/all";
@@ -19,9 +18,9 @@ type Order = {
 };
 
 export default async function PortalOrdersPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
-  const [params, customer] = await Promise.all([searchParams, getActiveCustomer()]);
-  const cursor = pageCursor(params.cursor);
-  const records = (await runCommand("portal_orders", { cursor }, await buildContext(customer.breweryId))) as HistoryPage<Order & HistoryRow>;
+  const cursor = pageCursor((await searchParams).cursor);
+  const { customer, ctx } = await getPortalContext();
+  const records = (await runCommand("portal_orders", { cursor }, ctx)) as HistoryPage<Order & HistoryRow>;
   const page = historyPage(records, "/portal/orders", cursor);
   return (
     <PortalOrdersView

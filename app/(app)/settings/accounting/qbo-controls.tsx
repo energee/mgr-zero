@@ -9,6 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 
@@ -45,9 +46,14 @@ function QboMappingFields({ kind, localId, label, currentId, context = "accounti
   </QboMappingSheetView>;
 }
 
-export function QboSyncButton() {
-  const action = useCommandAction();
-  return <QboSyncView busy={action.busy} error={action.error} onSync={() => void action.run("sync_qbo_payments", {})} />;
+export function QboSyncButton({ status, disabled = false }: { status?: QboSyncStatus; disabled?: boolean }) {
+  const action = useCommandAction(), router = useRouter();
+  // A superseded result needs no local notice: the refreshed stored status already shows it.
+  const sync = async () => {
+    await action.run("sync_qbo_payments", {}, undefined, status?.retryRequestId ?? undefined, { refresh: false });
+    router.refresh();
+  };
+  return <QboSyncView status={status} disabled={disabled} busy={action.busy} error={action.error} onSync={() => void sync()} />;
 }
 
 export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoiceId: string; invoiceLabel: string; actions: QboInvoiceAction[] }) {

@@ -14,7 +14,7 @@ Enter your **Email** and the **Password** you chose, then select **Sign in**. A 
 
 <Screen name="Portal forgot password" />
 
-A used, expired, or wrong-audience invitation opens **Invite expired**. Sign in if you already joined, or select **Reset password**. Contact brewery staff if your customer access is missing. The brewery can remove your access to a customer. From your next page or action, even if you are signed in, MGR no longer shows or accepts that customer's orders; the orders and invoices you placed stay with the customer. The brewery cannot resend an invitation or attach an existing sign-in account through the invite form. Entry cards sit near the bottom of a phone screen and center on wider screens.
+A used, expired, or wrong-audience invitation opens **Invite expired**. Sign in if you already joined, or select **Reset password**. Contact brewery staff if your customer access is missing. The brewery can remove your access to a customer. From your next page or action, even if you are signed in, MGR no longer shows or accepts that customer's orders; the orders and invoices you placed stay with the customer. If you already have a sign-in account, the brewery can invite you again. Sign in and open [Invitations](/invitations), review the brewery and customer account, then select **Accept invitation**. Access starts only after you consent. Pending invitations expire after seven days. Accepting opens the invited customer account. If you belong to several customer accounts, open **Me**, choose **Customer account**, and select **Switch account**. An old accepted invitation cannot restore removed access; ask for a new one. Entry cards sit near the bottom of a phone screen and center on wider screens.
 
 <Screen name="Portal set password" />
 
@@ -38,7 +38,7 @@ The brewery's public taproom menu is a separate read-only website feed. Publishi
 
 New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
 
-Below the list, **Coming up** opens what the brewery plans to brew next: one row per beer and the week it is expected, from this week on, soonest first. A plan whose week has passed without brewing drops off. Tap a beer to jump to it on Shop. A beer marked **not yet listed** has no wholesale package to order yet; ask the brewery. Dates are the brewery’s plan and can move. Nothing else about a batch is shown.
+Below the list, **Coming up** opens what the brewery plans to brew next: one row per beer and the week it is expected, from this week on, soonest first. A cancelled plan or a plan whose week has passed without brewing drops off. Rescheduling moves it to the new planned week. Tap a beer to jump to it on Shop. A beer marked **not yet listed** has no wholesale package to order yet; ask the brewery. Dates are the brewery’s plan and can move. Nothing else about a batch is shown.
 
 <Screen name="Coming up" />
 
@@ -72,6 +72,8 @@ From a shipped order, **Reorder** starts a new cart with still-active, currently
 **staged — needs restocking** means the brewery changed an order after it had been picked, and warehouse staff still need to put the staged stock back.
 
 ## Orders [#orders]
+
+When the brewery confirms your order, MGR queues an email to each buyer linked to your customer account. Email delivery depends on the brewery's sending setup and may be delayed or blocked. Check the order here for its current status; an email reflects the details when it was confirmed.
 
 Order history shows up to 50 records, newest first. **More** opens older records when available; **Newest** returns to the latest page.
 
@@ -122,3 +124,9 @@ If the application and this guide disagree, report the page, action, and exact m
 In the [screen explorer](/docs/screens-explore), sign in and password recovery lead to Shop. The buyer is Jordan Lee throughout. Product rows stay in the portal. Orders and Invoices open their customer detail screens, and Reorder returns to Shop. Account addresses are read-only. Me offers Change password. Pay invoice stands in for a QuickBooks payment link; the walkthrough does not open a payment session.
 
 If an invoice question loses its response, use **Retry saved request** in **Unresolved requests**. It sends the saved input with its original identity. Edited input waits for recovery. Reloading the same browser tab preserves it; changing accounts hides it until you return to the original account. Nothing is sent automatically. Keep the tab open until the outcome is recovered.
+
+If a payment link cannot open, MGR returns you to the invoice, says online payment isn’t available, and keeps **Question this invoice** available; contact the brewery to arrange payment.
+
+### Refused delivery quantities
+
+Order detail shows refused and accepted quantities when a delivery is partly or fully refused. Refused units close on that order; place a new order for redelivery. When the brewery invoices on delivery, its invoice covers only accepted beer and deposits. A full refusal creates no on-delivery invoice. An invoice issued at ship remains until the brewery records the physical return and credit.

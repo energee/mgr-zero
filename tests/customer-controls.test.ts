@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { admin, asUser, channelId, makeBrewery, makeCustomerUser, makeStaffCtx } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
+import { upsertCustomerInput } from "../app/(app)/customers/customer-form";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>, breweryId: string, channel: string;
 const address = { label: "Main", address1: "1 Main St", city: "Philadelphia", state: "PA", zip: "19107" };
@@ -19,8 +20,8 @@ describe("customer controls", () => {
   it("customer edit sends the prefilled tax override and preserves it on an unrelated name edit", async () => {
     const source = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(source).toContain("customer?.taxTreatment");
-    expect(source).toMatch(/taxTreatment: taxTreatment/);
-    const input = { name: "Export account", type: "retailer", state: "PA", saleChannelId: channel, taxTreatment: "export" };
+    const input = upsertCustomerInput({ name: "Export account", type: "retailer", state: "pa", saleChannelId: channel, licenseNumber: "", paymentTerms: "net30", taxTreatment: "export" });
+    expect(input).toMatchObject({ state: "PA", taxTreatment: "export", licenseNumber: undefined });
     const saved = await runCommand("upsert_customer", input, ctx) as { id: string; tax_treatment: string };
     const updated = await runCommand("upsert_customer", { ...input, id: saved.id, name: "New name", taxTreatment: saved.tax_treatment }, ctx) as { tax_treatment: string };
     expect(updated.tax_treatment).toBe("export");

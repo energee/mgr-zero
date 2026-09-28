@@ -3,14 +3,15 @@
 // replaces a route's stops in one RPC; depart/confirm/return walk the route
 // and Today's delivery_next follows the assigned driver.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
+import { Client } from "pg";
+import { DB, admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string };
 let adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let whId: string, whBinId: string, storageId: string, storageBinId: string;
-let customerId: string, shipToId: string, skuId: string;
+let customerId: string, shipToId: string, skuId: string, lotId: string;
 
 beforeAll(async () => {
   b = await makeBrewery();
@@ -19,6 +20,13 @@ beforeAll(async () => {
   ({ id: storageId, binId: storageBinId } = await seedLocation(b.id, { name: "Storage", uses: ["storage"] }));
   const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
   skuId = cat.skuId;
+  const pool = await ins("keg_pools", { brewery_id: b.id, name: "Return fleet", kind: "owned", deposit_cents: 2500 });
+  const { error: poolError } = await admin.from("skus").update({ container_source: "owned_fleet", keg_pool_id: pool.id }).eq("id", skuId);
+  if (poolError) throw poolError;
+  const run = await ins("packaging_runs", { brewery_id: b.id, brand_id: cat.brandId, planned_on: "2026-09-01", created_by: adminCtx.userId });
+  const lot = await ins("lots", { brewery_id: b.id, packaging_run_id: run.id, brand_id: cat.brandId, code: "REFUSED-LOT", packaged_on: "2026-09-01" });
+  lotId = lot.id;
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, lot_id: lotId, qty: 20, type: "opening_balance", created_by: adminCtx.userId });
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
@@ -26,7 +34,7 @@ beforeAll(async () => {
 });
 
 /** A shipped wholesale order; returns its shipment id. */
-async function shipment(qty = 2, invoiceTiming: "now" | "on_delivery" = "now") {
+async function shipment(qty = 2, invoiceTiming: "now" | "on_delivery" = "now", sourceLotId?: string) {
   const { order_id: id } = await runCommand("create_order", {
     kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty }],
   }, adminCtx) as { order_id: string };
@@ -34,7 +42,7 @@ async function shipment(qty = 2, invoiceTiming: "now" | "on_delivery" = "now") {
   await runCommand("confirm_order", { orderId: id }, adminCtx);
   const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
   await runCommand("record_pick", { orderId: id, picks: [{ lineId: line!.id, qty }] }, adminCtx);
-  await runCommand("ship_order", { orderId: id, ship: [{ lineId: line!.id, qty }], invoiceTiming }, adminCtx);
+  await runCommand("ship_order", { orderId: id, ship: [{ lineId: line!.id, qty, ...(sourceLotId ? { sources: [{ binId: whBinId, lotId: sourceLotId, qty }] } : {}) }], invoiceTiming }, adminCtx);
   const { data: sh } = await admin.from("shipments").select("id").eq("order_id", id).single();
   return sh!.id as string;
 }
@@ -184,29 +192,162 @@ describe("depart, confirm, and return a route", () => {
 });
 
 describe("route edges", () => {
-  it("keeps a failed stop open and blocks return without creating delivery money or stock effects", async () => {
+  it("replays a completed pre-outcome request without changing the original payload identity", async () => {
+    const sh = await shipment(2, "on_delivery");
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const requestId = crypto.randomUUID();
+    const input = { deliveryId: stop!.id, signedBy: "Pat" };
+    const saved = await runCommand("confirm_delivery", input, adminCtx, { requestId, correlationId: requestId }) as { delivery_id: string; invoice_id: string };
+    const legacy = { delivery_id: saved.delivery_id, invoice_id: saved.invoice_id };
+    // A completed request persisted by the old three-argument RPC.
+    sql(`update private.command_requests set payload_hash = extensions.digest(jsonb_build_object('delivery','${stop!.id}'::uuid,'signed_by','Pat')::text,'sha256'),
+      result = '${JSON.stringify(legacy)}'::jsonb where actor_id='${adminCtx.userId}' and request_id='${requestId}'`);
+    expect(await runCommand("confirm_delivery", input, adminCtx, { requestId, correlationId: requestId })).toEqual(legacy);
+    expect(await runCommand("confirm_delivery", { ...input, note: "" }, adminCtx, { requestId, correlationId: requestId })).toEqual(legacy);
+    await expect(runCommand("confirm_delivery", { ...input, transferRefused: true }, adminCtx, { requestId, correlationId: requestId })).rejects.toThrow(/different payload/i);
+    expect((await admin.from("invoices").select("id").eq("shipment_id", sh)).data).toHaveLength(1);
+  });
+
+  it("keeps invoice-now money until physical Return and credit clears the refusal", async () => {
+    const sh = await shipment(4, "now");
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[]; invoice: { id: string } };
+    await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat", refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "customer_refused" }, adminCtx);
+    const { data: billed } = await admin.from("invoice_lines").select("id, qty").eq("invoice_id", detail.invoice.id).eq("kind", "sku").single();
+    expect(billed!.qty).toBe(4);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    // An accepted unit returned later is distinct from the two refused units.
+    const acceptedInput = { invoiceId: detail.invoice.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1 }] };
+    const acceptedRequest = crypto.randomUUID();
+    const acceptedResult = await runCommand("return_shipment", acceptedInput, adminCtx, { requestId: acceptedRequest, correlationId: acceptedRequest });
+    // Preserve completed requests written by the original five-argument RPC.
+    sql(`update private.command_requests set payload_hash=extensions.digest(jsonb_build_object('invoice','${detail.invoice.id}'::uuid,'lines',jsonb_build_array(jsonb_build_object('invoice_line_id','${billed!.id}','qty',1)),'location','${whId}'::uuid,'reason','unsold')::text,'sha256') where actor_id='${adminCtx.userId}' and request_id='${acceptedRequest}'`);
+    expect(await runCommand("return_shipment", acceptedInput, adminCtx, { requestId: acceptedRequest, correlationId: acceptedRequest })).toEqual(acceptedResult);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    const input = { invoiceId: detail.invoice.id, refusedDeliveryId: stop!.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 2 }] };
+    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: crypto.randomUUID() }, adminCtx)).rejects.toThrow(/closed refused delivery/i);
+    const otherShipment = await shipment(1, "now");
+    const { data: otherInvoice } = await admin.from("invoices").select("id").eq("shipment_id", otherShipment).single();
+    await expect(runCommand("return_shipment", { ...input, invoiceId: otherInvoice!.id }, adminCtx)).rejects.toThrow(/does not belong to this invoice/i);
+    const foreignStaff = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await expect(runCommand("return_shipment", input, foreignStaff)).rejects.toThrow();
+    await expect(runCommand("return_shipment", { ...input, lines: [{ invoiceLineId: billed!.id, qty: 3 }] }, adminCtx)).rejects.toThrow(/outstanding refusal/i);
+    const requestId = crypto.randomUUID();
+    const result = await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId });
+    expect(await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId })).toEqual(result);
+    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: undefined }, adminCtx, { requestId, correlationId: requestId })).rejects.toThrow(/different payload/i);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toEqual([]);
+  });
+
+  it.each(["now", "on_delivery"] as const)("does not deadlock %s refusal check-in with an accepted return", async (invoiceTiming) => {
+    const sh = await shipment(4, invoiceTiming);
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[] };
+    await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat", refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "customer_refused" }, adminCtx);
+    const { data: invoice } = await admin.from("invoices").select("id").eq("shipment_id", sh).single();
+    const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", invoice!.id).eq("kind", "sku").single();
+    const sources = await runCommand("get_invoice_return_sources", { invoiceId: invoice!.id }, adminCtx) as { id: string }[];
+    const ordinary = new Client({ connectionString: DB });
+    const refusal = new Client({ connectionString: DB });
+    await Promise.all([ordinary.connect(), refusal.connect()]);
+    let pending: Promise<unknown> | undefined;
+    try {
+      await ordinary.query("begin; set local statement_timeout='8s'");
+      await ordinary.query("select id from public.invoices where id=$1 for update", [invoice!.id]);
+      await refusal.query("set statement_timeout='8s'; set role authenticated");
+      await refusal.query("select set_config('request.jwt.claim.sub',$1,false)", [adminCtx.userId]);
+      const pid = (await refusal.query("select pg_backend_pid() pid")).rows[0].pid;
+      pending = invoiceTiming === "now"
+        ? refusal.query("select public.return_shipment($1,$2::jsonb,$3,'unsold',$4,$5)", [invoice!.id, JSON.stringify([{ invoice_line_id: billed!.id, qty: 2 }]), whId, crypto.randomUUID(), stop!.id])
+        : refusal.query("select public.check_in_refused_return($1,$2,$3::jsonb,$4)", [stop!.id, whId, JSON.stringify([{ order_line_id: detail.lines[0].id, sources: [{ movement_id: sources[0].id, bin_id: whBinId, qty: 2, damaged: false }] }]), crypto.randomUUID()]);
+      // Observe the refusal waiting on our invoice, after it has locked the order.
+      pending.catch(() => {});
+      await expect.poll(async () => (await ordinary.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
+      await ordinary.query("select set_config('request.jwt.claim.sub',$1,true)", [adminCtx.userId]);
+      await ordinary.query("set local role authenticated");
+      // This inserts an order event, whose FK must coexist with the refusal lock.
+      await ordinary.query("select public.return_shipment($1,$2::jsonb,$3,'unsold',$4)", [invoice!.id, JSON.stringify([{ invoice_line_id: billed!.id, qty: 1 }]), whId, crypto.randomUUID()]);
+      await ordinary.query("commit");
+      await pending;
+      expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toEqual([]);
+    } finally {
+      // Roll back first so an unsuccessful assertion cannot strand the waiter.
+      await ordinary.query("rollback");
+      await Promise.allSettled([pending, ordinary.end(), refusal.end()]);
+    }
+  });
+
+  it("closes a refused transfer without receiving its stock", async () => {
+    const tr = await transfer();
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ stockTransferId: tr, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    await expect(runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "other" }, adminCtx)).rejects.toThrow(/note/i);
+    expect(await runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "closed" }, adminCtx)).toMatchObject({ outcome: "refused", invoice_id: null });
+    await runCommand("return_route", { routeId }, adminCtx);
+    expect((await admin.from("stock_transfers").select("status").eq("id", tr).single()).data?.status).toBe("in_transit");
+  });
+
+  it("invoices accepted quantities and checks refused beer into its source lot once", async () => {
+    const sh = await shipment(10, "on_delivery", lotId);
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[] };
+    const orderLineId = detail.lines[0].id;
+    const result = await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat", refused: [{ orderLineId, qty: 2 }], reason: "damaged" }, adminCtx) as { invoice_id: string };
+    expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "sku")).data).toEqual([{ qty: 8, unit_price_cents: 12000 }]);
+    expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "keg_deposit")).data).toEqual([{ qty: 8, unit_price_cents: 2500 }]);
+    const { data: line } = await admin.from("order_lines").select("order_id").eq("id", orderLineId).single();
+    const { data: source } = await admin.from("inventory_movements").select("id, lot_id").eq("ref", line!.order_id).eq("type", "sale_removal").single();
+    const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", result.invoice_id).eq("kind", "sku").single();
+    await runCommand("return_shipment", { invoiceId: result.invoice_id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1, sources: [{ movementId: source!.id, binId: whBinId, qty: 1 }] }] }, adminCtx);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    const warehouse = await makeStaffCtx(b.id, "warehouse");
+    const input = { deliveryId: stop!.id, locationId: whId, lines: [{ orderLineId, sources: [{ movementId: source!.id, binId: whBinId, qty: 1, damaged: true }] }] };
+    const requestId = crypto.randomUUID();
+    const checked = await runCommand("check_in_refused_return", input, warehouse, { requestId, correlationId: requestId });
+    expect(await runCommand("check_in_refused_return", input, warehouse, { requestId, correlationId: requestId })).toEqual(checked);
+    const { data: returned } = await admin.from("inventory_movements").select("qty, lot_id").eq("source_movement_id", source!.id).eq("type", "return_in").eq("ref", stop!.id);
+    expect(returned).toEqual([{ qty: 1, lot_id: lotId }]);
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, warehouse)).toMatchObject([{ outstanding_qty: 1 }]);
+    expect(await runCommand("get_today", {}, warehouse)).toContainEqual(expect.objectContaining({ reason: "refused_return", subjectId: stop!.id }));
+    const stranger = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await expect(runCommand("check_in_refused_return", input, stranger)).rejects.toThrow();
+    expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, stranger)).toEqual([]);
+    expect((await admin.from("inventory_movements").select("qty").eq("ref", stop!.id).eq("type", "loss")).data).toEqual([{ qty: -1 }]);
+    await expect(runCommand("check_in_refused_return", { ...input, lines: [{ orderLineId, sources: [{ movementId: source!.id, binId: whBinId, qty: 2, damaged: false }] }] }, warehouse)).rejects.toThrow(/outstanding/i);
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("check_in_refused_return", input, sales)).rejects.toThrow(/permission|allowed/i);
+  });
+
+  it("closes a refused stop without invoicing or restoring stock, then returns the route", async () => {
     const driver = await makeStaffCtx(b.id, "warehouse");
     const sh = await shipment(4, "on_delivery");
     const { routeId } = await runCommand("save_route", {
-      name: "Failed stop remains open", deliveryDate: "2026-09-17", driverUserId: driver.userId,
+      deliveryDate: "2026-09-17", driverUserId: driver.userId,
       stops: [{ shipmentId: sh, stopNo: 1 }],
     }, adminCtx) as { routeId: string };
     await runCommand("depart_route", { routeId }, driver);
     const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
-
-    // V1 has no failed/partial-delivery mutation. Leaving the stop unconfirmed is
-    // the documented safe state: it stays actionable and the route cannot return.
-    await expect(runCommand("return_route", { routeId }, driver)).rejects.toThrow(/stop/i);
-    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, driver) as {
-      delivery: { delivered_at: string | null }; lines: { qty: number }[]; invoice: unknown;
-    };
-    expect(detail.delivery.delivered_at).toBeNull();
-    expect(detail.lines.map((line) => line.qty)).toEqual([4]);
-    expect(detail.invoice).toBeNull();
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, driver) as { lines: { id: string }[] };
+    const input = { deliveryId: stop!.id, refused: [{ orderLineId: detail.lines[0].id, qty: 4 }], reason: "closed" };
+    await expect(runCommand("confirm_delivery", { ...input, refused: [{ orderLineId: detail.lines[0].id, qty: 5 }] }, driver)).rejects.toThrow(/quantity/i);
+    await expect(runCommand("confirm_delivery", { ...input, reason: undefined }, driver)).rejects.toThrow(/reason/i);
+    const requestId = crypto.randomUUID();
+    const result = await runCommand("confirm_delivery", input, driver, { requestId, correlationId: requestId });
+    expect(result).toMatchObject({ outcome: "refused", invoice_id: null });
+    expect(await runCommand("confirm_delivery", input, driver, { requestId, correlationId: requestId })).toEqual(result);
     expect((await admin.from("invoices").select("id").eq("shipment_id", sh)).data).toEqual([]);
-    expect((await admin.from("routes").select("returned_at").eq("id", routeId).single()).data?.returned_at).toBeNull();
-    const today = await runCommand("get_today", { now: "2026-09-17T12:00:00Z" }, driver) as { reason: string; subjectId: string }[];
-    expect(today).toContainEqual(expect.objectContaining({ reason: "delivery_next", subjectId: stop!.id }));
+    expect((await admin.from("inventory_movements").select("id").eq("ref", stop!.id)).data).toEqual([]);
+    await runCommand("return_route", { routeId }, driver);
+    expect((await admin.from("routes").select("returned_at").eq("id", routeId).single()).data?.returned_at).not.toBeNull();
   });
 
   it("keeps stop ids across a re-save, refuses removing a delivered stop, a duplicate stop number, and a foreign document", async () => {

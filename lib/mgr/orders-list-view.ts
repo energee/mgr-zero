@@ -37,7 +37,7 @@ export function toOrdersListViewProps({ role, status, orders }: OrdersListSnapsh
     subtitle: `${role} default`,
     empty: orders.length === 0 ? { title: status ? `No ${status} orders` : "No orders yet", description: "Orders appear here once they are placed." } : undefined,
     rows: orders.map((o) => {
-      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id);
+      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, role);
       const ships = o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : "";
       const restock = o.needs_restock ? " · restock staged" : "";
       return {
