@@ -10,5 +10,5 @@ export default async function DisconnectSquarePage() {
   const { ctx } = await requireAdminContext("Disconnect Square");
   const health = await runCommand("get_pos_integration_health", {}, ctx) as DisconnectHealth;
   const status = disconnectStatus(health);
-  return <>{E.back("Point of sale", "Disconnect Square", undefined, "/settings/pos")}<PosRouteSheet title="Disconnect Square" backHref="/settings/pos">{status === "available" && health.connectionId ? <SquareDisconnectControl connectionId={health.connectionId} /> : <DisconnectSquareView status={status} />}</PosRouteSheet></>;
+  return <>{E.back("Point of sale", "Disconnect Square", undefined, "/settings/pos")}<PosRouteSheet title="Disconnect Square" backHref="/settings/pos">{(status === "available" || status === "unresolved") && health.connectionId ? <SquareDisconnectControl connectionId={health.connectionId} status={status} /> : <DisconnectSquareView status={status} />}</PosRouteSheet></>;
 }

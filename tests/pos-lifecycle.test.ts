@@ -79,4 +79,13 @@ describe("Square provider boundary", () => {
       body: JSON.stringify({ client_id: "sandbox-app", access_token: "access-secret", revoke_only_access_token: false }),
     }));
   });
+
+  it("revokes by merchant id when MGR no longer holds the access token (#640)", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    await new SquareClient(config, fetch).revokeMerchant("merchant-1");
+    expect(fetch).toHaveBeenCalledWith("https://connect.squareupsandbox.com/oauth2/revoke", expect.objectContaining({
+      method: "POST", headers: expect.objectContaining({ Authorization: "Client sandbox-secret" }),
+      body: JSON.stringify({ client_id: "sandbox-app", merchant_id: "merchant-1" }),
+    }));
+  });
 });

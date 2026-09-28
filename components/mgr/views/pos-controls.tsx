@@ -44,10 +44,11 @@ export function SquareConnectControl({ configured, reconnect = false }: { config
   return <ConnectSquareView configured={configured} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
-/** Leaves for Connect only when Square confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
-export function SquareDisconnectControl({ connectionId }: { connectionId: string }) {
+/** Runs disconnect_square; on an "unresolved" connection the same command retries revocation by merchant id (#640).
+ *  Leaves for Connect only when Square confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
+export function SquareDisconnectControl({ connectionId, status }: { connectionId: string; status: "available" | "unresolved" }) {
   const action = useCommandAction(), router = useRouter();
-  return <DisconnectSquareView busy={action.busy} error={action.error}
+  return <DisconnectSquareView status={status} busy={action.busy} error={action.error}
     onDisconnect={() => void action.run("disconnect_square", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/pos/connect") : router.refresh(), { refresh: false })} />;
 }
 

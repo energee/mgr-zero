@@ -22,7 +22,7 @@ it("never calls a retained Square recovery connection disconnected", () => {
   expect(html("available")).toContain("asks Square to revoke");
   expect(html("unresolved")).toContain("did not confirm");
   expect(html("unresolved")).not.toContain("already disconnected");
-  expect(html("unresolved")).not.toContain("<button");
+  expect(html("unresolved")).toContain("Retry revocation</button>");
   expect(html("pending")).not.toContain("already disconnected");
   expect(html("disconnected")).toContain("already disconnected");
 });

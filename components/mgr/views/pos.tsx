@@ -104,7 +104,10 @@ export function DisconnectSquareView({ status = "available", busy = false, error
       {E.info("MGR deletes its stored Square credential first, then asks Square to revoke it. If Square does not confirm, this page says so.")}
       <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect Square"}</Button>
     </>}
-    {status === "unresolved" && E.note("MGR deleted its stored Square credential, but Square did not confirm revocation. Remove MGR's access in your Square account, or reconnect.")}
+    {status === "unresolved" && <>
+      {E.note("MGR deleted its stored Square credential, but Square did not confirm revocation. Retry asks Square to revoke MGR's access for this seller; you can also remove it in your Square account, or reconnect.")}
+      <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Retrying…" : "Retry revocation"}</Button>
+    </>}
     {status === "pending" && E.note("A disconnect started but its Square revocation outcome was not recorded. MGR no longer holds a usable credential.")}
     {status === "disconnected" && E.info("Square is already disconnected.")}
     <CommandFormMessage error={error ?? null} />

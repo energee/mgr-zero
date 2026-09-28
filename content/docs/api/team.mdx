@@ -155,7 +155,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed
+Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id
 
 | Field | Type | Required |
 | --- | --- | --- |

@@ -7677,6 +7677,7 @@ export type Database = {
         }
         Returns: {
           access_token: string
+          merchant_id: string
           replay_result: Json
         }[]
       }
