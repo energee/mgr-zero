@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+/** Records per history page; also the API default. */
+export const HISTORY_PAGE_SIZE = 50;
+export type HistoryRow = { id: string; created_at: string };
+
 // Keep PostgreSQL's timestamp precision: converting through Date loses microseconds.
 export const historyInput = {
-  limit: z.number().int().min(1).max(200).default(50),
+  limit: z.number().int().min(1).max(200).default(HISTORY_PAGE_SIZE),
   cursor: z.string().refine(value => {
     const parts = value.split("~");
     return parts.length === 2 && z.iso.datetime({ offset: true }).safeParse(parts[0]).success && z.uuid().safeParse(parts[1]).success;
@@ -10,13 +14,13 @@ export const historyInput = {
 };
 
 /** Input validation permits only an ISO timestamp and UUID in this PostgREST filter. */
-export function historyBefore(cursor: string) {
+function historyBefore(cursor: string) {
   const [createdAt, id] = cursor.split("~");
   return `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`;
 }
 
 /** The cursor for the last displayed row, read back by historyBefore. */
-export function historyCursor(row: { created_at: string; id: string }) {
+export function historyCursor(row: HistoryRow) {
   return `${row.created_at}~${row.id}`;
 }
 
