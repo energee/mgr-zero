@@ -101,8 +101,9 @@ describe.sequential("cellar workflow serialization", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, brewer);
     const a = await client(brewer.userId, true);
     const b = await client(brewer.userId, false);
-    await a.query("select public.close_packaging_run($1,$2,9.95,$3::jsonb,$4,'2026-09-02',null,$5,$6,$7)", [
-      breweryId, run.id, JSON.stringify([{ sku_id: f.skuId, qty_actual: 995 }]), `LOCK-${crypto.randomUUID()}`, location.id, location.binId, crypto.randomUUID(),
+    const materialPlan = await runCommand("get_packaging_close_plan", { runId: run.id }, brewer) as { revision: string };
+    await a.query("select public.close_packaging_run($1,$2,9.95,$3::jsonb,$4,'2026-09-02',null,$5,$6,$7,'[]'::jsonb,$8)", [
+      breweryId, run.id, JSON.stringify([{ sku_id: f.skuId, qty_actual: 995 }]), `LOCK-${crypto.randomUUID()}`, location.id, location.binId, crypto.randomUUID(), materialPlan.revision,
     ]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;

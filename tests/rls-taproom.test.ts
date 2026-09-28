@@ -21,7 +21,7 @@ const matrix = {
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", packaging_runs: "deny",
-  lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
+  lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
@@ -108,6 +108,8 @@ async function fixtures() {
   await put("lots", { packaging_run_id: run.id, brand_id: cat.brandId, code: "PRIVATE-LOT", packaged_on: day });
   await put("packaging_run_outputs", { run_id: run.id, sku_id: cat.skuId, qty_planned: 1 });
   await put("packaging_run_consumptions", { run_id: run.id, movement_id: consumption.id });
+  const packagingRecord = await put("packaging_material_records", { run_id: run.id, planned: [], created_by: owner.id });
+  await put("packaging_material_actuals", { record_id: packagingRecord.id, material_id: material.id, location_id: wh.id, bin_id: wh.binId, material_name: "Fixture material", unit: "lb", location_name: "Warehouse", bin_name: "Default", qty_used: 1, qty_loss: 0, qty_unused: 0, used_movement_id: consumption.id });
   await put("material_contracts", { vendor_id: vendor.id, material_id: material.id, qty_committed: 100 });
   const po = await put("purchase_orders", { vendor_id: vendor.id, status: "sent", sent_via: "external", created_by: owner.id });
   const poLine = await put("purchase_order_lines", { po_id: po.id, material_id: material.id, qty_ordered: 1 });
@@ -315,7 +317,12 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     begin_square_menu_publication: [B,"L1",false,R()],
     begin_square_publication: [B,"L1",BRAND,null,null,false,"publish_pos_item",R(),null],
     begin_square_sales_sync: [B,R()],
-    close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R()],
+    packaging_material_plan: [B,[{sku_id:SKU,qty_planned:1}]],
+    get_packaging_material_plan: [B,[{sku_id:SKU,qty_planned:1}]],
+    get_packaging_close_plan: [B,readyRun.id],
+    get_packaging_material_record: [B,readyRun.id],
+    correct_packaging_material_record: [B,R(),"Correction",[],R()],
+    close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R(),[],"reviewed"],
     complete_batch: [B,f.batch.id,R()],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],

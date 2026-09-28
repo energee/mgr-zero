@@ -1,6 +1,7 @@
 // components/mgr/views/run-closed.tsx — Run closed. Live slots ledger facts;
 // inventory draws lot / output / yield and Print labels.
 import type { ReactNode } from "react";
+import { PackagingMaterialHistory, PackagingMaterialCorrection } from "./packaging-materials";
 import { E } from "@/components/mgr/e";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 
@@ -25,6 +26,8 @@ export function RunClosedView({
           {E.fld("Yield", model.yield ?? "")}
         </>
       )}
+      {model.records ? <PackagingMaterialHistory records={model.records} /> : null}
+      {model.correction ? <PackagingMaterialCorrection {...model.correction} /> : null}
       {action !== undefined ? action : E.btn("Print labels")}
     </>
   );

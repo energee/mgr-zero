@@ -1,3 +1,4 @@
+import { closeWithConfirmedMaterials } from "./packaging-fixture";
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
@@ -50,7 +51,7 @@ async function packageBeer(source: Awaited<ReturnType<typeof brew>>, packagedBbl
     plannedOn: "2026-09-02", occupancyId: source.occupancyId, outputs: [{ skuId, qtyPlanned: qty }],
   }, ctx) as { id: string };
   await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, ctx);
-  await runCommand("close_packaging_run", {
+  await closeWithConfirmedMaterials({
     runId: run.id, bblDrawn, outputs: [{ skuId, qtyActual: qty }], lotCode: `LOT-${crypto.randomUUID()}`,
     packagedOn: "2026-09-02", locationId: location.id, binId: location.binId,
   }, ctx);
@@ -135,7 +136,7 @@ describe("batch completion reconciliation", () => {
       brandId, plannedOn: "2026-09-02", occupancyId: source.occupancyId, outputs: [{ skuId, qtyPlanned: 1 }],
     }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, ctx);
-    await runCommand("close_packaging_run", {
+    await closeWithConfirmedMaterials({
       runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }], lotCode: `EXACT-${crypto.randomUUID()}`,
       packagedOn: "2026-09-02", locationId: location.id, binId: location.binId,
     }, ctx);

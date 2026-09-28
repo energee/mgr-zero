@@ -78,6 +78,15 @@ defineCommand({
   })),
 });
 
+const packagingActual = z.object({
+  materialId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), lotId: z.string().uuid().nullable(),
+  used: z.number().nonnegative(), loss: z.number().nonnegative(), unused: z.number().nonnegative(),
+});
+const actualRows = (rows: z.infer<typeof packagingActual>[]) => rows.map(row => ({
+  material_id: row.materialId, location_id: row.locationId, bin_id: row.binId, lot_id: row.lotId,
+  used: row.used, loss: row.loss, unused: row.unused,
+}));
+
 // Closing is the moment beer becomes stock. `locationId`/`binId` are required
 // rather than derived: a vessel has no location, so the finished goods would
 // otherwise have nowhere to land. Missing planned packages settle at zero --
@@ -97,6 +106,8 @@ defineCommand({
     bestBy: isoDate.optional(),
     locationId: z.string().uuid(),
     binId: z.string().uuid(),
+    actuals: z.array(packagingActual).optional(),
+    planRevision: z.string().min(1).optional(),
   }),
   roles: ["admin", "brewer", "warehouse"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("close_packaging_run", {
@@ -104,6 +115,31 @@ defineCommand({
     p_outputs: i.outputs.map((o) => ({ sku_id: o.skuId, qty_actual: o.qtyActual })),
     p_lot_code: i.lotCode, p_packaged_on: i.packagedOn, p_best_by: i.bestBy ?? null,
     p_location: i.locationId, p_bin: i.binId, p_request_id: execution.requestId,
+    p_actuals: i.actuals === undefined ? undefined : actualRows(i.actuals), p_plan_revision: i.planRevision,
+  })),
+});
+
+defineQuery({
+  name: "get_packaging_material_plan", description: "Planned packaging materials and stock shortages for unsaved output quantities",
+  input: z.object({ outputs }), roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_packaging_material_plan", { p_brewery: ctx.breweryId, p_outputs: rpcOutputs(i.outputs) })),
+});
+defineQuery({
+  name: "get_packaging_close_plan", description: "Reviewed BOM revision, material requirements and exact source balances for a packaging run",
+  input: z.object({ runId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_packaging_close_plan", { p_brewery: ctx.breweryId, p_run: i.runId })),
+});
+defineQuery({
+  name: "get_packaging_material_record", description: "Frozen planned and actual packaging materials with append-only correction history",
+  input: z.object({ runId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_packaging_material_record", { p_brewery: ctx.breweryId, p_run: i.runId })),
+});
+defineCommand({
+  name: "correct_packaging_material_record", description: "Replace unused packaging material actuals with a reason; preserves history, finished outputs and tank draw",
+  input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), actuals: z.array(packagingActual) }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_packaging_material_record", {
+    p_brewery: ctx.breweryId, p_record: i.recordId, p_reason: i.reason, p_actuals: actualRows(i.actuals), p_request_id: execution.requestId,
   })),
 });
 

@@ -6,13 +6,16 @@
 "use client";
 
 import { PackagingSourcePicker, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PackagingCloseFields } from "@/components/mgr/views/close-packaging-run";
+import { packagingActualsReady, suggestedPackagingActuals, type PackagingClosePlan } from "@/lib/mgr/packaging-actuals";
+import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { useRouter } from "next/navigation";
+import { command, CommandResponseError } from "@/lib/commands/client";
+import { canRetireCommandFailure } from "@/lib/commands/failure";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { closeRunReady } from "@/lib/mgr/close-packaging-run-view";
 
@@ -36,66 +39,51 @@ export function StartRunButton({ runId }: { runId: string }) {
   );
 }
 
-/** `today` is the brewery's day (breweryToday on the server page), the packaged-on default. */
-export function CloseRunForm({ runId, outputs, locations, bins, today }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string }) {
-  const [bblDrawn, setBblDrawn] = useState("");
-  const [actuals, setActuals] = useState<Record<string, string>>(Object.fromEntries(outputs.map((o) => [o.sku_id, String(o.qty_planned)])));
-  const [lotCode, setLotCode] = useState("");
-  const [packagedOn, setPackagedOn] = useState(today);
-  const [bestBy, setBestBy] = useState("");
-  const [locationId, setLocationId] = useState("");
-  const [binId, setBinId] = useState("");
-  const { busy, error, run } = useCommandAction();
-  const ready = closeRunReady({ bblDrawn, actuals, lotCode, packagedOn, locationId, binId });
-  return (
-    <div className="flex flex-col gap-4">
-      {E.edit("Barrels drawn", bblDrawn, "number", undefined, { id: "cr-drawn", min: 0, step: "any", onChange: setBblDrawn })}
-      <div className="flex flex-col gap-2">
-        <Label>Actual outputs</Label>
-        {outputs.map((o) => (
-          <div key={o.id} className="flex items-center justify-between gap-2">
-            <span className="text-sm">{o.sku_name ?? o.sku_id.slice(0, 8)}</span>
-            <div className="w-36">{E.edit(`${o.sku_name ?? o.sku_id} actual`, actuals[o.sku_id] ?? "", "number", undefined, { hideLabel: true, min: 0, step: "any", onChange: qty => setActuals(prev => ({ ...prev, [o.sku_id]: qty })) })}</div>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cr-lot">Lot code</Label>
-        <Input id="cr-lot" value={lotCode} onChange={(e) => setLotCode(e.target.value)} required />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cr-packaged">Packaged on</Label>
-          <Input id="cr-packaged" type="date" value={packagedOn} onChange={(e) => setPackagedOn(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="cr-bestby">Best by · optional</Label>
-          <Input id="cr-bestby" type="date" value={bestBy} onChange={(e) => setBestBy(e.target.value)} />
-        </div>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="cr-loc">Finished goods location</Label>
-        <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
-          <SelectTrigger id="cr-loc"><SelectValue placeholder="Location" /></SelectTrigger>
-          <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
-          <SelectTrigger aria-label="Bin"><SelectValue placeholder="Bin" /></SelectTrigger>
-          <SelectContent>{bins.filter((b) => b.location_id === locationId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <CommandFormMessage error={error} />
-      <Button
-        data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit"
-        disabled={busy || !ready}
-        onClick={() => run("close_packaging_run", {
-          runId, bblDrawn: Number(bblDrawn),
-          outputs: outputs.map((o) => ({ skuId: o.sku_id, qtyActual: Number(actuals[o.sku_id]) })),
-          lotCode, packagedOn, bestBy: bestBy || undefined, locationId, binId,
-        })}
-      >
-        Close packaging run
-      </Button>
-    </div>
-  );
+/** The binding supplies live state to the inventory's exact close controls. */
+export function CloseRunForm({ runId, outputs, locations, bins, today, initialPlan }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string; initialPlan: PackagingClosePlan }) {
+  const breweryId = useBrewery();
+  const context = useCommandContext();
+  const router = useRouter();
+  const [fields, setFields] = useState({ bblDrawn: "", lotCode: "", packagedOn: today, bestBy: "", locationId: "", binId: "" });
+  const [quantities, setQuantities] = useState(Object.fromEntries(outputs.map(row => [row.sku_id, String(row.qty_planned)])));
+  const [plan, setPlan] = useState(initialPlan);
+  const [actuals, setActuals] = useState(() => suggestedPackagingActuals(initialPlan));
+  const [phase, setPhase] = useState<"idle" | "busy" | "unknown">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const attempt = useRef<{ requestId: string; input: unknown; context: typeof context } | null>(null);
+  const ready = closeRunReady({ ...fields, actuals: quantities }) && packagingActualsReady(actuals, plan.materials, plan.planned.map(row => row.materialId));
+  async function submit() {
+    if (phase === "busy" || (!ready && phase !== "unknown")) return;
+    const retrying = phase === "unknown";
+    if (!attempt.current) attempt.current = { requestId: crypto.randomUUID(), context, input: {
+      runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
+      outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
+      planRevision: plan.revision, actuals: actuals.map(row => ({ materialId: row.materialId, locationId: row.locationId, binId: row.binId, lotId: row.lotId, used: Number(row.used), loss: Number(row.loss), unused: Number(row.unused) })),
+    } };
+    setPhase("busy"); setError(null);
+    try {
+      await command(breweryId, "close_packaging_run", attempt.current.input, attempt.current.requestId, attempt.current.context);
+      attempt.current = null; setPhase("idle"); router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not close packaging run");
+      const stale = cause instanceof CommandResponseError && cause.status === 409 && cause.code === "conflict" && cause.message === "Packaging material plan changed. Review it again.";
+      if (cause instanceof CommandResponseError && (stale || canRetireCommandFailure(cause.status, retrying, cause.code))) { attempt.current = null; setPhase("idle"); }
+      else setPhase("unknown");
+    }
+  }
+  async function refreshPlan() {
+    if (phase !== "idle") return;
+    setPhase("busy"); setError(null);
+    try { setPlan(await command(breweryId, "get_packaging_close_plan", { runId }, undefined, context) as PackagingClosePlan); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not review material plan"); }
+    finally { setPhase("idle"); }
+  }
+  return <PackagingCloseFields model={{ ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id] })), plan, actuals, locations, bins }}
+    disabled={phase !== "idle"} retry={phase === "unknown"} ready={ready || phase === "unknown"}
+    onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) }))}
+    onOutput={(id, value) => setQuantities(previous => ({ ...previous, [id]: value }))}
+    onActual={(key, patch) => setActuals(previous => previous.map(row => row.key === key ? { ...row, ...patch } : row))}
+    onAdd={() => setActuals(previous => [...previous, { key: crypto.randomUUID(), materialId: "", locationId: "", binId: "", lotId: null, used: "0", loss: "0", unused: "0" }])}
+    onRemove={key => setActuals(previous => previous.filter(row => row.key !== key))}
+    onSubmit={() => { void submit(); }} onRefresh={() => { void refreshPlan(); }} messages={<CommandFormMessage error={error} />} />;
 }
