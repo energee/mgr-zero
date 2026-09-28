@@ -5,15 +5,20 @@
 // post-login identity and membership composition.
 "use server";
 
+import "@/lib/commands/all";
+import { buildContext } from "@/lib/commands/context";
+import { runCommand, CommandError } from "@/lib/commands/registry";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
-import { acceptInviteErrorPath, inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
 
+/** The brewery and customer selection cookies share these options. */
+const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
+
 /** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
-async function home(db: Awaited<ReturnType<typeof createServerClient>>) {
-  const auth = createRequestAuthContext(() => Promise.resolve(db));
+async function home(auth: ReturnType<typeof createRequestAuthContext>) {
   if (!(await auth.getIdentity())) return "/login?error=1";
   if ((await auth.getStaffMemberships()).length) return "/";
   if ((await auth.getCustomerMemberships()).length) return "/portal";
@@ -28,7 +33,11 @@ export async function login(form: FormData) {
   });
   const back = form.get("portal") ? "/portal/login" : "/login";
   if (error) redirect(`${back}?error=1`);
-  redirect(await home(db));
+  const auth = createRequestAuthContext(() => Promise.resolve(db));
+  const identity = await auth.getIdentity();
+  if (!identity) redirect(`${back}?error=1`);
+  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), home(auth)]);
+  redirect(pending ? "/invitations" : destination);
 }
 
 /** Passwordless sign-in: the shared staff entry view's secondary action. */
@@ -62,7 +71,7 @@ export async function savePassword(form: FormData) {
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
   if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
-  redirect(await home(db));
+  redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
 }
 
 export async function acceptInvite(form: FormData) {
@@ -84,6 +93,35 @@ export async function acceptInvite(form: FormData) {
 
 /** Me: operate as another of the caller's breweries. lib/brewery.ts reads the cookie. */
 export async function switchBrewery(form: FormData) {
-  (await cookies()).set("brewery", String(form.get("breweryId")), { path: "/", sameSite: "lax" });
+  (await cookies()).set("brewery", String(form.get("breweryId")), SELECTION_COOKIE);
   redirect("/");
+}
+
+/** The invitation id is also the stable acceptance request id across reloads. */
+export async function acceptAccountInvitation(form: FormData) {
+  const inviteId = String(form.get("inviteId") ?? "");
+  type Accepted = { breweryId: string; kind: string; customerId: string | null };
+  let result: Accepted;
+  try {
+    result = await runCommand("accept_account_invitation", { inviteId }, await buildContext(), {
+      requestId: inviteId, correlationId: crypto.randomUUID(),
+    }) as Accepted;
+  } catch (error) {
+    if (!(error instanceof CommandError)) throw error;
+    redirect("/invitations?error=1");
+  }
+  const jar = await cookies();
+  if (result.kind === "staff") jar.set("brewery", result.breweryId, SELECTION_COOKIE);
+  if (result.customerId) jar.set("customer", result.customerId, SELECTION_COOKIE);
+  redirect(result.kind === "staff" ? "/" : "/portal");
+}
+
+export async function switchCustomer(form: FormData) {
+  const customerId = String(form.get("customerId") ?? "");
+  const auth = createRequestAuthContext();
+  if (!(await auth.getCustomerMemberships()).some(m => m.customerId === customerId)) {
+    throw new CommandError("permission denied", 403, "permission_denied");
+  }
+  (await cookies()).set("customer", customerId, SELECTION_COOKIE);
+  redirect("/portal");
 }

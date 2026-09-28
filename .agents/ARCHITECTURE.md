@@ -263,9 +263,11 @@ a gap to close, not a convention to trust.
   its own brewery; a failed request never blocks a new one. A `pending_auth`
   row older than 15 minutes for that email is marked failed before the next
   claim inserts, so a crash between claim and completion doesn't block the
-  email forever (#580). Existing Auth
-  emails are refused; attaching existing
-  accounts needs a separate consent workflow. Team, first-run, and customer detail
+  email forever (#580). Existing Auth accounts receive a pending-consent invitation.
+  The signed-in recipient accepts through the identity-bound pre-tenant command;
+  acceptance rechecks expiry, confirmed email and current inviter authority.
+  Completed replay never restores revoked membership; a new invitation does.
+  Team, first-run, and customer detail
   share the command recovery lifecycle: frozen input and request identity survive
   reloads in the same browser tab, scoped to the original actor and tenant.
 - **CSV exemption stops between logical rows.** `import_csv` may continue after

@@ -1,3 +1,4 @@
+import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
@@ -583,6 +584,14 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={signIn} />,
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Account invitations",
+    to: { "Accept invitation": "Today", "Continue": "Today" },
+    job: "Consent to join using an existing account", states: DEFAULT_STATES,
+    reads: "list_my_invitations", writes: "accept_account_invitation",
+    spec: "Existing accounts consent before membership is granted. Expired or revoked invitations cannot be accepted.",
+    body: <AccountInvitationsView invitations={[{ id: "example", breweryName: "Demo Brewing", kind: "staff", role: "sales", customerName: null, expiresAt: "2026-10-04" }]} />,
   },
   {
     step: 2,
@@ -1553,13 +1562,13 @@ export const SCREENS: Screen[] = [
     portal: "Account",
     surface: "sheet",
     name: "Portal Me",
-    to: { "Change password": "Portal set password", "Sign out": "Portal sign in" },
+    to: { "Change password": "Portal set password", "Sign out": "Portal sign in", "Switch account": "Shop" },
     job: "Who I am on this customer account, leave, change password",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
-    body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} />,
+    spec: "Opened from the portal header Me control. Accounts with multiple customer memberships can switch between them. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
+    body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} accounts={[{ value: "ridgeline", label: "Ridgeline · Demo Brewing" }, { value: "al", label: "Al’s Bar · Demo Brewing" }]} activeCustomerId="ridgeline" />,
   },
   {
     step: 7,

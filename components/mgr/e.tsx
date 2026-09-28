@@ -291,8 +291,8 @@ export const E = {
   ),
   /** A text link. `to` names the destination screen when the copy does not
    *  (tests/mgr-screens.test.ts resolves every link to a screen or shell area). */
-  link: (t: React.ReactNode, to?: string) => (
-    <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
+  link: (t: React.ReactNode, to?: string, href = "#") => (
+    <a href={href} data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
    *  (DatePicker). */

@@ -293,7 +293,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   await ins("inventory_movements", { brewery_id: B, sku_id: parentSku.id, location_id: W, bin_id: BIN, qty: 1, type: "opening_balance", created_by: f.owner.id });
   const contract = (await admin.from("material_contracts").select("id").eq("brewery_id", B).single()).data!.id;
   const delivery = (await admin.from("notification_deliveries").select("id").eq("brewery_id", B).single()).data!.id;
-  const importRequest = R(), inviteRequest = R(), failureRequest = R();
+  const importRequest = R(), inviteRequest = R(), failureRequest = R(), consentInvite = R();
   const importRows = [{ skuId: SKU, locationId: W, binId: BIN, qty: "1" }];
   const authUser = await admin.auth.admin.createUser({ email: `${R()}@test.local`, email_confirm: true });
   expect(authUser.error).toBeNull();
@@ -301,7 +301,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     values('${f.taproom.id}','${B}','${importRequest}','import_csv',decode('00','hex'),'${JSON.stringify({ kind: "opening_balances", rows: importRows })}');
     insert into private.invite_requests(brewery_id,actor_id,email,kind,role,auth_user_id,state,request_id)
     values('${B}','${f.taproom.id}','${inviteRequest}@test.local','staff','warehouse','${authUser.data.user!.id}','pending_membership','${inviteRequest}'),
-      ('${B}','${f.taproom.id}','${failureRequest}@test.local','staff','warehouse','${authUser.data.user!.id}','pending_membership','${failureRequest}');`);
+      ('${B}','${f.taproom.id}','${failureRequest}@test.local','staff','warehouse','${authUser.data.user!.id}','pending_membership','${failureRequest}');
+    insert into private.invite_requests(id,brewery_id,actor_id,email,kind,role,auth_user_id,state,request_id,consent_expires_at)
+    values('${consentInvite}','${B}','${f.taproom.id}','${authUser.data.user!.email}','staff','warehouse','${authUser.data.user!.id}','pending_consent','${R()}',now()+interval '7 days');`);
   expect(sql(`select count(*) from private.command_requests where actor_id='${f.taproom.id}' and request_id='${importRequest}' and result->'rows' <> '[]'::jsonb`)).toEqual(["1"]);
   expect(sql(`select count(*) from private.invite_requests where actor_id='${f.taproom.id}' and request_id in ('${inviteRequest}','${failureRequest}')`)).toEqual(["2"]);
   const reversible = await ins("inventory_movements", { brewery_id: B, sku_id: SKU, location_id: W, bin_id: BIN, qty: 1, type: "adjustment", created_by: f.owner.id });
@@ -310,6 +312,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
     set_brewery_operating_defaults: [B,24,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
+    revoke_account_invitation: [B,consentInvite,R()],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],
     begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()], get_qbo_sync_status: [B],
@@ -358,8 +361,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
       and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')`).map(row => JSON.parse(row) as {name:string;signature:string;args:string[]});
-  const readNames = ["get_order_email_status","get_batch_completion_preview","get_loss_review","get_pos_menu","get_pos_menu_item","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","pos_order_versions","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","portal_schedule_rows","staff_role","today_live_reasons","list_team_members","list_customer_users","list_chat_conversations","get_chat_history"];
-  const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
+  const readNames = ["list_my_invitations","get_order_email_status","get_batch_completion_preview","get_loss_review","get_pos_menu","get_pos_menu_item","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","pos_order_versions","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","portal_schedule_rows","staff_role","today_live_reasons","list_team_members","list_customer_users","list_chat_conversations","get_chat_history"];
+  // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
+  const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   const infrastructureNames = ["consume_command_admission"];
   expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames])].sort());
@@ -368,8 +372,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["get_order_email_status(uuid,uuid)","get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
-  const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
+  const readSignatures = ["list_my_invitations()","get_order_email_status(uuid,uuid)","get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
+  const ownSignatures = ["accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   // #467: brewery bootstrap is service-role only; the server passes the verified actor.
@@ -453,7 +457,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(publicSnapshot()).toEqual(publicBefore);
   expect(sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`)).toEqual(before);
-  const ownCommands = ownNames.map(name => name === "set_personal_notification_destination" ? "set_notification_destination" : name);
+  const ownCommands = ownNames.filter(name => name !== "accept_account_invitation").map(name => name === "set_personal_notification_destination" ? "set_notification_destination" : name);
   const ctx = { db, userId: f.taproom.id, breweryId: B, role: "taproom" as const };
   const commands = listTools().filter(t => t.kind === "command" && t.scope === "tenant");
   expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownCommands,"record_taproom_count","tap_keg","kick_keg","swap_keg"].sort());

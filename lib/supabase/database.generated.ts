@@ -7486,6 +7486,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_account_invitation: {
+        Args: { p_invite: string; p_request_id: string }
+        Returns: Json
+      }
       activate_chat_installation: {
         Args: {
           p_actor: string
@@ -8476,6 +8480,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_my_invitations: { Args: never; Returns: Json }
       list_open_taps: {
         Args: { p_brewery: string; p_location: string }
         Returns: Json
@@ -9042,6 +9047,10 @@ export type Database = {
           p_note: string
           p_request_id: string
         }
+        Returns: Json
+      }
+      revoke_account_invitation: {
+        Args: { p_brewery: string; p_invite: string; p_request_id: string }
         Returns: Json
       }
       revoke_customer_user: {
