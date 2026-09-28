@@ -1,4 +1,6 @@
 import type { Filing, LossReview, Report } from "@/lib/commands/compliance";
+import { destinationStateCsv } from "./destination-state-export";
+import { money } from "./money";
 import { sentenceCase } from "./labels";
 
 export type MonthlyComplianceSnapshot = {
@@ -21,6 +23,8 @@ export type MonthlyComplianceViewModel = {
   packaged: string;
   removals: { key: string; title: string; bbl: string }[];
   cellarRemovals: { key: string; title: string; bbl: string }[];
+  stateRows: string[][];
+  stateExport?: { csv: string; filename: string };
   byState: { key: string; title: string; bbl: string }[];
 };
 
@@ -58,6 +62,8 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     packaged: bbl(figures.packaged),
     removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
     cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 8 })} bbl` })),
+    stateRows: (figures.stateTotals ?? []).map(row => [row.state, row.outwardBbl.toFixed(8), row.returnedBbl.toFixed(8), row.adjustmentBbl.toFixed(8), row.volumeBbl.toFixed(8), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
+    stateExport: figures.stateTransactions ? { csv: destinationStateCsv(figures.periodStart, figures.periodEnd, figures.stateTransactions), filename: `destination-states-${figures.periodStart}-${figures.periodEnd}.csv` } : undefined,
     byState: Object.entries(figures.byState).map(([key, value]) => ({ key, title: `Taxpaid to ${key}`, bbl: bbl(value) })),
   };
 }

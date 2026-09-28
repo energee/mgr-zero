@@ -516,6 +516,16 @@ A departed route lists its stops with their delivered times. The lowest undelive
 
 **Compliance** (More; Sales and Admin) files TTB periods monthly, quarterly, or annually: pick **Monthly**, **Quarterly**, or **Annual** at the top. Monthly lists the last three months, Quarterly the last four calendar quarters (January–March, April–June, July–September, October–December), and Annual the last two calendar years, each plus every period of that length already filed. A period marked *not filed* opens for review; the current period is marked *in progress* and can be reviewed but not filed until its last day has passed. A filed period shows its filing date and taxpaid barrels. Below the periods sit the **Licenses** link and, under **Lot trace**, every packaged lot. MGR reports TTB periods here; other jurisdictions and date ranges are available through the API. A TTB filing always covers one whole calendar month, quarter, or year; any other TTB range, such as February 1 through April 30 or a partial month, can be reviewed but not filed.
 
+Destination-state totals show outward beer, physical returns, signed adjustments,
+and net BBL alongside invoiced beer sales, credits, and net sales. Deposits are
+excluded from beer sales. Movement dates and invoice dates remain separate.
+**Export state transactions** downloads the exact supporting facts, source IDs,
+BBL, and cents behind those totals. Returns retain the original shipment state;
+later address edits do not reassign sales. Facts without a recorded destination
+appear under **Unassigned** for review. MGR does not infer their state.
+Saved snapshots retain their own export. Older snapshots without supporting
+facts say so. State tax calculations and filing forms remain external.
+
 <Screen name="Monthly compliance" />
 
 A period is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Figures print to two decimals; the printed cells always add up and a period's printed end is always the next period's printed begin, so an **In** or **Out** cell can differ by 0.01 from its movements rounded on their own. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel or format later does not change historical classification, and taxpaid removals by destination state. The removal classes are printed so they add up to the printed **Out** plus any cellar removals, so one class can differ by 0.01 from its own movements rounded alone.
