@@ -33,13 +33,14 @@ describe("portal invoice Pay route", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns a useful no-store unavailable page without a bearer link", async () => {
+  it("returns to the shared invoice failure surface without a bearer link", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
     const response = await GET(new Request("https://mgr.test/portal/invoices/invoice-1/pay"), {
       params: Promise.resolve({ id: "invoice-1" }),
     });
-    expect(response.status).toBe(200);
-    expect(await response.text()).toMatch(/Payment unavailable[\s\S]*Online payment isn’t available[\s\S]*Return to invoice/);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://mgr.test/portal/invoices/invoice-1?payment=unavailable");
+    expect(await response.text()).toBe("");
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(console.info).toHaveBeenCalledWith("qbo_payment_unavailable", { reason: "not_configured" });
@@ -54,6 +55,15 @@ describe("portal invoice Pay route", () => {
     expect(response.headers.get("location")).toBe("https://pay.example.test/session/bearer-secret");
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+
+  it("uses the same safe surface when the provider throws", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    state.error = new Error("provider-secret");
+    const response = await GET(new Request("https://mgr.test/portal/invoices/invoice-1/pay"), { params: Promise.resolve({ id: "invoice-1" }) });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://mgr.test/portal/invoices/invoice-1?payment=unavailable");
+    expect(await response.text()).not.toContain("provider-secret");
   });
 
   it("returns 404 for an invoice outside the customer scope", async () => {

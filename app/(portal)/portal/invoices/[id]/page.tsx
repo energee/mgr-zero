@@ -11,8 +11,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { toPortalInvoiceViewProps, type PortalInvoiceSnapshot } from "@/lib/mgr/portal-invoice-view";
 import { QuestionForm } from "./question-form";
 
-export default async function PortalInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PortalInvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ payment?: string }> }) {
   const { id } = await params;
+  const failedPayment = (await searchParams).payment === "unavailable";
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
   const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
@@ -21,8 +22,10 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
   return (
     <PortalInvoiceView
       model={model}
-      variant={model.payable ? "pay" : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
-      footer={payment}
+      paymentFailed={failedPayment}
+      returnHref={`/portal/invoices/${snapshot.invoice.id}`}
+      variant={model.payable ? (failedPayment ? "unavailable" : "pay") : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
+      footer={failedPayment ? null : payment}
       question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} breweryName={model.breweryName} />}
     />
   );

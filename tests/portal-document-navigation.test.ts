@@ -16,7 +16,7 @@ import OrdersPage from "@/app/(portal)/portal/orders/page";
 
 it.each([{ kind: "invoice" as const, paid: false, status: "Unpaid" }, { kind: "invoice" as const, paid: true, status: "Paid" }, { kind: "credit_memo" as const, paid: false, status: "Credit" }])("retains $status document facts and the real question form without fixture PDF", async ({ kind, paid, status }) => {
   state.kind = kind; state.paid = paid;
-  const html = renderToStaticMarkup(await InvoicePage({ params: Promise.resolve({ id: "invoice" }) }));
+  const html = renderToStaticMarkup(await InvoicePage({ params: Promise.resolve({ id: "invoice" }), searchParams: Promise.resolve({}) }));
   expect(html).toContain("Ask about this invoice");
   expect(html).toContain('href="/portal/invoices"');
   expect(html).not.toContain("Download PDF");
@@ -37,4 +37,12 @@ it("keeps each history detail link alongside exact draft and short-shipped reord
     expect(html).toContain(`href="/portal?${action}=${id}"`);
   }
   expect(html).toContain("adjusted · 2 short");
+});
+
+it("shows failed payment beside the authorized invoice and question form", async () => {
+  state.kind = "invoice"; state.paid = false;
+  const page = await InvoicePage({ params: Promise.resolve({ id: "invoice" }), searchParams: Promise.resolve({ payment: "unavailable" }) });
+  expect(page.props.returnHref).toBe("/portal/invoices/invoice");
+  expect(page.props.footer).toBeNull();
+  expect(renderToStaticMarkup(page)).toContain("Return to invoice");
 });

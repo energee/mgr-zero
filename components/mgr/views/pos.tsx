@@ -26,7 +26,7 @@ export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalog
 }
 
 export function PointOfSaleView({ model, syncAction, paths }: {
-  model: { connected: boolean; canDisconnect?: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null };
+  model: { connected: boolean; canDisconnect?: boolean; merchant: string; state: string; locations: string; lastSync: string; error?: string | null; oauthFailed?: boolean };
   syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; mapping?: string; menu?: string; connector?: string };
 }) {
   return <>
@@ -35,6 +35,7 @@ export function PointOfSaleView({ model, syncAction, paths }: {
     {model.connected
       ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
       : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", paths?.connect)}</>, "w", SquareMark)}
+    {model.oauthFailed && <>{E.note("Square connection was not completed. Try again to authorize MGR in Square.")}{E.btn("Try connecting again", "g", paths?.connect)}</>}
     {model.error && E.note(`Last connection error: ${model.error}`)}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}

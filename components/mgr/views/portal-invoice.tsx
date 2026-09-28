@@ -22,6 +22,8 @@ export function PortalInvoiceView({
   variant,
   question,
   footer,
+  paymentFailed = false,
+  returnHref,
 }: {
   model: PortalInvoiceViewModel;
   /** Inventory Pay passes "pay". Omit on live unpaid (QBO parked) or paid. */
@@ -30,6 +32,8 @@ export function PortalInvoiceView({
   question?: ReactNode;
   /** Live/inventory: Pay and Download PDF. Unavailable has none by default. */
   footer?: ReactNode;
+  paymentFailed?: boolean;
+  returnHref?: string;
 }) {
   const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid, model.payable);
   const questionNav = E.nav("Question this invoice", `sends a note to ${model.breweryName}`);
@@ -39,6 +43,7 @@ export function PortalInvoiceView({
   return (
     <>
       {E.back("Invoices", model.title, undefined, model.backHref)}
+      {paymentFailed && <>{E.note("Payment unavailable. Online payment isn’t available for this invoice right now. Contact the brewery to arrange payment.")}{E.btn("Return to invoice", "g", returnHref)}</>}
       {E.ttl(model.total)}
       {E.fld("Issued", model.issued)}
       {E.row("Status", model.status, "", model.status === "Unpaid" ? "w" : "ok")}
