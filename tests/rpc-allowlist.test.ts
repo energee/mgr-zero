@@ -105,6 +105,7 @@ const AUTHENTICATED_RPCS = [
   "portal_quote_order(uuid,uuid,uuid,date,text,text,jsonb,uuid)",
   "portal_submit_quote(uuid,uuid,uuid,uuid,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
+  "correct_purchase_receipt(uuid,uuid,text,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
   "record_batch_addition(uuid,uuid,uuid,ingredient_stage,uuid,numeric,text,uuid)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid,jsonb,jsonb,boolean)",
