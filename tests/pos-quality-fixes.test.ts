@@ -102,7 +102,7 @@ describe("Square quality-review lifecycle fences", () => {
     const revoke = vi.fn(() => new Promise<void>((resolve) => { release = resolve; }));
     const requestId = crypto.randomUUID();
     const pending = disconnectSquare(ctx, connection.connectionId, revoke, requestId);
-    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith("old-access"));
+    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith({ accessToken: "old-access" }));
     expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", connection.connectionId).single()).data)
       .toEqual({ state: "recovery_required", remote_revocation_state: "pending" });
     const retryRevoke = vi.fn();

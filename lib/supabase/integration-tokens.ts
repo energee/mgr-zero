@@ -537,7 +537,11 @@ export async function getSquareHealth(ctx: Ctx) {
   };
 }
 
-export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (token: string) => Promise<void>, requestId: string) {
+/** A Square revocation target: the purged access token, or, when an earlier disconnect already purged it
+ *  and left revocation unresolved, the seller's merchant id (#640). */
+export type SquareRevokeTarget = { accessToken: string } | { merchantId: string };
+
+export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (target: SquareRevokeTarget) => Promise<void>, requestId: string) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("begin_square_disconnect", {
@@ -545,13 +549,14 @@ export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (
   }).maybeSingle();
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square disconnect failed");
-  const row = data as { access_token?: unknown; replay_result?: unknown } | null;
+  const row = data as { access_token?: unknown; merchant_id?: unknown; replay_result?: unknown } | null;
   if (row?.replay_result && typeof row.replay_result === "object") {
     return row.replay_result as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
   }
-  const token = typeof row?.access_token === "string" ? row.access_token : null;
+  const target: SquareRevokeTarget | null = typeof row?.access_token === "string" ? { accessToken: row.access_token }
+    : typeof row?.merchant_id === "string" ? { merchantId: row.merchant_id } : null;
   let revoked = false;
-  if (token) revoked = await revoke(token).then(() => true, () => false);
+  if (target) revoked = await revoke(target).then(() => true, () => false);
   const { data: finished, error: finishError } = await admin.rpc("finish_square_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
   });

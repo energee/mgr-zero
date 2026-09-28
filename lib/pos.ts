@@ -270,19 +270,23 @@ export class SquareClient {
     return this.token({ refresh_token: refreshToken, grant_type: "refresh_token" });
   }
 
-  private async revokeToken(accessToken: string, revokeOnlyAccessToken: boolean) {
+  private async revokeToken(target: { access_token: string; revoke_only_access_token: boolean } | { merchant_id: string }) {
     const response = await this.fetcher(`${this.oauthOrigin}/oauth2/revoke`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Client ${this.config.applicationSecret}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ client_id: this.config.applicationId, access_token: accessToken, revoke_only_access_token: revokeOnlyAccessToken }),
+      body: JSON.stringify({ client_id: this.config.applicationId, ...target }),
     });
     const data = await response.json().catch(() => null) as { success?: unknown } | null;
     if (!response.ok || data?.success !== true) throw unavailable();
   }
 
-  revoke(accessToken: string) { return this.revokeToken(accessToken, false); }
+  revoke(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: false }); }
 
-  revokeAccessToken(accessToken: string) { return this.revokeToken(accessToken, true); }
+  revokeAccessToken(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: true }); }
+
+  /** Revokes every token this app holds for the seller, without a token (#640). Square accepts
+   *  merchant_id in place of access_token: developer.squareup.com/reference/square/o-auth-api/revoke-token */
+  revokeMerchant(merchantId: string) { return this.revokeToken({ merchant_id: merchantId }); }
 
   private async api(path: string, accessToken: string, init?: RequestInit) {
     const response = await this.fetcher(`${this.apiOrigin}${path}`, {

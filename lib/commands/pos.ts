@@ -11,14 +11,15 @@ defineCommand({
 });
 
 defineCommand({
-  name: "disconnect_square", description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed",
+  name: "disconnect_square", description: "Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed; on a connection whose revocation is unresolved, retry it by merchant id",
   input: z.object({ connectionId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectSquare }, { squareConfig, SquareClient }] = await Promise.all([
       import("@/lib/supabase/integration-tokens"), import("@/lib/pos"),
     ]);
     const client = new SquareClient(squareConfig());
-    return disconnectSquare(ctx, input.connectionId, (token) => client.revoke(token), execution.requestId);
+    return disconnectSquare(ctx, input.connectionId,
+      (target) => "accessToken" in target ? client.revoke(target.accessToken) : client.revokeMerchant(target.merchantId), execution.requestId);
   },
 });
 

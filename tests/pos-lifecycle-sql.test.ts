@@ -41,7 +41,7 @@ describe("Square durable credential lifecycle", () => {
     await expect(disconnectSquare(ctx, connection.data!.id, revoke, requestId)).resolves.toEqual({
       disconnected: true, remoteRevocationState: "unresolved",
     });
-    expect(revoke).toHaveBeenCalledWith("old-access");
+    expect(revoke).toHaveBeenCalledWith({ accessToken: "old-access" });
     expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='square'`)).toEqual(["0"]);
 
     release(new Response(JSON.stringify({ access_token: "late-access", refresh_token: "late-refresh",
@@ -56,6 +56,15 @@ describe("Square durable credential lifecycle", () => {
     expect(replayRevoke).not.toHaveBeenCalled();
     expect((await admin.from("pos_connections").select("state,remote_revocation_state,last_error").eq("id", connection.data!.id).single()).data)
       .toEqual({ state: "recovery_required", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
+
+    // #640: with the token gone, a new disconnect retries revocation by merchant id.
+    const retryRevoke = vi.fn().mockResolvedValue(undefined);
+    await expect(disconnectSquare(ctx, connection.data!.id, retryRevoke, crypto.randomUUID())).resolves.toEqual({
+      disconnected: true, remoteRevocationState: "confirmed",
+    });
+    expect(retryRevoke).toHaveBeenCalledWith({ merchantId: connection.data!.merchant_id });
+    expect((await admin.from("pos_connections").select("state,remote_revocation_state,last_error").eq("id", connection.data!.id).single()).data)
+      .toEqual({ state: "disconnected", remote_revocation_state: "confirmed", last_error: null });
   });
 
   it("disconnects a recovery-required connection that still holds its credential (#620)", async () => {
@@ -72,7 +81,7 @@ describe("Square durable credential lifecycle", () => {
     const revoke = vi.fn().mockResolvedValue(undefined);
     await expect(disconnectSquare(ctx, connection.data!.id, revoke, crypto.randomUUID()))
       .resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
-    expect(revoke).toHaveBeenCalledWith("expired-access");
+    expect(revoke).toHaveBeenCalledWith({ accessToken: "expired-access" });
     expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='square'`)).toEqual(["0"]);
     expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", connection.data!.id).single()).data)
       .toEqual({ state: "disconnected", remote_revocation_state: "confirmed" });
