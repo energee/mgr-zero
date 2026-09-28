@@ -52,6 +52,9 @@ export const scheduleBatchHazy: ScheduleBatchViewModel = {
 };
 
 export const brewDayHazy: BrewDayViewModel = {
+  sources: [{ material_id: "malt", material_name: "Pale malt", unit: "lb", location_id: "brewery", location_name: "Brewery", bin_id: "stock", bin_name: "Stock", lot_id: "malt-lot", lot_code: "M-24", qty: 800 }],
+  actuals: [{ key: "malt", source: "malt/brewery/stock/malt-lot", stage: "mash", qty: "660" }], process: { knockoutTempF: "68" },
+  plan: { recipe: "Hazy v4", ingredients: [{ id: "malt", material_id: "malt", materialName: "Pale malt", unit: "lb", stage: "mash", per_bbl_qty: 45.2 }] },
   title: "B-0416 · Hazy",
   lots: [
     { key: "malt", title: "2-row", detail: "lot L-0821 · 660 lb" },
