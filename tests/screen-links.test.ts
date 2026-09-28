@@ -12,6 +12,11 @@ const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
+  it("keeps batch history and exact occupancy reading destinations distinct", () => {
+    expect(resolveTap(by("Batches"), "Open")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "B-0409 · Pils")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");
+  });
   it("opens the live invitation sheet and import route", () => {
     for (const name of ["Team", "First-run checklist"]) {
       expect(isInertOn(by(name), "Invite staff")).toBe(false);

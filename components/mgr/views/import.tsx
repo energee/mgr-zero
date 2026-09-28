@@ -76,7 +76,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     {step === 3 && <>
       <p>{busy ? "Committing rows…" : result ? `${result.committed} committed · ${result.blocked} blocked` : "Batch results need recovery"}</p>
       <p className="break-all text-sm">Batch request: {model.batchId}</p>
-      {E.note("Retry keeps the exact batch and returns its first results. Keep this page open until results are recovered. To correct blocked records, start a batch containing only those rows; never resend committed opening balances as a new batch.")}
+      {E.note("Retry keeps the exact batch and returns its first results. Reloading this browser tab restores an unresolved batch. Keep the tab open until results are recovered. To correct blocked records, start a batch containing only those rows; never resend committed opening balances as a new batch.")}
       {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}

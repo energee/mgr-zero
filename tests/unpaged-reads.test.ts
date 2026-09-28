@@ -21,7 +21,9 @@ function unpagedReads(src: string): string[] {
     const semicolon = src.indexOf(";", start);
     const end = Math.min(semicolon < 0 ? src.length : semicolon, starts[index + 1] ?? src.length);
     const read = src.slice(start, end);
-    return /\.select\(/.test(read) && !BOUNDED.test(read) ? [read] : [];
+    // Limiting an embedded relation does not bound the parent list.
+    const parentRead = read.replace(/\.limit\([^)]*referencedTable[^)]*\)/g, "");
+    return /\.select\(/.test(read) && !BOUNDED.test(parentRead) ? [read] : [];
   });
 }
 
@@ -35,7 +37,7 @@ const ALLOWED: Record<string, number> = {
   "inventory.ts": 6,
   "orders.ts": 13,
   "packaging.ts": 9,
-  "portal.ts": 9,
+  "portal.ts": 7,
   "production.ts": 15,
   "purchasing.ts": 13,
   "search.ts": 4,
@@ -44,6 +46,9 @@ const ALLOWED: Record<string, number> = {
 };
 
 describe("unpagedReads", () => {
+  it("does not mistake an embedded reading limit for a parent occupancy limit", () => {
+    expect(unpagedReads(`db.from("vessel_occupancies").select("id, fermentation_readings(id)").limit(1, { referencedTable: "fermentation_readings" });`)).toHaveLength(1);
+  });
   it("flags a plain list read and passes a paged, single, limited, or write read", () => {
     expect(unpagedReads(`rows(ctx.db.from("skus").select("id").eq("brewery_id", b));`)).toHaveLength(1);
     expect(unpagedReads([

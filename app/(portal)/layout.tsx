@@ -1,3 +1,4 @@
+import { CommandRecovery } from "@/components/mgr/command-recovery";
 // app/(portal)/layout.tsx — chrome for the customer portal: the same
 // AppShell as staff, fed the buyer-facing portal manifest (Order · Orders ·
 // Invoices · Account) and the customer's account name. Resolves the caller's customer
@@ -30,6 +31,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </MeSheet>
         }
       >
+        <CommandRecovery />
         {children}
       </PortalShell>
     </BreweryProvider>

@@ -33,8 +33,8 @@ export const batchesBrewer: BatchesSnapshot = {
     { key: "b0416", title: "B-0416 · Hazy IPA v4", detail: "Fri 9/4 · 15 bbl", verb: "Start", tone: "info" },
   ],
   active: [
-    { key: "b0409", title: "B-0409 · Pils", detail: "FV1 · 1.9 °P · read 4 h ago", verb: "Reading", tone: "info" },
-    { key: "b0413", title: "B-0413 · Stout", detail: "FV3 · reading overdue 31 h", verb: "Reading", tone: "info", warning: true },
+    { key: "b0409", title: "B-0409 · Pils", detail: "FV1 · 12.8 bbl", verb: "Open", tone: "primary", readings: [{ key: "pils-fv1", title: "FV1", detail: "1.9 °P · 68 °F · read 4 h ago" }] },
+    { key: "b0413", title: "B-0413 · Stout", detail: "FV3 · 13.5 bbl", verb: "Open", tone: "primary", warning: true, readings: [{ key: "stout-fv3", title: "FV3", detail: "5.2 °P · 68 °F · reading overdue 31 h" }] },
   ],
 };
 

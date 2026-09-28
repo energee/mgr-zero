@@ -261,8 +261,8 @@ a gap to close, not a convention to trust.
   email forever (#580). Existing Auth
   emails are refused; attaching existing
   accounts needs a separate consent workflow. Team, first-run, and customer detail
-  share invitation forms that retain request identity for an unchanged failed
-  submission while the page remains open.
+  share the command recovery lifecycle: frozen input and request identity survive
+  reloads in the same browser tab, scoped to the original actor and tenant.
 - **CSV exemption stops between logical rows.** `import_csv` may continue after
   one independent CSV row fails, but dependent writes inside a logical row still
   require one Postgres function. `begin_csv_import` binds the complete batch
@@ -270,7 +270,8 @@ a gap to close, not a convention to trust.
   `import_csv_row` commits each logical row and its durable committed or blocked
   outcome. Exact reruns return original results, including opening movement IDs.
   Corrected batches contain only blocked rows. Proven by `tests/commands-import.test.ts`;
-  the wizard preserves batch identity while its page stays open.
+  the wizard preserves unresolved batch identity and original preview row numbers
+  across reloads in the same browser tab.
 
 ## Schema conventions
 
