@@ -1,7 +1,10 @@
 // Server transport only. The durable job owns the immutable body and retry window.
 import "server-only";
+import { z } from "zod";
 
-export type OrderEmail = { from: string; to: string; subject: string; text: string };
+// `to` is only required, not re-validated: see the lease parse in ./jobs.
+export const orderEmailSchema = z.object({ from: z.string().min(1), to: z.string().min(1), subject: z.string(), text: z.string() });
+export type OrderEmail = z.infer<typeof orderEmailSchema>;
 
 export class EmailProviderError extends Error {
   constructor(message: string, readonly retryable: boolean) { super(message); }
@@ -16,7 +19,7 @@ export async function sendOrderEmail(deliveryId: string, message: OrderEmail, ap
   });
   if (!response.ok) {
     const error: unknown = await response.json().catch(() => null);
-    const concurrent = response.status === 409 && error !== null && typeof error === "object" && "name" in error && error.name === "concurrent_idempotent_requests";
+    const concurrent = response.status === 409 && (error as { name?: unknown } | null)?.name === "concurrent_idempotent_requests";
     // 401/403 are our key or sending domain, not this buyer: retry until the
     // configuration is fixed rather than permanently blocking the confirmation.
     const ours = response.status === 401 || response.status === 403;

@@ -54,13 +54,14 @@ describe("order email job", () => {
 describe("email job admission", () => {
   it("requires its own configured bearer secret before touching the outbox", async () => {
     const { POST } = await import("@/app/api/email/jobs/deliver/route");
+    const call = async (token: string) => (await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: `Bearer ${token}` } }))).status;
     vi.stubEnv("CHAT_JOB_SECRET", "chat-only");
     vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "");
-    expect((await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer chat-only" } }))).status).toBe(401);
+    expect(await call("chat-only")).toBe(401);
     vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
-    expect((await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer chat-only" } }))).status).toBe(401);
+    expect(await call("chat-only")).toBe(401);
     rpc.mockResolvedValueOnce({ data: [], error: null });
-    expect((await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }))).status).toBe(200);
+    expect(await call("email-only")).toBe(200);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 });
