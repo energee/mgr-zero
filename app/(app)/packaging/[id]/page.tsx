@@ -2,6 +2,7 @@
 // its planned outputs, with the one next action for its state (run-actions.tsx):
 // pick a tank, start, or close; before it starts, reschedule or cancel the
 // plan (plan-actions.tsx). get_packaging_run is the read.
+import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { ChangePlan } from "../../plan-actions";
 import { E } from "@/components/mgr/e";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
@@ -21,7 +22,6 @@ type Run = {
   brand_name: string | null; vessel_name: string | null;
 };
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
-type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
