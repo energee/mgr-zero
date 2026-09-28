@@ -95,3 +95,13 @@ it("refuses foreign plans and uses existing production permissions at the RPC bo
   expect(denied.error).not.toBeNull();
   expect(await runCommand("cancel_packaging_run", { runId: run.id }, warehouse)).toMatchObject({ cancelled_at: expect.any(String) });
 });
+
+it("rejects a missing reschedule date before claiming the request", async () => {
+  const batch = await scheduleBatch();
+  const requestId = crypto.randomUUID();
+  const missing = await ctx.db.rpc("reschedule_batch", { p_brewery: ctx.breweryId, p_batch: batch.id, p_planned_on: null as unknown as string, p_request_id: requestId });
+  expect(missing.error?.message).toMatch(/planned date is required/);
+  // The request id was never claimed, so the same id may carry a valid date.
+  const moved = await ctx.db.rpc("reschedule_batch", { p_brewery: ctx.breweryId, p_batch: batch.id, p_planned_on: "2026-10-05", p_request_id: requestId });
+  expect(moved.error).toBeNull();
+});
