@@ -22,21 +22,6 @@ revoked membership.
 
 {/* ops:customers */}
 
-## count_customers_missing_portal_email [#count_customers_missing_portal_email]
-
-`query` · admin, sales
-
-Count customers without a current portal login email; presence does not imply deliverability or sending
-
-Takes no input.
-
-```bash
-curl -X POST "$MGR_URL/api/command" \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "count_customers_missing_portal_email", "input": {} }'
-```
-
 ## delete_customer [#delete_customer]
 
 `command` · admin
@@ -115,7 +100,6 @@ Customers alphabetical with sale channel name
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeShipTos` | boolean | no |
-| `missingPortalEmail` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
