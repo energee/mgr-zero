@@ -44,7 +44,7 @@ import PricingPage from "@/app/(app)/pricing/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
-import { CustomerView } from "@/components/mgr/views/customer";
+import { CustomerDetailForm } from "@/app/(app)/customers/customer-detail-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 beforeEach(() => { state.role = "admin"; state.calls = []; });
@@ -80,10 +80,10 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
-  expect(page.type).toBe(CustomerView);
-  expect(page.props.headerAction.props.customer.taxTreatment).toBe("research");
+  expect(page.type).toBe(CustomerDetailForm);
+  expect(page.props.initial.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
-  expect(page.props.detail.revokePortalUser({ key: "user", email: "jo@buyer.test" }).props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
+  expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
   for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
   state.role = "warehouse"; state.calls = [];

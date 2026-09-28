@@ -48,6 +48,18 @@ describe("Customers list", () => {
 });
 
 describe("Customer detail", () => {
+  it("associates distributed edit fields with one save form and disables read-only access", () => {
+    const model = toCustomerViewProps(customerRidgeline);
+    const editable = html(createElement(CustomerView, { model }));
+    const formId = editable.match(/<form id="([^"]+)"/)?.[1];
+    expect(formId).toBeTruthy();
+    expect(editable.match(new RegExp(`form="${formId}"`, "g"))?.length).toBeGreaterThanOrEqual(3);
+    const readonly = html(createElement(CustomerView, { model, canWrite: false, footer: null, deleteAction: null }));
+    expect(readonly).toContain("disabled");
+    expect(readonly).not.toContain(">Save customer<");
+    expect(readonly).not.toContain(">Delete customer<");
+  });
+
   it("maps get_customer onto edits, ship-tos, kegs, and orders", () => {
     const model = toCustomerViewProps(customerRidgeline);
     expect(model.name).toBe(RIDGELINE.name);
@@ -73,15 +85,15 @@ describe("Customer detail", () => {
 
   it("the live customer page mounts CustomerView with no second E.* tree", () => {
     const src = readFileSync("app/(app)/customers/[id]/page.tsx", "utf8");
-    expect(src).toMatch(/<CustomerView\b/);
+    expect(src).toMatch(/<CustomerDetailForm\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/detail=\{/);
-    expect(src).not.toMatch(/readOnly/);
+    expect(src).toContain("canWrite={canWrite}");
     expect(src).toMatch(/backHref: "\/customers"/);
     expect(src).toMatch(/<InviteForm\b/);
   });
 
-  it("a detail slot paints flds and ship-tos instead of the edit tree", () => {
+  it("a detail slot preserves the shared customer editing controls", () => {
     const markup = html(createElement(CustomerView, {
       model: toCustomerViewProps(customerRidgeline),
       detail: { shipTos: [{ key: "s1", title: "Main", detail: "dock" }], kegHref: "/kegs/x" },
@@ -90,8 +102,8 @@ describe("Customer detail", () => {
     expect(markup).toMatch(/Retailer/);
     expect(markup).toMatch(/Main/);
     expect(markup).toMatch(/>Open</);
-    expect(markup).not.toMatch(/>Save customer</);
-    expect(markup).not.toMatch(/Customer name/);
+    expect(markup).toMatch(/>Save customer</);
+    expect(markup).toMatch(/Customer name/);
   });
 });
 

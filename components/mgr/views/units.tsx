@@ -7,6 +7,17 @@ import type { UnitsViewModel } from "@/lib/mgr/units-view";
 
 export type { UnitsViewModel };
 
+export function GravityUnitControls({ model, canSetBrewery = true, busy = false, onBrewery, onMine }: {
+  model: UnitsViewModel; canSetBrewery?: boolean; busy?: boolean;
+  onBrewery?: (index: number) => void; onMine?: (index: number) => void;
+}) {
+  return <>
+    {canSetBrewery && <>{E.ttl("Brewery default")}{E.chips(model.breweryOptions, model.breweryIndex, false, onBrewery ? { onChange: onBrewery, disabled: busy, label: "Brewery default" } : undefined)}</>}
+    {E.ttl("Your preference")}
+    {E.chips(model.mineOptions, model.mineIndex, false, onMine ? { onChange: onMine, disabled: busy, label: "Your preference" } : undefined)}
+  </>;
+}
+
 export function UnitsView({
   model,
   controls,
@@ -21,14 +32,7 @@ export function UnitsView({
     <>
       {E.back(backLabel, "Units", undefined, model.backHref)}
       {E.info("Gravity is always stored in °Plato. This changes only how it is shown and typed.")}
-      {controls !== undefined ? controls : (
-        <>
-          {E.ttl("Brewery default")}
-          {E.chips(model.breweryOptions, model.breweryIndex)}
-          {E.ttl("Your preference")}
-          {E.chips(model.mineOptions, model.mineIndex)}
-        </>
-      )}
+      {controls !== undefined ? controls : <GravityUnitControls model={model} />}
       {E.fld("A 12.5 °P reading shows as", model.example)}
     </>
   );

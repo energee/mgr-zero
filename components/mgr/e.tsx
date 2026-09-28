@@ -99,7 +99,7 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
 /** What a live adapter passes to make a field its own: an onChange, or none
  *  with `disabled` for a read-out that must not look editable. Fixtures pass
  *  nothing and draw a default value. */
-export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby"> & {
+export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form"> & {
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
@@ -254,8 +254,8 @@ export const E = {
   tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
     <TabBar names={names} on={on} cls={cls} to={to} />
   ),
-  chips: (arr: string[], on = 0, bright = false) => (
-    <ToggleGroup type="single" defaultValue={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
+  chips: (arr: string[], on = 0, bright = false, controls?: { onChange: (index: number) => void; disabled?: boolean; label?: string }) => (
+    <ToggleGroup type="single" {...(controls ? { value: arr[on], onValueChange: (value: string) => { if (value) controls.onChange(arr.indexOf(value)); }, disabled: controls.disabled, "aria-label": controls.label } : { defaultValue: arr[on] })} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
         <ToggleGroupItem key={c} value={c} className={cn(bright && BRIGHT_ON)}>{c}</ToggleGroupItem>
       ))}
@@ -351,7 +351,7 @@ export const E = {
   pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode }) => (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name}>
+      <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
         <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
         <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
