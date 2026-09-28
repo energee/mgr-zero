@@ -44,7 +44,6 @@ export default async function SettingsPage() {
         deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,
         warehouse: warehouses.find((l) => l.id === row.portal_fulfillment_location_id)?.name ?? "",
         warehouseOptions: warehouses.map((l) => l.name),
-        sourceWater: "water profiles aren’t available yet",
         locations: locations.map((l) => l.name).join(" · ") || "none yet",
         team: plural(team.length, "member"),
       }}
@@ -52,7 +51,7 @@ export default async function SettingsPage() {
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
       deployment={E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
-      hrefs={{ locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
+      hrefs={{ water: "/catalog/water-profiles", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
     />
   );
 }

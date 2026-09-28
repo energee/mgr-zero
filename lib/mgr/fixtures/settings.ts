@@ -20,7 +20,6 @@ export const settingsDemo: SettingsViewModel = {
   deployment: "dedicated · read-only",
   warehouse: "Warehouse",
   warehouseOptions: ["Warehouse"],
-  sourceWater: "every recipe starts here unless it overrides",
   locations: "Warehouse · Taproom",
   team: "3 members · 1 pending invite",
 };

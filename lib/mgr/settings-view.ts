@@ -15,7 +15,6 @@ export type SettingsViewModel = {
   deployment: string;
   warehouse: string;
   warehouseOptions: string[];
-  sourceWater: string;
   locations: string;
   team: string;
 };
