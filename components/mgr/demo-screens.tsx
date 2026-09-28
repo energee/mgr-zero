@@ -19,7 +19,11 @@ const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "d
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {
   if (screen.name === "Orders") {
-    return { ...screen, body: cloneElement(screen.body as ReactElement<ComponentProps<typeof OrdersView>>, { model: toOrdersListViewProps({ ...ordersWorkList, role: persona.role }), createAction: persona.role === "admin" || persona.role === "sales" ? undefined : null }) };
+    const canWrite = persona.role === "admin" || persona.role === "sales";
+    const model = toOrdersListViewProps({ ...ordersWorkList, role: persona.role });
+    // createAction: undefined keeps OrdersView's default New order button; null hides it.
+    const body = screen.body as ReactElement<ComponentProps<typeof OrdersView>>;
+    return { ...screen, body: cloneElement(body, { model, createAction: canWrite ? undefined : null }) };
   }
   if (screen.name === "My notification preferences") {
     return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={persona.role !== "taproom"} back={persona.role === "admin" ? "Chat" : "More"} /> };
