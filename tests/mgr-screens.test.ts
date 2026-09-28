@@ -32,9 +32,11 @@ const body = (name: string) => {
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
-  it("gives brew day the sheet to follow and no new capture", () => {
+  it("gives brew day its pinned sheet and explicit actual confirmation", () => {
     const brew = text("Brew day");
-    expect(brew).toMatch(/Brew sheet · Hazy IPA v4/);
+    expect(brew).toMatch(/Pinned recipe plan/);
+    expect(brew).toMatch(/Confirm actual ingredients/);
+    expect(brew).toMatch(/Confirmed process observations/);
     expect(brew).not.toMatch(/Actual mash|Mash actual/i);
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
