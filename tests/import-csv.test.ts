@@ -42,9 +42,8 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   const adapter = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
   expect(adapter).toContain("<ImportView");
   expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext }");
-  expect(adapter).toContain('beginRecovery(sessionStorage, action.expectedContext, location.pathname, "import_csv", { kind: action.kind, rows: action.rows }, { requestId: action.requestId, owner: { id: IMPORT_OWNER, data: action.previewRows } })');
-  expect(adapter).toContain('command(action.expectedContext.breweryId ?? breweryId, "import_csv", saved.input, saved.requestId, action.expectedContext)');
-  expect(adapter).toContain("finishRecovery(sessionStorage, saved)");
+  expect(adapter).toContain('send.run("import_csv", { kind: action.kind, rows: action.rows }, data => setResult(data as ImportResult),');
+  expect(adapter).toContain("{ requestId: action.requestId, owner: { id: IMPORT_OWNER, data: action.previewRows }, refresh: false }");
   expect(adapter).toContain('readRecoveries(sessionStorage, renderedContext).find(row => row.owner?.id === IMPORT_OWNER)');
   expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
   expect(adapter).toContain("discardRecovery(sessionStorage, batch.expectedContext, batch.requestId)");
