@@ -50,7 +50,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const composable = canComposeFormat(data.format, data.usedAsChild);
   return <>
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
-      deleteAction={ctx.role === "admin" ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
+      deleteAction={ctx.role === "admin" ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} target={id} name={data.format.name} redirect="/catalog" /> : null}
       canCompose={components.length === 0 && composable}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} />}
       contents={composable ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /></div></section> : undefined}

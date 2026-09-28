@@ -65,7 +65,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
           })}
           onDelete={name => categoryAction.run("delete_catalog_category", { name }, () => {
             if (f.category === name) set("category")("");
-          })}
+          }, undefined, { target: name })}
         />}
         linkRows
         messages={<CommandFormMessage error={error} />}

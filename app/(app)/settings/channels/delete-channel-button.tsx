@@ -12,7 +12,7 @@ export function DeleteChannelButton({ channelId }: { channelId: string }) {
   const { busy, error, run } = useCommandAction();
   return (
     <>
-      <Button variant="ghost" size="sm" disabled={busy} onClick={() => run("delete_sale_channel", { channelId })}>Delete</Button>
+      <Button variant="ghost" size="sm" disabled={busy} onClick={() => run("delete_sale_channel", { channelId }, undefined, undefined, { target: channelId })}>Delete</Button>
       <CommandFormMessage error={error} />
     </>
   );

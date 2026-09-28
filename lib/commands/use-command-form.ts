@@ -25,8 +25,10 @@ export function useCommandAction() {
   // Resolves true on success, so a caller that navigates away can wait for it.
   // `refresh: false` skips the post-success router.refresh() for a caller that
   // must keep its client state on screen (the Confirm order review, whose
-  // server page redirects once the order is no longer submitted).
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string, { refresh = true }: { refresh?: boolean } = {}) {
+  // server page redirects once the order is no longer submitted). `target`
+  // names the row a per-row caller acts on, so an unresolved request blocks
+  // only that row (see recoveryKey); leave it out everywhere else.
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string, { refresh = true, target }: { refresh?: boolean; target?: string } = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
@@ -34,8 +36,8 @@ export function useCommandAction() {
     let attempt: RecoveryAttempt | undefined;
     try {
       // Only this record's own earlier attempt keeps a rejection from clearing it.
-      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => recoveryKey(row.name, row.input) === recoveryKey(name, input));
-      attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, requestId);
+      hadUnresolved = readRecoveries(sessionStorage, expectedContext).some(row => recoveryKey(row.name, row.target) === recoveryKey(name, target));
+      attempt = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target });
       const data = await command(attempt.expectedContext.breweryId ?? breweryId, attempt.name, attempt.input, attempt.requestId, attempt.expectedContext);
       finishRecovery(sessionStorage, attempt);
       onSuccess?.(data);
@@ -74,16 +76,16 @@ export const orUndef = (s: string) => s || undefined;
  * values the fields' useState starts from. defaultOpen opens on mount without
  * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
  */
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean }) {
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean; target?: string }) {
   const { error, failure, setError, run: runAction } = useCommandAction();
   const [open, setOpenState] = useState(opts.defaultOpen ?? false);
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
 
-  /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot. */
-  async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void) {
+  /** Runs a secondary verb (Remove, Delete, Clear) in this sheet's error slot; `target` as in useCommandAction. */
+  async function run(command: string, input: unknown, onSuccess?: (data: unknown) => void, target?: string) {
     setRunning(command);
-    try { return await runAction(command, input, onSuccess); } finally { setRunning(null); }
+    try { return await runAction(command, input, onSuccess, undefined, { target }); } finally { setRunning(null); }
   }
 
   function setOpen(next: boolean) {
@@ -97,7 +99,7 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     // A sheet is a form in a dialog portal; React bubbles its submit through
     // the tree, so an enclosing page form must never see it.
     e.stopPropagation();
-    await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); });
+    await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, opts.target);
   }
 
   return { open, setOpen, error, failure, submitting: running === name, busy: running !== null, submit, run };
