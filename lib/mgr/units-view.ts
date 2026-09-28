@@ -21,15 +21,19 @@ export type UnitsSnapshot = {
 
 const breweryOptions = GRAVITY_UNITS.map(gravityUnitLabel);
 const mineOptions = ["Use brewery default", ...breweryOptions];
+/** The unit each option position stands for: the chips report a position. */
+export const BREWERY_UNITS: readonly GravityUnit[] = GRAVITY_UNITS;
+/** Position 0 is "Use brewery default", the null personal override. */
+export const MINE_UNITS: readonly (GravityUnit | null)[] = [null, ...GRAVITY_UNITS];
 
 /** Map a get_gravity_unit payload onto UnitsView. */
 export function toUnitsViewProps({ brewery, mine, effective, backHref }: UnitsSnapshot): UnitsViewModel {
   return {
     backHref,
     breweryOptions,
-    breweryIndex: GRAVITY_UNITS.indexOf(brewery),
+    breweryIndex: BREWERY_UNITS.indexOf(brewery),
     mineOptions,
-    mineIndex: mine == null ? 0 : GRAVITY_UNITS.indexOf(mine) + 1,
+    mineIndex: MINE_UNITS.indexOf(mine),
     example: formatGravity(12.5, effective),
   };
 }

@@ -5,15 +5,19 @@
 import { useState, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { PAYMENT_TERMS } from "@/lib/mgr/enums";
-import { PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
+import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E } from "@/components/mgr/e";
-import type { CustomerViewModel } from "@/lib/mgr/customer-view";
+import type { CustomerEditValues, CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
-export type { CustomerViewModel };
+export type { CustomerEditValues, CustomerViewModel };
+
+const TYPE_OPTIONS = CUSTOMER_TYPES.map(value => ({ value, label: sentenceCase(value) }));
+const TERMS_OPTIONS = PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] }));
+const TAX_OPTIONS = [{ value: "", label: "Inherit from channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
 
 export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
@@ -22,41 +26,37 @@ export type CustomerDetailSlot = {
   ordersHref?: string;
   /** Live sales/admin: InviteForm. `null` hides the whole Portal users section. */
   portalUsers?: ReactNode;
-  /** Live sales/admin: the Remove access verb for one portal user row. */
+  /** Live sales/admin: the Remove access verb per portal user, keyed by userId
+   *  (the model's portalUsers `key`). A map, not a callback, because this view
+   *  is a client component and the page renders the verbs on the server. */
   revokePortalUser?: Record<string, ReactNode>;
 };
 
-export type CustomerEditValues = { name: string; type: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
-
 export function CustomerView({
   model,
-  headerAction,
   footer,
   detail,
   deleteAction,
-  initial, channels, canWrite = true, busy = false, error = null, onSave,
+  canWrite = true, busy = false, error = null, onSave,
 }: {
   model: CustomerViewModel;
-  headerAction?: ReactNode;
   footer?: ReactNode;
   /** Live activity and access controls around the shared edit fields. */
   detail?: CustomerDetailSlot;
   deleteAction?: ReactNode;
-  initial?: CustomerEditValues;
-  channels?: { id: string; name: string }[];
   canWrite?: boolean;
   busy?: boolean;
   error?: string | null;
   onSave?: (values: CustomerEditValues) => void;
 }) {
   const formId = useId();
-  const [values, setValues] = useState<CustomerEditValues>(initial ?? { name: model.name, type: model.type.toLowerCase(), state: model.state, saleChannelId: model.channel, licenseNumber: model.license, paymentTerms: PAYMENT_TERMS.find(term => PAYMENT_TERM_LABEL[term] === model.terms) ?? "net30", taxTreatment: TAX_TREATMENTS.find(tax => sentenceCase(tax) === model.taxTreatment) ?? "" });
-  const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: key === "state" ? value.toUpperCase() : value })) });
+  const [values, setValues] = useState(model.editValues);
+  const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: value })) });
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
   return (
     <div className="@container flex min-w-0 flex-col gap-6 [&_[data-slot=item]]:rounded-none [&_[data-slot=item]]:border-0 [&_[data-slot=item]]:border-b [&_[data-slot=item]]:px-0">
       <header className="[&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
-        {E.back("Customers", model.name, headerAction, model.backHref)}
+        {E.back("Customers", model.name, undefined, model.backHref)}
       </header>
       <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -64,7 +64,7 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
               {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true })}
-              {E.pick("Type", values.type, ["retailer", "distributor", "brewery", "other"].map(value => ({ value, label: sentenceCase(value) })), { ...controls("type"), displayValue: sentenceCase(values.type) })}
+              {E.pick("Type", values.type, TYPE_OPTIONS, controls("type"))}
               {E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
               {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
             </div>
@@ -104,9 +104,9 @@ export function CustomerView({
           <section aria-label="Trading terms" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
             <div className="flex flex-col gap-4">
-              {E.pick("Sale channel", values.saleChannelId, (channels ?? model.channelOptions.map(name => ({ id: name, name }))).map(channel => ({ value: channel.id, label: channel.name })), { ...controls("saleChannelId"), required: true, displayValue: channels?.find(channel => channel.id === values.saleChannelId)?.name ?? values.saleChannelId })}
-              {E.pick("Terms", values.paymentTerms, PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] })), { ...controls("paymentTerms"), displayValue: paymentTermLabel(values.paymentTerms) })}
-              {E.pick("Tax treatment", values.taxTreatment, [{ value: "", label: "Inherit from channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))], { ...controls("taxTreatment"), displayValue: values.taxTreatment ? sentenceCase(values.taxTreatment) : "Inherit from channel" })}
+              {E.pick("Sale channel", values.saleChannelId, model.channelOptions.map(channel => ({ value: channel.id, label: channel.name })), { ...controls("saleChannelId"), required: true })}
+              {E.pick("Terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
+              {E.pick("Tax treatment", values.taxTreatment, TAX_OPTIONS, controls("taxTreatment"))}
             </div>
           </section>
           <section aria-label="Customer activity" className="flex flex-col gap-3">

@@ -6,7 +6,7 @@ import { GravityUnitControls } from "@/components/mgr/views/units";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
 export function GravityUnitForm({
   brewery, mine, canSetBrewery,
@@ -33,8 +33,8 @@ export function GravityUnitForm({
 
   return <div className="flex flex-col gap-2">
     <GravityUnitControls model={toUnitsViewProps({ brewery: breweryChoice, mine: mineChoice, effective: mineChoice ?? breweryChoice })} canSetBrewery={canSetBrewery} busy={busy}
-      onBrewery={index => { const unit = GRAVITY_UNITS[index]; setBreweryChoice(unit); run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); }); }}
-      onMine={index => { const unit = index === 0 ? null : GRAVITY_UNITS[index - 1]; setMineChoice(unit); run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); }); }} />
+      onBrewery={unit => { setBreweryChoice(unit); run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); }); }}
+      onMine={unit => { setMineChoice(unit); run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); }); }} />
     <CommandFormMessage error={error} />
   </div>;
 }

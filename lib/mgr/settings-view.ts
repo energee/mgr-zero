@@ -13,8 +13,9 @@ export type SettingsViewModel = {
   aiModel: string;
   aiModels: GatewayModelOption[];
   deployment: string;
-  warehouse: string;
-  warehouseOptions: string[];
+  /** Portal fulfillment location id, or null when none is set. */
+  warehouseId: string | null;
+  warehouseOptions: { id: string; name: string }[];
   locations: string;
   team: string;
 };

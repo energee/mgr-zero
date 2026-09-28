@@ -3,18 +3,19 @@
 // and the formatGravity example always draw.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { UnitsViewModel } from "@/lib/mgr/units-view";
+import { BREWERY_UNITS, MINE_UNITS, type UnitsViewModel } from "@/lib/mgr/units-view";
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
 export type { UnitsViewModel };
 
 export function GravityUnitControls({ model, canSetBrewery = true, busy = false, onBrewery, onMine }: {
   model: UnitsViewModel; canSetBrewery?: boolean; busy?: boolean;
-  onBrewery?: (index: number) => void; onMine?: (index: number) => void;
+  onBrewery?: (unit: GravityUnit) => void; onMine?: (unit: GravityUnit | null) => void;
 }) {
   return <>
-    {canSetBrewery && <>{E.ttl("Brewery default")}{E.chips(model.breweryOptions, model.breweryIndex, false, onBrewery ? { onChange: onBrewery, disabled: busy, label: "Brewery default" } : undefined)}</>}
+    {canSetBrewery && <>{E.ttl("Brewery default")}{E.chips(model.breweryOptions, model.breweryIndex, false, onBrewery ? { onChange: index => onBrewery(BREWERY_UNITS[index]), disabled: busy, label: "Brewery default" } : undefined)}</>}
     {E.ttl("Your preference")}
-    {E.chips(model.mineOptions, model.mineIndex, false, onMine ? { onChange: onMine, disabled: busy, label: "Your preference" } : undefined)}
+    {E.chips(model.mineOptions, model.mineIndex, false, onMine ? { onChange: index => onMine(MINE_UNITS[index]), disabled: busy, label: "Your preference" } : undefined)}
   </>;
 }
 

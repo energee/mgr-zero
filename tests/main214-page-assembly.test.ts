@@ -81,7 +81,7 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
   expect(page.type).toBe(CustomerDetailForm);
-  expect(page.props.initial.taxTreatment).toBe("research");
+  expect(page.props.model.editValues.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
   expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
