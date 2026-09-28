@@ -82,3 +82,7 @@ export function readServerEnv(env: Environment = process.env): ServerEnv {
 export function isChatConfigured(env: Record<string, string | undefined> = process.env): boolean {
   return Boolean(env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN || env.VERCEL === "1");
 }
+
+export function readOrderEmailEnv(env: Environment = process.env) {
+  return { apiKey: required(env, "RESEND_API_KEY"), from: required(env, "ORDER_EMAIL_FROM") };
+}
