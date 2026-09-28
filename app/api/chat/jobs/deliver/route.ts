@@ -3,11 +3,11 @@
 // retry/suppress). Body may carry {limit} (capped at 100 by the lease RPC).
 // Bearer-authenticated internal job (CHAT_JOB_SECRET).
 import { NextResponse } from "next/server";
-import { authorizeJob } from "@/lib/chat/job-auth";
+import { authorizeJob } from "@/lib/jobs/auth";
 import { runChatCallbackBatch, runChatDeliveryBatch } from "@/lib/chat/jobs";
 
 export async function POST(request: Request) {
-  if (!authorizeJob(request)) return NextResponse.json({ ok: false }, { status: 401 });
+  if (!authorizeJob(request, process.env.CHAT_JOB_SECRET)) return NextResponse.json({ ok: false }, { status: 401 });
   const body: unknown = await request.json().catch(() => null);
   const limit = Number(body && typeof body === "object" && "limit" in body ? body.limit : undefined) || 50;
   try {
