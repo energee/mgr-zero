@@ -124,3 +124,18 @@ it("replays completed pre-preview requests but refuses new or changed unpreviewe
   await expect(runCommand("record_material_count", f.input, f.ctx)).rejects.toThrow("Preview the count");
   expect((await admin.from("material_counts").select("id").eq("brewery_id", f.b.id)).data).toEqual([]);
 });
+
+
+it("rejects repeated UUID identities regardless of text spelling before planning or writing", async () => {
+  const f = await fixture();
+  const aliases = [f.material.id.toUpperCase(), f.material.id.replaceAll("-", "")];
+  for (const alias of aliases) {
+    const lines = [{ material_id: f.material.id, qty: 65 }, { material_id: alias, qty: 65 }];
+    const preview = await f.ctx.db.rpc("get_material_count_preview", { p_brewery: f.b.id, p_location: f.wh.id, p_bin: f.wh.binId, p_lines: lines });
+    expect(preview.error).toMatchObject({ message: expect.stringContaining("only once") });
+    const commit = await f.ctx.db.rpc("record_material_count", { p_brewery: f.b.id, p_location: f.wh.id, p_bin: f.wh.binId, p_counted_on: "2026-09-28", p_lines: lines, p_request_id: crypto.randomUUID(), p_revision: "not-a-valid-preview" });
+    expect(commit.error).toMatchObject({ message: expect.stringContaining("only once") });
+  }
+  await expect(runCommand("get_material_count_preview", { ...f.input, lines: [f.input.lines[0], { ...f.input.lines[0], materialId: f.material.id.toUpperCase() }] }, f.ctx)).rejects.toThrow("only once");
+  expect((await admin.from("material_counts").select("id").eq("brewery_id", f.b.id)).data).toEqual([]);
+});
