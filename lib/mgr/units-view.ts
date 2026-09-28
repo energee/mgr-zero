@@ -20,7 +20,6 @@ export type UnitsSnapshot = {
 };
 
 const breweryOptions = GRAVITY_UNITS.map(gravityUnitLabel);
-const mineOptions = ["Use brewery default", ...breweryOptions];
 /** The unit each option position stands for: the chips report a position. */
 export const BREWERY_UNITS: readonly GravityUnit[] = GRAVITY_UNITS;
 /** Position 0 is "Use brewery default", the null personal override. */
@@ -32,7 +31,7 @@ export function toUnitsViewProps({ brewery, mine, effective, backHref }: UnitsSn
     backHref,
     breweryOptions,
     breweryIndex: BREWERY_UNITS.indexOf(brewery),
-    mineOptions,
+    mineOptions: [`Use brewery default (${gravityUnitLabel(brewery)})`, ...breweryOptions],
     mineIndex: MINE_UNITS.indexOf(mine),
     example: formatGravity(12.5, effective),
   };

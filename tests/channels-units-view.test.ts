@@ -161,9 +161,16 @@ describe("Units view", () => {
     expect(model.backHref).toBeUndefined();
     expect(model.breweryOptions).toEqual(["Plato", "Specific gravity"]);
     expect(model.breweryIndex).toBe(0);
-    expect(model.mineOptions).toEqual(["Use brewery default", "Plato", "Specific gravity"]);
+    expect(model.mineOptions).toEqual(["Use brewery default (Plato)", "Plato", "Specific gravity"]);
     expect(model.mineIndex).toBe(0);
     expect(model.example).toBe(formatGravity(12.5, "plato"));
+  });
+
+  it("explains who each gravity choice affects, in inventory and live alike (#671 review)", () => {
+    const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
+    expect(html).toContain("What everyone here sees unless they choose otherwise below.");
+    expect(html).toContain("Yours alone — it changes nothing for anyone else.");
+    expect(html).toContain("Use brewery default (Plato)");
   });
 
   it("uses effective for the example when mine overrides brewery", () => {
