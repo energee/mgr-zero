@@ -31,5 +31,15 @@ export function CommandRecovery() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Recovery failed. Retry the saved request."); }
     finally { setBusy(false); }
   }
-  return <CommandRecoveryView rows={rows.filter(row => row.expectedContext.actorId === context.actorId && row.expectedContext.breweryId === context.breweryId && row.expectedContext.customerId === context.customerId)} busy={busy} error={error} onRetry={retry} />;
+  // Discard only after the user has checked the result: nothing is sent, and
+  // the same record accepts a new submit again.
+  function discard(requestId: string) {
+    setError(null);
+    try {
+      const attempt = readRecoveries(sessionStorage, context).find(row => row.requestId === requestId);
+      if (!attempt) throw new Error("This request is no longer pending in this account.");
+      finishRecovery(sessionStorage, attempt);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The saved request could not be discarded."); }
+  }
+  return <CommandRecoveryView rows={rows.filter(row => row.expectedContext.actorId === context.actorId && row.expectedContext.breweryId === context.breweryId && row.expectedContext.customerId === context.customerId)} busy={busy} error={error} onRetry={retry} onDiscard={discard} />;
 }

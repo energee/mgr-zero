@@ -47,6 +47,9 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   expect(adapter).toContain("finishRecovery(sessionStorage, saved)");
   expect(adapter).toContain('readRecoveries(sessionStorage, renderedContext).find(row => row.name === "import_csv")');
   expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
+  expect(adapter).toContain("const saved = readRecoveries(sessionStorage, batch.expectedContext).find(row => row.requestId === batch.requestId)");
+  expect(adapter).toContain("if (saved) finishRecovery(sessionStorage, saved);");
+  expect(adapter).toContain("onDiscard={discard}");
   const source = readFileSync("components/mgr/views/import.tsx", "utf8");
   expect(source).toMatch(/from "@\/components\/mgr\/e"/);
   expect(source).toContain("E.pick(field.name");

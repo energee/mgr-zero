@@ -14,8 +14,9 @@ import { beginRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { command } from "@/lib/commands/client";
 import { submitEvent } from "./helpers";
 let retrySaved: (id: string) => Promise<void>;
+let discardSaved: (id: string) => void;
 vi.mock("@/components/mgr/views/command-recovery", () => ({
-  CommandRecoveryView: (props: { onRetry: typeof retrySaved }) => { retrySaved = props.onRetry; return null; },
+  CommandRecoveryView: (props: { onRetry: typeof retrySaved; onDiscard: typeof discardSaved }) => { retrySaved = props.onRetry; discardSaved = props.onDiscard; return null; },
 }));
 beforeEach(() => {
   renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
@@ -191,4 +192,50 @@ it.each([200, 403])("isolates concurrent commands on one page when the second re
     await inFlight;
   }
   expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
+});
+
+it("keeps an unknown outcome on one record from blocking the same command on another record (#615)", async () => {
+  const requests: { requestId: string; input: { invoiceId: string } }[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    if (request.input.invoiceId === "invoice-a") throw new Error("response lost");
+    return { status: 422, json: async () => ({ ok: false, error: { message: "customer not mapped" } }) };
+  }));
+  let action!: ReturnType<typeof useCommandAction>;
+  function Harness() { action = useCommandAction(); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-b" })).toBe(false);
+  expect(requests.map(request => request.input.invoiceId)).toEqual(["invoice-a", "invoice-b"]);
+  expect(requests[1].requestId).not.toBe(requests[0].requestId);
+  // B's definitive rejection clears B only; A's unknown outcome stays saved.
+  expect(readRecoveries(sessionStorage, renderedContext).map(attempt => attempt.input)).toEqual([{ invoiceId: "invoice-a" }]);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a", memo: "edited" })).toBe(false);
+  expect(requests).toHaveLength(2);
+});
+
+it("Discard ends a request kept after a rejected retry, so a corrected submit proceeds (#615)", async () => {
+  const requests: { requestId: string; input: unknown }[] = [];
+  let response: "dropped" | "denied" = "dropped";
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    if (response === "dropped") throw new Error("committed, response lost");
+    return { status: 403, json: async () => ({ ok: false, error: { message: "membership changed" } }) };
+  }));
+  let action!: ReturnType<typeof useCommandAction>;
+  function Harness() { action = useCommandAction(); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  await action.run("record_movement", { binId: "bin", qty: 2 });
+  response = "denied";
+  await action.run("record_movement", { binId: "bin", qty: 2 });
+  // Conservative: a rejected retry cannot prove the first send did nothing.
+  const [kept] = readRecoveries(sessionStorage, renderedContext);
+  expect(kept.requestId).toBe(requests[0].requestId);
+  renderToStaticMarkup(createElement(CommandRecovery));
+  discardSaved(kept.requestId);
+  expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
+  await action.run("record_movement", { binId: "bin", qty: 3 });
+  expect(requests).toHaveLength(3);
+  expect(requests[2].requestId).not.toBe(kept.requestId);
 });
