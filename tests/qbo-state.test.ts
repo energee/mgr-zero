@@ -122,6 +122,10 @@ describe("QuickBooks current invoice state", () => {
     expect(success.lastSuccess.at).toBeTruthy();
     expect(success.lastSuccess.operator).toBeTruthy();
     expect(success.latestFailure).toBeNull();
+    // The operator reads as the staff member's full name, as other staff screens show it.
+    await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "Pat Operator" } });
+    expect((await readStatus()).lastSuccess.operator).toBe("Pat Operator");
+    await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "" } });
     const failedId = crypto.randomUUID();
     transport.mockRejectedValue(new Error("secret provider response"));
     await expect(syncQboInvoices(f.ctx, failedId, new QboOAuthClient(config, transport))).rejects.toThrow("QuickBooks is unavailable");
