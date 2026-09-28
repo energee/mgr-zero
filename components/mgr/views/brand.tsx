@@ -10,7 +10,6 @@
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
-import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
@@ -63,7 +62,7 @@ export function BrandView({
         E.edit("ABV", model.abv, "number", undefined, { onChange: controls.abv, min: String(BRAND_ABV.min), max: String(BRAND_ABV.max), step: "0.1" }),
         <div className="flex flex-col gap-2">
           <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
-          {categoryAction !== undefined ? categoryAction : <CatalogCategoriesControl categories={model.categoryOptions} />}
+          {categoryAction}
         </div>,
         <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />,
       )}

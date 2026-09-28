@@ -8,19 +8,20 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import { E } from "@/components/mgr/e";
 import { FormatRowsView, type FormatRow } from "@/components/mgr/views/format-rows";
 import { VolumeField } from "@/components/mgr/volume-field";
-import { formatControls, formatSizing, type FormatViewModel } from "@/lib/mgr/format-view";
+import { type formatControls, formatSizing, type FormatViewModel } from "@/lib/mgr/format-view";
 import { validFormatRows } from "@/lib/format-edit-rules";
 
 export type { FormatViewModel };
 
 type Controls = Partial<ReturnType<typeof formatControls>>;
+const NO_ROWS: FormatRow[] = [{ id: "", qty: "1" }];
 
 function FormatSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange?: (value: string) => void }) {
   const choices = options.map(option => ({ value: option, label: SIZE_LABEL[option] ?? (option === "custom" ? "Custom size" : sentenceCase(option)) }));
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({ model: supplied, createAction, controls: suppliedControls, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows, onComponentRowsChange, deleteAction, formId }: {
+export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId }: {
   model: FormatViewModel;
   createAction?: ReactNode;
   controls?: Controls;
@@ -39,13 +40,8 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
 }) {
   const generatedFormId = useId();
   const id = formId ?? generatedFormId;
-  const [localComponents, setLocalComponents] = useState<FormatRow[]>([{ id: "", qty: "1" }]);
-  const [bomRows, setBomRows] = useState<FormatRow[]>(() => supplied.bom.map(line => ({ id: line.material, qty: line.qty, onBreak: line.onBreak === "consumed" ? "consumed" : "return_to_stock" })));
+  const [bomRows, setBomRows] = useState<FormatRow[]>(() => model.bom.map(line => ({ id: line.material, qty: line.qty, onBreak: line.onBreak === "consumed" ? "consumed" : "return_to_stock" })));
   const [confirmClear, setConfirmClear] = useState(false);
-  const [local, setLocal] = useState(supplied);
-  const model = suppliedControls ? supplied : local;
-  const patch = (next: Partial<FormatViewModel>) => setLocal(previous => ({ ...previous, ...next }));
-  const controls: Controls = suppliedControls ?? formatControls(model, patch);
   const sizing = formatSizing(model);
   const keg = model.packageType === "keg";
   return <>
@@ -68,7 +64,7 @@ export function FormatView({ model: supplied, createAction, controls: suppliedCo
       {canCompose && <details className="pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-center gap-2 text-sm">{E.sw(model.composed, "Calculate volume from smaller packages", controls.composed)}Calculate volume from smaller packages.</label></details>}
       {model.composed && !editing && <section className="flex flex-col gap-3 pt-3" aria-label="Package contents">
         <h3 className="text-sm font-medium">Package contents</h3>
-        <FormatRowsView kind="components" rows={componentRows ?? localComponents} options={componentOptions} valid={validFormatRows(componentRows ?? localComponents, componentOptions.map(o => o.id), false)} onChange={onComponentRowsChange ?? setLocalComponents} confirmClear={false} onConfirmClear={() => {}} />
+        <FormatRowsView kind="components" rows={componentRows} options={componentOptions} valid={validFormatRows(componentRows, componentOptions.map(o => o.id), false)} onChange={onComponentRowsChange} confirmClear={false} onConfirmClear={() => {}} />
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}

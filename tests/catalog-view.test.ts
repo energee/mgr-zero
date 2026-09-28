@@ -8,6 +8,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { BrandView } from "../components/mgr/views/brand";
 import { CatalogView } from "../components/mgr/views/catalog";
 import { FormatView } from "../components/mgr/views/format";
+import { FormatFixture } from "../components/mgr/fixture-adapters";
 import { FormatsView } from "../components/mgr/views/formats";
 import { PackageBomView } from "../components/mgr/views/package-bom";
 import { SkuListView } from "../components/mgr/views/sku-list";
@@ -149,7 +150,7 @@ describe("Brand view", () => {
   it("uses brewery categories without supplying hardcoded choices", () => {
     expect(toBrandViewProps({ ...brandHazy, categories: ["Taproom only"] }).categoryOptions).toEqual(["Taproom only"]);
     expect(toBrandViewProps({ ...brandHazy, categories: undefined }).categoryOptions).toEqual([]);
-    expect(htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }))).toContain("Manage categories");
+    expect(htmlOf(screen("Brand").body as ReactNode)).toContain("Manage categories");
   });
   it("maps list_brands onto style, ABV, category, price group, and SKU list", () => {
     const model = toBrandViewProps(brandHazy);
@@ -422,10 +423,17 @@ describe("Format view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("the Format inventory record is FormatView", () => {
+  it("the Format inventory record is FormatView through its fixture adapter", () => {
     const body = screen("Format").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(FormatView);
+    expect(body.type).toBe(FormatFixture);
     expect(body.props.model).toEqual(toFormatViewProps(formatCan));
+    expect(htmlOf(body as ReactNode)).toMatch(/>Save format</);
+  });
+
+  it("FormatView and CatalogCategoriesControl keep no fixture state", () => {
+    for (const file of ["components/mgr/views/format.tsx", "components/mgr/views/catalog-categories.tsx"]) {
+      expect(readFileSync(file, "utf8")).not.toMatch(/setLocal|localError|localComponents/);
+    }
   });
 
   it("the live format form mounts the shared controlled FormatView", () => {
