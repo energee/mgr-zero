@@ -18,14 +18,15 @@ export default async function PortalInvoicePage({ params, searchParams }: { para
   const ctx = await buildContext(customer.breweryId);
   const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
   const model = toPortalInvoiceViewProps({ ...snapshot, backHref: "/portal/invoices" });
-  const payment = model.payable ? <Button asChild><a href={`/portal/invoices/${snapshot.invoice.id}/pay`} target="_blank" rel="noreferrer">Pay invoice</a></Button> : null;
+  // The Pay route redirects here with ?payment=unavailable when QuickBooks
+  // returns no link; the invoice then renders as unavailable.
+  const payable = model.payable && !failedPayment;
+  const payment = payable ? <Button asChild><a href={`/portal/invoices/${snapshot.invoice.id}/pay`} target="_blank" rel="noreferrer">Pay invoice</a></Button> : null;
   return (
     <PortalInvoiceView
       model={model}
-      paymentFailed={failedPayment}
-      returnHref={`/portal/invoices/${snapshot.invoice.id}`}
-      variant={model.payable ? (failedPayment ? "unavailable" : "pay") : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
-      footer={failedPayment ? null : payment}
+      variant={payable ? "pay" : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
+      footer={payment}
       question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} breweryName={model.breweryName} />}
     />
   );

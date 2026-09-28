@@ -39,10 +39,11 @@ it("keeps each history detail link alongside exact draft and short-shipped reord
   expect(html).toContain("adjusted · 2 short");
 });
 
-it("shows failed payment beside the authorized invoice and question form", async () => {
+it("shows failed payment as unavailable beside the authorized invoice and question form", async () => {
   state.kind = "invoice"; state.paid = false;
   const page = await InvoicePage({ params: Promise.resolve({ id: "invoice" }), searchParams: Promise.resolve({ payment: "unavailable" }) });
-  expect(page.props.returnHref).toBe("/portal/invoices/invoice");
   expect(page.props.footer).toBeNull();
-  expect(renderToStaticMarkup(page)).toContain("Return to invoice");
+  const html = renderToStaticMarkup(page);
+  expect(html).toContain("Online payment isn’t available");
+  expect(html).toContain("Ask about this invoice");
 });
