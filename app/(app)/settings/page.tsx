@@ -42,8 +42,8 @@ export default async function SettingsPage() {
         aiModel: ai.model,
         aiModels,
         deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,
-        warehouse: warehouses.find((l) => l.id === row.portal_fulfillment_location_id)?.name ?? "",
-        warehouseOptions: warehouses.map((l) => l.name),
+        warehouseId: row.portal_fulfillment_location_id,
+        warehouseOptions: warehouses.map(({ id, name }) => ({ id, name })),
         locations: locations.map((l) => l.name).join(" · ") || "none yet",
         team: plural(team.length, "member"),
       }}

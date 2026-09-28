@@ -6,6 +6,7 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
+import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 
 export type { SettingsViewModel };
@@ -37,12 +38,7 @@ export function SettingsView({
         <section aria-labelledby="settings-defaults" className="flex min-w-0 flex-col gap-6 rounded-xl border bg-card p-5 sm:p-6">
           <div><h2 id="settings-defaults" className="font-heading text-xl font-semibold">Team defaults</h2><p className="mt-1 text-sm text-muted-foreground">Ask MGR and wholesale portal preferences.</p></div>
           <div>{aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}</div>
-          <div className="border-t pt-6">{fulfillmentForm ?? (
-            <div className="flex flex-col gap-4">
-              {E.pick("Portal fulfillment warehouse", model.warehouse, model.warehouseOptions)}
-              {E.btn("Save warehouse", "g")}
-            </div>
-          )}</div>
+          <div className="border-t pt-6">{fulfillmentForm ?? <PortalFulfillmentView locations={model.warehouseOptions} currentId={model.warehouseId} />}</div>
         </section>
       </div>
       <div className="mt-2 grid gap-8 border-t pt-6 @min-[48rem]:grid-cols-2">

@@ -3,7 +3,7 @@
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
 import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
-import { PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 
 const roles = ["admin", "sales"] as const;
 
@@ -21,7 +21,7 @@ defineCommand({
   roles: [...roles],
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().min(1),
-    type: z.enum(["distributor", "retailer", "brewery", "other"]),
+    type: z.enum(CUSTOMER_TYPES),
     state: stateCode, // customers.state is NOT NULL (home state)
     // The channel is the customer's row into the price grid (§16.3) and is required.
     saleChannelId: z.string().uuid(),

@@ -12,14 +12,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { PAYMENT_TERMS, type PaymentTerm } from "@/lib/mgr/enums";
+import { CUSTOMER_TYPES, PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
+import type { CustomerEditValues } from "@/lib/mgr/customer-view";
 import { PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
 
-const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
-type CustomerType = (typeof CUSTOMER_TYPES)[number];
+/** upsert_customer input from form values, shared by this dialog and the
+ *  inline Customer detail form: blanks become undefined, state is uppercased. */
+export const upsertCustomerInput = (values: CustomerEditValues, id?: string) => ({
+  ...(id ? { id } : {}),
+  name: values.name,
+  type: values.type as CustomerType,
+  state: values.state.toUpperCase(),
+  saleChannelId: values.saleChannelId,
+  licenseNumber: values.licenseNumber || undefined,
+  paymentTerms: values.paymentTerms as PaymentTerm,
+  taxTreatment: (values.taxTreatment || undefined) as TaxTreatment | undefined,
+});
 
 /** Wholesale is the channel a wholesale account almost always sits on, so it is
  * the create-form default; the brewery's first channel stands in if it is gone. */
@@ -54,16 +65,7 @@ export function CustomerForm({
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "net30");
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const form = useCommandForm("upsert_customer", {
-    build: () => ({
-      ...(isEdit ? { id: customer.id } : {}),
-      name,
-      type,
-      state: state.toUpperCase(),
-      saleChannelId,
-      licenseNumber: licenseNumber || undefined,
-      paymentTerms: paymentTerms as PaymentTerm,
-      taxTreatment: taxTreatment || undefined,
-    }),
+    build: () => upsertCustomerInput({ name, type, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
     reset: () => {
       setName(customer?.name ?? "");
       setType(customer?.type ?? "retailer");

@@ -390,11 +390,15 @@ describe("Settings view", () => {
     expect(sharedView).toMatch(/<ThemeToggle\b/);
   });
 
-  it("uses the shadcn Select in the warehouse form", () => {
+  it("uses the shared inline warehouse form", () => {
     const fulfillmentForm = src("app/(app)/settings/portal-fulfillment-form.tsx");
-    expect(fulfillmentForm).toMatch(/from "@\/components\/ui\/select"/);
-    expect(fulfillmentForm).toMatch(/<SelectTrigger\b/);
+    expect(fulfillmentForm).toContain("<PortalFulfillmentView");
+    expect(src("components/mgr/views/settings.tsx")).toContain("<PortalFulfillmentView");
     expect(fulfillmentForm).not.toMatch(/<select\b/);
+  });
+
+  it("keeps the Choose warehouse placeholder unselectable (#671 review)", () => {
+    expect(src("components/mgr/views/portal-fulfillment.tsx")).toContain('{ value: "", label: "Choose warehouse", disabled: true }');
   });
 });
 

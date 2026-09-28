@@ -27,6 +27,10 @@ export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest"
 export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
 export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
 
+// Customer types (customer_type enum; lib/commands/customers.ts, the customer forms).
+export const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
+export type CustomerType = (typeof CUSTOMER_TYPES)[number];
+
 // Payment terms, one list for customers and vendors (#491; lib/commands/customers.ts,
 // lib/commands/purchasing.ts, lib/import-csv.ts). Nothing computes a due date
 // from them yet. Labels: PAYMENT_TERM_LABEL in lib/mgr/labels.ts.
