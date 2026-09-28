@@ -1,14 +1,17 @@
 "use client";
-import { Fragment, useId, useState } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { canRecordBrewDay, type BrewDayViewModel } from "@/lib/mgr/brew-day-view";
 
+import { PlanCancelled } from "./plan-actions";
+
 export type { BrewDayViewModel };
 
-export function BrewDayView({ model, busy = false, error, onChange, onRecord }: {
+export function BrewDayView({ model, busy = false, error, onChange, onRecord, planActions }: {
+  planActions?: ReactNode;
   model: BrewDayViewModel; busy?: boolean; error?: string | null;
   onChange?: (patch: Partial<Pick<BrewDayViewModel, "vesselId" | "initialBbl" | "brewedOn">>) => void;
   onRecord?: () => void;
@@ -22,6 +25,8 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
     {E.back("Batches", model.title, undefined, model.backHref)}
     {model.planned && E.fld("Planned", model.planned)}
     {model.note && E.fld("Note", model.note)}
+    {model.cancelledAt ? <PlanCancelled /> : <>
+    {!model.recorded && planActions}
     <section data-gated className="flex flex-col gap-3" aria-label="Material consumption unavailable">
       {E.note("Material consumption unavailable here. Record brew day records the brew date and knockout occupancy only.")}
       {(model.lots ?? []).map(lot => <Fragment key={lot.key}>{E.nav(lot.title, lot.detail)}</Fragment>)}
@@ -43,5 +48,6 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
       <CommandFormMessage error={error} />
       <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit" disabled={busy || !ready}>Record brew day</Button>
     </form>}
+    </>}
   </>;
 }

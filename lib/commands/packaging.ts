@@ -60,6 +60,24 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "cancel_packaging_run", description: "Cancel an unstarted packaging run plan; retains history and refuses recorded physical work",
+  input: z.object({ runId: z.string().uuid() }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_packaging_run", {
+    p_brewery: ctx.breweryId, p_run: i.runId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "reschedule_packaging_run", description: "Reschedule an unstarted packaging run plan; retains history and refuses recorded physical work",
+  input: z.object({ runId: z.string().uuid(), plannedOn: isoDate }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reschedule_packaging_run", {
+    p_brewery: ctx.breweryId, p_run: i.runId, p_planned_on: i.plannedOn, p_request_id: execution.requestId,
+  })),
+});
+
 // Closing is the moment beer becomes stock. `locationId`/`binId` are required
 // rather than derived: a vessel has no location, so the finished goods would
 // otherwise have nowhere to land. Missing planned packages settle at zero --
@@ -192,7 +210,7 @@ defineQuery({
 
 type RunRow = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null;
-  planned_on: string; started_at: string | null; closed_at: string | null;
+  planned_on: string; started_at: string | null; closed_at: string | null; cancelled_at: string | null;
   bbl_drawn: number | null; note: string | null;
 };
 
@@ -232,7 +250,7 @@ async function plannedQty(ctx: Ctx, runIds: string[]) {
   return totals;
 }
 
-const RUN_COLUMNS = "id, run_no, brand_id, occupancy_id, planned_on, started_at, closed_at, bbl_drawn, note";
+const RUN_COLUMNS = "id, run_no, brand_id, occupancy_id, planned_on, started_at, closed_at, cancelled_at, bbl_drawn, note";
 
 defineQuery({
   name: "list_packaging_runs",

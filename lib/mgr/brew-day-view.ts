@@ -14,6 +14,7 @@ export type BrewDayViewModel = {
   brewedOn: string;
   vessels: BrewDayVessel[];
   recorded?: boolean;
+  cancelledAt?: string | null;
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };
