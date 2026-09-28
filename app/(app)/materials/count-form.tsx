@@ -6,10 +6,9 @@ import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
-import type { MaterialCountPreview } from "@/lib/mgr/cycle-count-view";
+import { canRetireMaterialCountFailure, type MaterialCountPreview } from "@/lib/mgr/cycle-count-view";
 import { E } from "@/components/mgr/e";
 import { command, CommandResponseError } from "@/lib/commands/client";
-import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -62,7 +61,7 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
       attempt.current = null; setOpen(false); setQty(""); clearPreview(); router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not record count");
-      if (cause instanceof CommandResponseError && canRetireCommandFailure(cause.status, retrying, cause.code)) {
+      if (cause instanceof CommandResponseError && canRetireMaterialCountFailure(cause.status, retrying, cause.code, cause.message)) {
         attempt.current = null; setPlan(null); setPhase("idle");
       } else setPhase("unknown");
     }

@@ -1,4 +1,14 @@
 // lib/mgr/cycle-count-view.ts — view-model for Cycle count (inventory sheet).
+import { canRetireCommandFailure } from "@/lib/commands/failure";
+
+// The count RPC replays a completed request before checking its revision.
+// This exact refusal therefore proves even an uncertain earlier send did not
+// commit. Other conflicts (including request identity mismatches) do not.
+export function canRetireMaterialCountFailure(status: number, retrying: boolean, code: string | undefined, message: string) {
+  return (status === 409 && code === "conflict" && message === "Material stock changed. Preview the count again.")
+    || canRetireCommandFailure(status, retrying, code);
+}
+
 export type CycleCountViewModel = {
   material: string;
   qty: string;
