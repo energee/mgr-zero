@@ -1,4 +1,6 @@
 // lib/mgr/run-closed-view.ts — view-model for Run closed.
+import type { PackagingActualDraft, PackagingMaterialRecord } from "./packaging-actuals";
+import type { PackagingCloseFieldsModel } from "./close-packaging-run-view";
 export type RunClosedViewModel = {
   backHref?: string;
   backTo?: string;
@@ -6,6 +8,6 @@ export type RunClosedViewModel = {
   lot?: string;
   output?: string;
   yield?: string;
-  records?: import("./packaging-actuals").PackagingMaterialRecord[];
-  correction?: Pick<import("./close-packaging-run-view").PackagingCloseFieldsModel,"plan" | "locations" | "bins"> & { rows: import("./packaging-actuals").PackagingActualDraft[]; reason: string };
+  records?: PackagingMaterialRecord[];
+  correction?: Pick<PackagingCloseFieldsModel, "plan" | "locations" | "bins"> & { rows: PackagingActualDraft[]; reason: string };
 };

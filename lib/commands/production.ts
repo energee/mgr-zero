@@ -267,8 +267,8 @@ const brewProcess = processInput.extend({
   boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
   spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
 });
-function brewActualRows(actuals: z.infer<typeof brewActual>[] | undefined) {
-  return actuals?.map(a => ({ material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null, stage: a.stage,
+function brewActualRows(actuals: z.infer<typeof brewActual>[]) {
+  return actuals.map(a => ({ material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null, stage: a.stage,
     location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty }));
 }
 
@@ -298,7 +298,7 @@ defineCommand({
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_brew_day", {
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId,
-    p_actuals: brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty,
+    p_actuals: i.actuals && brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty,
     p_initial_bbl: i.initialBbl, p_brewed_on: i.brewedOn, p_request_id: execution.requestId,
   })),
 });
@@ -310,7 +310,7 @@ defineCommand({
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_brew_record", {
     p_brewery: ctx.breweryId, p_record: i.recordId, p_reason: i.reason, p_initial_bbl: i.initialBbl,
-    p_actuals: brewActualRows(i.actuals)!, p_process: i.process, p_confirm_empty: i.confirmEmpty, p_request_id: execution.requestId,
+    p_actuals: brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty, p_request_id: execution.requestId,
   })),
 });
 

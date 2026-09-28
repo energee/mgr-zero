@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { brewCorrectionModel, brewSourceKey, canRecordBrewDay, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewSourceKey, canRecordBrewDay, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
 import { INGREDIENT_STAGES, type IngredientStage } from "@/lib/mgr/recipe-process-view";
 
@@ -23,6 +23,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
   const id = useId(), [draft, setDraft] = useState(model);
   const value = onChange ? model : draft;
   const change = (patch: Partial<BrewDayViewModel>) => { setDraft({ ...value, ...patch }); onChange?.(patch); };
+  const patchActual = (key: string, patch: Partial<BrewActualDraft>) => change({ actuals: (value.actuals ?? []).map(item => item.key === key ? { ...item, ...patch } : item) });
   const vessel = value.vessels.find(item => item.id === value.vesselId);
   const ready = canRecordBrewDay(value);
   const header = <>
@@ -48,7 +49,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
         {!record.additions.length && E.note("Confirmed no ingredients used.")}
         {processFields.map(([key, label]) => record.process[key] === undefined ? null : <Fragment key={key}>{E.fld(label, String(record.process[key]))}</Fragment>)}
       </section>)}
-      {model.records?.length && model.vesselId ? E.act("Correct brew record", "attention", undefined, () => change(brewCorrectionModel(model, model.records![model.records!.length - 1])), busy) : null}
+      {model.records?.length && model.vesselId ? E.act("Correct brew record", "attention", undefined, () => change(brewCorrectionModel(model, model.records!.at(-1)!)), busy) : null}
       {E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
@@ -61,9 +62,9 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
       {E.ttl("Confirm actual ingredients")}
       {E.note("Mash, boil and whirlpool quantities start from the plan. Confirm each exact source and amount. Later fermentation, dry-hop and packaging additions stay planned. For water additions, enter actual use in the material's stock unit.")}
       {(value.actuals ?? []).map((row, index) => <fieldset key={row.key} disabled={busy} className="flex flex-col gap-2 rounded border p-3">
-        {E.pick(`Material source ${index + 1}`, row.source, (value.sources ?? []).map(source => ({ value: brewSourceKey(source), label: `${source.material_name} · ${source.lot_code ?? "Untracked"} · ${source.location_name} / ${source.bin_name} · ${source.qty} ${source.unit} available` })), { required: true, forward: true, placeholder: "Choose exact source", onChange: source => change({ actuals: value.actuals!.map(item => item.key === row.key ? { ...item, source } : item) }) })}
-        {E.pick("Stage", row.stage, [...INGREDIENT_STAGES], { onChange: stage => change({ actuals: value.actuals!.map(item => item.key === row.key ? { ...item, stage: stage as IngredientStage } : item) }) })}
-        {E.edit("Actual quantity", row.qty, "number", undefined, { min: "0", step: "0.0001", required: true, onChange: qty => change({ actuals: value.actuals!.map(item => item.key === row.key ? { ...item, qty } : item) }) })}
+        {E.pick(`Material source ${index + 1}`, row.source, (value.sources ?? []).map(source => ({ value: brewSourceKey(source), label: `${source.material_name} · ${source.lot_code ?? "Untracked"} · ${source.location_name} / ${source.bin_name} · ${source.qty} ${source.unit} available` })), { required: true, forward: true, placeholder: "Choose exact source", onChange: source => patchActual(row.key, { source }) })}
+        {E.pick("Stage", row.stage, [...INGREDIENT_STAGES], { onChange: stage => patchActual(row.key, { stage: stage as IngredientStage }) })}
+        {E.edit("Actual quantity", row.qty, "number", undefined, { min: "0", step: "0.0001", required: true, onChange: qty => patchActual(row.key, { qty }) })}
         {E.btn("Remove ingredient", busy ? "g disabled" : "g", undefined, () => change({ actuals: value.actuals!.filter(item => item.key !== row.key) }))}
       </fieldset>)}
       {E.btn("Add ingredient", busy ? "g disabled" : "g", undefined, () => change({ actuals: [...(value.actuals ?? []), { key: crypto.randomUUID(), source: "", stage: "other", qty: "" }] }))}

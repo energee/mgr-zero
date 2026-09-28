@@ -7,8 +7,8 @@ import { PlanCancelled } from "./plan-actions";
 import { E } from "@/components/mgr/e";
 import { PackagingMaterialActuals } from "./packaging-materials";
 import { Button } from "@/components/ui/button";
-import { packagingActualsReady, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
-import { closeRunReady, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
+import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
+import { packagingCloseReady, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
 export type { ClosePackagingRunViewModel };
 
@@ -48,10 +48,10 @@ export function PackagingCloseFields({ model, disabled, ready, retry, onField, o
   const view = onField ? model : fixture;
   const changeField = onField ?? ((field, value) => setFixture(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) })));
   const changeOutput = onOutput ?? ((id, value) => setFixture(previous => ({ ...previous, outputs: previous.outputs.map(row => row.id === id ? { ...row, qty: value } : row) })));
-  const changeActual = onActual ?? ((key, patch) => setFixture(previous => ({ ...previous, actuals: previous.actuals.map(row => row.key === key ? { ...row, ...patch } : row) })));
-  const addActual = onAdd ?? (() => setFixture(previous => ({ ...previous, actuals: [...previous.actuals, { key: crypto.randomUUID(), materialId: "", locationId: "", binId: "", lotId: null, used: "0", loss: "0", unused: "0" }] })));
-  const removeActual = onRemove ?? ((key) => setFixture(previous => ({ ...previous, actuals: previous.actuals.filter(row => row.key !== key) })));
-  const maySubmit = ready ?? (closeRunReady({ ...view, actuals: Object.fromEntries(view.outputs.map(row => [row.id, row.qty])) }) && packagingActualsReady(view.actuals, view.plan.materials, view.plan.planned.map(row => row.materialId)));
+  const changeActual = onActual ?? ((key, patch) => setFixture(previous => ({ ...previous, actuals: patchActual(previous.actuals, key, patch) })));
+  const addActual = onAdd ?? (() => setFixture(previous => ({ ...previous, actuals: [...previous.actuals, emptyPackagingActual()] })));
+  const dropActual = onRemove ?? ((key) => setFixture(previous => ({ ...previous, actuals: removeActual(previous.actuals, key) })));
+  const maySubmit = ready ?? packagingCloseReady(view);
   return <div className="flex flex-col gap-3">
     {E.edit("Barrels drawn", view.bblDrawn, "number", undefined, { min: 0, step: "any", disabled, required: true, onChange: value => changeField("bblDrawn", value) })}
     {E.ttl("Actual outputs")}
@@ -61,7 +61,7 @@ export function PackagingCloseFields({ model, disabled, ready, retry, onField, o
     {E.edit("Best by · optional", view.bestBy, "date", undefined, { disabled, onChange: value => changeField("bestBy", value) })}
     {E.pick("Finished goods location", view.locationId, view.locations.map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("locationId", value) })}
     {E.pick("Finished goods bin", view.binId, view.bins.filter(row => row.location_id === view.locationId).map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("binId", value) })}
-    <PackagingMaterialActuals plan={view.plan} rows={view.actuals} locations={view.locations} bins={view.bins} disabled={disabled} onChange={changeActual} onAdd={addActual} onRemove={removeActual} />
+    <PackagingMaterialActuals plan={view.plan} rows={view.actuals} locations={view.locations} bins={view.bins} disabled={disabled} onChange={changeActual} onAdd={addActual} onRemove={dropActual} />
     <Button type="button" variant="outline" disabled={disabled} onClick={onRefresh}>Review current material plan</Button>
     {messages}
     <Button type="button" data-variant="irreversible" disabled={!maySubmit || (disabled && !retry)} onClick={onSubmit}>{retry ? "Retry unchanged close" : "Close packaging run"}</Button>

@@ -34,15 +34,18 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
   const picking = !run.cancelled_at && !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
-  const [occupancies, locations, bins, today] = (await Promise.all([
+  const needsMaterials = closing || !!run.closed_at;
+  const [occupancies, locations, bins, today, closePlan, materialHistory] = (await Promise.all([
     picking ? runCommand("list_occupancies", {}, ctx) : [],
-    (closing || run.closed_at) ? runCommand("list_locations", {}, ctx) : [],
-    (closing || run.closed_at) ? runCommand("list_bins", {}, ctx) : [],
+    needsMaterials ? runCommand("list_locations", {}, ctx) : [],
+    needsMaterials ? runCommand("list_bins", {}, ctx) : [],
     closing ? breweryToday(ctx) : "",
-  ])) as [Occupancy[], Location[], Bin[], string];
-
-  const materialPlan = closing || run.closed_at ? await runCommand("get_packaging_close_plan", { runId: id }, ctx) as PackagingClosePlan : null;
-  const materialHistory = run.closed_at ? await runCommand("get_packaging_material_record", { runId: id }, ctx) as { records: PackagingMaterialRecord[] } : { records: [] };
+    closing ? runCommand("get_packaging_close_plan", { runId: id }, ctx) : null,
+    run.closed_at ? runCommand("get_packaging_material_record", { runId: id }, ctx) : { records: [] },
+  ])) as [Occupancy[], Location[], Bin[], string, PackagingClosePlan | null, { records: PackagingMaterialRecord[] }];
+  const latest = materialHistory.records.at(-1);
+  // A closed run needs the current plan only to correct its latest record.
+  const correctionPlan = latest ? await runCommand("get_packaging_close_plan", { runId: id }, ctx) as PackagingClosePlan : null;
   const title = runNo(run.run_no);
   if (run.closed_at) {
     return (
@@ -54,7 +57,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
             {E.info("Closed: lot, finished goods and confirmed material usage are on the ledger.")}
           </>
         }
-        action={materialHistory.records.length ? <MaterialCorrection key={materialHistory.records.at(-1)!.id} record={materialHistory.records.at(-1)!} plan={materialPlan!} locations={locations} bins={bins} /> : null}
+        action={latest && correctionPlan ? <MaterialCorrection key={latest.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );
   }
@@ -73,7 +76,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
             ? <PickTankForm runId={run.id} occupancies={occupancies} />
             : !run.started_at
               ? <StartRunButton runId={run.id} />
-              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={materialPlan!} />}
+              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={closePlan!} />}
         </>
       }
     />

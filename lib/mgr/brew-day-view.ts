@@ -1,4 +1,6 @@
-import type { IngredientStage } from "./recipe-process-view";
+import { BREW_DAY_STAGES, type IngredientStage } from "./recipe-process-view";
+import { materialSourceKey, restoreSources } from "./material-source";
+import { fromTicks, toTicks } from "./quantity-input";
 // lib/mgr/brew-day-view.ts — view-model for Brew day.
 export type BrewDayLotView = { key: string; title: string; detail: string };
 export type BrewDayVessel = { id: string; name: string; kind: string; capacity_bbl: number };
@@ -38,13 +40,13 @@ export type BrewDayViewModel = {
 };
 
 export function brewSourceKey(source: Pick<BrewMaterialSource, "material_id" | "location_id" | "bin_id" | "lot_id">) {
-  return [source.material_id, source.location_id, source.bin_id, source.lot_id ?? ""].join("/");
+  return materialSourceKey({ materialId: source.material_id, locationId: source.location_id, binId: source.bin_id, lotId: source.lot_id });
 }
 
 export function brewPlanActuals(plan: BrewPlan, volume: number, sources: BrewMaterialSource[]): BrewActualDraft[] {
-  return (plan.ingredients ?? []).filter(row => ["mash", "boil", "whirlpool"].includes(row.stage)).map(row => {
+  return (plan.ingredients ?? []).filter(row => (BREW_DAY_STAGES as readonly string[]).includes(row.stage)).map(row => {
     const matches = sources.filter(source => source.material_id === row.material_id);
-    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(Math.round(row.per_bbl_qty * volume * 10000) / 10000), source: matches.length === 1 ? brewSourceKey(matches[0]) : "" };
+    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(fromTicks(toTicks(row.per_bbl_qty * volume))), source: matches.length === 1 ? brewSourceKey(matches[0]) : "" };
   });
 }
 
@@ -57,8 +59,8 @@ export function canRecordBrewDay(model: BrewDayViewModel) {
   for (const row of actuals) {
     const source = model.sources?.find(source => brewSourceKey(source) === row.source), qty = Number(row.qty);
     if (!source || !Number.isFinite(qty) || qty <= 0) return false;
-    const total = (totals.get(row.source) ?? 0) + Math.round(qty * 10000);
-    if (total > Math.round(source.qty * 10000)) return false;
+    const total = (totals.get(row.source) ?? 0) + toTicks(qty);
+    if (total > toTicks(source.qty)) return false;
     totals.set(row.source, total);
   }
   return true;
@@ -73,13 +75,21 @@ export function brewActualPayload(model: BrewDayViewModel) {
   });
 }
 
+/** The command and input the form's current values submit: a correction of
+ *  the latest record, or the first brew-day record. Blank observations are omitted. */
+export function brewRecordPayload(values: BrewDayViewModel, batchId: string): [string, Record<string, unknown>] {
+  const process = Object.fromEntries(Object.entries(values.process ?? {}).filter(([, value]) => value !== "").map(([key, value]) => [key, Number(value)]));
+  const facts = { initialBbl: Number(values.initialBbl), actuals: brewActualPayload(values), process, confirmEmpty: Boolean(values.confirmEmpty) };
+  return values.correctionRecordId
+    ? ["correct_brew_record", { ...facts, recordId: values.correctionRecordId, reason: values.correctionReason }]
+    : ["record_brew_day", { ...facts, batchId, vesselId: values.vesselId, brewedOn: values.brewedOn }];
+}
+
 export function brewCorrectionModel(model: BrewDayViewModel, record: BrewRecordView): BrewDayViewModel {
-  const sources = [...(model.sources ?? []).map(source => ({ ...source }))];
-  for (const addition of record.additions) {
-    const found = sources.find(source => brewSourceKey(source) === brewSourceKey(addition.source));
-    if (found) found.qty = (Math.round(found.qty * 10000) + Math.round(addition.confirmed_qty * 10000)) / 10000;
-    else sources.push({ ...addition.source, material_name: addition.material_name, unit: addition.unit, location_name: addition.location_name, bin_name: addition.bin_name, lot_code: addition.lot_code, qty: addition.confirmed_qty });
-  }
+  const sources = restoreSources(model.sources ?? [], record.additions.map(addition => ({
+    source: { ...addition.source, material_name: addition.material_name, unit: addition.unit, location_name: addition.location_name, bin_name: addition.bin_name, lot_code: addition.lot_code, qty: 0 },
+    qty: addition.confirmed_qty,
+  })), brewSourceKey);
   return { ...model, recorded: false, correctionRecordId: record.id, correctionReason: "", initialBbl: String(record.initial_bbl), brewedOn: record.brewed_on,
     plan: record.plan_snapshot, process: Object.fromEntries(Object.entries(record.process).map(([key, value]) => [key, String(value)])), sources,
     actuals: record.additions.map(row => ({ key: row.id, source: brewSourceKey(row.source), recipeIngredientId: row.recipe_ingredient_id ?? undefined, stage: row.stage, qty: String(row.confirmed_qty) })), confirmEmpty: record.additions.length === 0 };
