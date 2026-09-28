@@ -1,5 +1,5 @@
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
-import { PackagingSource } from "@/components/mgr/views/plan-actions";
+import { PackagingSource, PlanActions } from "@/components/mgr/views/plan-actions";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -1658,7 +1658,7 @@ export const SCREENS: Screen[] = [
     writes: "cancel_batch, reschedule_batch, record_brew_day [existing commands: brew date + knockout occupancy] · SCHEMA-GATE: brew-day lot consumption and frozen process sheet are not supported by the existing command/read",
     states: permitted("brewer or admin required"),
     spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <BrewDayView model={brewDayHazy} />,
+    body: <BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} />,
   },
   {
     step: 7,
@@ -1685,7 +1685,7 @@ export const SCREENS: Screen[] = [
     writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
     states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
     spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
-    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging runs", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], planEditable: true, showCloseReview: false }} action={<PackagingSource occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
+    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging runs", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSource occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
   },
   {
     step: 7,

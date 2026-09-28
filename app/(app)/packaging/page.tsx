@@ -20,7 +20,7 @@ import { RepackForm, type RepackParent } from "./repack-form";
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
-  started_at: string | null; closed_at: string | null; bbl_drawn: number | null;
+  started_at: string | null; closed_at: string | null; cancelled_at: string | null; bbl_drawn: number | null;
   brand_name: string | null; vessel_name: string | null; qty_planned: number;
 };
 type Brand = { id: string; name: string };

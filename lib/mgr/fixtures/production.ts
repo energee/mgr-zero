@@ -52,7 +52,6 @@ export const scheduleBatchHazy: ScheduleBatchViewModel = {
 };
 
 export const brewDayHazy: BrewDayViewModel = {
-  plannedOn: "2026-09-04",
   title: "B-0416 · Hazy",
   lots: [
     { key: "malt", title: "2-row", detail: "lot L-0821 · 660 lb" },

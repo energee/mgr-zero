@@ -1,7 +1,6 @@
 import { expect, it } from "vitest";
 import { batchesFromQuery } from "@/lib/mgr/batches-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
-import { canRecordBrewDay } from "@/lib/mgr/brew-day-view";
 import { brewDayHazy } from "@/lib/mgr/fixtures/production";
 
 it("retains cancelled plans as history without offering physical work", () => {
@@ -12,7 +11,6 @@ it("retains cancelled plans as history without offering physical work", () => {
   const runs = toPackagingRunsViewProps([{ ...batch, run_no: 4, started_at: null, qty_planned: 12 }], "UTC", id => `/packaging/${id}`);
   expect(runs.upcoming).toEqual([]);
   expect(runs.recent[0]).toMatchObject({ verb: "Open", detail: expect.stringContaining("Cancelled") });
-  expect(canRecordBrewDay({ ...brewDayHazy, cancelledAt: "2026-09-27" })).toBe(false);
 });
 
 it("shares plan controls across inventory and live views and hides them for cancelled work", async () => {
@@ -29,8 +27,8 @@ it("shares plan controls across inventory and live views and hides them for canc
   const sourceWrapper = readFileSync("app/(app)/packaging/[id]/run-actions.tsx", "utf8");
   expect(sourceWrapper.match(/<PackagingSource/g)).toHaveLength(2);
   for (const element of [
-    createElement(BrewDayView, { model: { ...brewDayHazy, cancelledAt: "2026-09-27" } }),
-    createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28", planEditable: true, cancelledAt: "2026-09-27" } }),
+    createElement(BrewDayView, { model: { ...brewDayHazy, cancelledAt: "2026-09-27" }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
+    createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28", cancelledAt: "2026-09-27" }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
   ]) {
     const html = renderToStaticMarkup(element);
     expect(html).toContain("Cancelled");
@@ -40,5 +38,6 @@ it("shares plan controls across inventory and live views and hides them for canc
     expect(html).not.toContain("Close packaging run");
   }
   expect(readFileSync("app/(app)/plan-actions.tsx", "utf8")).toContain("<PlanActions");
-  for (const file of ["components/mgr/views/brew-day.tsx", "components/mgr/views/close-packaging-run.tsx"]) expect(readFileSync(file, "utf8")).toContain("<PlanActions");
+  // Inventory frames pass the same PlanActions the live pages bind.
+  expect(readFileSync("components/mgr/screens.tsx", "utf8").match(/planActions=\{<PlanActions /g)).toHaveLength(2);
 });
