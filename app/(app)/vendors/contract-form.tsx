@@ -34,6 +34,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
       startsOn: startsOn || undefined, endsOn: endsOn || undefined, contractNo: contractNo || undefined,
     }),
     reset: () => { setVendorId(contract?.vendor_id ?? ""); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(initialCost); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
+    target: contract?.id,
   });
   const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;

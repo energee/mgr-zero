@@ -32,7 +32,7 @@ it("resolves failed A after newer B supersedes it, then starts an explicit new s
   expect(await action!.run("sync_qbo_payments", {})).toBe(false);
   newerBatchCompleted = true;
   const outcomes: unknown[] = [];
-  expect(await action!.run("sync_qbo_payments", {}, result => outcomes.push(result), requests[0])).toBe(true);
+  expect(await action!.run("sync_qbo_payments", {}, result => outcomes.push(result), { requestId: requests[0] })).toBe(true);
   expect(outcomes).toEqual([{ superseded: true }]);
   expect(await action!.run("sync_qbo_payments", {}, result => outcomes.push(result))).toBe(true);
   expect(requests[1]).toBe(requests[0]);
