@@ -358,6 +358,17 @@ describe("Me view", () => {
 });
 
 describe("Settings view", () => {
+  it("links source water to existing profiles without claiming a configured default", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo, hrefs: { water: "/catalog/water-profiles" } }));
+    expect(html).toContain('href="/catalog/water-profiles"');
+    expect(html).toContain("Source water");
+    expect(html).not.toContain("aren’t available");
+    const inventory = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+    expect(inventory).not.toContain('href="/catalog/water-profiles"');
+    expect(src("app/(app)/settings/page.tsx")).toContain('water: "/catalog/water-profiles"');
+    expect(src("app/(app)/settings/page.tsx")).toContain('brewery.role !== "admin"');
+  });
+
   it("the Settings inventory record is SettingsView", () => {
     const body = screen("Settings").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SettingsView);
