@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
+import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
 
 export type ImportViewModel = {
   kind: ImportKind; step: number; fileName?: string | null; headers?: string[]; csvRowCount?: number;
@@ -23,7 +24,6 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   onCommit?: () => void; onCorrectBlocked?: () => void; onDiscard?: () => void;
 }) {
   const { kind, step, mapping, lookups, result, busy } = model;
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [draft, setDraft] = useState<Pick<ImportViewModel, "rows" | "validation"> | null>(null);
   const { rows, validation } = onEdit ? model : draft ?? model;
   const edit = (index: number, field: string, value: string) => {
@@ -82,11 +82,8 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
-      {!result && !busy && onDiscard && (confirmDiscard ? <>
-        {E.note("MGR will stop offering this retry and will not send the batch. Check the result first: open the imported records and confirm which rows were saved.")}
-        {E.btn("Confirm discard", "del", undefined, () => { setConfirmDiscard(false); onDiscard(); })}
-        {E.btn("Keep saved request", "g", undefined, () => setConfirmDiscard(false))}
-      </> : E.btn("Discard saved request", "g", undefined, () => setConfirmDiscard(true)))}
+      {!result && !busy && onDiscard && <ConfirmDiscard onDiscard={onDiscard}
+        note="MGR will stop offering this retry and will not send the batch. Check the result first: open the imported records and confirm which rows were saved." />}
     </>}
   </>;
 }

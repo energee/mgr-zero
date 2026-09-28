@@ -62,10 +62,10 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
           onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
             if (!previousName || f.category === previousName) set("category")(name);
-          }, undefined, { target: previousName })}
+          }, { target: previousName })}
           onDelete={name => categoryAction.run("delete_catalog_category", { name }, () => {
             if (f.category === name) set("category")("");
-          }, undefined, { target: name })}
+          }, { target: name })}
         />}
         linkRows
         messages={<CommandFormMessage error={error} />}

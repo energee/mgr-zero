@@ -153,7 +153,7 @@ it("reloads after global recovery so mounted forms cannot resubmit stale fields"
   vi.stubGlobal("sessionStorage", storage);
   const reload = vi.fn(() => expect(values.size).toBe(0));
   vi.stubGlobal("location", { pathname: "/orders", reload });
-  const saved = beginRecovery(storage, renderedContext, "/orders", "create_order", { note: "original" });
+  const saved = beginRecovery(storage, renderedContext, "/orders", "create_order", { note: "original" }).attempt;
   const fetch = vi.fn(async (_url, init) => {
     expect(JSON.parse(init.body)).toMatchObject({ requestId: saved.requestId, input: { note: "original" } });
     return { status: 200, json: async () => ({ ok: true, data: { id: "existing-order" } }) };
@@ -207,13 +207,13 @@ it("keeps an unknown outcome on one targeted row from blocking the same command 
   let action!: ReturnType<typeof useCommandAction>;
   function Harness() { action = useCommandAction(); return null; }
   renderToStaticMarkup(createElement(Harness));
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a" }, undefined, undefined, { target: "invoice-a" })).toBe(false);
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-b" }, undefined, undefined, { target: "invoice-b" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a" }, undefined, { target: "invoice-a" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-b" }, undefined, { target: "invoice-b" })).toBe(false);
   expect(requests.map(request => request.input.invoiceId)).toEqual(["invoice-a", "invoice-b"]);
   expect(requests[1].requestId).not.toBe(requests[0].requestId);
   // B's definitive rejection clears B only; A's unknown outcome stays saved.
   expect(readRecoveries(sessionStorage, renderedContext).map(attempt => attempt.input)).toEqual([{ invoiceId: "invoice-a" }]);
-  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a", memo: "edited" }, undefined, undefined, { target: "invoice-a" })).toBe(false);
+  expect(await action.run("push_invoice_to_qbo", { invoiceId: "invoice-a", memo: "edited" }, undefined, { target: "invoice-a" })).toBe(false);
   expect(requests).toHaveLength(2);
 });
 
@@ -290,7 +290,7 @@ it("does not save a non-durable call: a read or a one-time link proof (#615)", a
   let action!: ReturnType<typeof useCommandAction>;
   function Harness() { action = useCommandAction(); return null; }
   renderToStaticMarkup(createElement(Harness));
-  expect(await action.run("consume_chat_link_proof", { proof: "one-time" }, undefined, undefined, { durable: false })).toBe(false);
+  expect(await action.run("consume_chat_link_proof", { proof: "one-time" }, undefined, { durable: false })).toBe(false);
   expect(saved).toEqual([[]]);
   expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
   const chat = readFileSync("app/(app)/settings/chat/chat-settings-client.tsx", "utf8");

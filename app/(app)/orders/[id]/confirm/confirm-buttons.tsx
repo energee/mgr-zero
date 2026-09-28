@@ -40,7 +40,7 @@ export function ConfirmButtons({ orderId, lines }: { orderId: string; lines: { s
           if (next.length > 0) return setWarnings(next);
           router.push("/orders");
           router.refresh();
-        }, undefined, { refresh: false })}>{action.busy ? "Confirming…" : "Confirm order"}</Button>
+        }, { refresh: false })}>{action.busy ? "Confirming…" : "Confirm order"}</Button>
         <CommandForm open={cancelOpen} onOpenChange={setCancelOpen} title="Cancel order" trigger={<Button variant="destructive" disabled={action.busy}>Cancel order</Button>}>
           <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void action.run("cancel_order", { orderId, reason }, () => router.push("/orders")); }}>
             <div className="flex flex-col gap-2">

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
-import { finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "@/lib/commands/recovery";
+import { discardRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "@/lib/commands/recovery";
 import { CommandRecoveryView } from "./views/command-recovery";
 
 export function CommandRecovery() {
@@ -36,12 +36,8 @@ export function CommandRecovery() {
   function discard(requestId: string) {
     setError(null);
     try {
-      const attempt = readRecoveries(sessionStorage, context).find(row => row.requestId === requestId);
-      if (!attempt) throw new Error("This request is no longer pending in this account.");
-      // Discarding a request still being sent would let a changed submit apply twice.
-      if (inFlightRequests.has(requestId)) throw new Error("This request is still being sent. Wait for its outcome.");
-      finishRecovery(sessionStorage, attempt);
+      if (!discardRecovery(sessionStorage, context, requestId)) throw new Error("This request is no longer pending in this account.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The saved request could not be discarded."); }
   }
-  return <CommandRecoveryView rows={rows.filter(row => row.expectedContext.actorId === context.actorId && row.expectedContext.breweryId === context.breweryId && row.expectedContext.customerId === context.customerId)} busy={busy} error={error} onRetry={retry} onDiscard={discard} />;
+  return <CommandRecoveryView rows={rows} busy={busy} error={error} onRetry={retry} onDiscard={discard} />;
 }
