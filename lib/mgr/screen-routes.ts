@@ -154,6 +154,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Purchase orders", file: "app/(app)/purchase-orders/page.tsx" },
   { name: "New PO", file: "app/(app)/purchase-orders/new/page.tsx" },
   { name: "Receive PO", file: "app/(app)/purchase-orders/[id]/po-actions.tsx" },
+  { name: "Correct receipt", file: "app/(app)/purchase-orders/[id]/page.tsx" },
   { name: "Receipt", file: "app/(app)/purchase-orders/[id]/page.tsx" },
   { name: "Materials on hand", file: "app/(app)/materials/page.tsx" },
   { name: "Cycle count", file: "app/(app)/materials/page.tsx" },

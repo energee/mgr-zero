@@ -9,7 +9,7 @@ import type { MaterialsOnHandSnapshot } from "@/lib/mgr/materials-on-hand-view";
 import type { NewPoViewModel } from "@/lib/mgr/new-po-view";
 import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
-import type { ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CORRECTION_INFO, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import type { VendorViewModel } from "@/lib/mgr/vendor-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
@@ -59,6 +59,7 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
 };
 
 export const receiptPoCountryMalt: ReceiptViewModel = {
+  correction: {},
   title: "PO-0142 · received",
   status: "partially received",
   stillOwed: "1 Citra box · 44 lb",
@@ -68,6 +69,15 @@ export const receiptPoCountryMalt: ReceiptViewModel = {
     ["+300 lb rice hulls · receipt", "not lot-tracked"],
   ],
   info: "2-row is over by 2 bags and Citra short 1 on a substituted lot.",
+};
+
+export const correctReceiptCountryMalt: ReceivePoViewModel = {
+  title: "PO-0142 · correct receipt", state: "correction", status: "Received 2026-09-10",
+  correctionReason: "Two malt bags were counted twice",
+  lines: receivePoCountryMalt.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
+    detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
+  tape: [["+2,200 lb 2-row · replacement preview", "Lot CM-26-4410"], ["+132 lb Citra · replacement preview", "Lot 2026-CIT-91"], ["+300 lb rice hulls · replacement preview", "untracked"]],
+  info: CORRECTION_INFO,
 };
 
 export const materialsOnHandList: MaterialsOnHandSnapshot = {

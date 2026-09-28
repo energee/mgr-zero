@@ -286,6 +286,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   await ins("purchase_order_lines", { brewery_id: B, po_id: draftPo.id, material_id: MAT, qty_ordered: 1 });
   const sentPo = await ins("purchase_orders", { brewery_id: B, vendor_id: VENDOR, created_by: f.owner.id, status: "sent", sent_via: "external" });
   const sentLine = await ins("purchase_order_lines", { brewery_id: B, po_id: sentPo.id, material_id: MAT, qty_ordered: 1 });
+  const receipt = await ins("receipts", { brewery_id: B, po_id: sentPo.id, received_by: f.owner.id });
   const submitted = await ins("stock_transfers", { brewery_id: B, from_location_id: W, to_location_id: f.taps[0].id, created_by: f.owner.id, status: "submitted" });
   const transferLine = await ins("stock_transfer_lines", { brewery_id: B, transfer_id: submitted.id, sku_id: SKU, qty: 1, from_bin_id: BIN, to_bin_id: f.taps[0].binId });
   const parentSku = await ins("skus", { brewery_id: B, brand_id: BRAND, format_id: f.composed.id, name });
@@ -333,6 +334,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],
     portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
+    correct_purchase_receipt: [B,receipt.id,"Wrong count",[{po_line_id:sentLine.id,qty_counted:1}],R()],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R(),[],{},true],
     correct_brew_record: [B,R(),"Test correction",1,[],{},true,R()],
     get_brew_day_plan: [B,plannedBatch.id], get_brew_record: [B,plannedBatch.id], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],

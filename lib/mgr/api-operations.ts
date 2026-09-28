@@ -31,7 +31,7 @@ export type ApiOperation = {
 export const API_AREAS = [
   { slug: "portal", title: "Customer portal", match: /^(portal_|get_portal_|list_portal_)/ },
   { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|list_lots|trace_lot|loss)/ },
-  { slug: "purchasing", title: "Purchasing & materials", match: /^(?!.*packaging_).*(purchase_order|vendor|material)/ },
+  { slug: "purchasing", title: "Purchasing & materials", match: /^(?!.*packaging_).*(purchase_order|purchase_receipt|vendor|material)/ },
   { slug: "production", title: "Production", match: /^(?!get_brand_recipe_cost$).*(batch|brew_day|brew_record|cellar|vessel|fermentation|recipe|water_profile)/ },
   { slug: "catalog", title: "Catalog & pricing", match: /^(?!get_inventory_sku$)(?!set_pos_price_override$).*(product|sku|brand|price|catalog_categor|sale_channel|sales_channel)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_|format|repack|occupanc)/ },
