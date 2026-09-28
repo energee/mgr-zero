@@ -350,6 +350,8 @@ describe("SCREENS", () => {
       for (const [, tag, link] of html.matchAll(/(<a [^>]*>)(.*?)<\/a>/g)) {
         if (/href="https:\/\//.test(tag)) continue;
         const target = tag.match(/data-to="([^"]*)"/)?.[1] ?? link.replace(/<[^>]*>/g, "");
+        // Provider navigation stays inert in inventory fixtures; live views receive the verified URL.
+        if (target === "Open in QuickBooks" && /href="#"/.test(tag)) continue;
         expect.soft(
           screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
           `${s.name}: unresolved back target ${target}`,

@@ -3,6 +3,8 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { money } from "@/lib/mgr/money";
+import { QboStaffInvoiceLinkView } from "./accounting";
+import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
 
 export type { InvoiceViewModel };
@@ -17,6 +19,7 @@ export function InvoiceView({
   qboGate,
   quickbooks,
   accountingActions,
+  staffLink,
 }: {
   model: InvoiceViewModel;
   headerAction?: ReactNode;
@@ -28,6 +31,7 @@ export function InvoiceView({
   qboGate?: ReactNode;
   quickbooks?: { detail: string; balanceCents: number | null; healthy: boolean };
   accountingActions?: ReactNode;
+  staffLink?: QboStaffInvoiceLink | null;
 }) {
   const mappingRows = qbo !== undefined || qboGate ? undefined : mappings;
   const unanswered = (q: InvoiceQuestionView) => {
@@ -43,6 +47,7 @@ export function InvoiceView({
       ))}
       {qbo !== undefined ? qbo : (typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate)}
       {qbo === undefined && quickbooks && E.row("QuickBooks", `${quickbooks.detail}${quickbooks.balanceCents != null && quickbooks.balanceCents > 0 && !quickbooks.detail.includes(money(quickbooks.balanceCents)) ? ` · ${money(quickbooks.balanceCents)} balance` : ""}`, "", quickbooks.healthy ? "ok" : "w")}
+      {qbo === undefined && (quickbooks || !!mappingRows?.length) && <QboStaffInvoiceLinkView link={staffLink} />}
       {mappingRows?.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : E.act("Fix", "attention", row.href), row.tone ?? "")}</Fragment>
       ))}
