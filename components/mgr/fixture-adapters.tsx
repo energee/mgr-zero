@@ -4,17 +4,19 @@
 // Nothing under app/ imports this; live forms own the same state and call commands.
 "use client";
 
-import { useState, type ComponentProps } from "react";
-import { FormatView } from "@/components/mgr/views/format";
+import { cloneElement, useState, type ComponentProps, type ReactElement } from "react";
+import type { FormatView } from "@/components/mgr/views/format";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { deleteCategory, saveCategory } from "@/lib/mgr/catalog-categories-view";
 import { formatControls, type FormatViewModel } from "@/lib/mgr/format-view";
 
-export function FormatFixture(props: ComponentProps<typeof FormatView>) {
-  const [model, setModel] = useState(props.model);
+/** Wraps the inventory `<FormatView>` as a child, so the drawn element stays FormatView
+ *  (screen-view-composition finds it) while this adapter owns its state. */
+export function FormatFixture({ children }: { children: ReactElement<ComponentProps<typeof FormatView>> }) {
+  const [model, setModel] = useState(children.props.model);
   const [components, setComponents] = useState([{ id: "", qty: "1" }]);
   const patch = (next: Partial<FormatViewModel>) => setModel(previous => ({ ...previous, ...next }));
-  return <FormatView {...props} model={model} controls={formatControls(model, patch)} componentRows={components} onComponentRowsChange={setComponents} />;
+  return cloneElement(children, { model, controls: formatControls(model, patch), componentRows: components, onComponentRowsChange: setComponents });
 }
 
 export function CatalogCategoriesFixture({ categories }: { categories: string[] }) {

@@ -424,9 +424,10 @@ describe("Format view", () => {
   });
 
   it("the Format inventory record is FormatView through its fixture adapter", () => {
-    const body = screen("Format").body as { type: unknown; props: { model: unknown } };
+    const body = screen("Format").body as { type: unknown; props: { children: { type: unknown; props: { model: unknown } } } };
     expect(body.type).toBe(FormatFixture);
-    expect(body.props.model).toEqual(toFormatViewProps(formatCan));
+    expect(body.props.children.type).toBe(FormatView);
+    expect(body.props.children.props.model).toEqual(toFormatViewProps(formatCan));
     expect(htmlOf(body as ReactNode)).toMatch(/>Save format</);
   });
 

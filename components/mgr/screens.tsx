@@ -77,6 +77,7 @@ import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { CatalogCategoriesFixture, FormatFixture } from "@/components/mgr/fixture-adapters";
+import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
@@ -2645,7 +2646,7 @@ export const SCREENS: Screen[] = [
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · create_composed_format · replace_format_components · replace_format_bom · delete_format [admin]",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
-    body: <FormatFixture model={toFormatViewProps(formatCan)} deleteAction={<DeleteFormatControl name={formatCan.format.name} />} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} />,
+    body: <FormatFixture><FormatView model={toFormatViewProps(formatCan)} deleteAction={<DeleteFormatControl name={formatCan.format.name} />} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} /></FormatFixture>,
   },
   {
     step: 5,
