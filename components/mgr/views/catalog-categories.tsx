@@ -33,38 +33,28 @@ function CategoryRow({ name, busy, onSave, onDelete }: CategoryActions & { name:
   </form>;
 }
 
+/** Controlled: the caller owns the list, error, and save/delete (live commands or the inventory adapter). */
 export function CatalogCategoriesControl({ categories, busy = false, error, onSave, onDelete }: {
   categories: string[];
   error?: string | null;
-} & Partial<CategoryActions>) {
+} & CategoryActions) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [local, setLocal] = useState(categories);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const names = onSave ? categories : local;
   async function save(next: string, previous?: string) {
-    if (onSave) {
-      if (!await onSave(next, previous)) return false;
-    } else {
-      if (names.includes(next)) { setLocalError("A category with this name already exists"); return false; }
-      setLocalError(null);
-      setLocal(previous ? names.map(value => value === previous ? next : value) : [...names, next]);
-    }
+    if (!await onSave(next, previous)) return false;
     toast.success(previous ? "Category updated" : "Category added");
     return true;
   }
   async function remove(value: string) {
-    if (onDelete) {
-      if (!await onDelete(value)) return false;
-    } else setLocal(names.filter(name => name !== value));
+    if (!await onDelete(value)) return false;
     toast.success("Category deleted");
     return true;
   }
-  return <CommandForm title="Manage categories" open={open} onOpenChange={next => { if (!busy) { setOpen(next); setName(""); setLocalError(null); } }}
+  return <CommandForm title="Manage categories" open={open} onOpenChange={next => { if (!busy) { setOpen(next); setName(""); } }}
     trigger={<Button type="button" variant="outline" data-preview-action>Manage categories</Button>}>
     <div className="flex flex-col gap-5" data-preview-action>
       <p className="text-sm text-muted-foreground">Categories are shared by this brewery. Renaming updates every brand using that category. Only unused categories can be deleted.</p>
-      <CommandFormMessage error={error ?? localError} />
+      <CommandFormMessage error={error} />
       <form className="flex flex-col gap-2" onSubmit={async event => {
         event.preventDefault(); event.stopPropagation();
         if (!busy && name.trim() && await save(name.trim())) setName("");
@@ -72,7 +62,7 @@ export function CatalogCategoriesControl({ categories, busy = false, error, onSa
         {E.edit("New category", name, "text", undefined, { onChange: setName, required: true, disabled: busy, "aria-label": "New category" })}
         <CommandFormFooter><Button type="submit" disabled={busy || !name.trim()}>Add category</Button></CommandFormFooter>
       </form>
-      {names.length ? names.map(value => <CategoryRow key={value} name={value} busy={busy} onSave={save} onDelete={remove} />) : <p className="text-sm text-muted-foreground">No categories yet. Add the first one above.</p>}
+      {categories.length ? categories.map(value => <CategoryRow key={value} name={value} busy={busy} onSave={save} onDelete={remove} />) : <p className="text-sm text-muted-foreground">No categories yet. Add the first one above.</p>}
     </div>
   </CommandForm>;
 }

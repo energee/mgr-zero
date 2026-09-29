@@ -76,6 +76,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
+import { CatalogCategoriesFixture, FormatFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -1398,7 +1399,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is non-stock SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "compliance sheets wait until the brand is saved"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand in a packaged or poured format. Packaged SKUs hold stock; poured SKUs use the existing brand-owned serving identity and draw from keg stock. A poured format is non-stock SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
-    body: <BrandView model={toBrandViewProps(brandHazy)} />,
+    body: <BrandView model={toBrandViewProps(brandHazy)} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
     step: 5,
@@ -2645,7 +2646,7 @@ export const SCREENS: Screen[] = [
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · create_composed_format · replace_format_components · replace_format_bom · delete_format [admin]",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
-    body: <FormatView model={toFormatViewProps(formatCan)} deleteAction={<DeleteFormatControl name={formatCan.format.name} />} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} />,
+    body: <FormatFixture><FormatView model={toFormatViewProps(formatCan)} deleteAction={<DeleteFormatControl name={formatCan.format.name} />} componentOptions={formatsInventory.formats.filter(format => format.basis === "packaged" && format.bbl_per_unit !== null && !formatsInventory.components?.some(component => component.parent_format_id === format.id))} /></FormatFixture>,
   },
   {
     step: 5,
