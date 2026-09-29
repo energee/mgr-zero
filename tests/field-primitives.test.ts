@@ -51,7 +51,9 @@ it("shared views draw fields with E primitives", () => {
       expect(source, `stale exception: ${file}: ${entry.reason}`).toContain(entry.match);
       source = source.replace(entry.match, "");
     }
-    for (const match of source.matchAll(/<select\b|<Input\b|<input\b|type="number"/g)) {
+    // Native <select> and type="number" are banned by eslint.config.mjs
+    // (tests/ui-control-policy.test.ts); this scan covers the other raw inputs.
+    for (const match of source.matchAll(/<Input\b|<input\b/g)) {
       violations.push(`${file}:${source.slice(0, match.index).split("\n").length}: ${match[0]}`);
     }
   }
