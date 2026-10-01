@@ -6,7 +6,8 @@
  * `invite_staff` / `invite_customer_user` commands) and no OAuth provider is
  * configured. Forgot password opens /reset. Submission goes to the `login`
  * server action, which redirects back with `?error=1` on failure. `portal`
- * draws the buyer's variant (screen record Portal sign in).
+ * draws the buyer's variant (screen record Portal sign in). Staff email-link
+ * entry validates email only; password sign-in still requires both fields.
  */
 import { cn } from "@/lib/utils"
 import { emailLogin, login } from "@/app/(auth)/actions"

@@ -8,6 +8,7 @@
 import "@/lib/commands/all";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand, CommandError } from "@/lib/commands/registry";
+import { z } from "zod";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
@@ -40,12 +41,14 @@ export async function login(form: FormData) {
   redirect(pending ? "/invitations" : destination);
 }
 
-/** Passwordless sign-in: the shared staff entry view's secondary action. */
+/** Passwordless sign-in validates email even when browser validation is unavailable. */
 export async function emailLogin(form: FormData) {
+  const email = z.string().email().safeParse(form.get("email"));
+  if (!email.success) redirect("/login?error=email");
   const db = await createServerClient();
   const origin = (await headers()).get("origin") ?? "";
   await db.auth.signInWithOtp({
-    email: String(form.get("email")),
+    email: email.data,
     options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?next=/` },
   });
   redirect("/login?sent=1");
