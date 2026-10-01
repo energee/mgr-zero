@@ -26,6 +26,18 @@ describe("orderFormReadiness", () => {
     expect(orderFormReadiness({ ...base, lines: [{ skuId: "", qty: "" }, line] }).submittable).toBe(true);
   });
 
+  it.each([
+    { skuId: "sku-2", qty: "" },
+    { skuId: "", qty: "3" },
+    { skuId: "sku-2", qty: "0" },
+    { skuId: "sku-2", qty: "-1" },
+    { skuId: "sku-2", qty: "not a number" },
+    { skuId: "sku-2", qty: "Infinity" },
+  ])("blocks an entered invalid row beside a complete line: %j", partial => {
+    const input = { kind: "wholesale" as const, customerId: "c1", shipToId: "s1", fromLocationId: "l1", toLocationId: "", lines: [line, partial], catalog };
+    expect(orderFormReadiness(input).submittable).toBe(false);
+  });
+
   it("taproom transfer needs to-location instead of customer and ship-to", () => {
     const base = { kind: "taproom_transfer" as const, customerId: "", shipToId: "", fromLocationId: "l1", toLocationId: "l2", lines: [line], catalog };
     expect(orderFormReadiness(base).submittable).toBe(true);

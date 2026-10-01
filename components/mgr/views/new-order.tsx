@@ -5,6 +5,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { CommandForm } from "@/components/mgr/command-form";
+import { orderLineErrors } from "@/lib/order-form-rules";
 import { DatePicker } from "@/components/mgr/date-picker";
 import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
@@ -41,6 +42,7 @@ export function OrderQuantity({ value, label, onChange, contextualLabels = false
 }
 
 export function NewOrderView({ model, controls = {}, messages, feedback, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
+  const lineErrors = orderLineErrors(model.lines.map(line => ({ skuId: line.skuId ?? line.name, qty: String(line.qty) })));
   const skus = model.skus ?? model.lines.map(line => ({ id: line.name, label: line.name }));
   const source = model.sources.find(option => typeof option !== "string" && option.id === model.source);
   const sourceLabel = typeof source === "object" ? source.label : model.source;
@@ -69,8 +71,9 @@ export function NewOrderView({ model, controls = {}, messages, feedback, footer,
     </div>)}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
     {E.info("Order number is assigned on commit.")}
+    {lineErrors.map(error => <p key={error} role="status" className="text-sm text-muted-foreground">{error}</p>)}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Save draft"}</Button>}
+    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled || lineErrors.length > 0}>{submitting ? "Saving…" : "Save draft"}</Button>}
   </>;
 }
