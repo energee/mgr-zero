@@ -20,15 +20,25 @@ export type OrderFormReadiness = {
   hint: string | null;
 };
 
-/** A line the form both counts toward readiness and sends to create_order. */
-export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number(l.qty) > 0;
+/** Only a wholly empty spare row may be omitted from the order. */
+export const isBlankLine = (l: { skuId: string; qty: string }) => !l.skuId && !l.qty.trim();
+
+/** Every entered row needs a SKU and a finite, positive quantity. */
+export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number.isFinite(Number(l.qty)) && Number(l.qty) > 0;
+
+/** Shared feedback for live and inventory order rows; blank spare rows need no correction. */
+export function orderLineErrors(lines: { skuId: string; qty: string }[]): string[] {
+  return lines.flatMap((line, index) => isBlankLine(line) || isCompleteLine(line)
+    ? [] : [`Line ${index + 1}: select a SKU and enter a quantity greater than zero${lines.length > 1 ? ", or remove the line" : ""}.`]);
+}
 
 const conjunction = new Intl.ListFormat("en", { type: "conjunction" });
 
 export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadiness {
   const party = i.kind === "wholesale" ? Boolean(i.customerId && i.shipToId) : Boolean(i.toLocationId);
   const hasLine = i.lines.some(isCompleteLine);
-  const submittable = party && Boolean(i.fromLocationId) && hasLine;
+  const lineErrors = orderLineErrors(i.lines);
+  const submittable = party && Boolean(i.fromLocationId) && hasLine && lineErrors.length === 0;
 
   const missing: string[] = [];
   if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");

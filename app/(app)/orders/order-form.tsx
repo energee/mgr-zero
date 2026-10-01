@@ -7,7 +7,7 @@ import Link from "next/link";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { useCommandQuery } from "@/components/mgr/query-provider";
-import { defaultShipToId, isCompleteLine, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { defaultShipToId, isBlankLine, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -77,7 +77,7 @@ export function OrderForm({
       requestedShipDate: requestedShipDate || undefined,
       poNumber: poNumber || undefined,
       lines: lines
-        .filter(isCompleteLine)
+        .filter(line => !isBlankLine(line))
         .map((l) => ({ skuId: l.skuId, qty: Number(l.qty) })),
     }),
     reset,
@@ -95,7 +95,11 @@ export function OrderForm({
   }
 
   return (
-    <form onSubmit={form.submit} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
+    <form onSubmit={event => {
+      // Guard keyboard/programmatic submits too; a disabled button alone is not the boundary.
+      if (!readiness.submittable) { event.preventDefault(); event.stopPropagation(); return; }
+      void form.submit(event);
+    }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
       <NewOrderView feedback={feedback} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
