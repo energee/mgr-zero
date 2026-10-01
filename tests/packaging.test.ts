@@ -408,6 +408,96 @@ describe("closing the run", () => {
     return { runId: run.id, occupancyId };
   }
 
+  it("rejects packaged volume above draw below tank and batch capacity without any close effects (#723)", async () => {
+    const { runId, occupancyId } = await startedRun("FV-DRAW-GUARD", 10, "2026-12-01");
+    const requestId = crypto.randomUUID();
+    const materialsBefore = sql(`select id::text from material_movements where brewery_id='${b.id}' order by id`, true);
+    await expect(closeWithConfirmedMaterials({
+      runId, bblDrawn: 1, outputs: [{ skuId: stout.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 3 }],
+      lotCode: "DRAW-GUARD", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+    }, ctx, { requestId, correlationId: crypto.randomUUID() })).rejects.toThrow(/packaged .* bbl but .* drawn/i);
+    expect(sql(`select (closed_at is null and bbl_drawn is null)::text from packaging_runs where id='${runId}'`, true)).toEqual(["true"]);
+    expect(sql(`select count(*) from lots where packaging_run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from inventory_movements where ref='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from packaging_run_outputs where run_id='${runId}' and (qty_actual is not null or movement_id is not null)`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from packaging_material_records where run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from packaging_run_consumptions where run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select id::text from material_movements where brewery_id='${b.id}' order by id`, true)).toEqual(materialsBefore);
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`, true)).toEqual(["0"]);
+    expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
+    await expect(closeWithConfirmedMaterials({
+      runId, bblDrawn: 3, outputs: [{ skuId: stout.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 3 }],
+      lotCode: "DRAW-GUARD", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+    }, ctx, { requestId, correlationId: crypto.randomUUID() })).resolves.toMatchObject({ bbl_drawn: 3 });
+  });
+
+  it.each([0, 0.0005, 0.00050001])("checks each run's frozen output against draw with excess %s bbl (#723)", async (excess) => {
+    const cat = await seedCatalog(b.id, { product: `Precision ${excess}`, format: `Precision ${excess}`, bblPerUnit: 1 + excess });
+    const { occupancyId } = await brewInto(`FV-PRECISION-${excess}`, cat.brandId, 10, "2026-11-10");
+    for (let index = 0; index < 2; index++) {
+      const run = await runCommand("schedule_packaging_run", {
+        brandId: cat.brandId, plannedOn: "2026-12-01", occupancyId, outputs: [{ skuId: cat.skuId, qtyPlanned: 1 }],
+      }, ctx) as { id: string };
+      await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
+      const close = closeWithConfirmedMaterials({
+        runId: run.id, bblDrawn: 1, outputs: [{ skuId: cat.skuId, qtyActual: 1 }],
+        lotCode: `PRECISION-${excess}-${index}`, packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+      }, ctx);
+      if (excess > 0.0005) await expect(close).rejects.toThrow(/packaged .* bbl but .* drawn/i);
+      else await expect(close).resolves.toMatchObject({ bbl_drawn: 1 });
+    }
+    expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual([excess > 0.0005 ? "10.000" : "8.000"]);
+  });
+
+  it.each([
+    [1.0004, 1.0009, false, 1],
+    [1.0004, 1.0005, true, 1],
+    [1.0006, 1.0015, true, 1.001],
+    [1.0006, 1.00150001, false, 1.001],
+  ])("compares output with stored draw precision: draw %s, output %s (#723)", async (draw, output, accepted, stored) => {
+    const cat = await seedCatalog(b.id, { product: `Canonical ${output}`, format: `Canonical ${output}`, bblPerUnit: output });
+    const { occupancyId } = await brewInto(`FV-CANONICAL-${output}`, cat.brandId, 10, "2026-11-10");
+    const run = await runCommand("schedule_packaging_run", {
+      brandId: cat.brandId, plannedOn: "2026-12-01", occupancyId, outputs: [{ skuId: cat.skuId, qtyPlanned: 1 }],
+    }, ctx) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
+    const input = { runId: run.id, bblDrawn: draw, outputs: [{ skuId: cat.skuId, qtyActual: 1 }],
+      lotCode: `CANONICAL-${output}`, packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    if (accepted) {
+      const closed = await closeWithConfirmedMaterials(input, ctx, execution);
+      expect(closed).toMatchObject({ bbl_drawn: stored });
+      expect(await closeWithConfirmedMaterials(input, ctx, execution)).toEqual(closed);
+      await expect(closeWithConfirmedMaterials({ ...input, bblDrawn: draw + 0.00001 }, ctx, execution))
+        .rejects.toMatchObject({ code: "conflict" });
+    } else {
+      await expect(closeWithConfirmedMaterials(input, ctx, execution)).rejects.toThrow(/packaged .* bbl but .* drawn/i);
+      expect(sql(`select count(*) from private.command_requests where request_id='${execution.requestId}'`, true)).toEqual(["0"]);
+    }
+  });
+
+  it.each([null, "NaN", "Infinity", "-Infinity", -1])("rejects invalid direct RPC draw %s without effects (#723)", async (draw) => {
+    const { runId, occupancyId } = await startedRun(`FV-INVALID-DRAW-${draw}`, 10, "2026-12-01");
+    const plan = await runCommand("get_packaging_close_plan", { runId }, ctx) as { revision: string; planned: { materialId: string }[] };
+    const requestId = crypto.randomUUID();
+    const result = await ctx.db.rpc("close_packaging_run", {
+      p_brewery: b.id, p_run: runId, p_bbl_drawn: draw as unknown as number,
+      p_outputs: [{ sku_id: kegSkuId, qty_actual: 1 }], p_lot_code: `INVALID-${draw}`,
+      p_packaged_on: "2026-12-01", p_best_by: null as unknown as string, p_location: wh.id, p_bin: wh.binId,
+      p_request_id: requestId, p_plan_revision: plan.revision, p_actuals: plan.planned.map(row => ({
+        material_id: row.materialId, location_id: wh.id, bin_id: wh.binId, lot_id: null, used: 0, loss: 0, unused: 0,
+      })),
+    });
+    expect(result.error?.message).toMatch(/barrels drawn must be nonnegative and finite/i);
+    expect(sql(`select (closed_at is null and bbl_drawn is null)::text from packaging_runs where id='${runId}'`, true)).toEqual(["true"]);
+    expect(sql(`select count(*) from lots where packaging_run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from inventory_movements where ref='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from packaging_material_records where run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from packaging_run_consumptions where run_id='${runId}'`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`, true)).toEqual(["0"]);
+    expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
+  });
+
   it("keeps closed yield and consumed materials frozen after a format correction", async () => {
     const catalog = await seedCatalog(b.id, { product: "Correction", sku: "Correction case", bblPerUnit: 0.1 });
     const editor = await makeStaffCtx(b.id, "admin");
@@ -438,12 +528,12 @@ describe("closing the run", () => {
     const { runId, occupancyId } = await startedRun("FV-CLOSE", 30, "2026-12-01");
 
     const closed = (await closeWithConfirmedMaterials({
-      runId, bblDrawn: 25, outputs: [{ skuId: stout.skuId, qtyActual: 396 }],
+      runId, bblDrawn: 26, outputs: [{ skuId: stout.skuId, qtyActual: 396 }],
       lotCode: "L2026-336", packagedOn: "2026-12-01", bestBy: "2027-06-01",
       locationId: wh.id, binId: wh.binId,
     }, ctx)) as { closed_at: string; bbl_drawn: string };
     expect(closed.closed_at).toBeTruthy();
-    expect(Number(closed.bbl_drawn)).toBe(25);
+    expect(Number(closed.bbl_drawn)).toBe(26);
 
     const lot = (await admin.from("lots").select("id, code, brand_id, packaged_on, best_by")
       .eq("packaging_run_id", runId).single()).data!;
@@ -480,7 +570,7 @@ describe("closing the run", () => {
     expect(qtyByMaterial.get(lid)).toBe(-396 * 24);
 
     const [vol] = sql(`select round(bbl,3) from occupancy_volumes where occupancy_id = '${occupancyId}'`, true);
-    expect(vol.trim()).toBe("5.000");
+    expect(vol.trim()).toBe("4.000");
   });
 
   it("refuses a second close, an unknown package, and more beer than the tank holds", async () => {

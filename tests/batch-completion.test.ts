@@ -93,9 +93,9 @@ describe("batch completion reconciliation", () => {
 
   it("refuses the run close that tips the batch's packaged total past its baseline (#499)", async () => {
     const source = await brew(10);
-    // Two closes, each within its tank (#432), that together would package 10.01 bbl from 10.
-    await packageBeer(source, 5, 1);
-    await expect(packageBeer(source, 5.01, 1)).rejects.toThrow(/packaged 10\.01 bbl.*batch had 10/i);
+    // Both closes fit draw/tank tolerance; the batch guard still rejects any negative residual.
+    await packageBeer(source, 5, 5);
+    await expect(packageBeer(source, 5.0004, 5)).rejects.toThrow(/packaged .* bbl across this batch's runs.*batch had/i);
     // The refused close rolled back: its run is still open and booked no finished goods.
     expect(sql(`select (r.closed_at is not null)::text || '|' || count(m.id) from packaging_runs r
       join vessel_occupancies o on o.id = r.occupancy_id
@@ -107,7 +107,7 @@ describe("batch completion reconciliation", () => {
   it("refuses a negative full-precision residual atomically", async () => {
     const source = await brew(10);
     // Packaging fit when it closed; a measurement since then shrank the baseline under it.
-    await packageBeer(source, 5, 1);
+    await packageBeer(source, 5, 5);
     insertFixture("volume_adjustments", {
       brewery_id: breweryId, occupancy_id: source.occupancyId, bbl: -5.01, reason: "measurement", created_by: ctx.userId,
     });
@@ -118,7 +118,7 @@ describe("batch completion reconciliation", () => {
 
   it("uses frozen packaged movement BBL rather than current format volume or bbl_drawn", async () => {
     const source = await brew(10);
-    const { formatId } = await packageBeer(source, 9.5, 9);
+    const { formatId } = await packageBeer(source, 9.5, 9.6);
     sql(`update formats set bbl_per_unit=0.02 where id='${formatId}'`, true);
     const result = await preview(source.batchId);
     expect(n(result.packagedBbl)).toBe(9.5);
@@ -137,7 +137,7 @@ describe("batch completion reconciliation", () => {
     }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, ctx);
     await closeWithConfirmedMaterials({
-      runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }], lotCode: `EXACT-${crypto.randomUUID()}`,
+      runId: run.id, bblDrawn: 0.95, outputs: [{ skuId, qtyActual: 1 }], lotCode: `EXACT-${crypto.randomUUID()}`,
       packagedOn: "2026-09-02", locationId: location.id, binId: location.binId,
     }, ctx);
     const result = await complete(source.batchId);
