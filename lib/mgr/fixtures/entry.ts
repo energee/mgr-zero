@@ -8,6 +8,7 @@ export const signIn: EntryViewModel = {
   inputs: ["Email", "Password"],
   primary: "Sign in",
   secondary: "Email me a link",
+  secondaryEmailOnly: true,
   link: { label: "Forgot password?", to: "Reset password" },
 };
 

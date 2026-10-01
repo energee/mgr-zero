@@ -15,6 +15,13 @@ import { emailLogin } from "@/app/(auth)/actions";
 describe("passwordless sign-in", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it.each([undefined, "", "not-an-email"])("rejects invalid email %s before Auth even without browser validation (#708)", async (email) => {
+    const form = new FormData();
+    if (email !== undefined) form.set("email", email);
+    await expect(emailLogin(form)).rejects.toThrow("redirect:/login?error=email");
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+  });
+
   it("emails an existing account a same-origin confirmation link", async () => {
     const form = new FormData();
     form.set("email", "maria@example.com");
