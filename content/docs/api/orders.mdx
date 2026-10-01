@@ -22,6 +22,8 @@ quantities and order prices. A credit memo reverses
 part of an invoice as negative lines at the original prices plus return-in
 movements. Invoices are never edited.
 
+`sync_qbo_payments` freezes each pushed document's Invoice or CreditMemo type and current-company identity. It reads the matching QuickBooks endpoint and applies the entire observed batch atomically. A confirmed missing credit memo becomes deleted; current state-report facts and exports then exclude its money without changing original local amounts, physical return movements, or filed snapshots. Deleted deposit refunds also stop reducing current keg-deposit balances without changing physical keg-return events. An explicit successful recreation makes the original credit money count again; filed snapshots remain immutable. Optional provider RemainingCredit is validated but is not stored as an invoice balance. Credit balances never count as invoice cash or prove payment or voiding. Uncertain or malformed provider responses leave the request unresolved for exact retry. Legacy invoice-only batches retain their exact target set on replay.
+
 Order and invoice history queries page with a cursor; see [History paging](/docs/api#history-paging).
 
 {/* ops:orders */}

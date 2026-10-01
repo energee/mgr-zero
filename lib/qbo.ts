@@ -79,7 +79,7 @@ type QboInvoiceRead = {
   syncToken: string;
   taxCents: number;
   totalCents: number;
-  balanceCents: number;
+  balanceCents: number | null;
   cashCollectedCents: number;
   paidAt: string | null;
   privateNote: string;
@@ -360,18 +360,21 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
     const observations: QboInvoiceObservation[] = [];
     const paymentCache: QboPaymentCache = new Map();
     for (const target of start.targets) {
-      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+      // Old batches froze invoices only. An explicit unknown type is not legacy.
+      const entityType = target.entityType === undefined ? "Invoice" : target.entityType;
+      if (entityType !== "Invoice" && entityType !== "CreditMemo") throw new Error("QuickBooks sync entity type was invalid");
+      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
         .catch(() => { throw new Error("QuickBooks is unavailable"); });
       if (!read.ok && read.status === 401) {
         tokens = await refreshQboCredentials(ctx, client, tokens);
         if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
-        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
           .catch(() => { throw new Error("QuickBooks is unavailable"); });
       }
       if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
-      const remoteState = read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
+      const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
         && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
       observations.push({
         invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
@@ -499,8 +502,9 @@ export class QboOAuthClient {
     remoteId: string,
     accessToken: string,
     paymentCache: QboPaymentCache = new Map(),
+    entityType: "Invoice" | "CreditMemo" = "Invoice",
   ): Promise<QboInvoiceRead> {
-    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     const response = await this.transport(url, {
       method: "GET",
@@ -508,17 +512,22 @@ export class QboOAuthClient {
       redirect: "error",
     });
     if (!response.ok) return { ok: false, status: response.status, definitive: response.status === 404 };
-    const payload = await response.json() as { Invoice?: Record<string, unknown> };
-    const invoice = payload?.Invoice;
+    const payload = await response.json() as Record<string, Record<string, unknown>>;
+    const invoice = payload?.[entityType];
     const totalCents = cents(invoice?.TotalAmt);
-    const balanceCents = cents(invoice?.Balance);
+    // Intuit CreditMemo has optional RemainingCredit, not Invoice Balance.
+    // Validate it when present, but never store credit availability as invoice money due.
+    const balanceField = entityType === "Invoice" ? invoice?.Balance : invoice?.RemainingCredit;
+    const balanceCents = cents(balanceField);
     const tax = invoice?.TxnTaxDetail;
     const taxCents = cents(tax && typeof tax === "object" ? (tax as Record<string, unknown>).TotalTax : 0);
     if (!invoice || invoice.Id !== remoteId || typeof invoice.SyncToken !== "string"
-      || totalCents === null || balanceCents === null || taxCents === null) {
+      || totalCents === null || taxCents === null
+      || (balanceCents === null && (entityType === "Invoice" || balanceField !== undefined))) {
       throw new Error("QuickBooks response was invalid");
     }
-    const linked = Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
+    // Credit application is not cash collection and never reads payment evidence.
+    const linked = entityType === "Invoice" && Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
     const paymentIds = [...new Set(linked.flatMap((item) => item && typeof item === "object"
       && (item as Record<string, unknown>).TxnType === "Payment"
       && typeof (item as Record<string, unknown>).TxnId === "string"
@@ -536,9 +545,9 @@ export class QboOAuthClient {
     const updated = invoice.MetaData && typeof invoice.MetaData === "object"
       ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
     return {
-      ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents, taxCents,
+      ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents: entityType === "Invoice" ? balanceCents : null, taxCents,
       cashCollectedCents: Math.min(cashCollectedCents, totalCents),
-      paidAt: typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
+      paidAt: entityType === "Invoice" && typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
     };
