@@ -151,7 +151,10 @@ bun run lint       # eslint, incl. the admin-client import guard
 bunx tsc --noEmit  # typecheck
 bun run build      # production build
 bun run test:e2e   # agent-browser smoke — local only, not run in CI
+bun tests-e2e/mobile-command-surface.ts # fixture-only overlay regression; no seed or writes
 ```
+
+`bun tests-e2e/mobile-command-surface.ts [screenshot-directory]` checks Reading and Count actions, Count's Location Select, and minimized-composer Tabs. It starts its own server on an available port; stop this worktree's dev server first because Next permits only one `.next/dev` owner. It never stops an existing server or seeds data. A leftover lock from a crashed server is also refused; inspect it yourself rather than having the runner delete an unknown lock. The 390×500 viewport is a short-viewport proxy, not proof of a real phone soft keyboard.
 
 `bun run test:e2e` drives the browser with `agent-browser` (Vercel's browser
 automation CLI) instead of Playwright. It runs agent-browser's bundled Chrome

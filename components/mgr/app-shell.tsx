@@ -102,12 +102,12 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
   );
 }
 
-/** Phone tab bar. */
+/** Phone tab bar: above the composer (30), below modal and picker surfaces (50). */
 export function TabBar({ items, active, className }: { items: readonly NavItem[]; active?: string; className?: string }) {
   return (
     <nav
       aria-label="Tabs"
-      className={cn("relative z-[60] grid border-t bg-background pb-[env(safe-area-inset-bottom)] text-xs", className)}
+      className={cn("relative z-40 grid border-t bg-background pb-[env(safe-area-inset-bottom)] text-xs", className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((t) => (
