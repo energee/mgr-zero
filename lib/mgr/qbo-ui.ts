@@ -31,6 +31,7 @@ export function qboMappingVersion(currentId?: string | null) {
   return `saved:${currentId ?? ""}`;
 }
 
+/** paidStatusShown means detail already conveys full paid status; callers need not repeat it. */
 export function qboInvoicePresentation(input: {
   kind: "invoice" | "credit_memo";
   role: StaffRole;
@@ -45,7 +46,7 @@ export function qboInvoicePresentation(input: {
   accountantDrift?: boolean;
   writtenOff?: boolean;
   missingMappings?: boolean;
-}): { detail: string; actions: QboInvoiceAction[] } {
+}): { detail: string; actions: QboInvoiceAction[]; paidStatusShown?: true } {
   const canWriteOff = input.kind === "invoice" && input.role === "admin";
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
   if (input.role === "warehouse" || input.role === "brewer" || input.role === "taproom") {
@@ -61,7 +62,7 @@ export function qboInvoicePresentation(input: {
     const cash = input.cashCollectedCents ?? 0;
     if (input.balanceCents === 0) {
       if (cash > 0 && typeof input.totalCents === "number" && cash >= input.totalCents) {
-        return { detail: "paid in QuickBooks", actions: [] };
+        return { detail: "paid in QuickBooks", actions: [], paidStatusShown: true };
       }
       return { detail: cash > 0
         ? `settled in QuickBooks · ${money(cash)} cash received`

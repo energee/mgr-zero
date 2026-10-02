@@ -43,7 +43,7 @@ export type InvoiceViewModel = {
 
 export type InvoiceSnapshot = {
   backHref?: string;
-  /** breweries.timezone: paid and question days are the brewery's day, not the UTC prefix (#442). */
+  /** breweries.timezone: question days use the brewery's day, not the UTC prefix (#442). */
   timeZone: string;
   invoice: {
     id: string;
@@ -101,7 +101,7 @@ export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHr
   const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
   const dueOrIssued = invoice.due_on ? `due ${formatDate(invoice.due_on)}` : `issued ${formatDate(invoice.issued_on)}`;
   const state = invoiceCurrentState(invoice);
-  const stateDetail = state === "paid" ? ` · paid ${formatDate(invoice.paid_at!, timeZone)}`
+  const stateDetail = state === "paid" ? " · paid"
     : state === "written_off" ? " · written off" : state === "unpaid" ? "" : ` · ${state}`;
   const drift = invoice.qbo_accountant_drift ? " · edited in QuickBooks" : "";
   return {
