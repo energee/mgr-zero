@@ -1,5 +1,5 @@
 import { assert } from "vitest";
-import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { NewOrderView } from "@/components/mgr/views/new-order";
@@ -62,14 +62,17 @@ describe("shared order-entry controls", () => {
   });
   it("preserves nullable availability, option IDs, decimal quantities, and explicit footer suppression", () => {
     const change = vi.fn();
-    const node = NewOrderView({
+    let node: ReactNode;
+    // Capture JSX inside React's SSR dispatcher so the real useId hook remains exercised.
+    function Harness() { return node = NewOrderView({
       model: {
         customer: "c2", customers: [{ id: "c1", label: "Same name" }, { id: "c2", label: "Same name" }],
         shipTo: "s2", shipTos: [{ id: "s2", label: "Dock" }], source: "l1", sources: [{ id: "l1", label: "Cooler" }],
         requestedShip: "", po: "", skus: [{ id: "sku2", label: "Case" }],
-        lines: [{ name: "Case", skuId: "sku2", qty: "1.5", warning: false }],
+        lines: [{ name: "Case", skuId: "sku2", qty: "1.5", warning: false, skuError: "This SKU is unavailable" }],
       }, controls: { shipTo: change, lineQty: (_index, value) => change(value) }, footer: null,
-    });
+    }); }
+    const markup = renderToStaticMarkup(createElement(Harness));
     const nodes = elements(node);
     const shipTo = nodes.find(element => element.type === Select)!;
     expect(shipTo.props.value).toBe("s2");
@@ -80,7 +83,10 @@ describe("shared order-entry controls", () => {
     expect(quantity.props.value).toBe("1.5");
     invoke(quantity, "onChange", "2.5");
     expect(change).toHaveBeenCalledWith("2.5");
-    const markup = renderToStaticMarkup(node);
+    const errorId = markup.match(/<p id="([^"]+)" role="alert"/)?.[1];
+    expect(errorId).toBeTruthy();
+    expect(markup).toContain(`aria-describedby="${errorId}"`);
+    expect(markup).toContain("This SKU is unavailable");
     expect(markup).not.toContain("ATP ");
     expect(markup).not.toContain("Save draft");
     expect(SCREENS.find(screen => screen.name === "New order")?.surface).toBeUndefined();
