@@ -22,6 +22,20 @@ it("preserves role and connection restrictions on deleted-invoice recovery", () 
   expect(toInvoiceListRow({ ...deleted, kind: "credit_memo" }, "admin", true, "America/New_York").actions).not.toContain("Write off");
 });
 
+it("does not display a legacy confirmation marker as a paid date", () => {
+  const row = toInvoiceListRow({ ...invoice, paid_at: "2026-09-12T00:30:00Z", qbo_cash_collected_cents: 104000 }, "admin", true, "UTC");
+  expect(row.detail).toContain("paid in QuickBooks");
+  expect(row.detail).not.toMatch(/paid Sep|Sep 11|Sep 12/);
+});
+
+it("shows full payment only once while retaining confirmation on other presentations", () => {
+  const paid = { ...invoice, paid_at: "2026-09-12T00:30:00Z", qbo_cash_collected_cents: 104000 };
+  expect(toInvoiceListRow(paid, "admin", true, "UTC").detail).toBe("paid in QuickBooks · $1,040.00");
+  expect(toInvoiceListRow({ ...paid, qbo_accountant_drift: true }, "admin", true, "UTC").detail).toContain("review there · paid");
+  expect(toInvoiceListRow(paid, "warehouse", true, "UTC").detail).toContain("available to Sales · paid");
+  expect(toInvoiceListRow({ ...paid, qbo_cash_collected_cents: 50000 }, "admin", true, "UTC").detail).toContain("$500.00 cash received · paid");
+});
+
 it("prints an unpaid invoice's due day the way the rest of the app does (#493)", () => {
   const unpaid = toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, "admin", true, "America/New_York");
   expect(unpaid.detail).toContain("due Sep 12, 2026");
