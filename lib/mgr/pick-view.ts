@@ -27,6 +27,8 @@ export type PickSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_picked: number | null;
+    /** Latest server short_pick event for this line; invalidates unchanged counts after recovery replay. */
+    shortPickEventId?: string;
     skus: { name: string } | null;
   }[];
   locations: { id: string; name: string }[];
