@@ -7,7 +7,8 @@ import Link from "next/link";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { useCommandQuery } from "@/components/mgr/query-provider";
-import { defaultShipToId, isCompleteLine, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { QueryFeedback } from "@/components/mgr/query-feedback";
+import { defaultShipToId, isCompleteLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -51,8 +52,15 @@ export function OrderForm({
   const channel = skuPickerChannel(kind, customer);
   const priced = useCommandQuery<SkuRow[]>("list_skus", { saleChannelId: channel }, channel !== undefined);
   const skuOptions = channel === undefined ? skus : (priced.data ?? []).map(toSkuOption);
+  // A cold channel read is not an empty list; retain inputs but block submission until it resolves.
+  const skuOptionsReady = channel === undefined || priced.data !== undefined;
+  const availableSkuIds = skuOptions.map(sku => sku.id);
+  const skuFeedback = channel === undefined ? undefined : <QueryFeedback
+    error={priced.error} loading={!priced.data ? "Loading customer-priced SKUs" : undefined}
+    paused={priced.isPaused} fetching={priced.isFetching} updatedAt={priced.dataUpdatedAt}
+    retry={() => void priced.refetch()} />;
   const readiness = orderFormReadiness({
-    kind, customerId, shipToId, fromLocationId, toLocationId, lines,
+    kind, customerId, shipToId, fromLocationId, toLocationId, lines, availableSkuIds,
     catalog: { customers: customers.length, locations: locations.length, skus: skus.length },
   });
 
@@ -95,13 +103,17 @@ export function OrderForm({
   }
 
   return (
-    <form onSubmit={form.submit} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
-      <NewOrderView feedback={feedback} model={{
+    <form onSubmit={event => { if (!skuOptionsReady || !readiness.submittable) { event.preventDefault(); event.stopPropagation(); return; } void form.submit(event); }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
+      <NewOrderView feedback={feedback} skuFeedback={skuFeedback} skuOptionsReady={skuOptionsReady}
+        skuEmptyMessage={channel === undefined ? undefined : "No active SKUs are priced for this customer. Check Price groups or choose another customer."} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
         requestedShip: requestedShipDate, po: poNumber, backHref: "/orders",
-        lines: lines.map(line => ({ ...line, name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? "", warning: false })),
+        lines: lines.map(line => ({ ...line,
+          name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
+          skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,
+          warning: false })),
       }} controls={{
         kind: setKind, customer: value => { setCustomerId(value); setShipToId(defaultShipToId(customers.find(customer => customer.id === value)?.shipTos ?? [])); },
         shipTo: setShipToId, source: setFromLocationId, destination: setToLocationId,

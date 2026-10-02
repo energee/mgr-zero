@@ -72,6 +72,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Movement recorded", file: "app/(app)/inventory/page.tsx" },
   { name: "Orders", file: "app/(app)/orders/page.tsx" },
   { name: "New order", file: "app/(app)/orders/new/page.tsx" },
+  { name: "New order pricing loading", file: "app/(app)/orders/new/page.tsx" },
+  { name: "New order unavailable SKU", file: "app/(app)/orders/new/page.tsx" },
   { name: "Confirm order", file: "app/(app)/orders/[id]/confirm/page.tsx" },
   { name: "Complete transfer", file: "app/(app)/orders/[id]/complete/page.tsx" },
   { name: "Order", file: "app/(app)/orders/[id]/page.tsx" },

@@ -10,6 +10,8 @@ export type OrderFormReadinessInput = {
   fromLocationId: string;
   toLocationId: string;
   lines: { skuId: string; qty: string }[];
+  /** When supplied, selected SKUs must belong to the current picker options. */
+  availableSkuIds?: string[];
   /** Option counts of the selects the form renders. */
   catalog: { customers: number; locations: number; skus: number };
 };
@@ -23,12 +25,19 @@ export type OrderFormReadiness = {
 /** A line the form both counts toward readiness and sends to create_order. */
 export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number(l.qty) > 0;
 
+/** A retained nonblank selection is unavailable when the current options omit it. */
+export function isUnavailableSku(skuId: string, availableSkuIds: string[]): boolean {
+  return Boolean(skuId) && !availableSkuIds.includes(skuId);
+}
+
 const conjunction = new Intl.ListFormat("en", { type: "conjunction" });
 
 export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadiness {
   const party = i.kind === "wholesale" ? Boolean(i.customerId && i.shipToId) : Boolean(i.toLocationId);
   const hasLine = i.lines.some(isCompleteLine);
-  const submittable = party && Boolean(i.fromLocationId) && hasLine;
+  const availableSkuIds = i.availableSkuIds;
+  const hasUnavailableSku = availableSkuIds !== undefined && i.lines.some(line => isUnavailableSku(line.skuId, availableSkuIds));
+  const submittable = party && Boolean(i.fromLocationId) && hasLine && !hasUnavailableSku;
 
   const missing: string[] = [];
   if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");

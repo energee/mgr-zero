@@ -1,6 +1,6 @@
 // lib/mgr/new-order-view.ts — view-model for the New order sheet.
 export type OrderOption = string | { id: string; label: string };
-export type NewOrderLineView = { name: string; skuId?: string; qty: number | string; atp?: number; warning: boolean };
+export type NewOrderLineView = { name: string; skuId?: string; qty: number | string; atp?: number; warning: boolean; /** Retained selection absent from the current order's SKU options. */ skuError?: string };
 
 export type NewOrderViewModel = {
   customers: OrderOption[];
