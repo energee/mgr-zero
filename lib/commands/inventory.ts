@@ -187,7 +187,7 @@ defineQuery({
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel",
-  input: z.object({ saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price") }), roles: STAFF_ROLES,
+  input: z.object({ saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"), active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied") }), roles: STAFF_ROLES,
   aiExposed: true,
   handler: async (ctx, i) => {
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
@@ -195,10 +195,9 @@ defineQuery({
         .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
         .eq("brewery_id", ctx.breweryId).order("id").limit(PAGE_SIZE);
       if (after) query = query.gt("id", after.id);
-      const [result, counted] = await Promise.all([
-        query,
-        ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
-      ]);
+      let count = ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+      if (i.active !== undefined) { query = query.eq("active", i.active); count = count.eq("active", i.active); }
+      const [result, counted] = await Promise.all([query, count]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     }, row => row.id);
     const sorted = rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
