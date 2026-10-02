@@ -35,6 +35,16 @@ it("passes real identity, source and decimal count to the shared page adapters",
   expect(short.props.snapshot.backHref).toBe("/orders/order/pick");
 });
 
+it("maps the latest existing short_pick event to only its matching line", async () => {
+  query.mockImplementation(async name => name === "get_order" ? { order, lines: [line, { ...line, id: "other" }], events: [
+    { id: "old", created_at: "2026-10-02T01:00:00Z", event: "short_pick", payload: { line_id: "line" } },
+    { id: "new", created_at: "2026-10-02T02:00:00Z", event: "short_pick", payload: { line_id: "line" } },
+    { id: "foreign", created_at: "2026-10-02T03:00:00Z", event: "picked", payload: { line_id: "other" } },
+  ] } : []);
+  const page = await PickPage({ params });
+  expect(page.props.snapshot.lines).toEqual([{ ...line, shortPickEventId: "new" }, { ...line, id: "other" }]);
+});
+
 it.each(["", "NaN", "Infinity", "-1", "5", "6"])("rejects invalid or non-short count %s", async qty => {
   await expect(ShortPickPage({ params, searchParams: Promise.resolve({ line: "line", qty }) })).rejects.toThrow("/orders/order/pick");
 });
