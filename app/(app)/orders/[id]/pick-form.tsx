@@ -8,7 +8,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PickView } from "@/components/mgr/views/pick";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { isNumber } from "@/lib/mgr/quantity-input";
-import { pickCountDraftKey, readPickCounts, savePickCounts } from "@/lib/mgr/pick-counts";
+import { draftCounts, pickCountDraftKey, readPickCounts, savePickCounts } from "@/lib/mgr/pick-counts";
 import { toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
 
 export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
@@ -34,9 +34,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
     else {
       // A same-page server refresh must not replace newer in-memory edits after a storage failure.
       const previous = working.current;
-      const values = readPickCounts(snapshot.lines, JSON.stringify(Object.fromEntries(previous.lines.map(line => [line.id, {
-        value: previous.values[line.id], ordered: line.qty_ordered, picked: line.qty_picked, shortPickEventId: line.shortPickEventId,
-      }]))));
+      const values = readPickCounts(snapshot.lines, JSON.stringify(draftCounts(previous.lines, previous.values)));
       working.current = { key, lines: snapshot.lines, values, restored: true };
       setQtys(values);
     }

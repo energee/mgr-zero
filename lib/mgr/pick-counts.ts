@@ -4,7 +4,7 @@ import type { CommandContextExpectation } from "@/lib/commands/registry";
 import type { PickSnapshot } from "./pick-view";
 
 const pickDraft = z.record(z.string(), z.object({ value: z.string(), ordered: z.number(), picked: z.number().nullable(), shortPickEventId: z.string().optional() }));
-function draftCounts(lines: PickSnapshot["lines"], values: Record<string, string>) {
+export function draftCounts(lines: PickSnapshot["lines"], values: Record<string, string>) {
   return Object.fromEntries(lines.map(line => [line.id, {
     value: values[line.id], ordered: line.qty_ordered, picked: line.qty_picked, shortPickEventId: line.shortPickEventId,
   }]));
