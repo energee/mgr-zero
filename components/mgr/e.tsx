@@ -242,11 +242,10 @@ export const E = {
   qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => (
     <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} />
   ),
-  /** A view switcher: the body below is the active panel, so there are no
-   *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
-   *  an order's states) is a tab bar too; single-choice fields stay chips —
-   *  except the unit a quantity is entered in, which is a switcher on the number
-   *  itself and rides inside the field as `E.qty`'s addon (see `volume`).
+  /** A view switcher used by inventory drawings. In-place filters with changing
+   *  result content use `TabBar` directly and supply associated panels. Single-
+   *  choice fields stay chips — except the unit a quantity is entered in, which
+   *  rides inside `E.qty`'s addon (see `volume`).
    *  Spans the column by default; pass width classes to hug ("w-fit", an input
    *  addon) or to scroll a bar too long for the phone ("overflow-x-auto").
    *  `to` names the screen a tab opens; the explorer walks there and hides tabs
