@@ -2,6 +2,7 @@
 import type { EmptyState } from "./empty-state";
 import type { TodayItem } from "@/lib/commands/today";
 import type { TaproomTodayRow } from "@/lib/mgr/taproom-today";
+import { breweryDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
 
 export type TodayIcon = "package" | "truck" | "route" | "thermo" | "beer" | "task" | "invoice";
 
@@ -15,6 +16,8 @@ export type TodayRowView = {
   warning?: boolean;
   href?: string;
   icon?: TodayIcon;
+  /** get_today's due instant, kept only when the item has one (#717). */
+  dueAt?: string;
 };
 
 export type TodayViewModel = {
@@ -50,7 +53,19 @@ export type TodaySnapshot = {
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
+  /** breweries.timezone; required when any item carries a dueAt. */
+  timeZone?: string;
+  /** The clock that decides overdue versus due; tests pin it. */
+  now?: Date;
 };
+
+/** "overdue since 12:30 PM" or "due 6:00 PM" in the brewery zone; a due time on
+ *  another brewery day also names the date. */
+function dueText(dueAt: string, timeZone: string, now: Date): string {
+  const due = new Date(dueAt);
+  const when = breweryDate(timeZone, due) === breweryDate(timeZone, now) ? formatTimeOfDay(due, timeZone) : formatDateTime(due, timeZone);
+  return due <= now ? `overdue since ${when}` : `due ${when}`;
+}
 
 export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
 
@@ -82,14 +97,17 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
       rows: [],
     };
   }
+  const now = s.now ?? new Date();
   return {
     date: s.date,
     rows: items.map((it) => {
       const [verb, tone] = TODAY_VERB[it.reason];
+      if (it.dueAt && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
       return {
         key: `${it.reason}:${it.subjectId}`,
         title: it.safeLabel,
-        detail: it.detail,
+        detail: it.dueAt ? `${it.detail} · ${dueText(it.dueAt, s.timeZone!, now)}` : it.detail,
+        ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,
         tone,
         href: it.href,
