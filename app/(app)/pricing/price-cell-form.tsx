@@ -10,7 +10,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { dollarsInput } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function PriceCellForm({
@@ -25,7 +25,7 @@ export function PriceCellForm({
   // One grid page holds many cells: an unresolved save locks only this cell.
   const cell = `${saleChannelId}:${priceGroupId}:${formatId}`;
   const form = useCommandForm("set_channel_price", {
-    build: () => ({ saleChannelId, priceGroupId, formatId, unitPriceCents: Math.round(Number(dollars) * 100) }),
+    build: () => ({ saleChannelId, priceGroupId, formatId, unitPriceCents: toCents(dollars) }),
     reset: () => setDollars(initial),
     target: cell,
   });

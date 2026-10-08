@@ -6,11 +6,12 @@ import type { Database } from "@/lib/supabase/database";
 // Both take the caller's client: provider callbacks and jobs pass the
 // service-role client (iron rule 4 keeps its construction in the named
 // internal-job owner), and the RPCs themselves refuse any other role.
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CommandError, unwrap, type StaffRole } from "@/lib/commands/registry";
+import { unwrap, type StaffRole } from "@/lib/commands/registry";
 
-export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+import { sha256 } from "@/lib/hash";
+import { readAppUrl } from "@/lib/env/server-parser";
 
 export type ResolvedChatActor = {
   installationId: string;
@@ -21,8 +22,7 @@ export type ResolvedChatActor = {
 };
 
 export async function issueChatLinkProof(db: SupabaseClient<Database>, installationId: string, externalUserId: string) {
-  const base = process.env.APP_URL;
-  if (!base) throw new CommandError("APP_URL is not configured", 500);
+  const base = readAppUrl();
   const proof = randomBytes(32).toString("base64url");
   const data = await unwrap(db.rpc("issue_chat_link_proof", {
     p_installation: installationId, p_external_user_id: externalUserId, p_proof_hash: sha256(proof),

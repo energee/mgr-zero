@@ -63,4 +63,3 @@ export function recentPeriods(today: string, cadence: Cadence): string[] {
   });
 }
 
-export const bbl = (n: number) => n.toFixed(2);

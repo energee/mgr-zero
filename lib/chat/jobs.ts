@@ -6,10 +6,12 @@ import type { Database } from "@/lib/supabase/database";
 // service_role chat RPCs, never ordinary domain commands, and never mints a
 // user token. Delivery orchestration (scan/lease/deliver/cleanup) lands here
 // in the worker task.
-import { createHash } from "node:crypto";
 import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readAppUrl } from "@/lib/env/server-parser";
+import { sha256 } from "@/lib/hash";
+import { isUuid } from "@/lib/commands/context";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";
@@ -26,9 +28,7 @@ export function serviceClient(): SupabaseClient<Database> {
 }
 
 export function slackTransport() {
-  const base = process.env.APP_URL;
-  if (!base) throw new Error("APP_URL is not configured");
-  return new SlackTransport(slackClientFor, { mgrBaseUrl: base });
+  return new SlackTransport(slackClientFor, { mgrBaseUrl: readAppUrl() });
 }
 
 type SlackEventBody = {
@@ -53,7 +53,7 @@ export async function recordSlackCallback(rawBody: string): Promise<{ receiptId:
     p_callback_id: body.event_id,
     p_callback_kind: "app_home_opened",
     p_external_user_id: body.event.user,
-    p_payload_hash: createHash("sha256").update(rawBody).digest("hex"),
+    p_payload_hash: sha256(rawBody),
   })) as { receipt_id: string | null; duplicate: boolean } | null;
   if (!result) return null; // no active installation for that workspace: ignore
   return { receiptId: result.receipt_id, duplicate: result.duplicate };
@@ -279,7 +279,7 @@ export function slackInteraction(raw: string): SlackInteraction | null {
   } catch { return null; }
 }
 export async function recordSlackInteraction(p: SlackInteraction) {
-  const hash = createHash("sha256").update(JSON.stringify(p)).digest("hex");
+  const hash = sha256(JSON.stringify(p));
   return await unwrap(serviceClient().rpc("record_chat_callback_receipt", {
     p_provider: "slack", p_external_installation_id: p.team.id, p_external_user_id: p.user.id,
     p_callback_id: hash, p_callback_kind: p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id,
@@ -293,7 +293,7 @@ export async function consumeSlackInteraction(p: SlackInteraction) {
   const action = p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id;
   const token = p.type === "view_submission" ? p.view?.private_metadata : p.actions![0].value;
   // Invalid metadata cannot reach a UUID cast or an error message containing provider input.
-  const intent = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token ?? "") ? token ?? null : null;
+  const intent = isUuid(token) ? token : null;
   const values = p.view?.state?.values ?? {};
   const field = (name: string) => values[name]?.[name]?.selected_option?.value ?? values[name]?.[name]?.value ?? "";
   const input = action === "mgr_save_preferences" ? {

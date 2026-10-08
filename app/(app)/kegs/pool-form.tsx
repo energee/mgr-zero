@@ -12,14 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { dollarsInput } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 import { KEG_POOL_KINDS } from "@/lib/mgr/enums";
 import { KIND_LABEL } from "./keg-labels";
 
 type Kind = (typeof KEG_POOL_KINDS)[number];
 export type Pool = { id: string; name: string; kind: Kind; per_fill_cents: number | null; deposit_cents: number; active: boolean };
-
-const toCents = (s: string) => (s === "" ? undefined : Math.round(Number(s) * 100));
 
 export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string | null }; vendors: { id: string; name: string }[] }) {
   const [name, setName] = useState(pool?.name ?? "");

@@ -14,6 +14,7 @@ import { E } from "@/components/mgr/e";
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toCents } from "@/lib/mgr/money";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
   const [draft, setDraft] = useState(model);
@@ -23,7 +24,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
       ...(groupId ? { id: groupId } : {}),
       name: draft.name,
       position: Number(draft.position),
-      costCeilingCents: draft.costCeilingInput === "" ? undefined : Math.round(Number(draft.costCeilingInput) * 100),
+      costCeilingCents: toCents(draft.costCeilingInput),
     }),
     reset: () => setDraft(model),
   });

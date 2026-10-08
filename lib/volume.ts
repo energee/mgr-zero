@@ -20,6 +20,13 @@ export function saleVolume(qty: number, bblPerUnit: number | undefined) {
   return bblPerUnit === undefined ? "" : `${(qty * bblPerUnit).toFixed(2)} bbl`;
 }
 
+/** Two-decimal barrels, the TTB report precision ("2.00 bbl"). */
+export const bblFixed = (bbl: number) => `${Number(bbl).toFixed(2)} bbl`;
+
+/** Barrels as stored, up to `digits` fraction digits with thousands separators;
+ *  for variance, loss, and preview figures where a rounded glyph would hide the value. */
+export const bblExact = (bbl: number, digits: number) => `${Number(bbl).toLocaleString("en-US", { maximumFractionDigits: digits })} bbl`;
+
 /** Keg fractions shown as glyphs, by denominator. */
 const FRACTIONS = [[2, "½"], [4, "¼"], [6, "⅙"], [8, "⅛"]] as const;
 const closeTo = (value: number, target: number) => Math.abs(value - target) < 0.0001;

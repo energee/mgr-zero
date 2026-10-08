@@ -5,6 +5,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { poLineCounts } from "@/lib/mgr/new-po-view";
+import { toCents } from "@/lib/mgr/money";
 
 type Vendor = { id: string; name: string };
 type Material = { id: string; name: string; purchase_uom: string; lot_tracked: boolean };
@@ -26,7 +27,7 @@ export function NewPoForm({ vendors, materials }: { vendors: Vendor[]; materials
       vendorId, expectedOn: expectedOn || undefined,
       lines: lines.map(line => ({
         materialId: line.materialId, qtyOrdered: Number(line.qty),
-        unitCostCents: line.cost === "" ? undefined : Math.round(Number(line.cost) * 100),
+        unitCostCents: toCents(line.cost),
         expectedLotCode: line.lot.trim() || undefined,
       })),
     }, () => router.push("/purchase-orders"));
