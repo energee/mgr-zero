@@ -17,21 +17,21 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const { location, sku } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const shortfalls = await runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Shortfall[];
   // list_locations filters by use in Postgres, so ask it for the two subsets
   // this page draws rather than reading every location and discarding most of
   // them here. A standing allocation's `ref` is a taproom, so the two subsets
   // together still name every location a reservation points at.
-  const [taprooms, warehouses] = await Promise.all([
+  const [shortfalls, taprooms, warehouses, skus] = await Promise.all([
+    runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Promise<Shortfall[]>,
     runCommand("list_locations", { use: "taproom" }, ctx) as Promise<LocationRow[]>,
     runCommand("list_locations", { use: "warehouse" }, ctx) as Promise<LocationRow[]>,
+    runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
   ]);
   const locationRows = [...taprooms, ...warehouses];
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   // A location can be both warehouse and taproom; it is never its own source (#454).
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
-  const [skus, allocations, suggestions] = await Promise.all([
-    runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
+  const [allocations, suggestions] = await Promise.all([
     toLocationId ? runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as Promise<{ id: string; sku_id: string; qty: number; skus: { name: string } | null }[]> : Promise.resolve([]),
     toLocationId ? runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx) as Promise<Suggestion[]> : Promise.resolve([]),
   ]);

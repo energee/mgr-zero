@@ -102,7 +102,7 @@ defineQuery({
     const [today, pos, routes] = await Promise.all([
       runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
       canRun(ctx, "list_purchase_orders") ? runCommand("list_purchase_orders", {}, ctx) as Promise<{ id: string; po_no: number; status: string; expected_on: string | null; vendor_name: string | null }[]> : [],
-      canRun(ctx, "list_routes") ? runCommand("list_routes", {}, ctx) as Promise<{ routes: { id: string; name: string | null; delivery_date: string; departed_at: string | null; stops: unknown[] }[] }> : { routes: [] },
+      canRun(ctx, "list_routes") ? runCommand("list_routes", { routesOnly: true }, ctx) as Promise<{ routes: { id: string; name: string | null; delivery_date: string; departed_at: string | null; stops: unknown[] }[] }> : { routes: [] },
     ]);
     const rows: WorkRow[] = [
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),

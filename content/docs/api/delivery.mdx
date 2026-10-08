@@ -109,12 +109,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, sales
 
-Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive
+Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive; routesOnly returns just the routes
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `id` | uuid | no |
 | `date` | date (YYYY-MM-DD) | no |
+| `routesOnly` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

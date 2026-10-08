@@ -23,13 +23,15 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <WeeklyCountView model={{ backHref: "/beer", locations: [], location: "", role: brewery.role as "admin" | "warehouse" | "taproom", lotLabels: {}, history: [], timeZone: brewery.timeZone }} />;
 
-  const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: location.id }, ctx) as TaproomCountSnapshot;
-  const [printLabels, projection, history] = await Promise.all([
-    runCommand("get_taproom_print_labels", { locationId: location.id, revision: snapshot.revision }, ctx) as Promise<PrintLabel[]>,
+  // Only the print labels need the snapshot's revision; the other reads go alongside it.
+  const [{ snapshot, printLabels }, projection, history, receipt] = await Promise.all([
+    (runCommand("get_taproom_count_snapshot", { locationId: location.id }, ctx) as Promise<TaproomCountSnapshot>).then(async snapshot => ({
+      snapshot, printLabels: await runCommand("get_taproom_print_labels", { locationId: location.id, revision: snapshot.revision }, ctx) as PrintLabel[],
+    })),
     runCommand("get_taproom_draft_projection", { locationId: location.id }, ctx) as Promise<DraftProjection>,
     runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<CountHeader[]>,
+    selected.count ? runCommand("get_taproom_count", { countId: selected.count }, ctx) as Promise<Receipt> : null,
   ]);
-  const receipt = selected.count ? await runCommand("get_taproom_count", { countId: selected.count }, ctx) as Receipt : null;
   const shownReceipt = receipt?.location_id === location.id ? receipt : null;
   const lotLabels = Object.fromEntries(printLabels.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.sku_id, row.lot_id), row.lot_code!]));
 

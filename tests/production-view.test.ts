@@ -276,6 +276,7 @@ describe("cellar readings (#700)", () => {
   it("the cellar page asks list_batches for readings instead of one call per occupancy", () => {
     const page = readFileSync("app/(app)/cellar/page.tsx", "utf8");
     expect(page).not.toContain("list_fermentation_readings");
-    expect(page).toContain('runCommand("list_batches", { readings: true }, ctx)');
+    // #759: and only the open batches, so the row cap is never spent on finished ones.
+    expect(page).toContain('runCommand("list_batches", { readings: true, open: true }, ctx)');
   });
 });

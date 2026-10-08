@@ -31,6 +31,16 @@ describe("complete finished-goods reads", () => {
     expect(await runCommand("list_skus", { active: false }, ctx)).toHaveLength(1_001);
     expect(await runCommand("list_skus", {}, ctx)).toHaveLength(1_002);
   });
+  // #759: the tap board offers only active keg SKUs; it used to read every SKU and filter.
+  it("keeps only SKUs whose format packages that type when packageType is supplied", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const keg = await seedCatalog(brewery.id, { product: "Keg brand", sku: "Half keg", packageType: "keg", bblPerUnit: 0.5 });
+    const can = await seedCatalog(brewery.id, { product: "Can brand", sku: "Case", packageType: "can" });
+    const kegs = await runCommand("list_skus", { packageType: "keg", active: true }, ctx) as { id: string; formats: { package_type: string } }[];
+    expect(kegs.map(sku => sku.id)).toEqual([keg.skuId]);
+    expect((await runCommand("list_skus", {}, ctx) as { id: string }[]).map(sku => sku.id).sort()).toEqual([keg.skuId, can.skuId].sort());
+  });
   it("assembles every owned stock row beyond the PostgREST row cap", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");

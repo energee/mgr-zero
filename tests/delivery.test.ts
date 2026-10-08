@@ -99,6 +99,13 @@ describe("save_route and list_routes", () => {
     // an empty date lists nothing; no date lists every route that has not returned
     expect((await runCommand("list_routes", { date: "2030-01-01" }, warehouse) as { routes: unknown[] }).routes).toEqual([]);
 
+    // #759: Work needs only the routes; routesOnly skips the unrouted documents and drivers.
+    const routesOnly = await runCommand("list_routes", { date: "2026-09-11", routesOnly: true }, warehouse) as typeof listed;
+    expect(routesOnly.routes.map((r) => r.id)).toEqual(listed.routes.map((r) => r.id));
+    expect(routesOnly.routes.find((r) => r.id === saved.routeId)!.stops).toHaveLength(3);
+    expect(routesOnly.unassigned).toEqual([]);
+    expect(routesOnly.drivers).toEqual([]);
+
     // re-saving replaces the stops: drop stop 3 and it becomes unassigned again
     await runCommand("save_route", {
       id: saved.routeId, name: "Route A", deliveryDate: "2026-09-11", driverUserId: warehouse.userId,
