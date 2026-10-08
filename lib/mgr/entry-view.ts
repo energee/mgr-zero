@@ -5,6 +5,8 @@ export type EntryViewModel = {
   field?: { label: string; value: string };
   primary: string;
   secondary?: string;
+  /** The secondary sign-in action requires only the email field. */
+  secondaryEmailOnly?: boolean;
   link?: { label: string; to: string };
   info?: string;
   note?: string;

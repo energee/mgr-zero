@@ -1,4 +1,6 @@
-// components/mgr/views/entry.tsx — shared sign-in / reset / set-password body.
+// components/mgr/views/entry.tsx — shared entry forms own email-only secondary validation.
+"use client";
+
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ export function EntryView({
   hidden?: ReactNode;
   defaults?: Record<string, string | undefined>;
 }) {
+  const emailLink = model.secondaryEmailOnly;
   const fields = model.inputs.map(label => {
     const password = label.toLowerCase().includes("password");
     const name = label === "Email" ? "email" : label === "Your name" ? "name" : "password";
@@ -39,7 +42,7 @@ export function EntryView({
   });
   const primary = primaryHref === null ? null : primaryHref ? (
     <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>
-  ) : <Button type={action ? "submit" : "button"}>{model.primary}</Button>;
+  ) : <Button type={action || emailLink ? "submit" : "button"}>{model.primary}</Button>;
   const controls = (
     <FieldGroup>
       {hidden}
@@ -47,8 +50,12 @@ export function EntryView({
       {primary ? <Field>{primary}</Field> : null}
       {model.secondary ? (
         <Field>
-          {secondaryHref ? <Button variant="outline" asChild><Link href={secondaryHref}>{model.secondary}</Link></Button> : secondaryAction
-            ? <Button type="submit" formAction={secondaryAction} variant="outline">{model.secondary}</Button>
+          {secondaryHref ? <Button variant="outline" asChild><Link href={secondaryHref}>{model.secondary}</Link></Button> : secondaryAction || emailLink
+            ? <Button type="submit" formAction={secondaryAction} formNoValidate={emailLink} onClick={emailLink ? (event) => {
+              // The passwordless action validates email, not the required password.
+              const email = event.currentTarget.form?.elements.namedItem("email") as HTMLInputElement;
+              if (!email.reportValidity()) event.preventDefault();
+            } : undefined} variant="outline">{model.secondary}</Button>
             : E.btn(model.secondary, "g")}
         </Field>
       ) : null}
@@ -61,7 +68,8 @@ export function EntryView({
       {E.ttl(model.title)}
       {model.note ? E.note(model.note) : null}
       {model.field ? E.fld(model.field.label, model.field.value) : null}
-      {action ? <form action={action}>{controls}</form> : controls}
+      {/* A local fixture action prevents native GET submission before hydration too. */}
+      {action || emailLink ? <form action={action ?? (() => {})} onSubmit={action ? undefined : (event) => event.preventDefault()}>{controls}</form> : controls}
       {model.extraPrimary ? extraAction ? <form action={extraAction}><Button type="submit" variant="outline">{model.extraPrimary}</Button></form> : E.btn(model.extraPrimary, "g") : null}
       {model.link ? linkHref
         ? <Link href={linkHref} className="text-sm underline">{model.link.label}</Link>
