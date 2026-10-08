@@ -23,7 +23,9 @@ export function classifyCommandFailure(error: unknown): CommandFailureDetail {
   const value = error as { message?: unknown; status?: unknown; code?: unknown } | null;
   const status = typeof value?.status === "number" ? value.status : undefined;
   const code = typeof value?.code === "string" ? value.code : undefined;
-  const message = error instanceof Error ? error.message : "command failed";
+  // A rejection that is not an Error (a thrown string or bare object) has no
+  // safe text of its own; show customer copy, never the internal command name (#762).
+  const message = error instanceof Error ? error.message : "The request did not finish. Try again.";
   const definitive = status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
   return { message, kind: definitive ? "definitive" : "unknown", ...(status === undefined ? {} : { status }), ...(code ? { code } : {}) };
 }
