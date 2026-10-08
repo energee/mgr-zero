@@ -4,9 +4,9 @@
 // (a) every table whose policy predicate filters on brewery_id must have an index
 // whose first column is brewery_id, otherwise each RLS check is a sequential scan;
 // (b) auth.uid() inside a policy must be wrapped as (select auth.uid()) so Postgres
-// evaluates it once per statement (initPlan) instead of once per row.
-// (c) the hot lookups #757 found as sequential scans each have an index leading
-// with their columns, and no two indexes duplicate each other.
+// evaluates it once per statement (initPlan) instead of once per row;
+// (c) #757: named hot lookups each have an index leading with their columns,
+// and no two indexes have the same definition.
 import { describe, it, expect } from "vitest";
 import { sql } from "./helpers";
 
@@ -17,50 +17,46 @@ const POLICY_EXPRS = `
   from pg_policy p join pg_class c on c.oid = p.polrelid
   where c.relnamespace = 'public'::regnamespace`;
 
-// Leading columns of every public index, comma-joined, labelled by table:
-// "keg_events (brewery_id,at,created_at,id)". Expressions print as nothing.
-const INDEX_PREFIXES = `
-  select c.relname || ' (' || string_agg(a.attname, ',' order by k.ord) || ')'
+// Columns of every public index on plain columns, each followed by a comma and
+// labelled by table: "keg_events:brewery_id,at,created_at,id,". A trailing
+// comma makes a prefix test exact: "orders:ship_to_id," never matches ship_to_ids.
+const INDEX_COLUMNS = `
+  select c.relname || ':' || string_agg(a.attname || ',', '' order by k.ord)
   from pg_index i
   join pg_class c on c.oid = i.indrelid
   cross join lateral unnest(i.indkey) with ordinality k(attnum, ord)
   join pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
-  where c.relnamespace = 'public'::regnamespace
+  where c.relnamespace = 'public'::regnamespace and 0 <> all(i.indkey)
   group by i.indexrelid, c.relname`;
 
-// Lookups an index must lead with (#757): membership by user for
-// my_brewery_ids()/my_customer_ids() in every RLS check, keg history paged by
-// time, delete_bin's "bin has stock" probes, and delete_customer's ship-to
-// foreign-key check on orders.
+// Lookups #757 found as sequential scans; the migration
+// 20261008150000_hot_lookup_indexes.sql names the caller of each.
 const HOT_LOOKUPS = [
-  "brewery_users (user_id)",
-  "customer_users (user_id)",
-  "keg_events (brewery_id,at,created_at,id)",
-  "inventory_movements (bin_id)",
-  "material_movements (bin_id)",
-  "keg_events (bin_id)",
-  "orders (ship_to_id)",
+  "brewery_users:user_id,",
+  "customer_users:user_id,",
+  "keg_events:brewery_id,at,created_at,id,",
+  "inventory_movements:bin_id,",
+  "material_movements:bin_id,",
+  "keg_events:bin_id,",
+  "orders:ship_to_id,",
 ];
 
 describe("RLS index and auth.uid() rules", () => {
   it("every hot lookup has an index leading with its columns", () => {
-    const indexes = sql(INDEX_PREFIXES);
-    // An index on (a,b,c) also serves a lookup on (a,b): match on the prefix.
-    const leads = (have: string, want: string) => have === want || have.startsWith(want.slice(0, -1) + ",");
-    const missing = HOT_LOOKUPS.filter((want) => !indexes.some((have) => leads(have, want)));
+    const indexes = sql(INDEX_COLUMNS);
+    const missing = HOT_LOOKUPS.filter((want) => !indexes.some((have) => have.startsWith(want)));
     expect(missing).toEqual([]);
   });
 
-  it("no two indexes on a table share the same columns, predicate and expressions", () => {
+  it("no two indexes on a table have the same definition", () => {
+    // A unique index serves the same reads as a plain one, so UNIQUE and the
+    // name are stripped before comparing.
     const duplicates = sql(`
-      select a.indexrelid::regclass || ' = ' || b.indexrelid::regclass
-      from pg_index a
-      join pg_index b on b.indrelid = a.indrelid and a.indexrelid < b.indexrelid
-        and a.indkey::text = b.indkey::text and a.indclass::text = b.indclass::text
-        and coalesce(pg_get_expr(a.indpred, a.indrelid), '') = coalesce(pg_get_expr(b.indpred, b.indrelid), '')
-        and coalesce(pg_get_expr(a.indexprs, a.indrelid), '') = coalesce(pg_get_expr(b.indexprs, b.indrelid), '')
-      join pg_class c on c.oid = a.indrelid
+      select string_agg(i.indexrelid::regclass::text, ' = ' order by i.indexrelid::regclass::text)
+      from pg_index i join pg_class c on c.oid = i.indrelid
       where c.relnamespace = 'public'::regnamespace
+      group by regexp_replace(pg_get_indexdef(i.indexrelid), '^CREATE (UNIQUE )?INDEX \\S+ ', '')
+      having count(*) > 1
       order by 1`);
     expect(duplicates).toEqual([]);
   });
