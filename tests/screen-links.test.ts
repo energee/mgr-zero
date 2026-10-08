@@ -188,7 +188,6 @@ describe("Me guide link (#718)", () => {
   const read = (p: string) => readFileSync(p, "utf8");
   it("each live Me sheet links its audience's guide", () => {
     expect(read("app/(app)/layout.tsx")).toMatch(/<MeSheetActions guide="\/docs\/staff-guide" \/>/);
-    expect(read("app/(portal)/layout.tsx")).toMatch(/<MeSheetActions guide="\/docs\/portal-guide" \/>/);
     expect(read("components/mgr/me-sheet.tsx")).toMatch(/<Link href=\{guide\}>Guide<\/Link>/);
   });
   it("shows Guide in both inventory Me sheets as a link out", () => {

@@ -1,7 +1,8 @@
 // components/mgr/me-sheet.tsx — the header "Me" control (plan §3; screen
 // records Me and Portal Me): who I am, which brewery, change password, sign
-// out, and a Guide link to the audience's customer guide. Uses the same centered dialog at every viewport. Its children are the
-// shared staff or portal view; live layouts supply data and actions.
+// out, and a Guide link to the audience's customer guide. Uses the same
+// centered dialog at every viewport. Its children are the shared staff or
+// portal view; live layouts supply data and actions.
 // `avatar` swaps the UserCircle icon for the person: their photo, or their
 // initials when `src` is omitted. The schema has no avatar column, so the app
 // passes nothing and only the design inventory (screen-frame.tsx, which owns
@@ -38,8 +39,8 @@ export function MeSheet({ avatar, children, open, onOpenChange }: {
   );
 }
 
-/** `guide` is the docs route for this audience: /docs/staff-guide or /docs/portal-guide. */
-export function MeSheetActions({ guide }: { guide: string }) {
+/** `guide` is the customer guide for this audience. */
+export function MeSheetActions({ guide }: { guide: "/docs/staff-guide" | "/docs/portal-guide" }) {
   return (
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide}>Guide</Link></Button>
