@@ -51,7 +51,7 @@ export default async function TodayPage() {
   const canMove = canRun(ctx, "record_movement");
   return (
     <TodayView
-      model={toTodayViewProps({ date, items, emptyVerb: canMove ? "Record movement" : "" })}
+      model={toTodayViewProps({ date, items, timeZone: brewery.timeZone, emptyVerb: canMove ? "Record movement" : "" })}
       emptyAction={canMove ? E.btn("Record movement", "g", "/inventory?recordMovement=1") : null}
       linkRows
     />
