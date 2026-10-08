@@ -144,6 +144,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    else console.error("qbo_payment_refresh_failed", error);
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -166,14 +167,16 @@ export async function resolvePortalInvoicePayment(
     claim = next;
     refreshed = true;
   }
-  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
-  if (read && !read.ok && read.status === 401 && !refreshed) {
+  // A thrown read (network, invalid response) reaches the Pay route, which
+  // logs it and shows the buyer Payment unavailable.
+  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
+  if (!read.ok && read.status === 401 && !refreshed) {
     const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
     if (!next) return { kind: "unavailable", reason: "provider_unavailable" };
     claim = next;
-    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
+    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
   }
-  if (!read || !read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
+  if (!read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
   const url = read.invoiceLink ? validateQboPaymentUrl(read.invoiceLink, allowedHosts) : null;
   if (!url) return { kind: "unavailable", reason: "link_unavailable" };
   if (!await confirmPortalInvoicePayment(ctx, invoiceId, claim)) {
