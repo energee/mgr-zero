@@ -104,7 +104,6 @@ const AUTHENTICATED_RPCS = [
   "my_customer_ids()",
   "portal_availability(uuid)",
   "portal_brewery_rows()",
-  "my_invoice_ids()",
   "portal_invoice_rows()",
   "portal_keg_deposit_rows()",
   "portal_order_event_rows()",

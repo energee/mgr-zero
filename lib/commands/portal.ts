@@ -22,9 +22,7 @@ const quoteInput = z.object({
 });
 type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: string): Promise<number> };
 
-// Buyer invoice columns every portal invoice read needs. Customers read
-// invoices, order events and shipments only through the portal_* views (#754):
-// the base tables hold QuickBooks sync bookkeeping and staff attribution.
+// Buyer invoice columns every portal invoice read needs (portal_invoices, #754).
 const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at";
 
 function requireCustomer(ctx: Ctx): string {
@@ -172,9 +170,9 @@ defineQuery({
       unwrap(ctx.db.from("portal_order_events").select("id, event, created_at").eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("portal_shipments").select("id, invoice_timing").eq("order_id", i.orderId).maybeSingle()),
     ]);
-    // A view has no foreign key to embed through, so the shipment's invoice is a
-    // second read; invoices.shipment_id is unique, hence limit(1).
-    const invoices = shipment ? await unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, invoice_lines`).eq("shipment_id", shipment.id!).limit(1)) : [];
+    // A view has no foreign key to embed through, so the shipment's invoice
+    // (at most one: invoices.shipment_id is unique) is a second read.
+    const invoices = shipment ? await unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, invoice_lines`).eq("shipment_id", shipment.id!)) : [];
     return { order, lines: ln, events, shipment: shipment && { ...shipment, invoices } };
   },
 });
@@ -227,9 +225,8 @@ defineQuery({
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
-    const [invoice, lines, brewery] = await Promise.all([
-      unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, qbo_accountant_drift`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
-      unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
+    const [{ invoice_lines: lines, ...invoice }, brewery] = await Promise.all([
+      unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, qbo_accountant_drift, invoice_lines`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
     const localTotal = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);

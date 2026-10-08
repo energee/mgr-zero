@@ -125,15 +125,15 @@ describe("schema rules", () => {
     `)).toEqual(["security_invoker=true"]);
   });
 
-  it("pins buyer reads of invoices, order events, shipments and deliveries to portal projections (#754)", () => {
+  it("pins buyer reads of invoices, invoice lines, order events, shipments and deliveries to portal projections (#754)", () => {
     // Same reason as portal_brewery: a customer policy on the base table would
     // expose every column, since staff and customers share the table grant.
     expect(sql(`
       select c.relname || ':' || p.polname from pg_policy p join pg_class c on c.oid = p.polrelid
-      where c.oid in ('public.invoices'::regclass, 'public.order_events'::regclass,
+      where c.oid in ('public.invoices'::regclass, 'public.invoice_lines'::regclass, 'public.order_events'::regclass,
                       'public.shipments'::regclass, 'public.deliveries'::regclass)
       order by 1
-    `)).toEqual(["deliveries:staff_read", "invoices:staff_read", "order_events:staff_read", "shipments:staff_read"]);
+    `)).toEqual(["deliveries:staff_read", "invoice_lines:staff_read", "invoices:staff_read", "order_events:staff_read", "shipments:staff_read"]);
     const columns = (view: string) => sql(`
       select string_agg(attname, ',' order by attnum) from pg_attribute
       where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];

@@ -1,5 +1,5 @@
 // tests/rls-portal-columns.test.ts — #754: a portal customer reads only buyer
-// columns of invoices, order_events, shipments and deliveries. Staff and
+// columns of invoices, invoice_lines, order_events, shipments and deliveries. Staff and
 // customers share the `authenticated` table grant, so the customer path is a
 // portal_* projection with no customer policy on the base table (the
 // portal_brewery pattern, iron rule 3).
@@ -13,7 +13,7 @@ const HIDDEN_INVOICE_COLUMNS = ["qbo_sync_error", "qbo_sync_token", "qbo_idempot
 
 let customerDb: Awaited<ReturnType<typeof asUser>>;
 let staffDb: Awaited<ReturnType<typeof asUser>>;
-let invoiceId: string, orderId: string, shipmentId: string, deliveryId: string, foreignInvoiceId: string;
+let invoiceId: string, invoiceLineId: string, orderId: string, shipmentId: string, deliveryId: string, foreignInvoiceId: string;
 let custCtx: { db: typeof customerDb; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
@@ -33,6 +33,7 @@ beforeAll(async () => {
   const route = await ins("routes", { brewery_id: b.id, delivery_date: "2026-10-08" });
   deliveryId = (await ins("deliveries", { brewery_id: b.id, route_id: route.id, shipment_id: shipmentId, stop_no: 1, note: "driver-only note" })).id;
   invoiceId = (await ins("invoices", { brewery_id: b.id, customer_id: mine.customerId, shipment_id: shipmentId, kind: "invoice" })).id;
+  invoiceLineId = (await ins("invoice_lines", { brewery_id: b.id, invoice_id: invoiceId, kind: "adjustment", description: "Delivery fee", qty: 1, unit_price_cents: 500 })).id;
   const { error } = await admin.from("invoices").update({
     qbo_sync_error: "QBO 400: internal stack", written_off_at: new Date().toISOString(), written_off_reason: "bad debt", written_off_by: staff.userId,
   }).eq("id", invoiceId);
@@ -45,7 +46,7 @@ beforeAll(async () => {
 
 describe("portal customers cannot read internal columns (#754)", () => {
   it("returns no base-table rows to a customer, so no column of them leaks", async () => {
-    for (const [table, key, id] of [["invoices", "id", invoiceId], ["order_events", "order_id", orderId], ["shipments", "id", shipmentId], ["deliveries", "id", deliveryId]] as const) {
+    for (const [table, key, id] of [["invoices", "id", invoiceId], ["invoice_lines", "id", invoiceLineId], ["order_events", "order_id", orderId], ["shipments", "id", shipmentId], ["deliveries", "id", deliveryId]] as const) {
       const { data, error } = await rawDatabase(customerDb).from(table).select("*").eq(key, id);
       expect(error, table).toBeNull();
       expect(data, table).toEqual([]);
@@ -81,6 +82,9 @@ describe("portal customers cannot read internal columns (#754)", () => {
     expect(detail.events[0]).not.toHaveProperty("actor");
     expect(detail.shipment.id).toBe(shipmentId);
     expect(detail.shipment.invoices.map((i) => i.id)).toEqual([invoiceId]);
+    const one = await runCommand("portal_invoice", { invoiceId }, custCtx) as { invoice: Record<string, unknown>; lines: Record<string, unknown>[] };
+    expect(one.invoice).not.toHaveProperty("invoice_lines");
+    expect(one.lines).toEqual([{ id: invoiceLineId, kind: "adjustment", description: "Delivery fee", qty: 1, amount_cents: 500, skus: null }]);
   });
 
   it("staff still read every column of the base tables", async () => {
