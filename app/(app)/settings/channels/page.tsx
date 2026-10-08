@@ -42,7 +42,7 @@ export default async function ChannelsPage() {
         return (
           <span className="flex items-center gap-2">
             {canEdit && <ChannelForm channel={{ id: c.id, name: c.name, taxTreatment: c.tax_treatment }} />}
-            {canDelete && <DeleteChannelButton channelId={c.id} />}
+            {canDelete && <DeleteChannelButton channelId={c.id} name={c.name} />}
           </span>
         );
       }}

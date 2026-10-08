@@ -4,13 +4,14 @@
 // the same adapter, so the dialog reads the same whether the row exists yet. Delete calls
 // delete_price_group and shows its refusal ("price group is in use") inline,
 // the way delete-channel-button.tsx does. An existing group also adds pours
-// (PourForm) and removes them (delete_format) in the same error slot.
+// (PourForm) and removes them (delete_format) in the same error slot. Both
+// removals confirm in the shared sheet first (#760).
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { E } from "@/components/mgr/e";
+import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -45,11 +46,17 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
-          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id }); }, form.busy)}
+          renderPour={(pour) => <ConfirmDeleteControl title={`Remove ${pour.name}`} triggerLabel="Remove" size="sm" busy={form.busy} error={form.error} busyLabel="Removing…"
+            name={<>Remove the <strong>{pour.name}</strong> pour from {model.name}?</>}
+            warning="Refused while its price cells are filled, or while a Square mapping, menu line or recorded sale uses it."
+            onDelete={() => form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id })} />}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (
-              <Button type="button" variant="ghost" disabled={form.busy} onClick={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })}>Delete</Button>
+              <ConfirmDeleteControl title={`Delete ${model.name}`} triggerLabel="Delete" busy={form.busy} error={form.error}
+                name={<>Delete the <strong>{model.name}</strong> price group? This cannot be undone.</>}
+                warning="A group a brand sits on, a pour belongs to, or a cell is filled for cannot be deleted."
+                onDelete={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })} />
             )}
             <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price group"}</Button>
           </CommandFormFooter>}
