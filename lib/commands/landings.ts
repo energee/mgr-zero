@@ -103,10 +103,12 @@ defineQuery({
     const [today, pos, routes] = await Promise.all([
       runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
       canRun(ctx, "list_purchase_orders") ? runCommand("list_purchase_orders", {}, ctx) as Promise<{ id: string; po_no: number; status: string; expected_on: string | null; vendor_name: string | null }[]> : [],
-      // Open routes with a stop count: Work never shows the stops, so it does not read them (#759).
+      // The open routes list_routes lists (gated by its roles), with a stop count: Work never shows the
+      // stops, so it does not read them (#759). Ordered like list_routes so same-day routes keep their order.
       canRun(ctx, "list_routes") ? completeRows("Open routes", (start) => ctx.db.from("routes")
         .select("id, name, delivery_date, departed_at, deliveries(count)", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).is("returned_at", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<OpenRoute[]> : [],
+        .eq("brewery_id", ctx.breweryId).is("returned_at", null)
+        .order("delivery_date").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<OpenRoute[]> : [],
     ]);
     const rows: WorkRow[] = [
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
