@@ -8,10 +8,12 @@ import type { PickViewModel } from "@/lib/mgr/pick-view";
 
 export type { PickViewModel };
 
-export function PickView({ model, footer, quantities, onQuantity, onShort, onPrint, messages, submitting = false }: {
+export function PickView({ model, footer, quantities, onQuantity, onShort, onPrint, messages, submitting = false, disabled = false }: {
   model: PickViewModel; footer?: ReactNode; quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void; onShort?: (key: string) => void;
   onPrint?: () => void; messages?: ReactNode; submitting?: boolean;
+  /** A validation/restore gate disables saving without claiming an in-flight command. */
+  disabled?: boolean;
 }) {
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
@@ -25,6 +27,6 @@ export function PickView({ model, footer, quantities, onQuantity, onShort, onPri
     <Button type="button" variant="ghost" onClick={onPrint}>Print pick sheet</Button>
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting}>{submitting ? "Saving…" : "Done picking"}</Button>}
+    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Done picking"}</Button>}
   </>;
 }
