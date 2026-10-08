@@ -96,3 +96,16 @@ describe("guide URLs", () => {
     });
   });
 });
+
+// #719: New Order's SKU field is OrderSkuPicker, which filters the supplied
+// options locally; it keeps no recent choices and no search cache. The guide
+// must not promise the header Search's recents for it.
+describe("New Order SKU picker guide", () => {
+  it("describes local filtering, not recent choices or cached searches", () => {
+    const view = read("components/mgr/views/new-order.tsx");
+    expect(view).not.toContain("SearchPalette");
+    const para = read("content/docs/staff-guide.mdx").split("\n").find((line) => line.startsWith("SKU fields in **New Order**"));
+    expect(para).toBeDefined();
+    expect(para).not.toMatch(/recent|cached/i);
+  });
+});
