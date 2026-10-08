@@ -19,6 +19,8 @@ begin
   return new;
 end $$;
 
+revoke all on function private.track_qbo_settled_at() from public, anon, authenticated, service_role;
+
 create trigger invoices_track_qbo_settled_at before update of qbo_remote_state, qbo_balance_cents, paid_at
   on public.invoices for each row execute function private.track_qbo_settled_at();
 
