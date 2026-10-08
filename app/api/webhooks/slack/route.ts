@@ -15,6 +15,12 @@ export async function POST(request: Request) {
   const raw = await request.clone().text();
   const interaction = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ? slackInteraction(raw) : null;
   const retry = () => new Response("receipt unavailable", { status: 503, headers: { "retry-after": "5" } });
+  // A failed receipt is safe to drop here only because Slack retries the 503;
+  // the log keeps the cause, which the retry alone would hide.
+  const failed = (error: unknown) => {
+    console.error("slack webhook receipt failed:", error instanceof Error ? error.message : String(error));
+    return retry();
+  };
   if (interaction) {
     if (!validSlackSignature(request, raw)) return new Response("Invalid signature", { status: 401 });
     try {
@@ -27,10 +33,10 @@ export async function POST(request: Request) {
       // indication that no action committed; request a provider retry.
       const finished = await recordSlackInteraction(interaction);
       return finished?.disposition === "pending" || finished?.disposition === "processing" ? retry() : response;
-    } catch { return retry(); }
+    } catch (error) { return failed(error); }
   }
   if (!validSlackSignature(request, raw)) return new Response("Invalid signature", { status: 401 });
-  try { await recordSlackCallback(raw); } catch { return retry(); }
+  try { await recordSlackCallback(raw); } catch (error) { return failed(error); }
   const response = await chat().webhooks.slack(request, { waitUntil });
   return response;
 }
