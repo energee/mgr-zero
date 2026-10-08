@@ -17,7 +17,7 @@ const POLICY_EXPRS = `
   from pg_policy p join pg_class c on c.oid = p.polrelid
   where c.relnamespace = 'public'::regnamespace`;
 
-// Columns of every public index on plain columns, each followed by a comma and
+// Columns of every full (not partial) public index on plain columns, each followed by a comma and
 // labelled by table: "keg_events:brewery_id,at,created_at,id,". A trailing
 // comma makes a prefix test exact: "orders:ship_to_id," never matches ship_to_ids.
 const INDEX_COLUMNS = `
@@ -26,7 +26,7 @@ const INDEX_COLUMNS = `
   join pg_class c on c.oid = i.indrelid
   cross join lateral unnest(i.indkey) with ordinality k(attnum, ord)
   join pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
-  where c.relnamespace = 'public'::regnamespace and 0 <> all(i.indkey)
+  where c.relnamespace = 'public'::regnamespace and 0 <> all(i.indkey) and i.indpred is null
   group by i.indexrelid, c.relname`;
 
 // Lookups #757 found as sequential scans; the migration

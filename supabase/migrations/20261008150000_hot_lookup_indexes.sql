@@ -13,7 +13,10 @@ create index if not exists customer_users_user_idx on customer_users (user_id, c
 create index if not exists keg_events_at_idx on keg_events (brewery_id, at, created_at, id);
 
 -- delete_bin probes each ledger for any row in the bin while it holds the bin
--- row lock. bin_id was only a trailing column of the on-hand indexes.
+-- row lock. bin_id was only a trailing column of the on-hand indexes. Other
+-- tables that reference bins (counts, transfers, receipts) are not indexed
+-- here: #757 named only the ledgers. No command deletes a location, so
+-- location_id needs no index for a delete.
 create index if not exists movements_bin_idx on inventory_movements (bin_id);
 create index if not exists material_movements_bin_idx on material_movements (bin_id);
 create index if not exists keg_events_bin_idx on keg_events (bin_id);
