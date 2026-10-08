@@ -99,6 +99,34 @@ describe("import_csv rows", () => {
     try { expect((await direct(ctx.db)).error?.code).toBe("42501"); }
     finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
   });
+  // #758: rows run concurrently, but rows sharing an import key keep file order,
+  // so the first of two same-name customers still wins and outcomes stay in row order.
+  it("runs independent rows concurrently and keeps file order within a key (#758)", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const rows = [
+      { name: `Dup ${tag}`, type: "retailer", state: "PA", saleChannelId: channel, licenseNumber: "FIRST" },
+      ...Array.from({ length: 60 }, (_, i) => ({ name: `Bulk ${tag} ${i}`, type: "retailer", state: "PA", saleChannelId: channel })),
+      { name: `Dup ${tag}`, type: "retailer", state: "PA", saleChannelId: channel, licenseNumber: "SECOND" },
+    ];
+    let inFlight = 0, peak = 0;
+    const rpc = ctx.db.rpc.bind(ctx.db);
+    const db = Object.assign(Object.create(ctx.db), {
+      rpc: (fn: string, args: object) => {
+        if (fn !== "import_csv_row") return rpc(fn as never, args as never);
+        inFlight++; peak = Math.max(peak, inFlight);
+        return Promise.resolve(rpc(fn as never, args as never)).finally(() => inFlight--);
+      },
+    });
+    const result = await runCommand("import_csv", { kind: "customers", rows }, { ...ctx, db },
+      { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() }) as { committed: number; blocked: number; outcomes: { row: number; status: string }[] };
+    expect(peak, "row RPCs ran concurrently").toBeGreaterThan(1);
+    expect(result.outcomes.map(o => o.row)).toEqual(rows.map((_, i) => i + 1));
+    expect(result.outcomes[0].status).toBe("committed");
+    expect(result.outcomes.at(-1)!.status).toBe("blocked");
+    expect(result.committed).toBe(61);
+    const { data } = await admin.from("customers").select("license_no").eq("brewery_id", ctx.breweryId).eq("name", `Dup ${tag}`);
+    expect(data).toEqual([{ license_no: "FIRST" }]);
+  });
   it("imports ship-tos and channel price cells and reports duplicate creates explicitly", async () => {
     const customer = await execute("customers", [{ name: "Ship customer", type: "retailer", state: "PA", saleChannelId: channel }]);
     const customerId = customer.outcomes[0].result!.id;

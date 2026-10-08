@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
-import { parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
+import { describe, expect, it } from "vitest";
+import { importRowKey, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
@@ -60,4 +60,16 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
   expect(source).toContain("String(model.previewRows?.[row.row - 1] ?? row.row)");
   expect(source).not.toMatch(/<select\b/);
   expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);
+});
+
+// #758: import_csv serializes rows that share a key, so they keep file order.
+describe("importRowKey", () => {
+  it("groups rows that can collide in the database", () => {
+    expect(importRowKey("customers", { name: " Acme " })).toBe(importRowKey("customers", { name: "Acme" }));
+    expect(importRowKey("customers", { name: "Acme" })).not.toBe(importRowKey("customers", { name: "Other" }));
+    expect(importRowKey("products_skus", { product: "IPA", formatId: "a" })).toBe(importRowKey("products_skus", { product: "IPA", formatId: "b" }));
+    expect(importRowKey("ship_tos", { customerId: "c1", label: "A" })).toBe(importRowKey("ship_tos", { customerId: "c1", label: "B" }));
+    expect(importRowKey("channel_prices", { saleChannelId: "s", priceGroupId: "g", formatId: "f" }))
+      .not.toBe(importRowKey("channel_prices", { saleChannelId: "s", priceGroupId: "g", formatId: "f2" }));
+  });
 });

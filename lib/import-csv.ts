@@ -16,6 +16,20 @@ export type ImportLookups = Record<string, { id: string; name: string; location_
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
+/** Rows that can collide in the database share a key, so import_csv runs them in
+ *  file order (the first of two same-name customers wins); rows with different
+ *  keys run concurrently. Coarse is safe: a shared key only serializes. */
+export function importRowKey(kind: ImportKind, row: Record<string, string>): string {
+  const v = (f: string) => row[f]?.trim() ?? "";
+  switch (kind) {
+    case "customers": return v("name");
+    case "ship_tos": return v("customerId");
+    case "products_skus": return v("product");
+    case "channel_prices": return [v("saleChannelId"), v("priceGroupId"), v("formatId")].join(":");
+    case "opening_balances": return [v("skuId"), v("locationId"), v("binId")].join(":");
+  }
+}
+
 // The opening qty: record_inventory_movement refuses qty <> round(qty, 2), the same
 // rule the order commands state as multipleOf(0.01), so trailing zeros pass and a
 // third significant decimal does not.
