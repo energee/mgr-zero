@@ -25,8 +25,10 @@ export function BrandApprovalView({ model, controls = {}, messages, footer }: {
       {E.fld("Brand", model.brand)}
       <RegistrySelect label="Approval" value={model.kind} options={model.kindOptions} onChange={controls.kind} />
       <RegistryInput label={approvalNumberLabel(model.kind)} value={model.number ?? ""} onChange={controls.number} required />
-      {cola && <RegistryInput label="Serial number · optional" value={model.serialNumber ?? ""} onChange={controls.serialNumber} />}
-      {cola && colaLink(model.number ?? "")}
+      {cola && <>
+        <RegistryInput label="Serial number · optional" value={model.serialNumber ?? ""} onChange={controls.serialNumber} />
+        {colaLink(model.number ?? "")}
+      </>}
       <RegistryDate label="Date submitted · optional" value={model.submittedOn ?? ""} onChange={controls.submittedOn} />
       {messages}
       {footer !== undefined ? footer : E.btn("Save approval")}
