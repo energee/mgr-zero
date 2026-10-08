@@ -14,9 +14,11 @@ import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/histor
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
-export function OrdersClient({ role, status, customerId, cursor }: { role: StaffRole; status?: string; customerId?: string; cursor?: string }) {
+export function OrdersClient({ role, status, customerId, customerName, cursor }: { role: StaffRole; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
+  // get_customer can fail (a stale or malformed link); say so rather than invent a name.
+  const customer = customerId ? customerName ?? page.rows[0]?.customers?.name ?? "Customer unavailable" : undefined;
   const canWrite = hasRole(salesRoles, role); // create_order's roles
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
@@ -26,7 +28,7 @@ export function OrdersClient({ role, status, customerId, cursor }: { role: Staff
   };
   return (
     <OrdersView
-      model={toOrdersListViewProps({ role, status, orders: page.rows })}
+      model={toOrdersListViewProps({ role, status, customer, orders: page.rows })}
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
       listStatus={!result.data ? <QueryFeedback error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
       feedback={result.data ? <QueryFeedback error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
@@ -38,7 +40,7 @@ export function OrdersClient({ role, status, customerId, cursor }: { role: Staff
           <LinkTabs items={WORK_CHIPS} current="orders" className="w-full md:w-fit" />
           <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
         </div>
-        {customerId && E.row("Customer filter", page.rows[0]?.customers?.name ?? "Customer", E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}
+        {customer && E.row("Customer filter", customer, E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}
         </>
       )}
     />

@@ -65,11 +65,14 @@ describe("portal invoice Pay route", () => {
 
   it("uses the same safe surface when the provider throws", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     state.error = new Error("provider-secret");
     const response = await GET(new Request("https://mgr.test/portal/invoices/invoice-1/pay"), { params: Promise.resolve({ id: "invoice-1" }) });
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://mgr.test/portal/invoices/invoice-1?payment=unavailable");
     expect(await response.text()).not.toContain("provider-secret");
+    // The buyer sees the generic surface; the server log keeps the cause (#769).
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", state.error);
   });
 
   it("returns 404 for an invoice outside the customer scope", async () => {

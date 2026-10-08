@@ -112,7 +112,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `shortOnly` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

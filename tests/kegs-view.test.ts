@@ -1,5 +1,6 @@
 // tests/kegs-view.test.ts — Keg fleet, Customer keg balance, and Keg event
-// history. Views own no sample data. Live PoolForm / KegEventForm stay wrappers.
+// history. Views own no sample data. Live PoolForm / KegEventForm wrap the
+// shared KegPoolFields / KegEventFields in their command forms.
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -20,7 +21,7 @@ const src = (file: string) => readFileSync(file, "utf8");
 describe("Keg fleet", () => {
   it("does not restore fixture controls when live slots are explicitly disabled", () => {
     const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools: [], navRows: [] }), eventForm: null }));
-    expect(html).not.toContain("Record keg return");
+    expect(html).not.toContain("Record keg event");
     expect(html).not.toContain("Selected pool");
     expect(html).not.toContain("Customer keg balance");
     expect(html).not.toContain("Preview:");
@@ -32,9 +33,9 @@ describe("Keg fleet", () => {
     expect(body.props.model).toEqual(toKegFleetViewProps(kegFleetMicrostar));
   });
 
-  it("renders Record keg return without leaking live hrefs", () => {
+  it("renders Record keg event without leaking live hrefs", () => {
     const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
-    expect(html).toMatch(/>Record keg return</);
+    expect(html).toMatch(/>Record keg event</);
     expect(html).toMatch(/Microstar/);
     expect(html).not.toMatch(/href="\/kegs/);
     expect(html).not.toMatch(/href="\/inventory"/);
@@ -48,7 +49,7 @@ describe("Keg fleet", () => {
     expect(page).toMatch(/<PoolForm\b/);
     expect(page).toMatch(/<KegEventForm\b/);
     expect(page).not.toMatch(/\bnote=/);
-    expect(src("app/(app)/kegs/event-form.tsx").match(/Beer coming back with a keg/g)).toHaveLength(1);
+    expect(src("components/mgr/views/keg-fleet.tsx").match(/Beer coming back with a keg/g)).toHaveLength(1);
   });
 });
 

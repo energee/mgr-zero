@@ -23,7 +23,7 @@ export default async function SettingsPage() {
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
     runCommand("get_brewery_ai_model", {}, ctx) as Promise<{ model: string }>,
-    getGatewayLanguageModels().catch(() => []),
+    getGatewayLanguageModels(),
   ]);
   // Every location is already in hand for the summary line, so the portal's
   // fulfillment sources come out of that list rather than a second read.
