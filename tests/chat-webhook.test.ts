@@ -105,6 +105,7 @@ describe("Slack webhook", () => {
   it("records a durable event receipt before SDK dispatch and answers 503 when that insert fails", async () => {
     const { chat } = await import("@/lib/chat/slack-adapter");
     const dispatch = vi.spyOn(chat().webhooks, "slack");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       await admin.from("chat_callback_receipts").insert({
         brewery_id: breweryId, installation_id: installationId, provider: "slack", callback_id: "Ev-conflict",
@@ -114,6 +115,8 @@ describe("Slack webhook", () => {
       const res = await POST(signed(homeOpened("Ev-conflict")));
       expect(res.status).toBe(503);
       expect(dispatch).not.toHaveBeenCalled();
+      // The 503 asks Slack to retry; the log keeps why the receipt failed (#763).
+      expect(logged).toHaveBeenCalledWith("slack webhook receipt failed:", expect.any(String));
       const ok = await POST(signed(homeOpened("Ev-before-dispatch")));
       expect(ok.status).toBe(200);
       expect(dispatch).toHaveBeenCalledOnce();
@@ -121,6 +124,7 @@ describe("Slack webhook", () => {
       expect(stored).toMatchObject({ disposition: "pending", callback_kind: "app_home_opened" });
     } finally {
       dispatch.mockRestore();
+      logged.mockRestore();
     }
   });
 });
