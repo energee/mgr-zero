@@ -1,7 +1,7 @@
 // app/(app)/orders/[id]/cancel-order-dialog.tsx — the one Cancel order dialog
 // shared by the order detail (lifecycle-buttons.tsx) and the Confirm order
 // review (confirm/confirm-buttons.tsx): a required reason, cancel_order's error
-// inside the dialog, a busy label, and a reset of reason and error on close.
+// inside the dialog, a busy label, and a reset of reason and error on close (the error also on open).
 "use client";
 
 import { useState } from "react";
@@ -22,7 +22,9 @@ export function CancelOrderDialog({ orderId, action, trigger, onCancelled }: {
   const [reason, setReason] = useState("");
   function changeOpen(next: boolean) {
     setOpen(next);
-    if (!next) { setReason(""); action.setError(null); }
+    // Opening drops a stale Submit/Confirm error; closing resets the form.
+    action.setError(null);
+    if (!next) setReason("");
   }
   return (
     <CommandForm open={open} onOpenChange={changeOpen} title="Cancel order" trigger={trigger}>

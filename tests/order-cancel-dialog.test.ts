@@ -34,9 +34,12 @@ it("labels the cancel submit while it runs", () => {
   expect(html).toContain("Cancelling…");
 });
 
-it("clears the error when the dialog closes", () => {
+it("clears the error when the dialog closes, and a stale confirm error when it opens", () => {
   renderToStaticMarkup(createElement(ConfirmButtons, { orderId: "o", lines: [] }));
   form.onOpenChange(false);
+  expect(action.setError).toHaveBeenCalledWith(null);
+  action.setError.mockClear();
+  form.onOpenChange(true);
   expect(action.setError).toHaveBeenCalledWith(null);
 });
 
