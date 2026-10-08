@@ -225,10 +225,12 @@ defineQuery({
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
-    const [{ invoice_lines: lines, ...invoice }, brewery] = await Promise.all([
+    const [row, brewery] = await Promise.all([
       unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, qbo_accountant_drift, invoice_lines`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
+    // .single() makes unwrap throw on zero rows; the view type is just nullable.
+    const { invoice_lines: lines, ...invoice } = row!;
     const localTotal = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
     const total_cents = invoiceCurrentTotalCents(invoice as { kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }, localTotal);
     return { invoice: { ...invoice, total_cents }, lines, brewery };

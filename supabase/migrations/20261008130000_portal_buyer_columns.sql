@@ -30,10 +30,10 @@ language sql stable security definer set search_path = '' as $$
          i.due_on, i.paid_at, i.qbo_remote_state, i.qbo_total_cents, i.qbo_tax_cents,
          i.qbo_balance_cents, i.qbo_accountant_drift, i.written_off_at, i.created_at,
          coalesce((select jsonb_agg(jsonb_build_object(
-                     'id', l.id, 'kind', l.kind, 'description', l.description,
-                     'qty', l.qty, 'amount_cents', l.amount_cents,
+                     'id', l.id, 'kind', l.kind, 'sku_id', l.sku_id, 'description', l.description,
+                     'qty', l.qty, 'unit_price_cents', l.unit_price_cents, 'amount_cents', l.amount_cents,
                      'skus', case when s.id is null then null else jsonb_build_object('name', s.name) end
-                   ) order by l.id)
+                   ))
                    from public.invoice_lines l left join public.skus s on s.id = l.sku_id
                    where l.invoice_id = i.id), '[]'::jsonb)
   from public.invoices i

@@ -8707,7 +8707,6 @@ export type Database = {
       }
       my_brewery_ids: { Args: never; Returns: string[] }
       my_customer_ids: { Args: never; Returns: string[] }
-      my_invoice_ids: { Args: never; Returns: string[] }
       on_hand_rows: {
         Args: never
         Returns: {

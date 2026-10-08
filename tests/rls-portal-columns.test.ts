@@ -84,7 +84,7 @@ describe("portal customers cannot read internal columns (#754)", () => {
     expect(detail.shipment.invoices.map((i) => i.id)).toEqual([invoiceId]);
     const one = await runCommand("portal_invoice", { invoiceId }, custCtx) as { invoice: Record<string, unknown>; lines: Record<string, unknown>[] };
     expect(one.invoice).not.toHaveProperty("invoice_lines");
-    expect(one.lines).toEqual([{ id: invoiceLineId, kind: "adjustment", description: "Delivery fee", qty: 1, amount_cents: 500, skus: null }]);
+    expect(one.lines).toEqual([{ id: invoiceLineId, kind: "adjustment", sku_id: null, description: "Delivery fee", qty: 1, unit_price_cents: 500, amount_cents: 500, skus: null }]);
   });
 
   it("staff still read every column of the base tables", async () => {
