@@ -24,6 +24,8 @@ movements. Invoices are never edited.
 
 Order and invoice history queries page with a cursor; see [History paging](/docs/api#history-paging).
 
+The legacy invoice `paid_at` field is a payment-confirmation/state marker, not an actual settlement date. Older values can be invoice modification times; newer confirmations use the sync transaction time. Do not display it as a payment date. Current balance and remote state still determine whether an invoice is payable. A partial payment remains due; zero balance with positive attributable cash is paid, and credit-only closure is settled. No actual settlement date is supplied for either one or multiple payments.
+
 {/* ops:orders */}
 
 ## adjust_order_lines [#adjust_order_lines]

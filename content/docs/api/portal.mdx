@@ -14,6 +14,8 @@ updates, and submits. Confirming, picking, and shipping stay with the brewery.
 
 Order and invoice history queries page with a cursor; see [History paging](/docs/api#history-paging).
 
+Portal invoice results expose legacy `paid_at` only as a confirmation/state marker. Do not render it as a settlement date: older values may be invoice edit times, and new confirmations use sync time. Use current balance and remote state for payable status. Partial payments remain due, and credit-only closure is settled rather than paid. The portal supplies no actual payment date for one or multiple payments.
+
 {/* ops:portal */}
 
 ## get_portal_account [#get_portal_account]

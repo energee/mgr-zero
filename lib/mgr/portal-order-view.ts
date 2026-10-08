@@ -1,6 +1,5 @@
 // lib/mgr/portal-order-view.ts — view-model for portal Order detail.
 // portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
-import { calendarDay } from "./calendar-day";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
@@ -118,7 +117,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     invoice: invoice
       ? {
         title: docNo("INV", invoice.invoice_no, "Invoice"),
-        detail: invoiceState === "paid" ? `paid ${calendarDay(invoice.paid_at!)}`
+        detail: invoiceState === "paid" ? "paid"
           : invoiceIsSettledWithoutPayment(invoice) ? "settled"
           : invoiceState === "written_off" ? "written off" : invoiceState ?? "unpaid",
         amount: money(invoiceCurrentTotalCents(invoice, invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0))),

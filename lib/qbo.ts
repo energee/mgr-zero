@@ -81,6 +81,7 @@ type QboInvoiceRead = {
   totalCents: number;
   balanceCents: number;
   cashCollectedCents: number;
+  /** Legacy observation slot; transport supplies null, not a settlement date. */
   paidAt: string | null;
   privateNote: string;
   content: Record<string, unknown>;
@@ -533,12 +534,12 @@ export class QboOAuthClient {
       }
       cashCollectedCents += (await allocations).get(remoteId) ?? 0;
     }
-    const updated = invoice.MetaData && typeof invoice.MetaData === "object"
-      ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
     return {
       ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents, taxCents,
       cashCollectedCents: Math.min(cashCollectedCents, totalCents),
-      paidAt: typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
+      // Invoice edits are not payment dates. Reconciliation records its own
+      // confirmation marker only after the existing balance/cash guards pass.
+      paidAt: null,
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
     };

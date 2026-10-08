@@ -164,6 +164,16 @@ describe("QuickBooks current invoice state", () => {
     expect((await stranger.ctx.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
   });
 
+  it("stores sync confirmation rather than invoice modification time after cash payment", async () => {
+    const f = await stateFixture();
+    const transport = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, MetaData: { LastUpdatedTime: "2026-09-12T15:00:00Z" }, LinkedTxn: [{ TxnId: "paid-date", TxnType: "Payment" }] }))
+      .mockResolvedValueOnce(paymentResponse("paid-date", 100));
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, transport));
+    expect(sql(`select (paid_at is not null)::text || '|' || (paid_at <> '2026-09-12T15:00:00Z'::timestamptz)::text || '|' || qbo_cash_collected_cents from invoices where id='${f.invoice.id}'`))
+      .toEqual(["true|true|10000"]);
+  });
+
   it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
     const f = await stateFixture();
     const fetch = vi.fn<typeof globalThis.fetch>()
