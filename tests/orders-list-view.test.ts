@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: "sales" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "sales" }) }));
 vi.mock("@/lib/commands/all", () => ({}));
-vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn() }));
+vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
 import OrdersPage from "@/app/(app)/orders/page";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
@@ -49,6 +49,19 @@ describe("Orders list view loop", () => {
     const model = toOrdersListViewProps({ role: "sales", status: "shipped", orders: [] });
     expect(model.empty?.title).toBe("No shipped orders");
     expect(model.rows).toEqual([]);
+  });
+
+  it("names the customer filter in the empty state (#768)", () => {
+    expect(toOrdersListViewProps({ role: "sales", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No orders for Ridgeline Tap Room");
+    expect(toOrdersListViewProps({ role: "sales", status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
+  });
+
+  it("labels the customer filter with the customer's name even when no order matches (#768)", async () => {
+    const page = await OrdersPage({ searchParams: Promise.resolve({ customerId: "c1" }) });
+    expect(page.props.customerName).toBe("Ridgeline Tap Room");
+    const html = renderToStaticMarkup(createElement(OrdersClient, { ...page.props }));
+    expect(html).toContain("Ridgeline Tap Room");
+    expect(html).not.toMatch(/>Customer</);
   });
 
   it("the Orders inventory record is OrdersView painted from that fixture", () => {
