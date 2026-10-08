@@ -899,6 +899,8 @@ The shared preview keeps the horizontal upload/map/preview/commit steps and a co
 
 Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch** returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows into a fresh editable preview. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading this browser tab restores the unresolved batch and its original row numbers. Retry is always explicit. If you have checked the imported records and the batch cannot be recovered, select **Discard saved request**, then **Confirm discard**; MGR drops the saved batch without sending it and returns to the preview, or to upload after a reload. Check which rows were saved first, and never re-import committed opening balances. Closing the tab clears its recovery data.
 
+Once results show, **Import another file** returns to upload so you can import the next kind, such as ship-tos after customers or opening balances after SKUs. It clears the finished batch, file, and mapping, and reloads the reference ID lists so records the last batch created can be used. It appears only after results are recovered; an unresolved batch must be retried or discarded first. Any blocked rows from the finished batch are left behind, so correct them with **Correct blocked rows in a new batch** before moving on.
+
 ## Actions not yet available [#unavailable]
 
 Do not hunt for hidden controls for these:
