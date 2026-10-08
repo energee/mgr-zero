@@ -13,7 +13,7 @@ import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
 import { money } from "@/lib/mgr/money";
-import { cartActionsDisabled, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
@@ -52,6 +52,9 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
   const lines = cartLines(qty);
   const locked = !ready || busy || attempt !== null;
   const disabled = cartActionsDisabled({ hasSource: fulfillmentSource !== null, busy: locked, shipToId: fields.shipToId, lineCount: lines?.length ?? 0 });
+  // Shown only when missing input is the whole reason; a missing source, a
+  // pending request, or bad quantities already have their own messages.
+  const missingInput = lines && fulfillmentSource && !attempt ? cartMissingInput({ shipToId: fields.shipToId, lineCount: lines.length }) : null;
   const unavailable = (lines ?? []).filter(l => !items.some(i => i.skuId === l.skuId));
   const subtotal = (lines ?? []).reduce((n, l) => n + (items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty, 0);
 
@@ -126,6 +129,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
         {initial?.removed.length ? E.info(`Removed unavailable or unpriced items: ${initial.removed.join(", ")}. Review the remaining quantities.`) : null}
         {!lines && E.info("Enter whole quantities of zero or more.")}
+        {missingInput && E.info(missingInput)}
         {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`)}
         {feedback}
       </>} />

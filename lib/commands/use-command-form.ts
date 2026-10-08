@@ -61,7 +61,7 @@ export function useCommandAction() {
       if (saved && !saved.resumed && detail.kind === "definitive") finishRecovery(sessionStorage, saved.attempt);
       else if (saved && typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED)); // finishRecovery already notifies.
       setFailure(detail);
-      setError(detail.message === "command failed" ? `${name} failed` : detail.message);
+      setError(detail.message);
       return false;
     } finally {
       setBusy(false);

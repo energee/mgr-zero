@@ -100,7 +100,7 @@ describe("Sale channels view", () => {
     expect(src).toMatch(/<SaleChannelsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ChannelForm\b/);
-    expect(src).toMatch(/<DeleteChannelButton\b/);
+    expect(src).toMatch(/control=\{DeleteChannelControl\} command="delete_sale_channel"/);
     expect(src).toContain('backHref: toSettings ? "/settings" : "/more"');
     // Add/Edit/Delete are drawn only for a role the registry lets run them (#478).
     expect(src).toContain('canRun(ctx, "upsert_sale_channel")');

@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { DestinationStateExport } from "./destination-state-export";
+import { FileSnapshotControl } from "./file-snapshot";
 import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
 import type { MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
@@ -36,6 +37,6 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "gross taxable shipments · before returns", row.bbl)}</Fragment>)}
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
-    {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}{E.btn("Save filed snapshot", "irr")}</>}
+    {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}<FileSnapshotControl /></>}
   </>;
 }
