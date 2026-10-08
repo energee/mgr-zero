@@ -1,15 +1,17 @@
 // app/(app)/cellar/[occupancyId]/reading/page.tsx — the deep-link adapter for
 // the Fermentation reading sheet. The latest row supplies reference values;
-// reading history remains on Vessel detail.
+// reading history remains on Vessel detail. The sheet names the tank and,
+// when known, its batch (#716).
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { notFound } from "next/navigation";
+import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { ReadingForm } from "./reading-form";
 
-type Occupancy = { occupancy_id: string; vessel_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
+type Occupancy = { occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_no: number | null; brand_name: string | null; bbl: number };
 type Reading = { temp_f: number; gravity_plato: number | null; ph: number | null };
 
 export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
@@ -25,7 +27,7 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
   return (
     <ReadingForm
       occupancyId={occupancyId}
-      occupancyLabel={occupancy.vessel_name ?? "unknown vessel"}
+      identity={readingIdentity(occupancy)}
       unit={gravityUnit.effective}
       role={brewery.role as "admin" | "brewer"}
       openByDefault

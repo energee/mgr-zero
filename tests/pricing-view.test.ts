@@ -159,7 +159,9 @@ describe("Price group view", () => {
     }));
     expect(html).toMatch(/14 oz pour/);
     expect(html).toMatch(/taster/);
-    expect(html.match(/>Remove</g)?.length).toBe(3);
+    // Two pour Removes; the group itself is Delete (#760: each opens a confirm sheet).
+    expect(html.match(/>Remove</g)?.length).toBe(2);
+    expect(html).toMatch(/>Delete</);
   });
 
   it("renders the inventory edits, Prices line, and refused Remove", () => {
@@ -171,7 +173,7 @@ describe("Price group view", () => {
     expect(html).toMatch(/Cost ceiling · group 1/);
     expect(html).toMatch(/none/);
     expect(html).toContain(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);
-    expect(html).toMatch(/>Remove</);
+    expect(html).toMatch(/>Delete</);
     expect(html).toMatch(/refused while a brand sits on it/);
     expect(html).not.toMatch(/→/);
   });
