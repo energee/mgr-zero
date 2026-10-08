@@ -489,6 +489,36 @@ describe("QuickBooks current invoice state", () => {
     }
   });
 
+  // #758: a sync skips invoices settled (paid, voided or deleted) more than 90 days
+  // ago, and still re-reads open and recently settled ones.
+  it("skips invoices settled more than 90 days ago", async () => {
+    const started = async (settled: "old" | "recent" | "open") => {
+      const f = await stateFixture();
+      if (settled !== "open") sql(`update invoices set qbo_remote_state='voided', qbo_balance_cents=0,
+        qbo_settled_at=now() - interval '${settled === "old" ? 100 : 10} days' where id='${f.invoice.id}'`, true);
+      const begin = await beginQboInvoiceSync(f.ctx, crypto.randomUUID());
+      if ("replayResult" in begin) throw new Error("unexpected replay");
+      return begin.targets.map(t => t.invoiceId);
+    };
+    expect(await started("old")).toEqual([]);
+    expect(await started("recent")).toHaveLength(1);
+    expect(await started("open")).toHaveLength(1);
+  });
+
+  // The settled time follows what each sync observed: set when it becomes paid,
+  // voided or deleted, kept while it stays settled, cleared when it reopens.
+  it("records when an invoice became settled and clears it on reopen", async () => {
+    const f = await stateFixture();
+    const settledAt = () => sql(`select coalesce(qbo_settled_at::text,'null') from invoices where id='${f.invoice.id}'`, true)[0];
+    sql(`update invoices set qbo_remote_state='voided', qbo_balance_cents=0 where id='${f.invoice.id}'`, true);
+    const first = settledAt();
+    expect(first).not.toBe("null");
+    sql(`update invoices set qbo_sync_token='again' where id='${f.invoice.id}'`, true);
+    expect(settledAt()).toBe(first);
+    sql(`update invoices set qbo_remote_state='live', qbo_balance_cents=5000 where id='${f.invoice.id}'`, true);
+    expect(settledAt()).toBe("null");
+  });
+
   it("marks only a definitive 404 from the original current realm as deleted", async () => {
     expect(sql(`select r.role from pg_proc p cross join (values ('anon'),('authenticated'),('service_role')) r(role)
       where p.oid='public.complete_qbo_invoice_sync(uuid,uuid,uuid,uuid,text,jsonb)'::regprocedure
