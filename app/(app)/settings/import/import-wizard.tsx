@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import { ImportView } from "@/components/mgr/views/import";
 import { discardRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { useCommandAction } from "@/lib/commands/use-command-form";
@@ -40,6 +41,7 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(recovery.error);
   const send = useCommandAction();
+  const router = useRouter();
   const fields = IMPORT_FIELDS[kind];
   const rows = useMemo(() => csv ? mapCsvRows(csv.rows, mapping) : [], [csv, mapping]);
   const validation = useMemo(() => rows.map(row => validateImportRow(kind, row, lookups)), [rows, kind, lookups]);
@@ -69,6 +71,12 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
     stage({ headers: fields.map(f => f.name), rows: blocked.map(row => fields.map(f => row[f.name] ?? "")) });
     setBatch(null); setResult(null); setStep(2);
   }
+  // Results are recovered (run already cleared the saved batch): start a fresh upload of
+  // any kind, and refresh lookups so the next file sees records this batch created.
+  function nextFile() {
+    setBatch(null); setResult(null); setCsv(null); setFileName(null); setMapping({}); setError(null); send.setError(null); setStep(0);
+    router.refresh();
+  }
   return <ImportView model={{ kind, step, fileName, headers: csv?.headers, csvRowCount: csv?.rows.length, mapping, rows, validation, lookups, result, error: error ?? (send.error && `${send.error}. Some rows may have committed. Retry this same batch to recover their results.`), busy: send.busy, batchId: batch?.requestId, previewRows: batch?.previewRows, backHref: "/settings" }}
     onKind={value => { setKind(value); setCsv(null); setFileName(null); }}
     onStep={setStep} onMapping={(field, column) => setMapping({ ...mapping, [field]: column })}
@@ -84,6 +92,6 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
       values[rowIndex][headers.indexOf(field)] = value;
       stage({ headers, rows: values });
     }}
-    onCommit={() => void commit()} onCorrectBlocked={correctBlocked} onDiscard={discard}
+    onCommit={() => void commit()} onCorrectBlocked={correctBlocked} onDiscard={discard} onNextFile={nextFile}
   />;
 }
