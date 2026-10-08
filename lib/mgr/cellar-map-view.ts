@@ -2,7 +2,7 @@ import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
 
 export type CellarMapViewModel = {
-  backHref?: string; addHref?: string; readingHref?: string | null; brewHref?: string;
+  backHref?: string; addHref?: string; readingHref?: string | null; readingHint?: string; brewHref?: string;
   tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
@@ -11,9 +11,13 @@ export function toCellarMapViewProps(vessels: { id: string; name: string; capaci
   // The map draws one Reading button, so it can only be bound when a single
   // tank is occupied; with several there is no unambiguous target and guessing
   // records the reading against the wrong one, so the tile opens the tank
-  // instead. The caller supplies the path — this never invents one.
+  // instead. The caller supplies the path — this never invents one. A disabled
+  // Reading carries a hint saying why, so it is never a silent dead end (#715).
   const only = occupancies.length === 1 ? occupancies[0] : undefined;
-  return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), tiles: vessels.map(vessel => {
+  let readingHint: string | undefined;
+  if (readingHref && occupancies.length === 0) readingHint = "No tank holds beer, so there is nothing to read.";
+  if (readingHref && occupancies.length > 1) readingHint = "Several tanks hold beer. Open a tank to record its reading.";
+  return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), readingHint, tiles: vessels.map(vessel => {
     const occupancy = occupancies.find(item => item.vessel_id === vessel.id);
     const quantity = occupancy ? Number(occupancy.bbl) : 0;
     const capacity = Number(vessel.capacity_bbl);

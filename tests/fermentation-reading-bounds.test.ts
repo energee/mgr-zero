@@ -30,7 +30,7 @@ describe("fermentation reading bounds (#468)", () => {
 
   it("the form's temperature and pH fields carry the same min and max", () => {
     const html = renderToStaticMarkup(createElement(FermentationReadingView, {
-      formId: "f", unit: "plato",
+      formId: "f", unit: "plato", identity: { vessel: "FV3" },
       values: { observedAt: "", tempF: "66", gravity: "", ph: "4.4", note: "" },
     }));
     const attrs = (id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? "";
