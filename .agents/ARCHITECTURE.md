@@ -146,6 +146,8 @@ a gap to close, not a convention to trust.
    another brewery's data. Portal customers never `SELECT` the `breweries` base
    table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
+   Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
+   caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
    *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,

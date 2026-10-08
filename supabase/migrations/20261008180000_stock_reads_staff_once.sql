@@ -6,20 +6,23 @@
 -- exception block is a subtransaction; at 50k movements for one brewery that
 -- made `select ... from on_hand` take ~850 ms against ~11 ms for this form.
 --
--- Same rows as before: staff of any original role see the whole brewery;
--- taproom staff see only locations put to taproom use; non-staff see nothing.
+-- Same rows as before: admin, sales, warehouse and brewer (is_staff_of's list)
+-- see the whole brewery;
+-- taproom staff see only locations put to taproom use; anyone else sees nothing.
+-- `materialized` keeps the scope check at one call per membership.
 
 create or replace function public.on_hand_rows()
 returns table(brewery_id uuid, sku_id uuid, location_id uuid, qty numeric)
 language sql stable security definer set search_path = '' as $$
-  with staff as (
+  with staff as materialized (
     select bu.brewery_id, bu.role from public.brewery_users bu
     where bu.user_id = auth.uid() and private.request_scope_allows(bu.brewery_id))
   select m.brewery_id, m.sku_id, m.location_id, sum(m.qty)
   from public.inventory_movements m
   join staff s on s.brewery_id = m.brewery_id
   join public.locations l on l.id = m.location_id and l.brewery_id = m.brewery_id
-  where s.role <> 'taproom' or 'taproom' = any(l.uses)
+  where s.role in ('admin','sales','warehouse','brewer')
+     or (s.role = 'taproom' and 'taproom' = any(l.uses))
   group by 1,2,3;
 $$;
 
@@ -30,7 +33,7 @@ language sql stable security definer set search_path = '' as $$
   -- the shipped event already took it out of the bin.
   -- private.bin_stock_on_hand (#532) repeats this reason-to-sign arithmetic
   -- for keg bins; change both together.
-  with staff as (
+  with staff as materialized (
     select bu.brewery_id, bu.role from public.brewery_users bu
     where bu.user_id = auth.uid() and private.request_scope_allows(bu.brewery_id))
   select e.brewery_id, e.pool_id, e.keg_size, e.location_id, e.bin_id,
@@ -41,6 +44,7 @@ language sql stable security definer set search_path = '' as $$
   from public.keg_events e
   join staff s on s.brewery_id = e.brewery_id
   join public.locations l on l.id = e.location_id and l.brewery_id = e.brewery_id
-  where s.role <> 'taproom' or 'taproom' = any(l.uses)
+  where s.role in ('admin','sales','warehouse','brewer')
+     or (s.role = 'taproom' and 'taproom' = any(l.uses))
   group by 1,2,3,4,5;
 $$;
