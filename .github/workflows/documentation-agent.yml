@@ -75,6 +75,9 @@ jobs:
             exit 1
           fi
           git diff --cached --check
+          # Transfer only validated changes, never an old guide snapshot that
+          # could revert unrelated prose merged while the audit was running.
+          git diff --cached --binary > customer-guide.patch
           # Guide *shape* (frontmatter, prose-only MDX, anchors, the chooser's
           # links) is specified once, in tests/docs.test.ts. The publish job
           # pushes with the App token so ci.yml runs vitest on the generated
@@ -88,7 +91,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: customer-guide
-          path: content/docs
+          path: customer-guide.patch
           if-no-files-found: error
 
   publish:
@@ -115,11 +118,12 @@ jobs:
         with:
           ref: main
           token: ${{ steps.mgr-app.outputs.token }}
+          # Three-way application needs the audited revision's pre-image blobs.
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
           name: customer-guide
-          path: content/docs
 
       - name: Publish documentation pull request
         env:
@@ -132,7 +136,15 @@ jobs:
           git config user.name "$login"
           git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
           git checkout -B documentation/user-guide
-          git add content/docs
+          # Preserve intervening main edits; conflicts fail before commit/push.
+          # Empty audits stop in maintain. --index stages only the patch;
+          # the guard handles corrections already on main. --allow-empty is defensive.
+          git apply --3way --index --allow-empty customer-guide.patch
+          rm -f customer-guide.patch
+          if git diff --cached --quiet; then
+            echo "main already matches the maintained guide; nothing to publish."
+            exit 0
+          fi
           if [ "$EVENT_NAME" = "pull_request" ]; then
             doc_source="PR #$PR_NUMBER"
           else
