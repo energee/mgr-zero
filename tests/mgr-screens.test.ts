@@ -161,7 +161,7 @@ describe("SCREENS", () => {
       "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",
       "app/(app)/catalog/brands/[id]/brand-page.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
       "app/(app)/settings/channels/page.tsx",
-      "app/(app)/settings/channels/delete-channel-button.tsx",
+      "components/mgr/views/delete-channel.tsx",
     ];
     const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
       "lib/commands/customers.ts", "lib/commands/portal.ts", "lib/commands/catalog.ts"];
@@ -218,7 +218,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(197);
+    expect(SCREENS).toHaveLength(201);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });

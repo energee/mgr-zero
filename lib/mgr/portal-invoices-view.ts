@@ -39,15 +39,10 @@ export type PortalInvoicesSnapshot = {
   }[];
 };
 
-/** "Aug 29, 2026" for a paid_at timestamp: its UTC day, since the portal payload carries no brewery time zone. */
-function day(iso: string): string {
-  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? formatDate(iso.slice(0, 10)) : iso;
-}
-
 function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string {
   if (inv.kind === "credit_memo") return "credit";
   const state = invoiceCurrentState(inv);
-  if (state === "paid") return `paid ${day(inv.paid_at!)}`;
+  if (state === "paid") return "paid";
   if (invoiceIsSettledWithoutPayment(inv)) return "settled";
   if (state !== "unpaid") return state === "written_off" ? "written off" : state;
   return inv.due_on ? `due ${formatDate(inv.due_on)}` : "unpaid";

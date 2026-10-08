@@ -6,8 +6,7 @@ export async function POST(request: Request) {
   try {
     return Response.json({ ok: true, deliveries: await runOrderEmailBatch() });
   } catch {
-    // Return a failed job response without exposing recipient/body/credentials.
-    console.error("Order email delivery job failed");
+    // The worker logs sanitized stage/category evidence; never serialize its error here.
     return Response.json({ ok: false }, { status: 500 });
   }
 }

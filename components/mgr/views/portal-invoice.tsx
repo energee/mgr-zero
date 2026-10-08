@@ -46,6 +46,7 @@ export function PortalInvoiceView({
         ? E.info("Online payment isn’t available for this invoice right now.")
         : null}
       {kind === "nonpayable" ? E.info(model.status === "Unpaid" ? "Online payment isn’t available for this invoice right now." : model.status === "Review" ? "QuickBooks changes need review before online payment is available." : "This invoice is not payable.") : null}
+      {/* Optional paidOn slot remains compatible; the current adapter supplies no settlement date. */}
       {kind === "paid"
         ? (model.paidOn ? E.row("Paid", model.paidOn, "", "ok") : null)
         : kind === "pay" || kind === "unavailable" ? (

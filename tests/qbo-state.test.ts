@@ -164,6 +164,16 @@ describe("QuickBooks current invoice state", () => {
     expect((await stranger.ctx.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
   });
 
+  it("stores sync confirmation rather than invoice modification time after cash payment", async () => {
+    const f = await stateFixture();
+    const transport = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, MetaData: { LastUpdatedTime: "2026-09-12T15:00:00Z" }, LinkedTxn: [{ TxnId: "paid-date", TxnType: "Payment" }] }))
+      .mockResolvedValueOnce(paymentResponse("paid-date", 100));
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, transport));
+    expect(sql(`select (paid_at is not null)::text || '|' || (paid_at <> '2026-09-12T15:00:00Z'::timestamptz)::text || '|' || qbo_cash_collected_cents from invoices where id='${f.invoice.id}'`))
+      .toEqual(["true|true|10000"]);
+  });
+
   it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
     const f = await stateFixture();
     const fetch = vi.fn<typeof globalThis.fetch>()
@@ -230,8 +240,9 @@ describe("QuickBooks current invoice state", () => {
   });
 
   it("fetches a shared Payment once and fails cash recognition closed when its invoice allocation is ambiguous", async () => {
-    const firstId = "00000000-0000-4000-8000-000000000101";
-    const secondId = "00000000-0000-4000-8000-000000000102";
+    // Random ids keep reruns from colliding in the shared test DB; sorted so
+    // the sync's `order by id` still visits remote-one first (#767).
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
     const f = await stateFixture("admin", firstId, "remote-one");
     expect((await admin.from("invoices").insert({
       id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
@@ -359,8 +370,9 @@ describe("QuickBooks current invoice state", () => {
   });
 
   it("applies a fetched batch atomically and replays its frozen target set without provider calls", async () => {
-    const firstId = "00000000-0000-4000-8000-000000000001";
-    const secondId = "00000000-0000-4000-8000-000000000002";
+    // Random ids keep reruns from colliding in the shared test DB; sorted so
+    // the sync's `order by id` still visits remote-one first (#767).
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
     const f = await stateFixture("admin", firstId, "remote-one");
     expect((await admin.from("invoices").insert({
       id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
@@ -381,7 +393,7 @@ describe("QuickBooks current invoice state", () => {
     expect(sql(`select id || ':' || coalesce(qbo_sync_token,'NULL') from invoices where id in ('${firstId}','${secondId}') order by id`))
       .toEqual([`${firstId}:NULL`, `${secondId}:NULL`]);
 
-    const lateId = "00000000-0000-4000-8000-000000000003";
+    const lateId = crypto.randomUUID();
     expect((await admin.from("invoices").insert({
       id: lateId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
       qbo_invoice_id: "remote-late", qbo_sync_status: "pushed",

@@ -33,6 +33,30 @@ describe("order commands", () => {
     expect(full.lines.length).toBe(1);
     expect(full.events.map(e => e.event)).toEqual(["created", "submitted", "confirmed"]);
   });
+  it("draft edits replace headers and lines and preserve, clear or set requested date", async () => {
+    const created = await runCommand("create_order", {
+      kind: "wholesale", customerId, shipToId, fromLocationId: whId,
+      requestedShipDate: "2026-10-12", note: "Keep this note", lines: [{ skuId, qty: 5 }],
+    }, adminCtx) as { order_id: string };
+    const secondShipTo = await runCommand("upsert_ship_to", { customerId, label: "Second dock", city: "Columbus", state: "OH", address1: "42 River St", zip: "43215" }, adminCtx) as { id: string };
+    const orderId = created.order_id;
+    const edit = { orderId, shipToId: secondShipTo.id, poNumber: "PO-edited", lines: [{ skuId, qty: 2.5 }] };
+    await runCommand("update_draft_order", edit, adminCtx);
+    const read = () => runCommand("get_order", { orderId }, adminCtx) as Promise<{ order: { status: string; ship_to_id: string; po_number: string; requested_ship_date: string | null; note: string }; lines: { qty_ordered: number; unit_price_cents: number }[] }>;
+    const saved = await read();
+    expect(saved.order).toMatchObject({ status: "draft", ship_to_id: secondShipTo.id, po_number: "PO-edited", requested_ship_date: "2026-10-12", note: "Keep this note" });
+    expect(saved.lines).toHaveLength(1);
+    expect(Number(saved.lines[0].qty_ordered)).toBe(2.5);
+    expect(saved.lines[0].unit_price_cents).toBe(3600);
+    await runCommand("update_draft_order", { ...edit, requestedShipDate: null, poNumber: "" }, adminCtx);
+    expect((await read()).order).toMatchObject({ requested_ship_date: null, po_number: "" });
+    await runCommand("update_draft_order", { ...edit, requestedShipDate: "2026-10-19" }, adminCtx);
+    expect((await read()).order.requested_ship_date).toBe("2026-10-19");
+    await runCommand("submit_order", { orderId }, adminCtx);
+    await expect(runCommand("update_draft_order", edit, adminCtx)).rejects.toThrow(/order is/);
+    await runCommand("confirm_order", { orderId }, adminCtx);
+    await expect(runCommand("update_draft_order", edit, adminCtx)).rejects.toThrow(/order is/);
+  });
   it("brewer role cannot create orders", async () => {
     await expect(runCommand("create_order", {
       kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 1 }],

@@ -151,7 +151,10 @@ bun run lint       # eslint, incl. the admin-client import guard
 bunx tsc --noEmit  # typecheck
 bun run build      # production build
 bun run test:e2e   # agent-browser smoke — local only, not run in CI
+bun tests-e2e/mobile-command-surface.ts # fixture-only overlay regression; no seed or writes
 ```
+
+`bun tests-e2e/mobile-command-surface.ts [screenshot-directory]` checks Reading and Count actions, Count's Location Select, and minimized-composer Tabs. It starts its own server on an available port; stop this worktree's dev server first because Next permits only one `.next/dev` owner. It never stops an existing server or seeds data. A leftover lock from a crashed server is also refused; inspect it yourself rather than having the runner delete an unknown lock. The 390×500 viewport is a short-viewport proxy, not proof of a real phone soft keyboard.
 
 `bun run test:e2e` drives the browser with `agent-browser` (Vercel's browser
 automation CLI) instead of Playwright. It runs agent-browser's bundled Chrome
@@ -236,7 +239,11 @@ staff and portal field manuals linked from `content/docs/index.mdx` when behavio
 Claude job has read-only GitHub permissions and may edit only those three MDX files. A separate
 deterministic job rejects wider or active-content changes, then maintains one
 reviewable `documentation/user-guide` pull request; the bot never commits directly
-to `main`.
+to `main`. The validated guide changes travel as a binary patch, applied
+three-way to fresh `main` with full history. Unrelated intervening guide updates
+are preserved; conflicting edits fail publication before any commit or push.
+An empty audit or an already-applied correction produces no commit and leaves
+any existing maintenance PR unchanged. The App-token push still runs CI on the documentation PR, and human review remains required.
 
 ### Buyer order-confirmation email
 
@@ -252,6 +259,37 @@ Each call processes at most ten emails. A scheduler must call it regularly;
 this repository change does not configure one or enable hosted sending.
 Domain, provider credentials and scheduler setup require user approval (#311).
 Tests mock the provider and send no real mail.
+
+Worker failures emit `Order email delivery failure` with sanitized `stage` and
+`category` fields. Provider failures include `providerStatus` when an HTTP
+response exists. A validated opaque `deliveryId` identifies a leased delivery;
+logs never include recipients, message contents, credentials, raw provider
+payloads, or exception messages. The status API keeps its existing generic
+`provider_uncertain` / `provider_rejected` codes; detailed causes are operator
+logs, not customer-facing fields. Provider retries still return HTTP 200 with a
+retry count; fatal worker failures still return a generic HTTP 500.
+
+Use the log category to recover before the saved 23-hour cutoff:
+- `configuration` at the configuration stage: restore the worker's provider,
+  sender, or service-client settings before the next scheduled run.
+- `authentication` with HTTP 401/403: investigate the Resend key and sending
+  domain authorization. Fix approved configuration promptly; these still retry.
+- `rate_limit` (429), `outage` (5xx), `concurrent_request` (idempotent 409),
+  `network`, or `malformed_response` at send: investigate provider health or
+  response handling and let scheduled retries reuse the frozen request.
+- `rejected` at send: investigate the definitive provider rejection using its
+  HTTP status and delivery identity; the existing delivery stays blocked.
+- `database` at lease or record_result: restore database access. A record_result
+  failure may follow provider acceptance; never create a replacement send.
+- `malformed_response` at lease: investigate the lease RPC contract before
+  restarting. No provider call occurs for an invalid leased batch.
+- `lease_lost` at record_result or `lease_expired` at send: investigate worker
+  timing/concurrency; let the lease workflow recover with the same identity.
+- `retry_window_expired`: the lease RPC normally blocks expired deliveries
+  before returning them, so inspect this code through the status API. The worker
+  logs it only when the cutoff passes after leasing. Investigate the provider's
+  outcome; do not reset the window, change the provider key, or automatically
+  resend a blocked delivery.
 
 Retries preserve the original recipient, body, sender and provider key.
 [Resend retains idempotency keys for 24 hours](https://resend.com/changelog/idempotency-keys);

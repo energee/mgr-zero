@@ -44,7 +44,7 @@ describe("QuickBooks invoice presentation", () => {
     expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", balanceCents: 0, cashCollectedCents: 4000 }))
       .toEqual({ detail: "settled in QuickBooks · $40.00 cash received", actions: [] });
     expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", totalCents: 10000, balanceCents: 0, cashCollectedCents: 10000 }))
-      .toEqual({ detail: "paid in QuickBooks", actions: [] });
+      .toEqual({ detail: "paid in QuickBooks", actions: [], paidStatusShown: true });
   });
 
   it("keeps stored invoice status and local write-off available after disconnect", () => {

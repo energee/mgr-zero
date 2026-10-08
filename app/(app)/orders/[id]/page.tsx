@@ -2,8 +2,9 @@
 // one order: state and next action, lines with ATP, the event history, and
 // the restock flag. The drawing is OrderView (shared with the inventory);
 // lifecycle-buttons.tsx holds the status-gated verbs (Submit, Confirm, Adjust,
-// Pick, Ship, Cancel). Confirm has its own two-tap review at
-// /orders/[id]/confirm, Adjust lines is /orders/[id]/adjust, a taproom transfer completes at
+// Pick, Ship, Cancel). Draft edits use /orders/[id]/edit. Confirm has its own
+// two-tap review at /orders/[id]/confirm. Adjust lines is /orders/[id]/adjust;
+// a taproom transfer completes at
 // /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
 // or malformed id renders not-found.tsx.
 import { canRun } from "@/lib/commands/registry";
@@ -32,6 +33,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone });
   if (!canSell) model.confirmHref = undefined;
+  if (!canRun(ctx, "update_draft_order")) model.editHref = undefined;
   if (!canFulfill) { model.putBackHref = undefined; model.completeHref = undefined; }
   return (
     <OrderView

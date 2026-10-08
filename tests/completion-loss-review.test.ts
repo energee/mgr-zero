@@ -61,7 +61,7 @@ async function exactCompletion() {
   }, brewerCtx) as { id: string };
   await runCommand("update_packaging_run", { runId: run.id, startedAt: `${fixtureDate}T00:00:00Z` }, brewerCtx);
   await closeWithConfirmedMaterials({
-    runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }],
+    runId: run.id, bblDrawn: 0.95, outputs: [{ skuId, qtyActual: 1 }],
     lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);
   const completion = await runCommand("complete_batch", { batchId: batch.id }, brewerCtx) as { adjustmentId: string; residualBbl: string };

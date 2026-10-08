@@ -386,6 +386,15 @@ describe("planning: draft purchase orders from material gaps", () => {
     // The draft is not yet supply (only a sent PO is on order), so the gap stands until it is marked sent.
     const again = (await runCommand("get_material_requirements", {}, ctx)) as { material_id: string; on_order: number }[];
     expect(again.find((r) => r.material_id === pale.id)!.on_order).toBe(0);
+
+    // #759: Planning shows only gaps; shortOnly asks Postgres for them instead of the page filtering.
+    // Wheat fully covered: a requirement row with nothing short.
+    await seedMovement(b.id, { materialId: wheat.id, locationId: wh.id, binId: wh.binId, qty: 100, createdBy: ctx.userId });
+    const all = (await runCommand("get_material_requirements", {}, ctx)) as { material_id: string; short: number }[];
+    expect(all.find((r) => r.material_id === wheat.id)).toMatchObject({ short: 0 });
+    const gaps = (await runCommand("get_material_requirements", { shortOnly: true }, ctx)) as { material_id: string; short: number }[];
+    expect(gaps.map((g) => g.material_id).sort()).toEqual(all.filter((r) => r.short > 0).map((r) => r.material_id).sort());
+    expect(gaps.map((g) => g.material_id)).not.toContain(wheat.id);
   });
 });
 
