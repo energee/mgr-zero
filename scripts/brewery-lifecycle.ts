@@ -10,18 +10,25 @@
 //   Records stay for 3 years from closed_at; removing them after that is manual.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Client } from "pg";
+import { Client, types } from "pg";
+import { csvCell } from "@/lib/mgr/destination-state-export";
+
+// Keep `date` columns (brewed_on, packaged_on, ...) as the plain YYYY-MM-DD Postgres stored;
+// node-pg would otherwise build a local-midnight Date that shifts across timezones.
+types.setTypeParser(types.builtins.DATE, v => v);
 
 // ponytail: plumbing tables are named here; a new integration table defaults to exported.
 const PLUMBING = new Set(["brewery_counters", "chat_action_intents", "chat_callback_receipts", "chat_installations",
   "chat_user_links", "notification_deliveries", "notification_destinations", "notification_occurrences",
   "notification_preferences", "pos_connections", "qbo_connections", "qbo_pushes"]);
 
-const csvCell = (v: unknown) => {
-  if (v === null || v === undefined) return "";
-  const s = typeof v === "object" && !(v instanceof Date) ? JSON.stringify(v) : v instanceof Date ? v.toISOString() : String(v);
-  return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-};
+const cell = (v: unknown) => v === null || v === undefined ? '""'
+  : csvCell(v instanceof Date ? v.toISOString() : typeof v === "object" ? JSON.stringify(v) : typeof v === "number" ? v : String(v));
+
+function writeCsv(dir: string, table: string, header: string[], rows: Record<string, unknown>[]) {
+  writeFileSync(join(dir, `${table}.csv`), [header.map(h => csvCell(h)), ...rows.map(r => header.map(h => cell(r[h])))]
+    .map(line => line.join(",")).join("\r\n") + "\r\n");
+}
 
 async function main() {
   const [command, breweryId, outDir] = process.argv.slice(2);
@@ -40,20 +47,22 @@ async function main() {
       return;
     }
     mkdirSync(outDir, { recursive: true });
+    // One read-only snapshot, so tables written while the export runs stay consistent.
+    await db.query("begin isolation level repeatable read read only");
     const { rows: tables } = await db.query<{ table: string }>(`select c.relname as table from pg_class c
       join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
       join pg_attribute a on a.attrelid = c.oid and a.attname = 'brewery_id' and not a.attisdropped
       where c.relkind = 'r' order by 1`);
-    const exported = [];
-    for (const { table } of tables.filter(t => !PLUMBING.has(t.table))) {
-      const { rows, fields } = await db.query(`select * from public.${table} where brewery_id = $1`, [breweryId]);
-      const header = fields.map(f => f.name);
-      writeFileSync(join(outDir, `${table}.csv`), [header.join(","), ...rows.map(r => header.map(h => csvCell(r[h])).join(","))].join("\n") + "\n");
-      exported.push(`${table}: ${rows.length}`);
-    }
     const brewery = await db.query("select * from public.breweries where id = $1", [breweryId]);
     if (brewery.rowCount !== 1) throw new Error("brewery not found");
-    writeFileSync(join(outDir, "breweries.csv"), [Object.keys(brewery.rows[0]).join(","), Object.values(brewery.rows[0]).map(csvCell).join(",")].join("\n") + "\n");
+    writeCsv(outDir, "breweries", brewery.fields.map(f => f.name), brewery.rows);
+    const exported = [];
+    for (const { table } of tables.filter(t => !PLUMBING.has(t.table))) {
+      const { rows, fields } = await db.query(`select * from public."${table.replaceAll('"', '""')}" where brewery_id = $1`, [breweryId]);
+      writeCsv(outDir, table, fields.map(f => f.name), rows);
+      exported.push(`${table}: ${rows.length}`);
+    }
+    await db.query("commit");
     console.log(exported.join("\n"));
   } finally {
     await db.end();

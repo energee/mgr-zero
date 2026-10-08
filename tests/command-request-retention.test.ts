@@ -43,12 +43,17 @@ describe("command request retention (#766)", () => {
     expect(close).toThrow(/QuickBooks/);
     expect(sql(`select count(*) from brewery_users where brewery_id='${brewery.id}'`, true)).toEqual(["2"]);
 
-    sql(`update public.qbo_connections set state='disconnected', remote_revocation_state='confirmed' where id='${connection}'`, true);
+    // An unresolved remote revocation cannot be retried and its credential is gone, so it does not block.
+    sql(`update public.qbo_connections set state='disconnected', remote_revocation_state='unresolved' where id='${connection}'`, true);
+    const invite = crypto.randomUUID();
+    sql(`insert into private.invite_requests(brewery_id,actor_id,email,kind,role,state,request_id)
+      values('${brewery.id}',(select user_id from brewery_users where brewery_id='${brewery.id}' and role='admin'),'${invite}@test.local','staff','warehouse','pending_auth','${invite}')`, true);
     close();
     close(); // a second close is a no-op
     expect(sql(`select count(*) from brewery_users where brewery_id='${brewery.id}'`, true)).toEqual(["0"]);
     expect(sql(`select count(*) from customer_users where customer_id='${customerId}'`, true)).toEqual(["0"]);
     expect(sql(`select closed_at is not null from breweries where id='${brewery.id}'`, true)).toEqual(["t"]);
+    expect(sql(`select state from private.invite_requests where request_id='${invite}'`, true)).toEqual(["revoked"]);
     expect((await admin.from("customers").select("id").eq("id", customerId)).data).toHaveLength(1);
     expect(sql(`select has_function_privilege('authenticated','public.close_brewery(uuid)','execute')`, true)).toEqual(["f"]);
   });

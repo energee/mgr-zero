@@ -1,4 +1,4 @@
-// app/api/jobs/prune/route.ts — scheduler wake for data retention (#766).
+// app/api/retention/jobs/prune/route.ts — scheduler wake for data retention (#766).
 // Bearer-authenticated internal job (RETENTION_JOB_SECRET); the scheduler is hosted config.
 import { NextResponse } from "next/server";
 import { authorizeJob } from "@/lib/jobs/auth";
