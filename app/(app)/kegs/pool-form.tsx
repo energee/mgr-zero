@@ -1,76 +1,41 @@
 // app/(app)/kegs/pool-form.tsx — one CommandForm for create_keg_pool (no
-// pool) and update_keg_pool (with pool). A leased or pay-per-fill pool names
-// its vendor; a pay-per-fill pool needs its per-fill cost. Kind is fixed
-// after creation.
+// pool) and update_keg_pool (with pool), drawing the shared KegPoolFields.
+// A leased or pay-per-fill pool names its vendor; a pay-per-fill pool needs
+// its per-fill cost. Kind is fixed after creation.
 "use client";
 
 import { useState } from "react";
-import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { KegPoolFields } from "@/components/mgr/views/keg-fleet";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { dollarsInput } from "@/lib/mgr/money";
-import { KEG_POOL_KINDS } from "@/lib/mgr/enums";
-import { KIND_LABEL } from "./keg-labels";
+import { kegPoolReady, toKegOption, type KegPoolKind, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 
-type Kind = (typeof KEG_POOL_KINDS)[number];
-export type Pool = { id: string; name: string; kind: Kind; per_fill_cents: number | null; deposit_cents: number; active: boolean };
+export type Pool = { id: string; name: string; kind: KegPoolKind; per_fill_cents: number | null; deposit_cents: number; active: boolean };
 
 const toCents = (s: string) => (s === "" ? undefined : Math.round(Number(s) * 100));
 
 export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string | null }; vendors: { id: string; name: string }[] }) {
-  const [name, setName] = useState(pool?.name ?? "");
-  const [kind, setKind] = useState<Kind>(pool?.kind ?? "owned");
-  const [vendorId, setVendorId] = useState(pool?.vendor_id ?? "");
-  const [perFill, setPerFill] = useState(dollarsInput(pool?.per_fill_cents));
-  const [deposit, setDeposit] = useState(dollarsInput(pool?.deposit_cents ?? 0));
-  const [active, setActive] = useState(pool?.active ?? true);
-  const reset = () => { setName(pool?.name ?? ""); setKind(pool?.kind ?? "owned"); setVendorId(pool?.vendor_id ?? ""); setPerFill(dollarsInput(pool?.per_fill_cents)); setDeposit(dollarsInput(pool?.deposit_cents ?? 0)); setActive(pool?.active ?? true); };
+  const initial = (): KegPoolValue => ({
+    name: pool?.name ?? "", kind: pool?.kind ?? "owned", vendorId: pool?.vendor_id ?? "",
+    perFill: dollarsInput(pool?.per_fill_cents), deposit: dollarsInput(pool?.deposit_cents ?? 0), active: pool?.active ?? true,
+  });
+  const [value, setValue] = useState(initial);
   const form = useCommandForm(pool ? "update_keg_pool" : "create_keg_pool", {
     build: () => (pool
-      ? { poolId: pool.id, name, vendorId: vendorId || undefined, perFillCents: toCents(perFill), depositCents: toCents(deposit), active }
-      : { name, kind, vendorId: kind === "owned" ? undefined : vendorId || undefined, perFillCents: toCents(perFill), depositCents: toCents(deposit) }),
-    reset,
+      ? { poolId: pool.id, name: value.name, vendorId: value.vendorId || undefined, perFillCents: toCents(value.perFill), depositCents: toCents(value.deposit), active: value.active }
+      : { name: value.name, kind: value.kind, vendorId: value.kind === "owned" ? undefined : value.vendorId || undefined, perFillCents: toCents(value.perFill), depositCents: toCents(value.deposit) }),
+    reset: () => setValue(initial()),
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={pool ? "Edit keg pool" : "Add keg pool"}
       trigger={<Button size="sm" variant={pool ? "outline" : "default"}>{pool ? "Edit" : "Add keg pool"}</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="pool-name">Pool name</Label>
-          <Input id="pool-name" value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-        {!pool && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pool-kind">Kind</Label>
-            <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
-              <SelectTrigger id="pool-kind"><SelectValue /></SelectTrigger>
-              <SelectContent>{KEG_POOL_KINDS.map((k) => <SelectItem key={k} value={k}>{KIND_LABEL[k]}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        )}
-        {kind !== "owned" && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pool-vendor">Vendor</Label>
-            <Select value={vendorId} onValueChange={setVendorId}>
-              <SelectTrigger id="pool-vendor"><SelectValue placeholder="Select a vendor" /></SelectTrigger>
-              <SelectContent>{vendors.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        )}
-        {E.edit("Per-fill cost ($)", perFill, "number", undefined, { id: "pool-per-fill", min: 0, step: 0.01, onChange: setPerFill, required: kind === "pay_per_fill" })}
-        {E.edit("Deposit per keg ($)", deposit, "number", undefined, { id: "pool-deposit", min: 0, step: 0.01, onChange: setDeposit })}
-        {pool && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> In service
-          </label>
-        )}
+        <KegPoolFields value={value} vendors={vendors.map(toKegOption)} editing={Boolean(pool)} onChange={setValue} />
         <CommandFormMessage error={form.error} />
         <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !name.trim() || (kind !== "owned" && !vendorId) || (kind === "pay_per_fill" && perFill === "")}>{form.submitting ? "Saving…" : pool ? "Save keg pool" : "Add keg pool"}</Button>
+          <Button type="submit" disabled={form.submitting || !kegPoolReady(value)}>{form.submitting ? "Saving…" : pool ? "Save keg pool" : "Add keg pool"}</Button>
         </CommandFormFooter>
       </form>
     </CommandForm>
