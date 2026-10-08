@@ -203,11 +203,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each open occupancy; readings adds each occupancy’s latest fermentation reading
+Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each open occupancy; readings adds each occupancy’s latest fermentation reading; open keeps only brewed batches not yet completed
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `readings` | boolean | no |
+| `open` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

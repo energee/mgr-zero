@@ -17,11 +17,14 @@ export type ImportViewModel = {
   previewRows?: number[];
 };
 
-/** onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start. */
-export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked, onDiscard }: {
+/**
+ * onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start.
+ * onNextFile returns to upload once results are recovered; it is never offered while a batch is unresolved.
+ */
+export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, onCommit, onCorrectBlocked, onDiscard, onNextFile }: {
   model: ImportViewModel; onKind?: (kind: ImportKind) => void; onFile?: (file?: File) => void; onStep?: (step: number) => void;
   onMapping?: (field: string, column: number) => void; onEdit?: (row: number, field: string, value: string) => void;
-  onCommit?: () => void; onCorrectBlocked?: () => void; onDiscard?: () => void;
+  onCommit?: () => void; onCorrectBlocked?: () => void; onDiscard?: () => void; onNextFile?: () => void;
 }) {
   const { kind, step, mapping, lookups, result, busy } = model;
   const [draft, setDraft] = useState<Pick<ImportViewModel, "rows" | "validation"> | null>(null);
@@ -82,6 +85,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
+      {result && !busy && <Button variant="outline" onClick={onNextFile}>Import another file</Button>}
       {!result && !busy && onDiscard && <ConfirmDiscard onDiscard={onDiscard}
         note="MGR will stop offering this retry and will not send the batch. Check the result first: open the imported records and confirm which rows were saved." />}
     </>}

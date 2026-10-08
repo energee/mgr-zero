@@ -390,12 +390,17 @@ async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each open occupancy; readings adds each occupancy’s latest fermentation reading",
-  input: z.object({ readings: z.boolean().optional().describe("Add each open occupancy's latest fermentation reading") }), roles: ["admin", "brewer"],
+  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each open occupancy; readings adds each occupancy’s latest fermentation reading; open keeps only brewed batches not yet completed",
+  input: z.object({
+    readings: z.boolean().optional().describe("Add each open occupancy's latest fermentation reading"),
+    open: z.boolean().optional().describe("Keep only batches that were brewed and are not completed (the ones still in a tank)"),
+  }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    const batches = (await unwrap(ctx.db.from("batches")
+    let q = ctx.db.from("batches")
       .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
-      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as BatchRow[];
+      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false });
+    if (i.open) q = q.not("brewed_on", "is", null).is("closed_at", null);
+    const batches = (await unwrap(q) ?? []) as BatchRow[];
     if (batches.length === 0) return [];
 
     const [brands, recipes, vessels] = await Promise.all([

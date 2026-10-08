@@ -335,3 +335,22 @@ describe("completion root structure and privileges", () => {
     expect(taproom.tax_treatment).toBe("research");
   });
 });
+
+// #759: Cellar offers Complete batch only for brewed, unclosed batches. The
+// page used to read every batch ever and filter; `open` asks Postgres instead.
+describe("list_batches open", () => {
+  it("returns only brewed batches that are not yet completed", async () => {
+    const live = await brew(1);
+    const done = await brew(1);
+    await complete(done.batchId);
+    const planned = await runCommand("schedule_batch", { plannedOn: "2026-09-05", plannedBbl: 1 }, ctx) as { id: string };
+
+    const open = await runCommand("list_batches", { open: true }, ctx) as { id: string; brewed_on: string | null; closed_at: string | null }[];
+    const ids = open.map(b => b.id);
+    expect(ids).toContain(live.batchId);
+    expect(ids).not.toContain(done.batchId);
+    expect(ids).not.toContain(planned.id);
+    expect(open.every(b => b.brewed_on !== null && b.closed_at === null)).toBe(true);
+    expect((await runCommand("list_batches", {}, ctx) as { id: string }[]).map(b => b.id)).toEqual(expect.arrayContaining([live.batchId, done.batchId, planned.id]));
+  });
+});
