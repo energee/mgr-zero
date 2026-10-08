@@ -2,6 +2,7 @@
 // tapped label (or shell link) opens. Three tiers: the record's own `to` map,
 // the global label and route rules, then an exact screen-name match. The
 // main flows must chain end to end so the explorer is a walkable prototype.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BACK, INERT, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
@@ -180,5 +181,17 @@ describe("isInertOn", () => {
     expect(INERT).not.toContain("Retry saved sync");
     expect(INERT).not.toContain("Sync QuickBooks");
     expect(resolveTap(by("Accounting"), "Retry saved sync")).toBe("Accounting");
+  });
+});
+
+describe("Me guide link (#718)", () => {
+  const read = (p: string) => readFileSync(p, "utf8");
+  it("each live Me sheet links its audience's guide", () => {
+    expect(read("app/(app)/layout.tsx")).toMatch(/<MeSheetActions guide="\/docs\/staff-guide" \/>/);
+    expect(read("app/(portal)/layout.tsx")).toMatch(/<MeSheetActions guide="\/docs\/portal-guide" \/>/);
+    expect(read("components/mgr/me-sheet.tsx")).toMatch(/<Link href=\{guide\}>Guide<\/Link>/);
+  });
+  it("shows Guide in both inventory Me sheets as a link out", () => {
+    for (const name of ["Me", "Portal Me"]) expect(isInertOn(by(name), "Guide"), name).toBe(true);
   });
 });
