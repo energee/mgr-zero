@@ -1,7 +1,7 @@
 // tests/water-profiles-view.test.ts — list_water_profiles rows → Water profiles view-model (issue #278).
 import { describe, expect, it } from "vitest";
 import { IONS, ionLine, toWaterProfilesViewProps, type WaterProfile } from "@/lib/mgr/water-profiles-view";
-import { IONS as CHEMISTRY_IONS, ION_LABELS } from "@/lib/water-chemistry";
+import { IONS as CHEMISTRY_IONS } from "@/lib/water-chemistry";
 
 const hazy: WaterProfile = { id: "p1", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40 };
 
@@ -11,10 +11,9 @@ describe("water profiles view", () => {
     expect(toWaterProfilesViewProps({ profiles: [hazy] }).rows).toEqual([{ key: "p1", title: "Hazy target", detail: ionLine(hazy) }]);
   });
   it("takes its ions and labels from the water formula's one list", () => {
-    expect(IONS.map(([key, label, input]) => [key, label, input])).toEqual(
-      CHEMISTRY_IONS.map((ion) => [`${ion}_ppm`, ION_LABELS[ion], `${ion}Ppm`]),
-    );
+    expect(IONS).toHaveLength(CHEMISTRY_IONS.length);
     expect(IONS[0]).toEqual(["calcium_ppm", "Calcium", "calciumPpm"]);
+    expect(IONS[5]).toEqual(["bicarbonate_ppm", "Bicarbonate", "bicarbonatePpm"]);
   });
   it("no profiles is the empty state", () => {
     expect(toWaterProfilesViewProps({ profiles: [] }).empty?.title).toBe("No water profiles yet");

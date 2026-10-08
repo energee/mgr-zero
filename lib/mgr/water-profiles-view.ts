@@ -2,14 +2,13 @@
 // and Water profile (the sheet): a name and six ions in ppm, as
 // list_water_profiles returns them and upsert_water_profile takes them.
 import type { EmptyState } from "./empty-state";
-import { IONS as CHEMISTRY_IONS, ION_LABELS } from "@/lib/water-chemistry";
+import { IONS as CHEMISTRY_IONS, ION_LABELS, type Ions } from "@/lib/water-chemistry";
 
-type ChemistryIon = (typeof CHEMISTRY_IONS)[number];
-export type Ion = `${ChemistryIon}_ppm`;
+export type Ion = `${keyof Ions}_ppm`;
 
 /** Column name, label, and the upsert_water_profile input key, one row per ion.
- *  Derived from lib/water-chemistry's IONS, the one place to add a seventh. */
-export const IONS = CHEMISTRY_IONS.map((ion) => [`${ion}_ppm`, ION_LABELS[ion], `${ion}Ppm`] as const) as readonly (readonly [Ion, string, `${ChemistryIon}Ppm`])[];
+ *  Derived from lib/water-chemistry's IONS: add a seventh ion there, not here. */
+export const IONS = CHEMISTRY_IONS.map((ion) => [`${ion}_ppm`, ION_LABELS[ion], `${ion}Ppm`] as const);
 export type WaterProfile = { id: string; name: string } & Record<Ion, number>;
 
 export type WaterProfilesViewModel = {

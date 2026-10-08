@@ -1,4 +1,5 @@
-// lib/hash.ts — the one sha256 hex helper and the OAuth state derivation shared
+// lib/hash.ts — the sha256 hex helper (lib/jobs/auth.ts keeps a raw-digest
+// createHash for timingSafeEqual) and the OAuth state derivation shared
 // by the QBO, Square, and Slack OAuth starts. Only the hash of a secret value
 // (OAuth state, link proof) is stored, so every caller must hash it the same way.
 import { createHash } from "node:crypto";

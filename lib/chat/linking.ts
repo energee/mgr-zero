@@ -9,7 +9,6 @@ import type { Database } from "@/lib/supabase/database";
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unwrap, type StaffRole } from "@/lib/commands/registry";
-
 import { sha256 } from "@/lib/hash";
 import { readAppUrl } from "@/lib/env/server-parser";
 

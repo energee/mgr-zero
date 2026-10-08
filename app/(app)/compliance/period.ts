@@ -62,4 +62,3 @@ export function recentPeriods(today: string, cadence: Cadence): string[] {
     return cadence === "quarter" ? `${yy}-Q${Math.ceil(m / 3)}` : `${yy}-${pad(m)}`;
   });
 }
-

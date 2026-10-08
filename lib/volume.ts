@@ -11,21 +11,21 @@ export function parseVolumeToBbl(value: string, unit: "oz" | "gal" | "bbl") {
   return amount;
 }
 
-/** A sale removal's volume: qty of a packaged unit times its barrels per unit.
- *  Sale-removal totals in the inventory are two-decimal bbl (2.00 / 0.87 / 0.97);
- *  formatVolume would drop the trailing zeros and turn a half-keg total into a
- *  glyph. An unknown barrels-per-unit has no volume to state, so it states none.
- */
-export function saleVolume(qty: number, bblPerUnit: number | undefined) {
-  return bblPerUnit === undefined ? "" : `${(qty * bblPerUnit).toFixed(2)} bbl`;
-}
-
 /** Two-decimal barrels, the TTB report precision ("2.00 bbl"). */
 export const bblFixed = (bbl: number) => `${Number(bbl).toFixed(2)} bbl`;
 
 /** Barrels as stored, up to `digits` fraction digits with thousands separators;
  *  for variance, loss, and preview figures where a rounded glyph would hide the value. */
 export const bblExact = (bbl: number, digits: number) => `${Number(bbl).toLocaleString("en-US", { maximumFractionDigits: digits })} bbl`;
+
+/** A sale removal's volume: qty of a packaged unit times its barrels per unit.
+ *  Sale-removal totals in the inventory are two-decimal bbl (2.00 / 0.87 / 0.97);
+ *  formatVolume would drop the trailing zeros and turn a half-keg total into a
+ *  glyph. An unknown barrels-per-unit has no volume to state, so it states none.
+ */
+export function saleVolume(qty: number, bblPerUnit: number | undefined) {
+  return bblPerUnit === undefined ? "" : bblFixed(qty * bblPerUnit);
+}
 
 /** Keg fractions shown as glyphs, by denominator. */
 const FRACTIONS = [[2, "½"], [4, "¼"], [6, "⅙"], [8, "⅛"]] as const;
