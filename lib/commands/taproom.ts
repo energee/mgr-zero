@@ -62,8 +62,9 @@ defineCommand({
   })),
 });
 
-const listPools = (ctx: Ctx) => unwrap(ctx.db.from("keg_pools")
-  .select("id, name, kind, vendor_id, per_fill_cents, deposit_cents, active").eq("brewery_id", ctx.breweryId).order("name"));
+const listPools = (ctx: Ctx) => completeRows("Keg pools", start => ctx.db.from("keg_pools")
+  .select("id, name, kind, vendor_id, per_fill_cents, deposit_cents, active", { count: "exact" })
+  .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + PAGE_SIZE - 1));
 
 defineQuery({
   name: "list_keg_pools", description: "Keg pools, alphabetical, active and retired alike", input: z.object({}), roles: ROLES,
@@ -72,17 +73,23 @@ defineQuery({
 
 // The Keg fleet page: every pool, what each bin physically holds per pool ×
 // size, and the customers holding kegs. Zero rows are kept so a bin that
-// emptied still shows; a customer with nothing out is not listed.
+// emptied still shows; a customer with nothing out is not listed. Page every
+// balance and label read past the row cap; order views by their full grain (#726).
 defineQuery({
   name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, and customers with kegs out", input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
     const [pools, rows, locations, bins, out, customers] = await Promise.all([
       listPools(ctx),
-      unwrap(ctx.db.from("keg_bin_on_hand").select("pool_id, keg_size, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("bins").select("id, name").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("keg_customer_balances").select("customer_id, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
+      completeRows("Keg fleet", start => ctx.db.from("keg_bin_on_hand").select("pool_id, keg_size, location_id, bin_id, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("pool_id").order("keg_size").order("location_id").order("bin_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Keg fleet locations", start => ctx.db.from("locations").select("id, name", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Keg fleet bins", start => ctx.db.from("bins").select("id, name", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Kegs out", start => ctx.db.from("keg_customer_balances").select("customer_id, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Keg fleet customers", start => ctx.db.from("customers").select("id, name", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const name = (list: { id: string; name: string }[] | null, id: string) => list?.find((x) => x.id === id)?.name ?? "";
     const kegsOut = new Map<string, number>();
@@ -164,13 +171,15 @@ defineQuery({
   handler: async (ctx) => {
     const [pools, totals, events, customers, kegs, deposits, refunded] = await Promise.all([
       listPools(ctx),
-      unwrap(ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty").eq("brewery_id", ctx.breweryId)),
+      completeRows("Keg report totals", start => ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       // Every event, oldest first, paged past PostgREST's 1000-row cap (#455);
       // kegAging re-sorts by instant, and this order breaks same-instant ties.
       completeRows("Keg report", start => ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])
         .order("at").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)),
-      unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
+      completeRows("Keg report customers", start => ctx.db.from("customers").select("id, name", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
       // Brewery-wide balances for the mismatch list, paged like the events above;
       // each view has one row per customer × pool × size, so that order is total.
       completeRows("Keg report", start => ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty", { count: "exact" })
