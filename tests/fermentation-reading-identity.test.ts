@@ -17,8 +17,9 @@ describe("fermentation reading identity (#716)", () => {
   });
 
   it("shows the vessel alone when no batch is known", () => {
-    expect(render({ vessel: "FV3" })).toContain("FV3");
-    expect(render({ vessel: "FV3" })).not.toContain("Batch");
+    const html = render({ vessel: "FV3" });
+    expect(html).toContain("FV3");
+    expect(html).not.toContain("Batch");
   });
 
   it("builds identity from an occupancy without inventing missing facts", () => {
