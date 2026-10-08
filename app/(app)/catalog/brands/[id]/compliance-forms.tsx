@@ -18,7 +18,7 @@ type Brand = { id: string; name: string };
 export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: Approval }) {
   // No expiry field: a COLA does not expire. The expires_on column and note
   // are not shown; approvalInput omits them, so the upsert keeps them (#438, #522).
-  const { v, set, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", submittedOn: approval?.approved_on ?? "" });
+  const { v, set, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", serialNumber: approval?.serial_number ?? "", submittedOn: approval?.approved_on ?? "" });
   const form = useCommandForm("upsert_brand_approval", {
     build: () => approvalInput(brand.id, v, approval),
     reset,
@@ -28,9 +28,10 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
     kind: v.kind,
     kindOptions: APPROVAL_KINDS,
     number: v.ttbId,
+    serialNumber: v.serialNumber,
     submittedOn: v.submittedOn,
   };
-  const controls = { kind: set("kind"), number: set("ttbId"), submittedOn: set("submittedOn") };
+  const controls = { kind: set("kind"), number: set("ttbId"), serialNumber: set("serialNumber"), submittedOn: set("submittedOn") };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">

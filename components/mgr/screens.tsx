@@ -1434,7 +1434,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Brand",
-    to: { Edit: "Brand approval", "COLA serial 260135": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand" },
+    to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand" },
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_catalog_categories · list_skus · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient]",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
@@ -2181,7 +2181,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked: the sheet is only ever opened from one brand"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
-    spec: "A COLA is filed under the applicant’s own serial (260135), not a TTB-issued number, and it never expires: the sheet asks for the serial and the date submitted, and offers no expiry; the stored approval-date column carries the submitted date and the expiry column is never written; renaming and dropping them waits for a migration. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand.",
+    spec: "A COLA has two identifiers: the TTB ID that TTB assigns (25318001000034), which is required, and the applicant’s own serial number (260135), which is optional; both are text, so leading zeros stay. Open COLA links TTB’s public COLA page built from the TTB ID alone, never the serial; with no TTB ID the sheet says to enter one, and the link does not verify approval or promise the page is reachable. A COLA never expires: the sheet asks for the two identifiers and the date submitted, and offers no expiry; the stored approval-date column carries the submitted date and the expiry column is never written; renaming and dropping them waits for a migration. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand.",
     body: <BrandApprovalView model={brandApprovalStout} />,
   },
   {
