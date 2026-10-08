@@ -1,6 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId, insertFixture } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId, insertFixture, sql } from "./helpers";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -56,6 +56,19 @@ describe("ledger integrity + RLS", () => {
     expect(Number(stored!.qty)).toBe(2);
     expect(Number(stored!.bbl)).toBe(1);
   });
+});
+
+// #756: is_staff_of/staff_role each run private.request_scope_allows, whose
+// exception block is a subtransaction. Called once per ledger row they made
+// on_hand ~80x slower at 50k movements; the stock helpers resolve the
+// caller's staff memberships once, as a set, instead.
+describe("stock helpers resolve staff membership once per query", () => {
+  for (const fn of ["on_hand_rows", "keg_bin_on_hand_rows"]) {
+    it(`${fn} calls no per-row role helper`, () => {
+      const body = sql(`select pg_get_functiondef('public.${fn}'::regproc)`, true).join("\n");
+      expect(body).not.toMatch(/is_staff_of|staff_role\(/);
+    });
+  }
 });
 
 describe("removal_shape CHECK: channel/tax_treatment/dest_state required on removals, null otherwise", () => {
