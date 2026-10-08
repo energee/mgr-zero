@@ -28,7 +28,7 @@ export function MeView({ model, footer, switchAction, avatar }: {
         brewery.current ? "ok" : "",
       )}</Fragment>)}
       {E.sp()}
-      {footer !== undefined ? footer : E.btns([["Change password", "g"], ["Sign out", "del"]])}
+      {footer !== undefined ? footer : E.btns([["Guide", "g"], ["Change password", "g"], ["Sign out", "del"]])}
     </>
   );
 }

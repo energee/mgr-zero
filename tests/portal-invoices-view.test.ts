@@ -55,7 +55,7 @@ describe("Invoice history view", () => {
     });
     expect(model.rows[1]).toMatchObject({
       title: "INV-1037",
-      detail: "paid Aug 29, 2026",
+      detail: "paid",
       total: "$980.00",
       unpaid: false,
       tone: "ok",
@@ -119,7 +119,8 @@ describe("Invoice history view", () => {
     expect(html).toMatch(/due Oct 3, 2026 · \$948\.00/);
     expect(html).toMatch(/>Pay</);
     expect(html).toMatch(/INV-1037/);
-    expect(html).toMatch(/paid Aug 29, 2026/);
+    expect(html).toMatch(/>paid<\/p>/);
+    expect(html).not.toMatch(/paid Aug/);
     expect(html).toMatch(/\$980\.00/);
     expect(html).not.toMatch(/href="\/portal\/invoices/);
     expect(html).not.toMatch(/→/);
@@ -156,12 +157,12 @@ describe("Portal invoice view", () => {
     ]);
   });
 
-  it("maps a paid invoice onto the paid date", () => {
+  it("maps a paid invoice onto status without claiming a settlement date", () => {
     const model = toPortalInvoiceViewProps(portalInvoicePaid);
     expect(model.title).toBe("INV-1037");
     expect(model.total).toBe("$980.00");
     expect(model.paid).toBe(true);
-    expect(model.paidOn).toBe("Aug 29, 2026");
+    expect(model.paidOn).toBeUndefined();
     expect(model.lines).toHaveLength(2);
   });
 
@@ -220,7 +221,7 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/INV-1037/);
     expect(html).toMatch(/\$980\.00/);
     expect(html).toMatch(/Paid/);
-    expect(html).toMatch(/Aug 29, 2026/);
+    expect(html).not.toMatch(/Aug 29, 2026/);
     expect(html).toMatch(/>Download PDF</);
     expect(html).not.toMatch(/>Pay invoice</);
     expect(html).toMatch(/Question this invoice/);

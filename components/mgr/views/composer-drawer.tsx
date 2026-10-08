@@ -42,6 +42,8 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
       onSnapPointChange={setSnapPoint}
     >
       <DrawerContent
+        // app/globals.css uses this marker to layer the owning viewport below Tabs.
+        data-mgr-composer=""
         // Keep the initial peek stationary while Base UI measures its portal.
         className={cn("h-dvh! max-h-none! border-t [--composer-peek:44px] max-md:[--composer-peek:92px]", !interacted && !chatOpen && "transform-[translate3d(0,calc(100%-var(--composer-peek)),0)]! transition-none!")}
         initialFocus={false}

@@ -81,6 +81,7 @@ type QboInvoiceRead = {
   totalCents: number;
   balanceCents: number | null;
   cashCollectedCents: number;
+  /** Legacy observation slot; transport supplies null, not a settlement date. */
   paidAt: string | null;
   privateNote: string;
   content: Record<string, unknown>;
@@ -143,6 +144,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    else console.error("qbo_payment_refresh_failed", error);
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -165,14 +167,16 @@ export async function resolvePortalInvoicePayment(
     claim = next;
     refreshed = true;
   }
-  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
-  if (read && !read.ok && read.status === 401 && !refreshed) {
+  // A thrown read (network, invalid response) reaches the Pay route, which
+  // logs it and shows the buyer Payment unavailable.
+  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
+  if (!read.ok && read.status === 401 && !refreshed) {
     const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
     if (!next) return { kind: "unavailable", reason: "provider_unavailable" };
     claim = next;
-    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
+    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
   }
-  if (!read || !read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
+  if (!read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
   const url = read.invoiceLink ? validateQboPaymentUrl(read.invoiceLink, allowedHosts) : null;
   if (!url) return { kind: "unavailable", reason: "link_unavailable" };
   if (!await confirmPortalInvoicePayment(ctx, invoiceId, claim)) {
@@ -542,12 +546,12 @@ export class QboOAuthClient {
       }
       cashCollectedCents += (await allocations).get(remoteId) ?? 0;
     }
-    const updated = invoice.MetaData && typeof invoice.MetaData === "object"
-      ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
     return {
       ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents: entityType === "Invoice" ? balanceCents : null, taxCents,
       cashCollectedCents: Math.min(cashCollectedCents, totalCents),
-      paidAt: entityType === "Invoice" && typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
+      // Invoice edits are not payment dates. Reconciliation records its own
+      // confirmation marker only after the existing balance/cash guards pass.
+      paidAt: null,
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
     };

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { CommandForm } from "@/components/mgr/command-form";
+import { orderLineErrors } from "@/lib/order-form-rules";
 import { DatePicker } from "@/components/mgr/date-picker";
 import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
@@ -24,13 +25,14 @@ function OrderPick({ label, value, options, onChange }: { label: string; value: 
   return E.pick(label, value, options.map(option => typeof option === "string" ? option : { value: option.id, label: option.label }), { onChange, placeholder: label });
 }
 
-// Options are already loaded and permission-filtered by the route. Search the
-// same supplied SKU set in both render paths; selection always returns an ID.
-export function OrderSkuPicker({ value, label, options, onChange }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void }) {
+// The adapter supplies options and request feedback. Pending reads must not
+// look empty, and retained unavailable selections keep their visible label.
+export function OrderSkuPicker({ value, label, options, onChange, selectedLabel, feedback, optionsReady = true, emptyMessage = "No matching SKUs", errorId }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void; selectedLabel?: string; feedback?: ReactNode; optionsReady?: boolean; emptyMessage?: string; errorId?: string }) {
   const [open, setOpen] = useState(false);
   return <CommandForm title="Select SKU" open={open} onOpenChange={setOpen}
-    trigger={<Button type="button" variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label}>{options.find(option => option.id === value)?.label ?? "Select SKU"}</Button>}>
-    <Command><CommandInput placeholder="Search SKUs" /><CommandList><CommandEmpty>No matching SKUs</CommandEmpty>
+    trigger={<Button type="button" variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label} aria-describedby={errorId}>{options.find(option => option.id === value)?.label ?? (value && selectedLabel ? selectedLabel : "Select SKU")}</Button>}>
+    {feedback}
+    <Command><CommandInput placeholder="Search SKUs" /><CommandList>{optionsReady && <CommandEmpty>{options.length ? "No matching SKUs" : emptyMessage}</CommandEmpty>}
       {options.map(option => <CommandItem key={option.id} value={option.id} keywords={[option.label]} onSelect={() => { onChange?.(option.id); setOpen(false); }}>{option.label}</CommandItem>)}
     </CommandList></Command>
   </CommandForm>;
@@ -40,7 +42,10 @@ export function OrderQuantity({ value, label, onChange, contextualLabels = false
   return E.edit(label, String(value), "number", undefined, { onChange, min: 0, max, step, required, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
 }
 
-export function NewOrderView({ model, controls = {}, messages, feedback, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
+/** SKU request feedback is shared by the line list and its picker surface. */
+export function NewOrderView({ model, controls = {}, messages, feedback, skuFeedback, skuOptionsReady = true, skuEmptyMessage, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; skuFeedback?: ReactNode; skuOptionsReady?: boolean; skuEmptyMessage?: string; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
+  const errorPrefix = useId();
+  const lineErrors = orderLineErrors(model.lines.map(line => ({ skuId: line.skuId ?? line.name, qty: String(line.qty) })));
   const skus = model.skus ?? model.lines.map(line => ({ id: line.name, label: line.name }));
   const source = model.sources.find(option => typeof option !== "string" && option.id === model.source);
   const sourceLabel = typeof source === "object" ? source.label : model.source;
@@ -58,19 +63,22 @@ export function NewOrderView({ model, controls = {}, messages, feedback, footer,
       <DatePicker key="date" label="Requested ship" value={controls.requestedShip ? model.requestedShip : undefined} defaultValue={model.requestedShip} onChange={controls.requestedShip} />,
     )}
     {E.edit("Customer PO", model.po, "text", undefined, { onChange: controls.po })}
+    {skuFeedback}
     {model.lines.map((line, index) => <div key={index}>
       {E.row(
-        <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
+        <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={line.skuError ? `${errorPrefix}-sku-${index}` : undefined} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
         line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
         <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",
       )}
+      {line.skuError && <p id={`${errorPrefix}-sku-${index}`} role="alert" className="text-sm text-destructive">{line.skuError}</p>}
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => controls.removeLine?.(index)}>Remove</Button>}
     </div>)}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
     {E.info("Order number is assigned on commit.")}
+    {lineErrors.map(error => <p key={error} role="status" className="text-sm text-muted-foreground">{error}</p>)}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Save draft"}</Button>}
+    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled || lineErrors.length > 0}>{submitting ? "Saving…" : "Save draft"}</Button>}
   </>;
 }

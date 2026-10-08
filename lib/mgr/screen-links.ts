@@ -191,6 +191,7 @@ export const TAPS: [string | RegExp, string][] = [
 export const INERT: (string | RegExp)[] = [
   "Export state transactions",
   "Open Ask MGR",
+  "Guide",
   "Reschedule",
   "Cancel plan",
   /^Switch to (dark|light) mode$/,
@@ -409,7 +410,8 @@ const authored = (screen: Screen, l: string, to?: string | null) =>
 export const isInertOn = (screen: Screen, label: string, to?: string | null) => {
   const l = label.trim();
   const localMapping = l === "Map" && ["QuickBooks mappings", "Invoice mappings"].includes(screen.name);
-  return !authored(screen, l, to) && (localMapping || INERT.some((k) => matches(k, l)));
+  const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
+  return !authored(screen, l, to) && (localMapping || draftSku || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];

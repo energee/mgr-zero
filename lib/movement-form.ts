@@ -16,3 +16,10 @@ export const binStockKey = (stock: BinMoveStock) => JSON.stringify([stock.bin_id
 export function selectedBinStock(stock: BinMoveStock[], source: string) {
   return stock.find(row => binStockKey(row) === source);
 }
+
+/** Why Move stock is not offered at this location, or null when it is: a bin move needs a second bin and some stock to move. */
+export function moveStockUnavailable({ bins, stock }: { bins: number; stock: number }): string | null {
+  if (bins < 2) return "Moving stock needs at least two bins at this location. Add a bin first.";
+  if (stock === 0) return "No stock is on hand in this location's bins.";
+  return null;
+}

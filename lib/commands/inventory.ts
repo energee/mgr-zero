@@ -186,19 +186,26 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel",
-  input: z.object({ saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price") }), roles: STAFF_ROLES,
+  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package",
+  input: z.object({
+    saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"),
+    active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied"),
+    packageType: z.enum(["keg", "can", "bottle"]).optional().describe("Keep only SKUs whose format packages this type"),
+  }), roles: STAFF_ROLES,
   aiExposed: true,
   handler: async (ctx, i) => {
+    // `formats!inner` turns the format embed into a filter; the count joins the same way, or paging waits for rows the filter removed.
+    const formats = i.packageType ? "formats!inner" : "formats";
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
       let query = ctx.db.from("skus")
-        .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
+        .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
         .eq("brewery_id", ctx.breweryId).order("id").limit(PAGE_SIZE);
       if (after) query = query.gt("id", after.id);
-      const [result, counted] = await Promise.all([
-        query,
-        ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
-      ]);
+      let count = ctx.db.from("skus").select(i.packageType ? "id, formats!inner(package_type)" : "id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+      for (const [column, value] of [["active", i.active], ["formats.package_type", i.packageType]] as const) {
+        if (value !== undefined) { query = query.eq(column, value); count = count.eq(column, value); }
+      }
+      const [result, counted] = await Promise.all([query, count]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     }, row => row.id);
     const sorted = rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

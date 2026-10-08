@@ -26,6 +26,7 @@ export function OrderView({
       {E.back("Orders", model.title, undefined, model.backHref)}
       {E.ttl(model.where)}
       {E.row("Current state", model.currentState, E.status(model.next), model.restockNote ? "w" : "")}
+      {model.editHref ? E.act("Edit draft", "primary", model.editHref) : null}
       {model.putBackHref ? E.act("Put back", "attention", model.putBackHref) : null}
       {model.confirmHref ? E.act("Review and confirm", "success", model.confirmHref) : null}
       {model.completeHref ? E.act("Complete transfer", "success", model.completeHref) : null}

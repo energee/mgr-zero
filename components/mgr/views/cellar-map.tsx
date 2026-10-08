@@ -12,6 +12,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
       {addition !== undefined ? addition : E.btn("Addition", "g")}
       {E.btn("Brew day", "g", model.brewHref)}
     </div>
+    {model.readingHint && E.info(model.readingHint)}
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
     {complete !== undefined ? complete : E.btn("Complete batch", "g")}
     {E.sp()}

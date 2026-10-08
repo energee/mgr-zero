@@ -7,6 +7,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Product chrome: composer below phone tabs (40), both below modal surfaces (50).
+   Target its viewport, not the popup: the viewport owns the stacking context. */
+[data-slot="drawer-portal"] > div:has(> [data-mgr-composer]) {
+  z-index: 30;
+}
+
 @theme inline {
   --color-dot-warning: var(--dot-warning);
   --color-dot-success: var(--dot-success);

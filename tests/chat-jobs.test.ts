@@ -278,6 +278,30 @@ describe("delivery batch", () => {
     await admin.from("chat_installations").update({ state: "active", last_failure_code: null }).eq("id", inst.id);
   });
 
+  it("logs a reauthorization flag that could not be recorded instead of hiding it", async () => {
+    await drain();
+    const id = await submittedOrder();
+    const [, other] = await deliveriesOf(id);
+    await admin.from("notification_deliveries").update({ state: "terminal" }).eq("id", other.id);
+    // Only the reauthorization flag fails; every other call reaches the database.
+    const db = new Proxy(admin, { get: (target, key) => key === "rpc"
+      ? (fn: string, args: unknown) => fn === "mark_chat_installation_reauthorization"
+        ? Promise.resolve({ data: null, error: { message: "flag write failed" } })
+        : target.rpc(fn as never, args as never)
+      : Reflect.get(target, key) });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      failNext = Object.assign(new Error("invalid_auth"), { data: { error: "invalid_auth" } });
+      await runChatDeliveryBatch({ limit: 1, now: new Date("2036-09-06T00:00:00Z"), transport, db: db as typeof admin });
+      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/reauthorization flag \(invalid_auth\) could not be recorded/), "database error");
+    } finally {
+      logged.mockRestore();
+    }
+    const [d] = await deliveriesOf(id);
+    expect(d).toMatchObject({ state: "terminal", last_error_code: "invalid_auth" });
+    expect((await admin.from("chat_installations").select("state").eq("id", inst.id).single()).data).toEqual({ state: "active" });
+  });
+
   it("blocks an invalid shared channel without fallback, and sends an aggregate digest to a valid one", async () => {
     await drain(); calls.sends.length = 0;
     const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops" }, adminCtx) as { id: string };

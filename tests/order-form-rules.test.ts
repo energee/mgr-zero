@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 const catalog = { customers: 1, locations: 1, skus: 1 };
 const line = { skuId: "sku-1", qty: "12" };
@@ -24,6 +24,28 @@ describe("orderFormReadiness", () => {
     expect(orderFormReadiness({ ...base, lines: [{ skuId: "", qty: "3" }] }).submittable).toBe(false);
     // One complete line is enough even when a blank row sits beside it.
     expect(orderFormReadiness({ ...base, lines: [{ skuId: "", qty: "" }, line] }).submittable).toBe(true);
+  });
+
+  it.each([
+    { skuId: "sku-2", qty: "" },
+    { skuId: "", qty: "3" },
+    { skuId: "sku-2", qty: "0" },
+    { skuId: "sku-2", qty: "-1" },
+    { skuId: "sku-2", qty: "not a number" },
+    { skuId: "sku-2", qty: "Infinity" },
+  ])("blocks an entered invalid row beside a complete line: %j", partial => {
+    const input = { kind: "wholesale" as const, customerId: "c1", shipToId: "s1", fromLocationId: "l1", toLocationId: "", lines: [line, partial], catalog };
+    expect(orderFormReadiness(input).submittable).toBe(false);
+  });
+
+  it("rejects unavailable selections even beside a complete eligible line", () => {
+    const base = { kind: "wholesale" as const, customerId: "c1", shipToId: "s1", fromLocationId: "l1", toLocationId: "", lines: [line], catalog };
+    expect(orderFormReadiness({ ...base, availableSkuIds: [] }).submittable).toBe(false);
+    expect(orderFormReadiness({ ...base, lines: [line, { skuId: "other", qty: "2" }], availableSkuIds: ["other"] }).submittable).toBe(false);
+    expect(orderFormReadiness({ ...base, availableSkuIds: [line.skuId] }).submittable).toBe(true);
+    expect(isUnavailableSku("", [])).toBe(false);
+    expect(isUnavailableSku(line.skuId, [])).toBe(true);
+    expect(isUnavailableSku(line.skuId, [line.skuId])).toBe(false);
   });
 
   it("taproom transfer needs to-location instead of customer and ship-to", () => {

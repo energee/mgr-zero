@@ -14,6 +14,8 @@ scheduling — that read belongs to the Packaging screen, not this reference.
 
 Closing a run requires confirmed material `actuals` and the `planRevision` returned by `get_packaging_close_plan`; a plan that changed since then is refused with `409 stale_plan`. Omit them only to replay an already completed pre-upgrade request with its original request ID. Used plus lost quantities debit explicit sources; unused is an observation. The close stores the reviewed BOM and actuals atomically with outputs and tank draw. `correct_packaging_material_record` appends exact material reversals and replacement actuals, without changing finished output or tank volume. Downstream finished-goods use, completed batches and dependent filed reports prevent correction.
 
+Each new close requires nonnegative, finite `bblDrawn` and rounds it to three decimals for storage and comparison with the sum of frozen `production_in` movement barrels. The original input remains part of request identity: different raw draws conflict under the same request ID even if they round alike. Completed requests replay before this validation. Output exceeding draw by more than **0.0005 bbl** is refused with `400 bad_request`; equality and excess up to that tolerance are accepted. Tank availability uses the same tolerance, while the batch-total guard still rejects any negative residual. A rejection rolls back the entire close, including its request claim, lot, output quantities and movements, material records and consumption. Correct the draw or package counts before submitting again.
+
 {/* ops:packaging */}
 
 ## cancel_packaging_run [#cancel_packaging_run]

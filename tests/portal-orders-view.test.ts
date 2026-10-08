@@ -95,7 +95,7 @@ describe("Order detail view", () => {
     expect(model.lines[0]?.amount).toBe(money(2 * SKU_HAZY.unit_price_cents));
     expect(model.lines[1]?.name).toBe(SKU_PILS.name);
     expect(model.invoice?.title).toBe("INV-1037");
-    expect(model.invoice?.detail).toMatch(/paid 8\/29/);
+    expect(model.invoice?.detail).toBe("paid");
     expect(model.po).toBeUndefined();
     expect(model.note).toBeUndefined();
     expect(model.adjusted).toBeUndefined();
