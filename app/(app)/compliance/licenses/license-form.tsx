@@ -26,7 +26,7 @@ export function LicenseForm({ license }: { license?: License }) {
     licenseNo: set("licenseNo"), expiresOn: set("expiresOn"),
   };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="License" trigger={sheetTrigger(!!license, "Add license")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="License" trigger={sheetTrigger(!!license, "Add license", license && `${license.state} ${license.kind} license`)}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <LicenseView
           model={model}

@@ -240,8 +240,9 @@ describe("QuickBooks current invoice state", () => {
   });
 
   it("fetches a shared Payment once and fails cash recognition closed when its invoice allocation is ambiguous", async () => {
-    const firstId = "00000000-0000-4000-8000-000000000101";
-    const secondId = "00000000-0000-4000-8000-000000000102";
+    // Random ids keep reruns from colliding in the shared test DB; sorted so
+    // the sync's `order by id` still visits remote-one first (#767).
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
     const f = await stateFixture("admin", firstId, "remote-one");
     expect((await admin.from("invoices").insert({
       id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
@@ -369,8 +370,9 @@ describe("QuickBooks current invoice state", () => {
   });
 
   it("applies a fetched batch atomically and replays its frozen target set without provider calls", async () => {
-    const firstId = "00000000-0000-4000-8000-000000000001";
-    const secondId = "00000000-0000-4000-8000-000000000002";
+    // Random ids keep reruns from colliding in the shared test DB; sorted so
+    // the sync's `order by id` still visits remote-one first (#767).
+    const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()].sort();
     const f = await stateFixture("admin", firstId, "remote-one");
     expect((await admin.from("invoices").insert({
       id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
@@ -391,7 +393,7 @@ describe("QuickBooks current invoice state", () => {
     expect(sql(`select id || ':' || coalesce(qbo_sync_token,'NULL') from invoices where id in ('${firstId}','${secondId}') order by id`))
       .toEqual([`${firstId}:NULL`, `${secondId}:NULL`]);
 
-    const lateId = "00000000-0000-4000-8000-000000000003";
+    const lateId = crypto.randomUUID();
     expect((await admin.from("invoices").insert({
       id: lateId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
       qbo_invoice_id: "remote-late", qbo_sync_status: "pushed",

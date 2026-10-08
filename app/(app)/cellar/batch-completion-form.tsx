@@ -88,7 +88,8 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     setBatchId(""); setPreview(null); setError(null); setPhase("idle"); requestId.current = null;
   }
 
-  return <CommandForm open={open} onOpenChange={changeOpen} title="Complete batch" trigger={<Button size="sm" variant="outline" disabled={batches.length === 0}>Complete batch</Button>}>
+  const none = batches.length === 0;
+  return <><CommandForm open={open} onOpenChange={changeOpen} title="Complete batch" trigger={<Button size="sm" variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={submit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="completion-batch">Batch</Label>
@@ -115,5 +116,6 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
         </Button>
       </CommandFormFooter>
     </form>
-  </CommandForm>;
+  </CommandForm>
+  {none && <p id="completion-none" className="text-xs text-muted-foreground">No brewed batch is open to complete.</p>}</>;
 }

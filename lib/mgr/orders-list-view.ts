@@ -22,6 +22,8 @@ export type OrdersListViewModel = {
 export type OrdersListSnapshot = {
   role: string;
   status?: string;
+  /** The filtered customer's name; an empty list then names it instead of saying "No orders yet". */
+  customer?: string;
   orders: {
     id: string;
     order_no: number | null;
@@ -32,10 +34,12 @@ export type OrdersListSnapshot = {
   }[];
 };
 
-export function toOrdersListViewProps({ role, status, orders }: OrdersListSnapshot): OrdersListViewModel {
+export function toOrdersListViewProps({ role, status, customer, orders }: OrdersListSnapshot): OrdersListViewModel {
+  const what = status ? `${status} orders` : "orders";
+  const title = customer ? `No ${what} for ${customer}` : status ? `No ${what}` : "No orders yet";
   return {
     subtitle: `${role} default`,
-    empty: orders.length === 0 ? { title: status ? `No ${status} orders` : "No orders yet", description: "Orders appear here once they are placed." } : undefined,
+    empty: orders.length === 0 ? { title, description: "Orders appear here once they are placed." } : undefined,
     rows: orders.map((o) => {
       const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, role);
       const ships = o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : "";

@@ -22,10 +22,11 @@ export default async function TodayPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const date = formatDayHeader(new Date(), brewery.timeZone);
-  if (brewery.role === "admin") {
-    const state = (await runCommand("get_first_run_state", {}, ctx)) as FirstRun;
-    if (!state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;
-  }
+  // Admin reads Today alongside the first-run state, not after it; a new brewery's Today is empty and cheap.
+  const [state, adminItems] = brewery.role === "admin"
+    ? await Promise.all([runCommand("get_first_run_state", {}, ctx) as Promise<FirstRun>, runCommand("get_today", {}, ctx) as Promise<TodayItem[]>])
+    : [null, null];
+  if (state && !state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;
   if (brewery.role === "taproom") {
     const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as { id: string; name: string }[];
     const location = locations[0];
@@ -44,7 +45,7 @@ export default async function TodayPage() {
     ]);
     return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
-  const items = (await runCommand("get_today", {}, ctx)) as TodayItem[];
+  const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
   // Only a role that may record a movement is offered one; the others get no
   // empty-state verb rather than a link to No access or a formless page (#478).
   const canMove = canRun(ctx, "record_movement");
