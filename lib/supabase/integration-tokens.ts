@@ -740,7 +740,7 @@ export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Pro
   if (ctx.role !== "customer" || !ctx.customerId || !isUuid(invoiceId)) {
     throw new CommandError("invoice not found", 404, "not_found");
   }
-  const visible = await ctx.db.from("invoices").select("id").eq("id", invoiceId)
+  const visible = await ctx.db.from("portal_invoices").select("id").eq("id", invoiceId)
     .eq("brewery_id", ctx.breweryId).eq("customer_id", ctx.customerId).maybeSingle();
   if (visible.error) throw new Error("invoice payment is unavailable");
   if (!visible.data) throw new CommandError("invoice not found", 404, "not_found");

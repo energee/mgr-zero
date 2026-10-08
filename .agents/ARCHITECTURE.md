@@ -146,8 +146,14 @@ a gap to close, not a convention to trust.
    another brewery's data. Portal customers never `SELECT` the `breweries` base
    table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
+   Staff and customers share one table grant, so the same holds for
+   `invoices`, `order_events`, `shipments` and `deliveries` (#754): no customer
+   policy on the base table; buyers read the `portal_invoices`,
+   `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
+   projections, which omit QBO sync bookkeeping, write-off attribution, event
+   payloads and staff ids (deliveries have no portal projection).
    *Enforced by:* RLS policies in migrations, proven by
-   `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
+   `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.

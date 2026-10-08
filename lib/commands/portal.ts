@@ -22,6 +22,11 @@ const quoteInput = z.object({
 });
 type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: string): Promise<number> };
 
+// Buyer invoice columns every portal invoice read needs. Customers read
+// invoices, order events and shipments only through the portal_* views (#754):
+// the base tables hold QuickBooks sync bookkeeping and staff attribution.
+const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at";
+
 function requireCustomer(ctx: Ctx): string {
   if (!ctx.customerId) throw new CommandError("not a portal customer");
   return ctx.customerId;
@@ -164,10 +169,13 @@ defineQuery({
     const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).eq("customer_id", customerId).single());
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
-      unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("id, invoice_timing, invoices(id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("portal_order_events").select("id, event, created_at").eq("order_id", i.orderId).order("created_at")),
+      unwrap(ctx.db.from("portal_shipments").select("id, invoice_timing").eq("order_id", i.orderId).maybeSingle()),
     ]);
-    return { order, lines: ln, events, shipment };
+    // A view has no foreign key to embed through, so the shipment's invoice is a
+    // second read; invoices.shipment_id is unique, hence limit(1).
+    const invoices = shipment ? await unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, invoice_lines`).eq("shipment_id", shipment.id!).limit(1)) : [];
+    return { order, lines: ln, events, shipment: shipment && { ...shipment, invoices } };
   },
 });
 
@@ -175,7 +183,7 @@ defineQuery({
   name: "portal_invoices", description: "Portal: the caller's invoices and credit memos",
   roles: "customer",
   input: z.object(historyInput),
-  handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.from("invoices").select("*, invoice_lines(*, skus(name))").eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),
+  handler: async (ctx, i) => historyResult(await unwrap(newestFirst(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, customer_id, shipment_id, issued_on, due_on, qbo_tax_cents, created_at, invoice_lines`).eq("brewery_id", ctx.breweryId).eq("customer_id", requireCustomer(ctx)).limit(i.limit + 1), i.cursor)) as HistoryRow[], i.limit),
 });
 
 defineQuery({
@@ -187,7 +195,7 @@ defineQuery({
     const [customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
       unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
       unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
-      unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
+      unwrap(ctx.db.from("portal_keg_deposits").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
       // Only this brewery's explicitly configured warehouse, never an
       // arbitrary/default one. Filter by the configured id rather than leaning
       // on customer_read_portal_source: a login that is also staff reads every
@@ -220,7 +228,7 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
     const [invoice, lines, brewery] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at, qbo_remote_state, qbo_total_cents, qbo_tax_cents, qbo_balance_cents, qbo_accountant_drift, written_off_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("portal_invoices").select(`${INVOICE_ROW}, issued_on, due_on, qbo_tax_cents, qbo_accountant_drift`).eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
