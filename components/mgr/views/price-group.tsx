@@ -1,10 +1,29 @@
 // components/mgr/views/price-group.tsx — one price-group row. Inventory
 // draws name / position / ceiling edits; live keeps GroupForm as the wrapper.
+// Removing a pour and deleting the group confirm first; both surfaces draw the
+// same two controls below, live binding onDelete to the commands.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PriceGroupViewModel } from "@/lib/mgr/price-group-view";
+import { ConfirmDeleteControl } from "./confirm-delete";
 
 export type { PriceGroupViewModel };
+
+type ConfirmProps = { busy?: boolean; error?: string | null; onDelete?: () => Promise<boolean> };
+
+/** Confirm, then delete one pour (delete_format) from its price group. */
+export function RemovePourControl({ pour, group, ...rest }: ConfirmProps & { pour: string; group: string }) {
+  return <ConfirmDeleteControl title={`Remove ${pour}`} triggerLabel="Remove" size="sm" busyLabel="Removing…" {...rest}
+    name={<>Remove the <strong>{pour}</strong> pour from {group}?</>}
+    warning="Refused while its price cells are filled, or while a Square mapping, menu line or recorded sale uses it." />;
+}
+
+/** Confirm, then delete the price group (delete_price_group). */
+export function DeletePriceGroupControl({ group, ...rest }: ConfirmProps & { group: string }) {
+  return <ConfirmDeleteControl title={`Delete ${group}`} triggerLabel="Delete" {...rest}
+    name={<>Delete the <strong>{group}</strong> price group? This cannot be undone.</>}
+    warning="A group a brand sits on, a pour belongs to, or a cell is filled for cannot be deleted." />;
+}
 
 type Controls = Partial<Record<"name" | "position" | "costCeiling", (value: string) => void>>;
 
@@ -30,14 +49,14 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
             ? E.info("Add a pour size this group sells by the glass. Every beer on the group uses it.")
             : model.pours.map((pour) => (
               <Fragment key={pour.id}>
-                {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : E.act("Remove", "destructive"))}
+                {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : <RemovePourControl pour={pour.name} group={model.name} />)}
               </Fragment>
             ))}
           {addPour}
         </>
       )}
       {messages}
-      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail ?? "", E.act("Remove", "destructive"), "w")}
+      {footer !== undefined ? footer : E.row("Remove price group", model.removeDetail ?? "", <DeletePriceGroupControl group={model.name} />, "w")}
     </>
   );
 }

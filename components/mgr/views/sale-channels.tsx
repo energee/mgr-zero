@@ -1,5 +1,5 @@
 // components/mgr/views/sale-channels.tsx — Sale channels list. Live passes
-// ChannelForm as createAction, DeleteChannelButton via rowTrailing, and the
+// ChannelForm as createAction, ChannelForm + DeleteChannelControl (delete-channel.tsx) via rowTrailing, and the
 // tax-treatment info string; inventory uses Add channel and unlabeled nav.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -21,7 +21,7 @@ export function SaleChannelsView({
   createAction?: ReactNode;
   /** Live tax-treatment copy. Inventory omits this. */
   info?: string;
-  /** Live: ChannelForm + DeleteChannelButton. Inventory draws E.nav. */
+  /** Live: ChannelForm + DeleteChannelControl. Inventory draws E.nav. */
   rowTrailing?: (id: string) => ReactNode;
   /** Live list: nav rows are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
