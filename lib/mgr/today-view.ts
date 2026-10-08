@@ -53,11 +53,16 @@ export type TodaySnapshot = {
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
-  /** breweries.timezone; required when any item carries a dueAt. */
+  /** breweries.timezone; required when any item carries a timed dueAt. */
   timeZone?: string;
   /** The clock that decides overdue versus due; tests pin it. */
   now?: Date;
 };
+
+/** Reasons whose dueAt is a real instant. The others (ship and route dates)
+ *  store midnight of a calendar day that their detail already names, so a clock
+ *  time there would be invented. */
+const TIMED_DUE: TodayItem["reason"][] = ["fermentation_reading_overdue"];
 
 /** "overdue since 12:30 PM" or "due 6:00 PM" in the brewery zone; a due time on
  *  another brewery day also names the date. */
@@ -102,11 +107,12 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
     date: s.date,
     rows: items.map((it) => {
       const [verb, tone] = TODAY_VERB[it.reason];
-      if (it.dueAt && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
+      const timed = it.dueAt && TIMED_DUE.includes(it.reason) ? it.dueAt : null;
+      if (timed && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
       return {
         key: `${it.reason}:${it.subjectId}`,
         title: it.safeLabel,
-        detail: it.dueAt ? `${it.detail} · ${dueText(it.dueAt, s.timeZone!, now)}` : it.detail,
+        detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : it.detail,
         ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,
         tone,

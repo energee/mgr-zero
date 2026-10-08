@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import type { TodayItem } from "../lib/commands/today";
 
-const item = (subjectId: string, dueAt: string | null): TodayItem => ({
-  reason: "fermentation_reading_overdue",
+const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason"] = "fermentation_reading_overdue"): TodayItem => ({
+  reason,
   subjectType: "occupancy",
   subjectId,
   sourceVersion: "1",
@@ -38,5 +38,11 @@ describe("Today due times", () => {
     const model = toTodayViewProps({ date: "Thu, Oct 8", items: [item("1", null)], timeZone, now });
     expect(model.rows[0].detail).toBe("Reading due");
     expect(model.rows[0]).not.toHaveProperty("dueAt");
+  });
+
+  it("adds no clock time to a date-only deadline such as a ship date", () => {
+    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [{ ...item("1", "2026-10-08T04:00:00Z", "pick_due"), detail: "pick due · ships Thu 10/8" }], now });
+    expect(model.rows[0].detail).toBe("pick due · ships Thu 10/8");
+    expect(model.rows[0].dueAt).toBe("2026-10-08T04:00:00Z");
   });
 });
