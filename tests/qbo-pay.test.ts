@@ -216,6 +216,15 @@ describe("QuickBooks portal payment link", () => {
       ctx, invoice.data.id, new QboOAuthClient(config, narrowedTransport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
 
+    expect((await admin.from("qbo_connections").update({ granted_scopes: ["com.intuit.quickbooks.accounting"] })
+      .eq("id", connection.data.id)).error).toBeNull();
+    // A thrown link read reaches the caller (the Pay route logs it) instead of
+    // being swallowed as an unlogged unavailable (#763).
+    const throwingTransport = vi.fn<typeof globalThis.fetch>(async () => { throw new TypeError("fetch failed"); });
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, throwingTransport), new Set(["pay.example.test"]),
+    )).rejects.toThrow("fetch failed");
+
     expect((await admin.from("qbo_connections").update({
       granted_scopes: ["com.intuit.quickbooks.accounting"], access_expires_at: "2026-09-08T12:00:00Z",
     }).eq("id", connection.data.id)).error).toBeNull();

@@ -32,7 +32,7 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
   };
   const controls = { kind: set("kind"), number: set("ttbId"), submittedOn: set("submittedOn") };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval", approval && `${approval.kind.toUpperCase()} ${approval.ttb_id}`)}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <BrandApprovalView
           model={model}
@@ -59,7 +59,7 @@ export function RegistrationForm({ brand, registration }: { brand: Brand; regist
   };
   const controls = { state: set("state"), registrationNo: set("registrationNo"), expiresOn: set("expiresOn") };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="State registration" trigger={sheetTrigger(!!registration, "Add registration")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="State registration" trigger={sheetTrigger(!!registration, "Add registration", registration && `${registration.state} registration`)}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <StateRegistrationView
           model={model}

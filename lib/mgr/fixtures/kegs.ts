@@ -5,11 +5,8 @@ import type { KegHistorySnapshot } from "@/lib/mgr/keg-history-view";
 import type { KegReport } from "@/lib/mgr/keg-report-view";
 
 export const kegFleetMicrostar: KegFleetViewModel = {
-  pool: "Microstar ⅙ bbl · 76 kegs · pay per fill",
-  kind: "Owned",
-  kindOptions: ["Owned", "Leased", "Pay per fill"],
-  vendor: "none · owned pools have no vendor",
-  perFill: "$0.00",
+  poolForm: { name: "Microstar ⅙ bbl", kind: "pay_per_fill", vendorId: "microstar", perFill: "4.50", deposit: "30.00", active: true },
+  vendors: [{ value: "microstar", label: "Kegline Leasing" }],
   bins: [
     { key: "wh", title: "Microstar ⅙ bbl · Warehouse", detail: "36 on hand · Walk-in", qty: "36" },
     { key: "st", title: "Microstar ⅙ bbl · Storage", detail: "40 on hand · Cold", qty: "40" },
@@ -17,14 +14,14 @@ export const kegFleetMicrostar: KegFleetViewModel = {
   customerBalance: "Ridgeline · 38 out · $1,110",
   report: "9 unreturned over 90 days",
   history: "acquired, returned, lost, found, retired",
-  eventKindIndex: 1,
-  eventKinds: ["acquire", "return empty", "lost / found", "retire"],
-  customer: "Ridgeline Tap Room",
-  customerOptions: ["Ridgeline Tap Room", "Al’s Bar"],
-  qty: 4,
-  previewName: "Ridgeline",
-  previewFrom: "38",
-  previewTo: "34",
+  eventForm: { poolId: "microstar", kegSize: "sixth_bbl", reason: "returned", locationId: "wh", binId: "walk-in", customerId: "ridgeline", qty: "4", note: "" },
+  eventOptions: {
+    pools: [{ value: "microstar", label: "Microstar ⅙ bbl" }],
+    locations: [{ value: "wh", label: "Warehouse" }],
+    bins: [{ value: "walk-in", label: "Walk-in" }],
+    customers: [{ value: "ridgeline", label: "Ridgeline Tap Room" }, { value: "als", label: "Al’s Bar" }],
+  },
+  eventPreview: { qty: 4, name: "Ridgeline", from: "38", to: "34" },
 };
 
 export const kegBalanceRidgeline: KegBalanceSnapshot = {

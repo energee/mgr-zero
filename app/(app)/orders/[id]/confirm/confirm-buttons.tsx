@@ -3,23 +3,21 @@
 // confirm goes back to Orders; one that returns ATP warnings stays to show them
 // (atp-warnings.tsx, shared with the order detail) until "Back to Orders" —
 // it skips the post-confirm refresh, which would re-render page.tsx and
-// redirect the now-confirmed order away before the warnings are read.
+// redirect the now-confirmed order away before the warnings are read. Cancel
+// order is the shared cancel-order-dialog.tsx.
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AtpWarnings, atpWarnings, type AtpWarning } from "../atp-warnings";
+import { CancelOrderDialog } from "../cancel-order-dialog";
 
 export function ConfirmButtons({ orderId, lines }: { orderId: string; lines: { skuId: string; skuName: string }[] }) {
   const router = useRouter();
   const action = useCommandAction();
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [reason, setReason] = useState("");
   const [warnings, setWarnings] = useState<AtpWarning[] | null>(null);
   if (warnings) {
     return (
@@ -41,15 +39,7 @@ export function ConfirmButtons({ orderId, lines }: { orderId: string; lines: { s
           router.push("/orders");
           router.refresh();
         }, { refresh: false })}>{action.busy ? "Confirming…" : "Confirm order"}</Button>
-        <CommandForm open={cancelOpen} onOpenChange={setCancelOpen} title="Cancel order" trigger={<Button variant="destructive" disabled={action.busy}>Cancel order</Button>}>
-          <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void action.run("cancel_order", { orderId, reason }, () => router.push("/orders")); }}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirm-cancel-reason">Reason</Label>
-              <Input id="confirm-cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
-            </div>
-            <CommandFormFooter><Button type="submit" variant="destructive" disabled={action.busy}>Cancel order</Button></CommandFormFooter>
-          </form>
-        </CommandForm>
+        <CancelOrderDialog orderId={orderId} action={action} trigger={<Button variant="destructive" disabled={action.busy}>Cancel order</Button>} onCancelled={() => router.push("/orders")} />
       </div>
     </div>
   );

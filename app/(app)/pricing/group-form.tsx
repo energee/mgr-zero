@@ -3,15 +3,15 @@
 // edit (`groupId` rides in the input). Both draw the same PriceGroupView from
 // the same adapter, so the dialog reads the same whether the row exists yet. Delete calls
 // delete_price_group and shows its refusal ("price group is in use") inline,
-// the way delete-channel-button.tsx does. An existing group also adds pours
-// (PourForm) and removes them (delete_format) in the same error slot.
+// the way the channel Delete does. An existing group also adds pours
+// (PourForm) and removes them (delete_format) in the same error slot; both
+// removals confirm first.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { E } from "@/components/mgr/e";
-import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
+import { DeletePriceGroupControl, PriceGroupView, RemovePourControl, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toCents } from "@/lib/mgr/money";
@@ -46,11 +46,13 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
-          renderPour={(pour) => E.act("Remove", "destructive", undefined, () => { void form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id }); }, form.busy)}
+          renderPour={(pour) => <RemovePourControl pour={pour.name} group={model.name} busy={form.busy} error={form.error}
+            onDelete={() => form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id })} />}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (
-              <Button type="button" variant="ghost" disabled={form.busy} onClick={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })}>Delete</Button>
+              <DeletePriceGroupControl group={model.name} busy={form.busy} error={form.error}
+                onDelete={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })} />
             )}
             <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price group"}</Button>
           </CommandFormFooter>}

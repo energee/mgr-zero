@@ -2,13 +2,15 @@
 // schema §16.3): the named ways this brewery sells, each with the tax
 // treatment its removals are recorded under. Add and edit go through
 // upsert_sale_channel (channel-form.tsx) and removal through
-// delete_sale_channel (delete-channel-button.tsx), both admin-only, so the
+// delete_sale_channel (DeleteChannelControl, confirmed first), both admin-only, so the
 // controls are drawn only for a role that may run them (#478). No channel
 // name is load-bearing (an order carries its own sale_channel_id, which
 // private.ship_order_impl reads), so any channel may be renamed; a channel a
 // movement, customer, order or price cell references cannot be deleted, a
-// refusal that surfaces inline.
+// refusal that surfaces in the confirm sheet.
+import { DeleteChannelControl } from "@/components/mgr/views/delete-channel";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
+import { DeleteCommandButton } from "../../delete-command-button";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
@@ -17,7 +19,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import "@/lib/commands/all";
 import { ChannelForm } from "./channel-form";
-import { DeleteChannelButton } from "./delete-channel-button";
 
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 
@@ -42,7 +43,7 @@ export default async function ChannelsPage() {
         return (
           <span className="flex items-center gap-2">
             {canEdit && <ChannelForm channel={{ id: c.id, name: c.name, taxTreatment: c.tax_treatment }} />}
-            {canDelete && <DeleteChannelButton channelId={c.id} />}
+            {canDelete && <DeleteCommandButton control={DeleteChannelControl} command="delete_sale_channel" input={{ channelId: c.id }} name={c.name} redirect="/settings/channels" />}
           </span>
         );
       }}

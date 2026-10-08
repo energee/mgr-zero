@@ -7,16 +7,16 @@ import "@/lib/commands/all";
 import { TapBoard, type TapSku } from "./tap-board";
 
 type Location = { id: string; name: string; uses: string[] };
-type Sku = { id: string; name: string; active: boolean; formats: { package_type: string | null } | null; format_volume: { bbl_per_unit: number | null } | null };
+type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null };
 
 export default async function TapBoardPage({ searchParams }: { searchParams: Promise<{ location?: string }> }) {
   const selected = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "list_open_taps", "Tap board");
-  const [locations, allSkus] = await Promise.all([
+  const [locations, kegSkus] = await Promise.all([
     runCommand("list_locations", { use: "taproom" }, ctx) as Promise<Location[]>,
-    runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
+    runCommand("list_skus", { active: true, packageType: "keg" }, ctx) as Promise<Sku[]>,
   ]);
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <TapBoardView state={{ snapshot: { open: [], history: [] }, sheet: null }} skus={[]} timeZone={brewery.timeZone} navigation={{ backHref: "/beer", locations: [], location: "" }} />;
@@ -24,7 +24,8 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
     runCommand("list_open_taps", { locationId: location.id }, ctx) as Promise<TapInterval[]>,
     runCommand("list_tap_history", { locationId: location.id }, ctx) as Promise<TapHistory[]>,
   ]);
-  const skus: TapSku[] = allSkus.filter((sku) => sku.active && sku.formats?.package_type === "keg" && Number(sku.format_volume?.bbl_per_unit) > 0)
+  // A keg with no volume cannot be tapped; the volume is format data, not a query input.
+  const skus: TapSku[] = kegSkus.filter((sku) => Number(sku.format_volume?.bbl_per_unit) > 0)
     .map((sku) => ({ id: sku.id, name: sku.name, nominalBbl: Number(sku.format_volume!.bbl_per_unit) }));
   const initial: TapBoardSnapshot = { open, history };
 
