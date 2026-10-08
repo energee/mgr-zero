@@ -709,7 +709,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave Chen": "Team" },
+    to: { "Save role": "Team" },
     job: "Change one member's role or remove that membership",
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff",
@@ -1660,12 +1660,12 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "record_fermentation_reading [one immutable reading row]",
     states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
-    spec: "Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
     body: (() => {
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
-        <FermentationReadingView formId={formId} values={values} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
         {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
       </>;
     })(),
@@ -2242,11 +2242,11 @@ export const SCREENS: Screen[] = [
     slice: 9,
     tab: "Beer",
     name: "Keg fleet",
-    to: { "Record keg return": "Keg event history" },
+    to: { "Record keg event": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
     reads: "get_keg_fleet · list_customers · list_locations · list_bins · list_vendors",
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
-    states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"]],
+    states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"], ["unavailable", "no pool in service or no location · Record keg event says what is missing", 1]],
     spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts no keg event. The two stay separate records; Customer keg balance and Keg report flag a customer with a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost. No dirty/clean CIP status.",
     body: <KegFleetView model={toKegFleetViewProps(kegFleetMicrostar)} />,
   },
@@ -2734,12 +2734,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Price group",
-    to: { Remove: "Price groups", "Remove price group": "Price groups" },
+    to: { "Remove price group": "Price groups" },
     job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
     reads: "list_price_groups",
     writes: "upsert_price_group · delete_price_group · upsert_format · delete_format",
     states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group on Brand · a person confirms"], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
-    spec: "A price group is one row of the grid: its name, position, optional cost ceiling, and the pours it owns. Glass sizes are added here (name and ounces), not on a brand. Every beer on the group uses those pours. Remove on a pour deletes it unless a cell still prices it. Prices are the cells on Price groups. Ceilings are dollars per barrel of recipe cost. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group, a cell prices it, or the group owns a pour.",
+    spec: "A price group is one row of the grid: its name, position, optional cost ceiling, and the pours it owns. Glass sizes are added here (name and ounces), not on a brand. Every beer on the group uses those pours. Remove on a pour and Delete on the group each ask for confirmation first; Remove deletes the pour unless a cell still prices it. Prices are the cells on Price groups. Ceilings are dollars per barrel of recipe cost. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group, a cell prices it, or the group owns a pour.",
     body: <PriceGroupView model={toPriceGroupViewProps(priceGroupTwo)} />,
   },
   {
@@ -2751,7 +2751,7 @@ export const SCREENS: Screen[] = [
     job: "Subdivide a location without making every query carry an or-null",
     reads: "list_locations · list_bins",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1]],
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["move unavailable", "fewer than two bins or no stock · Move stock says why", 1]],
     spec: "Opened from Location detail. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
     body: <LocationBinsView model={toLocationBinsViewProps(locationBinsTaproom)} />,
   },

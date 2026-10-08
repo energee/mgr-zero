@@ -29,7 +29,7 @@ export default async function PortalLayout({ children }: { children: React.React
               model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
               accounts={memberships.map(m => ({ value: m.customerId, label: `${m.customerName} · ${m.breweryName}` }))}
               activeCustomerId={customer.customerId} switchAction={switchCustomer}
-              footer={<MeSheetActions />}
+              footer={<MeSheetActions guide="/docs/portal-guide" />}
             />
           </MeSheet>
         }

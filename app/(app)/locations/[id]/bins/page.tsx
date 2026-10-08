@@ -1,5 +1,6 @@
 // app/(app)/locations/[id]/bins/page.tsx — Location bins: list_bins for one
-// location, Add/Edit via bin-form.tsx. Warehouse or admin.
+// location, Add/Edit via bin-form.tsx, Move stock via move-stock-form.tsx
+// (or the reason it is unavailable). Warehouse or admin.
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -11,6 +12,7 @@ import { notFound } from "next/navigation";
 import { MoveStockForm } from "../../move-stock-form";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { BinForm } from "../../bin-form";
+import { moveStockUnavailable } from "@/lib/movement-form";
 
 type LocationRow = { id: string; name: string };
 type BinRow = { id: string; name: string };
@@ -26,7 +28,7 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   const canWrite = brewery.role === "admin" || brewery.role === "warehouse";
   const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : [];
   return <LocationBinsView
-    model={toLocationBinsViewProps({ location, bins, backHref: `/locations/${id}` })}
+    model={{ ...toLocationBinsViewProps({ location, bins, backHref: `/locations/${id}` }), moveUnavailable: canWrite ? moveStockUnavailable({ bins: bins.length, stock: stock.length }) : null }}
     createAction={canWrite ? <BinForm locationId={id} /> : null}
     bins={bins.map(b => ({ key: b.id, title: b.name, detail: "", action: canWrite ? <BinForm locationId={id} bin={b} /> : null }))}
     footer={canWrite ? <MoveStockForm bins={bins} stock={stock} /> : null}

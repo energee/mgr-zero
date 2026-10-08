@@ -191,6 +191,7 @@ export const TAPS: [string | RegExp, string][] = [
 export const INERT: (string | RegExp)[] = [
   "Export state transactions",
   "Open Ask MGR",
+  "Guide",
   "Reschedule",
   "Cancel plan",
   /^Switch to (dark|light) mode$/,
