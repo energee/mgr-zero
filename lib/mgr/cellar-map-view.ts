@@ -11,13 +11,12 @@ export function toCellarMapViewProps(vessels: { id: string; name: string; capaci
   // The map draws one Reading button, so it can only be bound when a single
   // tank is occupied; with several there is no unambiguous target and guessing
   // records the reading against the wrong one, so the tile opens the tank
-  // instead. The caller supplies the path — this never invents one.
-  // A disabled Reading also says why (#715), so the brewer is pointed at the
-  // tank tiles rather than left at a dead end.
+  // instead. The caller supplies the path — this never invents one. A disabled
+  // Reading carries a hint saying why, so it is never a silent dead end (#715).
   const only = occupancies.length === 1 ? occupancies[0] : undefined;
-  const readingHint = !readingHref || only ? undefined
-    : occupancies.length ? "Several tanks hold beer. Open a tank to record its reading."
-    : "No tank holds beer, so there is nothing to read.";
+  let readingHint: string | undefined;
+  if (readingHref && occupancies.length === 0) readingHint = "No tank holds beer, so there is nothing to read.";
+  if (readingHref && occupancies.length > 1) readingHint = "Several tanks hold beer. Open a tank to record its reading.";
   return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), readingHint, tiles: vessels.map(vessel => {
     const occupancy = occupancies.find(item => item.vessel_id === vessel.id);
     const quantity = occupancy ? Number(occupancy.bbl) : 0;
