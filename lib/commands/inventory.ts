@@ -202,8 +202,9 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).order("id").limit(PAGE_SIZE);
       if (after) query = query.gt("id", after.id);
       let count = ctx.db.from("skus").select(i.packageType ? "id, formats!inner(package_type)" : "id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
-      if (i.active !== undefined) { query = query.eq("active", i.active); count = count.eq("active", i.active); }
-      if (i.packageType) { query = query.eq("formats.package_type", i.packageType); count = count.eq("formats.package_type", i.packageType); }
+      for (const [column, value] of [["active", i.active], ["formats.package_type", i.packageType]] as const) {
+        if (value !== undefined) { query = query.eq(column, value); count = count.eq(column, value); }
+      }
       const [result, counted] = await Promise.all([query, count]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     }, row => row.id);

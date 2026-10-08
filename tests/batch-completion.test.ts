@@ -345,11 +345,12 @@ describe("list_batches open", () => {
     await complete(done.batchId);
     const planned = await runCommand("schedule_batch", { plannedOn: "2026-09-05", plannedBbl: 1 }, ctx) as { id: string };
 
-    const ids = (await runCommand("list_batches", { open: true }, ctx) as { id: string; brewed_on: string | null; closed_at: string | null }[]);
-    expect(ids.map(b => b.id)).toContain(live.batchId);
-    expect(ids.map(b => b.id)).not.toContain(done.batchId);
-    expect(ids.map(b => b.id)).not.toContain(planned.id);
-    expect(ids.every(b => b.brewed_on !== null && b.closed_at === null)).toBe(true);
+    const open = await runCommand("list_batches", { open: true }, ctx) as { id: string; brewed_on: string | null; closed_at: string | null }[];
+    const ids = open.map(b => b.id);
+    expect(ids).toContain(live.batchId);
+    expect(ids).not.toContain(done.batchId);
+    expect(ids).not.toContain(planned.id);
+    expect(open.every(b => b.brewed_on !== null && b.closed_at === null)).toBe(true);
     expect((await runCommand("list_batches", {}, ctx) as { id: string }[]).map(b => b.id)).toEqual(expect.arrayContaining([live.batchId, done.batchId, planned.id]));
   });
 });

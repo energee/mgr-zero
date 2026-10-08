@@ -37,7 +37,7 @@ describe("complete finished-goods reads", () => {
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const keg = await seedCatalog(brewery.id, { product: "Keg brand", sku: "Half keg", packageType: "keg", bblPerUnit: 0.5 });
     const can = await seedCatalog(brewery.id, { product: "Can brand", sku: "Case", packageType: "can" });
-    const kegs = await runCommand("list_skus", { packageType: "keg", active: true }, ctx) as { id: string; formats: { package_type: string } }[];
+    const kegs = await runCommand("list_skus", { packageType: "keg", active: true }, ctx) as { id: string }[];
     expect(kegs.map(sku => sku.id)).toEqual([keg.skuId]);
     expect((await runCommand("list_skus", {}, ctx) as { id: string }[]).map(sku => sku.id).sort()).toEqual([keg.skuId, can.skuId].sort());
   });

@@ -21,20 +21,26 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   // this page draws rather than reading every location and discarding most of
   // them here. A standing allocation's `ref` is a taproom, so the two subsets
   // together still name every location a reservation points at.
-  const [shortfalls, taprooms, warehouses, skus] = await Promise.all([
+  // The selected taproom's allocations and suggestions wait only on the taproom list, not on the other reads.
+  const taproomRead = runCommand("list_locations", { use: "taproom" }, ctx) as Promise<LocationRow[]>;
+  const forTaproom = async () => {
+    const taprooms = await taproomRead;
+    const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
+    const [allocations, suggestions] = toLocationId ? await Promise.all([
+      runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as Promise<{ id: string; sku_id: string; qty: number; skus: { name: string } | null }[]>,
+      runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx) as Promise<Suggestion[]>,
+    ]) : [[], []];
+    return { taprooms, toLocationId, allocations, suggestions };
+  };
+  const [shortfalls, { taprooms, toLocationId, allocations, suggestions }, warehouses, skus] = await Promise.all([
     runCommand("get_shortfalls", sku ? { skuId: sku } : {}, ctx) as Promise<Shortfall[]>,
-    runCommand("list_locations", { use: "taproom" }, ctx) as Promise<LocationRow[]>,
+    forTaproom(),
     runCommand("list_locations", { use: "warehouse" }, ctx) as Promise<LocationRow[]>,
     runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
   ]);
   const locationRows = [...taprooms, ...warehouses];
-  const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   // A location can be both warehouse and taproom; it is never its own source (#454).
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
-  const [allocations, suggestions] = await Promise.all([
-    toLocationId ? runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as Promise<{ id: string; sku_id: string; qty: number; skus: { name: string } | null }[]> : Promise.resolve([]),
-    toLocationId ? runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx) as Promise<Suggestion[]> : Promise.resolve([]),
-  ]);
   const parValues = Object.fromEntries(suggestions.map(s => [s.skuId, s.par]));
   const standingValues = Object.fromEntries(allocations.map(a => [a.sku_id, Number(a.qty)]));
   return (

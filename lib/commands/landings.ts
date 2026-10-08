@@ -13,6 +13,7 @@ import { TODAY_VERB } from "@/lib/mgr/today-view";
 
 export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "routes";
 /** `id` is the row's own identity: two rows can share an href (two open questions on one invoice). */
+type OpenRoute = { id: string; name: string | null; delivery_date: string; departed_at: string | null; deliveries: { count: number }[] };
 export type WorkRow = { kind: WorkKind; id: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
@@ -102,7 +103,10 @@ defineQuery({
     const [today, pos, routes] = await Promise.all([
       runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
       canRun(ctx, "list_purchase_orders") ? runCommand("list_purchase_orders", {}, ctx) as Promise<{ id: string; po_no: number; status: string; expected_on: string | null; vendor_name: string | null }[]> : [],
-      canRun(ctx, "list_routes") ? runCommand("list_routes", { routesOnly: true }, ctx) as Promise<{ routes: { id: string; name: string | null; delivery_date: string; departed_at: string | null; stops: unknown[] }[] }> : { routes: [] },
+      // Open routes with a stop count: Work never shows the stops, so it does not read them (#759).
+      canRun(ctx, "list_routes") ? completeRows("Open routes", (start) => ctx.db.from("routes")
+        .select("id, name, delivery_date, departed_at, deliveries(count)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).is("returned_at", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<OpenRoute[]> : [],
     ]);
     const rows: WorkRow[] = [
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
@@ -110,8 +114,8 @@ defineQuery({
         kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${p.expected_on}` : ""),
         href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Send" : "Receive", tone: "info" as const, dueAt: p.expected_on,
       })),
-      ...routes.routes.map((r) => ({
-        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.stops.length, "stop")} · ${r.delivery_date}`,
+      ...routes.map((r) => ({
+        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${r.delivery_date}`,
         href: `/routes/${r.id}`, verb: r.departed_at ? "Return" : "Depart", tone: "info" as const, dueAt: r.delivery_date,
       })),
     ];

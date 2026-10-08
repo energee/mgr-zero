@@ -43,12 +43,9 @@ const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", 
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
 defineQuery({
-  name: "list_routes", description: "Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive; routesOnly returns just the routes",
+  name: "list_routes", description: "Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive",
   roles: [...READ],
-  input: z.object({
-    id: z.string().uuid().optional(), date: z.string().date().optional(),
-    routesOnly: z.boolean().optional().describe("Skip the unrouted documents and drivers (unassigned and drivers come back empty)"),
-  }),
+  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional() }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId).order("delivery_date").order("created_at");
     q = i.id ? q.eq("id", i.id) : i.date ? q.eq("delivery_date", i.date) : q.is("returned_at", null);
@@ -58,11 +55,11 @@ defineQuery({
     // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen
     const [routes, shipments, transfers, drivers, today] = await Promise.all([
       rows<RouteRow>(q),
-      i.routesOnly ? [] : completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
+      completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
-      i.routesOnly ? [] : completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
+      completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
-      i.routesOnly ? [] : unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
+      unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
       breweryToday(ctx),
     ]);
     const routeIds = routes.map((r) => r.id);
