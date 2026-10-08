@@ -9,12 +9,10 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { KegPoolFields } from "@/components/mgr/views/keg-fleet";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { dollarsInput } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 import { kegPoolReady, toKegOption, type KegPoolKind, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 
 export type Pool = { id: string; name: string; kind: KegPoolKind; per_fill_cents: number | null; deposit_cents: number; active: boolean };
-
-const toCents = (s: string) => (s === "" ? undefined : Math.round(Number(s) * 100));
 
 export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string | null }; vendors: { id: string; name: string }[] }) {
   const initial = (): KegPoolValue => ({

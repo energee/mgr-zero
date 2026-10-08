@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
   beginQboInvoiceSync,
@@ -185,11 +186,9 @@ export async function resolvePortalInvoicePayment(
   return { kind: "redirect", url: url.href };
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const state = sha256(`${requestId}:${ctx.userId}`);
+  const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_qbo_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: client.requestedScopes,

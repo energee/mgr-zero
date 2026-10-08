@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
+import { bblExact } from "@/lib/volume";
 import {
   canCloseBatchCompletion,
   isCurrentBatchCompletionReview,
@@ -20,7 +21,6 @@ type Preview = {
   batchId: string; closedAt: string | null; baselineBbl: number; packagedBbl: number;
   attributedBbl: number; residualBbl: number; thresholdBbl: number; adjustmentId: string | null;
 };
-const bbl = (value: number) => `${Number(value)} bbl`;
 
 export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const breweryId = useBrewery();
@@ -100,11 +100,11 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
       </div>
       {phase === "loading" && <p className="text-sm text-muted-foreground">Calculating from the cellar ledger…</p>}
       {preview && <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <dt className="text-muted-foreground">Baseline</dt><dd className="text-right">{bbl(preview.baselineBbl)}</dd>
-        <dt className="text-muted-foreground">Frozen packaged</dt><dd className="text-right">{bbl(preview.packagedBbl)}</dd>
-        <dt className="text-muted-foreground">Prior attributed</dt><dd className="text-right">{bbl(preview.attributedBbl)}</dd>
-        <dt className="text-muted-foreground">Threshold</dt><dd className="text-right">{bbl(preview.thresholdBbl)}</dd>
-        <dt className="font-medium">Predicted residual</dt><dd className="text-right font-medium">{bbl(preview.residualBbl)}</dd>
+        <dt className="text-muted-foreground">Baseline</dt><dd className="text-right">{bblExact(preview.baselineBbl, 8)}</dd>
+        <dt className="text-muted-foreground">Frozen packaged</dt><dd className="text-right">{bblExact(preview.packagedBbl, 8)}</dd>
+        <dt className="text-muted-foreground">Prior attributed</dt><dd className="text-right">{bblExact(preview.attributedBbl, 8)}</dd>
+        <dt className="text-muted-foreground">Threshold</dt><dd className="text-right">{bblExact(preview.thresholdBbl, 8)}</dd>
+        <dt className="font-medium">Predicted residual</dt><dd className="text-right font-medium">{bblExact(preview.residualBbl, 8)}</dd>
       </dl>}
       {preview && phase !== "saved" && <p className="text-xs text-muted-foreground">Completing closes every open occupancy for this batch. A residual at or above the threshold becomes one automatic loss reconciliation.</p>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
