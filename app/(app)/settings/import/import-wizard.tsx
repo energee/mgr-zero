@@ -74,7 +74,6 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
   // Results are recovered (run already cleared the saved batch): start a fresh upload of
   // any kind, and refresh lookups so the next file sees records this batch created.
   function nextFile() {
-    if (!result) return;
     setBatch(null); setResult(null); setCsv(null); setFileName(null); setMapping({}); setError(null); send.setError(null); setStep(0);
     router.refresh();
   }
