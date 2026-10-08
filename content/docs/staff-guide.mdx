@@ -397,6 +397,7 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 
 | Action | When shown | What happens |
 | --- | --- | --- |
+| **Edit draft** | Draft, Admin or Sales | Opens the saved header and lines. Change ship-to, requested ship date (clear it to remove it), customer PO, SKUs and quantities; add or remove lines. Every line needs an available SKU and a finite quantity of at least 0.01; a SKU appears only once, so combine duplicate quantities into one line. **Save draft** replaces the lines, captures current prices and returns to the order without submitting. Customer, kind and fulfillment locations stay fixed. Submitted orders cannot be edited; confirmed or picked orders use **Adjust lines**. |
 | **Submit** | Draft | Status becomes submitted and the event timeline records it. |
 | **Confirm** | Submitted | Status becomes confirmed and stock is reserved. Negative ATP shows as a warning (**ATP negative for …**) but does not block confirmation. |
 | **Adjust lines** | Confirmed or picked | Opens the full Adjust lines page, with a back link to the order. Replace the full line set and give a required **Reason**, then **Save lines** to return to the order. Reservations update. A line with a blank quantity is refused, not dropped from the order. Changing a picked order adds a **staged — needs restocking** badge until it is picked again. Shipping is refused without creating a shipment, invoice, or stock movement while that badge remains. |

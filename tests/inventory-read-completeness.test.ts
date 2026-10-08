@@ -14,6 +14,23 @@ const fixtureId = (prefix: string, index: number) =>
   `${prefix}-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
 
 describe("complete finished-goods reads", () => {
+  it("filters active SKU data and pagination counts while omission still includes inactive rows", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const catalog = await seedCatalog(brewery.id);
+    const base = await admin.from("skus").select("brand_id, format_id").eq("id", catalog.skuId).single();
+    expect(base.error).toBeNull();
+    const prefix = crypto.randomUUID().slice(0, 8);
+    const brandPrefix = crypto.randomUUID().slice(0, 8);
+    const brands = Array.from({ length: 1_001 }, (_, index) => ({ id: fixtureId(brandPrefix, index + 1), brewery_id: brewery.id, name: `Inactive brand ${index}` }));
+    expect((await admin.from("brands").insert(brands)).error).toBeNull();
+    const rows = brands.map((brand, index) => ({ id: fixtureId(prefix, index + 1), brewery_id: brewery.id, brand_id: brand.id, format_id: base.data!.format_id, name: `Inactive ${index}`, active: false }));
+    expect((await admin.from("skus").insert(rows)).error).toBeNull();
+    const active = await runCommand("list_skus", { active: true }, ctx) as { id: string }[];
+    expect(active.map(sku => sku.id)).toEqual([catalog.skuId]);
+    expect(await runCommand("list_skus", { active: false }, ctx)).toHaveLength(1_001);
+    expect(await runCommand("list_skus", {}, ctx)).toHaveLength(1_002);
+  });
   it("assembles every owned stock row beyond the PostgREST row cap", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");

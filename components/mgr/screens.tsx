@@ -100,6 +100,8 @@ import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
+import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
@@ -950,13 +952,38 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Order",
-    to: { Adjust: "Adjust lines", "Add line": "New order", Cancel: "Orders" },
+    to: { Adjust: "Adjust lines", "Edit draft": "Edit draft", "Add line": "New order", Cancel: "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp",
     writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
-    states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
+    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: <OrderView model={toOrderViewProps(orderPickedRestock)} adjustLines showAddLine complianceNote={OHIO_STOUT_NOTE} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "Work",
+    name: "Order draft",
+    to: { "Edit draft": "Edit draft", Submit: "Order", "Cancel order": "Orders" },
+    job: "Review and edit a saved draft before submission",
+    reads: "get_order",
+    writes: "submit_order · cancel_order",
+    states: [["draft", "Edit draft and Submit available to Admin and Sales"]],
+    spec: "Draft variant of Order. The picked/restock frame remains separate; Edit draft opens the shared saved-order editor.",
+    body: <OrderView model={toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "draft", needs_restock: false }, lines: orderPickedRestock.lines.map(line => ({ ...line, qty_picked: null, qty_shipped: null })), events: [], atp: [] })} footer={E.btns([["Submit", "p"], ["Cancel order", "del"]])} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "Work",
+    name: "Edit draft",
+    job: "Correct a saved draft before submission",
+    reads: "get_order · get_customer · list_skus",
+    writes: "update_draft_order",
+    states: [["draft", "saved headers and lines prefilled"], ["incomplete line", "Save draft disabled until fixed or removed", 1], ["permission", "Admin and Sales only", 1], ["submitted", "returns to the order; editing refused", 1]],
+    spec: "The shared page editor changes ship-to, requested ship date, customer PO and lines. Customer, kind and fulfillment locations stay fixed. Saving keeps draft status and refreshes line prices; clearing the requested date explicitly removes it. Inventory simulates saving locally, while staff calls the existing authorized draft command.",
+    body: <EditDraftOrderView model={editDraftOrder} />,
   },
   {
     step: 5,

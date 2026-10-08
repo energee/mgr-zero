@@ -29,6 +29,7 @@ export type OrderViewModel = {
   restockNote?: string;
   putBackHref?: string;
   confirmHref?: string;
+  editHref?: string;
   completeHref?: string;
   lines: OrderLineView[];
   events: [ReactNode, ReactNode?][];
@@ -139,6 +140,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
     note: order.note ?? undefined,
     restockNote: restockNoteFor(order, lines),
     putBackHref: order.status === "picked" && order.needs_restock ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
+    editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
     completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? (backHref ? `/orders/${order.id}/complete` : "#") : undefined,
     lines: lines.map((l) => {

@@ -37,12 +37,14 @@ defineCommand({
   roles: [...salesRoles],
   input: z.object({
     orderId: z.string().uuid(), shipToId: z.string().uuid().optional(),
-    requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    // Omitted preserves the saved date; explicit null clears it via the existing RPC.
+    requestedShipDate: z.string().date().nullable().optional(), poNumber: z.string().optional(), note: z.string().optional(),
     lines,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
     p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null,
     p_po: i.poNumber ?? null, p_note: i.note ?? null, p_lines: toLines(i.lines), p_request_id: execution.requestId,
+    p_clear_requested: i.requestedShipDate === null,
   })),
 });
 
