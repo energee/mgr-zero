@@ -1660,12 +1660,12 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "record_fermentation_reading [one immutable reading row]",
     states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
-    spec: "Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
     body: (() => {
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
-        <FermentationReadingView formId={formId} values={values} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
         {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
       </>;
     })(),
