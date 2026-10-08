@@ -1,4 +1,4 @@
-// app/(app)/compliance/period.ts — one reporting period as the URL segment:
+// lib/compliance-period.ts — one reporting period as the URL segment:
 // a month YYYY-MM, a quarter YYYY-Qn, or a year YYYY; its date range, and its
 // label. A TTB filing covers exactly one of these (#486). The UI files TTB
 // periods; other jurisdictions and ranges are reachable through the API.

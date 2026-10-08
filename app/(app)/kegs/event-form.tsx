@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/mgr/enums";
-import { REASON_LABEL, SIZE_LABEL } from "./keg-labels";
+import { REASON_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
 
 type Reason = (typeof KEG_EVENT_REASONS)[number];
 const needsCustomer = (r: Reason) => r === "shipped" || r === "returned";

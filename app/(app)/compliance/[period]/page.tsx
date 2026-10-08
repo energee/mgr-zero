@@ -13,7 +13,7 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, periodLabel, periodOver, periodRange } from "../period";
+import { JURISDICTION, periodLabel, periodOver, periodRange } from "@/lib/compliance-period";
 
 export default async function PeriodPage({ params }: { params: Promise<{ period: string }> }) {
   const { period } = await params;

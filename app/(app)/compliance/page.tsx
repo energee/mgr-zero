@@ -9,7 +9,7 @@ import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { bblFixed } from "@/lib/volume";
-import { cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "./period";
+import { cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "@/lib/compliance-period";
 
 const CADENCES: [Cadence, string][] = [["month", "Monthly"], ["quarter", "Quarterly"], ["year", "Annual"]];
 
