@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { submissionFailureMessage } from "@/app/(portal)/portal/cart";
-import { cartActionsDisabled, planDraftSync } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartMissingInput, planDraftSync } from "@/lib/portal-cart";
 
 describe("portal cart recovery", () => {
   it("does not claim an order is still a draft when submission may have committed", () => {
@@ -26,5 +26,14 @@ describe("portal cart draft sync", () => {
     expect(cartActionsDisabled({ shipToId: "", lineCount: 1, busy: false })).toBe(true);
     expect(cartActionsDisabled({ shipToId: "s", lineCount: 0, busy: false })).toBe(true);
     expect(cartActionsDisabled({ shipToId: "s", lineCount: 1, busy: true })).toBe(true);
+  });
+});
+
+describe("portal cart disabled reason (#768)", () => {
+  it("names the missing ship-to and quantity that keep Save draft and Review order disabled", () => {
+    expect(cartMissingInput({ shipToId: "s", lineCount: 1 })).toBeNull();
+    expect(cartMissingInput({ shipToId: "", lineCount: 1 })).toBe("Before saving or reviewing this order, choose a ship-to.");
+    expect(cartMissingInput({ shipToId: "s", lineCount: 0 })).toBe("Before saving or reviewing this order, enter a quantity above zero.");
+    expect(cartMissingInput({ shipToId: "", lineCount: 0 })).toBe("Before saving or reviewing this order, choose a ship-to and enter a quantity above zero.");
   });
 });
