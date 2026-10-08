@@ -405,32 +405,71 @@ describe("portal commands", () => {
     expect(Object.keys(row)).not.toContain("qty");
   });
 
-  // #755: the badge aggregate must read only the caller's brewery ledger. A
-  // whole-ledger aggregate reads at least the foreign rows. Seq scans are off so
-  // the count reflects the query's filter, not the planner's table-size guess.
-  it("portal_availability reads only the caller's brewery movements", async () => {
+  // #755: the badge aggregates must read only the caller's brewery ledger and
+  // allocations. A whole-table aggregate reads at least the foreign rows. Seq
+  // scans are off so the count reflects the query's filter, not the planner's
+  // table-size guess.
+  it("portal_availability reads only the caller's brewery movements and allocations", async () => {
     const other = await makeBrewery();
-    const foreignSku = (await seedCatalog(other.id, { sku: "Busy SKU" })).skuId;
+    const foreign = await seedCatalog(other.id, { sku: "Busy SKU" });
     const foreignLoc = await seedLocation(other.id);
     const foreignRows = 200;
     // Rows read = heap rows from seq scans + index entries returned by any of the
     // table's indexes (an index-only scan never shows up in idx_tup_fetch).
-    const readsSql = `select pg_stat_get_xact_tuples_returned(i.indrelid)
+    const reads = (table: string) => `select pg_stat_get_xact_tuples_returned(i.indrelid)
         + sum(pg_stat_get_xact_tuples_returned(i.indexrelid)) as n
-      from pg_index i where i.indrelid = 'public.inventory_movements'::regclass group by i.indrelid`;
-    const [read] = sql(`begin;
+      from pg_index i where i.indrelid = 'public.${table}'::regclass group by i.indrelid`;
+    const read = sql(`begin;
       insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, bbl, type, created_by)
-      select '${other.id}', '${foreignSku}', '${foreignLoc.id}', '${foreignLoc.binId}', 1, 0.0645, 'production_in', '${adminCtx.userId}'
+      select '${other.id}', '${foreign.skuId}', '${foreignLoc.id}', '${foreignLoc.binId}', 1, 0.0645, 'production_in', '${adminCtx.userId}'
       from generate_series(1, ${foreignRows});
-      select n as before_n from (${readsSql}) r \\gset
+      -- one open standing allocation per (location, sku), so spread them over new SKUs
+      -- (a SKU is one brand x format, so each needs its own brand)
+      with br as (
+        insert into public.brands (brewery_id, name)
+        select '${other.id}', 'Busy ' || g from generate_series(1, ${foreignRows}) g returning id, name
+      ), s as (
+        insert into public.skus (brewery_id, brand_id, format_id, name)
+        select '${other.id}', br.id, '${foreign.formatId}', br.name from br
+        returning id)
+      insert into public.allocations (brewery_id, sku_id, qty, source, ref)
+      select '${other.id}', s.id, 1, 'taproom_standing', '${foreignLoc.id}' from s;
+      select m.n as moves_before, a.n as allocs_before from (${reads("inventory_movements")}) m, (${reads("allocations")}) a \\gset
       set local enable_seqscan = off;
       select set_config('request.jwt.claims', json_build_object('sub', '${custCtx.userId}', 'role', 'authenticated')::text, true);
       set local role authenticated;
       select count(*) from public.portal_availability('${customerId}');
       reset role;
-      select (n - :before_n)::text from (${readsSql}) r;
-      rollback;`, true).slice(-1);
-    expect(Number(read)).toBeLessThan(foreignRows);
+      select (n - :moves_before)::text from (${reads("inventory_movements")}) r;
+      select (n - :allocs_before)::text from (${reads("allocations")}) r;
+      rollback;`, true).slice(-2).map(Number);
+    expect(read[0]).toBeLessThan(foreignRows);
+    expect(read[1]).toBeLessThan(foreignRows);
+  });
+
+  // #755 rewrote the aggregate; pin the badge contract it must keep: on hand
+  // minus open allocations, allocation-only SKUs included, and no rows for a
+  // customer the caller does not belong to.
+  it("portal_availability badges on-hand minus open allocations for the caller only", async () => {
+    const own = await seedCatalog(b.id, { product: "Badge", sku: "Badge" });
+    const low = await seedCatalog(b.id, { product: "Badge low", sku: "Badge low" });
+    const allocOnly = await seedCatalog(b.id, { product: "Badge alloc only", sku: "Badge alloc only" });
+    const outsider = await seedCustomer((await makeBrewery()).id);
+    const rows = sql(`begin;
+      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, bbl, type, created_by)
+      select '${b.id}', id, '${warehouseId}', '${warehouseBinId}', q, q * 0.0645, 'production_in', '${adminCtx.userId}'
+      from (values ('${own.skuId}'::uuid, 30), ('${low.skuId}'::uuid, 25)) v(id, q);
+      insert into public.allocations (brewery_id, sku_id, qty, source, ref)
+      select '${b.id}', id, q, 'taproom_standing', '${warehouseId}'
+      from (values ('${low.skuId}'::uuid, 10), ('${allocOnly.skuId}'::uuid, 5)) v(id, q);
+      select set_config('request.jwt.claims', json_build_object('sub', '${custCtx.userId}', 'role', 'authenticated')::text, true);
+      set local role authenticated;
+      select s.name || ':' || a.badge from public.portal_availability('${customerId}') a
+        join (values ('${own.skuId}'::uuid, 'Badge'), ('${low.skuId}'::uuid, 'Badge low'), ('${allocOnly.skuId}'::uuid, 'Badge alloc only')) s(id, name)
+        on s.id = a.sku_id order by s.name;
+      select 'outsider:' || count(*) from public.portal_availability('${outsider.customerId}');
+      rollback;`, true).slice(1); // first line is set_config's echo
+    expect(rows).toEqual(["Badge:in", "Badge alloc only:out", "Badge low:low", "outsider:0"]);
   });
 
   it("portal_catalog uses only the selected customer's brewery and sale channel", async () => {
