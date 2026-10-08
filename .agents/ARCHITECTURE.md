@@ -146,6 +146,11 @@ a gap to close, not a convention to trust.
    another brewery's data. Portal customers never `SELECT` the `breweries` base
    table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
+   Customer, order, invoice, price and compliance reads admit only the staff
+   roles of the commands that read them, via
+   `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
+   of them (#770). Other tables keep `is_staff_of`. `tests/rls-taproom.test.ts`
+   checks sales, warehouse and brewer against each table's command role list.
    *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,

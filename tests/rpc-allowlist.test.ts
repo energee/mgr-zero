@@ -101,6 +101,7 @@ const AUTHENTICATED_RPCS = [
   "is_staff_of(uuid)",
   "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid,uuid,uuid)",
   "my_brewery_ids()",
+  "my_staff_brewery_ids(staff_role[])",
   "my_customer_ids()",
   "portal_availability(uuid)",
   "portal_brewery_rows()",
