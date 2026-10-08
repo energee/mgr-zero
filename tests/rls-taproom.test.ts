@@ -445,6 +445,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     chat_settings_request_completed: [B,f.taproom.id,importRequest],
     get_published_pos_menu: [R()],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
+    close_brewery: [B], prune_command_requests: [],
   };
   const serviceCatalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
