@@ -250,8 +250,8 @@ describe("taproom complete public RLS read boundary", () => {
       pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",
       pos_item_mappings: "list_pos_variations", pos_locations: "list_pos_locations",
     };
-    const clients = await Promise.all((["sales", "warehouse", "brewer"] as const).map(async role =>
-      [role, await asUser((await makeStaff(own.brewery.id, role)).email)] as const));
+    const clients = await Promise.all((["admin", "sales", "warehouse", "brewer"] as const).map(async role =>
+      [role, await asUser((role === "admin" ? own.owner : await makeStaff(own.brewery.id, role)).email)] as const));
     await Promise.all(clients.flatMap(([role, client]) => Object.entries(readBy).map(async ([table, command]) => {
       const roles = getCommandDefinition(command)?.roles;
       expect(Array.isArray(roles), `${command} has a staff role list`).toBe(true);

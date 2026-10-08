@@ -19,7 +19,8 @@ $$ select brewery_id from public.brewery_users
 revoke all on function public.my_staff_brewery_ids(public.staff_role[]) from public, anon;
 grant execute on function public.my_staff_brewery_ids(public.staff_role[]) to authenticated;
 
--- admin, sales and warehouse: the order, invoice, delivery, transfer and lot read commands admit exactly these roles
+-- admin, sales and warehouse: the order, invoice, delivery and transfer commands admit exactly
+-- these roles; lots too, because list_movements shows warehouse each movement's lot code
 alter policy staff_read on public.customers using (brewery_id in (select public.my_staff_brewery_ids(array['admin', 'sales', 'warehouse']::public.staff_role[])));
 alter policy staff_read on public.ship_tos using (brewery_id in (select public.my_staff_brewery_ids(array['admin', 'sales', 'warehouse']::public.staff_role[])));
 alter policy staff_read on public.orders using (brewery_id in (select public.my_staff_brewery_ids(array['admin', 'sales', 'warehouse']::public.staff_role[])));
