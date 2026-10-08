@@ -406,26 +406,29 @@ describe("portal commands", () => {
   });
 
   // #755: the badge aggregate must read only the caller's brewery ledger. A
-  // seq scan of every tenant's movements reads at least the foreign rows.
+  // whole-ledger aggregate reads at least the foreign rows. Seq scans are off so
+  // the count reflects the query's filter, not the planner's table-size guess.
   it("portal_availability reads only the caller's brewery movements", async () => {
     const other = await makeBrewery();
     const foreignSku = (await seedCatalog(other.id, { sku: "Busy SKU" })).skuId;
-    const foreignBin = (await seedLocation(other.id)).binId;
-    const foreignRows = 2000;
+    const foreignLoc = await seedLocation(other.id);
+    const foreignRows = 200;
+    // Rows read = heap rows from seq scans + index entries returned by any of the
+    // table's indexes (an index-only scan never shows up in idx_tup_fetch).
+    const readsSql = `select pg_stat_get_xact_tuples_returned(i.indrelid)
+        + sum(pg_stat_get_xact_tuples_returned(i.indexrelid)) as n
+      from pg_index i where i.indrelid = 'public.inventory_movements'::regclass group by i.indrelid`;
     const [read] = sql(`begin;
       insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, bbl, type, created_by)
-      select '${other.id}', '${foreignSku}', b.location_id, b.id, 1, 0.0645, 'production_in', '${adminCtx.userId}'
-      from public.bins b, generate_series(1, ${foreignRows}) where b.id = '${foreignBin}';
-      analyze public.inventory_movements;
-      create temp table before_read on commit drop as
-        select seq_tup_read + coalesce(idx_tup_fetch, 0) as n from pg_stat_xact_user_tables where relid = 'public.inventory_movements'::regclass;
-      grant select on before_read to authenticated;
+      select '${other.id}', '${foreignSku}', '${foreignLoc.id}', '${foreignLoc.binId}', 1, 0.0645, 'production_in', '${adminCtx.userId}'
+      from generate_series(1, ${foreignRows});
+      select n as before_n from (${readsSql}) r \\gset
+      set local enable_seqscan = off;
       select set_config('request.jwt.claims', json_build_object('sub', '${custCtx.userId}', 'role', 'authenticated')::text, true);
       set local role authenticated;
       select count(*) from public.portal_availability('${customerId}');
       reset role;
-      select (s.seq_tup_read + coalesce(s.idx_tup_fetch, 0) - b.n)::text
-        from pg_stat_xact_user_tables s, before_read b where s.relid = 'public.inventory_movements'::regclass;
+      select (n - :before_n)::text from (${readsSql}) r;
       rollback;`, true).slice(-1);
     expect(Number(read)).toBeLessThan(foreignRows);
   });
