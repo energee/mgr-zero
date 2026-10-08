@@ -1,13 +1,11 @@
 // app/(app)/locations/bin-form.tsx — CommandForm for create_bin (no id) and
-// update_bin / delete_bin (with id). A location keeps at least one bin.
-// Remove confirms in the shared sheet first (#760) and shows its refusal there.
+// update_bin / delete_bin (with id, confirmed first). A location keeps at least one bin.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { BinView } from "@/components/mgr/views/bin";
-import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
+import { BinView, RemoveBinControl } from "@/components/mgr/views/bin";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 
@@ -28,9 +26,7 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {bin ? (
-              <ConfirmDeleteControl title={`Remove ${bin.name}`} triggerLabel="Remove" busy={form.busy} error={form.error} busyLabel="Removing…"
-                name={<>Remove the <strong>{bin.name}</strong> bin?</>}
-                warning="A location keeps at least one bin. A bin with recorded stock, or one a POS menu uses, cannot be removed."
+              <RemoveBinControl bin={bin.name} busy={form.busy} error={form.error}
                 onDelete={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false), { target: bin.id })} />
             ) : null}
             <Button type="submit" disabled={form.busy || !name.trim()}>{form.submitting ? "Saving…" : bin ? "Save bin" : "Add bin"}</Button>

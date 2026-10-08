@@ -2,10 +2,9 @@
 // every SKU on this price group and format sells at on this sale channel. The
 // dialog is titled with the group and format and names the channel in its
 // body, so the cell being edited is never in doubt. Dollars in, integer cents
-// out (set_channel_price); Clear empties the cell (clear_channel_price) after
-// the shared confirm sheet (#760), which leaves those SKUs unpriced on that
-// channel. The trigger carries the cell's group, format and channel for
-// assistive tech, since its visible text is only the price.
+// out (set_channel_price); Clear, once confirmed, empties the cell
+// (clear_channel_price), which leaves those SKUs unpriced on that channel. The
+// trigger's sr-only text names the cell, since its visible text is the price.
 "use client";
 
 import { useState, type ReactNode } from "react";

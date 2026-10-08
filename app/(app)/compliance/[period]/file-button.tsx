@@ -1,7 +1,6 @@
 // app/(app)/compliance/[period]/file-button.tsx — Save filed snapshot →
-// file_compliance_report, after the shared confirm sheet (FileSnapshotControl):
-// a period is filed once (#760). Disabled until the generated report balances
-// and every required external filing mapping is approved.
+// file_compliance_report, confirmed first (FileSnapshotControl). Disabled
+// until the report balances and every required external mapping is approved.
 "use client";
 
 import { useState } from "react";

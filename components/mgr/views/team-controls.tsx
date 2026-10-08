@@ -37,15 +37,15 @@ export function TeamMemberView({ name, email, avatar, savedRole, role, onRoleCha
   const [draftRole, setRole] = useState(savedRole), busy = saving || removing, value = role ?? draftRole;
   const removeName = name.replace(/^@/, "");
   return <>
-    {E.row(name, email, "", "", E.face({ src: avatar, name: name.replace(/^@/, "") }))}
+    {E.row(name, email, "", "", E.face({ src: avatar, name: removeName }))}
     <form onSubmit={event => { event.preventDefault(); if (!busy && value !== savedRole) onSubmit?.(event); }} className="flex flex-col gap-4">
       <StaffRoleField value={value} onChange={next => { setRole(next); onRoleChange?.(next); }} disabled={busy} />
       <CommandFormMessage error={error} />
       <CommandFormFooter><Button type="submit" disabled={busy || value === savedRole}>{saving ? "Saving…" : "Save role"}</Button></CommandFormFooter>
     </form>
-    {E.note(`Removing ${removeName} ends this brewery membership. Their sign-in account remains.`)}
+    {E.note(`Removing ${removeName} ends this brewery membership.`)}
     <ConfirmDeleteControl title={`Remove ${removeName}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
       name={<>Remove <strong>{removeName}</strong> from this brewery?</>}
-      warning="They lose access to this brewery right away. Their sign-in account remains, and only a new invitation restores access." />
+      warning="They lose access right away. Their sign-in account remains, and only a new invitation restores access." />
   </>;
 }
