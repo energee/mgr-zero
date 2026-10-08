@@ -8,7 +8,8 @@
 // private.ship_order_impl reads), so any channel may be renamed; a channel a
 // movement, customer, order or price cell references cannot be deleted, a
 // refusal that surfaces in the confirm sheet.
-import { DeleteChannelControl, SaleChannelsView } from "@/components/mgr/views/sale-channels";
+import { DeleteChannelControl } from "@/components/mgr/views/delete-channel";
+import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { DeleteCommandButton } from "../../delete-command-button";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";

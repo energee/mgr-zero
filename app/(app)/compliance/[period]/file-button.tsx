@@ -20,6 +20,8 @@ export function FileButton({ jurisdiction, periodStart, periodEnd, balances, ext
       <FileSnapshotControl busy={busy} error={error} disabled={!balances || externalMappingRequired.length > 0}
         onDelete={() => run("file_compliance_report", { jurisdiction, periodStart, periodEnd, note: note || undefined })} />
       {externalMappingRequired.includes("taproom") && <CommandFormMessage tone="warning">Save is unavailable until direct cellar Taproom volume has an approved external filing-line mapping.</CommandFormMessage>}
+      {/* Stays after the confirm sheet closes: a failed filing must not vanish. */}
+      <CommandFormMessage error={error} />
     </div>
   );
 }

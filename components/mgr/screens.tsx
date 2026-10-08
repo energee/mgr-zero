@@ -709,7 +709,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave Chen": "Team" },
+    to: { "Save role": "Team" },
     job: "Change one member's role or remove that membership",
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff",

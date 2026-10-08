@@ -161,7 +161,7 @@ describe("SCREENS", () => {
       "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",
       "app/(app)/catalog/brands/[id]/brand-page.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
       "app/(app)/settings/channels/page.tsx",
-      "components/mgr/views/sale-channels.tsx",
+      "components/mgr/views/delete-channel.tsx",
     ];
     const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
       "lib/commands/customers.ts", "lib/commands/portal.ts", "lib/commands/catalog.ts"];

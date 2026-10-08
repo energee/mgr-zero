@@ -11,7 +11,7 @@ import { FileSnapshotControl } from "../components/mgr/views/file-snapshot";
 import { TeamMemberView } from "../components/mgr/views/team-controls";
 import { PriceGroupView } from "../components/mgr/views/price-group";
 import { BinView } from "../components/mgr/views/bin";
-import { DeleteChannelControl } from "../components/mgr/views/sale-channels";
+import { DeleteChannelControl } from "../components/mgr/views/delete-channel";
 import { priceGroupTwo } from "../lib/mgr/fixtures/pricing";
 import { toPriceGroupViewProps } from "../lib/mgr/price-group-view";
 import { binCold } from "../lib/mgr/fixtures/locations";
@@ -102,4 +102,18 @@ describe("row deletes go through the confirm sheet", () => {
     expect(source("app/(app)/pricing/price-cell-form.tsx")).toMatch(/className="sr-only"/);
     expect(source("components/mgr/command-form.tsx")).toMatch(/aria-label=\{name \? `Edit \$\{name\}`/);
   });
+});
+
+it("a server page hands DeleteCommandButton only client-module controls", () => {
+  // A function prop from a server component must be a client reference (#760 review).
+  for (const file of ["components/mgr/views/delete-channel.tsx", "components/mgr/views/delete-format.tsx"]) {
+    expect(readFileSync(file, "utf8").startsWith('"use client"')).toBe(true);
+  }
+  expect(readFileSync("app/(app)/settings/channels/page.tsx", "utf8")).toContain('from "@/components/mgr/views/delete-channel"');
+});
+
+it("a confirm sheet's trigger shows no stale error before its own attempt", () => {
+  const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Remove Cold", name: "Remove?", warning: "x", error: "name already exists" }));
+  expect(html).not.toContain("name already exists");
+  expect(readFileSync("components/mgr/views/confirm-delete.tsx", "utf8")).toContain("error={failed ? error : null}");
 });

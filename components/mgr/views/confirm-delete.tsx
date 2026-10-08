@@ -22,7 +22,9 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   /** Holds the trigger closed, e.g. while a report does not balance. */
   disabled?: boolean;
   error?: string | null;
-  /** Resolves true when the action succeeded and the sheet may close. */
+  /** Resolves true when the action succeeded and the sheet may close. A caller
+   *  may share `error` with its own form; the sheet shows it only after its own
+   *  attempt failed, never a stale Save error from the form underneath. */
   onDelete?: () => Promise<boolean>;
   size?: "sm";
   tone?: "destructive" | "irreversible";
@@ -32,20 +34,24 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   busyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const toggle = (next: boolean) => { if (!busy) { setOpen(next); setFailed(false); } };
   const irreversible = tone === "irreversible";
-  return <CommandForm open={open} onOpenChange={next => { if (!busy) setOpen(next); }} title={title}
+  return <CommandForm open={open} onOpenChange={toggle} title={title}
     trigger={<Button data-preview-action variant={irreversible ? "default" : "destructive"} size={size} disabled={busy || disabled}
       aria-label={triggerLabel ? title : undefined} {...(irreversible ? { "data-variant": "irreversible", className: `w-full md:w-fit md:self-end ${IRREVERSIBLE}` } : {})}>{triggerLabel ?? title}</Button>}>
     <form data-preview-action className="flex flex-col gap-4" onSubmit={async event => {
       event.preventDefault();
       event.stopPropagation();
-      if (!busy && (!onDelete || await onDelete())) setOpen(false);
+      if (busy) return;
+      if (!onDelete || await onDelete()) setOpen(false);
+      else setFailed(true);
     }}>
       <p>{name}</p>
       <p className="text-sm text-muted-foreground">{warning}</p>
-      <CommandFormMessage error={error} />
+      <CommandFormMessage error={failed ? error : null} />
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>{dismissLabel}</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => toggle(false)}>{dismissLabel}</Button>
         {irreversible
           ? <IrreversibleSubmit label={title} busy={busyLabel} submitting={busy} />
           : <Button type="submit" variant="destructive" disabled={busy}>{busy ? busyLabel : title}</Button>}
