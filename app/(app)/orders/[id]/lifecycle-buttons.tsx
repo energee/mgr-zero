@@ -1,8 +1,8 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions:
 // Submit (draft), Confirm (submitted — surfaces confirm_order's ATP soft
 // warnings inline via atp-warnings.tsx), and Cancel with reason (any pre-ship
-// status) run here. Adjust lines, Record pick and Ship / Complete transfer are
-// links to their own pages under /orders/[id]/. Calls commands directly rather
+// status, via cancel-order-dialog.tsx) run here. Adjust lines, Record pick and
+// Ship / Complete transfer are links to their own pages under /orders/[id]/. Calls commands directly rather
 // than through useCommandForm since these aren't single-field command forms.
 "use client";
 
@@ -10,11 +10,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AtpWarnings, atpWarnings, type AtpWarning } from "./atp-warnings";
+import { CancelOrderDialog } from "./cancel-order-dialog";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 
@@ -34,25 +33,15 @@ export function LifecycleButtons({
   lines: { skuId: string; skuName: string }[];
 }) {
   const router = useRouter();
-  const { busy, error, setError, run: runAction } = useCommandAction();
+  const action = useCommandAction();
+  const { busy, error, run: runAction } = action;
   const [warnings, setWarnings] = useState<AtpWarning[]>([]);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
 
   const skuNames = new Map(lines.map((l) => [l.skuId, l.skuName]));
 
   async function run(name: string) {
     await runAction(name, { orderId }, data => {
       setWarnings(atpWarnings(data));
-      router.refresh();
-    });
-  }
-
-  async function submitCancel(e: React.FormEvent) {
-    e.preventDefault();
-    await runAction("cancel_order", { orderId, reason: cancelReason }, () => {
-      setCancelOpen(false);
-      setCancelReason("");
       router.refresh();
     });
   }
@@ -80,22 +69,7 @@ export function LifecycleButtons({
         )}
         {canFulfill && status === "picked" && <Button size="sm" asChild><Link href={`/orders/${orderId}/${transfer ? "complete" : "ship"}`}>{transfer ? "Complete transfer" : "Ship"}</Link></Button>}
         {canCancel && (
-          <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) { setCancelReason(""); setError(null); } }} title="Cancel order" trigger={<Button size="sm" variant="destructive" disabled={busy}>
-                Cancel
-              </Button>}>
-              <form onSubmit={submitCancel} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="cancel-reason">Reason</Label>
-                  <Input id="cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} required />
-                </div>
-                <CommandFormMessage error={error} />
-                <CommandFormFooter>
-                  <Button type="submit" disabled={busy}>
-                    {busy ? "Cancelling…" : "Cancel order"}
-                  </Button>
-                </CommandFormFooter>
-              </form>
-            </CommandForm>
+          <CancelOrderDialog orderId={orderId} action={action} trigger={<Button size="sm" variant="destructive" disabled={busy}>Cancel</Button>} onCancelled={() => router.refresh()} />
         )}
       </div>
       <CommandFormMessage error={error} />

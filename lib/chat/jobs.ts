@@ -227,7 +227,11 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
         } else {
           await stop("terminal", cls.code);
           if (REAUTH_CODES.has(cls.code)) {
-            await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: ctx.installation.id, p_failure_code: cls.code })).catch(() => undefined);
+            // The delivery is already terminal; only the installation flag is
+            // at stake, so log it here rather than as an unrecorded delivery.
+            await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: ctx.installation.id, p_failure_code: cls.code })).catch((flagError) => {
+              console.error(`chat installation ${ctx.installation.id} reauthorization flag (${cls.code}) could not be recorded:`, flagError instanceof Error ? flagError.message : flagError);
+            });
           }
         }
       } catch (recordError) {

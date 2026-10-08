@@ -390,7 +390,7 @@ describe("action-specific offline outbox", () => {
     const form = readFileSync("app/(app)/cellar/[occupancyId]/reading/reading-form.tsx", "utf8");
     expect(form.indexOf("storeOutboxAttempt(localStorage, next)")).toBeLessThan(form.indexOf("await deliver(next)"));
     const values = { observedAt: "2026-09-10T08:10:00", tempF: "68", gravity: "4.2", ph: "4.1", note: "steady" };
-    const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, unit: "plato" }));
+    const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, identity: { vessel: "FV3" }, unit: "plato" }));
     const recovery = renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, recovery: { state: "uncertain", discardLabel: "FV3 reading" } }));
     expect(editing).toContain('type="datetime-local"');
     expect(renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values }))).toContain("Save reading");
