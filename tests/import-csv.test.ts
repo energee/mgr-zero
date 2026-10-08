@@ -64,12 +64,14 @@ it("the import wizard binds the shared explorer steps, Select, and Attachment co
 
 // #758: import_csv serializes rows that share a key, so they keep file order.
 describe("importRowKey", () => {
-  it("groups rows that can collide in the database", () => {
-    expect(importRowKey("customers", { name: " Acme " })).toBe(importRowKey("customers", { name: "Acme" }));
-    expect(importRowKey("customers", { name: "Acme" })).not.toBe(importRowKey("customers", { name: "Other" }));
-    expect(importRowKey("products_skus", { product: "IPA", formatId: "a" })).toBe(importRowKey("products_skus", { product: "IPA", formatId: "b" }));
-    expect(importRowKey("ship_tos", { customerId: "c1", label: "A" })).toBe(importRowKey("ship_tos", { customerId: "c1", label: "B" }));
-    expect(importRowKey("channel_prices", { saleChannelId: "s", priceGroupId: "g", formatId: "f" }))
-      .not.toBe(importRowKey("channel_prices", { saleChannelId: "s", priceGroupId: "g", formatId: "f2" }));
+  it("groups exactly the rows that can collide in the database", () => {
+    const key = (kind: Parameters<typeof importRowKey>[0], row: Record<string, string>, index = 0) => importRowKey(kind, row, index);
+    expect(key("customers", { name: " Acme " })).toBe(key("customers", { name: "Acme" }, 1));
+    expect(key("customers", { name: "Acme" })).not.toBe(key("customers", { name: "acme" }, 1));
+    expect(key("products_skus", { product: "IPA", formatId: "a" })).toBe(key("products_skus", { product: "IPA", formatId: "b" }, 1));
+    const cell = { saleChannelId: "s", priceGroupId: "g", formatId: "F" };
+    expect(key("channel_prices", cell)).toBe(key("channel_prices", { ...cell, formatId: "f" }, 1));
+    expect(key("ship_tos", { customerId: "c" })).not.toBe(key("ship_tos", { customerId: "c" }, 1));
+    expect(key("opening_balances", { skuId: "s" })).not.toBe(key("opening_balances", { skuId: "s" }, 1));
   });
 });

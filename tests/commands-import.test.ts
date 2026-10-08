@@ -99,33 +99,59 @@ describe("import_csv rows", () => {
     try { expect((await direct(ctx.db)).error?.code).toBe("42501"); }
     finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
   });
-  // #758: rows run concurrently, but rows sharing an import key keep file order,
-  // so the first of two same-name customers still wins and outcomes stay in row order.
-  it("runs independent rows concurrently and keeps file order within a key (#758)", async () => {
-    const tag = crypto.randomUUID().slice(0, 8);
-    const rows = [
-      { name: `Dup ${tag}`, type: "retailer", state: "PA", saleChannelId: channel, licenseNumber: "FIRST" },
-      ...Array.from({ length: 60 }, (_, i) => ({ name: `Bulk ${tag} ${i}`, type: "retailer", state: "PA", saleChannelId: channel })),
-      { name: `Dup ${tag}`, type: "retailer", state: "PA", saleChannelId: channel, licenseNumber: "SECOND" },
-    ];
+  // #758: rows run concurrently, but rows sharing an import key keep file order.
+  // Row 0 is held back, so without grouping its adjacent duplicate would win.
+  const concurrentImport = async (kind: string, rows: Record<string, string>[], hold?: (row: number) => boolean) => {
     let inFlight = 0, peak = 0;
     const rpc = ctx.db.rpc.bind(ctx.db);
     const db = Object.assign(Object.create(ctx.db), {
-      rpc: (fn: string, args: object) => {
+      rpc: (fn: string, args: { p_row_n?: number }) => {
         if (fn !== "import_csv_row") return rpc(fn as never, args as never);
         inFlight++; peak = Math.max(peak, inFlight);
-        return Promise.resolve(rpc(fn as never, args as never)).finally(() => inFlight--);
+        const wait = hold?.(args.p_row_n!) ? new Promise(r => setTimeout(r, 300)) : Promise.resolve();
+        return wait.then(() => rpc(fn as never, args as never)).finally(() => inFlight--);
       },
     });
-    const result = await runCommand("import_csv", { kind: "customers", rows }, { ...ctx, db },
+    const result = await runCommand("import_csv", { kind, rows }, { ...ctx, db },
       { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() }) as { committed: number; blocked: number; outcomes: { row: number; status: string }[] };
+    return { result, peak };
+  };
+  it("runs independent rows concurrently and keeps file order within a key (#758)", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const dup = (license: string) => ({ name: `Dup ${tag}`, type: "retailer", state: "PA", saleChannelId: channel, licenseNumber: license });
+    const rows = [dup("FIRST"), dup("SECOND"),
+      ...Array.from({ length: 30 }, (_, i) => ({ name: `Bulk ${tag} ${i}`, type: "retailer", state: "PA", saleChannelId: channel }))];
+    const { result, peak } = await concurrentImport("customers", rows, row => row === 0);
     expect(peak, "row RPCs ran concurrently").toBeGreaterThan(1);
     expect(result.outcomes.map(o => o.row)).toEqual(rows.map((_, i) => i + 1));
-    expect(result.outcomes[0].status).toBe("committed");
-    expect(result.outcomes.at(-1)!.status).toBe("blocked");
-    expect(result.committed).toBe(61);
+    expect(result.outcomes.slice(0, 2).map(o => o.status)).toEqual(["committed", "blocked"]);
     const { data } = await admin.from("customers").select("license_no").eq("brewery_id", ctx.breweryId).eq("name", `Dup ${tag}`);
     expect(data).toEqual([{ license_no: "FIRST" }]);
+  });
+  it("runs a products file with a UPC in file order across products (#758)", async () => {
+    const upc = `0${Date.now()}`.slice(0, 12);
+    const rows = [{ product: `UPC A ${upc}`, formatId: format, upc }, { product: `UPC B ${upc}`, formatId: format, upc }];
+    const { result, peak } = await concurrentImport("products_skus", rows, row => row === 0);
+    expect(peak).toBe(1);
+    expect(result.outcomes.map(o => o.status)).toEqual(["committed", "blocked"]);
+  });
+  it("stops starting rows after a row RPC fails (#758)", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const rows = Array.from({ length: 40 }, (_, i) => ({ name: `Stop ${tag} ${i}`, type: "retailer", state: "PA", saleChannelId: channel }));
+    let calls = 0;
+    const rpc = ctx.db.rpc.bind(ctx.db);
+    const db = Object.assign(Object.create(ctx.db), {
+      rpc: (fn: string, args: { p_row_n?: number }) => {
+        if (fn !== "import_csv_row") return rpc(fn as never, args as never);
+        calls++;
+        return args.p_row_n === 0 ? Promise.resolve({ data: null, error: { message: "boom", code: "XX000" } }) : rpc(fn as never, args as never);
+      },
+    });
+    await expect(runCommand("import_csv", { kind: "customers", rows }, { ...ctx, db },
+      { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() })).rejects.toThrow();
+    // Workers that outlive the rejection would keep calling; give them time to show it.
+    await new Promise(r => setTimeout(r, 1500));
+    expect(calls, "workers stop after the failure").toBeLessThan(rows.length);
   });
   it("imports ship-tos and channel price cells and reports duplicate creates explicitly", async () => {
     const customer = await execute("customers", [{ name: "Ship customer", type: "retailer", state: "PA", saleChannelId: channel }]);

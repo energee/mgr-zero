@@ -21,15 +21,19 @@ defineCommand({
     };
     // atomic-exempt: independent CSV rows; every dependent write within a row shares one RPC transaction.
     // Rows sharing importRowKey run in file order; distinct keys run IMPORT_CONCURRENCY at a time (#758).
-    const queues = new Map<string, number[]>();
-    input.rows.forEach((r, row) => {
-      const key = importRowKey(input.kind, r);
-      const queue = queues.get(key);
-      if (queue) queue.push(row); else queues.set(key, [row]);
-    });
-    const pending = [...queues.values()];
-    await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, pending.length) }, async () => {
-      for (let queue = pending.shift(); queue; queue = pending.shift()) for (const row of queue) await importRow(row);
+    // A UPC can collide across products, so a products file with any UPC runs entirely in order.
+    const anyUpc = input.kind === "products_skus" && input.rows.some(r => r.upc?.trim());
+    const queues = [...Map.groupBy(input.rows.keys(), row => anyUpc ? "" : importRowKey(input.kind, input.rows[row], row)).values()];
+    // After one row RPC throws, stop starting rows: the command fails, and rows
+    // committed after its error would be invisible to the caller.
+    let failed = false, next = 0;
+    await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, queues.length) }, async () => {
+      while (!failed && next < queues.length) {
+        for (const row of queues[next++]) {
+          if (failed) return;
+          try { await importRow(row); } catch (error) { failed = true; throw error; }
+        }
+      }
     }));
     return { committed: outcomes.filter(r => r.status === "committed").length, blocked: outcomes.filter(r => r.status === "blocked").length, outcomes };
   },
