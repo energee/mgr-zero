@@ -8710,6 +8710,10 @@ export type Database = {
       }
       my_brewery_ids: { Args: never; Returns: string[] }
       my_customer_ids: { Args: never; Returns: string[] }
+      my_staff_brewery_ids: {
+        Args: { p_roles: Database["public"]["Enums"]["staff_role"][] }
+        Returns: string[]
+      }
       on_hand_rows: {
         Args: never
         Returns: {

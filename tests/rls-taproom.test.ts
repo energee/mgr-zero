@@ -235,6 +235,32 @@ describe("taproom complete public RLS read boundary", () => {
     }
   });
 
+  // #770: each business-record table is readable by exactly the staff roles of
+  // the command that lists it, so RLS and the command gate cannot drift apart.
+  // Tables not named here keep is_staff_of (the Beer landing counts through them).
+  it("business-record reads follow the command role gates", async () => {
+    const readBy: Partial<Record<Table, string>> = {
+      customers: "list_customers", ship_tos: "get_customer", sale_channels: "list_sale_channels",
+      orders: "list_orders", order_lines: "get_order", order_events: "get_order", order_deposit_lines: "get_order", shipments: "get_order",
+      invoices: "list_invoices", invoice_lines: "get_invoice", invoice_questions: "list_invoice_questions",
+      deliveries: "get_delivery_stop", routes: "list_routes", stock_transfers: "list_stock_transfers", stock_transfer_lines: "get_stock_transfer",
+      lots: "list_movements", channel_prices: "list_channel_prices",
+      report_filings: "list_compliance_reports", brand_approvals: "get_compliance_registry",
+      state_registrations: "get_compliance_registry", brewery_state_licenses: "get_compliance_registry",
+      pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",
+      pos_item_mappings: "list_pos_variations", pos_locations: "list_pos_locations",
+    };
+    const clients = await Promise.all((["admin", "sales", "warehouse", "brewer"] as const).map(async role =>
+      [role, await asUser((role === "admin" ? own.owner : await makeStaff(own.brewery.id, role)).email)] as const));
+    await Promise.all(clients.flatMap(([role, client]) => Object.entries(readBy).map(async ([table, command]) => {
+      const roles = getCommandDefinition(command)?.roles;
+      expect(Array.isArray(roles), `${command} has a staff role list`).toBe(true);
+      const seen = (await tenantRows(client, table as Table, own)).length;
+      if ((roles as readonly string[]).includes(role)) expect(seen, `${role} reads ${table}`).toBeGreaterThan(0);
+      else expect(seen, `${role} must not read ${table}`).toBe(0);
+    })));
+  });
+
   it("team list is empty for taproom", async () => {
     const team = await db.rpc("list_team_members", { p_brewery: own.brewery.id });
     expect(team.error).toBeNull();
@@ -363,7 +389,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
       and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')`).map(row => JSON.parse(row) as {name:string;signature:string;args:string[]});
-  const readNames = ["get_material_count_preview","list_my_invitations","get_order_email_status","get_batch_completion_preview","get_loss_review","get_pos_menu","get_pos_menu_item","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","pos_order_versions","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","portal_invoice_rows","portal_keg_deposit_rows","portal_order_event_rows","portal_shipment_rows","portal_schedule_rows","staff_role","today_live_reasons","list_team_members","list_customer_users","customers_missing_portal_email","list_chat_conversations","get_chat_history"];
+  const readNames = ["get_material_count_preview","list_my_invitations","get_order_email_status","get_batch_completion_preview","get_loss_review","get_pos_menu","get_pos_menu_item","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","pos_order_versions","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_staff_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","portal_invoice_rows","portal_keg_deposit_rows","portal_order_event_rows","portal_shipment_rows","portal_schedule_rows","staff_role","today_live_reasons","list_team_members","list_customer_users","customers_missing_portal_email","list_chat_conversations","get_chat_history"];
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -374,7 +400,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["get_material_count_preview(uuid,uuid,uuid,jsonb)","list_my_invitations()","get_order_email_status(uuid,uuid)","get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_invoice_rows()","portal_keg_deposit_rows()","portal_order_event_rows()","portal_shipment_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","customers_missing_portal_email(uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
+  const readSignatures = ["get_material_count_preview(uuid,uuid,uuid,jsonb)","list_my_invitations()","get_order_email_status(uuid,uuid)","get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","pos_order_versions()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_staff_brewery_ids(staff_role[])","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","portal_invoice_rows()","portal_keg_deposit_rows()","portal_order_event_rows()","portal_shipment_rows()","portal_schedule_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_customer_users(uuid,uuid)","customers_missing_portal_email(uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
   const ownSignatures = ["accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());

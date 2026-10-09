@@ -154,6 +154,11 @@ a gap to close, not a convention to trust.
    `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
    projections, which omit QBO sync bookkeeping, write-off attribution, event
    payloads and staff ids (deliveries have no portal projection).
+   Customer, order, invoice, price and compliance reads admit only the staff
+   roles of the commands that read them, via
+   `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
+   of them (#770). Other tables keep `is_staff_of`. `tests/rls-taproom.test.ts`
+   checks sales, warehouse and brewer against each table's command role list.
    *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
