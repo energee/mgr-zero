@@ -165,8 +165,8 @@ describe("Brand view", () => {
     expect(model.hops).toBe("Citra, Mosaic");
     expect(model.skuList).toBe("3 active packages · 1 pour");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
-    expect(model.compliance.map((row) => row.title)).toEqual(["COLA serial 260135", "OH registration"]);
-    expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15", verb: "Edit" });
+    expect(model.compliance.map((row) => row.title)).toEqual(["COLA TTB ID 25318001000034", "OH registration"]);
+    expect(model.compliance[0]).toMatchObject({ detail: "submitted 2026-01-15 · serial 260135", verb: "Edit" });
     expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
   });
 
@@ -202,7 +202,7 @@ describe("Brand view", () => {
     expect(html).toMatch(/SKU list/);
     expect(html).toMatch(/3 active packages/);
     expect(html).toMatch(/Compliance/);
-    expect(html).toMatch(/COLA serial 260135/);
+    expect(html).toMatch(/COLA TTB ID 25318001000034/);
     expect(html).toMatch(/OH registration/);
     expect(html).toMatch(/Suggested group 2/);
     expect(html).toMatch(/recipe cost \$48\.10\/bbl/);

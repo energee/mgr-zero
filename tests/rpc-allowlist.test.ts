@@ -180,7 +180,7 @@ const AUTHENTICATED_RPCS = [
   "resolve_invoice_question(uuid,uuid,uuid)",
   "update_packaging_run(uuid,uuid,uuid,jsonb,timestamp with time zone,uuid)",
   "upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid)",
-  "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid,text[])",
+  "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid,text[],text)",
   "upsert_brewery_state_license(uuid,text,text,text,date,text,uuid,text[])",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,tax_treatment,uuid)",
   "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid,uuid,numeric)",

@@ -173,7 +173,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null
+Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -181,6 +181,7 @@ Record or edit one brand's COLA or formula approval by its TTB id; the same id o
 | `kind` | cola or formula | yes |
 | `ttbId` | string | yes |
 | `id` | uuid | no |
+| `serialNumber` | string or null | no |
 | `approvedOn` | date (YYYY-MM-DD) or null | no |
 | `expiresOn` | date (YYYY-MM-DD) or null | no |
 | `note` | string or null | no |
