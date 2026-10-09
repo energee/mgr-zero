@@ -23,7 +23,7 @@ const eslintConfig = defineConfig([
     // invitation boundary, brewery-bootstrap boundary, chat and order-email internal-job owners, and safe website-menu projection.
     // Tests and scripts run outside request paths and are exempt below.
     files: ["app/**", "lib/**", "components/**", "proxy.ts"],
-    ignores: ["lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts", "lib/supabase/invites.ts", "lib/supabase/provision.ts", "lib/supabase/public-menu.ts", "lib/chat/jobs.ts", "lib/email/jobs.ts"],
+    ignores: ["lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts", "lib/supabase/invites.ts", "lib/supabase/provision.ts", "lib/supabase/public-menu.ts", "lib/chat/jobs.ts", "lib/email/jobs.ts", "lib/retention/jobs.ts"],
     rules: {
       "no-restricted-imports": ["error", {
         paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only the named service boundaries in .agents/ARCHITECTURE.md iron rule 4 may import it." }],

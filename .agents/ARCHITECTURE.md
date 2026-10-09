@@ -168,7 +168,7 @@ a gap to close, not a convention to trust.
    permissive policy.
 4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
    `lib/supabase/invites.ts`, `lib/supabase/provision.ts`, `lib/supabase/public-menu.ts`,
-   `lib/chat/jobs.ts`, and `lib/email/jobs.ts`.**
+   `lib/chat/jobs.ts`, `lib/email/jobs.ts`, and `lib/retention/jobs.ts`.**
    The token boundary is the sole credential path: each operation admits only its named roles,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
