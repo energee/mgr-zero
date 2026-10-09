@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/taproom";
+import { cappedDb, type PageFailure, type PageRead } from "./capped-db";
 
 type Row = Record<string, string | number | boolean | null>;
 const breweryId = "fleet-brewery";
@@ -29,39 +30,8 @@ function fixture() {
 }
 
 // Only the transport is simulated: registry permissions, paging, joins and totals are real.
-type PageRead = { table: string; order: string[] };
-function context(tables: Record<string, Row[]>, failure?: { table: string; start: number; changed?: boolean }, reads?: PageRead[]): Ctx {
-  const db = {
-    from(table: string) {
-      let rows = [...(tables[table] ?? [])];
-      const order: string[] = [];
-      let start = 0, end = 999, counted = false;
-      const query = {
-        select(_columns: string, options?: { count: string }) { counted = options?.count === "exact"; return query; },
-        eq(column: string, value: string) { rows = rows.filter(row => row[column] === value); return query; },
-        order(column: string) { order.push(column); return query; },
-        range(from: number, to: number) { start = from; end = to; return query; },
-        then(resolve: (result: { data: Row[] | null; error: { message: string; code: string } | null; count: number | null }) => unknown) {
-          reads?.push({ table, order: [...order] });
-          rows.sort((a, b) => {
-            for (const column of order) {
-              const comparison = String(a[column]).localeCompare(String(b[column]));
-              if (comparison) return comparison;
-            }
-            return 0;
-          });
-          const fails = failure?.table === table && failure.start === start;
-          return Promise.resolve(resolve({
-            data: fails && !failure.changed ? null : rows.slice(start, Math.min(end + 1, start + 1000)),
-            error: fails && !failure.changed ? { message: "Read denied", code: "42501" } : null,
-            count: counted ? rows.length + (fails && failure.changed ? 1 : 0) : null,
-          }));
-        },
-      };
-      return query;
-    },
-  };
-  return { db: db as unknown as Ctx["db"], userId: "staff", breweryId, role: "warehouse" };
+function context(tables: Record<string, Row[]>, failure?: PageFailure, reads?: PageRead[]): Ctx {
+  return { db: cappedDb(tables, { failure, reads }), userId: "staff", breweryId, role: "warehouse" };
 }
 
 type Fleet = {

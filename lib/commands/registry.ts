@@ -112,7 +112,12 @@ type CountedPage<T> = PromiseLike<{ data: T[] | null; error: { message: string; 
  *  `count: "exact"`; a keyset read starts after `last` and passes `key`, which
  *  must strictly increase in JS string order (uuid keys, not collated names or
  *  enums). Throws 409 "`name` changed while loading" when the count moves, a
- *  page comes up short or overshoots, or a key goes backwards. */
+ *  page comes up short or overshoots, or a key goes backwards.
+ *  The exact count adds one count(*) over the filtered set per page: the price
+ *  of refusing a silently capped list. A list written to while it loads (the
+ *  pick sheet during picking) can return 409 and the reader reloads; an offset
+ *  read whose total stays equal while a row moves across a page boundary is
+ *  not detected, which a keyset read on a unique key avoids (#759). */
 export async function completeRows<T>(name: string, page: (start: number, last: NoInfer<T> | undefined) => CountedPage<T>, key?: (row: NoInfer<T>) => string): Promise<T[]> {
   const rows: T[] = [];
   let total: number | undefined;

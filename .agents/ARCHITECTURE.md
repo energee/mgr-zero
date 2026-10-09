@@ -46,7 +46,7 @@ never copy it into a second place.
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
 | `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
-| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. |
+| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads only its role (`staffRoleAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRole` reuses them. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`, and `readAppUrl` — the public origin for links and OAuth redirects, never taken from a request Host) shared by server code, scripts, and tests. |
 | `lib/commands/movement-input.ts` | `movementInput`, the `record_movement` command's input schema. It registers no command, so the client-side Composer can import it; `lib/commands/inventory.ts`, `lib/commands/preview.ts`, and the inventory page share it. |
 | `lib/composer/state.ts` | The Composer drawer's `record_movement` proposal: the `composerProposal` schema that `lib/chat/messages.ts` parses the newest assistant message's proposal against. A malformed or non-movement proposal returns an operator error instead of reaching the commit button. |
@@ -156,6 +156,17 @@ a gap to close, not a convention to trust.
    `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
    projections, which omit QBO sync bookkeeping, write-off attribution, event
    payloads and staff ids (deliveries have no portal projection).
+   `orders`, `order_lines`, `order_deposit_lines` and `skus` follow the same
+   rule (#788). Buyers read `portal_orders`: only the columns
+   `portal_order_rows` returns, with ship-to and lines inlined. Buyers read
+   `portal_sku_prices`: active, priced SKUs on the caller's channels, with no
+   QBO mapping. `order_deposit_lines` has no portal projection. `sku_prices`
+   returns no customer rows, because it is `security_invoker` over `skus`.
+   A definer projection is never inlined, so a filter on its view runs after
+   every caller row is built; single-row reads pass an id to the rows function
+   instead (`portal_order_rows(p_order)`).
+   Still open (#793): `customers`, `brands`, `formats` and `channel_prices`
+   keep customer policies that expose whole rows.
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
@@ -164,7 +175,7 @@ a gap to close, not a convention to trust.
    Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
    caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
    *Enforced by:* RLS policies in migrations, proven by
-   `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
+   `tests/rls-tenancy.test.ts`, `tests/rls-portal-columns.test.ts` and `tests/rls-portal-order-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
@@ -309,3 +320,13 @@ constraint or query index leading with it counts). Policies call
 `(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
 statement instead of once per row. *Enforced by:*
 `tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
+
+`movements_onhand_idx` and `allocations_open_idx` carry `include (qty)`, so
+`portal_availability`'s per-brewery sums can be index-only scans. Heap fetches
+remain for pages vacuum has not yet marked all-visible. The cost: on
+`allocations`, a qty update on an open row is no longer a HOT update;
+`inventory_movements` is append-only, so it pays only the wider entry.
+*Enforced by:* `tests/schema-rls-indexes.test.ts`, which explains the
+function's body and expects both index-only scans, and rejects two indexes on
+one table with the same keys whatever their `include` (#794). So widen an
+existing index with `include` rather than adding a second one on the same keys.

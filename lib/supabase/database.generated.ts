@@ -7327,6 +7327,23 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_orders: {
+        Row: {
+          brewery_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string | null
+          note: string | null
+          order_lines: Json | null
+          order_no: number | null
+          po_number: string | null
+          requested_ship_date: string | null
+          ship_to_id: string | null
+          ship_tos: Json | null
+          status: Database["public"]["Enums"]["order_status"] | null
+        }
+        Relationships: []
+      }
       portal_schedule: {
         Row: {
           brand_id: string | null
@@ -7342,6 +7359,17 @@ export type Database = {
           id: string | null
           invoice_timing: string | null
           order_id: string | null
+        }
+        Relationships: []
+      }
+      portal_sku_prices: {
+        Row: {
+          brand_name: string | null
+          brewery_id: string | null
+          sale_channel_id: string | null
+          sku_id: string | null
+          sku_name: string | null
+          unit_price_cents: number | null
         }
         Relationships: []
       }
@@ -8804,6 +8832,23 @@ export type Database = {
           order_id: string
         }[]
       }
+      portal_order_rows: {
+        Args: { p_order?: string }
+        Returns: {
+          brewery_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          note: string
+          order_lines: Json
+          order_no: number
+          po_number: string
+          requested_ship_date: string
+          ship_to_id: string
+          ship_tos: Json
+          status: Database["public"]["Enums"]["order_status"]
+        }[]
+      }
       portal_quote_order: {
         Args: {
           p_brewery: string
@@ -8833,6 +8878,17 @@ export type Database = {
           id: string
           invoice_timing: string
           order_id: string
+        }[]
+      }
+      portal_sku_price_rows: {
+        Args: never
+        Returns: {
+          brand_name: string
+          brewery_id: string
+          sale_channel_id: string
+          sku_id: string
+          sku_name: string
+          unit_price_cents: number
         }[]
       }
       portal_submit_quote: {

@@ -292,14 +292,15 @@ defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines",
   roles: [...readRoles],
   input: z.object({ date: z.string().date().optional() }),
-  handler: (ctx, i) => {
+  // Paged past PostgREST's 1000-row cap (#759); without a date this is every
+  // confirmed/picked order. id breaks ship-date ties so pages never overlap.
+  handler: (ctx, i) => completeRows("Pick sheet", start => {
     let q = ctx.db.from("orders")
-      .select("*, customers(name), order_lines(*, skus(name))")
-      .eq("brewery_id", ctx.breweryId).in("status", ["confirmed", "picked"])
-      .order("requested_ship_date", { ascending: true });
+      .select("*, customers(name), order_lines(*, skus(name))", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).in("status", ["confirmed", "picked"]);
     if (i.date) q = q.eq("requested_ship_date", i.date);
-    return unwrap(q);
-  },
+    return q.order("requested_ship_date", { ascending: true }).order("id").range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 // Both invoice reads use the same current connection and exact successful push provenance.
