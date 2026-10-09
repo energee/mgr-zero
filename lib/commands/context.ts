@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   createRequestAuthContext,
   getRequestAuthContext,
+  staffRoleAt,
   type RequestAuthContext,
 } from "@/lib/auth/request-context";
 import { z } from "zod";
@@ -18,22 +19,18 @@ const uuid = z.uuid();
 /** True for a canonical UUID string; shared by the command route and the bearer context. */
 export const isUuid = (value: string | undefined): value is string => value !== undefined && uuid.safeParse(value).success;
 
+const notMember = () => new CommandError("not a member of this brewery", 403, "not_member");
+
 // Exported for tests; production callers go through buildContextFromBearer.
 // Both membership reads go through unwrap so a database failure is a 500
-// db_error rather than being mistaken for "not a member" (403). A malformed
-// breweryId is rejected up front (Postgres would raise 22P02 → db_error) and
-// still reads as not_member, the contract tests/api-command.test.ts pins.
+// db_error rather than being mistaken for "not a member" (403). Both the bearer
+// and cookie contexts reject a malformed breweryId up front (Postgres would
+// raise 22P02 → db_error), so it reads as not_member, the contract
+// tests/api-command.test.ts and tests/route-context-reads.test.ts pin.
 export async function ctxForBearer(db: SupabaseClient<Database>, userId: string, breweryId: string, customerId?: string): Promise<Ctx> {
-  if (!isUuid(breweryId)) {
-    throw new CommandError("not a member of this brewery", 403, "not_member");
-  }
-  const staff = await unwrap(db
-    .from("brewery_users")
-    .select("role")
-    .eq("brewery_id", breweryId)
-    .eq("user_id", userId)
-    .maybeSingle());
-  if (staff && !customerId) return { db, userId, breweryId, role: staff.role };
+  if (!isUuid(breweryId)) throw notMember();
+  const role = await staffRoleAt(db, userId, breweryId);
+  if (role && !customerId) return { db, userId, breweryId, role };
 
   let customerQuery = db
     .from("customer_users")
@@ -47,7 +44,7 @@ export async function ctxForBearer(db: SupabaseClient<Database>, userId: string,
     return { db, userId, breweryId, role: "customer", customerId: customer[0].customer_id };
   }
 
-  throw new CommandError("not a member of this brewery", 403, "not_member");
+  throw notMember();
 }
 
 const contextChanged = () => new CommandError("Signed-in account or active workspace changed. Return to the original context to retry this unchanged action.", 409, "context_changed");
@@ -77,6 +74,7 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
+  if (!isUuid(breweryId)) throw notMember();
   const role = customerId ? null : await request.getStaffRole(breweryId);
   if (role) {
     const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role } satisfies Ctx;
@@ -97,7 +95,7 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
 
-  throw new CommandError("not a member of this brewery", 403, "not_member");
+  throw notMember();
 }
 
 // Server Components share React's request cache through the RSC composition.

@@ -292,8 +292,8 @@ defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines",
   roles: [...readRoles],
   input: z.object({ date: z.string().date().optional() }),
-  // Without a date this is every confirmed/picked order, so it pages past PostgREST's
-  // 1000-row cap (#759); id breaks ship-date ties so pages never overlap.
+  // Paged past PostgREST's 1000-row cap (#759); without a date this is every
+  // confirmed/picked order. id breaks ship-date ties so pages never overlap.
   handler: (ctx, i) => completeRows("Pick sheet", start => {
     let q = ctx.db.from("orders")
       .select("*, customers(name), order_lines(*, skus(name))", { count: "exact" })

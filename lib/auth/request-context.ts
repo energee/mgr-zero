@@ -1,6 +1,6 @@
 import type { Database } from "@/lib/supabase/database";
 // lib/auth/request-context.ts — request-scoped Supabase identity and membership lookups shared by layouts and commands.
-import type { StaffRole } from "@/lib/commands/registry";
+import { unwrap, type StaffRole } from "@/lib/commands/registry";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase/server";
@@ -44,10 +44,17 @@ export interface RequestAuthContext {
   getIdentity(): Promise<RequestIdentity | null>;
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
-  getStaffMembership(breweryId: string): Promise<StaffMembership | null>;
   /** The caller's role at one brewery, or null when not staff there: the one fact a command needs. */
   getStaffRole(breweryId: string): Promise<StaffRole | null>;
   getCustomerMembership(breweryId: string, customerId?: string): Promise<CustomerMembership | null>;
+}
+
+/** One user's role at one brewery (null when not staff there), read from the
+ *  single brewery_users row; a database failure is a 500 db_error via unwrap.
+ *  Shared by the cookie and bearer command contexts. */
+export async function staffRoleAt(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<StaffRole | null> {
+  const row = await unwrap(db.from("brewery_users").select("role").eq("user_id", userId).eq("brewery_id", breweryId).maybeSingle());
+  return row?.role ?? null;
 }
 
 /**
@@ -125,25 +132,19 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     getIdentity,
     getStaffMemberships,
     getCustomerMemberships,
-    async getStaffMembership(breweryId) {
-      return (await getStaffMemberships()).find((membership) => membership.breweryId === breweryId) ?? null;
-    },
     // A command needs only the role, so it reads one brewery_users row rather than
     // every membership plus the staff_brewery name/timezone a layout prints (#759).
-    // When this request already loaded the memberships, the role comes from them.
+    // When this request already loaded the memberships (getActiveBrewery does,
+    // before buildContext), the role comes from them and keeps their contract on
+    // purpose: a page whose staff_brewery row is missing has already failed there.
     async getStaffRole(breweryId) {
-      if (staffMemberships) return (await getStaffMemberships()).find((membership) => membership.breweryId === breweryId)?.role ?? null;
+      if (staffMemberships) {
+        const membership = (await staffMemberships).find((m) => m.breweryId === breweryId);
+        return membership?.role ?? null;
+      }
       const requestIdentity = await getIdentity();
       if (!requestIdentity) return null;
-      const db = await getSupabaseClient();
-      const { data, error } = await db
-        .from("brewery_users")
-        .select("role")
-        .eq("user_id", requestIdentity.userId)
-        .eq("brewery_id", breweryId)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.role ?? null;
+      return staffRoleAt(await getSupabaseClient(), requestIdentity.userId, breweryId);
     },
     async getCustomerMembership(breweryId, customerId) {
       return (await getCustomerMemberships()).find((membership) => membership.breweryId === breweryId && (!customerId || membership.customerId === customerId)) ?? null;
