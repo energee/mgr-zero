@@ -32,10 +32,12 @@ describe("order_events", () => {
     const { data: cross } = await db2.from("order_events").select().eq("order_id", order.id);
     expect(cross!.length).toBe(0);
   });
-  it("customer reads events for own orders only", async () => {
+  it("customer reads own order events only through portal_order_events (#754)", async () => {
     const db = await asUser(custUser.email);
-    const { data } = await db.from("order_events").select().eq("order_id", order.id);
-    expect(data!.length).toBe(1);
+    const { data: base } = await db.from("order_events").select().eq("order_id", order.id);
+    expect(base).toEqual([]);
+    const { data } = await db.from("portal_order_events").select("*").eq("order_id", order.id);
+    expect(data!.map(e => e.event)).toEqual(["created"]);
   });
   it("is append-only even for staff", async () => {
     const db1 = await asUser(staff1.email);

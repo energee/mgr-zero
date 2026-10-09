@@ -13,6 +13,15 @@ export type FermentationReadingValues = {
   note: string;
 };
 
+/** Which tank receives the reading, and its batch when the occupancy names one (#716). */
+export type FermentationReadingIdentity = { vessel: string; batch?: string };
+
+/** Names the tank and batch from list_occupancies facts; absent facts stay absent. */
+export function readingIdentity(o: { vessel_name: string | null; batch_no: number | null; brand_name: string | null }): FermentationReadingIdentity {
+  const batch = [o.batch_no == null ? null : `Batch ${o.batch_no}`, o.brand_name].filter(Boolean).join(" · ");
+  return { vessel: o.vessel_name ?? "unknown vessel", ...(batch ? { batch } : {}) };
+}
+
 export type FermentationReadingRecovery = {
   state: "queued" | "uncertain" | "fix" | "permission_changed";
   discardLabel: string;
@@ -21,6 +30,7 @@ export type FermentationReadingRecovery = {
 export function FermentationReadingView({
   formId,
   values,
+  identity,
   unit,
   prior,
   locked = false,
@@ -33,6 +43,7 @@ export function FermentationReadingView({
 }: {
   values: FermentationReadingValues;
   formId: string;
+  identity: FermentationReadingIdentity;
   unit: GravityUnit;
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
   locked?: boolean;
@@ -49,6 +60,10 @@ export function FermentationReadingView({
   });
   return (
     <form id={formId} onSubmit={onSubmit} className="flex flex-col gap-4">
+      <p className="text-sm">
+        <span className="font-medium">{identity.vessel}</span>
+        {identity.batch && <span className="text-muted-foreground"> · {identity.batch}</span>}
+      </p>
       <fieldset disabled={locked || busy} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           {E.edit("Observed at", values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}

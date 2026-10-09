@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { beginSquareOAuth, refreshSquareTokens, SquareClient } from "@/lib/pos";
+import { beginSquareOAuth, refreshSquareCredentials, SquareClient } from "@/lib/pos";
 import { disconnectSquare, readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
 import { admin, makeBrewery, makeStaffCtx, sql } from "./helpers";
 
@@ -33,7 +33,7 @@ describe("Square durable credential lifecycle", () => {
 
     let release!: (response: Response) => void;
     const refreshFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { release = resolve; }));
-    const pending = refreshSquareTokens(ctx, new SquareClient(config, refreshFetch));
+    const pending = refreshSquareCredentials(ctx, new SquareClient(config, refreshFetch));
     await vi.waitFor(() => expect(refreshFetch).toHaveBeenCalledTimes(1));
 
     const requestId = crypto.randomUUID();

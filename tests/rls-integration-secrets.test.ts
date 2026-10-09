@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Ctx } from "@/lib/commands/registry";
-import { readIntegrationTokens, storeIntegrationTokens } from "@/lib/supabase/integration-tokens";
+import { readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, seedCustomer } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
@@ -19,6 +19,21 @@ function privateTokenCount(breweryId: string, provider: "qbo" | "square") {
 }
 
 type BrowserClient = { name: string; db: SupabaseClient<Database> };
+
+/** Seeds a provider credential through the service-only RPC, which rechecks the
+ *  actor's current role; there is no production store helper to call. */
+async function storeTokens(ctx: Ctx, provider: "qbo" | "square", accessToken: string, refreshToken: string) {
+  const connection = provider === "qbo"
+    ? await admin.from("qbo_connections").select("id").eq("brewery_id", ctx.breweryId).single()
+    : await admin.from("pos_connections").select("id").eq("brewery_id", ctx.breweryId).eq("provider", "square").single();
+  expect(connection.error).toBeNull();
+  const { data, error } = await admin.rpc("store_integration_tokens", {
+    p_brewery: ctx.breweryId, p_provider: provider, p_connection: connection.data!.id, p_actor: ctx.userId,
+    p_access_token: accessToken, p_refresh_token: refreshToken,
+  });
+  expect(error).toBeNull();
+  expect(data).toBe(true);
+}
 
 describe("integration token isolation", () => {
   let brewery: { id: string };
@@ -137,23 +152,15 @@ describe("integration token isolation", () => {
     }
   });
 
-  it("stores and reads tokens through the RLS-bound admin and sales server boundary", async () => {
-    await storeIntegrationTokens(adminCtx, {
-      provider: "qbo",
-      accessToken: "server-access-token",
-      refreshToken: "server-refresh-token",
-    });
-    await storeIntegrationTokens(salesCtx, {
-      provider: "square",
-      accessToken: "square-access-token",
-      refreshToken: "square-refresh-token",
-    });
+  it("stores tokens for admin and sales actors and reads them through the RLS-bound server boundary", async () => {
+    await storeTokens(adminCtx, "qbo", "server-access-token", "server-refresh-token");
+    await storeTokens(salesCtx, "square", "square-access-token", "square-refresh-token");
 
-    await expect(readIntegrationTokens(salesCtx, "qbo")).resolves.toEqual({
+    await expect(readVersionedIntegrationTokens(salesCtx, "qbo")).resolves.toMatchObject({
       accessToken: "server-access-token",
       refreshToken: "server-refresh-token",
     });
-    await expect(readIntegrationTokens(adminCtx, "square")).resolves.toEqual({
+    await expect(readVersionedIntegrationTokens(adminCtx, "square")).resolves.toMatchObject({
       accessToken: "square-access-token",
       refreshToken: "square-refresh-token",
     });
@@ -199,7 +206,7 @@ describe("integration token isolation", () => {
   });
 
   it("rejects server token access outside the integration roles and across a real target tenant", async () => {
-    await expect(readIntegrationTokens(warehouseCtx, "qbo")).rejects.toMatchObject({ status: 403 });
+    await expect(readVersionedIntegrationTokens(warehouseCtx, "qbo")).rejects.toMatchObject({ status: 403 });
     const otherBrewery = await makeBrewery();
     const otherAdmin = await makeStaff(otherBrewery.id, "admin");
     const otherDb = await asUser(otherAdmin.email);
@@ -209,14 +216,10 @@ describe("integration token isolation", () => {
       realm_id: `realm-${crypto.randomUUID()}`,
     });
     expect(connectionError).toBeNull();
-    await storeIntegrationTokens(otherCtx, {
-      provider: "qbo",
-      accessToken: "other-tenant-access-token",
-      refreshToken: "other-tenant-refresh-token",
-    });
+    await storeTokens(otherCtx, "qbo", "other-tenant-access-token", "other-tenant-refresh-token");
 
     const forgedCtx: Ctx = { ...adminCtx, breweryId: otherBrewery.id };
-    await expect(readIntegrationTokens(forgedCtx, "qbo")).rejects.toMatchObject({ status: 403 });
+    await expect(readVersionedIntegrationTokens(forgedCtx, "qbo")).rejects.toMatchObject({ status: 403 });
   });
 
   it("allows one POS connection per supported provider", async () => {
@@ -247,11 +250,7 @@ describe("integration token isolation", () => {
       .select("id")
       .single();
     expect(firstConnectionError).toBeNull();
-    await storeIntegrationTokens(lifecycleCtx, {
-      provider: "qbo",
-      accessToken: "old-access-token",
-      refreshToken: "old-refresh-token",
-    });
+    await storeTokens(lifecycleCtx, "qbo", "old-access-token", "old-refresh-token");
     expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
 
     const { error: noOpError } = await admin
@@ -259,7 +258,7 @@ describe("integration token isolation", () => {
       .update({ realm_id: firstRealm })
       .eq("id", firstConnection!.id);
     expect(noOpError).toBeNull();
-    await expect(readIntegrationTokens(lifecycleCtx, "qbo")).resolves.toEqual({
+    await expect(readVersionedIntegrationTokens(lifecycleCtx, "qbo")).resolves.toMatchObject({
       accessToken: "old-access-token",
       refreshToken: "old-refresh-token",
     });
@@ -271,11 +270,7 @@ describe("integration token isolation", () => {
       .eq("id", firstConnection!.id);
     expect(realmChangeError).toBeNull();
     expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(0);
-    await storeIntegrationTokens(lifecycleCtx, {
-      provider: "qbo",
-      accessToken: "delete-access-token",
-      refreshToken: "delete-refresh-token",
-    });
+    await storeTokens(lifecycleCtx, "qbo", "delete-access-token", "delete-refresh-token");
     expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
 
 
@@ -287,7 +282,7 @@ describe("integration token isolation", () => {
       realm_id: `realm-${crypto.randomUUID()}`,
     });
     expect(replacementError).toBeNull();
-    await expect(readIntegrationTokens(lifecycleCtx, "qbo")).rejects.toMatchObject({ status: 404 });
+    await expect(readVersionedIntegrationTokens(lifecycleCtx, "qbo")).rejects.toMatchObject({ status: 404 });
 
     const movedBrewery = await makeBrewery();
     const { data: movedConnection, error: movedConnectionError } = await admin
@@ -303,11 +298,7 @@ describe("integration token isolation", () => {
       breweryId: movedBrewery.id,
       role: "admin",
     };
-    await storeIntegrationTokens(movedCtx, {
-      provider: "qbo",
-      accessToken: "moved-access-token",
-      refreshToken: "moved-refresh-token",
-    });
+    await storeTokens(movedCtx, "qbo", "moved-access-token", "moved-refresh-token");
     const moveTarget = await makeBrewery();
     const { error: moveError } = await admin
       .from("qbo_connections")
@@ -336,11 +327,7 @@ describe("integration token isolation", () => {
       .select("id")
       .single();
     expect(posConnectionError).toBeNull();
-    await storeIntegrationTokens(posCtx, {
-      provider: "square",
-      accessToken: "pos-access-token",
-      refreshToken: "pos-refresh-token",
-    });
+    await storeTokens(posCtx, "square", "pos-access-token", "pos-refresh-token");
     expect(privateTokenCount(posBrewery.id, "square")).toBe(1);
 
     const { error: merchantChangeError } = await admin

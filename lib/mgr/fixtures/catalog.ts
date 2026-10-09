@@ -107,7 +107,7 @@ export const brandHazy: BrandSnapshot = {
   // Hazy sits on group 3 by hand; its recipe cost lands in group 2's band.
   cost: { costCentsPerBbl: 4810, uncosted: [] },
   compliance: {
-    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ttb_id: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
+    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ttb_id: "25318001000034", serial_number: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
     registrations: [{ id: "oh", brand_id: BRAND_HAZY, state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],
   },
 };

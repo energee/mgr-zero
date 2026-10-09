@@ -52,6 +52,11 @@ describe("list_work", () => {
     expect((await kinds(brewer)).some((k) => k.startsWith("routes:"))).toBe(false);
     const all = await runCommand("list_work", {}, adminCtx) as WorkRow[];
     for (const r of all) expect(["orders", "transfers", "batches", "runs", "POs", "routes"]).toContain(r.kind);
+    // #759: a route row counts its stops without list_work reading them; a returned route is not in motion.
+    const open = await ins("routes", { brewery_id: b.id, name: "Tuesday", delivery_date: "2026-09-09" });
+    await ins("routes", { brewery_id: b.id, name: "Done", delivery_date: "2026-09-01", departed_at: "2026-09-01T08:00:00Z", returned_at: "2026-09-01T17:00:00Z" });
+    const routes = (await runCommand("list_work", {}, adminCtx) as WorkRow[]).filter((r) => r.kind === "routes");
+    expect(routes).toEqual([expect.objectContaining({ id: open.id, label: "Tuesday", detail: "0 stops · 2026-09-09", href: `/routes/${open.id}`, verb: "Depart", dueAt: "2026-09-09" })]);
     expect(all.every((r) => typeof r.label === "string" && typeof r.verb === "string")).toBe(true);
   });
 });

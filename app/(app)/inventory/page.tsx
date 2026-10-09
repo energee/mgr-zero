@@ -9,7 +9,7 @@ import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
+import { buildContext, isUuid } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { assembleFinishedGoods, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
 import "@/lib/commands/all";
@@ -45,12 +45,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const canMove = brewery.role === "admin" || brewery.role === "warehouse";
   const canAddSku = brewery.role === "admin" || brewery.role === "sales";
   const requestedQty = Number(params.qty);
-  const handoffId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.movementHandoff ?? "") ? params.movementHandoff : undefined;
+  const handoffId = isUuid(params.movementHandoff) ? params.movementHandoff : undefined;
   const initial: Partial<MovementInput> | undefined = recordMovement === "1" ? {
     ...(skus.some((sku) => sku.id === params.skuId) ? { skuId: params.skuId } : {}),
     ...(locations.some((location) => location.id === params.locationId) ? { locationId: params.locationId } : {}),
     ...(bins.some((bin) => bin.id === params.binId && (!params.locationId || bin.location_id === params.locationId)) ? { binId: params.binId } : {}),
-    ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.lotId ?? "") ? { lotId: params.lotId } : {}),
+    ...(isUuid(params.lotId) ? { lotId: params.lotId } : {}),
     ...(Number.isFinite(requestedQty) && requestedQty !== 0 ? { qty: requestedQty } : {}),
     ...(movementKinds.has(params.type as MovementKind) ? { type: params.type as MovementKind } : {}),
     ...(channels.some((channel) => channel.id === params.saleChannelId) ? { saleChannelId: params.saleChannelId } : {}),

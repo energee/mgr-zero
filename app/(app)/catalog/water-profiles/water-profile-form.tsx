@@ -19,7 +19,7 @@ export function WaterProfileForm({ profile }: { profile?: WaterProfile }) {
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={profile ? "Edit water profile" : "Add water profile"}
-      trigger={sheetTrigger(Boolean(profile), "Add profile")}
+      trigger={sheetTrigger(Boolean(profile), "Add profile", profile?.name)}
       footer={<CommandFormFooter><Button form={formId} type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save profile"}</Button></CommandFormFooter>}>
       <form id={formId} onSubmit={form.submit} className="flex flex-col gap-3">
         <WaterProfileView fields={fields} onChange={(patch) => setFields((f) => ({ ...f, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />

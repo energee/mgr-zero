@@ -1,4 +1,5 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
+import { bblExact } from "@/lib/volume";
 
 export type TaproomCountSnapshotLine = {
   bin_id: string;
@@ -260,5 +261,5 @@ export function countFailureKind(status: number | null, message: string, retryin
 }
 
 export function projectionExpectedText(projection: { expected_bbl: number | null }): string | null {
-  return projection.expected_bbl === null ? null : `${Number(projection.expected_bbl).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl expected`;
+  return projection.expected_bbl === null ? null : `${bblExact(projection.expected_bbl, 4)} expected`;
 }
