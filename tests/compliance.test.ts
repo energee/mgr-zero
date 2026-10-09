@@ -31,6 +31,27 @@ describe("registry", () => {
     await expect(runCommand("upsert_brand_approval", { brandId, kind: "formula", ttbId: "F-1" }, warehouse)).rejects.toMatchObject({ status: 403 });
   });
 
+  it("a COLA keeps its TTB ID and applicant serial as separate strings, edited independently (#730)", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Serial Saison", sku: "Serial Saison case" });
+    const saved = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "25318001000034", serialNumber: "000135" }, sales) as { id: string };
+    expect(saved).toMatchObject({ ttb_id: "25318001000034", serial_number: "000135" });
+    // omitting the serial keeps it; changing only the TTB ID leaves the serial alone
+    expect(await runCommand("upsert_brand_approval", { id: saved.id, brandId: brand, kind: "cola", ttbId: "25318001000099" }, sales))
+      .toMatchObject({ ttb_id: "25318001000099", serial_number: "000135" });
+    expect(await runCommand("upsert_brand_approval", { id: saved.id, brandId: brand, kind: "cola", ttbId: "25318001000099", serialNumber: "0002" }, sales))
+      .toMatchObject({ ttb_id: "25318001000099", serial_number: "0002" });
+    // null clears the serial
+    expect(await runCommand("upsert_brand_approval", { id: saved.id, brandId: brand, kind: "cola", ttbId: "25318001000099", serialNumber: null }, sales))
+      .toMatchObject({ serial_number: null });
+  });
+
+  it("a formula approval takes no serial and keeps its number (#730)", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Formula Gose", sku: "Formula Gose case" });
+    expect(await runCommand("upsert_brand_approval", { brandId: brand, kind: "formula", ttbId: "F-0042" }, sales))
+      .toMatchObject({ kind: "formula", ttb_id: "F-0042", serial_number: null });
+    await expect(runCommand("upsert_brand_approval", { brandId: brand, kind: "formula", ttbId: "F-0043", serialNumber: "9" }, sales)).rejects.toMatchObject({ status: 400 });
+  });
+
   it("state registrations and licenses upsert by their natural key and the registry lists all three", async () => {
     await runCommand("upsert_state_registration", { brandId, state: "OH", registrationNo: "OH-1" }, sales);
     const again = await runCommand("upsert_state_registration", { brandId, state: "OH", registrationNo: "OH-2", expiresOn: "2025-12-31" }, sales) as { registration_no: string };

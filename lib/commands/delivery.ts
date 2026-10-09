@@ -72,10 +72,11 @@ defineQuery({
     const outstandingByStop = new Map<string | null, number>();
     for (const r of outstanding) outstandingByStop.set(r.delivery_id, (outstandingByStop.get(r.delivery_id) ?? 0) + Number(r.outstanding_qty));
     deliveries.sort((a, b) => a.stop_no - b.stop_no);
+    const stopsByRoute = Map.groupBy(deliveries, (d) => d.route_id);
     return {
       routes: routes.map((r) => ({
         ...r,
-        stops: deliveries.filter((d) => d.route_id === r.id).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
+        stops: (stopsByRoute.get(r.id) ?? []).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
           ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),

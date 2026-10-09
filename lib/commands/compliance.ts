@@ -5,7 +5,7 @@
 // filing. trace_lot follows a finished-goods lot back to its batch and through
 // every ledger movement that names it.
 import { z } from "zod";
-import { periodKey } from "@/app/(app)/compliance/period";
+import { periodKey } from "@/lib/compliance-period";
 import { isoDate } from "./packaging";
 import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
@@ -18,13 +18,15 @@ const text = z.string().nullable().optional();
 const cleared = (fields: Record<string, unknown>) => Object.keys(fields).filter((column) => fields[column] === null);
 
 defineCommand({
-  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record; an edit keeps a field left out and clears one sent as null",
+  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
-  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), approvedOn: day, expiresOn: day, note: text }),
+  // Both identifiers are text: a TTB ID or serial may carry leading zeros.
+  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text })
+    .refine((i) => i.kind === "cola" || i.serialNumber == null, { path: ["serialNumber"], message: "Only a COLA has an applicant serial number" }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand_approval", {
-    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_brand: i.brandId, p_kind: i.kind, p_ttb_id: i.ttbId,
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_brand: i.brandId, p_kind: i.kind, p_ttb_id: i.ttbId, p_serial_number: i.serialNumber ?? null,
     p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
-    p_clear: cleared({ approved_on: i.approvedOn, expires_on: i.expiresOn, note: i.note }),
+    p_clear: cleared({ serial_number: i.serialNumber, approved_on: i.approvedOn, expires_on: i.expiresOn, note: i.note }),
   })),
 });
 
@@ -50,7 +52,7 @@ defineCommand({
   })),
 });
 
-export type Approval = { id: string; brand_id: string; kind: "cola" | "formula"; ttb_id: string; approved_on: string | null; expires_on: string | null; note: string | null };
+export type Approval = { id: string; brand_id: string; kind: "cola" | "formula"; ttb_id: string; serial_number: string | null; approved_on: string | null; expires_on: string | null; note: string | null };
 export type Registration = { id: string; brand_id: string; state: string; registration_no: string | null; approved_on: string | null; expires_on: string | null };
 export type License = { id: string; state: string; kind: string; license_no: string | null; expires_on: string | null; note: string | null };
 export type RegistryBrand = { id: string; name: string; approvals: Approval[]; registrations: Registration[] };

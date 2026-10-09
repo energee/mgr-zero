@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { readSquareEnv } from "@/lib/env/server-parser";
 import {
@@ -193,7 +194,6 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
   };
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const unavailable = () => new Error("Square is unavailable");
 const text = (value: unknown) => typeof value === "string" && value.trim() ? value : null;
 const finiteVersion = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -608,7 +608,7 @@ export async function syncSquareCatalogFacts(client: SquareClient, accessToken: 
 
 export async function beginSquareOAuth(ctx: Ctx, client: SquareClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const state = sha256(`${requestId}:${ctx.userId}`);
+  const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_square_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.config.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: [...SQUARE_SCOPES],
@@ -667,7 +667,8 @@ export async function completeSquareOAuth(input: {
 
 const secondsUntil = (receivedAt: string, expiresAt: string) => Math.max(1, Math.ceil((Date.parse(expiresAt) - Date.parse(receivedAt)) / 1000));
 
-async function refreshSquareCredentials(
+/** Refreshes the stored Square credential through its compare-and-swap, advancing a catalog sync when given one. */
+export async function refreshSquareCredentials(
   ctx: Ctx,
   client: SquareClient,
   expected?: VersionedIntegrationTokens,
@@ -698,10 +699,6 @@ async function getSquareMerchant(ctx: Ctx) {
   const { data, error } = await ctx.db.from("pos_connections").select("merchant_id").eq("brewery_id", ctx.breweryId).eq("provider", "square").eq("state", "connected").single();
   if (error || typeof data?.merchant_id !== "string") throw unavailable();
   return data.merchant_id;
-}
-
-export async function refreshSquareTokens(ctx: Ctx, client: SquareClient) {
-  return (await refreshSquareCredentials(ctx, client)).tokens.accessToken;
 }
 
 export async function syncSquareCatalog(ctx: Ctx, requestId: string, client: SquareClient) {

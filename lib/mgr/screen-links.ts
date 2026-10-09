@@ -131,7 +131,7 @@ export const TAPS: [string | RegExp, string][] = [
   // The months list is titled Compliance on the glass; its children crumb to that (#259).
   ["Compliance", "Compliance months"],
   ["Add approval", "Brand approval"],
-  [/^COLA serial \w+$/, "Brand approval"],
+  [/^COLA TTB ID \w+$/, "Brand approval"],
   ["Add registration", "State registration"],
   [/^[A-Z]{2} registration$/, "State registration"],
   ["Licenses", "Licenses"],
@@ -191,6 +191,7 @@ export const TAPS: [string | RegExp, string][] = [
 export const INERT: (string | RegExp)[] = [
   "Export state transactions",
   "Open Ask MGR",
+  "Guide",
   "Reschedule",
   "Cancel plan",
   /^Switch to (dark|light) mode$/,
