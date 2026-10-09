@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Icon } from "@/components/mgr/icon";
 import { SearchView, type SearchViewModel } from "@/components/mgr/views/search";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useBrewery } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";

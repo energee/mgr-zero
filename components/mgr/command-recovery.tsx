@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { discardRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "@/lib/commands/recovery";
 import { CommandRecoveryView } from "./views/command-recovery";

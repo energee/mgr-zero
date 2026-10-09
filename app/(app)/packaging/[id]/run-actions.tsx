@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PackagingCloseFields } from "@/components/mgr/views/close-packaging-run";
 import { emptyPackagingActual, packagingActualPayload, patchActual, removeActual, suggestedPackagingActuals, type PackagingClosePlan } from "@/lib/mgr/packaging-actuals";
-import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import { useCommandAction, useRetainedCommand } from "@/lib/commands/use-command-form";
 import { packagingCloseReady } from "@/lib/mgr/close-packaging-run-view";

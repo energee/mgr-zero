@@ -1,4 +1,9 @@
 "use client";
+// lib/brewery-provider.tsx — the client half of lib/brewery.ts: the signed-in
+// actor and brewery that every client command call carries. The staff, portal
+// and chat-link layouts mount the provider; lib/commands/use-command-form.ts and
+// the forms read it. It lives in lib, not app/(app), because lib must never
+// import a route directory (tests/boundary.test.ts).
 import { createContext, useContext } from "react";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 

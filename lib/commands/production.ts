@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
-import { defineCommand, defineQuery, inChunks, unwrap, CommandError, type Ctx, latestOf } from "./registry";
+import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
@@ -396,11 +396,14 @@ defineQuery({
     open: z.boolean().optional().describe("Keep only batches that were brewed and are not completed (the ones still in a tank)"),
   }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    let q = ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
-      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false });
-    if (i.open) q = q.not("brewed_on", "is", null).is("closed_at", null);
-    const batches = (await unwrap(q) ?? []) as BatchRow[];
+    // Paged past PostgREST's 1000-row cap (#759); id breaks planned_on ties so pages never overlap.
+    const batches = await completeRows<BatchRow>("Batches", start => {
+      let q = ctx.db.from("batches")
+        .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId);
+      if (i.open) q = q.not("brewed_on", "is", null).is("closed_at", null);
+      return q.order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1);
+    });
     if (batches.length === 0) return [];
 
     const [brands, recipes, vessels] = await Promise.all([

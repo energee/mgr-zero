@@ -20,5 +20,5 @@ export function WorkList({ rows, defaults, subtitle, createAction, chips }: { ro
   // The server renders "all"; the browser's remembered chip takes over after hydration.
   const chip = useSyncExternalStore(subscribe, remembered, () => "all");
   const pick = (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* no storage */ } listeners.forEach((fn) => fn()); };
-  return <WorkView model={{ ...workFromQuery(rows, subtitle, defaults), workChips: chips }} chip={chips.includes(chip) ? chip : "all"} onChip={pick} createAction={createAction} />;
+  return <WorkView model={{ ...workFromQuery(rows, subtitle, defaults), workChips: chips }} chip={chip} onChip={pick} createAction={createAction} />;
 }

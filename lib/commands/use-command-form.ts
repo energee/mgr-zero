@@ -12,7 +12,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { beginRecovery, finishRecovery, inFlightRequests, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
 import { classifyCommandFailure, command, CommandResponseError, type CommandFailureDetail } from "./client";
 import { canRetireCommandFailure } from "./failure";

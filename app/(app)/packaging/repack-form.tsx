@@ -12,7 +12,7 @@
 import { useEffect, useId, useState } from "react";
 import { command } from "@/lib/commands/client";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { useBrewery } from "../brewery-provider";
+import { useBrewery } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { repackFooter, RepackView } from "@/components/mgr/views/repack";

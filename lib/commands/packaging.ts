@@ -293,8 +293,9 @@ defineQuery({
   description: "Packaging runs by planned date, newest first, with the brand each one packages, the tank it draws from and the units planned",
   input: z.object({}), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx) => {
-    const runs = (await unwrap(ctx.db.from("packaging_runs").select(RUN_COLUMNS)
-      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as RunRow[];
+    // Paged past PostgREST's 1000-row cap (#759); id breaks planned_on ties so pages never overlap.
+    const runs = await completeRows("Packaging runs", start => ctx.db.from("packaging_runs").select(RUN_COLUMNS, { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)) as RunRow[];
     if (runs.length === 0) return [];
 
     const [brands, vessels, qty] = await Promise.all([

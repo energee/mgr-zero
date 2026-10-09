@@ -248,8 +248,10 @@ describe("Beer view", () => {
 });
 
 describe("Work view", () => {
-  it("lets shared Work filters handle explorer clicks", () => {
-    expect(src("components/mgr/screen-explorer.tsx")).toContain("[data-work-filter]");
+  it("lets Work's filter tabs, not its rows, skip explorer navigation", () => {
+    // The rows sit in the filter's tabpanel (#727), so a bare [data-work-filter]
+    // guard would swallow every row tap in the explorer.
+    expect(src("components/mgr/screen-explorer.tsx")).toContain("[data-work-filter] [role=tablist]");
     expect(src("components/mgr/views/work.tsx")).toContain("data-work-filter");
   });
   it("preserves query identities and role-default filtering without inventing destinations", () => {

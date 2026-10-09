@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ImportView } from "@/components/mgr/views/import";
 import { discardRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { IMPORT_KINDS, IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
