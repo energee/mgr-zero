@@ -307,3 +307,9 @@ constraint or query index leading with it counts). Policies call
 `(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
 statement instead of once per row. *Enforced by:*
 `tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
+
+Ledger sums read from the index: `movements_onhand_idx` and
+`allocations_open_idx` carry `qty` (`include (qty)`), so a per-brewery SKU
+total such as `portal_availability` is an index-only scan, not a heap read.
+Widen an existing index with `include` before adding a second one on a ledger.
+*Enforced by:* `tests/schema-rls-indexes.test.ts` (#794).

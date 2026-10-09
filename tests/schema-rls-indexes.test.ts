@@ -48,6 +48,18 @@ describe("RLS index and auth.uid() rules", () => {
     expect(missing).toEqual([]);
   });
 
+  it("the indexes portal_availability sums from carry qty (#794)", () => {
+    // portal_availability sums qty per SKU for one brewery from each ledger.
+    // With qty in the index, both sums are index-only scans, not heap reads.
+    const defs = sql(`
+      select pg_get_indexdef(i) from unnest(array['public.movements_onhand_idx'::regclass, 'public.allocations_open_idx'::regclass]) i
+      order by 1`);
+    expect(defs).toEqual([
+      "CREATE INDEX allocations_open_idx ON public.allocations USING btree (brewery_id, sku_id) INCLUDE (qty) WHERE (status = 'open'::allocation_status)",
+      "CREATE INDEX movements_onhand_idx ON public.inventory_movements USING btree (brewery_id, sku_id, location_id, bin_id) INCLUDE (qty)",
+    ]);
+  });
+
   it("no two indexes on a table have the same definition", () => {
     // A unique index serves the same reads as a plain one, so UNIQUE and the
     // name are stripped before comparing.
