@@ -3,7 +3,9 @@ import type { Database } from "@/lib/supabase/database";
 // callback completion, reconciliation, and disconnect. Provider I/O goes through
 // SlackOAuthPort so tests run against a fake; durable state lives in the
 // chat_installations lifecycle RPCs (baseline § chat installation lifecycle).
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { oauthState, sha256 } from "@/lib/hash";
+import { readAppUrl } from "@/lib/env/server-parser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
@@ -12,8 +14,20 @@ export const PROVIDER = "slack";
 export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
 const CHAT_ENV = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"] as const;
 
-export function isChatConfigured() {
+/** Whether Slack installation can run: every Slack env var is set. Distinct from
+ *  lib/env/server-parser's isChatConfigured, which gates Ask MGR's AI Gateway. */
+export function isSlackConfigured() {
   return CHAT_ENV.every((key) => Boolean(process.env[key]));
+}
+
+/** The configured MGR origin; never taken from a request Host. */
+export function slackAppOrigin() {
+  return new URL(readAppUrl()).origin;
+}
+
+/** The one Slack OAuth redirect URI: the begin command and the callback must send the same value. */
+export function slackRedirectUri() {
+  return `${slackAppOrigin()}/api/chat/slack/oauth`;
 }
 
 export type SlackOAuthPort = {
@@ -40,8 +54,6 @@ export type Intent = {
   external_installation_id: string;
 };
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-
 function authorizeUrl(state: string, redirectUri: string) {
   const clientId = process.env.SLACK_CLIENT_ID;
   if (!clientId) throw new CommandError("SLACK_CLIENT_ID is not configured", 500);
@@ -55,9 +67,7 @@ function authorizeUrl(state: string, redirectUri: string) {
 
 async function beginIntent(ctx: Ctx, redirectUri: string, installationId: string | null, requestId: string) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  // UUID entropy belongs to the caller's stable command request; hashing binds
-  // the state to this verified actor while allowing an unchanged retry.
-  const state = sha256(`${requestId}:${ctx.userId}`);
+  const state = oauthState(requestId, ctx.userId);
   const url = authorizeUrl(state, redirectUri);
   const name = installationId === null ? "begin_chat_installation" : "begin_chat_reauthorization";
   const common = { p_brewery: ctx.breweryId, p_request_id: requestId, p_redirect_uri: redirectUri, p_state_hash: sha256(state) };

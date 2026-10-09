@@ -4,7 +4,7 @@
 // None of these touch MGR due state. Every write is one Postgres RPC.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError } from "./registry";
-import { sha256 } from "@/lib/chat/linking";
+import { sha256 } from "@/lib/hash";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -152,11 +152,17 @@ defineQuery({ name: "list_chat_channels", description: "List private active Slac
 });
 defineCommand({ name: "begin_chat_installation", description: "Begin explicit administrator consent to install Slack with the three required scopes",
   input: z.object({}), roles: ["admin"],
-  handler: async (ctx, _i, execution) => (await import("@/lib/chat/oauth")).beginSlackInstall(ctx, chatRedirectUri(), execution.requestId),
+  handler: async (ctx, _i, execution) => {
+    const { beginSlackInstall, slackRedirectUri } = await import("@/lib/chat/oauth");
+    return beginSlackInstall(ctx, slackRedirectUri(), execution.requestId);
+  },
 });
 defineCommand({ name: "begin_chat_reauthorization", description: "Begin explicit administrator consent to reauthorize the existing Slack workspace",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
-  handler: async (ctx, i, execution) => (await import("@/lib/chat/oauth")).beginSlackReauthorization(ctx, i.installationId, chatRedirectUri(), execution.requestId),
+  handler: async (ctx, i, execution) => {
+    const { beginSlackReauthorization, slackRedirectUri } = await import("@/lib/chat/oauth");
+    return beginSlackReauthorization(ctx, i.installationId, slackRedirectUri(), execution.requestId);
+  },
 });
 defineCommand({ name: "disable_chat_installation", description: "Stop all Slack delivery locally without needing Slack to be reachable",
   input: z.object({ installationId: z.string().uuid() }), roles: ["admin"],
@@ -171,8 +177,3 @@ defineCommand({ name: "disconnect_chat_installation", description: "Stop Slack d
     return disconnectSlackInstallation(ctx, i.installationId, { deleteInstallation: async (id) => slackOAuthPort().deleteInstallation(id) }, execution.requestId);
   },
 });
-function chatRedirectUri() {
-  const base = process.env.APP_URL;
-  if (!base) throw new Error("Chat setup is unavailable");
-  return new URL("/api/chat/slack/oauth", base).toString();
-}

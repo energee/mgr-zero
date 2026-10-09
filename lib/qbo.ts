@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
   beginQboInvoiceSync,
@@ -185,11 +186,9 @@ export async function resolvePortalInvoicePayment(
   return { kind: "redirect", url: url.href };
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const state = sha256(`${requestId}:${ctx.userId}`);
+  const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_qbo_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: client.requestedScopes,
@@ -201,7 +200,8 @@ function isPast(value: string | null) {
   return value !== null && Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now();
 }
 
-async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
+/** Refreshes the stored QuickBooks credential through its compare-and-swap; returns the persisted winner. */
+export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
   const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
   if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
     await markQboAuthorizationFailed(ctx, current);
@@ -222,10 +222,6 @@ async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?
     throw new Error("QuickBooks is unavailable");
   }
   return stored;
-}
-
-export async function refreshQboTokens(ctx: Ctx, client: QboOAuthClient) {
-  return (await refreshQboCredentials(ctx, client)).accessToken;
 }
 
 export async function completeQboOAuth(input: {
@@ -407,9 +403,10 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   }
 }
 
-// The one reading of a QuickBooks money field. MGR stores money as integer
-// cents, so a value that cannot round to an exact, safe integer number of
-// cents is not a number MGR can hold — it is a malformed response, and the
+// The reading of a QuickBooks Accounting money field (a JSON number); the tax
+// API's string amounts have their own parser in the tax calculation below.
+// MGR stores money as integer cents, so a value that cannot round to an exact,
+// safe integer number of cents is not a number MGR can hold — it is a malformed response, and the
 // caller must reject it rather than carry `Infinity` or a lossy float into a
 // total. Invoice and payment reads share this so they cannot disagree.
 const cents = (value: unknown) => {
