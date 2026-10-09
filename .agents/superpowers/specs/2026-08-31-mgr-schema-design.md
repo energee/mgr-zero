@@ -160,7 +160,8 @@ numeric(12,8) > 0, qbo_item_id, active`. New:
   `container_source in ('owned_fleet','per_fill_rental')` ⇔ `keg_pool_id is not null`.
   One-way kegs need no pool: they are a `sku_bom` line.
 - unique `(product_id, name)`; idx `(brewery_id, product_id)`.
-RLS: `staff_all`; `customer_read` select `active and brewery_id in (customer's brewery)`.
+RLS: `staff_read`; buyers read `portal_sku_prices`, with no customer policy on
+the base table (#788).
 
 ### `price_lists` — + `unique (brewery_id, name)`
 ### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable) **· revised by §16.4**
@@ -232,7 +233,8 @@ order's customer), `from_location_id → locations not null` (where removals pos
   `kind='taproom_transfer'` ⇒ `to_location_id not null and customer_id, ship_to_id null`.
 - unique `(brewery_id, order_no)`. idx `(brewery_id, status, requested_ship_date)`,
   `(customer_id, created_at desc)`.
-- RLS: staff lifecycle paths and customer reads remain separate. Customer writes
+- RLS: staff lifecycle paths and customer reads remain separate. Buyers read
+  `portal_orders`; the base table has no customer policy (#788). Customer writes
   happen only inside the definer `portal_create_order` / `update_draft_order` /
   `submit_order` RPCs, which assert the caller's customer membership and act
   only on that customer's wholesale order; app roles hold no table DML.
@@ -248,8 +250,8 @@ definer RPC resolves it server-side.
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
-`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS:
-`P-customer` read via `order_id in (orders the customer may see)`; customer
+`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: no
+customer policy; buyers read lines inlined in `portal_orders` (#788); customer
 line replacement happens only through the definer portal/draft RPCs on a draft
 order. Remainder after ship is
 always cancelled (decision): no backorder columns.
