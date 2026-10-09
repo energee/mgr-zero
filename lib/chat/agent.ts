@@ -14,9 +14,11 @@ export function boundToolResult(value: unknown) {
   return { data, returned, truncated, observedAt: new Date().toISOString() };
 }
 
-export type ComposerProposal = CommandPreview & { name: string; input: unknown };
+/** What the agent proposes for any AI-exposed command. Distinct from lib/composer/state's
+ *  ComposerProposal, the record_movement proposal the Composer drawer renders. */
+type ChatCommandProposal = CommandPreview & { name: string; input: unknown };
 
-export function createComposerTools(ctx: Ctx, conversationId: string, onProposal?: (proposal: ComposerProposal) => void): ToolSet {
+export function createComposerTools(ctx: Ctx, conversationId: string, onProposal?: (proposal: ChatCommandProposal) => void): ToolSet {
   let proposalPending = false;
   return Object.fromEntries(listTools({ aiOnly: true, ctx }).map((definition) => [definition.name, tool({
     description: definition.description,

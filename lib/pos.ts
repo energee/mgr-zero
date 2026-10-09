@@ -667,7 +667,8 @@ export async function completeSquareOAuth(input: {
 
 const secondsUntil = (receivedAt: string, expiresAt: string) => Math.max(1, Math.ceil((Date.parse(expiresAt) - Date.parse(receivedAt)) / 1000));
 
-async function refreshSquareCredentials(
+/** Refreshes the stored Square credential through its compare-and-swap, advancing a catalog sync when given one. */
+export async function refreshSquareCredentials(
   ctx: Ctx,
   client: SquareClient,
   expected?: VersionedIntegrationTokens,
@@ -698,10 +699,6 @@ async function getSquareMerchant(ctx: Ctx) {
   const { data, error } = await ctx.db.from("pos_connections").select("merchant_id").eq("brewery_id", ctx.breweryId).eq("provider", "square").eq("state", "connected").single();
   if (error || typeof data?.merchant_id !== "string") throw unavailable();
   return data.merchant_id;
-}
-
-export async function refreshSquareTokens(ctx: Ctx, client: SquareClient) {
-  return (await refreshSquareCredentials(ctx, client)).tokens.accessToken;
 }
 
 export async function syncSquareCatalog(ctx: Ctx, requestId: string, client: SquareClient) {

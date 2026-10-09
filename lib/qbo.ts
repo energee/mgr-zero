@@ -200,7 +200,8 @@ function isPast(value: string | null) {
   return value !== null && Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now();
 }
 
-async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
+/** Refreshes the stored QuickBooks credential through its compare-and-swap; returns the persisted winner. */
+export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
   const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
   if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
     await markQboAuthorizationFailed(ctx, current);
@@ -221,10 +222,6 @@ async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?
     throw new Error("QuickBooks is unavailable");
   }
   return stored;
-}
-
-export async function refreshQboTokens(ctx: Ctx, client: QboOAuthClient) {
-  return (await refreshQboCredentials(ctx, client)).accessToken;
 }
 
 export async function completeQboOAuth(input: {
@@ -403,9 +400,10 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   }
 }
 
-// The one reading of a QuickBooks money field. MGR stores money as integer
-// cents, so a value that cannot round to an exact, safe integer number of
-// cents is not a number MGR can hold — it is a malformed response, and the
+// The reading of a QuickBooks Accounting money field (a JSON number); the tax
+// API's string amounts have their own parser in the tax calculation below.
+// MGR stores money as integer cents, so a value that cannot round to an exact,
+// safe integer number of cents is not a number MGR can hold — it is a malformed response, and the
 // caller must reject it rather than carry `Infinity` or a lossy float into a
 // total. Invoice and payment reads share this so they cannot disagree.
 const cents = (value: unknown) => {

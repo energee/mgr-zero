@@ -1,6 +1,6 @@
 // app/(app)/compliance/[period]/page.tsx — Monthly compliance (screen record
 // Monthly compliance): the TTB period — the segment is a month YYYY-MM, a
-// quarter YYYY-Qn, or a year YYYY (period.ts) — generated from the ledger, or the filed
+// quarter YYYY-Qn, or a year YYYY (lib/compliance-period.ts) — generated from the ledger, or the filed
 // snapshot once one exists. Completion losses remain reviewable through
 // append-only category allocations. MGR saves snapshots but never transmits a filing.
 import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
@@ -13,7 +13,7 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, periodLabel, periodOver, periodRange } from "../period";
+import { JURISDICTION, periodLabel, periodOver, periodRange } from "@/lib/compliance-period";
 
 export default async function PeriodPage({ params }: { params: Promise<{ period: string }> }) {
   const { period } = await params;
