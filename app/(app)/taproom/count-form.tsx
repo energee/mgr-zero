@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { WeeklyCountDraftView, WeeklyCountPrintAction, WeeklyCountCorrectionView } from "@/components/mgr/views/weekly-count";
 import { useRouter } from "next/navigation";
 import { command, CommandResponseError } from "@/lib/commands/client";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import {
   beginCorrectionAttempt,
   beginCountAttempt,

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Label } from "@/components/ui/label";

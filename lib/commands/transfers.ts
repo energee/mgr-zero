@@ -4,7 +4,7 @@
 // command-request claim; a move inside one location is move_stock_bin
 // (inventory.ts), and create_stock_transfer refuses same-location pairs.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap } from "./registry";
 import { stockLine } from "./stock-line";
 
 const roles = ["admin", "warehouse"] as const;
@@ -86,9 +86,10 @@ defineQuery({
   name: "list_stock_transfers", description: "Stock transfers, newest first, with their lines",
   roles: [...readRoles],
   input: z.object({ status: z.enum(["draft", "submitted", "picked", "in_transit", "received", "cancelled"]).optional() }),
-  handler: (ctx, i) => {
-    let q = ctx.db.from("stock_transfers").select("*, stock_transfer_lines(*)").eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false });
+  // Paged past PostgREST's 1000-row cap (#759); id breaks created_at ties so pages never overlap.
+  handler: (ctx, i) => completeRows("Stock transfers", start => {
+    let q = ctx.db.from("stock_transfers").select("*, stock_transfer_lines(*)", { count: "exact" }).eq("brewery_id", ctx.breweryId);
     if (i.status) q = q.eq("status", i.status);
-    return unwrap(q);
-  },
+    return q.order("created_at", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1);
+  }),
 });

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
-vi.mock("@/app/(app)/brewery-provider", () => ({
+vi.mock("@/lib/brewery-provider", () => ({
   useBrewery: () => "brewery-a",
   useCommandContext: () => ({ actorId: "actor-a", breweryId: "brewery-a" }),
 }));

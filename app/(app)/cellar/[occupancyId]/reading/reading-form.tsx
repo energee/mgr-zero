@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm } from "@/components/mgr/command-form";
 import { FermentationReadingActionsView, FermentationReadingView, type FermentationReadingIdentity, type FermentationReadingValues } from "@/components/mgr/views/fermentation-reading";

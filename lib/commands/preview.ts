@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, previewCommand, STAFF_ROLES, unwrap } from "./registry";
-import { movementInput } from "./inventory";
+import { movementInput } from "./movement-input";
 
 const conversationId = z.string().uuid();
 
