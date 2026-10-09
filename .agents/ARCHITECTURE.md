@@ -318,3 +318,13 @@ constraint or query index leading with it counts). Policies call
 `(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
 statement instead of once per row. *Enforced by:*
 `tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
+
+`movements_onhand_idx` and `allocations_open_idx` carry `include (qty)`, so
+`portal_availability`'s per-brewery sums can be index-only scans. Heap fetches
+remain for pages vacuum has not yet marked all-visible. The cost: on
+`allocations`, a qty update on an open row is no longer a HOT update;
+`inventory_movements` is append-only, so it pays only the wider entry.
+*Enforced by:* `tests/schema-rls-indexes.test.ts`, which explains the
+function's body and expects both index-only scans, and rejects two indexes on
+one table with the same keys whatever their `include` (#794). So widen an
+existing index with `include` rather than adding a second one on the same keys.

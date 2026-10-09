@@ -922,6 +922,8 @@ inventory_movements + bin_id not null
 `movements_onhand_idx` extends to `(brewery_id, sku_id, location_id, bin_id)`
 so bin on-hand is an index prefix, not a filter over the location; no second
 index.
+It also carries `include (qty)` (#794), so ledger sums can be index-only
+scans; `allocations_open_idx` carries `qty` the same way.
 
 **Not tap lines.** Tap assignment is hand-maintained state that nothing
 downstream validates and that a bartender changes for optics; modelling it as a
