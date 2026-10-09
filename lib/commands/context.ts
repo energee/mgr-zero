@@ -77,9 +77,9 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
-  const staff = customerId ? null : await request.getStaffMembership(breweryId);
-  if (staff) {
-    const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role: staff.role } satisfies Ctx;
+  const role = customerId ? null : await request.getStaffRole(breweryId);
+  if (role) {
+    const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role } satisfies Ctx;
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }

@@ -45,6 +45,8 @@ export interface RequestAuthContext {
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
   getStaffMembership(breweryId: string): Promise<StaffMembership | null>;
+  /** The caller's role at one brewery, or null when not staff there: the one fact a command needs. */
+  getStaffRole(breweryId: string): Promise<StaffRole | null>;
   getCustomerMembership(breweryId: string, customerId?: string): Promise<CustomerMembership | null>;
 }
 
@@ -125,6 +127,23 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     getCustomerMemberships,
     async getStaffMembership(breweryId) {
       return (await getStaffMemberships()).find((membership) => membership.breweryId === breweryId) ?? null;
+    },
+    // A command needs only the role, so it reads one brewery_users row rather than
+    // every membership plus the staff_brewery name/timezone a layout prints (#759).
+    // When this request already loaded the memberships, the role comes from them.
+    async getStaffRole(breweryId) {
+      if (staffMemberships) return (await getStaffMemberships()).find((membership) => membership.breweryId === breweryId)?.role ?? null;
+      const requestIdentity = await getIdentity();
+      if (!requestIdentity) return null;
+      const db = await getSupabaseClient();
+      const { data, error } = await db
+        .from("brewery_users")
+        .select("role")
+        .eq("user_id", requestIdentity.userId)
+        .eq("brewery_id", breweryId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.role ?? null;
     },
     async getCustomerMembership(breweryId, customerId) {
       return (await getCustomerMemberships()).find((membership) => membership.breweryId === breweryId && (!customerId || membership.customerId === customerId)) ?? null;

@@ -79,9 +79,11 @@ it("preserves cookie and bearer membership across own breweries and rejects a fo
   const request = createRequestAuthContext(async () => ctx.db);
   for (const breweryId of [ctx.breweryId, own.id]) {
     expect(await request.getStaffMembership(breweryId)).toMatchObject({ breweryId, role: "taproom" });
+    expect(await createRequestAuthContext(async () => ctx.db).getStaffRole(breweryId)).toBe("taproom");
     expect(await ctxForBearer(ctx.db, ctx.userId, breweryId)).toMatchObject({ breweryId, role: "taproom" });
   }
   expect(await request.getStaffMembership(foreign.id)).toBeNull();
+  expect(await createRequestAuthContext(async () => ctx.db).getStaffRole(foreign.id)).toBeNull();
   await expect(ctxForBearer(ctx.db, ctx.userId, foreign.id)).rejects.toMatchObject({ status: 403 });
 });
 it("links and unlinks own Slack identity with replay and refuses other people's links", async () => {
