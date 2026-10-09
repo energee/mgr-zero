@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
-import { movementInput } from "@/lib/composer/state";
-
-// Owned by lib/composer/state.ts so the Composer drawer can validate a proposal
-// without importing this module (and registering every inventory command).
-export { movementInput };
+import { movementInput } from "./movement-input";
 
 /**
  * Appends an inventory movement through its security-definer RPC. `binId` is

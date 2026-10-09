@@ -1,34 +1,22 @@
 // lib/composer/state.ts — the record_movement proposal the Composer drawer
-// renders, and the form link it hands off to. The schemas live here, not in
-// lib/commands/inventory.ts, because the drawer is a client bundle and a
-// lib/commands/<area>.ts import registers every command in the area
-// (tests/boundary.test.ts). inventory.ts re-exports movementInput, so the
-// command and the drawer validate one shape.
+// renders, and the form link it hands off to. The drawer parses every streamed
+// proposal against composerProposal (lib/chat/messages.ts), so a malformed or
+// non-movement proposal never reaches the commit button.
 import { z } from "zod";
+import { movementInput, type MovementInput } from "@/lib/commands/movement-input";
 
-export const movementInput = z.object({
-  lotId: z.string().uuid().optional(),
-  skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
-  qty: z.number().min(-9_999_999_999.99).max(9_999_999_999.99).refine(n => n !== 0, "qty cannot be 0"), // numeric(12,2)
-  // Order-owned sale/transfer movements stay behind their atomic workflows.
-  type: z.enum(["opening_balance", "production_in", "adjustment", "depletion", "return_in",
-                "destruction", "loss", "sample", "festival_removal"]),
-  saleChannelId: z.string().uuid().optional(),
-  destState: z.string().length(2).optional(),
-  note: z.string().optional(),
-});
-export type MovementInput = z.infer<typeof movementInput>;
-export type MovementKind = MovementInput["type"];
-
-/** One line of preview_inventory_movement's `effects`; the drawer reads only these keys. */
+/** One line of preview_inventory_movement's `effects`; the drawer reads only
+ *  these keys. The RPC builds them with jsonb_build_object, which writes a null
+ *  operand as JSON null (bbl is null while a format has no bbl_per_unit), so
+ *  every display figure is nullish; the view omits a missing one. */
 const composerEffect = z.object({
   label: z.string(),
-  qty: z.string().optional(),
-  bbl: z.string().optional(),
-  stockBeforeQty: z.string().optional(),
-  stockAfterQty: z.string().optional(),
-  taxTreatment: z.string().nullable().optional(),
-  correction: z.string().nullable().optional(),
+  qty: z.string().nullish(),
+  bbl: z.string().nullish(),
+  stockBeforeQty: z.string().nullish(),
+  stockAfterQty: z.string().nullish(),
+  taxTreatment: z.string().nullish(),
+  correction: z.string().nullish(),
 });
 export type ComposerEffect = z.infer<typeof composerEffect>;
 

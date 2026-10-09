@@ -3,6 +3,7 @@
 // file may import. Source text is the subject, because the rule is about the
 // import graph rather than a value any function returns.
 import { readFileSync, readdirSync } from "node:fs";
+import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
 import { localModule } from "./local-module";
 
@@ -164,7 +165,22 @@ describe("lib never imports a route directory", () => {
     expect(files).toContain("lib/commands/use-command-form.ts");
   });
 
+  // Every spelling of an import: `from "…"` or `from '…'`, a bare `import "…"`,
+  // and a dynamic `import("…")`. Each specifier is resolved to a repo path, so
+  // `@/app/…` and `../../app/…` are the same violation.
+  const specifiers = (src: string) => [...src.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)["']([^"']+)["']/g)].map((m) => m[1]);
+  const target = (from: string, spec: string) =>
+    spec.startsWith("@/") ? posix.normalize(spec.slice(2)) : spec.startsWith(".") ? posix.join(posix.dirname(from), spec) : spec;
+  const intoApp = (from: string, src: string) => specifiers(src).filter((spec) => target(from, spec).startsWith("app/"));
+
+  it("catches every spelling of an import into app/", () => {
+    expect(intoApp("lib/chat/x.ts", [
+      `import { a } from "@/app/(app)/a";`, `import { b } from '@/app/b';`, `const c = await import("@/app/c");`,
+      `import { d } from "../../app/(app)/d";`, `import "@/app/e.css";`, `import { ok } from "@/lib/ok";`, `import { z } from "zod";`,
+    ].join("\n"))).toEqual(["@/app/(app)/a", "@/app/b", "@/app/c", "../../app/(app)/d", "@/app/e.css"]);
+  });
+
   it.each(files)("%s imports nothing from app/", (path) => {
-    expect(read(path)).not.toMatch(/from\s+"@\/app\//);
+    expect(intoApp(path, read(path))).toEqual([]);
   });
 });

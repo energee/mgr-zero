@@ -16,7 +16,7 @@ import { RecordMovementView, type RecordMovementViewModel } from "@/components/m
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
-import type { MovementInput } from "@/lib/composer/state";
+import type { MovementInput } from "@/lib/commands/movement-input";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
 // order flows (plan 1B), not entered manually here.

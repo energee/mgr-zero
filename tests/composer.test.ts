@@ -155,6 +155,17 @@ describe("AI composer", () => {
     expect(live).toMatch(/onRetry=\{retry\}/);
   });
 
+  // A malformed proposal must neither throw out of the staff layout's render
+  // (#463) nor borrow the conversation's Try again, which regenerates the last
+  // AI turn rather than retrying the proposal.
+  it("shows a rejected proposal as its own alert, without Try again", () => {
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toMatch(/const \{ proposal, error: proposalError \} = latestComposerProposal\(messages\)/);
+    expect(live).not.toMatch(/try \{ proposal = latestComposerProposal/);
+    expect(live).not.toMatch(/error=\{[^}]*proposalError/);
+    expect(live).toMatch(/\{proposalError && <p role="alert"[^>]*>\{proposalError\}<\/p>\}/);
+  });
+
   it("shares the AI SDK composer between live and inventory surfaces", () => {
     expect(E.comp().type).toBe(ComposerDrawerView);
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
