@@ -3,6 +3,7 @@ import { useId, useState, type FormEventHandler } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { ConfirmDeleteControl } from "./confirm-delete";
 
 const ROLES = [
   ["warehouse", "Warehouse", "pick, receive, count, transfer"], ["sales", "Sales", "orders, customers, price groups"],
@@ -31,18 +32,20 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
 
 export function TeamMemberView({ name, email, avatar, savedRole, role, onRoleChange, onSubmit, onRemove, saving = false, removing = false, error }: {
   name: string; email: string; avatar?: string; savedRole: string; role?: string; onRoleChange?: (value: string) => void;
-  onSubmit?: FormEventHandler<HTMLFormElement>; onRemove?: () => void; saving?: boolean; removing?: boolean; error?: string | null;
+  onSubmit?: FormEventHandler<HTMLFormElement>; onRemove?: () => Promise<boolean>; saving?: boolean; removing?: boolean; error?: string | null;
 }) {
   const [draftRole, setRole] = useState(savedRole), busy = saving || removing, value = role ?? draftRole;
   const removeName = name.replace(/^@/, "");
   return <>
-    {E.row(name, email, "", "", E.face({ src: avatar, name: name.replace(/^@/, "") }))}
+    {E.row(name, email, "", "", E.face({ src: avatar, name: removeName }))}
     <form onSubmit={event => { event.preventDefault(); if (!busy && value !== savedRole) onSubmit?.(event); }} className="flex flex-col gap-4">
       <StaffRoleField value={value} onChange={next => { setRole(next); onRoleChange?.(next); }} disabled={busy} />
       <CommandFormMessage error={error} />
       <CommandFormFooter><Button type="submit" disabled={busy || value === savedRole}>{saving ? "Saving…" : "Save role"}</Button></CommandFormFooter>
     </form>
-    {E.note(`Removing ${removeName} ends this brewery membership. Their sign-in account remains.`)}
-    <Button type="button" variant="destructive" className="w-full" disabled={busy} onClick={onRemove}>{removing ? "Removing…" : `Remove ${removeName}`}</Button>
+    {E.note(`Removing ${removeName} ends this brewery membership.`)}
+    <ConfirmDeleteControl title={`Remove ${removeName}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
+      name={<>Remove <strong>{removeName}</strong> from this brewery?</>}
+      warning="They lose access right away. Their sign-in account remains, and only a new invitation restores access." />
   </>;
 }

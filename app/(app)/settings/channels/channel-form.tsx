@@ -31,7 +31,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
       onOpenChange={form.setOpen}
       title="Channel"
       trigger={
-        <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+        <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"} aria-label={isEdit ? `Edit ${channel.name}` : undefined}>
           {isEdit ? "Edit" : "Add channel"}
         </Button>
       }

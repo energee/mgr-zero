@@ -11,6 +11,8 @@ import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
 export const cellarMapBrewer: CellarMapViewModel = {
+  readingHref: null,
+  readingHint: "Several tanks hold beer. Open a tank to record its reading.",
   tiles: [
     { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
     { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },

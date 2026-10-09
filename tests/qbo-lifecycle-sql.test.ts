@@ -4,7 +4,7 @@ import { rawDatabase } from "./raw-database";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
-import { beginQboOAuth, completeQboOAuth, QBO_ACCOUNTING_SCOPE, QBO_TAX_SCOPE, QboOAuthClient, refreshQboTokens } from "@/lib/qbo";
+import { beginQboOAuth, completeQboOAuth, QBO_ACCOUNTING_SCOPE, QBO_TAX_SCOPE, QboOAuthClient, refreshQboCredentials } from "@/lib/qbo";
 import { quotePortalOrder } from "@/lib/commands/portal";
 import {
   claimQboOAuth,
@@ -33,7 +33,7 @@ describe("QuickBooks durable lifecycle", () => {
     }, { status }));
     const client = new QboOAuthClient({ clientId: "client", clientSecret: "secret",
       redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport);
-    await expect(refreshQboTokens(ctx, client)).rejects.toThrow("QuickBooks is unavailable");
+    await expect(refreshQboCredentials(ctx, client)).rejects.toThrow("QuickBooks is unavailable");
     const health = await getQboHealth(ctx);
     expect(health).toMatchObject({ state: status === 400 ? "recovery_required" : "connected",
       lastError: status === 400 ? "QuickBooks authorization expired or was revoked" : null });
@@ -416,7 +416,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect(await admin.rpc("mark_qbo_authorization_failed", { ...args, p_actor: crypto.randomUUID() }))
       .toMatchObject({ data: false, error: null });
     const transport = vi.fn<typeof globalThis.fetch>();
-    await expect(refreshQboTokens(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
+    await expect(refreshQboCredentials(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
       redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport)))
       .rejects.toThrow("QuickBooks is unavailable");
     expect(transport).not.toHaveBeenCalled();
@@ -457,7 +457,7 @@ describe("QuickBooks durable lifecycle", () => {
       }
       return Response.json({ error: "invalid_grant" }, { status: 400 });
     });
-    await expect(refreshQboTokens(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
+    await expect(refreshQboCredentials(ctx, new QboOAuthClient({ clientId: "client", clientSecret: "secret",
       redirectUri: "https://mgr.test/qbo", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport)))
       .rejects.toThrow("QuickBooks is unavailable");
     expect((await admin.from("qbo_connections").select("state,last_error").eq("id", connection!.id).single()).data)
@@ -481,18 +481,18 @@ describe("QuickBooks durable lifecycle", () => {
     const releases: Array<(response: Response) => void> = [];
     const refreshClient = (suffix: string) => new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>(() =>
       new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
-    const refreshes = [refreshQboTokens(ctx, refreshClient("a")), refreshQboTokens(ctx, refreshClient("b"))];
+    const refreshes = [refreshQboCredentials(ctx, refreshClient("a")), refreshQboCredentials(ctx, refreshClient("b"))];
     await vi.waitFor(() => expect(releases).toHaveLength(2));
     releases[0](new Response(JSON.stringify({ access_token: "race-access-a", refresh_token: "race-refresh-a", expires_in: 3600 }), { status: 200 }));
     releases[1](new Response(JSON.stringify({ access_token: "race-access-b", refresh_token: "race-refresh-b", expires_in: 3600 }), { status: 200 }));
-    const winners = await Promise.all(refreshes);
+    const winners = (await Promise.all(refreshes)).map((tokens) => tokens.accessToken);
     const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
     expect(winners).toEqual([persisted.accessToken, persisted.accessToken]);
     expect(persisted.refreshToken).toMatch(/^race-refresh-[ab]$/);
 
     let releaseLate!: (response: Response) => void;
     const lateFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { releaseLate = resolve; }));
-    const lateRefresh = refreshQboTokens(ctx, new QboOAuthClient(config, lateFetch));
+    const lateRefresh = refreshQboCredentials(ctx, new QboOAuthClient(config, lateFetch));
     await vi.waitFor(() => expect(lateFetch).toHaveBeenCalledTimes(1));
     await expect(disconnectQbo(ctx, connection.data!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
       .resolves.toMatchObject({ disconnected: true });

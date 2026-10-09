@@ -310,6 +310,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["approval_kind"]
           note: string | null
+          serial_number: string | null
           ttb_id: string
         }
         Insert: {
@@ -320,6 +321,7 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["approval_kind"]
           note?: string | null
+          serial_number?: string | null
           ttb_id: string
         }
         Update: {
@@ -330,6 +332,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["approval_kind"]
           note?: string | null
+          serial_number?: string | null
           ttb_id?: string
         }
         Relationships: [
@@ -7276,6 +7279,48 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_invoices: {
+        Row: {
+          brewery_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          due_on: string | null
+          id: string | null
+          invoice_lines: Json | null
+          invoice_no: number | null
+          issued_on: string | null
+          kind: Database["public"]["Enums"]["invoice_kind"] | null
+          paid_at: string | null
+          qbo_accountant_drift: boolean | null
+          qbo_balance_cents: number | null
+          qbo_remote_state:
+            | Database["public"]["Enums"]["qbo_remote_state"]
+            | null
+          qbo_tax_cents: number | null
+          qbo_total_cents: number | null
+          shipment_id: string | null
+          written_off_at: string | null
+        }
+        Relationships: []
+      }
+      portal_keg_deposits: {
+        Row: {
+          customer_id: string | null
+          deposit_cents: number | null
+          keg_size: Database["public"]["Enums"]["keg_size"] | null
+          kegs_on_deposit: number | null
+        }
+        Relationships: []
+      }
+      portal_order_events: {
+        Row: {
+          created_at: string | null
+          event: string | null
+          id: string | null
+          order_id: string | null
+        }
+        Relationships: []
+      }
       portal_schedule: {
         Row: {
           brand_id: string | null
@@ -7283,6 +7328,14 @@ export type Database = {
           brewery_id: string | null
           listed: boolean | null
           planned_week: string | null
+        }
+        Relationships: []
+      }
+      portal_shipments: {
+        Row: {
+          id: string | null
+          invoice_timing: string | null
+          order_id: string | null
         }
         Relationships: []
       }
@@ -8704,6 +8757,46 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_invoice_rows: {
+        Args: never
+        Returns: {
+          brewery_id: string
+          created_at: string
+          customer_id: string
+          due_on: string
+          id: string
+          invoice_lines: Json
+          invoice_no: number
+          issued_on: string
+          kind: Database["public"]["Enums"]["invoice_kind"]
+          paid_at: string
+          qbo_accountant_drift: boolean
+          qbo_balance_cents: number
+          qbo_remote_state: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_tax_cents: number
+          qbo_total_cents: number
+          shipment_id: string
+          written_off_at: string
+        }[]
+      }
+      portal_keg_deposit_rows: {
+        Args: never
+        Returns: {
+          customer_id: string
+          deposit_cents: number
+          keg_size: Database["public"]["Enums"]["keg_size"]
+          kegs_on_deposit: number
+        }[]
+      }
+      portal_order_event_rows: {
+        Args: never
+        Returns: {
+          created_at: string
+          event: string
+          id: string
+          order_id: string
+        }[]
+      }
       portal_quote_order: {
         Args: {
           p_brewery: string
@@ -8725,6 +8818,14 @@ export type Database = {
           brewery_id: string
           listed: boolean
           planned_week: string
+        }[]
+      }
+      portal_shipment_rows: {
+        Args: never
+        Returns: {
+          id: string
+          invoice_timing: string
+          order_id: string
         }[]
       }
       portal_submit_quote: {
@@ -9660,6 +9761,7 @@ export type Database = {
           p_kind: Database["public"]["Enums"]["approval_kind"]
           p_note: string
           p_request_id: string
+          p_serial_number?: string
           p_ttb_id: string
         }
         Returns: Json

@@ -18,8 +18,9 @@ it("keeps buyer invitations fixed and staff invitations inclusive of taproom", (
 it("locks both membership actions during either pending write and retains errors", () => {
   const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "@actual", email: "actual@example.com", savedRole: "brewer", removing: true, error: "Cannot remove the last admin" }));
   expect(html).toContain("Cannot remove the last admin");
-  expect(html).toContain("sign-in account remains");
-  expect(html).toContain("Removing…");
+  expect(html).toContain("ends this brewery membership");
+  // Remove opens the confirm sheet; its trigger is held while either write runs.
+  expect(html).toContain("Remove actual");
   expect(html).not.toContain("/mock/");
   expect(html).not.toMatch(/<button(?![^>]*disabled)[^>]*>/);
 });

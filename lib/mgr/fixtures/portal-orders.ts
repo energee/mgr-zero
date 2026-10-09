@@ -80,7 +80,7 @@ export const portalOrderShipped: PortalOrderSnapshot = {
     line("l-pils-225", SKU_PILS, 6, 6),
   ],
   events: [
-    { id: "e-ship", event: "shipped", payload: {}, created_at: "2026-08-27T16:00:00.000Z" },
+    { id: "e-ship", event: "shipped", created_at: "2026-08-27T16:00:00.000Z" },
   ],
   shipment: {
     id: "00000000-0000-4000-8000-000000000325",

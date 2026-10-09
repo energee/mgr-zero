@@ -58,13 +58,13 @@ export type BrandSnapshot = {
   backHref?: string;
 };
 
-/** A COLA is filed under a serial and never expires; a formula keeps its TTB number; registrations do expire. */
+/** A COLA is listed by its TTB ID (with its serial when known) and never expires; a formula keeps its TTB number; registrations do expire. */
 export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
   const rows: RegistryRowView[] = [
     ...approvals.map((approval) => ({
       key: approval.id,
-      title: approval.kind === "cola" ? `COLA serial ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
-      detail: approval.approved_on ? `submitted ${approval.approved_on}` : "not submitted",
+      title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
+      detail: [approval.approved_on ? `submitted ${approval.approved_on}` : "not submitted", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
     })),
     ...registrations.map((registration) => ({

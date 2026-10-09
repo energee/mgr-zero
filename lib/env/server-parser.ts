@@ -83,6 +83,12 @@ export function isChatConfigured(env: Record<string, string | undefined> = proce
   return Boolean(env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN || env.VERCEL === "1");
 }
 
+/** The public MGR origin for links and OAuth redirects. Never derived from a
+ *  request Host, so a missing value is an error rather than a guess. */
+export function readAppUrl(env: Environment = process.env) {
+  return required(env, "APP_URL");
+}
+
 export function readOrderEmailEnv(env: Environment = process.env) {
   return { apiKey: required(env, "RESEND_API_KEY"), from: required(env, "ORDER_EMAIL_FROM") };
 }

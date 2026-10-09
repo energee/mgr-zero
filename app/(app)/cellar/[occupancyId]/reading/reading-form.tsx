@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm } from "@/components/mgr/command-form";
-import { FermentationReadingActionsView, FermentationReadingView, type FermentationReadingValues } from "@/components/mgr/views/fermentation-reading";
+import { FermentationReadingActionsView, FermentationReadingView, type FermentationReadingIdentity, type FermentationReadingValues } from "@/components/mgr/views/fermentation-reading";
 import { command } from "@/lib/commands/client";
 import {
   createReadingAttempt,
@@ -34,9 +34,9 @@ function localObservationValue(iso = new Date().toISOString()) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior, openByDefault = false, returnHref }: {
+export function ReadingForm({ occupancyId, identity, unit, role, prior, openByDefault = false, returnHref }: {
   occupancyId: string;
-  occupancyLabel: string;
+  identity: FermentationReadingIdentity;
   unit: GravityUnit;
   role: "admin" | "brewer";
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
@@ -153,7 +153,7 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior, op
         gravityPlato: typeof parsedGravity === "number" ? parsedGravity : undefined,
         ph: ph ? Number(ph) : undefined,
         note: note || undefined,
-      }, `Record fermentation reading · ${occupancyLabel}`);
+      }, `Record fermentation reading · ${identity.vessel}`);
       // Persistence is the gate: fetch is unreachable if this throws.
       storeOutboxAttempt(localStorage, next);
       setAttempt(next);
@@ -177,7 +177,7 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior, op
   }
 
   const values = { observedAt, tempF, gravity, ph, note };
-  const recovery = attempt ? { state: attempt.state, discardLabel: `${occupancyLabel} reading` } : undefined;
+  const recovery = attempt ? { state: attempt.state, discardLabel: `${identity.vessel} reading` } : undefined;
   const formId = "fermentation-reading-form";
   return (
     <CommandForm
@@ -190,6 +190,7 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior, op
       <FermentationReadingView
         formId={formId}
         values={values}
+        identity={identity}
         unit={unit}
         prior={prior}
         locked={attempt !== null}
