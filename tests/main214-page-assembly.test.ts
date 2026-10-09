@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { BreweryProvider } from "@/app/(app)/brewery-provider";
+import { BreweryProvider } from "@/lib/brewery-provider";
 // These pages live under app/(app), whose layout mounts BreweryProvider; the
 // tests render the page subtree on its own, so they supply it here.
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>

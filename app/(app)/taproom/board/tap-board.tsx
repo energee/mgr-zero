@@ -3,7 +3,7 @@
 import { formatDateTime } from "@/lib/date-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { command, CommandResponseError } from "@/lib/commands/client";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import {
   beginTapBoardAttempt,
   completeTapBoardAttempt,

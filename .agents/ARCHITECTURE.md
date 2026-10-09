@@ -30,7 +30,7 @@ never copy it into a second place.
 | `lib/supabase/public-menu.ts` | Server-only website menu reader. It may call only the service-only `get_published_pos_menu` RPC, whose opaque public id and fixed safe projection expose explicitly published current rows without granting anonymous access to tenant tables. The route hashes that stable projection into its public content version and ETag and applies one CORS policy to success, conditional, missing, and failure responses. |
 | `lib/pos.ts`, `lib/commands/pos.ts`, `lib/supabase/integration-tokens.ts` | Square transport, registered POS operations, and the credential boundary. Catalog publication owns one durable Square parent item per brand, premise, and menu group; poured formats are its variation identities. A location publish freezes its complete sorted brand manifest and atomically reserves every child attempt under the same per-brand locks used by standalone item publication before the first provider write, including prior-owned brands that now need retirement. Each item attempt freezes its exact request body, provider idempotency key, source variations, expected item/variation versions, credential generation, committed catalog generation, and owned or explicitly adopted identity. A sales mapping never grants write ownership or supplies a provider identity; existing provider objects become writable only through durable MGR ownership or an explicit adoption verified against an observed mapped variation. Adoption of a format that already has durable ownership must name that same variation identity or fail before an attempt is recorded. Unknown outcomes replay that body; exact menu replay traverses only its saved manifest; known version conflicts require a new current-object snapshot. A definitive child rejection terminally records the menu's completed, rejected, and superseded child outcomes so corrected work can start, while an uncertain child keeps the manifest recoverable. The catalog generation advances atomically with a successful snapshot commit, which supersedes unresolved publication derived from the prior committed snapshot; publication admission is blocked while a newer current-seller catalog fetch is unfinished, including its credential-refresh handoff, and captures the committed generation after that sync settles. OAuth reconnect terminally settles unresolved catalog work before installing its new credential; safe different-seller replacement also clears current publication ownership while retaining event history. A newer credential or catalog generation terminally supersedes unresolved publication work, and definitive missing or malformed owned provider objects reject their attempts. The publication lease admits current Admin or Warehouse only for its concrete durable attempt, refreshes an expired access credential through the same credential CAS, and terminally settles current-generation publication if Square rejects its authorization. Losing an eligible role terminally settles that actor's unfinished manifest and children as `role_changed`, so another current Admin or Warehouse operator can begin corrected work while the original audit remains immutable. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
-| `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching across the signed-in user's memberships. |
+| `lib/brewery.ts`, `lib/brewery-provider.tsx` | Current-brewery resolution and switching across the signed-in user's memberships. The provider is the client half the layouts mount; it lives in `lib` because `lib` never imports a route directory under `app/` (`tests/boundary.test.ts`). |
 | `lib/portal.ts` | `getActiveCustomer()`: resolves which customer account the session operates as from `customer_users`, mirroring `lib/brewery.ts`. Redirects to `/login` with no membership. |
 | `proxy.ts`, `app/(auth)/` | Session refresh and login. Customer-only accounts (a `customer_users` row, no `brewery_users` row) land on `/portal` instead of `/`. |
 | `app/(app)/<area>/` | Staff pages and forms. Thin: read via queries, mutate via commands. |
@@ -46,8 +46,10 @@ never copy it into a second place.
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
 | `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
-| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. |
+| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads only its role (`staffRoleAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRole` reuses them. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`, and `readAppUrl` — the public origin for links and OAuth redirects, never taken from a request Host) shared by server code, scripts, and tests. |
+| `lib/commands/movement-input.ts` | `movementInput`, the `record_movement` command's input schema. It registers no command, so the client-side Composer can import it; `lib/commands/inventory.ts`, `lib/commands/preview.ts`, and the inventory page share it. |
+| `lib/composer/state.ts` | The Composer drawer's `record_movement` proposal: the `composerProposal` schema that `lib/chat/messages.ts` parses the newest assistant message's proposal against. A malformed or non-movement proposal returns an operator error instead of reaching the commit button. |
 | `lib/compliance-period.ts` | Compliance reporting periods as URL keys (month `YYYY-MM`, quarter `YYYY-Qn`, year `YYYY`): their date ranges and labels, shared by the compliance pages and `lib/commands/compliance.ts`. |
 | `lib/time-window.ts`, `lib/volume.ts` | Domain display helpers: a stored `hh:mm` window (may wrap midnight) as the string a brewer reads; a stored barrel figure in the unit a brewer reads (storage and TTB stay bbl), including `saleVolume` — a shipped line's two-decimal bbl removal total, which `formatVolume` would round to a glyph — and the raw-figure formatters `bblFixed` (two-decimal, TTB report precision) and `bblExact` (stored precision, for variance, loss, and previews). |
 | `lib/hash.ts` | `sha256` hex digests and `oauthState`, the request-id-bound-to-actor OAuth state the QBO, Square, and Slack starts share. Only the hash of a secret is stored, so every caller hashes the same way. |
@@ -154,6 +156,17 @@ a gap to close, not a convention to trust.
    `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
    projections, which omit QBO sync bookkeeping, write-off attribution, event
    payloads and staff ids (deliveries have no portal projection).
+   `orders`, `order_lines`, `order_deposit_lines` and `skus` follow the same
+   rule (#788). Buyers read `portal_orders`: only the columns
+   `portal_order_rows` returns, with ship-to and lines inlined. Buyers read
+   `portal_sku_prices`: active, priced SKUs on the caller's channels, with no
+   QBO mapping. `order_deposit_lines` has no portal projection. `sku_prices`
+   returns no customer rows, because it is `security_invoker` over `skus`.
+   A definer projection is never inlined, so a filter on its view runs after
+   every caller row is built; single-row reads pass an id to the rows function
+   instead (`portal_order_rows(p_order)`).
+   Still open (#793): `customers`, `brands`, `formats` and `channel_prices`
+   keep customer policies that expose whole rows.
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
@@ -162,7 +175,7 @@ a gap to close, not a convention to trust.
    Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
    caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
    *Enforced by:* RLS policies in migrations, proven by
-   `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
+   `tests/rls-tenancy.test.ts`, `tests/rls-portal-columns.test.ts` and `tests/rls-portal-order-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
@@ -307,3 +320,13 @@ constraint or query index leading with it counts). Policies call
 `(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
 statement instead of once per row. *Enforced by:*
 `tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
+
+`movements_onhand_idx` and `allocations_open_idx` carry `include (qty)`, so
+`portal_availability`'s per-brewery sums can be index-only scans. Heap fetches
+remain for pages vacuum has not yet marked all-visible. The cost: on
+`allocations`, a qty update on an open row is no longer a HOT update;
+`inventory_movements` is append-only, so it pays only the wider entry.
+*Enforced by:* `tests/schema-rls-indexes.test.ts`, which explains the
+function's body and expects both index-only scans, and rejects two indexes on
+one table with the same keys whatever their `include` (#794). So widen an
+existing index with `include` rather than adding a second one on the same keys.

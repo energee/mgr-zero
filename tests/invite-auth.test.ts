@@ -7,7 +7,7 @@ const auth = (staff: StaffMembership[] = [], customer: CustomerMembership[] = []
   getIdentity: vi.fn(async () => ({ userId: "user", email: "invited@test.local" })),
   getStaffMemberships: vi.fn(async () => staff),
   getCustomerMemberships: vi.fn(async () => customer),
-  getSupabaseClient: vi.fn(), getStaffMembership: vi.fn(), getCustomerMembership: vi.fn(),
+  getSupabaseClient: vi.fn(), getStaffRole: vi.fn(), getCustomerMembership: vi.fn(),
 } as unknown as RequestAuthContext);
 
 describe("invite acceptance", () => {

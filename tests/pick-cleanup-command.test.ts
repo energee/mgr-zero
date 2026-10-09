@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const { push, refresh, notice } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), notice: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 vi.mock("sonner", () => ({ toast: { error: notice } }));
-vi.mock("@/app/(app)/brewery-provider", () => ({ useBrewery: () => "brewery", useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
+vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery", useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
 vi.mock("@/components/mgr/views/pick", () => ({ PickView: () => null }));
 vi.mock("@/components/mgr/views/short-pick", () => ({ ShortPickView: () => null }));
 import { PickForm } from "@/app/(app)/orders/[id]/pick-form";

@@ -1,32 +1,35 @@
-export type MovementKind = "opening_balance" | "production_in" | "adjustment" | "depletion"
-  | "return_in" | "destruction" | "loss" | "sample" | "festival_removal";
-export type MovementInput = {
-  skuId: string;
-  locationId: string;
-  binId: string;
-  qty: number;
-  type: MovementKind;
-  lotId?: string;
-  saleChannelId?: string;
-  destState?: string;
-  note?: string;
-};
-export type ComposerEffect = {
-  label: string;
-  qty?: string;
-  bbl?: string;
-  stockBeforeQty?: string;
-  stockAfterQty?: string;
-  taxTreatment?: string | null;
-  correction?: string | null;
-};
-export type ComposerProposal = {
-  name: "record_movement";
-  input: MovementInput;
-  previewToken: string;
-  effects: ComposerEffect[];
-  warnings: string[];
-};
+// lib/composer/state.ts — the record_movement proposal the Composer drawer
+// renders, and the form link it hands off to. The drawer parses every streamed
+// proposal against composerProposal (lib/chat/messages.ts), so a malformed or
+// non-movement proposal never reaches the commit button.
+import { z } from "zod";
+import { movementInput, type MovementInput } from "@/lib/commands/movement-input";
+
+/** One line of preview_inventory_movement's `effects`; the drawer reads only
+ *  these keys. The RPC builds them with jsonb_build_object, which writes a null
+ *  operand as JSON null (bbl is null while a format has no bbl_per_unit), so
+ *  every display figure is nullish; the view omits a missing one. */
+const composerEffect = z.object({
+  label: z.string(),
+  qty: z.string().nullish(),
+  bbl: z.string().nullish(),
+  stockBeforeQty: z.string().nullish(),
+  stockAfterQty: z.string().nullish(),
+  taxTreatment: z.string().nullish(),
+  correction: z.string().nullish(),
+});
+export type ComposerEffect = z.infer<typeof composerEffect>;
+
+/** The agent may propose any AI-exposed command (lib/chat/agent.ts); the drawer
+ *  renders and commits only this one, so anything else must fail the parse. */
+export const composerProposal = z.object({
+  name: z.literal("record_movement"),
+  input: movementInput,
+  previewToken: z.string().min(1),
+  effects: z.array(composerEffect),
+  warnings: z.array(z.string()),
+});
+export type ComposerProposal = z.infer<typeof composerProposal>;
 
 export function movementFormHref(input: MovementInput, handoffId?: string) {
   const query = new URLSearchParams({

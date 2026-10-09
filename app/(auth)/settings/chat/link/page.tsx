@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { EntrySurface } from "@/components/mgr/entry-surface";
 import { ChatLinkConsentView } from "@/components/mgr/views/chat";
 import { ChatLinkConsent } from "@/app/(app)/settings/chat/chat-settings-client";
-import { BreweryProvider } from "@/app/(app)/brewery-provider";
+import { BreweryProvider } from "@/lib/brewery-provider";
 import { getActiveBrewery } from "@/lib/brewery";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import type { ChatLinkIntent } from "@/lib/commands/chat";

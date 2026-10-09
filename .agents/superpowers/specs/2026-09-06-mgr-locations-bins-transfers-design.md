@@ -140,6 +140,8 @@ create index material_movements_onhand_idx
   on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 ```
 
+Since #794, `movements_onhand_idx` also carries `include (qty)`; see schema-design §16.6.
+
 `record_inventory_movement` gains a required `p_bin`, and `record_movement`'s input a
 required `binId`. There is no default to fall back to, so the column is required at the
 boundary too; the Record movement form preselects the location's first bin. The two
