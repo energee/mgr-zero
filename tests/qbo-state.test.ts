@@ -623,6 +623,43 @@ describe("QuickBooks current invoice state", () => {
     }
   });
 
+  // #758: a sync skips invoices settled (paid, voided or deleted) more than 90 days
+  // ago, and still re-reads open and recently settled ones.
+  it("skips invoices settled more than 90 days ago", async () => {
+    const started = async (settled: "old" | "recent" | "open") => {
+      const f = await stateFixture();
+      if (settled !== "open") {
+        sql(`update invoices set qbo_remote_state='voided', qbo_balance_cents=0 where id='${f.invoice.id}'`, true);
+        // A separate statement: the trigger sets qbo_settled_at whenever state columns are written.
+        sql(`update invoices set qbo_settled_at=now() - interval '${settled === "old" ? 100 : 10} days' where id='${f.invoice.id}'`, true);
+      }
+      const begin = await beginQboInvoiceSync(f.ctx, crypto.randomUUID());
+      if ("replayResult" in begin) throw new Error("unexpected replay");
+      return begin.targets.map(t => t.invoiceId);
+    };
+    expect(await started("old")).toEqual([]);
+    expect(await started("recent")).toHaveLength(1);
+    expect(await started("open")).toHaveLength(1);
+  });
+
+  // The settled time follows what each sync observed: set when it becomes paid,
+  // voided or deleted, kept while a later sync rewrites the same settled state,
+  // cleared when it reopens.
+  it("records when an invoice became settled and clears it on reopen", async () => {
+    const f = await stateFixture();
+    const set = (fields: string) => sql(`update invoices set ${fields} where id='${f.invoice.id}'`, true);
+    const settledAt = () => sql(`select coalesce(qbo_settled_at::text,'null') from invoices where id='${f.invoice.id}'`, true)[0];
+    set("qbo_remote_state='live', qbo_balance_cents=0, paid_at=now()");
+    const paid = settledAt();
+    expect(paid).not.toBe("null");
+    set("qbo_remote_state='live', qbo_balance_cents=0, paid_at=paid_at"); // a later sync, same paid state
+    expect(settledAt()).toBe(paid);
+    set("qbo_remote_state='live', qbo_balance_cents=5000, paid_at=null");
+    expect(settledAt()).toBe("null");
+    set("qbo_remote_state='voided', qbo_balance_cents=0");
+    expect(settledAt()).not.toBe("null");
+  });
+
   it("marks only a definitive 404 from the original current realm as deleted", async () => {
     expect(sql(`select r.role from pg_proc p cross join (values ('anon'),('authenticated'),('service_role')) r(role)
       where p.oid='public.complete_qbo_invoice_sync(uuid,uuid,uuid,uuid,text,jsonb)'::regprocedure

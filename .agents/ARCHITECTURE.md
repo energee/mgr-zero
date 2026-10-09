@@ -159,6 +159,8 @@ a gap to close, not a convention to trust.
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
    of them (#770). Other tables keep `is_staff_of`. `tests/rls-taproom.test.ts`
    checks sales, warehouse and brewer against each table's command role list.
+   Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
+   caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
    *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
@@ -166,7 +168,7 @@ a gap to close, not a convention to trust.
    permissive policy.
 4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
    `lib/supabase/invites.ts`, `lib/supabase/provision.ts`, `lib/supabase/public-menu.ts`,
-   `lib/chat/jobs.ts`, and `lib/email/jobs.ts`.**
+   `lib/chat/jobs.ts`, `lib/email/jobs.ts`, and `lib/retention/jobs.ts`.**
    The token boundary is the sole credential path: each operation admits only its named roles,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role

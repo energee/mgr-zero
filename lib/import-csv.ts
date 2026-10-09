@@ -16,6 +16,28 @@ export type ImportLookups = Record<string, { id: string; name: string; location_
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
+/** Rows that can collide on a unique key share an import key, so import_csv runs
+ *  them in file order (the first of two same-name customers wins); rows with
+ *  different keys run concurrently. Coarse is safe: a shared key only serializes.
+ *  The collisions per kind, from the schema:
+ *  - customers: unique (brewery_id, name)
+ *  - products_skus: the brand-name advisory lock (the first row creating a brand
+ *    sets its style and ABV) and unique (brand_id, format_id); unique (brewery_id, upc)
+ *    spans products, so import_csv runs a whole file in order once any row has a UPC
+ *  - channel_prices: primary key (sale_channel_id, price_group_id, format_id); last write wins
+ *  Ship-tos are never imported as default and opening balances only append, so
+ *  those rows cannot collide and get a key of their own. */
+export function importRowKey(kind: ImportKind, row: Record<string, string>, index: number): string {
+  // UUIDs are case-insensitive in SQL; lower-case them so one cell has one key.
+  const v = (f: string) => (row[f]?.trim() ?? "").toLowerCase();
+  switch (kind) {
+    case "customers": return `name:${row.name?.trim() ?? ""}`;
+    case "products_skus": return `product:${row.product?.trim() ?? ""}`;
+    case "channel_prices": return [v("saleChannelId"), v("priceGroupId"), v("formatId")].join(":");
+    case "ship_tos": case "opening_balances": return `row:${index}`;
+  }
+}
+
 // The opening qty: record_inventory_movement refuses qty <> round(qty, 2), the same
 // rule the order commands state as multipleOf(0.01), so trailing zeros pass and a
 // third significant decimal does not.

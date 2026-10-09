@@ -533,6 +533,7 @@ export type Database = {
       }
       breweries: {
         Row: {
+          closed_at: string | null
           created_at: string
           customer_phone: string | null
           fermentation_reading_due_hours: number
@@ -546,6 +547,7 @@ export type Database = {
           ttb_registry_no: string | null
         }
         Insert: {
+          closed_at?: string | null
           created_at?: string
           customer_phone?: string | null
           fermentation_reading_due_hours?: number
@@ -559,6 +561,7 @@ export type Database = {
           ttb_registry_no?: string | null
         }
         Update: {
+          closed_at?: string | null
           created_at?: string
           customer_phone?: string | null
           fermentation_reading_due_hours?: number
@@ -1823,6 +1826,7 @@ export type Database = {
           qbo_idempotency_key: string
           qbo_invoice_id: string | null
           qbo_remote_state: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at: string | null
           qbo_sync_error: string | null
           qbo_sync_generation: number
           qbo_sync_status: Database["public"]["Enums"]["qbo_sync_status"]
@@ -1851,6 +1855,7 @@ export type Database = {
           qbo_idempotency_key?: string
           qbo_invoice_id?: string | null
           qbo_remote_state?: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at?: string | null
           qbo_sync_error?: string | null
           qbo_sync_generation?: number
           qbo_sync_status?: Database["public"]["Enums"]["qbo_sync_status"]
@@ -1879,6 +1884,7 @@ export type Database = {
           qbo_idempotency_key?: string
           qbo_invoice_id?: string | null
           qbo_remote_state?: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at?: string | null
           qbo_sync_error?: string | null
           qbo_sync_generation?: number
           qbo_sync_status?: Database["public"]["Enums"]["qbo_sync_status"]
@@ -7947,6 +7953,7 @@ export type Database = {
         }
         Returns: Json
       }
+      close_brewery: { Args: { p_brewery: string }; Returns: Json }
       close_packaging_run: {
         Args: {
           p_actuals?: Json
@@ -8888,6 +8895,7 @@ export type Database = {
         Args: { p_older_than?: string }
         Returns: Json
       }
+      prune_command_requests: { Args: never; Returns: number }
       raise_invoice_question: {
         Args: {
           p_body: string
