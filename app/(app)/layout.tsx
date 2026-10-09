@@ -41,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     breweries: memberships.map((m) => ({ id: m.breweryId, name: m.breweryName, current: m.breweryId === brewery.id })),
                   }}
                   switchAction={switchBrewery}
-                  footer={<MeSheetActions />}
+                  footer={<MeSheetActions guide="/docs/staff-guide" />}
                 />
               </MeSheet>
             </>

@@ -1,7 +1,10 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId, insertFixture } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId, insertFixture, sql } from "./helpers";
 import "../lib/commands/all";
+import { createClient } from "@supabase/supabase-js";
+import { publicEnv } from "@/lib/env/public";
+import type { Database } from "@/lib/supabase/database";
 
 describe("ledger integrity + RLS", () => {
   let b: Awaited<ReturnType<typeof makeBrewery>>, staff: Awaited<ReturnType<typeof makeStaff>>, sku: { id: string }, loc: Awaited<ReturnType<typeof seedLocation>>;
@@ -55,6 +58,42 @@ describe("ledger integrity + RLS", () => {
     const { data: stored } = await admin.from("inventory_movements").select("qty, bbl").eq("id", m.id).single();
     expect(Number(stored!.qty)).toBe(2);
     expect(Number(stored!.bbl)).toBe(1);
+  });
+});
+
+// #756: is_staff_of/staff_role each run private.request_scope_allows, whose
+// exception block is a subtransaction. Called once per ledger row they made
+// on_hand ~80x slower at 50k movements; the stock helpers resolve the
+// caller's staff memberships once, as a set, instead.
+describe("stock helpers resolve staff membership once per query", () => {
+  for (const fn of ["on_hand_rows", "keg_bin_on_hand_rows"]) {
+    it(`${fn} calls no per-row role helper`, () => {
+      const body = sql(`select pg_get_functiondef('public.${fn}'::regproc)`, true).join("\n");
+      expect(body).not.toMatch(/is_staff_of|staff_role\(/);
+    });
+  }
+
+  // The role is read per brewery: taproom in A sees only A's taproom stock,
+  // brewer in B sees all of B's; a brewery-scoped request sees only that brewery.
+  it("applies each membership's own role and the request brewery scope", async () => {
+    const [a, b] = [await makeBrewery(), await makeBrewery()];
+    const user = await makeStaff(a.id, "taproom");
+    await admin.from("brewery_users").insert({ brewery_id: b.id, user_id: user.id, role: "brewer" });
+    const stock = async (breweryId: string) => {
+      const { skuId } = await seedCatalog(breweryId);
+      const wh = await seedLocation(breweryId, { name: "WH" });
+      const tap = await seedLocation(breweryId, { name: "Tap", uses: ["taproom"] });
+      for (const l of [wh, tap]) insertFixture("inventory_movements", { brewery_id: breweryId, sku_id: skuId, location_id: l.id, bin_id: l.binId, qty: 3, type: "opening_balance", created_by: user.id });
+      return { wh: wh.id, tap: tap.id };
+    };
+    const [la, lb] = [await stock(a.id), await stock(b.id)];
+    const locations = async (db: Awaited<ReturnType<typeof asUser>>) =>
+      ((await db.from("on_hand").select("location_id")).data ?? []).map(r => r.location_id).sort();
+    expect(await locations(await asUser(user.email))).toEqual([la.tap, lb.wh, lb.tap].sort());
+    const scoped = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+      auth: { persistSession: false }, global: { headers: { "x-mgr-actor-id": user.id, "x-mgr-brewery-id": a.id } } });
+    expect((await scoped.auth.signInWithPassword({ email: user.email, password: "test-password-1" })).error).toBeNull();
+    expect(await locations(scoped)).toEqual([la.tap]);
   });
 });
 

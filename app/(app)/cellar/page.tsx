@@ -1,6 +1,7 @@
 // app/(app)/cellar/page.tsx — Beer › Cellar: tanks with beer in them right
 // now (list_occupancies), each opening its reading log; latest readings
-// come embedded in list_batches({ readings: true }), one read for every tank; Transfer is
+// come embedded in list_batches({ readings: true, open: true }), one read for
+// every tank (every open occupancy belongs to a brewed, uncompleted batch); Transfer is
 // cellar-transfer-form.tsx → record_cellar_transfer; Addition is
 // cellar-addition-form.tsx → record_batch_addition.
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
@@ -23,23 +24,21 @@ type Occupancy = {
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
 type Batch = {
   id: string; batch_no: number | null; brand_name: string | null;
-  brewed_on: string | null; closed_at: string | null;
   active_occupancies: { id: string; latest_reading?: VesselReading | null }[];
 };
 
 export default async function CellarPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [occupancies, vessels, batches, unit, materials] = (await Promise.all([
-    runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true }, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_materials", {}, ctx),
-  ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[]];
+  const [occupancies, vessels, batches, unit, materials, lots] = (await Promise.all([
+    runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true, open: true }, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_materials", {}, ctx),
+    runCommand("list_material_lots", {}, ctx),
+  ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[], (AdditionLot & { material_id: string })[]];
   // The sheet is a client component: hand it the five fields it reads, not the whole materials row.
   const additionMaterials: AdditionMaterial[] = materials.map(({ id, name, category, base_uom, lot_tracked }) => ({ id, name, category, base_uom, lot_tracked }));
-  const lots = (await runCommand("list_material_lots", {}, ctx)) as (AdditionLot & { material_id: string })[];
   const lotsByMaterial: Record<string, AdditionLot[]> = {};
   for (const lot of lots) (lotsByMaterial[lot.material_id] ??= []).push(lot);
-  const completionCandidates = batches.filter((batch) => batch.brewed_on !== null && batch.closed_at === null)
-    .map((batch) => ({ id: batch.id, label: `Batch ${batch.batch_no ?? "—"} · ${batch.brand_name ?? "no brand"}` }));
+  const completionCandidates = batches.map((batch) => ({ id: batch.id, label: `Batch ${batch.batch_no ?? "—"} · ${batch.brand_name ?? "no brand"}` }));
 
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);

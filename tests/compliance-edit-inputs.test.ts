@@ -16,9 +16,11 @@ describe("compliance sheets omit the fields they do not show and null the ones l
   });
 
   it("Brand approval edit keeps its id", () => {
-    expect(approvalInput("b1", { kind: "cola", ttbId: "123", submittedOn: "2026-01-02" }, { id: "a1" }))
-      .toEqual({ id: "a1", brandId: "b1", kind: "cola", ttbId: "123", approvedOn: "2026-01-02" });
-    expect(approvalInput("b1", { kind: "formula", ttbId: "F9", submittedOn: "" }))
+    expect(approvalInput("b1", { kind: "cola", ttbId: "0123", serialNumber: "007", submittedOn: "2026-01-02" }, { id: "a1" }))
+      .toEqual({ id: "a1", brandId: "b1", kind: "cola", ttbId: "0123", serialNumber: "007", approvedOn: "2026-01-02" });
+    // an emptied COLA serial is null so it clears; a formula never sends a serial
+    expect(approvalInput("b1", { kind: "cola", ttbId: "0123", serialNumber: " ", submittedOn: "" }).serialNumber).toBeNull();
+    expect(approvalInput("b1", { kind: "formula", ttbId: "F9", serialNumber: "stale", submittedOn: "" }))
       .toEqual({ id: undefined, brandId: "b1", kind: "formula", ttbId: "F9", approvedOn: null });
   });
 

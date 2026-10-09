@@ -13,7 +13,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import "@/lib/commands/all";
 import { money } from "@/lib/mgr/money";
-import { SIZE_LABEL } from "../../keg-labels";
+import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 
 type Balance = {
   rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number; deposit_cents: number; mismatch: boolean }[];

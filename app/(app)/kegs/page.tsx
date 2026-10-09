@@ -12,7 +12,7 @@ import { kegEventUnavailable, toKegFleetViewProps } from "@/lib/mgr/keg-fleet-vi
 import "@/lib/commands/all";
 import { KegEventForm } from "./event-form";
 import { money } from "@/lib/mgr/money";
-import { KIND_LABEL, SIZE_LABEL } from "./keg-labels";
+import { KIND_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { PoolForm, type Pool } from "./pool-form";
 
 type Fleet = {

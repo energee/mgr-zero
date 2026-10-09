@@ -455,7 +455,7 @@ it("refuses to build a Slack redirect from the request Host", async () => {
   const prev = process.env.APP_URL;
   delete process.env.APP_URL;
   try {
-    const { slackRedirectUri } = await import("@/app/api/chat/slack/install/route");
+    const { slackRedirectUri } = await import("@/lib/chat/oauth");
     expect(() => slackRedirectUri()).toThrow(/APP_URL/);
     const { GET } = await import("@/app/api/chat/slack/oauth/route");
     const res = await GET(new Request("https://evil.example/api/chat/slack/oauth?code=x&state=y"));

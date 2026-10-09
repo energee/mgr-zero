@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readPublicEnv } from "@/lib/env/public";
-import { isChatConfigured, readQboEnv, readServerEnv, readSquareEnv } from "@/lib/env/server-parser";
+import { isChatConfigured, readAppUrl, readQboEnv, readServerEnv, readSquareEnv } from "@/lib/env/server-parser";
 
 const validPublic = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54341",
@@ -112,4 +112,9 @@ describe("isChatConfigured", () => {
   it("accepts a pulled development OIDC token", () => expect(isChatConfigured({ VERCEL_OIDC_TOKEN: "t" })).toBe(true));
   it("accepts a deployed Vercel function, where the OIDC token arrives per request", () => expect(isChatConfigured({ VERCEL: "1" })).toBe(true));
   it("rejects a bare environment", () => expect(isChatConfigured({})).toBe(false));
+});
+
+describe("readAppUrl", () => {
+  it("returns the configured public origin", () => expect(readAppUrl({ APP_URL: " https://mgr.test " })).toBe("https://mgr.test"));
+  it("refuses a missing APP_URL rather than guessing from the request", () => expect(() => readAppUrl({})).toThrow(/APP_URL/));
 });

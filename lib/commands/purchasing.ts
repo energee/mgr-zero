@@ -292,11 +292,13 @@ defineQuery({
 defineQuery({
   name: "get_material_requirements",
   description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft",
-  input: z.object({}), roles: [...PURCHASING],
-  handler: async (ctx) => {
-    const rows = await unwrap(ctx.db.from("material_requirements")
+  input: z.object({ shortOnly: z.boolean().optional().describe("Keep only materials with something short (short > 0)") }), roles: [...PURCHASING],
+  handler: async (ctx, i) => {
+    let q = ctx.db.from("material_requirements")
       .select("material_id, material_name, base_uom, purchase_uom, required, on_hand, on_order, short, needed_by, buy_by, out_of_reach, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
-      .eq("brewery_id", ctx.breweryId).order("needed_by").order("material_name"));
+      .eq("brewery_id", ctx.breweryId).order("needed_by").order("material_name");
+    if (i.shortOnly) q = q.gt("short", 0);
+    const rows = await unwrap(q);
     return (rows ?? []).map((r) => ({
       ...r, required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
       purchase_units_short: Number(r.purchase_units_short),

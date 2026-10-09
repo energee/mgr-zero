@@ -261,6 +261,19 @@ it("only offers the cellar Reading shortcut when one tank could be meant", () =>
   expect(toCellarMapViewProps(vessels, one).readingHref).toBeUndefined();
 });
 
+it("explains a disabled cellar Reading instead of leaving a dead end (#715)", () => {
+  const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }, { id: "v2", name: "FV2", capacity_bbl: 10 }];
+  const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
+  const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
+  const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
+  expect(toCellarMapViewProps(vessels, one, {}, {}, reading).readingHint).toBeUndefined();
+  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).readingHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
+  expect(toCellarMapViewProps(vessels, [], {}, {}, reading).readingHint).toBe("No tank holds beer, so there is nothing to read.");
+  const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
+  expect(html).toContain("Open a tank to record its reading.");
+  expect(html).not.toContain("/reading");
+});
+
 describe("cellar readings (#700)", () => {
   it("formats each open occupancy's latest reading from one list_batches read", () => {
     const reading = { id: "r1", at: "2026-09-01T15:00:00Z", temp_f: 66, gravity_plato: 4.5, ph: null, note: null };
@@ -276,6 +289,7 @@ describe("cellar readings (#700)", () => {
   it("the cellar page asks list_batches for readings instead of one call per occupancy", () => {
     const page = readFileSync("app/(app)/cellar/page.tsx", "utf8");
     expect(page).not.toContain("list_fermentation_readings");
-    expect(page).toContain('runCommand("list_batches", { readings: true }, ctx)');
+    // #759: and only the open batches, so the row cap is never spent on finished ones.
+    expect(page).toContain('runCommand("list_batches", { readings: true, open: true }, ctx)');
   });
 });
