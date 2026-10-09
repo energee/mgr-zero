@@ -88,11 +88,19 @@ export function Qty({
  *  clickable in the inventory. `to` names the screen a tab opens (data-to)
  *  where each tab is a screen of its own, like the Work chips.
  *
+ *  Each tab's Radix value is its index, not its name: Radix builds the tab and
+ *  panel ids from the value, and a name with a space ("Packaging runs") would
+ *  split aria-controls into two ids that resolve to nothing. onChange still
+ *  receives the name.
+ *
  *  A11y: a filter that changes rows in place (Work) passes `panel`, the
- *  selected tab's content, and `label`, the tablist's name. Every tab then gets
- *  a TabsContent: Radix always mounts each tabpanel (empty and `hidden` unless
- *  selected), so every aria-controls resolves, and only the selected one renders
- *  `panel` (#727).
+ *  selected tab's content, with `label`, the tablist's name, and `onChange`,
+ *  because the caller re-renders `panel` for the newly chosen tab. Every tab
+ *  then gets a TabsContent: Radix mounts each tabpanel (empty and `hidden`
+ *  unless selected), so every aria-controls resolves (#727). The panel is a
+ *  gap-3 column like the page body it replaces (the bar grows to fill it,
+ *  so an empty state can centre), and it is not a Tab stop
+ *  (tabIndex -1) because its rows hold their own focusable actions.
  *  Without `panel` the body below is drawn outside the bar and aria-controls
  *  points at nothing: tolerable for a drawing or a bar of links. As a unit
  *  switcher it also announces "tab 1 of 3" with no group name, since the input's
@@ -113,15 +121,14 @@ export function TabBar({
   to?: Record<string, string>;
   onChange?: (value: string) => void;
   hrefs?: Record<string, string>;
-  label?: string;
-  panel?: ReactNode;
-}) {
+} & ({ label?: never; panel?: never } | { label: string; panel: ReactNode; onChange: (value: string) => void })) {
+  const value = String(on);
   return (
-    <Tabs value={hrefs || onChange ? names[on] : undefined} defaultValue={hrefs || onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
+    <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
       <TabsList variant="solid" className={cls} aria-label={label}>
-        {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
+        {names.map((n, i) => <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
       </TabsList>
-      {panel === undefined ? null : names.map((n) => <TabsContent key={n} value={n}>{panel}</TabsContent>)}
+      {panel === undefined ? null : names.map((n, i) => <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
     </Tabs>
   );
 }

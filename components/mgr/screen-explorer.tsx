@@ -121,8 +121,10 @@ export function ScreenExplorer() {
   // One handler for every tap in the drawing: the nearest link, button or row
   // gives the label (a row's title, else its text: a tile has no title); a
   // resolved name opens that screen. A rail group label names its landing. A
-  // tab that names a screen of its own (data-to, the Work chips) opens it; any
-  // other tab filters the rows under it in place. Chips, a unit switcher inside
+  // tab that names a screen of its own (data-to, the Work chips on the list
+  // pages under Work) opens it; any other tab filters the rows under it in
+  // place. The Work landing's own chips are guarded below: they filter its
+  // rows through the shared view. Chips, a unit switcher inside
   // a field, and gated rows only ever act in place. Capture phase, and
   // propagation stops on a hit, so the shell's Next.js links never navigate the
   // docs page and the Me control's own sheet never opens outside the box.
