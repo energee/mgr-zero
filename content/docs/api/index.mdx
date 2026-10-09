@@ -234,12 +234,17 @@ return to that original account and workspace to retry an uncertain write.
 
 An operation lists the roles that may call it. The endpoint refuses the rest
 with `403 permission_denied` before the handler runs. Below that, Postgres
-row-level security scopes every query to the caller's brewery. For customers,
-orders, invoices, prices and compliance filings it also checks the role, so a
-role that slipped through would still read nothing there. Other tables are
-scoped by brewery only. That matters when you are debugging an empty result: an
-empty list and a forbidden read look the same from outside, on purpose. A caller cannot probe another tenant's data by watching which ids
-return `404` rather than `403`.
+row-level security scopes every query to the caller's brewery. Customers,
+orders, invoices, shipments, deliveries, routes, transfers, lots, sale
+channels, prices, compliance filings and POS sales also admit only the roles of
+the operations that read them. A role the endpoint should have refused still
+reads nothing from those records. Other records admit admin, sales, warehouse
+and brewer. Taproom staff read the catalog and, beyond it, only records of
+taproom locations.
+
+An empty list and a forbidden read look the same from outside, on purpose.
+Keep that in mind when you debug an empty result. A caller cannot probe another
+tenant's data by watching which ids return `404` rather than `403`.
 
 A portal user sees only their own customer's records. That is why the portal
 operations are a separate set, not the staff ones with a filter applied.
