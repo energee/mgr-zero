@@ -622,6 +622,8 @@ export type QboInvoiceSyncResult = { superseded: true } | {
 };
 
 export type QboInvoiceSyncTarget = {
+  /** Missing only on legacy frozen batches, which contained invoices exclusively. */
+  entityType?: "Invoice" | "CreditMemo";
   invoiceId: string;
   remoteId: string;
   pushId: string;
