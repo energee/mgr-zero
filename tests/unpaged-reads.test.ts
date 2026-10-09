@@ -37,7 +37,7 @@ const ALLOWED: Record<string, number> = {
   "inventory.ts": 6,
   "orders.ts": 13,
   "packaging.ts": 9,
-  "portal.ts": 7,
+  "portal.ts": 6,
   "production.ts": 15,
   "purchasing.ts": 13,
   "search.ts": 4,
