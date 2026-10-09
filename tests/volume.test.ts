@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatVolume, parseVolumeToBbl } from "@/lib/volume";
+import { bblExact, bblFixed, formatVolume, parseVolumeToBbl } from "@/lib/volume";
 
 describe("parseVolumeToBbl", () => {
   it("converts supported display units and preserves an empty composed volume", () => {
@@ -38,5 +38,22 @@ describe("formatVolume", () => {
     ["   ", "—"],
   ])("formats %s bbl as %s", (bbl, expected) => {
     expect(formatVolume(bbl)).toBe(expected);
+  });
+});
+
+describe("bblFixed", () => {
+  it("states two-decimal barrels, the TTB report precision", () => {
+    expect(bblFixed(2)).toBe("2.00 bbl");
+    expect(bblFixed(0.875)).toBe("0.88 bbl");
+    expect(bblFixed(-1.5)).toBe("-1.50 bbl");
+  });
+});
+
+describe("bblExact", () => {
+  it("states barrels up to the given fraction digits with thousands separators", () => {
+    expect(bblExact(0.123456, 4)).toBe("0.1235 bbl");
+    expect(bblExact(1234.5, 4)).toBe("1,234.5 bbl");
+    expect(bblExact(0.12345678, 8)).toBe("0.12345678 bbl");
+    expect(bblExact(2, 8)).toBe("2 bbl");
   });
 });

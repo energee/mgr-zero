@@ -512,7 +512,7 @@ describe("QuickBooks durable outbound push", () => {
   it("uses CreditMemo with positive frozen quantities and refuses unsupported or unmapped lines before fetch", async () => {
     const credit = await pushFixture("credit_memo");
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
-      CreditMemo: { Id: "credit-remote-1", SyncToken: "0", TotalAmt: 9.99, Balance: 9.99, InvoiceLink: "https://secret", access_token: "secret" },
+      CreditMemo: { Id: "credit-remote-1", SyncToken: "0", TotalAmt: 9.99, RemainingCredit: 9.99, InvoiceLink: "https://secret", access_token: "secret" },
     }), { status: 200 }));
     await expect(pushInvoiceToQbo(credit.ctx, credit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
       .resolves.toMatchObject({ status: "pushed", remoteId: "credit-remote-1" });

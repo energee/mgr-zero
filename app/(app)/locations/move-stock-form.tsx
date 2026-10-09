@@ -1,26 +1,27 @@
+// app/(app)/locations/move-stock-form.tsx — CommandForm for move_stock_bin on
+// Location bins, drawing the shared MoveStockFields. The page decides whether
+// a move is possible (moveStockUnavailable) and the view shows the reason.
 "use client";
 
 import { binStockKey, selectedBinStock } from "@/lib/movement-form";
 import { useState } from "react";
-import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { MoveStockFields } from "@/components/mgr/views/location-bins";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import type { BinMoveStock } from "@/lib/commands/inventory";
+import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
+import type { MoveStockValue } from "@/lib/mgr/location-bins-view";
+
+const EMPTY: MoveStockValue = { source: "", toBinId: "", qty: "", note: "" };
 
 export function MoveStockForm({ bins, stock }: { bins: { id: string; name: string }[]; stock: BinMoveStock[] }) {
-  const [source, setSource] = useState("");
-  const [toBinId, setToBinId] = useState("");
-  const [qty, setQty] = useState("");
-  const [note, setNote] = useState("");
-  const selected = selectedBinStock(stock, source);
-  const amount = Number(qty);
+  const [value, setValue] = useState(EMPTY);
+  const selected = selectedBinStock(stock, value.source);
+  const amount = Number(value.qty);
   // The database refuses a move larger than the source bin holds (#451); the
   // form stops it first with the same bound.
-  const valid = selected && toBinId && toBinId !== selected.bin_id && amount > 0 && Number.isFinite(amount) && amount <= Number(selected.qty) && (selected.kind !== "keg" || Number.isInteger(amount));
+  const valid = selected && value.toBinId && value.toBinId !== selected.bin_id && amount > 0 && Number.isFinite(amount) && amount <= Number(selected.qty) && (selected.kind !== "keg" || Number.isInteger(amount));
   const form = useCommandForm("move_stock_bin", {
     build: () => ({
       skuId: selected?.kind === "sku" ? selected.stock_id : undefined,
@@ -29,30 +30,21 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
       materialLotId: selected?.kind === "material" ? selected.lot_id ?? undefined : undefined,
       kegPoolId: selected?.kind === "keg" ? selected.stock_id : undefined,
       kegSize: selected?.keg_size ?? undefined,
-      qty: amount, fromBinId: selected?.bin_id, toBinId, note: note || undefined,
+      qty: amount, fromBinId: selected?.bin_id, toBinId: value.toBinId, note: value.note || undefined,
     }),
-    reset: () => { setSource(""); setToBinId(""); setQty(""); setNote(""); },
+    reset: () => setValue(EMPTY),
   });
-  const binName = (id: string) => bins.find(b => b.id === id)?.name ?? "Unknown bin";
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Move stock" trigger={<Button disabled={bins.length < 2 || stock.length === 0}>Move stock</Button>}>
+  const binNames = new Map(bins.map(b => [b.id, b.name]));
+  const binName = (id: string) => binNames.get(id) ?? "Unknown bin";
+  const identity = (s: BinMoveStock) => s.kind === "keg" ? SIZE_LABEL[s.keg_size ?? ""] ?? s.keg_size : s.lot_code ? `Lot ${s.lot_code}` : "Untracked stock";
+  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Move stock" trigger={<Button>Move stock</Button>}>
     <form className="flex flex-col gap-4" onSubmit={e => { if (!valid) { e.preventDefault(); return; } void form.submit(e); }}>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="bin-stock">Stock and source bin</Label>
-        <Select value={source} onValueChange={v => { setSource(v); setToBinId(""); setQty(""); }}>
-          <SelectTrigger id="bin-stock"><SelectValue placeholder="Choose stock" /></SelectTrigger>
-          <SelectContent>{stock.map(s => <SelectItem key={binStockKey(s)} value={binStockKey(s)}>{s.name} · {binName(s.bin_id)} · {s.kind === "keg" ? s.keg_size?.replace(/_/g, " ") : s.lot_code ? `Lot ${s.lot_code}` : "Untracked stock"} · {s.qty} {s.unit}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="bin-destination">Destination bin</Label>
-        <Select value={toBinId} onValueChange={setToBinId} disabled={!selected}>
-          <SelectTrigger id="bin-destination"><SelectValue placeholder="Choose a different bin" /></SelectTrigger>
-          <SelectContent>{bins.filter(b => b.id !== selected?.bin_id).map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      {E.edit(`Quantity${selected ? ` (${selected.unit})` : ""}`, qty, "number", undefined, { id: "bin-qty", min: selected?.kind === "keg" ? 1 : 0.0001, step: selected?.kind === "keg" ? 1 : 0.0001, max: selected ? Number(selected.qty) : undefined, onChange: setQty, required: true })}
-      <div className="flex flex-col gap-2"><Label htmlFor="bin-note">Note</Label><Input id="bin-note" value={note} onChange={e => setNote(e.target.value)} /></div>
-      {valid && <p className="text-sm text-muted-foreground" aria-live="polite">Move {amount} {selected.unit} from {binName(selected.bin_id)} to {binName(toBinId)}. The selected lot stays with the stock; location totals stay unchanged.</p>}
+      <MoveStockFields value={value} onChange={setValue} options={{
+        stock: stock.map(s => ({ value: binStockKey(s), label: `${s.name} · ${binName(s.bin_id)} · ${identity(s)} · ${s.qty} ${s.unit}` })),
+        destinations: bins.filter(b => b.id !== selected?.bin_id).map(b => ({ value: b.id, label: b.name })),
+        unit: selected?.unit, wholeUnits: selected?.kind === "keg", max: selected ? Number(selected.qty) : undefined,
+      }} />
+      {valid && <p className="text-sm text-muted-foreground" aria-live="polite">Move {amount} {selected.unit} from {binName(selected.bin_id)} to {binName(value.toBinId)}. The selected lot stays with the stock; location totals stay unchanged.</p>}
       <CommandFormMessage error={form.error} />
       <CommandFormFooter><Button type="submit" disabled={!valid || form.submitting}>{form.submitting ? "Moving…" : "Move stock"}</Button></CommandFormFooter>
     </form>

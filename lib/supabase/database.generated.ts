@@ -310,6 +310,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["approval_kind"]
           note: string | null
+          serial_number: string | null
           ttb_id: string
         }
         Insert: {
@@ -320,6 +321,7 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["approval_kind"]
           note?: string | null
+          serial_number?: string | null
           ttb_id: string
         }
         Update: {
@@ -330,6 +332,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["approval_kind"]
           note?: string | null
+          serial_number?: string | null
           ttb_id?: string
         }
         Relationships: [
@@ -9754,6 +9757,7 @@ export type Database = {
           p_kind: Database["public"]["Enums"]["approval_kind"]
           p_note: string
           p_request_id: string
+          p_serial_number?: string
           p_ttb_id: string
         }
         Returns: Json

@@ -93,14 +93,17 @@ describe("client and shared-view files never import the command registry", () =>
   });
 
   it.each(["app/(app)/kegs/event-form.tsx", "app/(app)/kegs/pool-form.tsx"])(
-    "%s takes its option arrays from lib/mgr/enums.ts",
+    "%s is a client form that never imports the taproom commands",
     (path) => {
       const source = read(path);
       expect(source).toMatch(/"use client"/);
       expect(source).not.toMatch(/from "@\/lib\/commands\/taproom"/);
-      expect(source).toMatch(/from "@\/lib\/mgr\/enums"/);
     },
   );
+
+  it("the shared keg fields take their option arrays from lib/mgr/enums.ts", () => {
+    expect(read("components/mgr/views/keg-fleet.tsx")).toMatch(/from "@\/lib\/mgr\/enums"/);
+  });
 });
 
 describe("date field defaults come from the brewery's day (#437)", () => {

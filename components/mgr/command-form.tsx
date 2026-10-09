@@ -113,9 +113,10 @@ export function CommandForm({
 export const asTrigger = (node: React.ReactNode) =>
   isValidElement(node) && node.type === Button ? node : <button type="button" className="block w-full text-left">{node}</button>;
 
-/** The row-or-add trigger every registry sheet shares: ghost Edit on a row, outline add beside the list. */
-export function sheetTrigger(edit: boolean, add: string) {
-  return edit ? <Button variant="ghost" size="sm">Edit</Button> : <Button variant="outline" size="sm">{add}</Button>;
+/** The row-or-add trigger every registry sheet shares: ghost Edit on a row, outline add beside the list.
+ *  `name` is the row's label, so a list of Edit buttons reads "Edit CA license" to assistive tech. */
+export function sheetTrigger(edit: boolean, add: string, name?: string) {
+  return edit ? <Button variant="ghost" size="sm" aria-label={name ? `Edit ${name}` : undefined}>Edit</Button> : <Button variant="outline" size="sm">{add}</Button>;
 }
 
 export function CommandFormFooter({ className, ...props }: React.ComponentProps<"div">) {

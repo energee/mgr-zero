@@ -32,6 +32,14 @@ export function gatewayLanguageModels(models: GatewayModel[]): GatewayModelOptio
     .sort((a, b) => modelProvider(a.id).localeCompare(modelProvider(b.id)) || a.name.localeCompare(b.name));
 }
 
-export async function getGatewayLanguageModels() {
-  return gatewayLanguageModels((await gateway.getAvailableModels()).models);
+/** The Gateway's language models, or an empty catalog when the Gateway read
+ *  fails. Empty is safe: Settings then says the catalog is unavailable and
+ *  keeps the saved model. The cause is logged so the outage is not silent. */
+export async function getGatewayLanguageModels(): Promise<GatewayModelOption[]> {
+  try {
+    return gatewayLanguageModels((await gateway.getAvailableModels()).models);
+  } catch (error) {
+    console.error("gateway model catalog unavailable:", error instanceof Error ? error.message : String(error));
+    return [];
+  }
 }

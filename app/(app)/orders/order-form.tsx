@@ -8,7 +8,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
-import { defaultShipToId, isCompleteLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { defaultShipToId, isBlankLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -85,7 +85,7 @@ export function OrderForm({
       requestedShipDate: requestedShipDate || undefined,
       poNumber: poNumber || undefined,
       lines: lines
-        .filter(isCompleteLine)
+        .filter(line => !isBlankLine(line))
         .map((l) => ({ skuId: l.skuId, qty: Number(l.qty) })),
     }),
     reset,
@@ -103,7 +103,11 @@ export function OrderForm({
   }
 
   return (
-    <form onSubmit={event => { if (!skuOptionsReady || !readiness.submittable) { event.preventDefault(); event.stopPropagation(); return; } void form.submit(event); }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
+    <form onSubmit={event => {
+      // Guard keyboard/programmatic submits too; a disabled button alone is not the boundary.
+      if (!skuOptionsReady || !readiness.submittable) { event.preventDefault(); event.stopPropagation(); return; }
+      void form.submit(event);
+    }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
       <NewOrderView feedback={feedback} skuFeedback={skuFeedback} skuOptionsReady={skuOptionsReady}
         skuEmptyMessage={channel === undefined ? undefined : "No active SKUs are priced for this customer. Check Price groups or choose another customer."} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,

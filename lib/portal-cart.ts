@@ -12,11 +12,17 @@ export function planDraftSync(draftId: string | null) {
     : ({ command: "portal_create_order" } as const);
 }
 
+/** Why Save draft and Review order are disabled for missing input, or null; busy and missing-source states have their own messages. */
+export function cartMissingInput(s: { shipToId: string; lineCount: number }): string | null {
+  const missing = [!s.shipToId && "choose a ship-to", s.lineCount === 0 && "enter a quantity above zero"].filter(Boolean).join(" and ");
+  return missing ? `Before saving or reviewing this order, ${missing}.` : null;
+}
+
 /** Both buttons need a ship-to and at least one positive line and are locked
  *  while a call is in flight. An existing draft does not relax the line rule:
  *  syncing zero lines would be rejected by the database anyway. */
 export function cartActionsDisabled(s: { shipToId: string; lineCount: number; busy: boolean; hasSource?: boolean }) {
-  return !s.shipToId || s.lineCount === 0 || s.busy || s.hasSource === false;
+  return cartMissingInput(s) !== null || s.busy || s.hasSource === false;
 }
 
 import { z } from "zod";
