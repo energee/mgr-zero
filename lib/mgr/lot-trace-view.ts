@@ -1,6 +1,7 @@
 // lib/mgr/lot-trace-view.ts — view-model for Lot trace.
 import { calendarDay } from "./calendar-day";
 import { sentenceCase } from "./labels";
+import { bblFixed } from "@/lib/volume";
 
 export type LotTraceRowView = { key: string; title: string; detail?: string; trailing?: string };
 export type LotTraceTapeView = { key: string; label: string; when?: string };
@@ -62,15 +63,15 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): Lot
     title: s.lot.code,
     sku,
     skuDetail: `run ${s.run?.run_no ?? "?"} · packaged ${calendarDay(s.lot.packaged_on)}${s.lot.best_by ? ` · best by ${calendarDay(s.lot.best_by)}` : ""}`,
-    skuTrailing: `${s.on_hand_bbl.toFixed(2)} bbl recorded balance`,
+    skuTrailing: `${bblFixed(s.on_hand_bbl)} recorded balance`,
     tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? `batch ${s.batch.batch_no}` : null, s.batch?.brewed_on ? `brewed ${calendarDay(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
-    drawn: s.run?.bbl_drawn != null ? `${Number(s.run.bbl_drawn).toFixed(2)} bbl` : "—",
+    drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
     tape: s.movements.map((movement) => ({
       key: movement.id,
       label: `${movement.qty > 0 ? "+" : "−"}${Math.abs(movement.qty)} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)} · ${movement.location}`,
       when: calendarDay(movement.created_at),
     })),
-    balances: s.balances.map((balance) => ({ key: `${balance.sku_id}:${balance.bin_id}`, title: ownedSku(s.lot.brand, balance.sku), detail: `${balance.location} · ${balance.bin}`, trailing: `${balance.qty} units · ${balance.bbl.toFixed(2)} bbl` })),
+    balances: s.balances.map((balance) => ({ key: `${balance.sku_id}:${balance.bin_id}`, title: ownedSku(s.lot.brand, balance.sku), detail: `${balance.location} · ${balance.bin}`, trailing: `${balance.qty} units · ${bblFixed(balance.bbl)}` })),
     recipientsEmpty: s.recipients.length ? undefined : "No recorded shipments of this lot",
     recipients: s.recipients.map((recipient) => ({
       id: recipient.id,

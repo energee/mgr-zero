@@ -147,7 +147,3 @@ export const getStaffMemberships = cache(() => getRscRequestAuthContext().getSta
 
 /** Returns every customer membership for the authenticated RSC request. */
 export const getCustomerMemberships = cache(() => getRscRequestAuthContext().getCustomerMemberships());
-
-export const getStaffMembership = cache((breweryId: string) => getRscRequestAuthContext().getStaffMembership(breweryId));
-
-export const getCustomerMembership = cache((breweryId: string) => getRscRequestAuthContext().getCustomerMembership(breweryId));

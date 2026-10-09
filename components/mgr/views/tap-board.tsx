@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { formatDateTime, formatWeekday } from "@/lib/date-format";
+import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -10,7 +11,7 @@ import { LinkTabs } from "@/components/mgr/work-tabs";
 import { tapLabel, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
-const volume = (value: number) => `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl`;
+const volume = (value: number) => bblExact(value, 4);
 const actor = (label: string | null) => label ? `@${label}` : "staff";
 const fills = [[.25, "¼"], [.5, "½"], [.6, "60%"], [1, "Full"]] as const;
 const closingFills = [[0, "Empty"], [.25, "About ¼ left"], [.5, "About ½ left"]] as const;

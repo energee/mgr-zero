@@ -125,6 +125,24 @@ describe("schema rules", () => {
     `)).toEqual(["security_invoker=true"]);
   });
 
+  it("pins buyer reads of invoices, invoice lines, order events, shipments and deliveries to portal projections (#754)", () => {
+    // Same reason as portal_brewery: a customer policy on the base table would
+    // expose every column, since staff and customers share the table grant.
+    expect(sql(`
+      select c.relname || ':' || p.polname from pg_policy p join pg_class c on c.oid = p.polrelid
+      where c.oid in ('public.invoices'::regclass, 'public.invoice_lines'::regclass, 'public.order_events'::regclass,
+                      'public.shipments'::regclass, 'public.deliveries'::regclass)
+      order by 1
+    `)).toEqual(["deliveries:staff_read", "invoice_lines:staff_read", "invoices:staff_read", "order_events:staff_read", "shipments:staff_read"]);
+    const columns = (view: string) => sql(`
+      select string_agg(attname, ',' order by attnum) from pg_attribute
+      where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
+    expect(columns("portal_invoices")).toBe("id,brewery_id,customer_id,shipment_id,invoice_no,kind,issued_on,due_on,paid_at,qbo_remote_state,qbo_total_cents,qbo_tax_cents,qbo_balance_cents,qbo_accountant_drift,written_off_at,created_at,invoice_lines");
+    expect(columns("portal_order_events")).toBe("id,order_id,event,created_at");
+    expect(columns("portal_shipments")).toBe("id,order_id,invoice_timing");
+    expect(columns("portal_keg_deposits")).toBe("customer_id,keg_size,kegs_on_deposit,deposit_cents");
+  });
+
   it("restricts brewery_counters keys to committed document kinds", () => {
     expect(sql(`
       select pg_get_constraintdef(oid) from pg_constraint
