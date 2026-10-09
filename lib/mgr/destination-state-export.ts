@@ -4,10 +4,14 @@ import type { StateTotal, StateTransaction } from "@/lib/commands/compliance";
 export function destinationStateCsv(periodStart: string, periodEnd: string, facts: StateTransaction[]): string {
   const records: (string | number)[][] = [["period_start", "period_end", "state", "kind", "event_date", "source_id", "original_source_id", "volume_bbl", "beer_sales_cents", "source_status"],
     ...facts.map(row => [periodStart, periodEnd, row.state, row.kind, row.eventDate, row.sourceId, row.originalSourceId ?? "", row.volumeBbl, row.salesCents, row.sourceStatus])];
-  return records.map(row => row.map(value => {
-    const text = typeof value === "string" && /^\s*[=+@-]/.test(value) ? `'${value}` : String(value);
-    return `"${text.replaceAll('"', '""')}"`;
-  }).join(",")).join("\r\n") + "\r\n";
+  return records.map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+}
+
+/** One quoted CSV cell. A text cell starting with = + @ or - gets a leading quote so a
+ *  spreadsheet shows it as text instead of running it as a formula. */
+export function csvCell(value: string | number): string {
+  const text = typeof value === "string" && /^\s*[=+@-]/.test(value) ? `'${value}` : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 /**
