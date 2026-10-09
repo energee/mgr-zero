@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 it("bootstraps own taproom membership without private brewery columns", async () => {
   const auth = createRequestAuthContext(async () => ctx.db);
-  expect(await auth.getStaffMembership(ctx.breweryId)).toMatchObject({ role: "taproom", breweryId: ctx.breweryId });
+  expect((await auth.getStaffMemberships()).find(m => m.breweryId === ctx.breweryId)).toMatchObject({ role: "taproom", breweryId: ctx.breweryId });
   expect((await ctx.db.from("breweries").select().eq("id", ctx.breweryId)).data).toEqual([]);
   const projection = await ctx.db.from("staff_brewery").select().eq("id", ctx.breweryId).single();
   expect(projection.error).toBeNull();
@@ -77,11 +77,18 @@ it("preserves cookie and bearer membership across own breweries and rejects a fo
   const foreign = await makeBrewery();
   await ins("brewery_users", { brewery_id: own.id, user_id: ctx.userId, role: "taproom" });
   const request = createRequestAuthContext(async () => ctx.db);
+  // A fresh context per call: no memberships loaded, so getStaffRole reads the one
+  // brewery_users row under RLS. Reusing `request` would test only the cached branch.
+  const fresh = () => createRequestAuthContext(async () => ctx.db);
+  const memberships = await request.getStaffMemberships();
   for (const breweryId of [ctx.breweryId, own.id]) {
-    expect(await request.getStaffMembership(breweryId)).toMatchObject({ breweryId, role: "taproom" });
+    expect(memberships.find(m => m.breweryId === breweryId)).toMatchObject({ breweryId, role: "taproom" });
+    expect(await request.getStaffRole(breweryId)).toBe("taproom");
+    expect(await fresh().getStaffRole(breweryId)).toBe("taproom");
     expect(await ctxForBearer(ctx.db, ctx.userId, breweryId)).toMatchObject({ breweryId, role: "taproom" });
   }
-  expect(await request.getStaffMembership(foreign.id)).toBeNull();
+  expect(memberships.some(m => m.breweryId === foreign.id)).toBe(false);
+  expect(await fresh().getStaffRole(foreign.id)).toBeNull();
   await expect(ctxForBearer(ctx.db, ctx.userId, foreign.id)).rejects.toMatchObject({ status: 403 });
 });
 it("links and unlinks own Slack identity with replay and refuses other people's links", async () => {
