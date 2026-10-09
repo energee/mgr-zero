@@ -9,7 +9,7 @@ import type { PickView } from "@/components/mgr/views/pick";
 import type { ShortPickView } from "@/components/mgr/views/short-pick";
 const action = vi.hoisted(() => ({ run: vi.fn(), setError: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: action.push }) }));
-vi.mock("@/app/(app)/brewery-provider", () => ({ useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
+vi.mock("@/lib/brewery-provider", () => ({ useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ ...action, busy: false, error: null }) }));
 let submit: (event: { preventDefault: () => void }) => void;
 let back: (event: { target: Element; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; button?: number; preventDefault: () => void }) => void;

@@ -8,7 +8,7 @@ import { CommandRecovery } from "@/components/mgr/command-recovery";
 import { getActiveBrewery } from "@/lib/brewery";
 import { getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
-import { BreweryProvider } from "./brewery-provider";
+import { BreweryProvider } from "@/lib/brewery-provider";
 import { AppShell } from "@/components/mgr/app-shell";
 import { MeSheet, MeSheetActions } from "@/components/mgr/me-sheet";
 import { MeView } from "@/components/mgr/views/me";

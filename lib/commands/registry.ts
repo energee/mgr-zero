@@ -19,6 +19,8 @@ export type CommandOrigin = "ui" | "chat";
 export type CommandRisk = "mutable" | "append_only" | "immutable" | "filed" | "external" | "destructive_local";
 export type CommandIdempotency = "dedupe" | "online_only";
 export type CommandAtomicity = "single_row" | "rpc" | "atomic_exempt_csv" | "external_intent";
+// `effects` is typed loosely here; lib/composer/state.ts (composerEffect) is the full
+// shape of record_movement's effects that the Composer drawer validates and renders.
 export type CommandPreview = { effects: { label: string; qty?: string }[]; warnings: string[]; version: unknown; previewToken?: string };
 
 /** Correlates one write request with its transport and downstream work. */

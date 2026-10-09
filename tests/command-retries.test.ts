@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 let renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
-vi.mock("@/app/(app)/brewery-provider", () => ({
+vi.mock("@/lib/brewery-provider", () => ({
   useBrewery: () => renderedContext.breweryId,
   useCommandContext: () => renderedContext,
 }));

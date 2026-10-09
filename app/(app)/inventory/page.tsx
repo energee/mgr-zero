@@ -15,7 +15,8 @@ import { assembleFinishedGoods, toFinishedGoodsViewProps, skuLabel } from "@/lib
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
-import { movementFormInstanceKey, type MovementInput, type MovementKind } from "@/lib/composer/state";
+import { movementFormInstanceKey } from "@/lib/composer/state";
+import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
 
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; uses: string[] };
@@ -26,7 +27,7 @@ type AtpRow = { sku_id: string; qty: string };
 type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref: string | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
 type InventorySearch = { page?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
-const movementKinds = new Set<MovementKind>(["opening_balance", "production_in", "adjustment", "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]);
+const movementKinds = new Set<string>(movementInput.shape.type.options);
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<InventorySearch> }) {
   const params = await searchParams;

@@ -10,7 +10,7 @@ import { getActiveCustomer } from "@/lib/portal";
 import { switchCustomer } from "@/app/(auth)/actions";
 import { getCustomerMemberships, getRequestIdentity } from "@/lib/auth/request-context";
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
-import { BreweryProvider } from "@/app/(app)/brewery-provider";
+import { BreweryProvider } from "@/lib/brewery-provider";
 import { PortalShell } from "@/components/mgr/app-shell";
 import { MeSheet, MeSheetActions } from "@/components/mgr/me-sheet";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
