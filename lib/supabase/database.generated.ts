@@ -1823,6 +1823,7 @@ export type Database = {
           qbo_idempotency_key: string
           qbo_invoice_id: string | null
           qbo_remote_state: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at: string | null
           qbo_sync_error: string | null
           qbo_sync_generation: number
           qbo_sync_status: Database["public"]["Enums"]["qbo_sync_status"]
@@ -1851,6 +1852,7 @@ export type Database = {
           qbo_idempotency_key?: string
           qbo_invoice_id?: string | null
           qbo_remote_state?: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at?: string | null
           qbo_sync_error?: string | null
           qbo_sync_generation?: number
           qbo_sync_status?: Database["public"]["Enums"]["qbo_sync_status"]
@@ -1879,6 +1881,7 @@ export type Database = {
           qbo_idempotency_key?: string
           qbo_invoice_id?: string | null
           qbo_remote_state?: Database["public"]["Enums"]["qbo_remote_state"]
+          qbo_settled_at?: string | null
           qbo_sync_error?: string | null
           qbo_sync_generation?: number
           qbo_sync_status?: Database["public"]["Enums"]["qbo_sync_status"]
