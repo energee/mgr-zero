@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/compliance";
-import { periodKey, periodLabel, periodOver, periodRange, recentPeriods } from "@/app/(app)/compliance/period";
+import { periodKey, periodLabel, periodOver, periodRange, recentPeriods } from "@/lib/compliance-period";
 
 const file = (periodStart: string, periodEnd: string, jurisdiction = "TTB") =>
   getCommandDefinition("file_compliance_report")!.input.safeParse({ jurisdiction, periodStart, periodEnd });

@@ -91,5 +91,6 @@
   "20260929010000_material_count_preview.sql": "5dd22516bb3d360d2e149a7a6cb267653ebf84e9b25eea7a43721748af2cd659",
   "20260929011000_material_count_uuid_identity.sql": "fee1ab684159c0b781810dd071e23905f84342eca1e66c4d985253ef4e6fdd96",
   "20261001205704_packaging_draw_conservation.sql": "9222f3694ec1f13211ee7c1b3d2d8928a0a77be195c2824a50f827c18fb5c8cd",
+  "20261001213621_qbo_credit_memo_reconciliation.sql": "6369dbd0979d14dc2fd8f50bdf6175e77328de73b169bdd7d71dda25c172b0be",
   "20261008120000_brand_approval_serial_number.sql": "f81c71919f550b66875c8e62514bc1ac1f02fa593899350502ee20a16c2c8e32"
 }

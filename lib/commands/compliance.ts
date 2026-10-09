@@ -5,7 +5,7 @@
 // filing. trace_lot follows a finished-goods lot back to its batch and through
 // every ledger movement that names it.
 import { z } from "zod";
-import { periodKey } from "@/app/(app)/compliance/period";
+import { periodKey } from "@/lib/compliance-period";
 import { isoDate } from "./packaging";
 import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 

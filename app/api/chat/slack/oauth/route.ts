@@ -4,9 +4,8 @@
 // short code only; code/state/tokens are never logged.
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { completeSlackInstall } from "@/lib/chat/oauth";
+import { completeSlackInstall, slackAppOrigin, slackRedirectUri } from "@/lib/chat/oauth";
 import { slackOAuthPort } from "@/lib/chat/slack-adapter";
-import { slackAppOrigin, slackRedirectUri } from "../install/route";
 
 export async function GET(request: Request) {
   let base: string;
