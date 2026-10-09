@@ -1,18 +1,11 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
+import { movementInput } from "@/lib/composer/state";
 
-export const movementInput = z.object({
-  lotId: z.string().uuid().optional(),
-  skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
-  qty: z.number().min(-9_999_999_999.99).max(9_999_999_999.99).refine(n => n !== 0, "qty cannot be 0"), // numeric(12,2)
-  // Order-owned sale/transfer movements stay behind their atomic workflows.
-  type: z.enum(["opening_balance", "production_in", "adjustment", "depletion", "return_in",
-                "destruction", "loss", "sample", "festival_removal"]),
-  saleChannelId: z.string().uuid().optional(),
-  destState: z.string().length(2).optional(),
-  note: z.string().optional(),
-});
+// Owned by lib/composer/state.ts so the Composer drawer can validate a proposal
+// without importing this module (and registering every inventory command).
+export { movementInput };
 
 /**
  * Appends an inventory movement through its security-definer RPC. `binId` is

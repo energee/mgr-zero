@@ -10,7 +10,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const action = { busy: false, error: null as string | null, setError: vi.fn(), run: vi.fn() };
 let form: { open: boolean; onOpenChange: (open: boolean) => void; children: unknown };
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, refresh() {} }) }));
-vi.mock("@/app/(app)/brewery-provider", () => ({ useBrewery: () => "b", useCommandContext: () => ({ actorId: "a", breweryId: "b" }) }));
+vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "b", useCommandContext: () => ({ actorId: "a", breweryId: "b" }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => action }));
 vi.mock("@/components/mgr/command-form", async (original) => {
   const real = await original<typeof import("@/components/mgr/command-form")>();

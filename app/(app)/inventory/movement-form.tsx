@@ -3,7 +3,7 @@
 "use client";
 
 import { command } from "@/lib/commands/client";
-import { useBrewery } from "../brewery-provider";
+import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { movementFields } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";

@@ -7,7 +7,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { BreweryProvider, useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { BreweryProvider, useBrewery, useCommandContext } from "@/lib/brewery-provider";
 
 const ACTOR = "11111111-1111-4111-8111-111111111111";
 const BREWERY = "22222222-2222-4222-8222-222222222222";

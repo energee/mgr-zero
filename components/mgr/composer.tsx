@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCommandContext } from "@/app/(app)/brewery-provider";
+import { useCommandContext } from "@/lib/brewery-provider";
 import { ComposerConversationView, ComposerDrawerView, ComposerProposalView, ComposerStripView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
@@ -124,7 +124,12 @@ export function Composer({ role }: { role: StaffRole }) {
     return () => { removeEventListener("online", flush); removeEventListener("mgr-outbox-change", refresh); };
   }, [breweryId, expectedContext.actorId, role]);
 
-  const proposal = latestComposerProposal(messages);
+  // A malformed proposal throws in latestComposerProposal. Catch it here: the
+  // Composer sits in the staff layout, so a render throw would error every
+  // staff page (#463). The drawer shows the message and offers no commit.
+  let proposal: ReturnType<typeof latestComposerProposal> = null;
+  let proposalError: string | undefined;
+  try { proposal = latestComposerProposal(messages); } catch (cause) { proposalError = messageOf(cause, "Composer proposal could not be shown."); }
   const transcript = messages.map((message) => ({ id: message.id, role: message.role === "user" ? "user" as const : "assistant" as const, content: composerMessageText(message) })).filter((message) => message.content);
   const streaming = status === "submitted" || status === "streaming";
 
@@ -152,7 +157,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message ?? proposalError} onRetry={retry} onNewChat={() => void newChat()} />
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView notice={outboxNotice ?? undefined} onDismissNotice={() => { try { dismissOutboxQuarantine(localStorage); } finally { setOutboxNotice(null); } }} rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

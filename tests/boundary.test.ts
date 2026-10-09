@@ -152,3 +152,19 @@ describe("server pages never call a function from a \"use client\" module", () =
     }
   });
 });
+
+describe("lib never imports a route directory", () => {
+  // lib/ is shared by routes, jobs and tests; a route group under app/ is one
+  // page tree's private code. An import from lib into app/ inverts that and
+  // breaks the moment the route moves (#765).
+  const files = (readdirSync(new URL("../lib", import.meta.url), { recursive: true }) as string[])
+    .filter((p) => /\.tsx?$/.test(p)).map((p) => `lib/${p}`);
+
+  it("finds the lib files", () => {
+    expect(files).toContain("lib/commands/use-command-form.ts");
+  });
+
+  it.each(files)("%s imports nothing from app/", (path) => {
+    expect(read(path)).not.toMatch(/from\s+"@\/app\//);
+  });
+});

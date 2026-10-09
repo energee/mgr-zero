@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
