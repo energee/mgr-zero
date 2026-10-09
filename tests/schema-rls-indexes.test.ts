@@ -6,7 +6,8 @@
 // (b) auth.uid() inside a policy must be wrapped as (select auth.uid()) so Postgres
 // evaluates it once per statement (initPlan) instead of once per row;
 // (c) #757: named hot lookups each have an index leading with their columns,
-// and no two indexes have the same definition.
+// and no two indexes have the same keys (INCLUDE columns aside);
+// (d) #794: portal_availability's two ledger sums plan as index-only scans.
 import { describe, it, expect } from "vitest";
 import { sql } from "./helpers";
 
@@ -48,26 +49,15 @@ describe("RLS index and auth.uid() rules", () => {
     expect(missing).toEqual([]);
   });
 
-  it("the indexes portal_availability sums from carry qty (#794)", () => {
-    // portal_availability sums qty per SKU for one brewery from each ledger.
-    // With qty in the index, both sums are index-only scans, not heap reads.
-    const defs = sql(`
-      select pg_get_indexdef(i) from unnest(array['public.movements_onhand_idx'::regclass, 'public.allocations_open_idx'::regclass]) i
-      order by 1`);
-    expect(defs).toEqual([
-      "CREATE INDEX allocations_open_idx ON public.allocations USING btree (brewery_id, sku_id) INCLUDE (qty) WHERE (status = 'open'::allocation_status)",
-      "CREATE INDEX movements_onhand_idx ON public.inventory_movements USING btree (brewery_id, sku_id, location_id, bin_id) INCLUDE (qty)",
-    ]);
-  });
-
   it("no two indexes on a table have the same definition", () => {
     // A unique index serves the same reads as a plain one, so UNIQUE and the
-    // name are stripped before comparing.
+    // name are stripped before comparing. INCLUDE is stripped too: a second
+    // index on the same keys should have been a wider existing one (#794).
     const duplicates = sql(`
       select string_agg(i.indexrelid::regclass::text, ' = ' order by i.indexrelid::regclass::text)
       from pg_index i join pg_class c on c.oid = i.indrelid
       where c.relnamespace = 'public'::regnamespace
-      group by regexp_replace(pg_get_indexdef(i.indexrelid), '^CREATE (UNIQUE )?INDEX \\S+ ', '')
+      group by regexp_replace(pg_get_indexdef(i.indexrelid), '^CREATE (UNIQUE )?INDEX \\S+ | INCLUDE \\([^)]*\\)', '', 'g')
       having count(*) > 1
       order by 1`);
     expect(duplicates).toEqual([]);
@@ -98,5 +88,26 @@ describe("RLS index and auth.uid() rules", () => {
       where regexp_replace(expr, '\\(\\s*SELECT auth\\.uid\\(\\)[^)]*\\)', '', 'gi') ~ 'auth\\.uid\\(\\)'
       order by 1`);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("ledger sum indexes", () => {
+  it("portal_availability sums both ledgers with index-only scans (#794)", () => {
+    // Explains the function's own body, so a rewrite that stops leading with
+    // brewery_id, or reads a column the index lacks, fails here. The test
+    // database is too small for the planner to prefer any index on cost, so
+    // every other path is disabled: what is left is an index-only scan on an
+    // index holding brewery_id, sku_id and qty. Without one, the plan falls
+    // back to a disabled node and the assertions fail. Index-only still means
+    // heap fetches for pages vacuum has not yet marked all-visible.
+    const body = sql(`select prosrc from pg_proc where proname = 'portal_availability'`).join("\n");
+    const plan = sql(`
+      set local enable_seqscan = off;
+      set local enable_bitmapscan = off;
+      set local enable_indexscan = off;
+      set local enable_sort = off;
+      explain (costs off) ${body.replaceAll("p_customer", "'00000000-0000-4000-8000-000000000000'::uuid")}`).join("\n");
+    expect(plan).toContain("Index Only Scan using movements_onhand_idx on inventory_movements");
+    expect(plan).toContain("Index Only Scan using allocations_open_idx on allocations");
   });
 });
