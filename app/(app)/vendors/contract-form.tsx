@@ -10,7 +10,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { contractBalanceFields } from "@/lib/mgr/contract-view";
-import { dollarsInput } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
   starts_on: string | null; ends_on: string | null; qty_committed: number;
@@ -30,7 +30,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
   const form = useCommandForm("upsert_material_contract", {
     build: () => ({
       id: contract?.id, vendorId, materialId, qtyCommitted: Number(qty),
-      unitCostCents: cost === "" ? undefined : Math.round(Number(cost) * 100),
+      unitCostCents: toCents(cost),
       startsOn: startsOn || undefined, endsOn: endsOn || undefined, contractNo: contractNo || undefined,
     }),
     reset: () => { setVendorId(contract?.vendor_id ?? ""); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(initialCost); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },

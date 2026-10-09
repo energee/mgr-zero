@@ -17,6 +17,7 @@ import {
 } from "../lib/mgr/fixtures/compliance";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
+import { colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
 import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -107,7 +108,7 @@ describe("registry sheets", () => {
 
   it("lists a COLA on its brand by serial and submitted date, never an expiry", () => {
     const cola = toBrandViewProps(brandHazy).compliance.find((row) => row.title.startsWith("COLA"))!;
-    expect(cola.title).toMatch(/^COLA serial /);
+    expect(cola.title).toBe("COLA TTB ID 25318001000034");
     expect(cola.detail).toMatch(/^submitted |^not submitted$/);
     expect(cola.detail).not.toMatch(/expires/);
   });
@@ -118,18 +119,35 @@ describe("registry sheets", () => {
     expect(html).not.toMatch(/<button[^>]*aria-label="Brand"/);
   });
 
-  it("names the COLA number a serial and never offers an expiry: COLAs do not expire", () => {
+  it("asks a COLA for its TTB ID and serial separately and never offers an expiry: COLAs do not expire", () => {
     const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
-    expect(html).toMatch(/Serial number/);
+    expect(html).toMatch(/TTB ID/);
+    expect(html).toMatch(/Serial number · optional/);
     expect(html).not.toMatch(/COLA number/);
     expect(html).not.toMatch(/Expires/);
     expect(html).toMatch(/Date submitted/);
     expect(html).not.toMatch(/Approved on/);
   });
 
-  it("keeps the formula label on a formula approval", () => {
+  it("keeps the formula label on a formula approval, with no serial or COLA link", () => {
     const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));
     expect(html).toMatch(/Formula number/);
+    expect(html).not.toMatch(/Serial number|Open COLA|TTB ID/);
+  });
+
+  it("links Open COLA from the TTB ID alone, encoded, on the official origin", () => {
+    expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=25318001000034");
+    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=0012%26x%3D1");
+    expect(colaUrl("  ")).toBeNull();
+    const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
+    expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&amp;ttbid=25318001000034"');
+    expect(html).not.toContain(`ttbid=${brandApprovalStout.serialNumber}`);
+  });
+
+  it("explains the missing link when a COLA has no TTB ID", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, number: "" } }));
+    expect(html).not.toMatch(/ttbonline\.gov/);
+    expect(html).toMatch(/Enter the TTB ID to open the COLA/);
   });
 
   it("states a known brand instead of picking one", () => {

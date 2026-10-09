@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { pushInvoiceToQbo, QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -62,6 +63,29 @@ it("counts invoice money once across shipment sources and keeps credits separate
   expect(result.figures.stateTransactions?.filter(row => row.kind === "return_in")).toHaveLength(0);
   const period = { jurisdiction: "TTB", periodStart: "2025-09-01", periodEnd: "2025-09-30" };
   await runCommand("file_compliance_report", period, ctx);
+  const shippedSource = sql(`select id from public.inventory_movements where ref='${order.id}' and type='sale_removal' order by id limit 1`)[0];
+  insertFixture("inventory_movements", [{ ...base, type: "return_in", qty: 1, source_movement_id: shippedSource, created_at: "2025-09-05T12:00:00Z" }]);
+  const physicalBeforeSync = sql(`select id || ':' || qty from public.inventory_movements where brewery_id='${brewery.id}' order by id`);
+  // Push the real $36 credit; only the provider's HTTP transport is simulated.
+  const realm = `realm-${crypto.randomUUID()}`;
+  const connection = await ins("qbo_connections", { brewery_id: brewery.id, realm_id: realm, state: "connected" });
+  sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+    values('${brewery.id}','qbo','${connection.id}','access-secret','refresh-secret')`);
+  expect((await ctx.db.rpc("set_qbo_customer_mapping", { p_brewery: brewery.id, p_customer: customer.customerId, p_qbo_customer_id: "customer", p_request_id: crypto.randomUUID() })).error).toBeNull();
+  expect((await ctx.db.rpc("set_qbo_item_mapping", { p_brewery: brewery.id, p_sku: skuId, p_qbo_item_id: "beer", p_request_id: crypto.randomUUID() })).error).toBeNull();
+  const transport = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ CreditMemo: { Id: "credit-36", SyncToken: "0", TotalAmt: 36, RemainingCredit: 36 } })));
+  const client = new QboOAuthClient({ clientId: "client", clientSecret: "secret", redirectUri: "https://mgr.test/oauth", apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com" }, transport);
+  await expect(pushInvoiceToQbo(ctx, credit.id, crypto.randomUUID(), client)).resolves.toMatchObject({ status: "pushed" });
+  transport.mockResolvedValue(new Response(null, { status: 404 }));
+  expect(await syncQboInvoices(ctx, crypto.randomUUID(), client)).toMatchObject({ synced: 1, deleted: 1 });
+  expect(String(transport.mock.calls[1][0])).toContain("/creditmemo/credit-36?");
+  expect(sql(`select amount_cents from public.invoice_lines where invoice_id='${credit.id}'`)).toEqual(["-3600"]);
+  const afterDeletion = await runCommand("generate_compliance_report", period, ctx) as import("../lib/commands/compliance").Report;
+  expect(destinationStateTotals(afterDeletion.figures.stateTransactions!)[0]).toMatchObject({ invoicedCents: 28800, creditedCents: 0, salesCents: 28800, volumeBbl: 4.5, returnedBbl: 0.5 });
+  expect(sql(`select id || ':' || qty from public.inventory_movements where brewery_id='${brewery.id}' order by id`)).toEqual(physicalBeforeSync);
+  const creditFact = afterDeletion.figures.stateTransactions!.find(row => row.kind === "credit_memo")!;
+  expect(creditFact).toMatchObject({ salesCents: 0, sourceStatus: "deleted" });
+  expect(destinationStateCsv(period.periodStart, period.periodEnd, afterDeletion.figures.stateTransactions!)).toContain(`"${creditFact.sourceId}","${line.id}","0","0","deleted"`);
   await admin.from("invoices").update({ qbo_remote_state: "voided" }).eq("id", invoice.id).throwOnError();
   const current = await runCommand("generate_compliance_report", period, ctx) as import("../lib/commands/compliance").Report;
   expect(destinationStateTotals(current.figures.stateTransactions!)[0].invoicedCents).toBe(0);

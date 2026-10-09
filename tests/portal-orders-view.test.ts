@@ -111,7 +111,7 @@ describe("Order detail view", () => {
         requested_ship_date: "2026-09-10",
       },
       lines: portalOrderShipped.lines,
-      events: [{ id: "e-adj", event: "lines_adjusted", payload: {}, created_at: "2026-08-26T12:00:00.000Z" }],
+      events: [{ id: "e-adj", event: "lines_adjusted", created_at: "2026-08-26T12:00:00.000Z" }],
       shipment: null,
     });
     expect(model.status).toBe("Confirmed · ships 2026-09-10");

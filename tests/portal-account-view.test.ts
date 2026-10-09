@@ -108,7 +108,7 @@ describe("inventory and live Account", () => {
     expect(layout).toMatch(/from "@\/components\/mgr\/views\/portal-me"/);
     expect(layout).toMatch(/toPortalMeViewProps/);
     expect(layout).toMatch(/<MeSheet[\s\S]*<PortalMeView\b/);
-    expect(layout).toMatch(/<MeSheetActions \/>/);
+    expect(layout).toMatch(/<MeSheetActions guide="\/docs\/portal-guide" \/>/);
     expect(layout).not.toMatch(/signOut="outline"/);
     expect(readFileSync("components/mgr/me-sheet.tsx", "utf8")).toMatch(/variant="destructive" className="w-full bg-destructive! text-destructive-foreground!/);
   });

@@ -24,7 +24,7 @@ export function PortalMeView({
         {E.pick("Customer account", activeCustomerId ?? "", accounts, { name: "customerId", required: true })}
         {E.btn("Switch account")}
       </form>}
-      {footer !== undefined ? footer : E.btns([["Change password", "g"], ["Sign out", "del"]])}
+      {footer !== undefined ? footer : E.btns([["Guide", "g"], ["Change password", "g"], ["Sign out", "del"]])}
     </>
   );
 }
