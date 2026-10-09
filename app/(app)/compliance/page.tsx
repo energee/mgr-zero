@@ -8,7 +8,8 @@ import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { bbl, cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "./period";
+import { bblFixed } from "@/lib/volume";
+import { cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "@/lib/compliance-period";
 
 const CADENCES: [Cadence, string][] = [["month", "Monthly"], ["quarter", "Quarterly"], ["year", "Annual"]];
 
@@ -32,7 +33,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         months: months.map((m) => {
           const f = filed.get(m);
           return f
-            ? { key: m, title: periodLabel(m), detail: `filed ${f.filed_at?.slice(0, 10)} · ${bbl(f.figures.removals.taxable ?? 0)} bbl taxable`, tone: "ok" as const, href: `/compliance/${m}` }
+            ? { key: m, title: periodLabel(m), detail: `filed ${f.filed_at?.slice(0, 10)} · ${bblFixed(f.figures.removals.taxable ?? 0)} taxable`, tone: "ok" as const, href: `/compliance/${m}` }
             : { key: m, title: periodLabel(m), detail: periodOver(m, today) ? "not filed · ready to review" : `in progress · file once the ${cadence} ends`, tone: "w" as const, href: `/compliance/${m}` };
         }),
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },

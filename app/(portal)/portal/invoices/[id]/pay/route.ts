@@ -44,6 +44,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof CommandError && error.status === 404) {
       return new Response("Invoice not found", { status: 404, headers: responseHeaders });
     }
+    // The buyer gets the generic Payment unavailable surface; the server log
+    // keeps the cause (missing QuickBooks config, a code bug) for staff.
+    console.error("qbo_payment_failed", error);
     return unavailable(request, id, "provider_unavailable");
   }
 }

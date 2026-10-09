@@ -1,17 +1,18 @@
 // app/(app)/kegs/page.tsx — Keg fleet (screen record Keg fleet): every keg
 // pool with Edit → update_keg_pool, Add keg pool → create_keg_pool, and the
 // kegs each bin holds per pool × size from get_keg_fleet. Record keg event
-// → record_keg_event. Links to Keg event history and to the balance of each
-// customer holding kegs. Warehouse and Admin.
+// → record_keg_event, or the reason it is unavailable. Links to Keg event
+// history and to the balance of each customer holding kegs. Warehouse and
+// Admin.
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { kegEventUnavailable, toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { KegEventForm } from "./event-form";
 import { money } from "@/lib/mgr/money";
-import { KIND_LABEL, SIZE_LABEL } from "./keg-labels";
+import { KIND_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { PoolForm, type Pool } from "./pool-form";
 
 type Fleet = {
@@ -33,6 +34,7 @@ export default async function KegsPage() {
     runCommand("list_vendors", {}, ctx),
   ])) as [Fleet, Named[], Bin[], Named[], Named[]];
   const activePools = fleet.pools.filter((p) => p.active);
+  const eventUnavailable = kegEventUnavailable({ activePools: activePools.length, locations: locations.length });
   return (
     <KegFleetView
       model={toKegFleetViewProps({
@@ -51,12 +53,11 @@ export default async function KegsPage() {
           { key: "history", href: "/kegs/history", title: "Keg event history", detail: "acquired, shipped, returned, lost, found, retired" },
           ...fleet.customers.map((c) => ({ key: c.customer_id, href: `/kegs/customers/${c.customer_id}`, title: "Customer keg balance", detail: `${c.name} · ${c.kegs_out} out` })),
         ],
+        eventUnavailable,
       })}
       createAction={<PoolForm vendors={vendors} />}
       poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
-      eventForm={activePools.length > 0 && locations.length > 0
-        ? <div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} /></div>
-        : null}
+      eventForm={<div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} /></div>}
     />
   );
 }

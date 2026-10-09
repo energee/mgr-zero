@@ -1,7 +1,7 @@
 // Admin reads remain at the existing authorized command boundary.
 import { redirect } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
-import { isChatConfigured } from "@/lib/chat/oauth";
+import { isSlackConfigured } from "@/lib/chat/oauth";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
@@ -19,7 +19,7 @@ export default async function ChatSettingsPage({ searchParams }: { searchParams:
     runCommand("get_brewery_operating_defaults", {}, ctx) as Promise<{ timezone: string; fermentation_reading_due_hours: number }>, searchParams,
   ]);
   const installation = health.installation;
-  const configured = isChatConfigured();
+  const configured = isSlackConfigured();
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
   // Each element slot carries a key: ChatSettingsView places it among its own
   // siblings, where an unkeyed server element trips React's list-key warning (#493).

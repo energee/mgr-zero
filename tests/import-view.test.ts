@@ -46,3 +46,12 @@ it("offers Discard for an unresolved batch only after a confirming step (#615)",
   expect(renderToStaticMarkup(createElement(ImportView, { model: { ...unresolved, result: { committed: 1, blocked: 0, outcomes: [] } }, onDiscard: vi.fn() }))).not.toContain("Discard saved request");
   expect(renderToStaticMarkup(createElement(ImportView, { model: { ...unresolved, busy: true }, onDiscard: vi.fn() }))).not.toContain("Discard saved request");
 });
+
+it("offers Import another file only once results are recovered, never past an uncertain batch (#722)", () => {
+  const recovered = { ...importPreview, step: 3, batchId: "done-request", result: { committed: 1, blocked: 1, outcomes: [] } };
+  const html = renderToStaticMarkup(createElement(ImportView, { model: recovered, onNextFile: vi.fn() }));
+  expect(html).toContain("Import another file");
+  expect(html).toContain("Correct blocked rows in a new batch");
+  expect(renderToStaticMarkup(createElement(ImportView, { model: { ...recovered, result: null, error: "Some rows may have committed" }, onNextFile: vi.fn() }))).not.toContain("Import another file");
+  expect(renderToStaticMarkup(createElement(ImportView, { model: { ...recovered, busy: true }, onNextFile: vi.fn() }))).not.toContain("Import another file");
+});

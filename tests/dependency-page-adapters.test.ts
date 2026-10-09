@@ -15,14 +15,14 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
 } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
-vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermission: (_ctx: unknown, name: string, resource?: string) => { state.gates.push([name, resource]); } }));
+vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, optionalPageQuery: query, requirePagePermission: (_ctx: unknown, name: string, resource?: string) => { state.gates.push([name, resource]); } }));
 async function query(name: string, input: unknown) {
   state.calls.push([name, input]);
   switch (name) {
     case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
     case "list_orders": return { rows: [], nextCursor: null };
     case "list_customers": return [{ id: "buyer", name: "Buyer", shipTos: [{ id: "ship", label: "Door", is_default: true }] }];
-    case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
+    case "get_customer": return { customer: { name: "Buyer" }, shipTos: [{ id: "ship", label: "Door", is_default: true }] };
     case "list_locations": return state.locations ?? [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
     case "list_skus": return [{ id: "active", name: "Keg", active: true, formats: { name: "keg", package_type: "keg" }, format_volume: { bbl_per_unit: .5 } }, { id: "inactive", name: "Old", active: false }];
     case "get_shortfalls": return [{ skuId: "active", skuName: "Keg", onHand: 1, allocated: 3, atp: -2, reservations: state.reservations ?? [{ id: "reserve", source: "order_line", ref: "line", qty: 3, orderId: "order", orderNo: 42 }] }];
@@ -54,7 +54,9 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   const readonly = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) })).props);
   expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined }]);
+  expect(state.calls).toContainEqual(["get_customer", { customerId: "buyer" }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
+  expect(renderToStaticMarkup(readonly.props.filters)).toContain("Buyer");
   state.role = "sales";
   // New order is its own route now; the list only links to it, and the route
   // itself carries the create_order gate and the picker options.

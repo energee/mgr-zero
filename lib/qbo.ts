@@ -1,5 +1,6 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
   beginQboInvoiceSync,
@@ -79,7 +80,7 @@ type QboInvoiceRead = {
   syncToken: string;
   taxCents: number;
   totalCents: number;
-  balanceCents: number;
+  balanceCents: number | null;
   cashCollectedCents: number;
   /** Legacy observation slot; transport supplies null, not a settlement date. */
   paidAt: string | null;
@@ -144,6 +145,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    else console.error("qbo_payment_refresh_failed", error);
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -166,14 +168,16 @@ export async function resolvePortalInvoicePayment(
     claim = next;
     refreshed = true;
   }
-  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
-  if (read && !read.ok && read.status === 401 && !refreshed) {
+  // A thrown read (network, invalid response) reaches the Pay route, which
+  // logs it and shows the buyer Payment unavailable.
+  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
+  if (!read.ok && read.status === 401 && !refreshed) {
     const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
     if (!next) return { kind: "unavailable", reason: "provider_unavailable" };
     claim = next;
-    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
+    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken);
   }
-  if (!read || !read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
+  if (!read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
   const url = read.invoiceLink ? validateQboPaymentUrl(read.invoiceLink, allowedHosts) : null;
   if (!url) return { kind: "unavailable", reason: "link_unavailable" };
   if (!await confirmPortalInvoicePayment(ctx, invoiceId, claim)) {
@@ -182,11 +186,9 @@ export async function resolvePortalInvoicePayment(
   return { kind: "redirect", url: url.href };
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const state = sha256(`${requestId}:${ctx.userId}`);
+  const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_qbo_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: client.requestedScopes,
@@ -198,7 +200,8 @@ function isPast(value: string | null) {
   return value !== null && Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now();
 }
 
-async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
+/** Refreshes the stored QuickBooks credential through its compare-and-swap; returns the persisted winner. */
+export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
   const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
   if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
     await markQboAuthorizationFailed(ctx, current);
@@ -219,10 +222,6 @@ async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?
     throw new Error("QuickBooks is unavailable");
   }
   return stored;
-}
-
-export async function refreshQboTokens(ctx: Ctx, client: QboOAuthClient) {
-  return (await refreshQboCredentials(ctx, client)).accessToken;
 }
 
 export async function completeQboOAuth(input: {
@@ -361,18 +360,21 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
     const observations: QboInvoiceObservation[] = [];
     const paymentCache: QboPaymentCache = new Map();
     for (const target of start.targets) {
-      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+      // Old batches froze invoices only. An explicit unknown type is not legacy.
+      const entityType = target.entityType === undefined ? "Invoice" : target.entityType;
+      if (entityType !== "Invoice" && entityType !== "CreditMemo") throw new Error("QuickBooks sync entity type was invalid");
+      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
         .catch(() => { throw new Error("QuickBooks is unavailable"); });
       if (!read.ok && read.status === 401) {
         tokens = await refreshQboCredentials(ctx, client, tokens);
         if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
-        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
+        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
           .catch(() => { throw new Error("QuickBooks is unavailable"); });
       }
       if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
-      const remoteState = read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
+      const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
         && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
       observations.push({
         invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
@@ -401,9 +403,10 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   }
 }
 
-// The one reading of a QuickBooks money field. MGR stores money as integer
-// cents, so a value that cannot round to an exact, safe integer number of
-// cents is not a number MGR can hold — it is a malformed response, and the
+// The reading of a QuickBooks Accounting money field (a JSON number); the tax
+// API's string amounts have their own parser in the tax calculation below.
+// MGR stores money as integer cents, so a value that cannot round to an exact,
+// safe integer number of cents is not a number MGR can hold — it is a malformed response, and the
 // caller must reject it rather than carry `Infinity` or a lossy float into a
 // total. Invoice and payment reads share this so they cannot disagree.
 const cents = (value: unknown) => {
@@ -500,8 +503,9 @@ export class QboOAuthClient {
     remoteId: string,
     accessToken: string,
     paymentCache: QboPaymentCache = new Map(),
+    entityType: "Invoice" | "CreditMemo" = "Invoice",
   ): Promise<QboInvoiceRead> {
-    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     const response = await this.transport(url, {
       method: "GET",
@@ -509,17 +513,22 @@ export class QboOAuthClient {
       redirect: "error",
     });
     if (!response.ok) return { ok: false, status: response.status, definitive: response.status === 404 };
-    const payload = await response.json() as { Invoice?: Record<string, unknown> };
-    const invoice = payload?.Invoice;
+    const payload = await response.json() as Record<string, Record<string, unknown>>;
+    const invoice = payload?.[entityType];
     const totalCents = cents(invoice?.TotalAmt);
-    const balanceCents = cents(invoice?.Balance);
+    // Intuit CreditMemo has optional RemainingCredit, not Invoice Balance.
+    // Validate it when present, but never store credit availability as invoice money due.
+    const balanceField = entityType === "Invoice" ? invoice?.Balance : invoice?.RemainingCredit;
+    const balanceCents = cents(balanceField);
     const tax = invoice?.TxnTaxDetail;
     const taxCents = cents(tax && typeof tax === "object" ? (tax as Record<string, unknown>).TotalTax : 0);
     if (!invoice || invoice.Id !== remoteId || typeof invoice.SyncToken !== "string"
-      || totalCents === null || balanceCents === null || taxCents === null) {
+      || totalCents === null || taxCents === null
+      || (balanceCents === null && (entityType === "Invoice" || balanceField !== undefined))) {
       throw new Error("QuickBooks response was invalid");
     }
-    const linked = Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
+    // Credit application is not cash collection and never reads payment evidence.
+    const linked = entityType === "Invoice" && Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
     const paymentIds = [...new Set(linked.flatMap((item) => item && typeof item === "object"
       && (item as Record<string, unknown>).TxnType === "Payment"
       && typeof (item as Record<string, unknown>).TxnId === "string"
@@ -535,7 +544,7 @@ export class QboOAuthClient {
       cashCollectedCents += (await allocations).get(remoteId) ?? 0;
     }
     return {
-      ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents, taxCents,
+      ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents: entityType === "Invoice" ? balanceCents : null, taxCents,
       cashCollectedCents: Math.min(cashCollectedCents, totalCents),
       // Invoice edits are not payment dates. Reconciliation records its own
       // confirmation marker only after the existing balance/cash guards pass.

@@ -2,6 +2,7 @@
 import type { EmptyState } from "./empty-state";
 import type { TodayItem } from "@/lib/commands/today";
 import type { TaproomTodayRow } from "@/lib/mgr/taproom-today";
+import { breweryDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
 
 export type TodayIcon = "package" | "truck" | "route" | "thermo" | "beer" | "task" | "invoice";
 
@@ -15,6 +16,8 @@ export type TodayRowView = {
   warning?: boolean;
   href?: string;
   icon?: TodayIcon;
+  /** get_today's due instant, kept only when the item has one (#717). */
+  dueAt?: string;
 };
 
 export type TodayViewModel = {
@@ -50,7 +53,24 @@ export type TodaySnapshot = {
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
+  /** breweries.timezone; required when any item carries a timed dueAt. */
+  timeZone?: string;
+  /** The clock that decides overdue versus due; tests pin it. */
+  now?: Date;
 };
+
+/** Reasons whose dueAt is a real instant. The others (ship and route dates)
+ *  store midnight of a calendar day that their detail already names, so a clock
+ *  time there would be invented. */
+const TIMED_DUE: TodayItem["reason"][] = ["fermentation_reading_overdue"];
+
+/** "overdue since 12:30 PM" or "due 6:00 PM" in the brewery zone; a due time on
+ *  another brewery day also names the date. */
+function dueText(dueAt: string, timeZone: string, now: Date): string {
+  const due = new Date(dueAt);
+  const when = breweryDate(timeZone, due) === breweryDate(timeZone, now) ? formatTimeOfDay(due, timeZone) : formatDateTime(due, timeZone);
+  return due <= now ? `overdue since ${when}` : `due ${when}`;
+}
 
 export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
 
@@ -82,14 +102,18 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
       rows: [],
     };
   }
+  const now = s.now ?? new Date();
   return {
     date: s.date,
     rows: items.map((it) => {
       const [verb, tone] = TODAY_VERB[it.reason];
+      const timed = it.dueAt && TIMED_DUE.includes(it.reason) ? it.dueAt : null;
+      if (timed && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
       return {
         key: `${it.reason}:${it.subjectId}`,
         title: it.safeLabel,
-        detail: it.detail,
+        detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : it.detail,
+        ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,
         tone,
         href: it.href,

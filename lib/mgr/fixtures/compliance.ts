@@ -29,7 +29,8 @@ export const brandApprovalStout: BrandApprovalViewModel = {
   brand: "Stout",
   kind: "cola",
   kindOptions: APPROVAL_KINDS,
-  number: "260135",
+  number: "25318001000034",
+  serialNumber: "260135",
   submittedOn: "2026-01-15",
 };
 

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
+import { toCents } from "@/lib/mgr/money";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, type ExactCommandAttempt, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 /**
@@ -127,7 +128,7 @@ export function PosItemControl({ posLocationId, brandId, formatId, item }: {
   const menuItem = `${posLocationId}:${brandId}:${formatId}`; // Recovery target: one menu item.
   return <PosItemView item={item} busy={command.busy || publication.busy} error={command.error ?? publication.error}
     notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
-    onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, brandId, unitPriceCents: value === "" ? null : Math.round(Number(value) * 100) }, undefined, { target: menuItem })}
+    onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, brandId, unitPriceCents: toCents(value) ?? null }, undefined, { target: menuItem })}
     onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, brandId, published }, undefined, { target: menuItem })}
     onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
 }

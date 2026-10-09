@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { isUuid } from "@/lib/commands/context";
+import { sha256 } from "@/lib/hash";
 import { getPublishedMenu } from "@/lib/supabase/public-menu";
 
 const corsHeaders = {
@@ -30,7 +30,7 @@ export async function GET(request: Request, context: { params: Promise<{ publicI
     return Response.json({ error: "menu unavailable" }, { status: 503, headers: errorHeaders });
   }
   if (!data) return missing();
-  const version = createHash("sha256").update(JSON.stringify(data)).digest("hex");
+  const version = sha256(JSON.stringify(data));
   const etag = `"${version}"`;
   const headers = { ...publicHeaders, ETag: etag };
   if (matches(request.headers.get("If-None-Match"), etag)) return new Response(null, { status: 304, headers });

@@ -7,12 +7,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type IntegrationProvider = "qbo" | "square";
 
-type TokenInput = {
-  provider: IntegrationProvider;
-  accessToken: string;
-  refreshToken: string;
-};
-
 type IntegrationTokens = {
   accessToken: string;
   refreshToken: string;
@@ -148,29 +142,6 @@ async function requireVisibleConnection(ctx: Ctx, provider: IntegrationProvider)
 async function authorizeTokenAccess(ctx: Ctx, provider: IntegrationProvider): Promise<string> {
   requireIntegrationRole(ctx);
   return requireVisibleConnection(ctx, provider);
-}
-
-export async function storeIntegrationTokens(ctx: Ctx, input: TokenInput): Promise<void> {
-  if (!input.accessToken || !input.refreshToken) {
-    throw new CommandError("integration tokens are required");
-  }
-  const connectionId = await authorizeTokenAccess(ctx, input.provider);
-
-  const { data, error } = await createAdminClient().rpc("store_integration_tokens", {
-    p_brewery: ctx.breweryId,
-    p_provider: input.provider,
-    p_connection: connectionId,
-    p_actor: ctx.userId,
-    p_access_token: input.accessToken,
-    p_refresh_token: input.refreshToken,
-  });
-  if (error) throw new Error("integration token storage failed");
-  if (data !== true) throw new CommandError("integration access is no longer available", 403);
-}
-
-export async function readIntegrationTokens(ctx: Ctx, provider: IntegrationProvider): Promise<IntegrationTokens> {
-  const { accessToken, refreshToken } = await readVersionedIntegrationTokens(ctx, provider);
-  return { accessToken, refreshToken };
 }
 
 export async function readVersionedIntegrationTokens(ctx: Ctx, provider: IntegrationProvider): Promise<VersionedIntegrationTokens> {
@@ -651,6 +622,8 @@ export type QboInvoiceSyncResult = { superseded: true } | {
 };
 
 export type QboInvoiceSyncTarget = {
+  /** Missing only on legacy frozen batches, which contained invoices exclusively. */
+  entityType?: "Invoice" | "CreditMemo";
   invoiceId: string;
   remoteId: string;
   pushId: string;
@@ -740,7 +713,7 @@ export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Pro
   if (ctx.role !== "customer" || !ctx.customerId || !isUuid(invoiceId)) {
     throw new CommandError("invoice not found", 404, "not_found");
   }
-  const visible = await ctx.db.from("invoices").select("id").eq("id", invoiceId)
+  const visible = await ctx.db.from("portal_invoices").select("id").eq("id", invoiceId)
     .eq("brewery_id", ctx.breweryId).eq("customer_id", ctx.customerId).maybeSingle();
   if (visible.error) throw new Error("invoice payment is unavailable");
   if (!visible.data) throw new CommandError("invoice not found", 404, "not_found");

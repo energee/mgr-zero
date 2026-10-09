@@ -172,5 +172,9 @@ async function balance(f: Awaited<ReturnType<typeof setup>>) {
   expect(rows.error).toBeNull();
   expect(rows.data!.length).toBeLessThanOrEqual(1);
   const row = rows.data![0];
-  return { kegs: row?.kegs_on_deposit ?? 0, cents: row?.deposit_cents ?? 0 };
+  const result = { kegs: row?.kegs_on_deposit ?? 0, cents: row?.deposit_cents ?? 0 };
+  // #754: the buyer reads the same deposit through portal_keg_deposits.
+  const account = await runCommand("get_portal_account", {}, f.portalCtx) as { deposits: { kegsOnDeposit: number; depositCents: number }[] };
+  expect(account.deposits).toEqual(result.kegs ? [expect.objectContaining({ kegsOnDeposit: result.kegs, depositCents: result.cents })] : []);
+  return result;
 }

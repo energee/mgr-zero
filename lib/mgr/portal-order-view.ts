@@ -60,7 +60,6 @@ export type PortalOrderSnapshot = {
   events: {
     id: string;
     event: string;
-    payload: Record<string, unknown>;
     created_at: string;
   }[];
   shipment: {
