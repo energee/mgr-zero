@@ -2,8 +2,8 @@
 --
 -- begin_qbo_invoice_sync re-read every pushed invoice ever, so a sync grew with
 -- the brewery's whole history. An invoice is settled once a sync observes it
--- fully paid, voided or deleted. qbo_settled_at records when; a trigger keeps
--- it, so complete_qbo_invoice_sync is unchanged. Open, part-paid and recently
+-- fully paid, voided or deleted. qbo_settled_at records when. A trigger sets
+-- it, so complete_qbo_invoice_sync needs no change. Open, part-paid and recently
 -- settled invoices are still re-read every sync. What is given up: an edit in
 -- QuickBooks to an invoice settled over 90 days ago (decision on #758).
 
@@ -30,6 +30,12 @@ update public.invoices set qbo_settled_at = coalesce(paid_at, now())
   where qbo_remote_state in ('voided','deleted')
      or (qbo_remote_state = 'live' and qbo_balance_cents = 0 and paid_at is not null);
 
+-- The body below is 20261001213621's (credit-memo reconciliation, #735).
+-- The one change is the settled filter on the generation bump and the target select.
+-- A credit memo is settled only once a sync sees it deleted.
+-- That is because complete_qbo_invoice_sync never sets its balance or paid_at.
+-- So a live credit memo is still re-read every sync.
+-- Whether credit-zeroed, zero-total or written-off invoices count as settled is not yet decided.
 create or replace function public.begin_qbo_invoice_sync(p_brewery uuid, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
@@ -85,13 +91,14 @@ begin
     return jsonb_build_object('actorId',v_actor,'connectionId',v_conn.id,'realmId',v_conn.realm_id,'targets',v_targets);
   end if;
   update public.invoices i set qbo_sync_generation=i.qbo_sync_generation+1
-  where i.brewery_id=p_brewery and i.kind='invoice' and i.qbo_sync_status='pushed'
+  where i.brewery_id=p_brewery and i.kind in ('invoice','credit_memo') and i.qbo_sync_status='pushed'
     and (i.qbo_settled_at is null or i.qbo_settled_at > now() - interval '90 days')
     and i.qbo_invoice_id is not null and exists(
       select 1 from public.qbo_pushes qp where qp.invoice_id=i.id and qp.brewery_id=p_brewery
         and qp.connection_id=v_conn.id and qp.realm_id=v_conn.realm_id and qp.status='pushed'
         and qp.qbo_entity_id=i.qbo_invoice_id);
   select coalesce(jsonb_agg(jsonb_build_object(
+      'entityType',case i.kind when 'invoice' then 'Invoice' else 'CreditMemo' end,
       'invoiceId',i.id,'remoteId',i.qbo_invoice_id,'pushId',p.id,
       'generation',i.qbo_sync_generation,'requestBody',p.request_body,'pushedResponse',p.response) order by i.id),'[]'::jsonb)
     into v_targets
@@ -102,7 +109,7 @@ begin
       and qp.realm_id=v_conn.realm_id and qp.status='pushed' and qp.qbo_entity_id=i.qbo_invoice_id
     order by qp.finished_at desc nulls last,qp.created_at desc,qp.id desc limit 1
   ) p on true
-  where i.brewery_id=p_brewery and i.kind='invoice' and i.qbo_sync_status='pushed'
+  where i.brewery_id=p_brewery and i.kind in ('invoice','credit_memo') and i.qbo_sync_status='pushed'
     and (i.qbo_settled_at is null or i.qbo_settled_at > now() - interval '90 days')
     and i.qbo_invoice_id is not null;
   insert into private.qbo_invoice_sync_batches(actor_id,request_id,brewery_id,connection_id,realm_id,targets)
