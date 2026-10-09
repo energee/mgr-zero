@@ -153,7 +153,12 @@ a gap to close, not a convention to trust.
    policy on the base table; buyers read the `portal_invoices`,
    `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
    projections, which omit QBO sync bookkeeping, write-off attribution, event
-   payloads and staff ids (deliveries have no portal projection).
+   payloads and staff ids (deliveries have no portal projection). `orders`,
+   `order_lines`, `order_deposit_lines` and `skus` follow the same rule (#788):
+   buyers read `portal_orders` (ship-to and lines inlined, no `created_by`,
+   locations, sale channel or `qty_picked`) and `portal_sku_prices` (active,
+   priced SKUs on the caller's channels, no QBO mapping); `sku_prices` stays
+   staff-only in practice because it is `security_invoker` over `skus`.
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
@@ -162,7 +167,7 @@ a gap to close, not a convention to trust.
    Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
    caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
    *Enforced by:* RLS policies in migrations, proven by
-   `tests/rls-tenancy.test.ts` and `tests/rls-portal-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
+   `tests/rls-tenancy.test.ts`, `tests/rls-portal-columns.test.ts` and `tests/rls-portal-order-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.

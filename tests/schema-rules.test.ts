@@ -143,6 +143,21 @@ describe("schema rules", () => {
     expect(columns("portal_keg_deposits")).toBe("customer_id,keg_size,kegs_on_deposit,deposit_cents");
   });
 
+  it("pins buyer reads of orders, order lines and skus to portal projections (#788)", () => {
+    // Same reason as #754: buyers never read orders.created_by or skus.qbo_item_id.
+    expect(sql(`
+      select c.relname || ':' || p.polname from pg_policy p join pg_class c on c.oid = p.polrelid
+      where c.oid in ('public.orders'::regclass, 'public.order_lines'::regclass,
+                      'public.order_deposit_lines'::regclass, 'public.skus'::regclass)
+      order by 1
+    `)).toEqual(["order_deposit_lines:staff_read", "order_lines:staff_read", "orders:staff_read", "skus:staff_read"]);
+    const columns = (view: string) => sql(`
+      select string_agg(attname, ',' order by attnum) from pg_attribute
+      where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
+    expect(columns("portal_orders")).toBe("id,brewery_id,customer_id,order_no,status,ship_to_id,requested_ship_date,po_number,note,created_at,ship_tos,order_lines");
+    expect(columns("portal_sku_prices")).toBe("brewery_id,sale_channel_id,sku_id,sku_name,brand_name,unit_price_cents");
+  });
+
   it("restricts brewery_counters keys to committed document kinds", () => {
     expect(sql(`
       select pg_get_constraintdef(oid) from pg_constraint
