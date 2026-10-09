@@ -244,7 +244,9 @@ export const E = {
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
-   *  an order's states) is a tab bar too; single-choice fields stay chips —
+   *  an order's states) is a tab bar too; a live in-place filter uses `TabBar`
+   *  with `panel` so its tabs control real tabpanels (WorkView). Single-choice
+   *  fields stay chips —
    *  except the unit a quantity is entered in, which is a switcher on the number
    *  itself and rides inside the field as `E.qty`'s addon (see `volume`).
    *  Spans the column by default; pass width classes to hug ("w-fit", an input

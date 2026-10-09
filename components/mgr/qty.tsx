@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useRef, type ReactNode } from "react";
 
@@ -88,11 +88,15 @@ export function Qty({
  *  clickable in the inventory. `to` names the screen a tab opens (data-to)
  *  where each tab is a screen of its own, like the Work chips.
  *
- *  A11y: the body below is the active panel, so there are no TabsContent panels
- *  and Radix's aria-controls points at nothing. As a unit switcher it also
- *  announces "tab 1 of 3" with no group name, since the input's only name is its
- *  aria-label. Tolerable in a drawing; the real app's unit choice wants a
- *  radiogroup, not a tablist. */
+ *  A11y: a filter that changes rows in place (Work) passes `panel`, the
+ *  selected tab's content, and `label`, the tablist's name. Every tab then gets
+ *  a TabsContent: Radix always mounts each tabpanel (empty and `hidden` unless
+ *  selected), so every aria-controls resolves, and only the selected one renders
+ *  `panel` (#727).
+ *  Without `panel` the body below is drawn outside the bar and aria-controls
+ *  points at nothing: tolerable for a drawing or a bar of links. As a unit
+ *  switcher it also announces "tab 1 of 3" with no group name, since the input's
+ *  only name is its aria-label; the real app's unit choice wants a radiogroup. */
 export function TabBar({
   names,
   on,
@@ -100,6 +104,8 @@ export function TabBar({
   to,
   onChange,
   hrefs,
+  label,
+  panel,
 }: {
   names: string[];
   on: number;
@@ -107,12 +113,15 @@ export function TabBar({
   to?: Record<string, string>;
   onChange?: (value: string) => void;
   hrefs?: Record<string, string>;
+  label?: string;
+  panel?: ReactNode;
 }) {
   return (
     <Tabs value={hrefs || onChange ? names[on] : undefined} defaultValue={hrefs || onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
-      <TabsList variant="solid" className={cls}>
+      <TabsList variant="solid" className={cls} aria-label={label}>
         {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
       </TabsList>
+      {panel === undefined ? null : names.map((n) => <TabsContent key={n} value={n}>{panel}</TabsContent>)}
     </Tabs>
   );
 }
