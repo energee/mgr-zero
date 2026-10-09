@@ -6,6 +6,7 @@ import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 import type { QboTaxInput } from "@/lib/qbo";
+import type { Database } from "@/lib/supabase/database";
 
 const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
 function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdentity>) {
@@ -24,8 +25,10 @@ type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: stri
 
 // Buyer invoice columns every portal invoice read needs (portal_invoices, #754).
 const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at";
-// Buyer order columns every portal order read needs (portal_orders, #788).
+// Buyer order columns the portal order list and detail reads share (#788).
+// The list uses only some of them; one constant keeps the two responses alike.
 const ORDER_ROW = "id, customer_id, order_no, status, ship_to_id, requested_ship_date, po_number, note, created_at";
+type PortalOrderRow = Database["public"]["Functions"]["portal_order_rows"]["Returns"][number];
 
 function requireCustomer(ctx: Ctx): string {
   if (!ctx.customerId) throw new CommandError("not a portal customer");
@@ -166,8 +169,11 @@ defineQuery({
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
-    // .single() makes unwrap throw not_found on another customer's id.
-    const { order_lines: ln, ...order } = (await unwrap(ctx.db.from("portal_orders").select(`${ORDER_ROW}, ship_tos, order_lines`).eq("id", i.orderId).eq("customer_id", customerId).single()))!;
+    // portal_order_rows(p_order) builds only this order; the portal_orders view
+    // would build every order before filtering. .single() makes unwrap throw
+    // not_found on another customer's id, so the row is never null.
+    const row = await unwrap(ctx.db.rpc("portal_order_rows", { p_order: i.orderId }).select(`${ORDER_ROW}, ship_tos, order_lines`).eq("customer_id", customerId).single()) as Omit<PortalOrderRow, "brewery_id">;
+    const { order_lines: ln, ...order } = row;
     const [events, shipment] = await Promise.all([
       unwrap(ctx.db.from("portal_order_events").select("id, event, created_at").eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("portal_shipments").select("id, invoice_timing").eq("order_id", i.orderId).maybeSingle()),

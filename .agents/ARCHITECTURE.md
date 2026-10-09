@@ -153,12 +153,18 @@ a gap to close, not a convention to trust.
    policy on the base table; buyers read the `portal_invoices`,
    `portal_order_events`, `portal_shipments` and `portal_keg_deposits`
    projections, which omit QBO sync bookkeeping, write-off attribution, event
-   payloads and staff ids (deliveries have no portal projection). `orders`,
-   `order_lines`, `order_deposit_lines` and `skus` follow the same rule (#788):
-   buyers read `portal_orders` (ship-to and lines inlined, no `created_by`,
-   locations, sale channel or `qty_picked`) and `portal_sku_prices` (active,
-   priced SKUs on the caller's channels, no QBO mapping); `sku_prices` stays
-   staff-only in practice because it is `security_invoker` over `skus`.
+   payloads and staff ids (deliveries have no portal projection).
+   `orders`, `order_lines`, `order_deposit_lines` and `skus` follow the same
+   rule (#788). Buyers read `portal_orders`: only the columns
+   `portal_order_rows` returns, with ship-to and lines inlined. Buyers read
+   `portal_sku_prices`: active, priced SKUs on the caller's channels, with no
+   QBO mapping. `order_deposit_lines` has no portal projection. `sku_prices`
+   returns no customer rows, because it is `security_invoker` over `skus`.
+   A definer projection is never inlined, so a filter on its view runs after
+   every caller row is built; single-row reads pass an id to the rows function
+   instead (`portal_order_rows(p_order)`).
+   Still open (#793): `customers`, `brands`, `formats` and `channel_prices`
+   keep customer policies that expose whole rows.
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none

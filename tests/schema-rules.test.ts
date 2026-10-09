@@ -125,6 +125,11 @@ describe("schema rules", () => {
     `)).toEqual(["security_invoker=true"]);
   });
 
+  // A view's columns in order, comma-joined; pins what a portal projection exposes.
+  const columns = (view: string) => sql(`
+    select string_agg(attname, ',' order by attnum) from pg_attribute
+    where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
+
   it("pins buyer reads of invoices, invoice lines, order events, shipments and deliveries to portal projections (#754)", () => {
     // Same reason as portal_brewery: a customer policy on the base table would
     // expose every column, since staff and customers share the table grant.
@@ -134,9 +139,6 @@ describe("schema rules", () => {
                       'public.shipments'::regclass, 'public.deliveries'::regclass)
       order by 1
     `)).toEqual(["deliveries:staff_read", "invoice_lines:staff_read", "invoices:staff_read", "order_events:staff_read", "shipments:staff_read"]);
-    const columns = (view: string) => sql(`
-      select string_agg(attname, ',' order by attnum) from pg_attribute
-      where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
     expect(columns("portal_invoices")).toBe("id,brewery_id,customer_id,shipment_id,invoice_no,kind,issued_on,due_on,paid_at,qbo_remote_state,qbo_total_cents,qbo_tax_cents,qbo_balance_cents,qbo_accountant_drift,written_off_at,created_at,invoice_lines");
     expect(columns("portal_order_events")).toBe("id,order_id,event,created_at");
     expect(columns("portal_shipments")).toBe("id,order_id,invoice_timing");
@@ -151,9 +153,6 @@ describe("schema rules", () => {
                       'public.order_deposit_lines'::regclass, 'public.skus'::regclass)
       order by 1
     `)).toEqual(["order_deposit_lines:staff_read", "order_lines:staff_read", "orders:staff_read", "skus:staff_read"]);
-    const columns = (view: string) => sql(`
-      select string_agg(attname, ',' order by attnum) from pg_attribute
-      where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
     expect(columns("portal_orders")).toBe("id,brewery_id,customer_id,order_no,status,ship_to_id,requested_ship_date,po_number,note,created_at,ship_tos,order_lines");
     expect(columns("portal_sku_prices")).toBe("brewery_id,sale_channel_id,sku_id,sku_name,brand_name,unit_price_cents");
   });

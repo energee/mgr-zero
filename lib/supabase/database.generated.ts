@@ -8833,7 +8833,7 @@ export type Database = {
         }[]
       }
       portal_order_rows: {
-        Args: never
+        Args: { p_order?: string }
         Returns: {
           brewery_id: string
           created_at: string

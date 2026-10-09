@@ -108,7 +108,7 @@ const AUTHENTICATED_RPCS = [
   "portal_invoice_rows()",
   "portal_keg_deposit_rows()",
   "portal_order_event_rows()",
-  "portal_order_rows()",
+  "portal_order_rows(uuid)",
   "portal_shipment_rows()",
   "portal_sku_price_rows()",
   "portal_schedule_rows()",
