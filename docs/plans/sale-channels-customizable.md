@@ -1,5 +1,12 @@
 # Customizable sale channels
 
+> **Historical; implemented.** The plan merged in #42 and the table shipped in the
+> baseline (landed pre-#285; schema changes are now new timestamped migrations plus
+> `bun run migrations:lock`). As shipped: orders copy `sale_channel_id` from the
+> customer at creation; `breweries.default_sale_channel_id` and `create_order`'s
+> channel input (Task 6b) were never built. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`.
+
 > **Revise before execution.** Schema revision 2 later added channel/customer
 > tax treatment and requires the related baseline changes to land in one pass.
 > Keep this plan's channel identity and assignment decisions, but reconcile its
@@ -95,9 +102,9 @@ value can be correct. The rule instead:
 | POS sale / refund | `pos_locations.sale_channel_id`, with an optional per-item override | slice 7 |
 | Manual movement | chosen in the form | Task 9 |
 
-`breweries.default_sale_channel_id` survives only as a **pre-fill** for new
-orders and for portal-submitted orders where no one picks — never as the value
-read at ship time. `ship_order_impl` reads `o.sale_channel_id`, which is
+~~`breweries.default_sale_channel_id` survives only as a **pre-fill** for new
+orders and for portal-submitted orders where no one picks~~ (not built: the order
+copies the customer's channel) — never as the value read at ship time. `ship_order_impl` reads `o.sale_channel_id`, which is
 `not null`, so shipping cannot depend on a lookup that may have been renamed.
 
 This drops the coupling noted below: `ship_order_impl` currently infers the
@@ -160,13 +167,13 @@ implements. Tests hit the real database (`bunx supabase start`).
    either. `tests/rls-orders.test.ts` — an order cannot reference another
    brewery's channel.
    Files: baseline — `orders.sale_channel_id uuid not null` with the composite
-   FK; `breweries.default_sale_channel_id` as the pre-fill only; :1654 selects
+   FK; ~~`breweries.default_sale_channel_id` as the pre-fill only~~ (not built); :1654 selects
    `o.sale_channel_id` instead of the literal, and stops keying off
    `o.kind = 'wholesale'` for the channel (the `kind` branch still chooses
    between `sale_removal` and the two `taproom_transfer` rows).
    Depends: 4.
 
-6b. **Order create + portal.**
+6b. **Order create + portal.** (Not built: orders copy the customer's channel.)
    Test: `tests/commands-orders.test.ts` — `create_order` accepts a channel and
    falls back to the brewery pre-fill; `tests/commands-portal.test.ts` — a
    customer-submitted order gets the pre-fill and the customer cannot choose
