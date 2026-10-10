@@ -38,7 +38,7 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request." },
   { code: "request_too_large", status: 413, meaning: "The JSON request body exceeded the 8 MiB transport limit.",
     remedy: "Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file." },
-  { code: "rate_limited", status: 429, meaning: "This authenticated account exceeded 120 command-endpoint requests in the current 60-second window.",
+  { code: "rate_limited", status: 429, meaning: "This authenticated account exceeded 120 command or chat requests in the current 60-second window.",
     remedy: "Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`." },
   { code: "db_error", status: 500, meaning: "The database refused the write for a reason not mapped to a public code. Logged server-side.",
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },

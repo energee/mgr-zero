@@ -25,7 +25,7 @@ export function ConfirmOrderView({
       {fulfillmentOptions
         ? E.pick("Fulfillment source", model.fulfillmentSource ?? "", fulfillmentOptions)
         : model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
-      {E.info(<>Lifecycle: submitted {E.arrow()} confirmed {E.arrow()} picked {E.arrow()} shipped {E.arrow()} delivered. Only the valid next action is active.</>)}
+      {E.info(<>Lifecycle: submitted {E.arrow()} confirmed {E.arrow()} picked {E.arrow()} shipped; delivery is stamped on the route stop. Only the valid next action is active.</>)}
       {model.lines.map((line) => (
         <Fragment key={line.key}>{E.row(line.name, "", line.trailing, line.tone ?? "")}</Fragment>
       ))}

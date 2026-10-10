@@ -70,10 +70,8 @@ From a shipped order, **Reorder** starts a new cart with still-active, currently
 | `submitted` | Sent to the brewery, waiting for review. |
 | `confirmed` | Accepted by the brewery. Inventory is reserved. |
 | `picked` | The warehouse recorded quantities prepared for shipment. |
-| `shipped` | The brewery recorded shipment and created an invoice for positive shipped quantities. |
+| `shipped` | The brewery recorded shipment. An invoice for positive shipped quantities is created at shipping, or, when the brewery chose invoicing on delivery, at delivery confirmation; a fully refused delivery creates none. |
 | `cancelled` | The brewery stopped the order. The reason appears in the timeline. |
-
-**staged — needs restocking** means the brewery changed an order after it had been picked, and warehouse staff still need to put the staged stock back.
 
 ## Orders [#orders]
 
@@ -84,7 +82,7 @@ Order history shows up to 50 records, newest first. **More** opens older records
 <Screen name="Order history" />
 <Screen name="Order detail" />
 
-**Orders** lists your newest orders first with status, requested date, and any restocking badge. Select an order number to see ship-to, PO, note, ordered/picked/shipped quantities, captured unit prices, and the event timeline.
+**Orders** lists your newest orders first with status and requested date. Select an order number to see ship-to, PO, note, ordered/shipped quantities, captured unit prices, and the event timeline.
 
 Brewery line adjustments show the quantities before and after, plus the reason. Cancellation reasons show up too. A short shipment shows ordered and shipped quantities, the shortage reason the brewery recorded at picking or shipping, the final invoice amount, and explains that the unshipped quantity was cancelled when the order closed, so no units remain to ship. The linked invoice separately shows whether its balance is unpaid, paid, settled, or written off. Order details remain available from every history row. Drafts also offer **Continue / edit**, and shipped orders offer **Reorder**, including short shipments; these actions open the cart. Submitted orders cannot be edited or cancelled in the portal. With no orders, the page says **No orders yet**. A new draft with no events says **No events yet**.
 

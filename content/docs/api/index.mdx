@@ -75,9 +75,9 @@ The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
 shared by cookie and bearer authentication, every brewery, and the pre-tenant
 provisioning command. A `429` response includes `Retry-After` in seconds. The
-limit protects this command endpoint; it is not an IP or general Data API
-limit. The 5,000-row CSV limit is separate, so imports with unusually large
-string cells may need to be split into smaller batches.
+same budget is spent by Ask MGR chat turns (`/api/chat`); it is not an IP or
+general Data API limit. The 5,000-row CSV limit is separate, so imports with
+unusually large string cells may need to be split into smaller batches.
 
 ### Responses [#responses]
 
@@ -585,8 +585,9 @@ Generate the id at the moment the user commits (pressing Submit), not when the
 request is built. `lib/commands/client.ts` does exactly this in the app: one id
 per invocation, reused by any transport-level retry underneath it.
 
-Timeouts and `5xx` responses are the cases worth retrying, with the same id.
-A `4xx` other than `409` will not change on retry. Fix the request instead.
+Timeouts, `5xx` responses, and `429` (after waiting for `Retry-After`) are the
+cases worth retrying, with the same id. Any other `4xx` will not change on
+retry. Fix the request instead.
 
 ## Errors [#errors]
 
@@ -629,7 +630,7 @@ one value that ties what your client saw to what the server recorded.
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
 | 409 | `stale_plan` | The packaging material plan changed after `get_packaging_close_plan`; `close_packaging_run` wrote nothing. | Call `get_packaging_close_plan` again, review the actuals, and close with the new `planRevision` and a new requestId. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
-| 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
+| 429 | `rate_limited` | This authenticated account exceeded 120 command or chat requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |
