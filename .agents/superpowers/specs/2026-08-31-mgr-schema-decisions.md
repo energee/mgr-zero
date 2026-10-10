@@ -2,12 +2,16 @@
 
 Date: 2026-08-31
 Status: Decided with Ted; implemented as `2026-08-31-mgr-schema-design.md` (58 tables) and `supabase/migrations/00001_baseline.sql`.
+Whether a table, command or gate exists is read from `supabase/migrations`,
+`lib/commands/registry.ts` and `components/mgr/screens.tsx`; this document
+records decisions and their reasons.
 
 ## Goal
 
 One complete baseline migration covering every
 entity the ten-slice spec implies (58 tables; it replaced the two slice-1A migrations), so that migrations after first
-deploy are rare and additive. Until first deploy the baseline is edited in place.
+deploy are rare and additive. Landed pre-#285: the baseline is no longer
+edited; a schema change is a new timestamped migration plus `bun run migrations:lock`.
 Enums stay conservative: adding a value later is one line; a wrong one is forever.
 
 ## Decisions
@@ -40,7 +44,7 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 - Currency in integer cents; volumes and quantities `numeric`; never float.
 - Unique-by-name where lookups happen by name: `customers (brewery_id, name)`, `products (brewery_id, name)`, `locations (brewery_id, name)`, `skus (product_id, name)`.
 - Views use `security_invoker = true`.
-- Multi-row writes (confirm order, ship, close packaging run) are one `security invoker` plpgsql function each; the command handler only calls it. Functions `set search_path = ''`. Rationale and v1 evidence: `2026-08-31-mgr-v1-review.md` §1.1.
+- Multi-row writes (confirm order, ship, close packaging run) are one explicitly granted `security definer` RPC each, per `.agents/ARCHITECTURE.md` rule 5 (this replaced the original `security invoker` choice); the command handler only calls it. Functions `set search_path = ''`. Rationale and v1 evidence: `2026-08-31-mgr-v1-review.md` §1.1.
 - Post-deploy, destructive DDL is guarded: `if exists (select 1 from <table>) then raise` — a migration must refuse to drop data it didn't expect.
 
 ## Derived values: views for state, snapshots for inputs, storage for facts of record
@@ -79,10 +83,10 @@ These came out of drawing the QuickBooks and Square surfaces accurately
 what exposed what was wrong in ours — each decision below traces to a specific
 live screenshot, not to a preference.
 
-**Held as a spec, not migrated.** The interface is still moving. Every table in
-§16 would otherwise be migrated two or three times before the first screen
-ships, and `AGENTS.md` allows editing the baseline in place, so there is no cost
-to deciding late and building once.
+**Held as a spec until the interface settled, then built.** §16 is now
+implemented in `00001_baseline.sql` and later migrations; the schema design's §16
+gives the per-subsection status. Holding it as a spec first meant each table was
+built once rather than migrated two or three times while the screens moved.
 
 **`product` → `brand`.** A batch is a production instance ("Lupula 3"); a brand
 is what you sell ("Lupula", and "Waves" when two batches blend). They were one
@@ -175,8 +179,9 @@ instead, where it costs nothing and forbids nothing.
 `taproom` (§16.13), but §0's `P-staff` template is role-agnostic, so the enum
 value on its own hands a bartender full staff write on customers, invoices and
 compliance. The narrow surface a taproom role implies is per-role policy work
-that has not been done. Naming the gap in the spec is the cheap part; the role
-does not ship until the policies exist.
+that had not been done. Naming the gap in the spec is the cheap part; the role
+did not ship until the policies existed. **Shipped:** the policies are in
+`2026-09-08-mgr-taproom-role-rls.md`.
 
 **Unmapped POS items are a measurement problem, so a person clears them.** POS
 posts nothing to the ledger (§16.15), so an unmapped item does not lose

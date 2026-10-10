@@ -1,7 +1,8 @@
 // tests/docs.test.ts — the customer guides are Fumadocs MDX pages in
 // content/docs (lib/source.ts, app/(docs)/docs). Guards the shape the
 // documentation maintainer must keep, and the legacy URL redirects.
-import { readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
@@ -107,5 +108,67 @@ describe("New Order SKU picker guide", () => {
     const para = read("content/docs/staff-guide.mdx").split("\n").find((line) => line.startsWith("SKU fields in **New Order**"));
     expect(para).toBeDefined();
     expect(para).not.toMatch(/recent|cached/i);
+  });
+});
+
+// Process guards from the 2026-10-10 docs reconciliation. Each one catches a
+// class of drift that had piled up unnoticed: dead paths in the agent entry
+// docs, specs still saying to edit the baseline migration, and env names the
+// code reads that .env.example never lists.
+const gitFiles = (pattern: string) =>
+  execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8", env: { PATH: process.env.PATH } })
+    .split("\n")
+    .filter(Boolean);
+
+describe("agent entry docs", () => {
+  // Backticked text that is not a file path, or a path another lane must fix.
+  const IGNORE = new Set([
+    "docs/http-api", // a branch name in ARCHITECTURE.md, not a path
+    "docs/audits/2026-09-05/security.md", // dead citation in ARCHITECTURE.md; fixed by the docs-reconcile logs lane
+  ]);
+
+  it("names only repo paths that exist", () => {
+    const tops = new Set(readdirSync(root));
+    const docs = ["AGENTS.md", ".agents/ARCHITECTURE.md", "README.md", ...gitFiles(".agents/skills/*/SKILL.md")];
+    const missing = docs
+      // The hugeicons skill is vendored and names paths in its own repo.
+      .filter((doc) => !doc.includes("/hugeicons/"))
+      .flatMap((doc) =>
+        [...read(doc).matchAll(/`([^`\s]+)`/g)]
+          .map((m) => m[1].replace(/[/.,:;]+$/, "").split(/[:#]/)[0])
+          .filter((p) => p.includes("/") && !/[<>*{}$()=|]/.test(p) && tops.has(p.split("/")[0]) && !IGNORE.has(p))
+          .filter((p) => !existsSync(resolve(root, p)))
+          .map((p) => `${doc} -> ${p}`),
+      );
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("baseline migration rule", () => {
+  // Before #285 the baseline migration was edited in place; AGENTS.md now
+  // forbids editing any committed migration. Docs from that window must say so.
+  it("marks every doc that edits 00001_baseline.sql in place as pre-#285 or historical", () => {
+    const stale = gitFiles("*.md").filter((path) => {
+      const text = read(path);
+      return text.includes("00001_baseline.sql") && text.includes("in place") && !/pre-#285|Historical/.test(text);
+    });
+    expect(stale).toEqual([]);
+  });
+});
+
+describe(".env.example", () => {
+  it("names every environment variable the app and shell scripts read", () => {
+    const sources = [...gitFiles("lib/**"), ...gitFiles("app/**"), ...gitFiles("scripts/*.sh")];
+    const read_ = sources.flatMap((path) =>
+      // process.env.X, lib/env's required(env, "X"), and shell ${X:?} / ${X:-}.
+      [...read(path).matchAll(/process\.env\.([A-Z][A-Z0-9_]*[A-Z0-9])\b|\(env, "([A-Z][A-Z0-9_]*)"\)|\$\{([A-Z][A-Z0-9_]*):[?-]/g)].map(
+        (m) => m[1] ?? m[2] ?? m[3],
+      ),
+    );
+    // Set by the runtime or by the test harness, not by an operator.
+    const RUNTIME = new Set(["NODE_ENV", "TEST_DATABASE_URL", "DATABASE_URL", "MGR_TEST_DB_RESET", "CLAUDE_SESSION_URL"]);
+    const example = read(".env.example");
+    const missing = [...new Set(read_)].filter((name) => !RUNTIME.has(name) && !new RegExp(`^#? ?${name}=`, "m").test(example));
+    expect(missing).toEqual([]);
   });
 });
