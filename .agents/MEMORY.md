@@ -13,9 +13,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - **MGR screen controls, established across the design pass (2026-09-03, PRs #89–#127):** one primary (filled) action per screen, other verbs outline/ghost; quantities and dates use native inputs (`E.qty`, native date) rather than an on-screen keypad; a field a user can change renders a real shadcn `Input`/`Select`/`Switch`, never a chip standing in for a field; `E.tabs` is for view switchers, chips stay for filters and single-choice fields; the shell and its grids use the real desktop width (`md:max-w-5xl`, responsive `E.btns`/`E.tiles`) rather than a phone-width column stretched wide.
 - **Accent colors carry semantic status/action roles (2026-09-06, PR #156):** the six-accent palette is fixed to meanings, not chosen per screen — confirm green, put-back/assign orange, pick/count/resume cyan, general actions purple, destructive red/pink — with AA-checked light/dark tokens; color supplements the label/icon, it never stands alone. Sign out is classed destructive (red), not the teal accent for "irreversible actions that still write a record" (PR #155); `app/globals.css`'s token comment is the single statement of which accent means what — update it in the same change that reclassifies a control.
 - **Migrations accumulate; a committed one is never edited again (2026-09-13, PRs #285, #337 — supersedes the earlier "baseline edited in place" practice).** `supabase db push` applies a migration version once and never rereads that file, so two migrations kept being hand-edited after hosted had already applied them (`00001_baseline.sql` through #320/#326, then a second file through #303–#319) and the edits never reached hosted — `/settings`, `/menu`, and Ask MGR broke on live (#329, #330). Fix: both applied files were restored to exactly what hosted ran, everything edited into them since became one catch-up migration, and `supabase/migrations.lock.json` + `tests/migrations-applied.test.ts` now fail the build the moment a committed migration's hash changes. A schema change is always a new migration file, then `bun run migrations:lock`. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md` (pre-#285 baseline design).
-- **The backend push landed 2026-09-08 (Programs 0–10, PRs #185–#209), then continued hardening through an adversarial-walkthrough remediation wave (PRs #480–#600).** Schema, RPCs, and the full command surface exist for all ten programs (ordering, locations/bins/stock-transfers, catalog identity, sale channels, production/packaging/cellar, purchasing, taproom kegs, delivery routes, compliance/lot-trace, explorer-parity landings). `components/mgr/screens.tsx` is no longer screens-only work — database/RPC work is normal, gated per-screen only where `writes` still says `SCHEMA-GATE` (`TODO.md` keeps the current count). Durable rulings from those programs: gravity is stored in °Plato only with a per-user/brewery display-unit preference, resolved server-side, never stored computed (Program 5); a hop contract's lead time is an observed vendor view, never stored, and PO transport (`sent_via`) is a property, not a `po_status` fork (Program 6, confirms the PR #173 design); a keg event naming a customer only ever means shipped/lost-at-customer, never `found` (Program 7); a departed delivery route is frozen — no stop can change and the route can't return with one open (Program 8); a movement's tax treatment is resolved and frozen at insert, never recomputed at report time, so editing a channel or customer later never restates a filed month (Program 9); global search is parallel per-entity RLS-bound reads, not a definer SQL function, because RLS already decides the rows (Program 10). Lot identity at pick/ship (a sale removal names no lot) stays an open gap, not yet scheduled.
+- **The backend push landed 2026-09-08 (Programs 0–10, PRs #185–#209), then continued hardening through an adversarial-walkthrough remediation wave (PRs #480–#600).** Schema, RPCs, and the full command surface exist for all ten programs (ordering, locations/bins/stock-transfers, catalog identity, sale channels, production/packaging/cellar, purchasing, taproom kegs, delivery routes, compliance/lot-trace, explorer-parity landings). `components/mgr/screens.tsx` is no longer screens-only work — database/RPC work is normal, gated per-screen only where `writes` still says `SCHEMA-GATE` (`TODO.md` keeps the current count). Durable rulings from those programs: gravity is stored in °Plato only with a per-user/brewery display-unit preference, resolved server-side, never stored computed (Program 5); a hop contract's lead time is an observed vendor view, never stored, and PO transport (`sent_via`) is a property, not a `po_status` fork (Program 6, confirms the PR #173 design); a keg event naming a customer only ever means shipped/lost-at-customer, never `found` (Program 7); a departed delivery route is frozen — no stop can change and the route can't return with one open (Program 8); a movement's tax treatment is resolved and frozen at insert, never recomputed at report time, so editing a channel or customer later never restates a filed month (Program 9); global search is parallel per-entity RLS-bound reads, not a definer SQL function, because RLS already decides the rows (Program 10). `ship_order` records the chosen bin and lot on every sale removal (migration `20260927080000`), so lot trace reaches the customer.
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
-- Schema revision 2 (2026-09-02, §16 of the design doc — held as a spec, not migrated): `products` → `brands`, and a batch's identity becomes `intended_brand_id`, nullable, because identity is optional at brew and already enforced at packaging by `lots.brand_id NOT NULL`. `formats` own `bbl_per_unit`; SKUs stop carrying it.
+- Schema revision 2 (2026-09-02, §16 of the design doc — implemented in `00001_baseline.sql` and later migrations): `products` → `brands`, and a batch's identity becomes `intended_brand_id`, nullable, because identity is optional at brew and already enforced at packaging by `lots.brand_id NOT NULL`. `formats` own `bbl_per_unit`; SKUs stop carrying it.
 - Taproom inventory: **the physical count posts depletion; POS is the variance check** (2026-09-02, §16.15). This inverts the rule drawn in the POS wireframes, which need amending. Tapping and kicking a keg have no ledger effect at all — POS yields *expected* consumption, the count yields *actual*, and the gap is the report a taproom manager acts on.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 - Every merged PR gets a full customer-documentation pass, with `workflow_dispatch` on `main` as the recovery path. Claude has read-only GitHub permissions and may edit only the master, staff, and portal guide MDX files; a separate deterministic job rejects any wider or active-content diff and maintains one reviewable `documentation/user-guide` PR. The agent never commits directly to `main`. The publish step mints the MGR App token (same as `dreaming.yml`) rather than `github.token`, so the resulting push triggers `ci.yml` (PR #49).
@@ -25,16 +25,17 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - The MGR mark is the v1 tank/porthole SVG. `app/icon.svg` is the favicon; `lib/mgr-icon.ts` owns the path; `components/mgr-icon.tsx` is the in-app reuse. Dream PRs are published by the MGR GitHub App (`mgr[bot]`), not `claude[bot]`; the model has read-only GitHub access and a separate deterministic job mints the App token from `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY`. Upload `docs/brand/mgr-github-app-icon.png` (a raster of the same mark) as the app logo.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
-  `previewToken`, and stale revalidation. There is no generic Undo. Replay and
-  offline outbox stay disabled until durable server dedupe/result replay exists;
+  `previewToken`, and stale revalidation. There is no generic Undo. The offline
+  outbox replays only fermentation readings (`lib/composer/offline-policy.ts`);
   voice and server chat history are deferred.
-- Before affected UI work, close the explicit rev-4 gates: pre-tenant
-  provisioning, invite compensation, import per-row RPC/dedupe, FG correction
-  identity/report semantics, durable taproom count snapshots, shipment invoice
-  timing, exact QBO payload persistence, and typed batch-completion/loss
-  reconciliation. Portal fulfillment source is closed
-  (`set_portal_fulfillment_source`, PR #29). A registry name or client-held ID
-  does not prove a gate is met.
+- The rev-4 gates are closed except exact QBO payload persistence: pre-tenant
+  provisioning (`provision_brewery`, `accept_account_invitation`), invite
+  compensation, import per-row RPC/dedupe, FG correction identity, durable
+  taproom count snapshots, shipment invoice timing (`ship_order`
+  `invoiceTiming`), typed batch-completion/loss reconciliation, and portal
+  fulfillment source (`set_portal_fulfillment_source`, PR #29). See
+  `.agents/ARCHITECTURE.md`. A registry name or client-held ID does not prove
+  a gate is met.
 - The public HTTP API is `POST /api/command` (the command registry). Auth is
   the existing Supabase user session: browser cookies, or
   `Authorization: Bearer <access_token>` from password grant against the
@@ -53,17 +54,14 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   New writers must be granted explicitly in the baseline's Data API grants
   section and pinned in `tests/data-api-boundary.test.ts` /
   `tests/rls-command-boundary.test.ts` (nothing is auto-exposed).
-- Until the durable Task 13 import workflow lands, each import row operation
-  derives a deterministic UUIDv8 from SHA-256 of the complete top-level
-  `requestId`, row number, and operation number. This is replay-safe but not
-  durable job state.
 - Integration credentials never sit in a public table. `private.integration_tokens`
   is reachable only through `lib/supabase/integration-tokens.ts` (server-only,
   admin/sales, visible-connection check, then service-only RPC that rechecks
   membership); connection delete/identity change purges the token row.
-- `import_csv`, `invite_staff`, `invite_customer_user` stay registered but fail
-  closed (P1.9) until the durable external-write gate exists; the Import screen
-  and invite forms are removed rather than hidden.
+- `import_csv` (`begin_csv_import` plus per-row `import_csv_row`) and
+  `invite_staff` / `invite_customer_user` (the durable invitation workflow)
+  are live; see the CSV and Auth invitation sections of
+  `.agents/ARCHITECTURE.md`.
 - Chat notifications are staff-only and Slack-first but provider-neutral: one
   active installation per brewery/provider, personal App Home/DM plus one
   admin-approved digest channel, and no quiet-hours bypass in the first
@@ -78,7 +76,8 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   `.agents/superpowers/plans/2026-09-07-ai-chat.md`; supersedes slice 1C's
   composer tasks 8–10. Companion decisions from the same review: staff roles
   become an array (`brewery_users.roles staff_role[]`, a junction table was
-  rejected); Style is its own per-brewery table; portal customers may read a
+  rejected) — decided, not built: the shipped schema has one scalar
+  `brewery_users.role` (#797); Style is its own per-brewery table; portal customers may read a
   brand + expected-week projection of planned batches through a gated view,
   never `batches` itself.
 - **Purchasing design decided (2026-09-07, PR #173):**
@@ -121,8 +120,8 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   kegs out plus kegs lost at that customer (a lost keg keeps its deposit, so
   it still counts as out). Shipping alone charges the deposit but posts no
   keg event, so it never flags by itself — that gap is a Shipped event not yet
-  entered, not drift. Voided/written-off invoices still count toward deposits
-  held; that's a TODO.md follow-up, not fixed here.
+  entered, not drift. Voided and written-off invoices no longer count toward
+  deposits held (#617, PR #630).
 - **`upsert_*` commands replace the whole record (2026-09-26 owner decision,
   issue #589, PR #606).** An omitted field may be cleared or reset to its
   default; a command must say explicitly which fields instead keep their

@@ -77,7 +77,7 @@ never copy it into a second place.
 | `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
 | `.agents/agents/dreaming.md`, `.agents/DRIFT.md`, `.github/workflows/dreaming.yml`, `.github/claude-ci-settings.json` | Daily/manual agent-doc curation and its unresolved read-only drift ledger. Claude edits documents with read-only GitHub access under the shared CI deny list (read from main, not the checked-out dream branch); the workflow validates and publishes through the MGR GitHub App (`mgr[bot]`). |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
-| `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
+| `.pi/prompts/` | Pi slash commands. `http-api.md` is a thin alias that loads `.agents/agents/http-api.md`; `simplify.md` is a self-contained prompt. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
 
 The chat RPC boundary is explicit. Authenticated commands use
@@ -146,7 +146,8 @@ a gap to close, not a convention to trust.
    proven by `tests/rls-ledger.test.ts`.
 3. **Every tenant table carries `brewery_id` with RLS.** Access derives from
    `brewery_users` / `customer_users` via `my_brewery_ids()`, `is_staff_of()`,
-   `staff_role()`, `my_customer_ids()` (the only RLS helpers; defined once in the baseline). Cross-tenant FKs are composite so a row can't reference
+   `staff_role()`, `my_customer_ids()` (defined in the baseline) and
+   `my_staff_brewery_ids(roles)` (migration `20261008170000`). Cross-tenant FKs are composite so a row can't reference
    another brewery's data. Portal customers never `SELECT` the `breweries` base
    table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
@@ -264,8 +265,12 @@ a gap to close, not a convention to trust.
   commit revalidates and rejects stale state. The full contract (registry
   fields, loop, attribution, limits) is
   `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md`; plan
-  `.agents/superpowers/plans/2026-09-07-ai-chat.md`. This is a design
-  prerequisite, not a claim about the current registry.
+  `.agents/superpowers/plans/2026-09-07-ai-chat.md`; transport is
+  `.agents/superpowers/plans/2026-09-11-composer-ai-sdk.md`. Shipped:
+  `preview_command` (`lib/commands/preview.ts`), the `record_movement`
+  Composer proposal (`lib/composer/state.ts`), and the offline outbox for
+  fermentation readings (`lib/composer/outbox.ts`). Any other command needs
+  its own registry-owned preview contract before it can be proposed.
 - **Inventory correction needs durable identity.** The FG ledger links exact standalone adjustment/loss reversals through
   unique same-tenant `compensates_id`; the trigger preserves original bucket,
   classification and frozen BBL. `source_movement_id` remains shipped-return
@@ -319,7 +324,7 @@ RLS predicates are index-backed: every table whose policy filters on
 constraint or query index leading with it counts). Policies call
 `(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
 statement instead of once per row. *Enforced by:*
-`tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
+`tests/schema-rls-indexes.test.ts` (from the 2026-09-05 security audit, not committed; PR #149).
 
 `movements_onhand_idx` and `allocations_open_idx` carry `include (qty)`, so
 `portal_availability`'s per-brewery sums can be index-only scans. Heap fetches
