@@ -1,5 +1,15 @@
 # Program 13 — QuickBooks invoices-out / payments-back Implementation Plan
 
+> **Shipped differently.** There is no `QBO_AUTH_BASE`; `.env.example` lists the QBO
+> names the code reads. `disconnect_qbo` disables the connection, releases its company
+> ownership, purges the credential and attempts remote revocation; it does not delete
+> the row. `lib/commands/qbo.ts` is the authority.
+
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Admin connects QBO; sales push an invoice with a durable exact payload; payments come back onto `invoices.paid_at`; portal Pay resolves an Intuit link **at click time** and never stores it.

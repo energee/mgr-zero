@@ -1,5 +1,7 @@
 # Issue #278 — lift the schema and missing-view gates Implementation Plan
 
+> **Completed:** #278 closed 2026-09-14. The `TODO.md` block cited below is historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ungate the thirteen screens in issue #278 by building the read views, RPCs, columns and live pages each one waits on, one slice per PR.
@@ -15,7 +17,7 @@
 - One worktree and PR per slice, base `main`: `scripts/worktree.sh feat/278-<slice> origin/main`. Only the final PR (slice 6) carries `TODO: Issue #278 — schema and missing-view gates (13 screens): …` (exact text from `TODO.md:16-22`); earlier PRs carry no `TODO:` line.
 - Never edit a committed migration. New file `supabase/migrations/2026MMDDHHMMSS_<name>.sql`, then `bun run migrations:lock`.
 - Every new SQL function signature goes into `AUTHENTICATED_RPCS` in `tests/rpc-allowlist.test.ts`; revoke from `public, anon, authenticated` then grant to `authenticated`.
-- Every new command name must match an `API_AREAS` regex in `lib/mgr/api-operations.ts`; run `bun run docs:api` and commit `content/docs/api.mdx`.
+- Every new command name must match an `API_AREAS` regex in `lib/mgr/api-operations.ts`; run `bun run docs:api` and commit `content/docs/api/*.mdx`.
 - A `[view]` read loses its `[view]` tag the moment it is registered: `tests/api-docs.test.ts` keeps `[view]` names out of the reference, and `lib/mgr/api-operations.ts` never hides a registered operation, so a registered view is published as an ordinary query (slice 1 set this). Drop `SCHEMA-GATE`, `SCHEMA/RLS-GATE`, `[design]` tags only when the command exists.
 - Customer-visible change → update `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
 - Proof per slice: `bunx tsc --noEmit && bun run lint`, pure vitest (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts tests/screen-command-gates.test.ts tests/app-screen-parity.test.ts tests/api-docs.test.ts tests/rpc-allowlist.test.ts tests/migrations-applied.test.ts`), the slice's DB test on the test stack, and a `browse` screenshot of the rendered page.

@@ -1,5 +1,14 @@
 # Program 8 — Delivery routes Implementation Plan
 
+> **Superseded rule:** `return_route` needs an outcome on every stop, not every stop
+> delivered (`specs/2026-09-27-failed-delivery-design.md`, issue #618, migration
+> `20260928080000_delivery_outcomes.sql`).
+
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A warehouse admin can build a route of stops, a driver can depart, confirm each stop (reusing Program 1 `confirm_delivery`), and return the truck. A stop is a customer shipment **or** a stock transfer.
@@ -15,7 +24,7 @@
 - Worktree `.agents/worktrees/backend`. Programs 1 and 2 required.
 - `deliveries.shipment_id` becomes nullable; add `stock_transfer_id uuid unique`; `check (num_nonnulls(shipment_id, stock_transfer_id) = 1)`.
 - `confirm_delivery` on a transfer stop sets `delivered_at` and does **not** create an invoice.
-- `depart_route` sets `departed_at`; `return_route` sets `returned_at` only when every stop has `delivered_at`.
+- `depart_route` sets `departed_at`; `return_route` sets `returned_at` only when every stop has an outcome (delivered or failed; see the banner above).
 - Assigned driver **or** admin may confirm/depart/return. Other warehouse members are denied.
 - TDD, docs:api, staff-guide, nav Deliveries `planned` off.
 - Parked: signature images, truck-loaded flag (UI plan forbids it).
@@ -86,7 +95,7 @@ it("a delivery must reference exactly one document", async () => {
 
 **Interfaces:**
 - `depart_route({ routeId })` — sets `departed_at` if null; requires at least one stop; roles admin or `driver_user_id = auth.uid()`.
-- `return_route({ routeId })` — requires `departed_at` and every stop `delivered_at`; sets `returned_at`.
+- `return_route({ routeId })` — requires `departed_at` and an outcome on every stop; sets `returned_at`.
 - Add `delivery_next` to `today_live_reasons()` (href already `/work/deliveries/:id`).
 
 - [ ] **Step 1:** Depart; Today for that driver shows stop 1; confirm_delivery (Program 1 command) on stop 1; Today shows stop 2; return before last stop raises; after all confirmed, return succeeds.

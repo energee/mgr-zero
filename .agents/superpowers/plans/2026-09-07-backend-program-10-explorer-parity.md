@@ -1,5 +1,10 @@
 # Program 10 — Explorer parity Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every **ungated** MGR screen record has a live route that uses `E.*` and the same fields/verbs as the explorer. A vitest fails if the inventory promises a page the app does not have.
@@ -43,7 +48,7 @@
 - Produces:
 
 ```ts
-export const SCREEN_ROUTES: Record<string, string>
+export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: string[] }[]
 export function ungatedMgrScreens(): { name: string }[]
 ```
 
@@ -73,18 +78,16 @@ describe("explorer parity", () => {
     const pages = pageFiles();
     const missing: string[] = [];
     for (const s of ungatedMgrScreens()) {
-      const route = SCREEN_ROUTES[s.name];
+      const route = SCREEN_ROUTES.find((r) => r.name === s.name);
       if (!route) { missing.push(`${s.name}: no SCREEN_ROUTES entry`); continue; }
-      const file = join("app", route.replace(/^\//, "").replace(/\[id\]/g, "[id]"), "page.tsx")
-        .replace("app/page.tsx", "app/(app)/page.tsx"); // see map comments
-      // simpler: SCREEN_ROUTES values are paths under app/ that must exist
+      if (!pages.has(route.file)) missing.push(`${s.name}: ${route.file} missing`);
     }
     expect(missing, "add a live page or keep the screen gated").toEqual([]);
   });
 });
 ```
 
-Implement `SCREEN_ROUTES` as `{ name: string, file: string }[]` pointing at real files:
+Implement `SCREEN_ROUTES` as `{ name: string; file: string; additionalFiles?: string[] }[]` pointing at real files (shipped in `lib/mgr/screen-routes.ts`):
 
 ```ts
 export const SCREEN_ROUTES: { name: string; file: string }[] = [

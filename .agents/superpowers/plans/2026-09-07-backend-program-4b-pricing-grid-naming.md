@@ -1,5 +1,10 @@
 # Program 4b — Pricing grid and naming standard Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Price every SKU by one lookup, `channel_prices[customer's sale channel][brand's price group][sku's format]`, and use one name per concept (sale channel, price group, format, channel price) across SQL, commands, pages, screens and guides.
