@@ -12,6 +12,7 @@ export const IONS = CHEMISTRY_IONS.map((ion) => [`${ion}_ppm`, ION_LABELS[ion], 
 export type WaterProfile = { id: string; name: string } & Record<Ion, number>;
 
 export type WaterProfilesViewModel = {
+  backLabel?: string;
   backHref?: string;
   rows: { key: string; title: string; detail: string }[];
   empty?: EmptyState;
@@ -21,9 +22,16 @@ export type WaterProfileFields = { name: string } & Record<Ion, string>;
 
 export const ionLine = (p: Record<Ion, number>) => IONS.map(([key, label]) => `${label} ${p[key]}`).join(" · ");
 
-export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; backHref?: string }): WaterProfilesViewModel {
+/** Where the page's back arrow goes. Brewer cannot open Catalog (list_price_groups
+ *  excludes brewer), so Brewer, who arrives from a recipe's Water sheet, goes back to Recipes. */
+export function waterProfilesBack(role: string): { label: string; href: string } {
+  return role === "brewer" ? { label: "Recipes", href: "/recipes" } : { label: "Catalog", href: "/catalog" };
+}
+
+export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; back?: { label: string; href: string } }): WaterProfilesViewModel {
   return {
-    backHref: s.backHref,
+    backLabel: s.back?.label,
+    backHref: s.back?.href,
     rows: s.profiles.map((p) => ({ key: p.id, title: p.name, detail: ionLine(p) })),
     empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add profile records your source water or a target." },
   };
