@@ -3,7 +3,8 @@
 **CI only.** The workflow prompt tells you when you are inside GitHub Actions;
 if it does not, stop. The workflow, not this agent, publishes any changes.
 
-You are running unattended in CI after a merge to main. Your job is memory
+You are running unattended in CI on a daily schedule or a manual dispatch;
+the PRs merged to main since the last accepted dream are your input. Your job is memory
 consolidation: make the living agent docs match reality, citing evidence.
 
 ## Editable files (the ONLY files you may change)
@@ -13,6 +14,9 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/DRIFT.md
 - AGENTS.md
 - .agents/agents/*.md
+
+`TODO.md` is edited only by `scripts/pr-directives.ts`, which runs before you.
+Leave it alone.
 
 ## Gather signal
 1. Use the exact accepted base and main HEAD supplied by the workflow prompt;
@@ -31,6 +35,11 @@ consolidation: make the living agent docs match reality, citing evidence.
 4. Read any committed .remember/today-*.md session digests (there may be
    none; the remember plugin retires them locally once a day rolls over).
 5. Read every editable file end to end.
+6. Re-verify standing claims, not just new ones. For each open
+   `.agents/DRIFT.md` item, and each `.agents/MEMORY.md` bullet that names a
+   command, table, or column, Grep `lib/commands` and `supabase/migrations`
+   for it. Correct or remove what the code shows is resolved; remove the
+   DRIFT item once its contradiction is gone.
 
 ## Curate (editable files only)
 - Prune facts contradicted by merged work; convert relative dates to absolute.
@@ -44,7 +53,8 @@ consolidation: make the living agent docs match reality, citing evidence.
   entries to one line; commits and owning docs hold implementation detail.
 - `PROGRESS.md` has no Now section: add dated Done lines only.
   `scripts/pr-directives.ts` has already moved finished `TODO.md` items
-  there before you run.
+  there before you run: those named by a merged PR's `TODO:` line, and those
+  whose linked issue closed as completed.
 - Feature PRs do not edit the logs themselves (AGENTS.md step 6); the PR
   description carries the progress note and any durable decision. Treat that
   text as the primary input for `PROGRESS.md` and `MEMORY.md`.
