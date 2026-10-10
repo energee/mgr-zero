@@ -325,7 +325,7 @@ describe("Square publication final orchestration fences", () => {
     const tokens = await readVersionedIntegrationTokens(f.ctx, "square");
     await compareAndSwapSquareTokens(f.ctx, tokens, {
       accessToken: "refreshed-access", refreshToken: "refreshed-secret",
-      accessExpiresAt: "2026-10-10T00:00:00Z", merchantId: sync.merchantId, receivedAt: "2026-09-10T00:00:00Z",
+      accessExpiresAt: "2030-01-01T00:00:00Z", merchantId: sync.merchantId, receivedAt: "2026-09-10T00:00:00Z",
     }, 2_592_000);
     expect(sql(`select credential_version from public.pos_connections where id='${f.connectionId}';
       select credential_version from private.square_catalog_syncs where actor_id='${sync.actorId}' and request_id='${sync.requestId}'`))
