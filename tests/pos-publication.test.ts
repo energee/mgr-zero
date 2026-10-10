@@ -306,7 +306,7 @@ describe("Square durable catalog publication", () => {
     const merchantId = sql(`select merchant_id from public.pos_connections where id='${connectionId}'`)[0]!;
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       access_token: "publication-access-2", refresh_token: "publication-refresh-2",
-      expires_at: "2026-10-10T00:00:00Z", merchant_id: merchantId,
+      expires_at: "2030-01-01T00:00:00Z", merchant_id: merchantId,
     }), { status: 200 }));
     await expect(publishSquareCatalogItem(ctx, { posLocationId: "L1", brandId }, crypto.randomUUID(),
       new SquareClient(config, fetch), "publish_pos_item")).rejects.toMatchObject({ status: 409 });

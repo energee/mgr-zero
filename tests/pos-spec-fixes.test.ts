@@ -11,7 +11,7 @@ const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secre
 async function connected(breweryId: string) {
   const merchantId = `merchant-${crypto.randomUUID()}`;
   const connection = await admin.from("pos_connections").insert({ brewery_id: breweryId, merchant_id: merchantId,
-    state: "connected", credential_version: 1, access_expires_at: "2099-01-01T00:00:00Z" }).select("id").single();
+    state: "connected", credential_version: 1, access_expires_at: "2030-01-01T00:00:00Z" }).select("id").single();
   expect(connection.error).toBeNull();
   sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
     values('${breweryId}','square','${connection.data!.id}','access-secret','refresh-secret',1)`);
@@ -122,7 +122,7 @@ describe("Square reviewed sync invariants", () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         access_token: "refreshed-access", refresh_token: "refreshed-refresh",
-        expires_at: "2026-10-10T00:00:00Z", merchant_id: connection.merchantId,
+        expires_at: "2030-01-01T00:00:00Z", merchant_id: connection.merchantId,
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
         { id: "L-refresh", name: "Refreshed taproom", status: "ACTIVE", merchant_id: connection.merchantId },
