@@ -3,6 +3,7 @@
 // profile is the brewery default unless the version overrides it.
 "use client";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
@@ -13,7 +14,7 @@ export type NamedOption = { id: string; name: string };
 
 export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, chemistryKnown = false, profilesHref, onChange, onAdd, ...verbs }: {
   title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
-  /** Live: the Water profiles page. Brewer has no Catalog, so this row is Brewer's way in; inventory leaves it unlinked. */
+  /** Live: the Water profiles page, opened in a new tab so the unsaved version draft survives. Brewer has no Catalog, so this row is Brewer's way in; inventory leaves it unlinked. */
   profilesHref?: string;
   /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
   chemistryKnown?: boolean;
@@ -32,7 +33,10 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
     {E.back("Recipe", title)}
     {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "brewery default" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
     {E.pick("Target profile", water.targetProfileId, [{ value: "", label: "No target" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ targetProfileId: nextValue }) : undefined })}
-    {E.nav("Water profiles", "add or edit a source or target", "", undefined, profilesHref)}
+    {/* A new tab: this sheet edits an unsaved version draft, and leaving the page would drop it. */}
+    {profilesHref
+      ? <Link href={profilesHref} target="_blank" rel="noopener" className="block">{E.nav("Water profiles", "add or edit a source or target")}</Link>
+      : E.nav("Water profiles", "add or edit a source or target")}
     {E.cols(
       E.edit("Mash water gal", water.mashGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ mashGal: nextValue }) : undefined, min: "0", step: "any" }),
       E.edit("Sparge water gal", water.spargeGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ spargeGal: nextValue }) : undefined, min: "0", step: "any" }),
