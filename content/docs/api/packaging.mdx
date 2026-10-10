@@ -9,8 +9,8 @@ line, so a partially edited BOM never exists.
 
 A packaging run is scheduled, then closed with what it actually produced and
 consumed. Closing is the step that moves beer out of a vessel and finished goods
-into inventory. No operation here previews a run's material shortfalls before
-scheduling — that read belongs to the Packaging screen, not this reference.
+into inventory. Before scheduling, `get_packaging_material_plan` previews
+material needs and stock shortages for unsaved output quantities.
 
 Closing a run requires confirmed material `actuals` and the `planRevision` returned by `get_packaging_close_plan`; a plan that changed since then is refused with `409 stale_plan`. Omit them only to replay an already completed pre-upgrade request with its original request ID. Used plus lost quantities debit explicit sources; unused is an observation. The close stores the reviewed BOM and actuals atomically with outputs and tank draw. `correct_packaging_material_record` appends exact material reversals and replacement actuals, without changing finished output or tank volume. Downstream finished-goods use, completed batches and dependent filed reports prevent correction.
 
