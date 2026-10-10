@@ -7,6 +7,9 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-10-10 — Agent logs reconciled with the code: `TODO.md` pruned to #311 and #329 (every other item's issue is closed); MEMORY, DRIFT and ARCHITECTURE stale current-tense claims corrected; AGENTS.md routes "next" to `TODO.md`.
+- 2026-10-10 — Recorded late: `/api/command` refuses excess requests with 429 `rate_limited` and Retry-After, 120 per account per 60 seconds (`lib/commands/admission.ts`, PR #226, 2026-09-09); the 2026-09-06 "remains unimplemented" line below is superseded.
+- 2026-10-10 — Recorded late: keg deposits held exclude voided and written-off invoices (#617, PR #630, 2026-09-27), closing the follow-up noted below.
 - 2026-09-27 — Keg deposit/keg-count reconciliation shipped (#577, PR #605,
   revised after review): Customer keg balance and Keg report flag a mismatch
   only once a deposit was refunded, counting kegs lost at the customer as
