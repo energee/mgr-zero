@@ -14,6 +14,15 @@ describe("dreaming workflow", () => {
     }
   });
 
+  it("lets the validate step accept every file the mechanical TODO step writes", () => {
+    // The script runs before validation; a path missing here fails every run that moves an item.
+    const written = [...read("scripts/pr-directives.ts").matchAll(/writeFileSync\("([^"]+)"/g)].map((m) => m[1]);
+    const allowlist = read(".github/workflows/dreaming.yml").match(/case "\$path" in\n\s+(\S+)\) ;;/)?.[1].split("|") ?? [];
+
+    expect(written).toEqual(expect.arrayContaining(["TODO.md", ".agents/PROGRESS.md"]));
+    for (const path of written) expect(allowlist).toContain(path);
+  });
+
   it("batches curation and leaves publication to a deterministic job", () => {
     const workflow = read(".github/workflows/dreaming.yml");
     const prompt = read(".agents/agents/dreaming.md");

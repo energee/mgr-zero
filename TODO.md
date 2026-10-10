@@ -24,7 +24,7 @@ dependencies and unresolved product contradictions remain ask-first.
 
 Each checklist item has an issue owner. A feature PR may name its exact,
 unique checklist text in a `TODO: <text>` line; the dreaming workflow removes
-completed items after merge. Screen mapping alone does not prove completion.
+completed items after merge, and items whose issue closed as completed. Screen mapping alone does not prove completion.
 
 ## Wave 1 — pilot correctness and onboarding
 
