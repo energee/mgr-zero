@@ -115,8 +115,12 @@ describe("New Order SKU picker guide", () => {
 // class of drift that had piled up unnoticed: dead paths in the agent entry
 // docs, specs still saying to edit the baseline migration, and env names the
 // code reads that .env.example never lists.
+// GIT_* is stripped: the pre-push hook exports GIT_DIR, which would point git
+// at the wrong repository.
+const gitEnv = { ...process.env };
+for (const key of Object.keys(gitEnv)) if (key.startsWith("GIT_")) delete gitEnv[key];
 const gitFiles = (pattern: string) =>
-  execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8", env: { PATH: process.env.PATH } })
+  execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8", env: gitEnv })
     .split("\n")
     .filter(Boolean);
 
@@ -159,7 +163,7 @@ describe("baseline migration rule", () => {
 describe(".env.example", () => {
   it("names every environment variable the app and shell scripts read", () => {
     const sources = [...gitFiles("lib/**"), ...gitFiles("app/**"), ...gitFiles("scripts/*.sh")];
-    const read_ = sources.flatMap((path) =>
+    const names = sources.flatMap((path) =>
       // process.env.X, lib/env's required(env, "X"), and shell ${X:?} / ${X:-}.
       [...read(path).matchAll(/process\.env\.([A-Z][A-Z0-9_]*[A-Z0-9])\b|\(env, "([A-Z][A-Z0-9_]*)"\)|\$\{([A-Z][A-Z0-9_]*):[?-]/g)].map(
         (m) => m[1] ?? m[2] ?? m[3],
@@ -168,7 +172,7 @@ describe(".env.example", () => {
     // Set by the runtime or by the test harness, not by an operator.
     const RUNTIME = new Set(["NODE_ENV", "TEST_DATABASE_URL", "DATABASE_URL", "MGR_TEST_DB_RESET", "CLAUDE_SESSION_URL"]);
     const example = read(".env.example");
-    const missing = [...new Set(read_)].filter((name) => !RUNTIME.has(name) && !new RegExp(`^#? ?${name}=`, "m").test(example));
+    const missing = [...new Set(names)].filter((name) => !RUNTIME.has(name) && !new RegExp(`^#? ?${name}=`, "m").test(example));
     expect(missing).toEqual([]);
   });
 });
