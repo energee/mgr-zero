@@ -101,8 +101,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # Mechanical first: PRs merged in the window that carry `TODO: <item>` move
-      # that item out of TODO.md and onto PROGRESS.md's Done log here, so the roadmap advances even
-      # when the model has nothing to dream about. scripts/pr-directives.ts.
+      # that item out of TODO.md and onto PROGRESS.md's Done log here, as does an item whose linked
+      # issue closed as completed, so the roadmap advances even when the model has nothing to dream
+      # about. scripts/pr-directives.ts.
       - uses: oven-sh/setup-bun@v2
         if: steps.window.outputs.new == 'true'
         with: { bun-version-file: ".bun-version" }
@@ -148,7 +149,7 @@ jobs:
           fi
           while IFS= read -r path; do
             case "$path" in
-              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md) ;;
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md|TODO.md) ;;
               *) echo "Dream changed forbidden path: $path"; exit 1 ;;
             esac
           done <<EOF
