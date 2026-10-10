@@ -1,8 +1,10 @@
 # MGR — Sending purchase orders, vendor lead times, and contract drawdown
 
 Date: 2026-09-07
-Status: Decided with Ted; not yet implemented. Screen-level items are current-focus
-work; column and view changes wait for the backend push.
+Status: Partly implemented. Shipped: `vendors.lead_time_days`, `purchase_orders.sent_via`
+limited to `mailto` and `external`, and the `vendor_lead_times` view. Deferred: the
+`direct` transport, `transmit_purchase_order`, `delivery_state` and webhooks. Landed
+pre-#285: schema changes are new timestamped migrations plus `bun run migrations:lock`.
 Amends: `2026-08-31-mgr-schema-design.md` — `lead_time_days` moves from `materials`
 to `vendors`, `purchase_orders` gains send transport and delivery state.
 `2026-08-31-mgr-ui-layout-plan.md` — `send_purchase_order` stays Mutable / hop green,
@@ -134,9 +136,8 @@ vendors selling similar products share a lead time.
 
 `materials.lead_time_days` (`00001_baseline.sql:191`) **moves to `vendors`**. It is
 dead weight where it is — nothing in code reads it; it appears only in the baseline
-and in the Planning screen's prose. Nothing is deployed, and AGENTS.md permits editing
-the baseline migration in place, so this is a straight column move, not a second
-migration.
+and in the Planning screen's prose. Nothing was deployed when this was written
+(pre-#285), so this was a straight column move, not a second migration.
 
 Rationale that survives the data model: lead time is a property of *fulfillment* — the
 vendor's warehouse, carrier and queue. Every observation available (`ordered_on →
