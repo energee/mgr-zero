@@ -1,6 +1,6 @@
 // tests/schema-rls-indexes.test.ts — RLS performance rules read straight from
 // pg_catalog on the live local database (psql via tests/helpers.ts). Written
-// after docs/audits/2026-09-05/security.md:
+// after a 2026-09-05 security audit whose report was never committed:
 // (a) every table whose policy predicate filters on brewery_id must have an index
 // whose first column is brewery_id, otherwise each RLS check is a sequential scan;
 // (b) auth.uid() inside a policy must be wrapped as (select auth.uid()) so Postgres

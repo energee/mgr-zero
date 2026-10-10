@@ -186,10 +186,10 @@ explicit override flag.
 - `upsert_customer` `ON CONFLICT (id)` cross-tenant hijack attempt rejected (42501), row unchanged.
 - `getActiveBrewery` / `getActiveCustomer` only select among the user's real memberships.
 - Login/logout have no user-controlled redirect.
-- `import_csv`, `invite_*` still fail closed before any write.
+- `import_csv`, `invite_*` still fail closed before any write. (Historical: both later shipped as live commands.)
 - GitHub workflows grant read-only scopes; Claude review skips `dreaming/main`.
 
-## Backlog (mirrored in `.agents/PROGRESS.md`)
+## Backlog (all resolved)
 
 | Item | Sev | Summary |
 | --- | --- | --- |

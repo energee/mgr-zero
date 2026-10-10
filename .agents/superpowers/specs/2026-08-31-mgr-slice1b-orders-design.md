@@ -4,6 +4,13 @@ Builds the order lifecycle on the baseline schema (`00001_baseline.sql`) and the
 slice-1A command registry. Parent spec: `2026-08-30-mgr-slice1-core-orders-design.md`
 §4/§4b — this doc records the decisions that spec left open, plus 1B's exact scope.
 
+Status: Historical — implemented in slice 1B (#15, merged 2026-09-01). The portal
+shows no ATP: no availability badges or counts (decision 7). Landed pre-#285:
+the baseline is no longer edited in place; a schema change is a new timestamped
+migration plus `bun run migrations:lock`. Whether a table, command or gate
+exists is read from `supabase/migrations`, `lib/commands/registry.ts` and
+`components/mgr/screens.tsx`.
+
 ## Scope
 
 **In:** wholesale order lifecycle (draft → submitted → confirmed → picked →
@@ -11,8 +18,7 @@ shipped, plus cancelled), allocations/ATP flows, pick lists + daily pick sheet,
 partial shipment + short-ship reconciliation, per-shipment invoices, returns as
 invoice-linked credit memos, taproom replenishment (pars → internal transfer
 orders) with standing taproom allocations, customer/ship-to/price-list CRUD,
-customer portal (order entry to `submitted`, history, invoices, availability
-hints), order change tracking (`order_events`), vitest data-layer coverage,
+customer portal (order entry to `submitted`, history, invoices), order change tracking (`order_events`), vitest data-layer coverage,
 one agent-browser portal smoke.
 
 **Out (deferred):** keg deposit invoice lines and `keg_events` (keg slice),
@@ -87,7 +93,7 @@ standing taproom allocations — plain registry commands.
 Queries: orders list/detail (with events + allocation state), daily pick sheet
 (confirmed orders grouped by `requested_ship_date`), invoices list/detail,
 replenishment view (ledger on-hand vs. par → suggested quantities), portal
-catalog (price-list prices + availability badge tiers).
+catalog (price-list prices).
 
 ## UI
 

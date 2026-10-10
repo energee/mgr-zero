@@ -1,13 +1,18 @@
 # MGR — Packaging run source: plan by product, execute against an occupancy
 
 Date: 2026-09-05
-Status: Decided with Ted; not yet implemented. Targets slice 5 (`schedule_packaging_run`).
+Status: Implemented. `packaging_runs` is keyed by `brand_id` (§16 renamed product to
+brand), `occupancy_id` is nullable until the run starts, and `update_packaging_run`
+promotes a plan by binding its occupancy (`00001_baseline.sql:5414`, revised in
+`20260928040000_unstarted_plans.sql`); `product_volume_requirements` is the planning
+view. Read `product_id` below as `brand_id`. Landed pre-#285: schema changes are new
+timestamped migrations plus `bun run migrations:lock`. Targets slice 5 (`schedule_packaging_run`).
 Amends: `2026-08-31-mgr-schema-decisions.md` — the "FG lots" row ("one run draws from
 exactly one vessel occupancy") now holds when a run **starts**, not at insert.
 
 ## Problem
 
-`packaging_runs.occupancy_id` is `not null` (`supabase/migrations/00001_baseline.sql:617`),
+`packaging_runs.occupancy_id` was `not null` in the baseline as first written (now nullable; `supabase/migrations/00001_baseline.sql:1221`),
 so a run cannot exist until the beer is physically in a vessel. That blocks the planning
 case a brewery running many one-off beers lives in: booking a packaging run — and the cans,
 labels and brew it implies — weeks before the beer has a batch record, let alone a tank.
@@ -168,16 +173,15 @@ extends the forecasting horizon that is already built.
   carries the run's product while its movements carry the SKU's. The promotion assertion
   proposed under **Schema** above covers occupancy↔product only, and is itself not yet built;
   outputs↔product needs the same guard.
-- No command owns the promotion. `update_packaging_run` is described at `screens.tsx:2060` as
-  reopening a planned run until it starts — rescheduling, not binding a source. `Pick source`
-  needs a home, and it is what calls the product-match assertion.
+- (Resolved: `update_packaging_run` owns the promotion; it picks the tank a planned run
+  draws from and stamps it started.) No command owned the promotion when this was written.
 - Nothing models seasonal / limited-release products; `skus.active` (`:260`) remains the only
   retirement lever, and the SKU list grows monotonically for one-off-heavy breweries.
 
 ## Affected, all still `[design]` in `screens.tsx`
 
 `schedule_packaging_run`, `update_packaging_run`, `close_packaging_run`,
-`list_packaging_runs`, `get_material_shortfalls`, `get_packaging_run` (`screens.tsx:1990`,
+`list_packaging_runs`, `get_packaging_material_plan` (then named `get_material_shortfalls`), `get_packaging_run` (`screens.tsx:1990`,
 `:2013`) and `list_formats`.
 
 **Schedule packaging run needs redrawing, not just its commands.** `screens.tsx:2043` is the
@@ -189,5 +193,5 @@ source". All four are wrong under product-level planning. AGENTS.md makes `scree
 source of truth and the customer guides embed those frames, so implementing this spec without
 redrawing the sheet leaves the inventory contradicting itself.
 
-The baseline migration is edited in place until first deploy, so no second migration file is
-implied.
+Historical: when this was written the baseline migration was still edited in place, so no
+second migration file was implied.

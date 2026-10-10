@@ -1,5 +1,10 @@
 # Locations & Bins — Phase 1 ("where things are") Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every ledger row — finished goods, raw materials, kegs — names a location and a bin, every location always has at least one bin, and admins can add, rename and remove bins.

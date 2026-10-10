@@ -1,5 +1,10 @@
 # Backend database integration — unification plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement a program task-by-task after Ted confirms the direction forks in §Direction. Steps use checkbox (`- [ ]`) syntax. Do not start Programs 2–9 until Program 0 is merged and the program's own TDD plan exists.
 
 **Goal:** Close the gap between the settled screens, the later Ted-decided specs, and the live database/command/app layers — without a v1-style 276-migration rewrite, and without pretending 108 designed operations are one PR.
@@ -10,7 +15,7 @@
 
 **Spec:** This plan sequences, it does not replace:
 
-- Schema §1–§15 (migrated) and §16 (not migrated): `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md`
+- Schema §1–§15 and §16 (all now migrated; read status from `supabase/migrations`): `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md`
 - Decisions: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`
 - Locations/bins/transfers (Ted 2026-09-06): `.agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md` and plan `.agents/superpowers/plans/2026-09-06-locations-bins-phase1.md`
 - Packaging plan-by-product (Ted 2026-09-05): `.agents/superpowers/specs/2026-09-05-mgr-packaging-source-planning.md`
@@ -95,6 +100,10 @@ Screens already drew price tiers as **format default + per-SKU override** so Men
 
 ### D6. Parked gates (do not un-park without a dedicated durability plan)
 
+> **Status (2026-10-10):** every gate below has since shipped through its own program
+> (Programs 11–16 and the 2026-09-08/09 specs); each command is registered in `lib/commands`.
+> The list is the 2026-09-07 parking decision, kept as history.
+
 These stay registered-fail-closed or SCHEMA-GATE until their own plan exists. Confirm they are out of this unification program:
 
 - `provision_brewery` (pre-tenant context)
@@ -110,13 +119,13 @@ These stay registered-fail-closed or SCHEMA-GATE until their own plan exists. Co
 
 **Recommended:** yes, park all of the above. A SCHEMA-GATE in `screens.tsx` `writes` stays until that program is scheduled.
 
-### D7. Open product questions that still block a later program
+### D7. Product questions (all decided 2026-09-07)
 
 Not this pass, but do not "just pick" them during execution:
 
-- §16.16 q2: does a poured format bind to one packaged format, or to a brand? Blocks `pos_menus`.
-- §16.16 q3: taproom-role RLS. Blocks shipping the role chip.
-- §16.16 q4: keg fill quarters/eighths vs weighing. Blocks tap-swap remaining input precision.
+- §16.16 q2 (decided 2026-09-07): a poured format belongs to a brand, not a packaged format.
+- §16.16 q3 (decided; shipped): taproom-role RLS per `specs/2026-09-08-mgr-taproom-role-rls.md`.
+- §16.16 q4 (decided): remaining fill is three chips (Empty, about ¼, about ½); no weighing.
 - DRIFT.md: `not_in_inventory` tap interval has no beer identity; taproom variance screens still do not post TTB removal types.
 
 ---
@@ -242,7 +251,7 @@ These are the "best possible way for maintenance" the request asked for. They ex
 
 ## Program plans (TDD, 2026-09-07)
 
-Each program is a separate writing-plans artifact. Execute in order. Program 0 is specified in this file; 1–9 are:
+Each program is a separate writing-plans artifact. Execute in order. Program 0 is specified in this file; 1–16 (plus 4b) are:
 
 | Program | Plan |
 | --- | --- |
@@ -251,6 +260,7 @@ Each program is a separate writing-plans artifact. Execute in order. Program 0 i
 | 2 Locations / bins / transfers | `.agents/superpowers/plans/2026-09-07-backend-program-2-locations-bins.md` (phase 1 still `.agents/superpowers/plans/2026-09-06-locations-bins-phase1.md`, retargeted) |
 | 3 Catalog identity | `.agents/superpowers/plans/2026-09-07-backend-program-3-catalog-identity.md` |
 | 4 Sale channels | `.agents/superpowers/plans/2026-09-07-backend-program-4-sale-channels.md` |
+| 4b Pricing grid naming | `.agents/superpowers/plans/2026-09-07-backend-program-4b-pricing-grid-naming.md` |
 | 5 Production / packaging | `.agents/superpowers/plans/2026-09-07-backend-program-5-production-packaging.md` |
 | 6 Purchasing | `.agents/superpowers/plans/2026-09-07-backend-program-6-purchasing.md` |
 | 7 Keg fleet | `.agents/superpowers/plans/2026-09-07-backend-program-7-taproom-kegs.md` |
@@ -324,7 +334,7 @@ Recipes (assumption columns SCHEMA-GATE — land the columns, drop stored OG/FG/
 
 ### Program 7 — Taproom and kegs
 
-Keg pools/events with location+bin (after Program 2), fleet screens. Tap board / `keg_taps` / swap wait on D7 q2/q4 and the durable count gate. Do not ship `staff_role = taproom`.
+Keg pools/events with location+bin (after Program 2), fleet screens. Tap board / `tap_intervals` / swap shipped after D7 q2–q4 were decided 2026-09-07 and the count model landed. The `taproom` role shipped with its RLS (`specs/2026-09-08-mgr-taproom-role-rls.md`).
 
 ### Program 8 — Delivery and routes
 
@@ -495,7 +505,7 @@ CI (`bun run test`, lint, tsc, `next build`) remains the merge gate. Database-ba
 | Two UIs forever | Medium | D3A: rewrite the live page when we touch it. |
 | `direct` PO email without Resend approval | Medium | D6/Program 6: mailto + external first. |
 | Chat-jobs pollution while tests still share a DB | High until 0.1 | Known; disconnect leftover installations or wait for `mgr_test`. |
-| Opening taproom role with P-staff | High | Enum value does not ship until RLS is designed. |
+| Opening taproom role with P-staff | High | Resolved: the role shipped with its RLS (`specs/2026-09-08-mgr-taproom-role-rls.md`). |
 | Scope explosion to QBO/Square/AI | High | D6 park list. A screen remaining gated is success, not failure. |
 
 ## v1 cross-check (folded in, not a separate pass)
@@ -523,4 +533,4 @@ Do not repeat: generic entity DSL, client-side writes, migration chain, vessel s
 
 Program 0 is small enough for inline execution in this session.
 
-Programs 1–9: subagent-driven, one program at a time, with a writing-plans file per program (locations phase 1 already exists — retarget its worktree line to `.agents/worktrees/backend`).
+Programs 1–16: subagent-driven, one program at a time, with a writing-plans file per program (locations phase 1 already exists — retarget its worktree line to `.agents/worktrees/backend`).

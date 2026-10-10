@@ -1,10 +1,15 @@
 # Program 7 — Taproom kegs (not the tap board) Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Keg fleet balances are per pool × size × location × bin, so "36 in the taproom, 40 in storage" is two rows. Staff can acquire, retire, ship, and return empties through named commands.
 
-**Architecture:** `keg_pools` and `keg_events` already exist; Program 2 put `location_id`+`bin_id` on `keg_events`. This program is commands + the Keg fleet screen. The tap board (`keg_taps`, swap, kick, tap) and weekly count stay SCHEMA-GATE.
+**Architecture:** `keg_pools` and `keg_events` already exist; Program 2 put `location_id`+`bin_id` on `keg_events`. This program is commands + the Keg fleet screen. The tap board (`keg_taps`, swap, kick, tap) and weekly count stayed SCHEMA-GATE in this program; both have since shipped through Program 12 (`tap_intervals`, `taproom_counts`, `list_taproom_counts`) and are no longer gated.
 
 **Tech Stack:** Same as Program 1. New `lib/commands/taproom.ts` (keg RPCs only).
 

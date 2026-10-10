@@ -1,6 +1,6 @@
 # Independent screen-parity queue
 
-Status: implemented in stacked PRs; awaiting merge. Inspected 2026-09-10 against `origin/main` at
+Status: complete; #290–#292 and #294–#296 merged 2026-09-10. Inspected 2026-09-10 against `origin/main` at
 `b3d536c` and the `taproom-truth/.local/handoffs/mgr-sol-2026-09-08` handoff.
 
 Five presentation slices, covering seven screen records. These avoid the

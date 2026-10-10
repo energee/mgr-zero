@@ -15,7 +15,7 @@ Audited revision `be1079352a06`. Reviewed and amended 2026-09-27; the amendments
 
 The highest-priority blockers are lot identity lost during repacking; recipe quantities whose meaning changes after a material-unit edit; uncertain command outcomes that users can inadvertently resubmit as new work; missing buyer offboarding; permanently refused delivery recovery; incomplete brew-day/material accounting; and misleading deposit balances. These are concrete workflow/data problems, not requests for a larger ERP.
 
-**Agreed scope:** Full ten-slice v1; pilot assessed separately. Decisions D1–D16 below now distinguish required functionality from explicit deferrals. These decisions set the completion target; they do not mark unfinished implementation complete or authorize code changes.
+**Agreed scope:** Full ten-slice v1; pilot assessed separately. Decisions D1–D19 below now distinguish required functionality from explicit deferrals. These decisions set the completion target; they do not mark unfinished implementation complete or authorize code changes.
 
 | Required for v1 | Explicitly outside or deferred from v1 |
 |---|---|
@@ -343,7 +343,7 @@ No hosted action in this list was performed. Future deployments and hosted chang
 
 **D19 — Brew-day consumption timing: adopted recommendation, Option A.** Record actual ingredient quantities and lots atomically with the completed brew-day record. Recipe quantities may prefill the form but require confirmation; only that commit changes inventory. Incremental recording during the brew is outside v1. On-hand inventory therefore continues to include material physically used during an unrecorded brew; make that timing explicit. Planning requirements are separate from on-hand stock. Later corrections preserve history under D3.
 
-**Remaining recommendations adopted by user instruction.** Preserve D1–D18, including choices that differed from the original recommendation. Do not continue routine interactive product prompts. These defaults complete the current planning pass:
+**Remaining recommendations adopted by user instruction.** Preserve D1–D19, including choices that differed from the original recommendation. Do not continue routine interactive product prompts. These defaults complete the current planning pass:
 
 | Area | Adopted behavior | Completion evidence |
 |---|---|---|

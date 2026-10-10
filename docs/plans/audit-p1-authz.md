@@ -1,5 +1,11 @@
 # Audit P1 Authorization Remediation Plan
 
+> **Historical:** executed on branch `audit-p1-authz` at `0bbf07a`. Task 6 (blocked
+> import and invites) was later reversed: `import_csv`, `invite_staff` and
+> `invite_customer_user` are live commands. The in-place baseline rule ended with
+> #285 (landed pre-#285): schema changes are new timestamped migrations plus
+> `bun run migrations:lock`.
+
 > Approved execution plan for the P1 authorization findings demonstrated at audit snapshot `96ba05c`. Execute in `audit-p1-authz`; keep the schema as `supabase/migrations/00001_baseline.sql`.
 
 **Goal:** Make the database enforce MGR's command roles, Data API exposure, integration-secret isolation, portal invariants, counter isolation, and blocked import/invite release gates.
