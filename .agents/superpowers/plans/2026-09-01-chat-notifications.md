@@ -13,9 +13,10 @@
 ## Global Constraints
 
 > **Status:** Tasks 1–13 shipped (`lib/commands/chat.ts`, `app/(app)/settings/chat`,
-> `scripts/render-slack-manifest.ts`, `tests-e2e/chat-previews.ts`). Task 14's
-> documentation landed in `.agents/ARCHITECTURE.md` and the staff guide; its boxes
-> are left unticked because the manual Slack sandbox run was not recorded here.
+> `scripts/render-slack-manifest.ts`, `tests-e2e/chat-previews.ts`), except Task 13
+> Step 4: the manual Slack sandbox matrix was never recorded, so that box stays
+> unticked. Task 14's documentation landed in `.agents/ARCHITECTURE.md` and the
+> staff guide; its boxes stay unticked because its final gate was not recorded here.
 > Landed pre-#285: the "edit the baseline in place" constraint below is history;
 > schema changes are new timestamped migrations plus `bun run migrations:lock`.
 > Commands below use `npx`/`npm`; this repo now runs them with `bunx`/`bun run`.
@@ -1241,7 +1242,7 @@ Run: `npm run test:e2e:chat`
 
 Expected: Chrome completes disconnected preview navigation at 375px and 1440px, focus remains visible, modal close returns focus, and no Slack request occurs.
 
-- [x] **Step 4: Run the manual Slack sandbox matrix**
+- [ ] **Step 4: Run the manual Slack sandbox matrix** (not recorded; see Status above)
 
 Against a non-production workspace and seeded local/preview brewery:
 

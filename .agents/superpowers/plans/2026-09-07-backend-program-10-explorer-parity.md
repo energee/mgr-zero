@@ -52,7 +52,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
 export function ungatedMgrScreens(): { name: string }[]
 ```
 
-`ungatedMgrScreens` walks `SCREENS` and drops `venue`, and drops a screen if every write/read token is SCHEMA-GATE or IMPLEMENTATION-GATE **and** the body is only a gated verb (Weekly count stays out until Program 12). A screen with mixed available+gated writes (Team) **is in** the set.
+`ungatedMgrScreens` walks `SCREENS` and drops `venue`, and drops a screen if every write/read token is SCHEMA-GATE or IMPLEMENTATION-GATE **and** the body is only a gated verb (Weekly count stayed out until Program 12; it has since shipped, so it is no longer gated). A screen with mixed available+gated writes (Team) **is in** the set.
 
 - [ ] **Step 1:**
 

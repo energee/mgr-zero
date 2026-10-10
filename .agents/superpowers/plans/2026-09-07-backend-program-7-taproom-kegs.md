@@ -9,7 +9,7 @@
 
 **Goal:** Keg fleet balances are per pool × size × location × bin, so "36 in the taproom, 40 in storage" is two rows. Staff can acquire, retire, ship, and return empties through named commands.
 
-**Architecture:** `keg_pools` and `keg_events` already exist; Program 2 put `location_id`+`bin_id` on `keg_events`. This program is commands + the Keg fleet screen. The tap board (`keg_taps`, swap, kick, tap) and weekly count stay SCHEMA-GATE.
+**Architecture:** `keg_pools` and `keg_events` already exist; Program 2 put `location_id`+`bin_id` on `keg_events`. This program is commands + the Keg fleet screen. The tap board (`keg_taps`, swap, kick, tap) and weekly count stayed SCHEMA-GATE in this program; both have since shipped through Program 12 (`tap_intervals`, `taproom_counts`, `list_taproom_counts`) and are no longer gated.
 
 **Tech Stack:** Same as Program 1. New `lib/commands/taproom.ts` (keg RPCs only).
 
