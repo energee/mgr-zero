@@ -157,7 +157,7 @@ describe("Square publication residual specification fences", () => {
     const intentId = (claim.data as Array<{ intent_id: string }>)[0]!.intent_id;
     const replacement = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: f.ctx.userId,
       p_merchant_id: `seller-b-${crypto.randomUUID()}`, p_merchant_label: "Seller B", p_access_token: "seller-b-access",
-      p_refresh_token: "seller-b-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "seller-b-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"],
       p_locations: [{ id: "L1", name: "Seller B Taproom", status: "ACTIVE" }] });
     expect(replacement.error).toBeNull();
@@ -201,7 +201,7 @@ describe("Square publication residual specification fences", () => {
     const intentId = (claim.data as Array<{ intent_id: string }>)[0]!.intent_id;
     const reconnect = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: f.ctx.userId,
       p_merchant_id: f.merchantId, p_merchant_label: "Same seller", p_access_token: "same-seller-access-2",
-      p_refresh_token: "same-seller-refresh-2", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "same-seller-refresh-2", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"],
       p_locations: [{ id: "L1", name: "Taproom", status: "ACTIVE" }] });
     expect(reconnect.error).toBeNull();

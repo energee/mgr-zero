@@ -56,3 +56,8 @@ it("the live sheet mounts WaterView with profile ions and no salt identity yet, 
   expect(sheets).not.toMatch(/Suggest additions|Against target|salt:/);
   for (const page of ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"]) expect(readFileSync(page, "utf8")).toMatch(/toWaterProfileOption/);
 });
+
+it("links Water profiles from the Water sheet, the Brewer's way in (Brewer cannot open Catalog)", () => {
+  expect(html({ profilesHref: "/catalog/water-profiles" })).toMatch(/href="\/catalog\/water-profiles"[^>]*>[\s\S]*?Water profiles/);
+  expect(readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8")).toMatch(/profilesHref="\/catalog\/water-profiles"/);
+});

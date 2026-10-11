@@ -610,6 +610,8 @@ describe("SCREENS", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
     expect(html("Today")).not.toMatch(/Pick · 3 ready/);
     expect(html("Today")).toMatch(/data-row-action[^>]*>Pick</);
+    // The weekly count is live (record_taproom_count): Today draws no gated stand-in for it.
+    expect(html("Today")).not.toMatch(/data-gated/);
     expect(html("Sales")).not.toMatch(/<button[^>]*>New order</);
     expect(html("Sales")).toMatch(/New order/);
     expect(html("Brewer")).not.toMatch(/grid-cols-2/);
@@ -953,5 +955,36 @@ describe("SCREENS", () => {
     expect(html).not.toMatch(/Against target<\//);
     const water = SCREENS.find((s) => s.name === "Water")!;
     expect(String(water.spec)).toMatch(/post-v1/i);
+  });
+});
+
+describe("order lifecycle labels", () => {
+  it("name only order_status values on Order and Order detail", async () => {
+    // Delivery is a route-stop event, not an order status (F67): a delivered
+    // stop leaves the order shipped, drawn as the composite below.
+    const { Constants } = await import("../lib/supabase/database.generated");
+    const statuses = new Set<string>(Constants.public.Enums.order_status);
+    const notLifecycle = new Set(["stale", "permission", "adjusted", "shipped · stop delivered"]);
+    for (const name of ["Order", "Order detail"]) {
+      const labels = SCREENS.find((s) => s.name === name)!.states!.map(([label]) => label);
+      const bad = labels.flatMap((label) => notLifecycle.has(label) ? [] : label.split(" / ").filter((part) => !statuses.has(part)));
+      expect(bad, name).toEqual([]);
+      expect(labels).toContain("shipped · stop delivered");
+    }
+    expect(readFileSync("components/mgr/views/confirm-order.tsx", "utf8")).not.toMatch(/shipped \{E\.arrow\(\)\} delivered/);
+  });
+});
+
+describe("screen command tokens", () => {
+  it("every reads/writes command is registered or tagged [design] or a gate", async () => {
+    // An unregistered, untagged read silently gates a live screen (X85:
+    // get_material_shortfalls hid Schedule packaging run). [view] is not a tag that excuses it.
+    const { taggedOperations } = await import("../lib/mgr/screen-routes");
+    const { getCommandDefinition } = await import("../lib/commands/registry");
+    const bad = SCREENS.filter((s) => !s.venue).flatMap((s) => (["reads", "writes"] as const).flatMap((field) =>
+      taggedOperations(s[field])
+        .filter((t) => !getCommandDefinition(t.name) && !/\[design|GATE|\[platform|\[client state/.test(t.tag))
+        .map((t) => `${s.name} ${field}: ${t.name}`)));
+    expect(bad).toEqual([]);
   });
 });

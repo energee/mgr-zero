@@ -1,6 +1,6 @@
 // tests/water-profiles-view.test.ts — list_water_profiles rows → Water profiles view-model (issue #278).
 import { describe, expect, it } from "vitest";
-import { IONS, ionLine, toWaterProfilesViewProps, type WaterProfile } from "@/lib/mgr/water-profiles-view";
+import { IONS, ionLine, toWaterProfilesViewProps, waterProfilesBack, type WaterProfile } from "@/lib/mgr/water-profiles-view";
 import { IONS as CHEMISTRY_IONS } from "@/lib/water-chemistry";
 
 const hazy: WaterProfile = { id: "p1", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40 };
@@ -17,5 +17,10 @@ describe("water profiles view", () => {
   });
   it("no profiles is the empty state", () => {
     expect(toWaterProfilesViewProps({ profiles: [] }).empty?.title).toBe("No water profiles yet");
+  });
+  it("sends Brewer back to Recipes, since Brewer cannot open Catalog", () => {
+    expect(waterProfilesBack("brewer")).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(waterProfilesBack("admin")).toEqual({ label: "Catalog", href: "/catalog" });
+    expect(toWaterProfilesViewProps({ profiles: [], back: waterProfilesBack("brewer") })).toMatchObject({ backLabel: "Recipes", backHref: "/recipes" });
   });
 });
