@@ -76,11 +76,11 @@ describe("QuickBooks OAuth lifecycle", () => {
 
     await expect(callback()).resolves.toBe("connection-1");
     expect(complete).toHaveBeenLastCalledWith("intent-1", "actor-1", "realm-1",
-      expect.objectContaining({ grantedScopes: requestedScopes }));
+      expect.objectContaining({ grantedScopes: requestedScopes }), null);
 
     await expect(callback("com.intuit.quickbooks.accounting")).resolves.toBe("connection-1");
     expect(complete).toHaveBeenLastCalledWith("intent-1", "actor-1", "realm-1",
-      expect.objectContaining({ grantedScopes: ["com.intuit.quickbooks.accounting"] }));
+      expect.objectContaining({ grantedScopes: ["com.intuit.quickbooks.accounting"] }), null);
 
     complete.mockClear();
     await expect(callback("com.intuit.quickbooks.accounting unrequested.scope")).rejects.toThrow("QuickBooks is unavailable");
@@ -106,7 +106,25 @@ describe("QuickBooks OAuth lifecycle", () => {
       },
     })).resolves.toBe("connection-1");
     expect(String(fetch.mock.calls[1][0])).toBe("https://sandbox-quickbooks.api.intuit.com/v3/company/9341452071117966/companyinfo/9341452071117966?minorversion=75");
-    expect(complete).toHaveBeenCalledWith("intent-1", "actor-1", "9341452071117966", expect.any(Object));
+    expect(complete).toHaveBeenCalledWith("intent-1", "actor-1", "9341452071117966", expect.any(Object), null);
+  });
+
+  it("stores the verified CompanyName as the realm label, not the realm id", async () => {
+    const complete = vi.fn().mockResolvedValue("connection-1");
+    await completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=realm-1`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1", CompanyName: "  Test Company  " } }), { status: 200 }))),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
+        complete, fail: vi.fn(), realmInUse: realmFree,
+      },
+    });
+    expect(complete).toHaveBeenCalledWith("intent-1", "actor-1", "realm-1", expect.any(Object), "Test Company");
   });
 
   it("does not exchange an invalid intent", async () => {

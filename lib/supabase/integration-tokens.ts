@@ -180,9 +180,10 @@ export async function claimQboOAuth(stateHash: string, actorId: string, breweryI
   };
 }
 
-export async function completeQboOAuthStore(intentId: string, actorId: string, realmId: string, tokens: import("@/lib/qbo").QboTokens) {
+/** Falls back to the realm id as the label when QuickBooks returned no CompanyName, so the label is never empty. */
+export async function completeQboOAuthStore(intentId: string, actorId: string, realmId: string, tokens: import("@/lib/qbo").QboTokens, realmLabel: string | null = null) {
   const { data, error } = await createAdminClient().rpc("complete_qbo_oauth", {
-    p_intent: intentId, p_actor: actorId, p_realm_id: realmId, p_realm_label: realmId,
+    p_intent: intentId, p_actor: actorId, p_realm_id: realmId, p_realm_label: realmLabel ?? realmId,
     p_access_token: tokens.accessToken, p_refresh_token: tokens.refreshToken,
     p_received_at: tokens.receivedAt,
     p_access_seconds: tokens.accessExpiresIn, p_refresh_seconds: tokens.refreshExpiresIn, p_hard_seconds: tokens.refreshHardExpiresIn,
@@ -196,6 +197,15 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
 export async function failQboOAuth(intentId: string, actorId: string) {
   const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
+  return data === true;
+}
+
+/** True when this Admin already completed this OAuth state for this brewery: a duplicate callback, not a failure. */
+export async function qboOAuthAlreadyCompleted(stateHash: string, actorId: string, breweryId: string) {
+  const { data, error } = await createAdminClient().rpc("qbo_oauth_already_completed", {
+    p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId,
+  });
+  if (error) throw new Error("QuickBooks OAuth state lookup failed");
   return data === true;
 }
 
