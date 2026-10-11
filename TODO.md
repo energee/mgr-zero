@@ -1,6 +1,7 @@
 # TODO — remaining v1 work
 
-Execution index: [#658](https://github.com/energee/mgr-zero/issues/658).
+Release index: [#311](https://github.com/energee/mgr-zero/issues/311) (hosted readiness; AI credits in #329).
+The v1 execution index #658 is closed: Waves 1–4 and 6 merged.
 Refreshed 2026-10-10 against main at `b180c6e7`. Waves 1–4 and 6 are done:
 every issue they listed is closed. What is done is in `.agents/PROGRESS.md`;
 what is in flight is the open PR list.
