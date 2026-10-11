@@ -92,7 +92,7 @@ Formula: use `brewing-domain.md` constants. If the domain doc does not spell the
 - `upsert_vessel({ id?, name, kind, capacityBbl })` admin/brewer
 - `list_vessels`
 - `schedule_batch({ intendedBrandId?, recipeVersionId?, plannedOn, plannedBbl, note? }) => { batchId }` — `intended_brand_id` nullable
-- `record_brew_day({ batchId, vesselId, initialBbl, brewedOn })` — one RPC: `batches.brewed_on`, open `vessel_occupancies` (exclusion on vessel). Reject if vessel occupied.
+- `record_brew_day({ batchId, vesselId, initialBbl, brewedOn })` — one RPC: `batches.brewed_on`, open `vessel_occupancies` (exclusion on vessel). Reject if vessel occupied (by another batch, once #807 lands).
 - `get_brew_day({ batchId })`
 - `list_batches`
 

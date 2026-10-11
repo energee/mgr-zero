@@ -71,7 +71,7 @@ production even if another receipt used the same lot in a different bucket.
 
 `po_open_balances` counts only effective receipt lines. Recompute PO status
 inside the same transaction and allow a previously received PO to become
-partially received again after a lower corrected count. Other effective
+partially received again after a lower corrected count (unless it was closed short — see #806). Other effective
 receipts still contribute. Expected quantity and variance on the replacement
 are measured against the order excluding the replaced revision.
 
