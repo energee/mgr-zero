@@ -12,7 +12,7 @@ describe("Square provider boundary", () => {
   it("uses the server OAuth code flow and supported API revision", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       access_token: "access-secret", refresh_token: "refresh-secret",
-      expires_at: "2026-10-10T12:00:00Z", merchant_id: "merchant-1",
+      expires_at: "2030-01-01T12:00:00Z", merchant_id: "merchant-1",
     }), { status: 200 }));
     const client = new SquareClient(config, fetch);
     const authorize = new URL(client.authorizeUrl("opaque-state"));
