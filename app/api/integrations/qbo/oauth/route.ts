@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
-import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, qboRealmInUse } from "@/lib/supabase/integration-tokens";
+import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, qboOAuthAlreadyCompleted, qboRealmInUse } from "@/lib/supabase/integration-tokens";
 import { getActiveBrewery } from "@/lib/brewery";
 
 export async function GET(request: Request) {
@@ -16,14 +16,27 @@ export async function GET(request: Request) {
     const activeBrewery = await getActiveBrewery();
     if (typeof actorId !== "string" || activeBrewery.role !== "admin"
       || (picked && picked !== activeBrewery.id)) throw new Error("oauth state invalid");
-    await completeQboOAuth({
-      request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
-      client: new QboOAuthClient(config),
-      store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
-    });
+    // QuickBooks can deliver a second callback for one consent; the first
+    // already connected, so the replay reports that instead of a failure.
+    const claim = async (stateHash: string, actor: string, breweryId: string, redirectUri: string) => {
+      const claimed = await claimQboOAuth(stateHash, actor, breweryId, redirectUri);
+      if (!claimed && await qboOAuthAlreadyCompleted(stateHash, actor, breweryId)) throw new AlreadyConnected();
+      return claimed;
+    };
+    try {
+      await completeQboOAuth({
+        request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
+        client: new QboOAuthClient(config),
+        store: { claim, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      });
+    } catch (error) {
+      if (!(error instanceof AlreadyConnected)) throw error;
+    }
     destination.searchParams.set("connected", "1");
   } catch {
     destination.searchParams.set("error", "oauth");
   }
   return NextResponse.redirect(destination, 303);
 }
+
+class AlreadyConnected extends Error {}

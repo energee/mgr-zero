@@ -53,7 +53,8 @@ export type QboOAuthClaim = {
 };
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
-  complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
+  /** realmLabel is the verified QuickBooks CompanyName, or null when QuickBooks returned none. */
+  complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens, realmLabel: string | null): Promise<string>;
   /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
   fail(intentId: string, actorId: string): Promise<boolean>;
   /** True when a stored (not disconnected) connection of any brewery uses this QuickBooks realm. */
@@ -246,11 +247,11 @@ export async function completeQboOAuth(input: {
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
-    await input.client.verifyRealm(realmId, tokens.accessToken);
+    const companyName = await input.client.verifyRealm(realmId, tokens.accessToken);
     storing = true;
     return await input.store.complete(claim.intentId, input.actorId, realmId, {
       ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
-    });
+    }, companyName);
   } catch (error) {
     // Tokens issued but never stored would stay live at Intuit; revoking the
     // refresh token revokes its access token too. But Intuit's revoke
@@ -444,6 +445,7 @@ export class QboOAuthClient {
     return this.token(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
   }
 
+  /** Confirms the token can read this realm's CompanyInfo; returns its CompanyName (trimmed), or null when blank. */
   async verifyRealm(realmId: string, accessToken: string) {
     const escapedRealm = encodeURIComponent(realmId);
     const url = new URL(`/v3/company/${escapedRealm}/companyinfo/${escapedRealm}`, this.config.apiBaseUrl);
@@ -454,10 +456,12 @@ export class QboOAuthClient {
       redirect: "error",
     });
     if (!response.ok) throw new Error("QuickBooks company verification failed");
-    const body = await response.json() as { CompanyInfo?: { Id?: unknown } };
+    const body = await response.json() as { CompanyInfo?: { Id?: unknown; CompanyName?: unknown } };
     if (typeof body.CompanyInfo?.Id !== "string" || !body.CompanyInfo.Id.trim()) {
       throw new Error("QuickBooks company verification failed");
     }
+    const name = body.CompanyInfo.CompanyName;
+    return typeof name === "string" && name.trim() ? name.trim() : null;
   }
 
   async revoke(token: string) {

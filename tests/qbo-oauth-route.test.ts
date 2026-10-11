@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
-  claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(),
+  claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(), alreadyCompleted: vi.fn(),
 }));
 const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, role: "admin" }));
 
@@ -24,6 +24,7 @@ vi.mock("@/lib/supabase/integration-tokens", () => ({
   completeQboOAuthStore: lifecycle.complete,
   failQboOAuth: lifecycle.fail,
   qboRealmInUse: lifecycle.realmInUse,
+  qboOAuthAlreadyCompleted: lifecycle.alreadyCompleted,
 }));
 
 import { GET } from "@/app/api/integrations/qbo/oauth/route";
@@ -39,6 +40,7 @@ describe("QuickBooks OAuth callback route", () => {
     lifecycle.claim.mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] });
     lifecycle.fail.mockResolvedValue(undefined);
     lifecycle.realmInUse.mockResolvedValue(false);
+    lifecycle.alreadyCompleted.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -85,7 +87,7 @@ describe("QuickBooks OAuth callback route", () => {
 
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
     expect(lifecycle.complete).toHaveBeenCalledWith("intent-1", "actor-1", "realm-1",
-      expect.objectContaining({ grantedScopes: requestedScopes }));
+      expect.objectContaining({ grantedScopes: requestedScopes }), null);
   });
 
   it("rejects invalid state before provider fetch", async () => {
@@ -98,6 +100,23 @@ describe("QuickBooks OAuth callback route", () => {
     ));
 
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
+    expect(lifecycle.alreadyCompleted).toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(lifecycle.complete).not.toHaveBeenCalled();
+  });
+
+  it("reports connected when a duplicate callback replays a state this Admin already completed", async () => {
+    lifecycle.claim.mockResolvedValue(null);
+    lifecycle.alreadyCompleted.mockResolvedValue(true);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await GET(new Request(
+      "https://mgr.test/api/integrations/qbo/oauth?code=second-code&state=opaque&realmId=realm-1",
+    ));
+
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
+    expect(lifecycle.alreadyCompleted).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), "actor-1", "brewery-1");
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
   });

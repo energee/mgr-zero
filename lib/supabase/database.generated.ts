@@ -8952,6 +8952,10 @@ export type Database = {
         Returns: Json
       }
       prune_command_requests: { Args: never; Returns: number }
+      qbo_oauth_already_completed: {
+        Args: { p_actor: string; p_brewery: string; p_state_hash: string }
+        Returns: boolean
+      }
       raise_invoice_question: {
         Args: {
           p_body: string
