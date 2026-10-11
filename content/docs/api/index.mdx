@@ -144,7 +144,8 @@ when QuickBooks has reported a positive balance, reads its payment link on the
 server, rechecks the balance and access, and redirects without returning or
 storing that bearer link in the command API. A zero or unknown current balance
 leaves payment unavailable; a reopened invoice with a positive balance remains
-eligible; a live sync without cash-paid status clears its payment-confirmation
+eligible, unless a sync stopped reading it 90 days after first seeing it paid,
+voided, or deleted; a live sync without cash-paid status clears its payment-confirmation
 marker, including credit-only closure. No settlement date is supplied. A reconnect,
 credential rotation, or loss of the required accounting permission while the
 link is being fetched also leaves payment unavailable.
