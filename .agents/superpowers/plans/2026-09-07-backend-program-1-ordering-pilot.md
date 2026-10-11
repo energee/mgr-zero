@@ -1,5 +1,10 @@
 # Program 1 — Ordering pilot Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A brewery can run wholesale end-to-end against real data on the current schema: Today shows the work, short picks and restocks resolve, ship can defer the invoice until delivery, returns credit and optionally write loss, portal account/invoice reads match the screens.

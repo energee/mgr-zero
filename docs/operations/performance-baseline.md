@@ -73,4 +73,4 @@ The `/api/command` Server view contained 358 modules totaling an estimated 716.0
 
 ## Follow-up production measurement
 
-No deployed URL or real-user sample exists yet, so LCP, INP, CLS, FCP, and TTFB remain unmeasured. After deployment, establish field baselines in Vercel Speed Insights against LCP < 2.5 s, INP < 200 ms, CLS < 0.1, FCP < 1.8 s, and TTFB < 800 ms. Configure any observability drains through the Vercel Dashboard or REST API rather than application bundle code.
+A production deployment exists, but no field Web Vitals sample has been collected, so LCP, INP, CLS, FCP, and TTFB remain unmeasured. Establish field baselines in Vercel Speed Insights against LCP < 2.5 s, INP < 200 ms, CLS < 0.1, FCP < 1.8 s, and TTFB < 800 ms. Configure any observability drains through the Vercel Dashboard or REST API rather than application bundle code.

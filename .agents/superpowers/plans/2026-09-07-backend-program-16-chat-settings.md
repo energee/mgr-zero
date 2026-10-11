@@ -1,5 +1,9 @@
 # Program 16 — Chat settings and Slack actions Implementation Plan
 
+> **Status:** Tasks 1–3 done (chat plan Tasks 11–13: `snooze_notification`,
+> `get_chat_integration_health`, `/settings/chat`, the Slack manifest renderer and
+> preview smoke). Task 4's documentation is in ARCHITECTURE and the staff guide.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Finish the Slack-first chat plan so MGR has a real Chat settings page and Slack has snooze/mute/preferences actions. Slack **venue** frames stay in the explorer; this program makes the MGR screens and the live Slack actions those frames describe.

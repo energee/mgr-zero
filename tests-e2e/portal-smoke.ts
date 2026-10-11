@@ -11,8 +11,7 @@
 // normal run. Lightpanda is NOT attempted — its `fill`/`type` don't reliably
 // drive React's controlled-input state here (the DOM value updates but the
 // qty state gating the Submit button never does — see the `submitState`
-// assertion below), so trying it first was pure latency. Benchmark and
-// status: `.ecc/benchmarks/e2e-engines-2026-08-31.json`.
+// assertion below), so trying it first was pure latency (Lightpanda currently cannot drive React controlled inputs (checked 2026-08-31)).
 //
 // The engine list is still a loop, so re-testing a newer lightpanda nightly
 // is `E2E_ENGINES=lightpanda,chrome bun run test:e2e`: each engine gets a
@@ -221,8 +220,7 @@ async function main() {
     }
 
     // Chrome-only by default: lightpanda's nightly can't drive React
-    // controlled inputs yet (see .ecc/benchmarks/e2e-engines-2026-08-31.json),
-    // so the attempt is pure overhead. E2E_ENGINES=lightpanda,chrome re-enables
+    // controlled inputs yet (checked 2026-08-31), so the attempt is pure overhead. E2E_ENGINES=lightpanda,chrome re-enables
     // the fallback chain for re-testing newer nightlies.
     // ?? only covers undefined: E2E_ENGINES="" yielded [""] and the suite ran once
     // against a nameless engine, failing deep inside agent-browser. Trim too, so

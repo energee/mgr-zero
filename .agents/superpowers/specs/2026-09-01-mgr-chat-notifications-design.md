@@ -33,7 +33,7 @@ The first implementation is Slack-only. The MGR data model and notification cont
 - Personal DMs are state-change driven. The team channel receives morning and midday unresolved summaries.
 - Brewery timezone and default quiet hours control delivery; linked users may override their own quiet hours.
 - No notification class bypasses quiet hours in the first release. App Home remains current during quiet hours.
-- The first notification bundle is submitted orders, picks due, assigned next delivery, and overdue fermentation readings.
+- The first notification bundle is submitted orders, picks due, assigned next delivery, and overdue fermentation readings. Stage 2 extends these four to the seven reasons in `lib/commands/chat.ts`.
 - MGR owns a brewery-level fermentation reading cadence, default 24 hours and bounded to 1–168 hours. The same value drives Today and every chat provider.
 - Projection-only ships before any MGR domain mutation from Slack.
 - Fermentation reading is the first candidate operational modal after the trust and replay gates close.
@@ -683,7 +683,7 @@ Any cross-tenant disclosure, unauthorized action, token exposure, repeated dupli
 - Postgres state adapter works with runtime DDL confined to the isolated `chat_sdk` schema and no public-schema access;
 - concurrent workspace token resolution cannot bleed across installations.
 
-### 22.3 Preview and wireframe verification
+### 22.3 Preview verification
 
 - fixture coverage for disconnected, active, link, App Home, DM, digest, preferences, gated forms, and reauthorization states;
 - fixture content contains no contact, price, license, credential, signature, free-text note, or hidden identifier fields;
@@ -691,7 +691,7 @@ Any cross-tenant disclosure, unauthorized action, token exposure, repeated dupli
 - Settings previews make no provider API call and do not read live tenant subjects;
 - pure renderer tests cover fixture labels and gated-state copy without a provider call;
 - browser verification covers keyboard selection, visible focus, modal focus return, responsive reflow, and the production Settings gallery at phone and desktop widths;
-- the wireframe artifact renders 73 total frames, 10 Chat frames, both phone/desk modes, and no horizontal overflow.
+- the screen inventory at `/docs/screens` and `tests/mgr-screens.test.ts` render every Chat frame in both phone/desk modes with no horizontal overflow.
 
 ### 22.4 Adapter conformance suite
 
@@ -746,7 +746,7 @@ No domain writes from Slack.
 
 ### Stage 2 — daily operations projection
 
-Enable the seven current reasons through App Home, state-change DMs, and twice-daily private operations summaries. Add quiet hours, message update/resolution, and integration health.
+Enable the seven current reasons (`submitted_order`, `pick_due`, `restock_due`, `delivery_next`, `fermentation_reading_overdue`, `invoice_question`, `operations_digest`; `lib/commands/chat.ts`) through App Home, state-change DMs, and twice-daily private operations summaries. Add quiet hours, message update/resolution, and integration health.
 
 ### Stage 3 — integration-owned forms
 
@@ -774,7 +774,7 @@ Implementation updates all affected owners in the same logical changes:
 
 - `.agents/ARCHITECTURE.md`;
 - schema design and schema decisions;
-- UI layout plan and wireframes;
+- UI layout plan and screen inventory;
 - `content/docs/index.mdx` and the applicable staff or portal guide;
 - `README.md` environment, setup, OAuth, and local Slack testing;
 - Slack app manifest and scope rationale;
@@ -804,7 +804,7 @@ The implementation plan must:
 - begin with the compatibility/trust spike and stop on a failed proof;
 - name tests before implementation work;
 - distinguish existing commands from planned/gated capabilities;
-- keep schema changes in the baseline migration while the product remains pre-deploy;
+- keep schema changes in the baseline migration while the product remains pre-deploy (historical, pre-#285: schema changes are now new timestamped migrations plus `bun run migrations:lock`);
 - serialize tasks that share the migration, registry, or integration route boundary;
 - identify safe parallel tracks for transport fixtures, provider-neutral notification logic, settings UI, and documentation;
 - include full real-Postgres, type-check, lint, and Slack sandbox verification gates;

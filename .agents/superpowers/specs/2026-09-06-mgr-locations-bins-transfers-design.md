@@ -1,7 +1,10 @@
 # MGR — Locations, bins, and internal stock transfers
 
 Date: 2026-09-06
-Status: Decided with Ted; not yet implemented. Three phases, each its own PR.
+Status: Implemented, phases 1–3 (`bins`, `stock_transfers`, `move_stock_bin`,
+`create_stock_transfer`, `receive_stock_transfer`, polymorphic deliveries). The
+`taproom_pars` re-key stays deferred. Landed pre-#285: schema changes are new
+timestamped migrations plus `bun run migrations:lock`. Three phases, each its own PR.
 Amends: `2026-08-31-mgr-schema-design.md` — `locations` is no longer a flat two-kind
 list, `material_movements` / `keg_events` stop being location-blind, and decision #6
 ("materials have no locations") is reversed. Adopts §16.6 (bins, decided 2026-09-02)
@@ -167,9 +170,8 @@ location and a bin. The work is mechanical, and it is the bulk of phase 1's chur
 
 ### Why this is cheap to do at all
 
-AGENTS.md authorises editing `00001_baseline.sql` in place, and nothing is deployed. These
-are edits to the baseline plus `supabase db reset` — no second migration file, no backfill,
-no versioning. Adding a location dimension to a live ledger would be a far larger piece of
+Historical (pre-#285): nothing was deployed yet, so these were edits to the baseline plus
+`supabase db reset` — no second migration file, no backfill, no versioning. Adding a location dimension to a live ledger would be a far larger piece of
 work; doing it now costs almost nothing.
 
 ## Decision 3 — `stock_transfers`, not a third order kind

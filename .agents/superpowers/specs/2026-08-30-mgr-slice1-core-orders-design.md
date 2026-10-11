@@ -2,6 +2,10 @@
 
 Date: 2026-08-30
 Status: Approved by Ted (in-chat design review)
+Whether a table, command or gate exists is read from `supabase/migrations`,
+`lib/commands/registry.ts` and `components/mgr/screens.tsx`; this document
+records product intent and decisions. Gates below that later work resolved are
+marked so in place.
 
 ## Product context
 
@@ -17,7 +21,7 @@ MGR is a multi-brewery SaaS for brewery operations. Full capability map (each it
 | 6 | Compliance reporting | TTB Brewer's Report of Operations + pluggable per-state excise (PA first, OH next) as pure functions over the movement ledger; CBMA reduced-rate table; COLA/formula approval tracking per product + state brand registrations per destination state |
 | 7 | POS reconciliation | Square ingest, exact package-SKU + `qty_per_sale` mapping (for example 16 oz draft = 1/124 of a ½-bbl keg), taproom depletion vs. transfer reconciliation (other POS later); reconciliation stays disabled until both mapping fields validate |
 | 8 | Planning | Order demand vs. planned brew/packaging schedule; feeds requirements engine ("Sept 12 packaging day short 4,000 labels, 10-day lead time — draft PO?") |
-| 9 | Keg fleet | Owned-keg asset ledger: acquired/retired/shipped/returned/lost/found events, with empty/filled/at-customer balances derived from those events plus FG inventory. Packaging fill lands FG; once this slice is enabled, order ship/beer-return appends the matching owned-fleet keg events in the same RPC as the FG/money effects. Empty-asset-only returns remain explicit keg events. Per-fill rental and one-way kegs are handled in slices 2/5, not here |
+| 9 | Keg fleet | Owned-keg asset ledger: acquired/retired/shipped/returned/lost/found events, with empty/filled/at-customer balances derived from those events plus FG inventory. Packaging fill lands FG. Keg fleet events are separate and explicitly recorded: `ship_order` and `return_shipment` post none, and the deposit refund and the Returned event are separate records (owner decision 2026-09-26, #577, PR #605). Per-fill rental and one-way kegs are handled in slices 2/5, not here |
 | 10 | Deliveries | Self-distribution logistics: routes and a derived truck load list. `ship_order` creates the shipment/removal rows and persists explicit invoice-on-delivery intent; `confirm_delivery` marks that existing shipment delivered and atomically creates its deferred invoice. Loading has no persisted status |
 
 ### Compliance research findings (constrain the ledger design)
@@ -25,6 +29,11 @@ MGR is a multi-brewery SaaS for brewery operations. Full capability map (each it
 - Wholesale into other states: destination-state supplier registration required; most states have the distributor remit excise, but **Ohio and Wisconsin require the out-of-state brewery to register and remit excise on volume shipped in**. Per-state excise reports with per-state rules are a launch-relevant requirement (PA brewery shipping to OH).
 - DTC beer shipping: only ~11 states + DC allow interstate DTC (2026), each with destination-state licenses, per-customer annual volume caps, and periodic shipment reports. PA requires more than a manufacturing license to ship.
 - Therefore: every inventory removal records channel + destination state + barrel volume in an **immutable ledger**; report generators (TTB BRO, PA, OH, …) are pure functions over it. DTC is schema-ready (channel enum + dest_state) but has no v1 flow.
+
+**Resolved:** `complete_batch`, `get_loss_review` and `reattribute_loss` are
+registered (`lib/commands/production.ts`, `lib/commands/compliance.ts`); the
+storage shape is decided in `2026-09-09-program12-completion-and-count-correction.md`.
+The original gate, kept as history:
 
 **SCHEMA-GATE — batch completion and cellar loss review:** do not enable
 `complete_batch`, automatic completion reconciliation, or its review/re-attribution
@@ -101,7 +110,9 @@ Rules: `brewery_id` + RLS everywhere in both modes; no "only one tenant" shortcu
 Self-serve provisioning is a target capability, not a current write path. It
 ships only after the command registry has a pre-tenant context; one registered
 `provision_brewery` command then creates the brewery and first admin membership
-through one `security invoker` Postgres function. Supabase Auth session calls
+through one explicitly granted `security definer` Postgres function (ARCHITECTURE rule 5;
+shipped as `lib/commands/tenancy.ts` and
+`supabase/migrations/20260924140000_provision_brewery_service_gate.sql`). Supabase Auth session calls
 are the non-domain exception to the registry, not permission to write these
 tables directly.
 
@@ -115,6 +126,9 @@ tables directly.
     with slice 4. These are permission bundles, not job-title enums: a taproom
     lead who records counts and a delivery driver each receive `warehouse`
     access (or `admin`), so no separate taproom/driver role is introduced.
+    (Historical: a `taproom` role later shipped with its own RLS, see
+    `2026-09-08-mgr-taproom-role-rls.md`. Roles stay one scalar per member;
+    multi-role is decided, not built, see #797.)
     Driver route reads/writes additionally require
     `routes.driver_user_id = auth.uid()` unless the caller is an admin.
   - **Wholesale customers**: `customer_users` (user_id, customer_id). A customer belongs to one brewery. RLS grants them their own orders/invoices and the brewery's orderable catalog with their assigned price list only.
@@ -156,13 +170,12 @@ SKU/location; materialize only if it measurably slows.
 
 `locations` — warehouse(s) + taprooms per brewery. Taproom transfer = a location move (not the taxpaid removal); the removal is recorded when beer is sold at the taproom via a `depletion` movement with `channel=taproom` — manual entry in slice 1 (weekly count / keg-blown), automated by Square ingest in slice 7. This is the TTB-correct treatment: taxpaid removal happens at sale, not at transfer.
 
-**SCHEMA-GATE — weekly taproom counts:** movement deltas alone do not prove that a
-count happened. An exact-as-expected count writes no movement, and changed rows
-cannot be grouped into one observation. Before `record_taproom_count`, its due
-state, or `get_taproom_count_snapshot` ships, add a durable count occurrence with
-expected/observed lines and optional linked adjustment movements. The entire
-count and all nonzero depletion/adjustment effects commit through one Postgres
-function; the movement ledger remains append-only.
+**Weekly taproom counts (shipped):** movement deltas alone do not prove that a
+count happened, so a count is a durable occurrence: `taproom_counts` with
+`taproom_count_lines`, both in `00001_baseline.sql`. `record_taproom_count`,
+`get_taproom_count_snapshot` and `correct_taproom_count` are registered in
+`lib/commands/taproom.ts`. A shortage posts exact-lot depletion whether or not
+Square is connected; the movement ledger remains append-only.
 
 DTC readiness: channel enum + dest_state already captured; per-customer annual volume is a query, not new schema.
 
@@ -188,11 +201,11 @@ DTC readiness: channel enum + dest_state already captured; per-customer annual v
 - Shipping atomically creates the shipment, writes `sale_removal` movements
   (`channel=wholesale`, destination state from ship-to), fulfils/releases
   allocations, and advances the order — ledger and order state cannot drift.
-- **SCHEMA-GATE — invoice timing:** ordinary versus self-delivery must be an
-  explicit, persisted shipment intent chosen before `ship_order` commits. The
-  current schema has no such field, so the command cannot yet safely decide
-  invoice-now versus invoice-on-delivery. Do not infer it from a null carrier or
-  a route that may be assigned later.
+- **Invoice timing (resolved):** ordinary versus self-delivery is an explicit,
+  persisted shipment intent chosen before `ship_order` commits:
+  `shipments.invoice_timing` (`now` | `on_delivery`), set by `ship_order`'s
+  `invoiceTiming` input. `on_delivery` defers the invoice to `confirm_delivery`.
+  It is never inferred from a null carrier or a route assigned later.
 - Invoices are generated per shipment; ordinary shipping creates one in that
   transaction. Self-delivery deliberately defers it: `confirm_delivery` only marks
   an existing shipment delivered and atomically creates its invoice; it never

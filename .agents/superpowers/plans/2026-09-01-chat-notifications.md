@@ -12,6 +12,15 @@
 
 ## Global Constraints
 
+> **Status:** Tasks 1–13 shipped (`lib/commands/chat.ts`, `app/(app)/settings/chat`,
+> `scripts/render-slack-manifest.ts`, `tests-e2e/chat-previews.ts`), except Task 13
+> Step 4: the manual Slack sandbox matrix was never recorded, so that box stays
+> unticked. Task 14's documentation landed in `.agents/ARCHITECTURE.md` and the
+> staff guide; its boxes stay unticked because its final gate was not recorded here.
+> Landed pre-#285: the "edit the baseline in place" constraint below is history;
+> schema changes are new timestamped migrations plus `bun run migrations:lock`.
+> Commands below use `npx`/`npm`; this repo now runs them with `bunx`/`bun run`.
+
 - Work only in `.agents/worktrees/plan-chat-notifications` on branch `plan/chat-notifications`.
 - Run `pwd`, `git branch --show-current`, and `git status --short` before the first edit and before every commit.
 - Task 1 must prove that Chat SDK runtime DDL is confined to private `chat_sdk`: the dedicated role may `CREATE` only there and must remain unable to access MGR public tenant data or any other application schema.
@@ -1050,27 +1059,27 @@ git commit -m "feat: deliver and recover chat notifications"
 - Consumes: active linked actor, opaque `chat_action_intents`, callback receipt dedupe.
 - Produces: snooze, mute/unmute reason, personal quiet-hours override, preferences modal, refresh, and unlink.
 
-- [ ] **Step 1: Write failing action tests**
+- [x] **Step 1: Write failing action tests**
 
 Cover opaque metadata, ten-minute intent expiry, one-time consumption, callback replay, installation/user/brewery binding, removed membership, snooze not changing Today due state, mute not hiding App Home, quiet-hour validation, refresh, and unlink.
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/commands-chat.test.ts tests/chat-webhook.test.ts`
 
-- [ ] **Step 3: Add idempotent integration-state RPCs**
+- [x] **Step 3: Add idempotent integration-state RPCs**
 
 Add `set_notification_preference`, `snooze_notification`, `set_personal_quiet_hours`, `consume_chat_action_intent`, and `unlink_chat_user`. Replayed callback receipts return the recorded disposition. Preference upserts and snooze-extension are monotonic/idempotent.
 
-- [ ] **Step 4: Register Slack actions and modal**
+- [x] **Step 4: Register Slack actions and modal**
 
 Use `bot.onAction` with action IDs `mgr_open`, `mgr_snooze`, `mgr_mute_reason`, `mgr_preferences`, `mgr_refresh`, and `mgr_unlink`. Open the preferences modal with the provider trigger ID immediately; perform writes after durable receipt. Unsupported provider/modal capability falls back to authenticated MGR.
 
-- [ ] **Step 5: Keep domain forms disabled**
+- [x] **Step 5: Keep domain forms disabled**
 
 Renderer tests must prove `fermentation-gated` and `order-confirm-gated` contain no executable provider action intent and only expose `open_mgr`.
 
-- [ ] **Step 6: Run green and commit**
+- [x] **Step 6: Run green and commit**
 
 Run:
 
@@ -1102,11 +1111,11 @@ git commit -m "feat: add Slack notification preferences"
 - Consumes: `get_chat_integration_health`, preview components, admin commands.
 - Produces: `/settings/chat` for disconnected, active, retrying, disabled, and reauthorization states.
 
-- [ ] **Step 1: Extend command tests red**
+- [x] **Step 1: Extend command tests red**
 
 Cover admin health visibility, non-admin permission denial for brewery settings, user access to personal preferences, redacted errors, reading cadence default/update, destination privacy state, queue counts, last successful callback/delivery, disable, and disconnect.
 
-- [ ] **Step 2: Implement registered settings operations**
+- [x] **Step 2: Implement registered settings operations**
 
 Register:
 
@@ -1124,15 +1133,15 @@ disconnect_chat_installation
 
 `set_brewery_operating_defaults` updates only `fermentation_reading_due_hours` and requires admin. `set_notification_destination` accepts only the server-validated Slack conversation ID returned by the channel picker.
 
-- [ ] **Step 3: Build the server page and client controls**
+- [x] **Step 3: Build the server page and client controls**
 
 The server page loads brewery/ctx/health through the registry. The client owns only forms and fixture preview selection. Show exact scopes, workspace, private channel, brewery quiet hours, 24-hour reading cadence, linked count, queue states, redacted last error, reinstall/disable/disconnect, and all ten previews. Remove any “send test” control; production previews never call Slack.
 
-- [ ] **Step 4: Add navigation and responsive behavior**
+- [x] **Step 4: Add navigation and responsive behavior**
 
 Add `Chat` under Settings in the current app rail. At 375px the preview appears below controls; at desktop it may sit beside controls only when both remain readable. No nested cards, horizontal scrolling, color-only status, or icon-only unlabeled control.
 
-- [ ] **Step 5: Run green and commit**
+- [x] **Step 5: Run green and commit**
 
 Run:
 
@@ -1163,7 +1172,7 @@ git commit -m "feat: add Chat integration settings"
 - Consumes: production Settings UI, `APP_URL`, Slack webhook/OAuth URLs, renderer fixtures.
 - Produces: reproducible visual smoke and `.local/slack-app-manifest.yml` for Slack import.
 
-- [ ] **Step 1: Add the reviewed Slack manifest template and renderer**
+- [x] **Step 1: Add the reviewed Slack manifest template and renderer**
 
 Commit `slack-app-manifest.template.yml` with only:
 
@@ -1221,19 +1230,19 @@ console.log(".local/slack-app-manifest.yml");
 
 Ignore `.local/` and add `"render:slack-manifest": "tsx scripts/render-slack-manifest.ts"`. Set `APP_URL` to the actual owned public preview or production HTTPS origin, run `npm run render:slack-manifest`, then import the generated file into Slack.
 
-- [ ] **Step 2: Write the browser smoke**
+- [x] **Step 2: Write the browser smoke**
 
 Follow `tests-e2e/portal-smoke.ts`: seed an admin, start Next on port 3101, log in, open `/settings/chat`, select all ten preview labels by keyboard, assert the gated-form copy, verify no request targets Slack, capture phone/desktop screenshots, and assert `document.documentElement.scrollWidth === document.documentElement.clientWidth`.
 
 Add `"test:e2e:chat": "tsx tests-e2e/chat-previews.ts"`.
 
-- [ ] **Step 3: Run the browser smoke**
+- [x] **Step 3: Run the browser smoke**
 
 Run: `npm run test:e2e:chat`
 
 Expected: Chrome completes disconnected preview navigation at 375px and 1440px, focus remains visible, modal close returns focus, and no Slack request occurs.
 
-- [ ] **Step 4: Run the manual Slack sandbox matrix**
+- [ ] **Step 4: Run the manual Slack sandbox matrix** (not recorded; see Status above)
 
 Against a non-production workspace and seeded local/preview brewery:
 
@@ -1251,7 +1260,7 @@ revoke token/uninstall -> all sends stop and actions invalidate
 
 Record message timestamps and redacted delivery IDs; save no tokens or customer data.
 
-- [ ] **Step 5: Commit manifest and browser smoke**
+- [x] **Step 5: Commit manifest and browser smoke**
 
 ```bash
 git add slack-app-manifest.template.yml scripts/render-slack-manifest.ts .gitignore tests-e2e/chat-previews.ts package.json bun.lock
