@@ -1,6 +1,6 @@
 # Hugeicons — where icons go, and where they never do
 
-Status: proposed 2026-09-03, awaiting approval before any icon lands.
+Status: approved and shipped in #69 (merged 2026-09-03); this plan remains the placement authority.
 Skill: `.agents/skills/hugeicons` (grep `references/icon-list.md`; never guess a name).
 Dependency (ask-first per AGENTS.md): `@hugeicons/react` + `@hugeicons/core-free-icons`.
 
@@ -42,7 +42,7 @@ About twenty placements product-wide; most screens show two or three.
 
 `E.btn` / `E.act` verbs; the irreversible teal button (color already carries
 it); `E.tape`; tables; chips; composer; venue frames (they speak the vendor's
-language). Lucide stays inside `components/ui/*` for shadcn chrome.
+language). Lucide stays inside `components/ui/*` for shadcn chrome. One exception today: the close mark in `components/mgr/command-form.tsx` imports `XIcon` from `lucide-react`; move it to the `Icon` wrapper when that file is next touched.
 
 ## Treatment
 

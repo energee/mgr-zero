@@ -1,5 +1,15 @@
 # Slice 1C — QBO Integration + AI Chat Composer Implementation Plan
 
+> **Shipped differently.** There is no `QBO_AUTH_BASE`; `.env.example` lists the QBO
+> names the code reads. `disconnect_qbo` disables the connection, releases its company
+> ownership, purges the credential and attempts remote revocation; it does not delete
+> the row. `lib/commands/qbo.ts` is the authority.
+
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > Follow the TDD operating loop in `AGENTS.md` once this plan is unblocked.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 

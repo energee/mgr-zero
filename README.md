@@ -11,7 +11,7 @@ what exists today.
 
 - Documentation: [`content/docs/`](content/docs/) — Fumadocs MDX served at `/docs` (`index.mdx` chooses between the staff and customer-portal guides and the HTTP API reference at `/docs/api`, whose operations are generated from the command registry and the screens by `bun run docs:api`; search at `/api/search`)
 - Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
-- Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
+- Historical plan (superseded): `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - Schema: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why)
 
 ## Iron rules
@@ -90,6 +90,8 @@ alter role mgr_chat_runtime set search_path = chat_sdk;
 ```
 
 Set `CHAT_STATE_DATABASE_URL` to that dedicated login, never the database owner.
+On the hosted pooler only, also set `CHAT_STATE_DATABASE_CA` to the PEM
+certificate from Supabase Database Settings; leave it unset locally.
 Its password is entered at the `psql` prompt and is not committed. Generate the
 Slack manifest after setting the public origin:
 
@@ -161,8 +163,7 @@ automation CLI) instead of Playwright. It runs agent-browser's bundled Chrome
 by default; `E2E_ENGINES=lightpanda,chrome` re-enables the engine-fallback
 chain (each engine gets freshly seeded data; the script prints which engine
 passed). Lightpanda renders the app but is currently blocked by
-engine/adapter gaps — benchmark + status in
-`.ecc/benchmarks/e2e-engines-2026-08-31.json`; retest after
+engine/adapter gaps: Lightpanda currently cannot drive React controlled inputs (checked 2026-08-31); retest after
 `brew upgrade lightpanda` or an agent-browser release. The script starts its own `next dev` on port
 3100 (not 3000, so it never collides with another worktree's dev server on
 the same repo), reusing one already running there, and stops what it
@@ -202,10 +203,12 @@ Hosted deployments exist; this does not establish release readiness. See the
 [2026-09-18 release evidence](docs/operations/release-readiness-2026-09-18.md)
 for the observed revision and outstanding gates. Before creating or changing
 hosted projects, obtain the approvals in the release checklist. Configure `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel.
-Then run `bunx supabase db push` against
-the hosted project, deploy, and verify login → catalog → inventory on the
-preview URL. Follow the full [hosted release checklist](docs/operations/release-checklist.md)
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel, plus
+`POSTGRES_URL_NON_POOLING` in Production. Production builds run
+`scripts/vercel-build.sh` (the `vercel.json` build command), which pushes
+migrations with `supabase db push` before `next build`; a manual
+`bunx supabase db push` is only for a preview project or recovery. Then verify
+login → catalog → inventory on the deployed URL. Follow the full [hosted release checklist](docs/operations/release-checklist.md)
 for approvals, environment separation, hosted advisors, smoke tests, and rollback evidence.
 
 ## CI

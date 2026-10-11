@@ -1,6 +1,6 @@
 # Program 12 T4 — accepted implementation contract
 
-Status: accepted/reviewed implementation contract. The user accepted all three proposals on 2026-09-09: the completion/removal-class model, the narrow Taproom print projection, and latest-count-only Admin correction. The contract is approved for implementation.
+Status: accepted/reviewed implementation contract. The user accepted all three proposals on 2026-09-09: the completion/removal-class model, the narrow Taproom print projection, and latest-count-only Admin correction. The contract is implemented: T4a–T4d have shipped (`get_taproom_print_labels`, `correct_taproom_count`, `complete_batch`, `reattribute_loss`). Landed pre-#285: schema changes are new timestamped migrations plus `bun run migrations:lock`.
 
 Source basis: committed tree `f94944328676151cdf876bd5f86cb28519fd5e7c` (`fix(inventory): resolve on-hand labels outside safe view`), whose only change after `b08cae722abc1501cb92411a6fc1a04d3ea6d080` is the get-on-hand label fix. This branch also inherits the `71bfa75501a11aa7489ffdbafc620726c4256753` repack stock-check serialization guard. Neither change alters the reviewed cellar/count writer ownership.
 
@@ -235,11 +235,11 @@ First reds must prove a completion with baseline `1.00000000`, packaged `0.94258
 
 ## Sequential implementation cards
 
-### T4a — safe print projection
+### T4a — safe print projection (implemented)
 
 Owners: baseline RPC/grants; `lib/commands/taproom.ts`; Taproom page/form; Weekly count screen record; API/staff docs; Taproom/RPC/API/screen/browser tests. No schema table or RLS allow-list widening. Finish focused tests, typecheck, lint, browser print proof, then spec and quality review.
 
-### T4b — latest-count correction
+### T4b — latest-count correction (implemented)
 
 Depends on T4a only by shared Taproom files; land after it to avoid competing edits. Owners: baseline count/movement tables, the immediate movement proof, the deferred reciprocal-graph trigger, and private effective-count SQL; `lib/commands/taproom.ts`; existing count state/page/form; variance and draft projection consumers; API/staff docs; count, variance, compliance-period, RLS/RPC, UI/browser tests. Prove the correction core and all existing count invariants before moving on.
 
@@ -247,7 +247,7 @@ Depends on T4a only by shared Taproom files; land after it to avoid competing ed
 
 Depends on no count schema semantics but follows T4b because both edit the baseline and generated docs. Owners: schema/program/domain contract text first; baseline volume/batch schema, occupancy view, formula and RPC; the shared gate helper and the six enumerated committed cellar writers; `lib/commands/production.ts`; Cellar page/form and screen record; production/compliance/RLS/RPC/API/browser tests, including the two-connection barriers. This card lands computed completion and the generic root only.
 
-### T4d — loss review, reclassification, and report
+### T4d — loss review, reclassification, and report (implemented)
 
 Depends on T4c's typed completion root, candidate key, precision checks, and shared cellar gate. Owners: baseline reclassification ledger, deferred structural proof, `reattribute_loss`, report; `lib/commands/compliance.ts`; compliance month page/forms and screen; report types; API/staff docs; compliance/production/RLS/RPC/screen/browser tests. It closes the loss-review gate while retaining the explicit external mapping block for direct cellar Taproom pours.
 

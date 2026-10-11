@@ -1,7 +1,10 @@
 # Price groups: one band that owns price and barcode
 
 Date: 2026-09-07
-Status: design, approved
+Status: design, approved; table shape and price resolution superseded by
+`2026-09-07-mgr-pricing-grid-naming.md` (no `price_lists`, `price_list_formats` or
+per-SKU override shipped). Decisions D1, D3, D5, D7 and D8 stand; D3's barcode
+table (`price_group_barcodes`) is a deferred follow-on, so no group owns a UPC yet.
 Supersedes naming: "Price lists" / "Price tiers" (see Decisions)
 
 ## Problem

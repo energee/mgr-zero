@@ -52,11 +52,11 @@ Pushed invoice, Payment, Credit memo, Push rejected, Square sales receipt, Tapro
 
 Recorded in the schema design spec §16.16. Poured formats are brand-owned
 (name + ounces); the `taproom` role ships **with** per-role RLS, which needs
-its own spec before Program 12 (TODO.md lists it); fill is three chips; guest
+its own spec before Program 12 (written: `specs/2026-09-08-mgr-taproom-role-rls.md`); fill is three chips; guest
 kegs carry `label` + `nominal_bbl`, new guest swaps gated until then.
 
 ## Execution order after 0–9
 
-10 (parity test goes red early, finishes after 9) → 11 and 16 can parallel → 12 (needs 2 + 7) → 13 and 15 can parallel after 1 → 14 after 12 (counts) and q2.
+10 (parity test goes red early, finishes after 9) → 11 and 16 can parallel → 12 (needs 2 + 7) → 13 and 15 can parallel after 1 → 14 after 12 (counts).
 
 Do not start 11–16 before the named gate in each plan is closed in tests.

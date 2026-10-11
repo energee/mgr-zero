@@ -1,6 +1,6 @@
 // tests/pr-directives.test.ts — lib/pr-directives.ts, the pure half of the CLI.
 import { describe, expect, it } from "vitest";
-import { check, moveDone, openItems, parseTodoTargets } from "@/lib/pr-directives";
+import { check, dropClosed, linkedIssues, moveDone, openItems, parseTodoTargets } from "@/lib/pr-directives";
 
 const TODO = `# TODO
 
@@ -50,5 +50,23 @@ describe("moveDone", () => {
   });
   it("throws when the target is gone (already moved)", () => {
     expect(() => moveDone(TODO, PROGRESS, "Program 9", "2026-09-08", 1)).toThrow(/matches 0/);
+  });
+});
+
+describe("linkedIssues and dropClosed", () => {
+  const LINKED = `## Wave 1
+- [ ] [#615](https://github.com/o/r/issues/615) — Preserve command identity.
+- [ ] [#621](https://github.com/o/r/issues/621) — Page histories.
+- [ ] Unlinked item
+`;
+
+  it("lists the issue each open item links", () => {
+    expect(linkedIssues(LINKED)).toEqual([615, 621]);
+  });
+
+  it("moves items whose issue closed as completed to Done, leaving the rest", () => {
+    const out = dropClosed(LINKED, PROGRESS, [621], "2026-10-10");
+    expect(openItems(out.todo)).toEqual(["[#615](https://github.com/o/r/issues/615) — Preserve command identity.", "Unlinked item"]);
+    expect(out.progress).toContain("## Done\n- 2026-10-10 — [#621](https://github.com/o/r/issues/621) — Page histories. (issue closed)\n");
   });
 });
