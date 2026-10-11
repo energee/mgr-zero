@@ -58,7 +58,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {model.error && E.note(`Last connection error: ${model.error}`)}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
-    {model.connected && <>{E.fld("Company", model.company)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
+    {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Push defaults", "Connect QuickBooks to read and save the company's payment options.")}

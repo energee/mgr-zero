@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { toAccountingViewProps } from "../lib/mgr/accounting-view";
+import { qboCompanyName, qboEnvironment, toAccountingViewProps } from "../lib/mgr/accounting-view";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountingView, QboConnectionView, QboDefaultsView, DisconnectQuickBooksView } from "../components/mgr/views/accounting";
@@ -45,4 +45,29 @@ it("reports portal-email presence without claiming delivery or blocking push", (
   expect(markup).toContain("2 · no portal login email");
   expect(markup).toContain('href="/customers?missingEmail=1"');
   expect(markup).not.toContain("cannot be pushed");
+});
+
+it("names the connected company, keeps its id as a separate fact, and labels the QuickBooks environment", () => {
+  const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", realmId: "4620816365342151800", lastError: null }, undefined, "sandbox");
+  expect(model.company).toBe("Test Company");
+  expect(model.status).toBe("connected · sandbox");
+  expect(model.companyId).toBe("4620816365342151800");
+  const html = renderToStaticMarkup(createElement(AccountingView, { model, connection: null, defaults: null, sync: null }));
+  expect(html).toContain("Test Company");
+  expect(html).toContain("connected · sandbox");
+  expect(html).toContain("4620816365342151800");
+  // A label that is only the id (connected before CompanyName was stored) is not repeated as a name.
+  expect(toAccountingViewProps({ connected: true, state: "connected", realmLabel: "4620816365342151800", realmId: "4620816365342151800", lastError: null }, undefined, "production").company).toBe("QuickBooks Online");
+  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, undefined, "production").status).toBe("disconnected");
+});
+
+it("reads the QuickBooks environment from the configured API host", () => {
+  expect(qboEnvironment("https://sandbox-quickbooks.api.intuit.com")).toBe("sandbox");
+  expect(qboEnvironment("https://quickbooks.api.intuit.com")).toBe("production");
+});
+
+it("treats a realm-id label as no company name", () => {
+  expect(qboCompanyName({ realmLabel: "Test Company", realmId: "4620816365342151800" })).toBe("Test Company");
+  expect(qboCompanyName({ realmLabel: "4620816365342151800", realmId: "4620816365342151800" })).toBeNull();
+  expect(qboCompanyName({ realmLabel: null })).toBeNull();
 });
