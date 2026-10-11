@@ -14,8 +14,13 @@ Portal orders ship from one warehouse per brewery, set with
 `set_portal_fulfillment_source`. Portal ordering fails until that is set.
 
 `invite_customer_user` is available to Admin and Sales. It emails a new Auth
-account and attaches buyer membership to the specified customer. Existing
-Auth emails conflict; there is no existing-account attachment or resend flow.
+account and attaches buyer membership to the specified customer. An email
+that already has a confirmed Auth account instead gets a pending invitation:
+the command returns `{ inviteId, state: "pending_consent" }`, and membership is
+granted only when that account signs in and calls `accept_account_invitation`
+(see [Team](/docs/api/team)). The command conflicts only when that account
+already belongs to the customer or an invitation for the email is already open.
+There is no resend flow.
 Keep the same request ID and input after an interrupted invitation; completion
 reuses the saved user identity. Replaying a completed invite never restores
 revoked membership.

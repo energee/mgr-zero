@@ -108,7 +108,7 @@ describe("Return route", () => {
     expect(body.props.model).toEqual(returnRouteA);
   });
 
-  it("the live route page mounts ReturnRouteView when every stop is delivered", () => {
+  it("the live route page mounts ReturnRouteView once every stop has an outcome", () => {
     const page = src("app/(app)/routes/[id]/page.tsx");
     expect(page).toMatch(/<ReturnRouteView\b/);
     expect(page).toMatch(/<ReturnRoute\b/);

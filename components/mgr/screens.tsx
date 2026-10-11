@@ -242,7 +242,7 @@ import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView, ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
-import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
+import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
@@ -414,8 +414,8 @@ export const SCREENS: Screen[] = [
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
-    body: <TodayView model={toTodayViewProps(todayWarehouse)} footer={E.gated("Weekly count")} />,
+    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Taproom, so Today draws no count footer.",
+    body: <TodayView model={toTodayViewProps(todayWarehouse)} />,
   },
   {
     step: 4, slice: "all", tab: "Today", name: "Today empty",
@@ -819,7 +819,7 @@ export const SCREENS: Screen[] = [
     job: "Echo the immutable row and name the correction",
     reads: "list_movements",
     writes: "none",
-    states: [["echo", "the tape is the record"], ["correction gated", "Record inventory correction waits on its schema"]],
+    states: [["echo", "the tape is the record"], ["correction", `Record inventory correction ${MOVEMENT_CORRECTION_GATE}`]],
     spec: "Post-commit of Record movement. A tape means recorded: show the committed movement reference, bin, frozen barrel volume, destination state/channel and timestamp from the RPC result. An uncertain response never shows this receipt. The ledger has Older/Newer paging. The named correction is Record inventory correction, not Undo.",
     body: <MovementRecordedView model={toMovementRecordedViewProps(movementRecordedFestival)} />,
   },
@@ -956,8 +956,8 @@ export const SCREENS: Screen[] = [
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp",
     writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
-    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
-    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
+    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
+    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: <OrderView model={toOrderViewProps(orderPickedRestock)} adjustLines showAddLine complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
@@ -1531,8 +1531,8 @@ export const SCREENS: Screen[] = [
     job: "One order’s status, lines and the invoice when it exists",
     reads: "portal_order [existing] · portal_invoices [existing]",
     writes: "none",
-    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["delivered", "invoice link · Reorder"]],
-    spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped and delivered. The invoice link is absent until the brewery has billed.",
+    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["shipped · stop delivered", "the order stays shipped · invoice link · Reorder"]],
+    spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped orders, whether or not the stop is delivered. The invoice link is absent until the brewery has billed.",
     body: <PortalOrderView model={toPortalOrderViewProps(portalOrderShipped)} />,
   },
   {
@@ -1796,7 +1796,7 @@ export const SCREENS: Screen[] = [
     name: "Schedule packaging run",
     to: { "Save run plan": "Packaging plan", "FV3 · Hazy IPA": "Entity picker" },
     job: "Plan a run against one source occupancy and see shortages before the day",
-    reads: "list_occupancies [open, with volume and contents] · list_formats [for the brand in the source] · get_material_shortfalls [view; preview for the planned outputs]",
+    reads: "list_occupancies [open, with volume and contents] · list_formats [for the brand in the source] · get_packaging_material_plan [preview for the planned outputs]",
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
@@ -2093,12 +2093,12 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Water",
-    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition", "Suggest additions": "Water", "Ion read-out": "Water" },
+    to: { "Water profiles": "Water profiles", Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition", "Suggest additions": "Water", "Ion read-out": "Water" },
     job: "State the water a version starts from, aims at, and what goes in it",
     reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
     writes: "create_recipe_version [water values and the water additions are written with the version]",
-    states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggestions locked", "post-v1 scope; Suggest additions and the ion read-out stay locked until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
-    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Source water opens, and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are locked here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
+    states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles, which this sheet links to"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggestions locked", "post-v1 scope; Suggest additions and the ion read-out stay locked until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
+    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Source water opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are locked here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
     body: (<>
       <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} sourceDefault={WATER_PROFILE_OPTIONS.find((p) => p.id === "denver")!.ions} />
     </>),
@@ -2699,7 +2699,7 @@ export const SCREENS: Screen[] = [
     reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["permission", "brewer or admin required", 1], ["source", "the brewery’s own supply · set once in Settings"], ["empty", "no profiles yet: Add profile is the only action"]],
-    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog, Add profile is already one tap away.",
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog or Settings (Admin) or a recipe’s Water sheet (Brewer), Add profile is already one tap away. The back arrow follows the role: Catalog for Admin, Recipes for Brewer.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: waterProfiles })} />,
   },
   {
@@ -2830,7 +2830,7 @@ export const SCREENS: Screen[] = [
     reads: "none",
     writes: "create_credit_memo [kind=credit_memo, own requestid]",
     states: [["applied", "reduces the customer balance here"], ["unapplied", "sits as available credit"], ["rejected", "the QuickBooks sync error is shown on the MGR credit row", 1], ["deposit line untaxed", "TaxCodeRef NON, or it refunds phantom tax", 1]],
-    spec: "Created by Return shipment, never free-form; the plan lists free-form credit memos as deliberately deferred. A keg deposit refund is credited through Return on the invoice that charged the deposit; the empty keg's Returned event is recorded separately in Keg fleet, so nothing yet ties the credit to the fleet balance. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
+    spec: "Created by Return shipment, never free-form; the plan lists free-form credit memos as deliberately deferred. A keg deposit refund is credited through Return on the invoice that charged the deposit; the empty keg's Returned event is recorded separately in Keg fleet, so the credit is not linked to the fleet balance; Customer keg balance flags a pool and size where the refunded deposit and the kegs on deposit disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
     body: (<>
       {X.stat("Applied")}
       {X.amt("Total credit", INV.creditMajor, "00")}
