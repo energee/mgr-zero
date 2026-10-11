@@ -62,7 +62,7 @@ describe("Square OAuth callback", () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         access_token: "access-secret", refresh_token: "refresh-secret",
-        expires_at: "2026-10-10T12:00:00Z", merchant_id: "merchant-1",
+        expires_at: "2030-01-01T12:00:00Z", merchant_id: "merchant-1",
       }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
         { id: "location-1", name: "Taproom", status: "ACTIVE", merchant_id: "merchant-1" },
