@@ -7,6 +7,8 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-10-09 — Performance and tenancy hardening wave (#756–#759, #765, #766, #770, #788, #794; PRs #777–#795): portal buyers read orders, lines and prices through projections, `portal_availability` is brewery-scoped and index-only, history lists page past 1000 rows, CSV import runs rows concurrently, and RLS follows the command role gates. QuickBooks sync skips invoices settled over 90 days ago (`invoices.qbo_settled_at`), old command-request records are pruned by `/api/retention/jobs/prune`, and `close_brewery` ends access while keeping records 3 years (`scripts/brewery-lifecycle.ts`).
+- 2026-09-28 — Order and stock correction wave merged (PRs #663–#699): durable command recovery and buyer order confirmations, delivery refusals with source-linked returns, brew and packaging actuals with guarded corrections, receipt corrections on immutable stock history, production plan cancel/reschedule, QuickBooks manual sync status and recovery, and existing-account invitation consent with buyer account switching.
 - 2026-10-10 — Agent logs reconciled with the code: `TODO.md` pruned to #311 and #329 (every other item's issue is closed); MEMORY, DRIFT and ARCHITECTURE stale current-tense claims corrected; AGENTS.md routes "next" to `TODO.md`.
 - 2026-10-10 — Recorded late: `/api/command` refuses excess requests with 429 `rate_limited` and Retry-After, 120 per account per 60 seconds (`lib/commands/admission.ts`, PR #226, 2026-09-09); the 2026-09-06 "remains unimplemented" line below is superseded.
 - 2026-10-10 — Recorded late: keg deposits held exclude voided and written-off invoices (#617, PR #630, 2026-09-27), closing the follow-up noted below.

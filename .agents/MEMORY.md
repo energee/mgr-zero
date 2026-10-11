@@ -149,5 +149,6 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 ## Process
 - Reviewers that verify by execution (writing to the live DB) find real bugs; read-only reviews find style.
 - Visually check rendered UI before calling UI work done (a serif-font regression went unnoticed).
+- Retention decisions (2026-10-08, #758/#766): QuickBooks sync stops re-reading an invoice 90 days after a sync saw it settled, so a later edit made in QuickBooks goes unnoticed by design; finished command-request replay records are pruned after 90 days; a closed brewery's data is kept 3 years and removing it afterward is a manual step.
 - Operating loop and authority boundaries are in `AGENTS.md`; don't repeat them here.
 - Tests never read design docs. `tests/chat-preview.test.ts` once grepped the wireframes HTML as a drift guard; the wireframe moved and the test went red for the wrong reason. Code-to-code assertions (fixtures ↔ renderer) carry the guarantee; docs drift by design (2026-09-02).
