@@ -37,7 +37,7 @@ describe("Square quality-review lifecycle fences", () => {
   ] as const)("fully revokes an issued authorization after failed %s and records cleanup", async (_label, adoptionFailure, revokeSuccess, cleanupState) => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "issued-access-secret",
-        refresh_token: "issued-refresh-secret", expires_at: "2026-10-10T00:00:00Z", merchant_id: "merchant-1" }), { status: 200 }))
+        refresh_token: "issued-refresh-secret", expires_at: "2030-01-01T00:00:00Z", merchant_id: "merchant-1" }), { status: 200 }))
       .mockResolvedValueOnce(adoptionFailure
         ? new Response(JSON.stringify({ locations: [{ id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: "merchant-1" }] }), { status: 200 })
         : new Response("location failure includes issued-access-secret", { status: 503 }))
@@ -68,7 +68,7 @@ describe("Square quality-review lifecycle fences", () => {
   it("does not revoke when the durable cleanup fence cannot be persisted", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "issued-access-secret",
-        refresh_token: "issued-refresh-secret", expires_at: "2026-10-10T00:00:00Z", merchant_id: "merchant-1" }), { status: 200 }))
+        refresh_token: "issued-refresh-secret", expires_at: "2030-01-01T00:00:00Z", merchant_id: "merchant-1" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
         { id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: "merchant-1" },
       ] }), { status: 200 }));
@@ -111,7 +111,7 @@ describe("Square quality-review lifecycle fences", () => {
 
     const adoption = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
       p_merchant_id: connection.merchantId, p_merchant_label: "replacement", p_access_token: "new-access",
-      p_refresh_token: "new-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "new-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
     });
     expect(adoption.error).not.toBeNull();
@@ -131,7 +131,7 @@ describe("Square quality-review lifecycle fences", () => {
     const nextIntent = (nextClaim.data as Array<{ intent_id: string }>)[0].intent_id;
     const completed = await admin.rpc("complete_square_oauth", { p_intent: nextIntent, p_actor: ctx.userId,
       p_merchant_id: connection.merchantId, p_merchant_label: "replacement", p_access_token: "new-access",
-      p_refresh_token: "new-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "new-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
     });
     expect(completed.error).toBeNull();
@@ -157,7 +157,7 @@ describe("Square quality-review lifecycle fences", () => {
 
     const adoption = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
       p_merchant_id: ownerConnection.merchantId, p_merchant_label: "duplicate", p_access_token: "issued-access",
-      p_refresh_token: "issued-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "issued-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
     });
     expect(adoption.error).not.toBeNull();
@@ -199,7 +199,7 @@ describe("Square quality-review lifecycle fences", () => {
     const replacementMerchant = `replacement-${crypto.randomUUID()}`;
     const completed = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
       p_merchant_id: replacementMerchant, p_merchant_label: "Replacement", p_access_token: "replacement-access",
-      p_refresh_token: "replacement-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_refresh_token: "replacement-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"],
       p_locations: [{ id: "REUSED-L", name: "New seller location", status: "ACTIVE" }],
     });

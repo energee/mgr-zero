@@ -1,10 +1,15 @@
 # Program 14 — Square POS, menus, and mappings Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Connect Square, map each location to one MGR location, map each variation to a format/SKU, ingest raw `pos_sales`, and publish a menu whose availability is **derived from bin stock**. Square never posts taproom depletion (Program 12 owns that).
 
-**Architecture:** Tokens through `lib/supabase/integration-tokens.ts` (`"pos"`). `pos_sales` already exist as raw facts. Add `external_variation_id` to mappings (§16.5). `pos_menus` as §16.7. Poured format binds to one packaged format (remainder q2 default) so a pint depletes the keg SKU's expected column only — **still not a ledger write**.
+**Architecture:** Tokens through `lib/supabase/integration-tokens.ts` (`"pos"`). `pos_sales` already exist as raw facts. Add `external_variation_id` to mappings (§16.5). `pos_menus` as §16.7. Poured formats are brand-owned rows in `formats` (name + ounces; schema-design §16.16 decision 2, q2 decided 2026-09-07) so a pint depletes the keg SKU's expected column only — **still not a ledger write**.
 
 **Tech Stack:** Square API via `fetch` (ask before adding the Square SDK). Env: `SQUARE_APPLICATION_ID`, `SQUARE_APPLICATION_SECRET`, `SQUARE_ENVIRONMENT`.
 
@@ -12,7 +17,7 @@
 
 ## Global Constraints
 
-- Worktree `.agents/worktrees/backend`. Program 12 counts must exist so POS expected is meaningful. Program 3 formats. q2 default: poured → one packaged format.
+- Worktree `.agents/worktrees/backend`. Program 12 counts must exist so POS expected is meaningful. Program 3 formats. q2 decided: poured formats are brand-owned, with no packaged-format binding.
 - Unmapped items: `ignored` or `queued` per §16.14 — person chooses; guest/event Square items are **ignored**, never mapped.
 - One Square location → one MGR location; second claim 409.
 - ListLocations on every sync; new locations appear unmapped.
@@ -22,7 +27,7 @@
 
 | File | Responsibility |
 | --- | --- |
-| `00001_baseline.sql` | `external_variation_id`, `pos_menus`, `pos_menu_lines`, poured `packaged_format_id` on formats |
+| `00001_baseline.sql` | `external_variation_id`, `pos_menus`, `pos_menu_lines` |
 | `lib/pos.ts` | Square fetch wrapper |
 | `lib/commands/pos.ts` | connect, map location, map item, ingest, menu queries |
 | `app/(app)/settings/pos/`, `app/(app)/menu/` | screens |
@@ -39,9 +44,9 @@
 - `map_pos_location({ posLocationId, mgrLocationId })` — 409 if mgr location already claimed
 - `map_pos_variation({ externalItemId, externalVariationId, skuId?, formatId?, qtyPerSale, disposition: "mapped"|"ignored" })`
 
-- [ ] **Step 1:** Two Square locations cannot map to the same MGR location. A pint variation maps to a poured format bound to the half-bbl packaged format.
+- [ ] **Step 1:** Two Square locations cannot map to the same MGR location. A pint variation maps to a brand-owned poured format.
 
-- [ ] **Step 2–5:** Add `formats.packaged_format_id` nullable FK for poured rows (q2). Commit `feat(pos): variation mappings and one Square location per MGR location`
+- [ ] **Step 2–5:** Map variations to brand-owned poured formats (no `packaged_format_id`; q2 decided). Commit `feat(pos): variation mappings and one Square location per MGR location`
 
 ---
 

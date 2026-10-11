@@ -1,6 +1,7 @@
 # Composer: complete application chat with AI SDK
 
-Status: proposed implementation plan. No implementation authorized by this document alone.
+Status: partially implemented: foundation #315, then #320 and #400 (all merged). The
+remaining coverage targets below are open.
 
 Target: PR #315, `fix/composer-chat-interface`, worktree
 `.agents/worktrees/composer`, PR base `main`.
@@ -23,7 +24,7 @@ Decisions from Ted:
 The final target is application coverage, not just an inventory chatbot.
 A first vertical slice is a checkpoint, not completion of this plan.
 
-## Verified starting point
+## Verified starting point (historical: the pre-#315 state)
 
 - `components/mgr/composer.tsx` currently routes a few keywords into ATP
   reads or a movement questionnaire. It has no model connection or continuous

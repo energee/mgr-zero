@@ -1,7 +1,7 @@
 # MGR v1 (`~/Repos/mgr`) — what to keep, what to leave
 
 Date: 2026-08-31
-Status: Reviewed with Ted 2026-08-31. §3 items 1–4 adopted (iron rule 5, `brewing-domain.md`, `tests/schema-rules.test.ts`, gotchas in `.agents/MEMORY.md`); items 5–6 pending their slices.
+Status: Reviewed with Ted 2026-08-31. §3 items 1–4 adopted (iron rule 5, `brewing-domain.md`, `tests/schema-rules.test.ts`, gotchas in `.agents/MEMORY.md`). Items 5–6 shipped: PG-error mapping in `lib/commands/registry.ts`, document numbering via the `private.set_doc_no()` trigger (not a `next_number()` function), and the QBO `requestid` in `lib/qbo.ts`.
 
 v1 shape: Jan–Aug 2026, 832 commits, ~123k LOC in `src/`, **276 migrations / 281 SQL
 functions**, 270 test files, 16 CI workflows, 40 generic-entity configs. It ended
@@ -13,7 +13,7 @@ its *lessons* and its *domain knowledge* are.
 
 | # | Item | Where in v1 | Why | Cost |
 |---|---|---|---|---|
-| 1 | **Multi-write commands are one Postgres function** | DECISIONS.md 2026-07-15 ×6; `00256–00265` | supabase-js can't span a transaction. v1 shipped client-sequenced writes and spent July–Aug retrofitting RPCs after real data loss (recipe save partial commit, Square refund unit loss, Square double-allocation, QBO token last-write-wins). mgr2 slice 1A is all single-row inserts so it hasn't bitten yet; `confirm order` (allocations + status) and `ship` (movements + allocation fulfil + status + invoice) will. Make it iron rule 5: *a command that writes more than one row calls one `security invoker` plpgsql function; the handler is the thin caller.* | Rule + one plpgsql function per multi-write command; test enforces it |
+| 1 | **Multi-write commands are one Postgres function** | DECISIONS.md 2026-07-15 ×6; `00256–00265` | supabase-js can't span a transaction. v1 shipped client-sequenced writes and spent July–Aug retrofitting RPCs after real data loss (recipe save partial commit, Square refund unit loss, Square double-allocation, QBO token last-write-wins). mgr2 slice 1A is all single-row inserts so it hasn't bitten yet; `confirm order` (allocations + status) and `ship` (movements + allocation fulfil + status + invoice) will. Make it iron rule 5: *a command that writes more than one row calls one `security invoker` plpgsql function; the handler is the thin caller.* (Superseded: `.agents/ARCHITECTURE.md` rule 5 now requires one explicitly granted `security definer` RPC.) | Rule + one plpgsql function per multi-write command; test enforces it |
 | 2 | **Idempotency on external side-effects** | DECISIONS.md "QuickBooks creates use durable request identities" | POST to QBO + local mapping write can't share a transaction. Persist outbound payload + deterministic `requestid` before sending; retry with the same id. Applies directly to mgr2 §5 QBO push. | Design note in the QBO slice; no schema now |
 | 3 | **`docs/knowledge/brewing-domain.md`** (37 dense lines) | v1 `docs/knowledge/` | TTB report identities, "taproom sales are taxpaid removals, never samples", removal month = completion date, loss-reconciliation thresholds (≥ max(0.05 bbl, 0.5%)), cross-foot check, yeast viability constants. Months of correction baked in. | Copy verbatim; strip the v1-specific paragraphs (entity_revisions, `get_ttb_report`) |
 | 4 | **`docs/spec/workflows.md` TTB line mapping (lines 167–235) + allocation-type matrix** | v1 `docs/spec/` | Maps movement types → BRO lines. mgr2 slice 6 needs this exactly. | Copy the table into the compliance spec when slice 6 starts |

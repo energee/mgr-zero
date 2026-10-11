@@ -10,7 +10,7 @@ export type { WaterProfilesViewModel };
 export function WaterProfilesView({ model, createAction, profileActions }: { model: WaterProfilesViewModel; createAction?: ReactNode; profileActions?: Record<string, ReactNode> }) {
   return (
     <>
-      {E.back("Catalog", "Water profiles", createAction !== undefined ? createAction : E.btn("Add profile"), model.backHref)}
+      {E.back(model.backLabel ?? "Catalog", "Water profiles", createAction !== undefined ? createAction : E.btn("Add profile"), model.backHref)}
       {model.empty ? E.blank(model.empty) : model.rows.map((row) => <div key={row.key}>{E.row(row.title, row.detail, profileActions ? profileActions[row.key] : E.act("Edit"))}</div>)}
     </>
   );

@@ -1,5 +1,10 @@
 # Program 3 — Catalog identity (brands, formats, price tiers) Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A brand is the sellable identity, a format is the physical shape (and the only place `bbl_per_unit` is typed), a SKU is exactly one brand × one packaged format, and a price list defaults at format with a per-SKU override.
@@ -16,7 +21,7 @@
 - Rename `products` → `brands`; every `product_id` → `brand_id` except `batches.product_id` which becomes `intended_brand_id` **nullable** in this same program (§16.9) so Program 5 does not rename it again.
 - `skus` unique `(brand_id, format_id)`. Drop `skus.bbl_per_unit`, `package_type`, `units_per_case`. `enforce_bbl_integrity` reads `formats.bbl_per_unit` (atomic) or the derived composed value.
 - Poured formats are not SKUs. Do not create a sku row for `basis = 'poured'`.
-- §16.16 q2 (poured binds to format vs brand) stays open — do not add `pos_menus` or a poured-binding column.
+- §16.16 q2 (poured binds to format vs brand) was decided 2026-09-07: poured formats are brand-owned. This program still adds no `pos_menus` or poured-binding column.
 - `create_product` / `list_products` names are retired. New names: `upsert_brand`, `list_brands`. `tests/api-docs.test.ts` alias rule already bans `create_customer`-style duplicates — add `create_product` → `upsert_brand` to that retired map.
 - TDD, docs:api, staff-guide, no Co-Authored-By.
 
@@ -226,7 +231,7 @@ bunx tsc --noEmit && bun run lint
 | Missed `products` reference | High | `rg products` / `product_id` / `create_product` / `list_products` / `bbl_per_unit` on skus must be empty after Task 2 |
 | Composed format with null bbl ships | High | `create_sku` and `enforce_bbl_integrity` both require resolvable volume |
 | Price with no format default and no override | Medium | `order_line_price` raises; New order UI already disables incomplete lines |
-| Doing poured-binding or pos_menus | Medium | q2 still open; do not |
+| Doing poured-binding or pos_menus | Medium | q2 decided 2026-09-07 (brand-owned); out of this program |
 
 ## Acceptance
 

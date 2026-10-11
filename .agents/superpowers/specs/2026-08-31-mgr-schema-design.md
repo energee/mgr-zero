@@ -2,12 +2,16 @@
 
 Date: 2026-08-31
 Status: §1–§15 approved 2026-08-31 (with `brewer` added); implemented as
-`supabase/migrations/00001_baseline.sql`. Newly discovered blockers are marked
-**SCHEMA-GATE** and are not implemented.
-**§16 is revision 2 — designed 2026-09-02, NOT migrated.** Nothing in §16 exists
-in the database. It is written here rather than as migrations deliberately: the
-interface is still moving, and a schema spec is cheaper to change than a
-migration chain. Sections above that §16 supersedes say so inline.
+`supabase/migrations/00001_baseline.sql`. §16 (revision 2, designed 2026-09-02)
+is implemented in `00001_baseline.sql` and later migrations; each §16
+subsection carries its own status. Sections above that §16 supersedes say so
+inline. A **SCHEMA-GATE** below is historical unless the code still gates it.
+**Read status from code.** Whether a table, command or gate exists is read from
+`supabase/migrations`, `lib/commands/registry.ts` (and the `lib/commands/*`
+files it loads) and `components/mgr/screens.tsx`; this document records
+decisions and their reasons. Landed pre-#285: the baseline is no longer edited
+in place; a schema change is a new timestamped migration plus
+`bun run migrations:lock`.
 Phase-2 deltas from the reviewed draft are marked **(impl)**.
 Inputs: `2026-08-31-mgr-schema-decisions.md` (decisions + conventions),
 `2026-08-30-mgr-slice1-core-orders-design.md` (product), `brewing-domain.md` (units), and the
@@ -110,7 +114,10 @@ money cents.
 default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
 `admin_update` update `staff_role(id)='admin'`. No `unique(id, brewery_id)` (it is the root).
 
-### `brewery_users` — roles become an array (decided 2026-09-07)
+### `brewery_users` — roles become an array (decided 2026-09-07, not built)
+**Decided, not built — tracking issue #797.** The shipped table has one scalar
+`role staff_role not null`, and every RLS predicate calls the scalar
+`staff_role(b)`. The array design below is the decision, not the schema.
 pk `(brewery_id, user_id)`, `roles staff_role[] not null check (cardinality(roles) > 0)`.
 One person sells and brews; forcing a single role made them admin or made them
 choose. An array on the same row is the smallest change: `staff_role(b)` becomes
@@ -120,11 +127,12 @@ as written, and `navFor` unions the nav of each role. A junction table was
 rejected: a second table, RLS, and a join for no behavior the array lacks. Last
 admin is now "the last row whose array contains admin". RLS unchanged
 (`member_read`, `admin_write`).
-The current brewery-bound command context cannot bootstrap these two rows, and the listed
-policies intentionally expose no client insert path. SaaS provisioning remains blocked
-until a registered pre-tenant `provision_brewery` command and narrow RLS bootstrap path can
-invoke one `security invoker` function for brewery + first-admin creation. No provisioning
-schema is added by this document pass.
+The brewery-bound command context cannot bootstrap these two rows, and the listed
+policies expose no client insert path. Provisioning shipped as the pre-tenant
+`provision_brewery` command (`lib/commands/tenancy.ts`), which calls a
+service-role-only `security definer` RPC
+(`supabase/migrations/20260924140000_provision_brewery_service_gate.sql`) that
+creates the brewery and its first admin.
 
 ### `customers` — unchanged + composite parent key
 Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (added after
@@ -164,7 +172,7 @@ RLS: `staff_read`; buyers read `portal_sku_prices`, with no customer policy on
 the base table (#788).
 
 ### `price_lists` — + `unique (brewery_id, name)`
-### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable) **· revised by §16.4**
+### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable) **· superseded by `2026-09-07-mgr-pricing-grid-naming.md` (`channel_prices`)**
 pk `(price_list_id, sku_id)`, both composite. RLS: `staff_all`, `customer_own_prices`.
 
 ### `sku_bom` — new (slice 5 packaging BOM) **· superseded by §16.12 (`format_bom`)**
@@ -182,14 +190,15 @@ policies carried forward verbatim. `lot_id → lots` composite FK added after `l
 (nullable). `ref uuid` stays (order id / pos sale id / run id; typed context lives on the
 domain row's `movement_id`).
 
-**SCHEMA-GATE — FG correction identity:** this shape cannot implement a generic
-`reverse_inventory_movement`. `removal_shape` rejects the opposite sign for most
-types, and there is no structured relationship to the original row. Posting a
-generic `adjustment` would restore on-hand while leaving the original TTB removal
-classified. Before a named FG correction ships, define an auditable original ↔
-compensation relationship, legal sign/type rules, and report-generator semantics;
-prove that all correction writes append and that the corrected report cross-foots.
-No generic correction command exists in the implemented baseline.
+**FG correction identity (resolved):** `inventory_movements.compensates_id`
+links a compensating row to its original (a composite FK, unique per original).
+`reverse_inventory_movement` reverses one standalone `adjustment` or `loss`
+with an exact linked opposite entry; see
+`2026-09-09-program12-completion-and-count-correction.md`. Compound movements
+and counts keep their own correction owner. **SCHEMA-GATE remains** for a
+generic reversal of `sale_removal` and the other removal types: those still
+need legal sign/type rules and report-generator semantics before any command
+reverses them.
 
 ### `lots` — new (slice 5)
 `packaging_run_id → packaging_runs unique not null` (1:1), `product_id → products`,
@@ -204,15 +213,14 @@ the referenced `order_lines`/`locations` row exists in the same `brewery_id`. id
 
 ### `taproom_pars` — unchanged
 
-**SCHEMA-GATE — taproom count observations:** the implemented baseline has no FG
-count header/lines. Nonzero movement deltas alone cannot preserve a count's time,
-expected values, observed values, or zero-variance completion, so weekly-due and
-prior-snapshot queries are not currently implementable. Before the count UI ships,
-add a durable count occurrence and per-SKU expected/observed lines with optional
-links to their resulting movements. `record_taproom_count` must write the complete
-observation plus every required depletion/adjustment movement in one
-security-invoker function. The exact table shape remains a baseline-migration
-decision; no status column or mutable inventory quantity is required.
+**Taproom count observations (shipped):** `taproom_counts` (the count
+occurrence) and `taproom_count_lines` (per-SKU `qty_before` and `qty_counted`,
+linked to any resulting movement) are in `00001_baseline.sql`. The registered commands
+are `get_taproom_count_snapshot`, `get_taproom_count`, `list_taproom_counts`,
+`record_taproom_count` and `correct_taproom_count` (`lib/commands/taproom.ts`).
+The design is in `2026-09-08-mgr-taproom-role-rls.md` and
+`2026-09-09-program12-completion-and-count-correction.md`. Shortages post
+exact-lot depletion whether or not Square is connected (§16.15).
 
 ### Views
 - `on_hand` sums the ledger by SKU/location. `atp` subtracts all open reservations
@@ -627,11 +635,12 @@ customer_id → customers, shipment_id → shipments, at timestamptz, note, crea
   `(shipment_id)`.
 Fill = FG `production_in` of a keg SKU; empty-at-brewery is derived, never stored:
 `fleet_total − at_customers − filled_on_hand`.
-When an order ships or returned beer includes an `owned_fleet` keg SKU, the owning
-`ship_order`/`return_shipment` RPC also appends the matching keg event linked to the
-shipment. A separate client command may not post the container effect later; the FG and
-asset ledgers must not drift. Empty-asset-only return/lost/found remains
-`record_keg_event`.
+**Keg events are recorded separately (owner decision 2026-09-26, #577, PR #605).**
+`ship_order` and `return_shipment` post no keg event. Shipping charges the keg
+deposit; returning beer issues the deposit refund as a credit memo. The fleet
+movement (`shipped`, `returned`, `lost`, `found`) is its own explicitly recorded
+`record_keg_event`. The deposit refund and the Returned keg event stay separate
+records.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
@@ -698,13 +707,12 @@ Core 6 · Catalog 5 · FG 5 · Orders 5 · Integrations 5 · Materials 11 · Rec
 Production 7 · Packaging 3 · Compliance 4 · Kegs 2 · Deliveries 2 = **58 tables**,
 ~18 views, 5 append-only ledgers, 2 immutable definition tables.
 
-## 16. Revision 2 — brands, formats, bins, channels (designed 2026-09-02, not migrated)
+## 16. Revision 2 — brands, formats, bins, channels (designed 2026-09-02)
 
-**Nothing in this section exists in the database.** It is deliberately held as a
-spec rather than a migration chain: the interface is still being drawn (see
-`components/mgr/screens.tsx`, published at `/docs/screens`), and
-every table below would otherwise be migrated two or three times before the
-first screen ships. Build it in one pass when the interface settles.
+**Implemented in `00001_baseline.sql` and later migrations; per-subsection
+status below.** Shipped: 16.1–16.3, 16.6, 16.8, 16.10–16.15. Superseded: 16.4
+(by `2026-09-07-mgr-pricing-grid-naming.md`). Partial: 16.7. The migrations are
+the status authority; this section records the decisions.
 
 Conventions of §0 apply unchanged: composite `(id, brewery_id)` parents, RLS on
 every table, `security_invoker` views, pinned `search_path`.
@@ -817,7 +825,8 @@ Different volume or packaging means a different format.
 
 ### 16.3 `sale_channels` — see `docs/plans/sale-channels-customizable.md` (#42, merged)
 
-**Superseded by #42, which is merged and is the authority.** This section
+**Superseded by #42, which is merged and is the authority for channel identity
+and assignment** (the tax-treatment addition below stays here). This section
 originally proposed `sale_channels (… is_removal, ttb_category)`, moving removal
 classification from the `removal_shape` CHECK onto the channel row. That was
 wrong and #42 is right: `brewing-domain.md` classifies removals by *type* —
@@ -862,6 +871,10 @@ payment of tax — `taxable`, `export`, `vessel_supplies`, `research`,
 `transfer_in_bond` — rather than starting with `export` alone.
 
 ### 16.4 Price tiers scoped to a channel; formats priced
+
+**Superseded by `2026-09-07-mgr-pricing-grid-naming.md`** (Program 4b). That
+spec drops `price_list_formats` and the per-SKU override; the shape below was
+never built and its OPEN question is closed there.
 
 `price_lists` are already tiers and `customers.price_list_id` already assigns
 them. Two gaps: a tier has no channel, and `price_list_items` is keyed
@@ -1060,8 +1073,8 @@ infers paid from balance: collected revenue reads
 `qbo_remote_state = 'live' and qbo_balance_cents = 0`, expressed once in the
 reporting view so no call site can forget it.
 
-A failing test is drafted at `tests/invoice-remote-state.test.ts`; it lands with
-§16.11's implementation, since it cannot go green before these columns exist.
+These columns shipped in `20260910120847_deploy_current_schema.sql`;
+`tests/qbo-state.test.ts` covers the partial, paid, reopened and voided states.
 
 Also rename `qbo_idempotency_key` in spirit: Intuit's mechanism is a `requestid`
 query parameter, not a body field. The column name is MGR-side and may stay, but
@@ -1133,12 +1146,14 @@ role-agnostic — `staff_all for all using (is_staff_of(brewery_id))` — so a
 price lists, invoices, production and compliance. Narrowing that surface needs
 per-role policies which are **not designed yet** and are not in §16.17's build
 order. Do not ship the role without them; see §16.16 item 3.
+**Shipped:** the per-role policies are in `2026-09-08-mgr-taproom-role-rls.md`,
+and `staff_role` includes `taproom` in `00001_baseline.sql`.
 
 **Tapping a keg that is not in taproom stock is allowed.** The interval is
 flagged `not_in_inventory`. No special ledger rule is needed — tapping posts
 nothing either way (§16.15) — so the flag exists solely to exclude the keg from
-variance, since it was never counted into taproom stock. An event keg or one
-carried over still gets a yield number from its nominal size.
+variance, since it was never counted into taproom stock. (Not built: a yield
+number needs the later POS reporting contract, §16.16.)
 
 **Concurrency.** The realistic failure is not two simultaneous clicks; it is a
 duplicate action from uncertainty — the website posts a swap, the bartender does
@@ -1151,6 +1166,11 @@ intervals or a phantom keg. Two guards:
    makes the duplicate impossible rather than merely visible.
 2. **Recent tap events on the board** — last few actions with who and when. This
    does not prevent anything; it is the correction path.
+
+**As shipped:** the table is `tap_intervals` (`keg_taps` in the wording below).
+Realtime, the POS-derived remaining percentage and yield are not built;
+`list_open_taps` supplies no POS yield or remaining-volume estimate, and
+remaining fill is three coarse chips (§16.16 item 4).
 
 **Live updates.** Subscribe to `keg_taps` filtered by brewery via Supabase
 Realtime, on the tap board page only, unsubscribed on navigate away. RLS applies
@@ -1325,8 +1345,9 @@ to the read side instead of a CHECK (§16.11).
 
 **Resolved 2026-09-07 (Ted, in review of Program 12's open questions):**
 
-1. Tiers are priced by format with a SKU override — shipped as Program 4b
-   (§16.4).
+1. Tiers are priced on the pricing grid — shipped as Program 4b per
+   `2026-09-07-mgr-pricing-grid-naming.md`, which superseded §16.4's
+   format-with-SKU-override shape.
 2. A poured format belongs to a **brand**, not the brewery: each brand lists
    its poured formats as a name and a size in ounces (a pint, a taster). A
    pour is a ratio back to whichever keg of that brand is open at that
@@ -1353,14 +1374,10 @@ Nothing in §16.16 is open.
 
 ### 16.17 Build order when this is migrated
 
-`brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
+Historical: this order was followed. `brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
 (per #42's plan, plus tax treatment — needs movement tests green) → price tiers → `pos_menus` →
-`keg_taps` → `repack` → invoice drift. The `taproom` role ships only once its
-per-role RLS policies exist (§16.16 item 3) — it is not a step in this order
-until they are designed.
-
-`AGENTS.md` authorises editing the baseline in place, so this lands as one
-revised `00001_baseline.sql` rather than a migration chain.
+`tap_intervals` → `repack` → invoice drift. The `taproom` role shipped with its
+per-role RLS (`2026-09-08-mgr-taproom-role-rls.md`).
 
 ## 17. Chat notification state (implemented 2026-09-07)
 

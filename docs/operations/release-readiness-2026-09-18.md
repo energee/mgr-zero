@@ -6,18 +6,18 @@ Read-only evidence from the Vercel CLI and Supabase Management API. No hosted se
 
 Reviewed `main`: `eec7ada59745a3dc0ccf8271102f0f6166080242` (after #406, #408, #409; #407 pending CI).
 
-## Environment separation (blocker)
+## Environment separation (resolved for Preview 2026-09-18; see Actions)
 
 | Check | Observed | Required |
 | --- | --- | --- |
 | Supabase project, Preview vs Production | Both Vercel environments point at `uogrvqmrbmolvtftotsf` (us-east-1) | Separate projects (checklist, Provisioning 1) |
 | Secrets, Preview vs Production | `SUPABASE_SECRET_KEY`, `CHAT_STATE_DATABASE_URL`, `SLACK_SIGNING_SECRET` identical in both | Separate credentials (Provisioning 5) |
 | Second project | `ugzhwxzictzvrzlacjmv` ("MGR", us-west-2, created 2026-09-09) is ACTIVE and retained per [region cutover](supabase-region-cutover.md) | Candidate Preview target, or a fresh Preview project |
-| Production env extras | Legacy `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_*` present (integration defaults); app reads only `.env.example` names | Remove or scope unused secrets |
+| Production env extras | Legacy `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_*` present (integration defaults); app reads only `.env.example` names | Remove legacy keys; keep `POSTGRES_URL_NON_POOLING` in Production (`scripts/vercel-build.sh` requires it) |
 | Preview `POSTGRES_URL_NON_POOLING` | Absent | Fine: `scripts/vercel-build.sh` pushes migrations only when `VERCEL_ENV=production` |
 | Vercel production branch restriction | Not readable from CLI (`link: null`); Vercel MCP returned 403 | Confirm in dashboard: Production deploys from `main` only |
 
-Consequence today: every preview deployment runs against the production database with production secrets. Nothing must be called "Preview smoke" until this is split.
+Before the repoint: every preview deployment runs against the production database with production secrets. Nothing must be called "Preview smoke" until this is split.
 
 ## Auth (both projects identical)
 
@@ -70,4 +70,4 @@ No identified backup exists (checklist, Database and deploy 1). Pre-migration ba
 | Resend via Vercel Marketplace | Terms accepted (installation `icfg_dV2IDkDMg1JTxRZhFLMuVlb6`); provisioning requires `-m domain=<owned domain> -m region=us-east-1`. **Parked**: no product domain exists yet. Supabase default sender stays (2 emails/hour), which caps staff invites | No resource provisioned, no Auth SMTP fields set. Reopen when a domain is chosen |
 | Advisor acceptance recorded | Decision 4 above | — |
 
-Still open: a sending domain, then `vercel integration add resend/resend-email -m domain=… -m region=us-east-1` and the four Auth SMTP fields; production-branch restriction (dashboard); pre-migration backup and restorer; leaked-password protection, Auth `disable_signup`, #329 hosted retest, J01/J02/J06 fresh retests on the release SHA.
+Still open: Preview `SLACK_SIGNING_SECRET` is still identical to Production (the repoint covered four other names); a sending domain, then `vercel integration add resend/resend-email -m domain=… -m region=us-east-1` and the four Auth SMTP fields; production-branch restriction (dashboard); pre-migration backup and restorer; leaked-password protection, Auth `disable_signup`, #329 hosted retest, J01/J02/J06 fresh retests on the release SHA.

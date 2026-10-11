@@ -1,6 +1,6 @@
 # QuickBooks local invoice write-off contract
 
-Accepted implementation clarification for Program 13 Q3.
+Accepted implementation clarification for the Program 13 write-off; shipped in #281 (`write_off_invoice`, `lib/commands/qbo.ts`).
 
 - `write_off_invoice` is an Admin-only MGR status change. It never calls QuickBooks, records payment, creates credit, or changes inventory.
 - An invoice is eligible only after the current, original-realm QuickBooks read established `voided` or `deleted`. Credit memos, live invoices, and an invoice already written off are refused.

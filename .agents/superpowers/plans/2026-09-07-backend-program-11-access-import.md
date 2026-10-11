@@ -1,5 +1,10 @@
 # Program 11 — Provisioning, invites, and import Implementation Plan
 
+> **Landed pre-#285.** Where this plan says to edit `00001_baseline.sql` in place or
+> not to add a migration, that is history: schema changes are now new timestamped
+> migrations plus `bun run migrations:lock`. `public/docs/*.html` guides are now
+> `content/docs/*.mdx`; `content/docs/api.mdx` is now `content/docs/api/*.mdx`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the three ARCHITECTURE access gates with tests that **force failure after the external step**, then ungate Create brewery, Accept invite, Invite portal user, Import, and the first-run invite/import rows.
@@ -15,7 +20,7 @@
 - Worktree `.agents/worktrees/backend`. Program 10 Team page exists so Invite can be ungated in place.
 - Tests **must** inject a failure between Auth user create and membership insert (staff and customer). A green path alone does not close the gate.
 - `provision_brewery` is pre-tenant: no `breweryId` on the command. Needs an explicit pre-tenant context in `buildContext` (ARCHITECTURE iron rule 1). Do not fake a brewery id.
-- Import kinds stay `customers | ship_tos | products_skus | price_list_items | opening_balances`. After Program 3, `products_skus` means brands+formats+skus. Opening balances use `record_inventory_movement` with `binId` (Program 2).
+- Import kinds stay `customers | ship_tos | products_skus | channel_prices | opening_balances` (`channel_prices` replaced `price_list_items` in Program 4b). After Program 3, `products_skus` means brands+formats+skus. Opening balances use `record_inventory_movement` with `binId` (Program 2).
 - TDD, docs:api, staff-guide, eslint allowlist change is in the same PR as the invite module.
 - Ask before adding papaparse back; CSV parse may be a small `split` + header row in the command input (rows already `z.array(z.record(...))` — the **browser** maps the file. No new dependency required).
 

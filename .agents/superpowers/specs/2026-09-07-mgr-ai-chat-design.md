@@ -7,6 +7,11 @@ material formerly spread over the UI layout plan §2 ("Proposal safety"),
 `.agents/ARCHITECTURE.md` (pre-implementation gate), and the slice 1C plan.
 Plan: `.agents/superpowers/plans/2026-09-07-ai-chat.md`.
 
+> **Transport replaced.** The model transport is the AI SDK through Vercel AI
+> Gateway (`plans/2026-09-11-composer-ai-sdk.md`; `lib/chat/models.ts`), not a
+> direct `@anthropic-ai/sdk` client. The registry and proposal contract below
+> still stand.
+
 ## 1. One rule
 
 The language layer is a **client of the registry**, not a privilege tier. It
@@ -94,8 +99,8 @@ Ambiguity asks a short question and produces no candidate:
 - "Ship it" and "same as last week" must re-check order identity, ship-to,
   price, active SKU/package, permission, and current order state.
 
-These are the golden eval set (`tests/ai-chat-evals.test.ts`, stubbed
-client): each must yield a question, never a candidate. The model never fills
+These are the golden eval set (planned as `tests/ai-chat-evals.test.ts`, stubbed
+client; not built yet): each must yield a question, never a candidate. The model never fills
 a risky blank; the server derives sign, delta, and units.
 
 ## 5. Attribution and history
@@ -109,12 +114,13 @@ a risky blank; the server derives sign, delta, and units.
 
 ## 6. Operating limits
 
-- Model: `claude-sonnet-5` via `@anthropic-ai/sdk`; zero-data-retention
+- Model: `anthropic/claude-sonnet-4.5` via the AI SDK and Vercel AI Gateway
+  (`AI_GATEWAY_MODEL` overrides it); zero-data-retention
   provider terms; tenant data never in application logs.
 - Per-brewery rate and cost cap; request timeout; both surface as a plain
   message with **Open as form**.
-- `ANTHROPIC_API_KEY` in `.env.example` + README; absent key hides chat, not
-  forms.
+- `AI_GATEWAY_API_KEY` in `.env.example` + README (Vercel deployments may use
+  OIDC instead); absent configuration hides chat, not forms.
 
 ## 7. Surfaces
 
@@ -124,9 +130,9 @@ a risky blank; the server derives sign, delta, and units.
   `aiExposed`) lists planned batches as brand + expected week and nothing
   else — no volume, recipe, tank, or lot — so "what's brewing next" is
   answerable in chat and on the **Coming up** screen, where each brand taps
-  through to Shop. Gated until customers can read that projection
-  (`SCHEMA/RLS-GATE`: a `portal_schedule` view over `batches` with
-  `brewed_on is null`, not a customer policy on the base table).
+  through to Shop. Shipped as a `security_invoker` `portal_schedule` view over
+  upcoming batches, not a customer policy on the base table
+  (`20260915100000_portal_schedule.sql`, `20260925204203_portal_schedule_upcoming.sql`).
 - Slack: deferred. When it ships, a Slack confirm button carries the same
   preview token to the same commit path — no second write path.
 - Voice: future transport.
