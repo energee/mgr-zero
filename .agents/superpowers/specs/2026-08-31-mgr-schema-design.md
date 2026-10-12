@@ -527,7 +527,8 @@ every occupancy whose stored batch identity matches, cross-batch transfer bounda
 signed physical gain/measurement adjustments, classified cellar removals (transfer
 losses among them), and frozen positive production movements from closed runs. It refuses missing,
 unbrewed or already-completed batches, missing occupancy, nonpositive baselines, open
-packaging runs and negative residuals. It closes all still-open scoped occupancies at one
+packaging runs and negative residuals (and, per #808, beer still in open tanks unless the
+caller confirms the named volume). It closes all still-open scoped occupancies at one
 valid timestamp and appends one nonphysical generic-loss root only when the residual is
 at least `greatest(0.05, baseline * 0.005)`. A deferred same-tenant reciprocal constraint
 proves that root is referenced by exactly one completed batch and belongs to that batch's
@@ -614,7 +615,8 @@ Report generators are code, not schema; CBMA rates are code (§14).
 Generated figures keep `removals` as the one additive filing total and expose
 `cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
 their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
-mapping requirement and blocks filing until that mapping is separately approved;
+mapping requirement and blocks filing until that mapping is separately approved
+(#816 proposes filing it as a taxpaid removal and dropping the gate once the TTB filer confirms);
 existing `report_filings.figures` snapshots remain immutable.
 
 ## 12. Kegs (owned / leased / pay-per-fill fleets)
@@ -641,6 +643,10 @@ deposit; returning beer issues the deposit refund as a credit memo. The fleet
 movement (`shipped`, `returned`, `lost`, `found`) is its own explicitly recorded
 `record_keg_event`. The deposit refund and the Returned keg event stay separate
 records.
+Amended 2026-10-11 by #815 (physical half only): `ship_order` will post `shipped` for
+returnable keg lines and a full keg returned with its beer will post `returned`; deposit
+refunds and later empties stay separate. Only automatic `shipped` events may take a
+location's shell balance negative, which is flagged, never refused.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
@@ -1042,7 +1048,9 @@ repack, so this is validated rather than asserted, and it is one level only.
 Materials released or consumed on a break follow each BOM line's `on_break`.
 
 Line cleaning likewise wants a named `loss` reason, or it lands in yield
-variance and makes every keg look slightly bad.
+variance and makes every keg look slightly bad. (Decided 2026-10-11, #814: line
+cleaning and dumped kegs are marked **destroyed** on the Taproom count and post a
+`destruction` movement, not a new `loss` reason.)
 
 ### 16.11 Invoice drift — `qbo_sync_token`, `qbo_remote_state`
 
@@ -1248,7 +1256,8 @@ POS". The opposite is correct and those frames need amending.
 
 **POS is not the source of truth for inventory.** It is the tool for seeing
 expected consumption against actual, and the gap is the product: bad pours,
-theft, staff drinks, comps, line cleaning. That number only exists because both
+theft, staff drinks, comps (taxpaid, decided in #814); line cleaning and dumps
+marked destroyed on the count sit beside the gap, not in it. That number only exists because both
 halves are kept, and it is what a taproom manager will act on.
 
 **A keg moving warehouse → taproom is not a removal.** It stays on the books as

@@ -79,7 +79,7 @@ Order lifecycle: `create_order` / `update_draft_order` (staff + portal; portal
 constrained to own customer, own price list), `submit_order`, `confirm_order`
 (creates order-line allocations; returns ATP soft warnings, never blocks),
 `adjust_order_lines` (staff; atomic re-allocation; sets `needs_restock` when
-`picked`), `cancel_order` (releases allocations), `record_pick`, `ship_order`
+`picked`; since #811 an added or raised line returns a picked order to `confirmed`), `cancel_order` (releases allocations), `record_pick`, `ship_order`
 (shipment + `sale_removal`/`taproom_transfer` movements with channel and
 `dest_state` from the ship-to + allocation fulfillment + invoice + remainder
 cancellation, one transaction; `taproom_transfer` orders write transfer

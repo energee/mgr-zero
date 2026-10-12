@@ -102,7 +102,8 @@ Good units go to the chosen bin and become available; damaged units post as a lo
   #626's job (D1), and this design only guarantees the link exists.
 - Keg custody is recorded by hand (`record_keg_event`); ship and confirm write no
   keg events. A refused keg therefore needs no keg reversal. Only its deposit is
-  not invoiced (section 2).
+  not invoiced (section 2). Amended 2026-10-11 by #815: ship will post `shipped`, and
+  checking in a refused keg will post `returned`.
 
 ## Out of scope
 
@@ -115,7 +116,9 @@ Good units go to the chosen bin and become available; damaged units post as a lo
 
 1. **Refusal reasons:** a pick list (*customer refused*, *closed / no access*,
    *damaged in transit*, *wrong item*, *other*) plus an optional note. The note
-   is required for *other*.
+   is required for *other*. (2026-10-11, #813: *closed / no access* leaves the
+   picker; an unattempted stop uses **Not delivered · leave for a later route**.
+   `closed` stays valid in the database for past rows.)
 2. **Transfer stops:** they may close with outcome `refused` too, so the route
    can return. The transfer stays `in_transit` until **Cancel transfer** (#578)
    or a later receipt resolves it. No stock moves at the stop.

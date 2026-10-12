@@ -104,8 +104,9 @@ Rules:
 - **No per-SKU override.** Cost if wrong: one-off pricing needs a new group.
 - **Two wholesale accounts at different prices are two channels.** Cost if
   wrong: channel-level sales reports split; add nothing until asked.
-- **Customers require a channel.** Seeded and imported customers default
-  to the brewery's Wholesale channel; taproom sales have no customer and
+- **Customers require a channel.** Seeded customers default to the
+  brewery's Wholesale channel; an imported customer names its channel in
+  the required `saleChannelId` cell; taproom sales have no customer and
   post to the channel the movement names.
 - **Formats are per brewery, so the grid's columns are whatever formats
   exist**; empty cells are simply unpriced.
