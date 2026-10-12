@@ -1,6 +1,7 @@
 // lib/mgr/keg-fleet-view.ts — view-model for Keg fleet: the pool and event
 // form values both the inventory and the live forms draw through
 // components/mgr/views/keg-fleet.tsx, and the rules those forms share.
+import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
 
@@ -23,6 +24,7 @@ export type KegEventValue = { poolId: string; kegSize: KegSize; reason: KegEvent
 export type KegEventOptions = { pools: KegOption[]; locations: KegOption[]; bins: KegOption[]; customers: KegOption[] };
 
 export type KegFleetViewModel = {
+  shortages?: string[];
   backHref?: string;
   pools?: KegFleetPoolRow[];
   bins?: KegFleetBinRow[];
@@ -69,4 +71,17 @@ export const kegPoolReady = (v: KegPoolValue) =>
 export function kegEventUnavailable({ activePools, locations }: { activePools: number; locations: number }): string | null {
   const missing = [activePools ? null : "a keg pool in service", locations ? null : "a location"].filter(Boolean);
   return missing.length ? `Recording a keg event needs ${missing.join(" and ")}.` : null;
+}
+
+/** One reconciliation flag per negative pool/size/location, across its bins. */
+export function kegShortages(pools: { id: string; name: string }[], rows: { pool_id: string; keg_size: string; location_id: string; location_name: string; qty: number }[]): string[] {
+  const totals = new Map<string, { pool: string; size: string; location: string; qty: number }>();
+  for (const row of rows) {
+    const key = `${row.pool_id}|${row.keg_size}|${row.location_id}`;
+    const total = totals.get(key) ?? { pool: row.pool_id, size: row.keg_size, location: row.location_name, qty: 0 };
+    total.qty += Number(row.qty);
+    totals.set(key, total);
+  }
+  return [...totals.values()].filter(row => row.qty < 0).map(row =>
+    `${pools.find(pool => pool.id === row.pool)?.name ?? row.pool} ${SIZE_LABEL[row.size] ?? row.size} · ${row.location}: ${-row.qty} below zero · record Acquired kegs to reconcile`);
 }

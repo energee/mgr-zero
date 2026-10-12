@@ -84,7 +84,7 @@ it.each(["now", "on_delivery"] as const)("shows durable confirmation after route
   query.mockImplementation(async name => {
     if (name === "get_order") return {
       order: { ...order, status: "shipped" }, lines: lines.map(line => ({ ...line, qty_shipped: 1 })),
-      shipment: { invoice_timing: invoiceTiming }, events: [{ event: "shipped", payload: { invoice_id: invoiceTiming === "now" ? "invoice" : null } }],
+      shipment: { invoice_timing: invoiceTiming }, events: [{ event: "shipped", payload: { invoice_id: invoiceTiming === "now" ? "invoice" : null, warnings: ["2 kegs short at Warehouse"] } }],
     };
     if (name === "list_locations") return [];
     if (name === "get_invoice") return { invoice: { invoice_no: 83 } };

@@ -82,6 +82,7 @@ export function KegFleetView({
   return (
     <>
       {E.back("Beer", "Keg fleet", createAction, model.backHref)}
+      {(model.shortages ?? []).map((shortage) => <div key={shortage}>{E.note(shortage)}</div>)}
       {model.pools ? (model.pools.length ? model.pools.map((pool) => <div key={pool.key}>
         {E.row(pool.title, pool.detail, poolActions?.[pool.key])}
         {pool.bins.map((row) => <div key={row.key}>{E.row(row.title, row.detail, row.qty)}</div>)}

@@ -4,9 +4,9 @@
 // Pure: joins keg_customer_balances and keg_deposit_balances rows per
 // customer × pool × size. A row is a mismatch only once a deposit on it was
 // refunded (the drift #577 names) and the kegs on deposit differ from kegs out
-// plus kegs lost at the customer, whose deposit is kept. Shipping an order
-// charges the deposit but records no keg event, so an unrefunded row is never
-// flagged: that gap is a Shipped event not entered yet, not drift.
+// plus kegs lost at the customer, whose deposit is kept. Shipping posts Shipped
+// and a full keg returned with beer posts Returned. Deposit-only refunds and
+// later empty pickups remain separate; unrefunded rows are never mismatches.
 export type KegBalanceRow = { customer_id: string; pool_id: string; keg_size: string; qty: number };
 export type DepositBalanceRow = { customer_id: string; keg_pool_id: string; keg_size: string; kegs_on_deposit: number; deposit_cents: number };
 export type KegDepositRow = {

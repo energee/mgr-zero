@@ -203,6 +203,13 @@ describe("Ship view", () => {
 });
 
 describe("Shipment done view", () => {
+  it("#815 shows saved shell shortages without inventing warnings on legacy receipts", () => {
+    const warnings = ["2 kegs short at Warehouse · record Acquired kegs to reconcile"];
+    const model = toShipmentDoneViewProps({ ...orderShipmentDone, warnings });
+    expect(model.warnings).toEqual(warnings);
+    expect(html(createElement(ShipmentDoneView, { model }))).toContain(warnings[0]);
+    expect(toShipmentDoneViewProps({ ...orderShipmentDone, warnings: undefined }).warnings).toEqual([]);
+  });
   it("does not claim an invoice when the confirmed shipment has none", () => {
     const model = toShipmentDoneViewProps({ ...orderShipmentDone, invoice: null });
     expect(model.invoice).toBe("No invoice was created");

@@ -11,7 +11,7 @@ import { KegFleetView } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
+import { kegShortages, toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
 import { toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -19,6 +19,16 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Keg fleet", () => {
+  it("#815 flags negative location totals, not a negative bin offset by shells in another bin", () => {
+    const shortages = kegShortages([{ id: "p", name: "Owned" }], [
+      { pool_id: "p", keg_size: "half_bbl", location_id: "wh", location_name: "Warehouse", qty: -3 },
+      { pool_id: "p", keg_size: "half_bbl", location_id: "wh", location_name: "Warehouse", qty: 1 },
+      { pool_id: "p", keg_size: "half_bbl", location_id: "cold", location_name: "Cold", qty: -1 },
+      { pool_id: "p", keg_size: "half_bbl", location_id: "cold", location_name: "Cold", qty: 2 },
+    ]);
+    expect(shortages).toEqual(["Owned ½ bbl · Warehouse: 2 below zero · record Acquired kegs to reconcile"]);
+    expect(htmlOf(createElement(KegFleetView, { model: { ...kegFleetMicrostar, shortages } }))).toContain(shortages[0]);
+  });
   it("does not restore fixture controls when live slots are explicitly disabled", () => {
     const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools: [], navRows: [] }), eventForm: null }));
     expect(html).not.toContain("Record keg event");

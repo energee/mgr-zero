@@ -5,6 +5,7 @@ import type { KegHistorySnapshot } from "@/lib/mgr/keg-history-view";
 import type { KegReport } from "@/lib/mgr/keg-report-view";
 
 export const kegFleetMicrostar: KegFleetViewModel = {
+  shortages: ["Owned ½ bbl · Warehouse: 2 below zero · record Acquired kegs to reconcile"],
   poolForm: { name: "Microstar ⅙ bbl", kind: "pay_per_fill", vendorId: "microstar", perFill: "4.50", deposit: "30.00", active: true },
   vendors: [{ value: "microstar", label: "Kegline Leasing" }],
   bins: [

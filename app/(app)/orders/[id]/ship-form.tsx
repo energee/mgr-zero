@@ -65,8 +65,8 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming, ship,
     }, data => {
       if (transfer) { router.push(`/orders/${snapshot.order.id}`); return; }
-      const invoiceId = (data as { invoice_id: string | null }).invoice_id;
-      setResult(toShipmentDoneViewProps({ ...proposed, lines: shippedLines(snapshot.lines, ship), invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
+      const { invoice_id: invoiceId, warnings } = data as { invoice_id: string | null; warnings?: string[] };
+      setResult(toShipmentDoneViewProps({ ...proposed, warnings, lines: shippedLines(snapshot.lines, ship), invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
     });
   }}>
     {transfer
