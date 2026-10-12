@@ -104,5 +104,6 @@
   "20261009110000_portal_availability_index.sql": "0d9c76c898aba32ff2becbe8a3f09ee1c44dd75ca48be100b8b32b321e2bd32d",
   "20261011120000_qbo_oauth_already_completed.sql": "1f1f253adf48a03efa269a961411da30f5c26fd3c8ec90bbfb54e25e597d67d4",
   "20261012060200_invoice_due_dates.sql": "59d34cc42bcc12efc488c34e03d741d010527977409da7663f05f678028481b4",
-  "20261012100000_qbo_customer_data.sql": "3edd1bf6c238b9ce5e615c201bc7061e4ddbb475b4da31fea371a5e8f73db45f"
+  "20261012100000_qbo_customer_data.sql": "3edd1bf6c238b9ce5e615c201bc7061e4ddbb475b4da31fea371a5e8f73db45f",
+  "20261012101000_taproom_count_disposition.sql": "ea00e87c2ffc9d00ae13771aacf2fcc965848ebd161f20b7ec20efb4778c1be2"
 }

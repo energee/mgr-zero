@@ -1424,3 +1424,5 @@ semantic notification, and SDK-state dedupe remain separate.
 
 The chat tables and grants in §17 are implemented in the baseline migration and
 covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.
+
+Taproom count shortages have one sold/default or destroyed disposition per bucket (#814). Sold keys are omitted at the command boundary to preserve legacy replay identity. Destruction has no channel/tax/state; only sold shortage lines are correctable.

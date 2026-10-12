@@ -25,3 +25,11 @@ it("preserves nulls, coverage, exclusions and absent trends in the shared report
   expect(html).not.toContain("short 4 weeks running");
   expect(html).not.toContain('href="/taproom');
 });
+
+it("#814 displays destruction separately from sold actual", () => {
+  const report = taproomVariance.report!;
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { ...taproomVariance,
+    report: { ...report, rows: [{ ...report.rows[0], destroyed_bbl: 2 }], periods: [{ ...report.periods[0], destroyed_bbl: 2 }] } } }));
+  expect(html).toContain("Destroyed");
+  expect(html).toContain("destroyed 2 bbl");
+});

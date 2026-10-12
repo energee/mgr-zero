@@ -29,6 +29,7 @@ const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_o
 ] }, { prior_count: { id: "sep1", counted_on: "2026-09-01" }, expected_bbl: 1.5, reason: null, rows: [{ brand_id: "hazy", brand_name: "Hazy IPA", expected_bbl: 1.5, excluded_bbl: 0, unattributed_bbl: 0, split: false }] });
 weeklyDraft.draft.lines[0].quantity = "4";
 weeklyDraft.draft.lines[1].quantity = "2";
+weeklyDraft.draft.lines[1].disposition = "destroyed";
 export const weeklyCount: WeeklyCountViewModel = {
   timeZone: DEMO_TIME_ZONE,
   locations: [["Ridgeline Tap Room"], ["Downtown"]], location: "Ridgeline Tap Room", role: "admin", draft: weeklyDraft,
@@ -45,7 +46,7 @@ export const taproomVariance: TaproomVarianceViewModel = {
   report: {
     weeks: 4, window_start: "2026-08-12", window_end: "2026-09-08", as_of: "2026-09-08T16:00:00Z", reason: null,
     rows: [
-      { brand_id: "hazy", brand_name: "Hazy IPA", expected_bbl: 11.5, actual_bbl: 11, variance_bbl: 0.5, excluded_bbl: 0, unattributed_bbl: 0, split: false, compared_periods: 4 },
+      { brand_id: "hazy", brand_name: "Hazy IPA", expected_bbl: 11.5, actual_bbl: 11, destroyed_bbl: 0.5, variance_bbl: 0.5, excluded_bbl: 0, unattributed_bbl: 0, split: false, compared_periods: 4 },
       { brand_id: "pils", brand_name: "Pils", expected_bbl: 8, actual_bbl: 7.9, variance_bbl: 0.1, excluded_bbl: 0, unattributed_bbl: 0, split: false, compared_periods: 4 },
       { brand_id: "stout", brand_name: "Stout", expected_bbl: 3, actual_bbl: 3, variance_bbl: 0, excluded_bbl: 0, unattributed_bbl: 0, split: false, compared_periods: 4 },
     ],
