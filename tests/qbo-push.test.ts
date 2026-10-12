@@ -44,7 +44,7 @@ async function pushFixture(kind: "invoice" | "credit_memo" = "invoice", role: "a
   expect((await admin.from("ship_tos").update({ is_default: true }).eq("id", customer.shipToId)).error).toBeNull();
   const invoice = await admin.from("invoices").insert({
     brewery_id: brewery.id, customer_id: customer.customerId, kind,
-    issued_on: "2026-09-09", due_on: kind === "invoice" ? "2026-10-09" : null,
+    issued_on: "2026-09-09",
   }).select("id,invoice_no,qbo_idempotency_key").single();
   if (invoice.error) throw invoice.error;
   const qty = kind === "invoice" ? 3 : -3;
@@ -67,6 +67,7 @@ describe("QuickBooks durable outbound push", () => {
       const body = String(init?.body);
       const persisted = sql(`select provider_request_id::text || '|' || request_body from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0];
       expect(persisted).toBe(`${key}|${body}`);
+      expect(body).toContain('"DueDate": "2026-10-09"');
       expect(body).toContain('"Amount": 9.99');
       expect(body).toContain('"UnitPrice": 3.33');
       expect(body).toContain('"Qty": 3');

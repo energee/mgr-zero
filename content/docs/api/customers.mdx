@@ -7,6 +7,11 @@ A customer is a distributor, retailer, brewery, or other account, carrying a
 two-letter `state`, a required sale channel (which decides its prices), and an
 optional licence number and payment terms.
 `upsert_customer` creates when `id` is omitted and updates when it is present.
+Customer `paymentTerms` freezes each new invoice's `due_on` at `issued_on` plus
+0 (`due_on_receipt`), 15 (`net15`), or 30 (`net30`) days. Explicit due dates
+are preserved; credit memos receive no inferred due date. Changing terms does
+not update issued invoices. The historical null-date backfill uses current terms,
+not unknown issue-time terms, and does not enqueue a QuickBooks push.
 
 Ship-to addresses matter beyond delivery. The state on the ship-to drives excise
 destination reporting, so an address is a compliance record, not just a label.
