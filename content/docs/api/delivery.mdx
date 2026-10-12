@@ -10,6 +10,8 @@ fully refused), and `return_route` refuses until every stop on the route has
 an outcome. Refused beer stays outstanding until `check_in_refused_return`
 puts it back, even after the route has returned.
 
+An unattempted open stop leaves a departed route through `leave_delivery_for_later`. Its shipment or transfer becomes unassigned for another route without refusal, invoicing or stock movement. Only the assigned driver or an Admin may do this; a shipment also records an order event. `confirm_delivery` accepts `closed` only for compatibility with exact completed request replay. Fresh `closed` requests are refused after replay lookup; historical database rows remain valid.
+
 {/* ops:delivery */}
 
 ## check_in_refused_return [#check_in_refused_return]
@@ -42,7 +44,7 @@ Close a stop with accepted and refused quantities; invoice only accepted goods o
 | `deliveryId` | uuid | yes |
 | `signedBy` | string | no |
 | `refused` | array of object | no |
-| `reason` | customer_refused or closed or damaged or wrong_item or other | no |
+| `reason` | customer_refused or damaged or wrong_item or other or closed | no |
 | `note` | string | no |
 | `transferRefused` | boolean | no |
 
@@ -85,6 +87,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_delivery_stop", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## leave_delivery_for_later [#leave_delivery_for_later]
+
+`command` · admin, warehouse
+
+Take an open stop off a departed route when it could not be attempted; its shipment or transfer becomes unassigned without refusal, invoicing, or restocking
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `routeId` | uuid | yes |
+| `deliveryId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "leave_delivery_for_later", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "routeId": "00000000-0000-0000-0000-000000000000", "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## list_refused_returns [#list_refused_returns]

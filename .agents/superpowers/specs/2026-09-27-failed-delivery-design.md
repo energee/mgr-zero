@@ -107,9 +107,9 @@ Good units go to the chosen bin and become available; damaged units post as a lo
 
 ## Out of scope
 
-- Re-delivery: the customer's replacement is a new order (D18).
-- Rerouting an undelivered stop to a later route. A stop now closes with an outcome,
-  so there is nothing to move.
+- Re-delivery of refused beer: the customer's replacement is a new order (D18).
+- Rerouting a refused stop. An unattempted open stop instead leaves through
+  `leave_delivery_for_later` and becomes unassigned for a later route (#813).
 - A vendor-returns or backorder engine.
 
 ## Decisions (2026-09-27)
@@ -150,3 +150,8 @@ a test and the render with the browse skill. Migration:
 | 12 | Docs: staff guide delivery sections (:388, :393, :476–488), portal guide, screens.tsx Route spec | `tests/docs.test.ts`, `tests/design-docs.test.ts` | 7–11 |
 
 Tasks whose dependencies have landed can run in parallel.
+
+
+### Unattempted stops (#813)
+
+An open stop on a departed route leaves through `leave_delivery_for_later`. The command deletes the delivery row and records `delivery_not_attempted` for a shipment. Its document becomes unassigned for a later route without a refusal, invoice or stock change. There is no driver note. `closed` is retained only for historical database rows, not the refusal picker.

@@ -196,6 +196,26 @@ describe("depart, confirm, and return a route", () => {
 });
 
 describe("leave deliveries for later (#813)", () => {
+  it("replays a completed legacy closed refusal but rejects a fresh closed refusal", async () => {
+    const sh = await shipment(2, "on_delivery");
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-18", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const input = { deliveryId: stop!.id, transferRefused: false, refused: [] as { orderLineId: string; qty: number }[], reason: "closed", note: "", signedBy: "" };
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, adminCtx) as { lines: { id: string }[] };
+    input.refused = [{ orderLineId: detail.lines[0].id, qty: 2 }];
+    const requestId = crypto.randomUUID();
+    const stored = { delivery_id: stop!.id, invoice_id: null, outcome: "refused" };
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${adminCtx.userId}','${b.id}','${requestId}','confirm_delivery',
+      extensions.digest(jsonb_build_object('delivery','${stop!.id}'::uuid,'signed_by','','refused',jsonb_build_array(jsonb_build_object('order_line_id','${detail.lines[0].id}','qty',2)),'reason','closed','note','','transfer_refused',false)::text,'sha256'),
+      '${JSON.stringify(stored)}'::jsonb)`);
+    expect(await runCommand("confirm_delivery", input, adminCtx, { requestId, correlationId: requestId })).toEqual(stored);
+    const freshId = crypto.randomUUID();
+    await expect(runCommand("confirm_delivery", input, adminCtx, { requestId: freshId, correlationId: freshId })).rejects.toThrow(/closed|refusal reason/i);
+    expect(sql(`select count(*) from private.command_requests where actor_id='${adminCtx.userId}' and request_id='${freshId}'`)).toBe("0");
+    expect((await admin.from("deliveries").select("outcome").eq("id", stop!.id).single()).data?.outcome).toBeNull();
+  });
   it.each(["now", "on_delivery"] as const)("frees an unattempted %s shipment without refusal, money, stock, or keg changes", async (invoiceTiming) => {
     const driver = await makeStaffCtx(b.id, "warehouse");
     const sh = await shipment(2, invoiceTiming);
@@ -206,7 +226,7 @@ describe("leave deliveries for later (#813)", () => {
     }, adminCtx) as { routeId: string };
     await runCommand("depart_route", { routeId }, driver);
     const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
-    const invoicesBefore = await admin.from("invoices").select("id, kind, total_cents").eq("shipment_id", sh).order("id");
+    const invoicesBefore = await admin.from("invoices").select("*").eq("shipment_id", sh).order("id");
     const movementsBefore = await admin.from("inventory_movements").select("id, type, qty").eq("ref", orderId).order("id");
     const kegsBefore = await admin.from("keg_events").select("id, qty, reason").eq("shipment_id", sh).order("id");
     expect(invoicesBefore.error).toBeNull();
@@ -220,7 +240,7 @@ describe("leave deliveries for later (#813)", () => {
     expect((await admin.from("deliveries").select("id").eq("id", stop!.id)).data).toEqual([]);
     expect((await admin.from("orders").select("status").eq("id", orderId).single()).data?.status).toBe("shipped");
     expect((await admin.from("order_lines").select("qty_shipped, qty_refused").eq("order_id", orderId)).data).toEqual([{ qty_shipped: 2, qty_refused: 0 }]);
-    expect((await admin.from("invoices").select("id, kind, total_cents").eq("shipment_id", sh).order("id")).data).toEqual(invoicesBefore.data);
+    expect((await admin.from("invoices").select("*").eq("shipment_id", sh).order("id")).data).toEqual(invoicesBefore.data);
     expect((await admin.from("inventory_movements").select("id, type, qty").eq("ref", orderId).order("id")).data).toEqual(movementsBefore.data);
     expect((await admin.from("inventory_movements").select("id").eq("ref", stop!.id)).data).toEqual([]);
     expect((await admin.from("keg_events").select("id, qty, reason").eq("shipment_id", sh).order("id")).data).toEqual(kegsBefore.data);
@@ -288,6 +308,8 @@ describe("leave deliveries for later (#813)", () => {
     }, adminCtx) as { routeId: string };
     await runCommand("depart_route", { routeId: wrongRoute }, adminCtx);
     await expect(runCommand("leave_delivery_for_later", { ...input, routeId: wrongRoute }, adminCtx)).rejects.toThrow(/delivery not found/i);
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, driver) as { lines: { id: string }[] };
+    await expect(runCommand("confirm_delivery", { deliveryId: stop!.id, refused: [{ orderLineId: detail.lines[0].id, qty: 2 }], reason: "closed" }, driver)).rejects.toThrow(/closed|refusal reason/i);
     await runCommand("confirm_delivery", { deliveryId: stop!.id, signedBy: "Pat" }, driver);
     await expect(runCommand("leave_delivery_for_later", input, driver)).rejects.toThrow(/delivered|refused|closed/i);
     await runCommand("return_route", { routeId }, driver);
@@ -403,7 +425,7 @@ describe("route edges", () => {
     await runCommand("depart_route", { routeId }, adminCtx);
     const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
     await expect(runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "other" }, adminCtx)).rejects.toThrow(/note/i);
-    expect(await runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "closed" }, adminCtx)).toMatchObject({ outcome: "refused", invoice_id: null });
+    expect(await runCommand("confirm_delivery", { deliveryId: stop!.id, transferRefused: true, reason: "customer_refused" }, adminCtx)).toMatchObject({ outcome: "refused", invoice_id: null });
     await runCommand("return_route", { routeId }, adminCtx);
     expect((await admin.from("stock_transfers").select("status").eq("id", tr).single()).data?.status).toBe("in_transit");
   });
@@ -451,7 +473,7 @@ describe("route edges", () => {
     await runCommand("depart_route", { routeId }, driver);
     const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
     const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, driver) as { lines: { id: string }[] };
-    const input = { deliveryId: stop!.id, refused: [{ orderLineId: detail.lines[0].id, qty: 4 }], reason: "closed" };
+    const input = { deliveryId: stop!.id, refused: [{ orderLineId: detail.lines[0].id, qty: 4 }], reason: "customer_refused" };
     await expect(runCommand("confirm_delivery", { ...input, refused: [{ orderLineId: detail.lines[0].id, qty: 5 }] }, driver)).rejects.toThrow(/quantity/i);
     await expect(runCommand("confirm_delivery", { ...input, reason: undefined }, driver)).rejects.toThrow(/reason/i);
     const requestId = crypto.randomUUID();

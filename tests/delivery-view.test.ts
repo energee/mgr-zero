@@ -151,6 +151,7 @@ describe("Confirm delivery", () => {
     const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
     expect(html).toMatch(/Ship to/);
     expect(html).toMatch(/Tap Room · Phoenixville, PA/);
+    expect(html).toContain("Not delivered · leave for a later route");
   });
 
   it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {

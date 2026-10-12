@@ -9312,6 +9312,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      leave_delivery_for_later: {
+        Args: { p_delivery: string; p_request_id: string; p_route: string }
+        Returns: Json
+      }
       return_route: {
         Args: { p_request_id: string; p_route: string }
         Returns: Json

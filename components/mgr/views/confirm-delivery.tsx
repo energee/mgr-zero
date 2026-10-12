@@ -8,7 +8,7 @@ import type { ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 
 const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
-  customer_refused: "Customer refused", closed: "Closed / no access", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
+  customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
 };
 
 export type { ConfirmDeliveryViewModel };
@@ -34,9 +34,9 @@ export function ConfirmDeliveryView({
   );
 }
 
-export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy = "", receivedSuggestions, busy, error, onSubmit }: {
+export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy = "", receivedSuggestions, busy, blocked = false, error, onSubmit, onLeave }: {
   lines: { key: string; title: string; qty: string }[]; transfer?: boolean; initialSignedBy?: string; receivedSuggestions?: string[];
-  busy?: boolean; error?: string | null; onSubmit?: (input: { signedBy: string; refused: { orderLineId: string; qty: number }[]; reason?: string; note: string; transferRefused: boolean }) => void;
+  busy?: boolean; blocked?: boolean; error?: string | null; onLeave?: () => void; onSubmit?: (input: { signedBy: string; refused: { orderLineId: string; qty: number }[]; reason?: string; note: string; transferRefused: boolean }) => void;
 }) {
   const [signedBy, setSignedBy] = useState(initialSignedBy);
   const [refused, setRefused] = useState<Record<string, number>>({});
@@ -52,6 +52,8 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
   const fullRefusal = transfer ? transferRefused : lines.length > 0 && lines.every((l) => (refused[l.key] ?? 0) === Number(l.qty));
   const disabled = busy || (!fullRefusal && !signedBy.trim()) || (hasRefusal && (!reason || (reason === "other" && !note.trim())));
   return <>
+    {blocked && E.note("An earlier delivery action may have completed. Use Retry saved request before editing or choosing either action.")}
+    <fieldset disabled={busy || blocked} className="flex min-w-0 flex-col gap-2">
     {transfer ? E.row("Transfer refused", "Stock stays in transit", E.sw(transferRefused, "Transfer refused", setTransferRefused)) : lines.map((l) => <Fragment key={l.key}>
       {E.edit(`${l.title} · refused`, String(refused[l.key] ?? 0), "number", undefined, { min: 0, max: Number(l.qty), step: 1, onChange: (value) => setRefused({ ...refused, [l.key]: Number(value) }) })}
       {E.fld("Accepted", String(Number(l.qty) - (refused[l.key] ?? 0)))}
@@ -59,10 +61,13 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
     {hasRefusal && <>
       {E.pick("Refusal reason", reason, REFUSAL_REASONS.map((value) => ({ value, label: REFUSAL_LABEL[value] })), { onChange: setReason, required: true })}
       {E.edit("Refusal note", note, "text", undefined, { onChange: setNote, required: reason === "other" })}
-      {E.note("Refused beer closes on this order. Stock returns only after a physical check-in. Redelivery needs a new order.")}
+      {E.note("Refused beer closes on this order. Stock returns only after a physical check-in. Redelivery of refused beer needs a new order.")}
     </>}
     {E.edit("Received by", signedBy, "text", receivedSuggestions, { onChange: setSignedBy, required: !fullRefusal })}
+    {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
+    {E.btn("Not delivered · leave for a later route", busy ? "g disabled" : "g", undefined, onLeave ?? (() => {}))}
     {error && E.status(error, "w")}
     {E.btn(busy ? "Saving…" : fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", disabled ? "irr disabled" : "irr", undefined, submit)}
+    </fieldset>
   </>;
 }

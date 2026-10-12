@@ -120,6 +120,14 @@ defineCommand({
 });
 
 defineCommand({
+  name: "leave_delivery_for_later", description: "Take an open stop off a departed route when it could not be attempted; its shipment or transfer becomes unassigned without refusal, invoicing, or restocking",
+  roles: [...ROLES], input: z.object({ routeId: z.string().uuid(), deliveryId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("leave_delivery_for_later", {
+    p_route: i.routeId, p_delivery: i.deliveryId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "return_route", description: "Stamp the route's return as its driver or an admin, once it has departed and every stop has an outcome",
   roles: [...ROLES], input: routeInput,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_route", { p_route: i.routeId, p_request_id: execution.requestId })),

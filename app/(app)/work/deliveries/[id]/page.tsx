@@ -1,8 +1,8 @@
 // app/(app)/work/deliveries/[id]/page.tsx — Confirm delivery: one stop, its
 // shipped lines and invoice timing (or, for a transfer stop, the destination
-// and picked lines), a receiving name, and the Delivered commit
-// (delivered-form.tsx → confirm_delivery), drawn to the Confirm delivery
-// screen record. Today's delivery_next row and the route's Resume land here.
+// and picked lines). The shared surface confirms delivery/refusal or leaves an
+// unattempted stop for later through delivered-form.tsx's command adapter.
+// Today's delivery_next row and the route's Resume land here.
 import { E } from "@/components/mgr/e";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -78,7 +78,7 @@ function deliveryAction(
   return (
     <>
       {E.sp()}
-      <DeliveredForm deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />
+      <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />
     </>
   );
 }
