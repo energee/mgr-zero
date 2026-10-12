@@ -8,6 +8,11 @@ their own customer's data, and these are the only operations that role can call.
 The scope is enforced server-side, not by which operations the client chooses
 to show.
 
+Buyer customer identity reads expose only id, brewery id, name, and sale channel
+id through `portal_customers`. Customer bookkeeping, tax, license, and payment
+terms are not exposed. The base customer, brand, format, and channel-price
+tables have no buyer read policies; catalog prices use `portal_sku_prices`.
+
 Portal orders are wholesale orders shipped from the brewery's warehouse, and
 they move through the same lifecycle staff orders do. A portal user drafts,
 updates, and submits. Confirming, picking, and shipping stay with the brewery.

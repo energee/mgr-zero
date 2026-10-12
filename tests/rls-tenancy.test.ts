@@ -31,9 +31,9 @@ describe("tenancy RLS", () => {
     expect(error?.code).toBe("42501");
   });
 
-  it("customer user sees only their own customer record", async () => {
+  it("customer user sees only their own projected customer identity", async () => {
     const db = await asUser(custB.user.email);
-    const { data } = await db.from("customers").select("id");
+    const { data } = await db.from("portal_customers").select("id");
     expect(data).toHaveLength(1);
     expect(data![0].id).toBe(custB.customer.id);
   });
@@ -94,8 +94,7 @@ describe("brewery column exposure", () => {
       .select("id, breweries(*)")
       .eq("id", customer.id)
       .single();
-    expect(embedded?.id).toBe(customer.id);
-    expect(embedded?.breweries).toBeNull();
+    expect(embedded).toBeNull(); // Buyers cannot read the customer base row either (#793).
   });
 
   it("exposes only the portal brewery projection to a customer", async () => {
