@@ -11,4 +11,4 @@ export const invoiceList = [
   { ...invoice, id: "pushed", invoice_no: 1038, customers: { name: "Al’s Bar" } },
   { ...invoice, id: "paid", invoice_no: 1037, paid_at: "2026-08-29T12:00:00Z", qbo_balance_cents: 0, qbo_cash_collected_cents: 98000 },
   { ...invoice, id: "credit", invoice_no: 12, kind: "credit_memo" as const, total_cents: -18000, subtotal_cents: -18000, due_on: null, qbo_balance_cents: null },
-].map(row => toInvoiceListRow(row, "admin", true, DEMO_TIME_ZONE));
+].map(row => toInvoiceListRow(row, "admin", true, DEMO_TIME_ZONE, new Date("2026-10-04T12:00:00Z")));

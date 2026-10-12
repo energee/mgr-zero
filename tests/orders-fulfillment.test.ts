@@ -61,6 +61,10 @@ describe("pick and ship", () => {
     expect(shipped.error).toBeNull();
 
     const invoiceId = (shipped.data as { invoice_id: string }).invoice_id;
+    const invoiceDates = (await admin.from("invoices").select("issued_on,due_on").eq("id", invoiceId).single()).data!;
+    const expectedDue = new Date(`${invoiceDates.issued_on}T12:00:00Z`);
+    expectedDue.setUTCDate(expectedDue.getUTCDate() + 30);
+    expect(invoiceDates.due_on).toBe(expectedDue.toISOString().slice(0, 10));
     expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 6, qty_shipped: 4 });
     expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data)
       .toEqual({ status: "shipped", needs_restock: true });
