@@ -2,13 +2,14 @@ import { z } from "zod";
 import { defineCommand, unwrap } from "./registry";
 import { IMPORT_KINDS, IMPORT_ROW_CAP, importRowKey, validateImportRow, type ImportOutcome } from "@/lib/import-csv";
 
+// Imports preserve raw batch identity while resolving existing references per atomic row.
 // Concurrent row RPCs per import. ponytail: fixed; raise it if a 5000-row import is still slow.
 const IMPORT_CONCURRENCY = 8;
 export { IMPORT_ROW_CAP } from "@/lib/import-csv";
 
 defineCommand({
   name: "import_csv",
-  description: "Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances; each row commits independently and the same requestId safely replays the exact batch",
+  description: "Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances with existing reference names or IDs; each row commits independently and the same requestId safely replays the exact raw batch",
   input: z.object({ kind: z.enum(IMPORT_KINDS), rows: z.array(z.record(z.string(), z.string())).min(1).max(IMPORT_ROW_CAP) }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => {
@@ -23,7 +24,10 @@ defineCommand({
     // Rows sharing importRowKey run in file order; distinct keys run IMPORT_CONCURRENCY at a time (#758).
     // A UPC can collide across products, so a products file with any UPC runs entirely in order.
     const anyUpc = input.kind === "products_skus" && input.rows.some(r => r.upc?.trim());
-    const queues = [...Map.groupBy(input.rows.keys(), row => anyUpc ? "" : importRowKey(input.kind, input.rows[row], row)).values()];
+    // A named reference and its UUID can identify the same price cell under different raw keys.
+    const anyName = input.kind === "channel_prices" && input.rows.some(row =>
+      ["saleChannelId", "priceGroupId", "formatId"].some(field => !z.uuid().safeParse(row[field]?.trim()).success));
+    const queues = [...Map.groupBy(input.rows.keys(), row => anyUpc || anyName ? "" : importRowKey(input.kind, input.rows[row], row)).values()];
     // After one row RPC throws, stop starting rows: the command fails, and rows
     // committed after its error would be invisible to the caller.
     let failed = false, next = 0;

@@ -4,15 +4,15 @@ import { CUSTOMER_TYPES, PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
 export const IMPORT_ROW_CAP = 5000;
 export const IMPORT_KINDS = ["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"] as const;
 export type ImportKind = typeof IMPORT_KINDS[number];
-type Field = { name: string; required?: boolean; type?: "uuid" | "positive" | "cents" | "number" | "state"; lookup?: string; values?: readonly string[] };
+type Field = { name: string; required?: boolean; type?: "positive" | "cents" | "number" | "state"; lookup?: string; values?: readonly string[] };
 export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
-  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", required: true, type: "state" }, { name: "saleChannelId", required: true, type: "uuid", lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }],
-  ship_tos: [{ name: "customerId", required: true, type: "uuid", lookup: "customers" }, ...["label", "address1", "city", "zip"].map(name => ({ name, required: true })), { name: "state", required: true, type: "state" }, { name: "address2" }],
-  products_skus: [{ name: "product", required: true }, { name: "formatId", required: true, type: "uuid", lookup: "formats" }, { name: "sku_name" }, { name: "style" }, { name: "abv", type: "number" }, { name: "upc" }],
-  channel_prices: [{ name: "saleChannelId", required: true, type: "uuid", lookup: "channels" }, { name: "priceGroupId", required: true, type: "uuid", lookup: "groups" }, { name: "formatId", required: true, type: "uuid", lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
-  opening_balances: [{ name: "skuId", required: true, type: "uuid", lookup: "skus" }, { name: "locationId", required: true, type: "uuid", lookup: "locations" }, { name: "binId", required: true, type: "uuid", lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
+  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", required: true, type: "state" }, { name: "saleChannelId", required: true, lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }],
+  ship_tos: [{ name: "customerId", required: true, lookup: "customers" }, ...["label", "address1", "city", "zip"].map(name => ({ name, required: true })), { name: "state", required: true, type: "state" }, { name: "address2" }],
+  products_skus: [{ name: "product", required: true }, { name: "formatId", required: true, lookup: "formats" }, { name: "sku_name" }, { name: "style" }, { name: "abv", type: "number" }, { name: "upc" }],
+  channel_prices: [{ name: "saleChannelId", required: true, lookup: "channels" }, { name: "priceGroupId", required: true, lookup: "groups" }, { name: "formatId", required: true, lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
+  opening_balances: [{ name: "skuId", required: true, lookup: "skus" }, { name: "locationId", required: true, lookup: "locations" }, { name: "binId", required: true, lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
 };
-export type ImportLookups = Record<string, { id: string; name: string; location_id?: string }[]>;
+export type ImportLookups = Record<string, { id: string; name: string; location_id?: string; basis?: string; price_group_id?: string | null }[]>;
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
@@ -26,7 +26,9 @@ export type ImportResult = { committed: number; blocked: number; outcomes: Impor
  *    spans products, so import_csv runs a whole file in order once any row has a UPC
  *  - channel_prices: primary key (sale_channel_id, price_group_id, format_id); last write wins
  *  Ship-tos are never imported as default and opening balances only append, so
- *  those rows cannot collide and get a key of their own. */
+ *  those rows cannot collide and get a key of their own. A price reference written
+ *  once by name and once by UUID has different keys, so import_csv serializes files
+ *  containing named price references. */
 export function importRowKey(kind: ImportKind, row: Record<string, string>, index: number): string {
   // UUIDs are case-insensitive in SQL; lower-case them so one cell has one key.
   const v = (f: string) => (row[f]?.trim() ?? "").toLowerCase();
@@ -43,20 +45,35 @@ export function importRowKey(kind: ImportKind, row: Record<string, string>, inde
 // third significant decimal does not.
 const openingQty = z.number().positive().multipleOf(0.01);
 
+/** Reference cells keep their raw UUID/name for durable replay. With lookup data,
+ * preview requires one trimmed, case-insensitive exact match; the RPC resolves
+ * references authoritatively when lookup data is absent. */
 export function validateImportRow(kind: ImportKind, row: Record<string, string>, lookups?: ImportLookups): string[] {
   const errors: string[] = Object.keys(row).filter(key => !IMPORT_FIELDS[kind].some(f => f.name === key)).map(key => `unknown CSV field ${key}`);
+  const references: Record<string, ImportLookups[string][number]> = {};
   for (const f of IMPORT_FIELDS[kind]) {
     const value = row[f.name]?.trim() ?? "";
     if (!value) { if (f.required) errors.push(`${f.name} is required`); continue; }
     if (f.values && !f.values.includes(value)) errors.push(`${f.name}: choose ${f.values.join(", ")}`);
-    if (f.type === "uuid" && !z.uuid().safeParse(value).success) errors.push(`${f.name} must be a UUID`);
+    // Preview resolves identities only for validation; the RPC receives the original cells.
+    if (f.lookup && lookups) {
+      const uuid = z.uuid().safeParse(value).success;
+      let candidates = lookups[f.lookup] ?? [];
+      if (f.lookup === "bins" && !uuid) candidates = candidates.filter(item => item.location_id?.toLowerCase() === references.locationId?.id.toLowerCase());
+      if (f.lookup === "formats") candidates = candidates.filter(item => item.basis === "packaged" || (kind === "channel_prices" && item.price_group_id === references.priceGroupId?.id));
+      const matches = candidates.filter(item => uuid
+        ? item.id.toLowerCase() === value.toLowerCase()
+        : item.name.trim().toLowerCase() === value.toLowerCase());
+      if (!matches.length) errors.push(`${f.name} was not found`);
+      else if (matches.length > 1) errors.push(`${f.name}: "${value}" matches ${matches.length} records; use the ID`);
+      else references[f.name] = matches[0];
+    }
     if (f.type === "state" && !(US_STATE_CODES as readonly string[]).includes(value)) errors.push(`${f.name} must be a US state code, such as PA`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
       if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
     }
-    if (f.lookup && lookups && !lookups[f.lookup]?.some(item => item.id === value)) errors.push(`${f.name} was not found`);
   }
-  if (kind === "opening_balances" && lookups && !lookups.bins?.some(b => b.id === row.binId?.trim() && b.location_id === row.locationId?.trim())) errors.push("binId must belong to locationId");
+  if (kind === "opening_balances" && references.binId && references.locationId && references.binId.location_id?.toLowerCase() !== references.locationId.id.toLowerCase()) errors.push("binId must belong to locationId");
   return errors;
 }
 

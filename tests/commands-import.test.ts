@@ -23,6 +23,48 @@ describe("import_csv rows", () => {
     await expect(execute("customers", [...rows, rows[0]], id)).rejects.toThrow(/different payload/);
     await expect(execute("ship_tos", rows, id)).rejects.toThrow(/different payload/);
   });
+  it("imports an exact channel name and preserves raw batch replay identity (#819)", async () => {
+    const rows = [{ name: "Named-channel customer", type: "retailer", state: "PA", saleChannelId: "  wHoLeSaLe  " }];
+    const requestId = crypto.randomUUID();
+    const first = await execute("customers", rows, requestId);
+    expect(first.committed).toBe(1);
+    expect(first.blocked).toBe(0);
+    const saved = await admin.from("customers").select("sale_channel_id").eq("id", first.outcomes[0].result!.id).single();
+    expect(saved.error).toBeNull();
+    expect(saved.data?.sale_channel_id).toBe(channel);
+    expect(await execute("customers", rows, requestId)).toEqual(first);
+    await expect(execute("customers", [{ ...rows[0], saleChannelId: channel }], requestId)).rejects.toThrow(/different payload/);
+  });
+  it("trims preview whitespace from reference names and UUIDs without changing replay identity (#819)", async () => {
+    const rows = [
+      { name: "Tabbed-reference customer", type: "retailer", state: "PA", saleChannelId: "\tWholesale\t" },
+      { name: "Unicode-space-reference customer", type: "retailer", state: "PA", saleChannelId: `\u00a0${channel}\u202f` },
+    ];
+    const requestId = crypto.randomUUID();
+    const first = await execute("customers", rows, requestId);
+    expect(first.committed).toBe(2);
+    expect(first.blocked).toBe(0);
+    expect(await execute("customers", rows, requestId)).toEqual(first);
+    const saved = await admin.from("customers").select("sale_channel_id").in("id", first.outcomes.map(outcome => outcome.result!.id));
+    expect(saved.error).toBeNull();
+    expect(saved.data).toEqual([{ sale_channel_id: channel }, { sale_channel_id: channel }]);
+    await expect(execute("customers", rows.map(row => ({ ...row, saleChannelId: row.saleChannelId.trim() })), requestId)).rejects.toThrow(/different payload/);
+  });
+  it("applies mixed name and UUID price rows in file order (#819)", async () => {
+    const group = await seedPriceGroup(ctx.breweryId, "Mixed references");
+    const formatRow = await admin.from("formats").select("name").eq("id", format).single();
+    expect(formatRow.error).toBeNull();
+    const rows = [
+      { saleChannelId: "Wholesale", priceGroupId: "Mixed references", formatId: formatRow.data!.name, unitPriceCents: "100" },
+      { saleChannelId: channel, priceGroupId: group, formatId: format, unitPriceCents: "250" },
+    ];
+    const { result, peak } = await concurrentImport("channel_prices", rows, row => row === 0);
+    expect(result.committed).toBe(2);
+    expect(peak).toBe(1);
+    const cell = await admin.from("channel_prices").select("unit_price_cents").eq("sale_channel_id", channel).eq("price_group_id", group).eq("format_id", format).single();
+    expect(cell.error).toBeNull();
+    expect(cell.data?.unit_price_cents).toBe(250);
+  });
   it("opening balance replay never appends again", async () => {
     const row = { skuId: sku, locationId: location, binId: bin, qty: "12.5" }; const id = crypto.randomUUID();
     const first = await execute("opening_balances", [row], id); expect(first.committed).toBe(1);
@@ -158,8 +200,8 @@ describe("import_csv rows", () => {
     const customerId = customer.outcomes[0].result!.id;
     const ships = await execute("ship_tos", [{ customerId, label: "Main", address1: "1 Main", city: "Town", state: "PA", zip: "19000" }, { customerId, label: "Bad" }]);
     expect(ships.committed).toBe(1); expect(ships.blocked).toBe(1);
-    const { data: group } = await admin.from("price_groups").insert({ brewery_id: ctx.breweryId, name: "Import", position: 1 }).select("id").single();
-    const prices = await execute("channel_prices", [{ saleChannelId: channel, priceGroupId: group!.id, formatId: format, unitPriceCents: "1234" }, { saleChannelId: channel, priceGroupId: group!.id, formatId: format, unitPriceCents: "1.2" }]);
+    const group = await seedPriceGroup(ctx.breweryId, "Import");
+    const prices = await execute("channel_prices", [{ saleChannelId: channel, priceGroupId: group, formatId: format, unitPriceCents: "1234" }, { saleChannelId: channel, priceGroupId: group, formatId: format, unitPriceCents: "1.2" }]);
     expect(prices.committed).toBe(1); expect(prices.blocked).toBe(1);
     expect((await execute("customers", [{ name: "Ship customer", type: "retailer", state: "PA", saleChannelId: channel }])).blocked).toBe(1);
   });
