@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { cloneElement, Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -33,7 +33,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
   </>;
   return <>
     {header}
-    {!model.cancelled && !value.recorded && !value.correctionRecordId && planActions}
+    {!model.cancelled && !value.recorded && !value.addingTurn && !value.correctionRecordId && planActions}
     {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
@@ -48,8 +48,8 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
         {!record.additions.length && E.note("Confirmed no ingredients used.")}
         {processFields.map(([key, label]) => record.process[key] === undefined ? null : <Fragment key={key}>{E.fld(label, String(record.process[key]))}</Fragment>)}
       </section>)}
-      {model.vesselId && currentBrewRecords(model.records ?? []).map(record => <Fragment key={record.id}>{E.act(`Correct turn ${record.turn}`, "attention", undefined, () => change(brewCorrectionModel(model, record)), busy)}</Fragment>)}
-      {model.vesselId && model.records?.length ? E.act("Add brew turn", "attention", undefined, () => change(brewTurnModel(model)), busy) : null}
+      {model.vesselId && currentBrewRecords(model.records ?? []).map(record => <Fragment key={record.id}>{cloneElement(E.act(`Correct turn ${record.turn}`, "attention", undefined, () => change(brewCorrectionModel(model, record)), busy), { "data-preview-action": true } as Record<string, unknown>)}</Fragment>)}
+      {model.vesselId && model.records?.length ? cloneElement(E.act("Add brew turn", "attention", undefined, () => change(brewTurnModel(model)), busy), { "data-preview-action": true } as Record<string, unknown>) : null}
       {E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
