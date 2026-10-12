@@ -75,7 +75,7 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): Lot
     tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? `batch ${s.batch.batch_no}` : null, s.batch?.brewed_on ? `brewed ${calendarDay(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
     memberBatches: s.batches.map(batch => ({ key: batch.id, title: `Batch ${batch.batch_no ?? "?"}`, detail: batch.brewed_on ? `brewed ${calendarDay(batch.brewed_on)}` : "Brew date not recorded" })),
-    sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} → ${transfer.to_vessel}`, detail: calendarDay(transfer.at), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
+    sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} to ${transfer.to_vessel}`, detail: calendarDay(transfer.at), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
     tape: s.movements.map((movement) => ({
       key: movement.id,
       label: `${movement.qty > 0 ? "+" : "−"}${Math.abs(movement.qty)} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)} · ${movement.location}`,
