@@ -170,7 +170,7 @@ the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
-Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` cover staged import rows and staff/buyer invitations.
+Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` cover staged import rows and staff/buyer invitations. The docs path check recognizes tracked repository roots, not generated build directories, so it does not require a dev-server run after a production build.
 
 Tests run against a real local Supabase stack (not a mock), but **their own
 throwaway one**: `bash scripts/test-db.sh` starts a second stack (project

@@ -131,8 +131,11 @@ describe("agent entry docs", () => {
     "docs/audits/2026-09-05/security.md", // dead citation in ARCHITECTURE.md; fixed by the docs-reconcile logs lane
   ]);
 
-  it("names only repo paths that exist", () => {
-    const tops = new Set(readdirSync(root));
+  it("names only repo paths that exist, regardless of generated build output", () => {
+    // Generated directories such as .next are not repository path owners.
+    const tops = new Set(gitFiles("*").map((path) => path.split("/")[0]));
+    expect(tops.has(".next")).toBe(false);
+    expect(tops.has("lib")).toBe(true);
     const docs = ["AGENTS.md", ".agents/ARCHITECTURE.md", "README.md", ...gitFiles(".agents/skills/*/SKILL.md")];
     const missing = docs
       // The hugeicons skill is vendored and names paths in its own repo.
