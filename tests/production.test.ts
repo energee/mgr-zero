@@ -102,6 +102,58 @@ describe("recipes and immutable versions", () => {
   });
 });
 
+describe("brew turns (#807)", () => {
+  it("allows a new-period turn after the first turn's period was filed", async () => {
+    const vessel = await runCommand("upsert_vessel", { name: "FV period turns", kind: "fermenter", capacityBbl: 20 }, ctx) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-09-30", plannedBbl: 20 }, ctx) as { id: string };
+    const firstInput = { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-09-30" };
+    await runCommand("record_brew_day", firstInput, ctx);
+    await admin.from("report_filings").insert({ brewery_id: b.id, jurisdiction: "TTB", period_start: "2026-09-01", period_end: "2026-09-30", figures: {}, filed_at: "2026-10-01T12:00:00Z", filed_by: ctx.userId }).throwOnError();
+    await runCommand("record_brew_day", { ...firstInput, brewedOn: "2026-10-01" }, ctx);
+    const occupancy = await admin.from("vessel_occupancies").select("initial_bbl").eq("batch_id", batch.id).single().throwOnError();
+    expect(occupancy.data!.initial_bbl).toBe(20);
+  });
+  it("records two turns into one open tank and replays each without adding volume", async () => {
+    const vessel = await runCommand("upsert_vessel", {
+      name: "FV double batch", kind: "fermenter", capacityBbl: 20,
+    }, ctx) as { id: string };
+    const batch = await runCommand("schedule_batch", {
+      plannedOn: "2026-10-01", plannedBbl: 20,
+    }, ctx) as { id: string };
+    const firstInput = {
+      actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id,
+      initialBbl: 10, brewedOn: "2026-10-01",
+    };
+    const secondInput = { ...firstInput, brewedOn: "2026-10-02" };
+    const firstRequest = crypto.randomUUID();
+    const secondRequest = crypto.randomUUID();
+    const firstExecution = { requestId: firstRequest, correlationId: firstRequest };
+    const secondExecution = { requestId: secondRequest, correlationId: secondRequest };
+    const first = await runCommand("record_brew_day", firstInput, ctx, firstExecution);
+    const second = await runCommand("record_brew_day", secondInput, ctx, secondExecution);
+
+    expect(await runCommand("record_brew_day", firstInput, ctx, firstExecution)).toEqual(first);
+    expect(await runCommand("record_brew_day", secondInput, ctx, secondExecution)).toEqual(second);
+    const occupancies = await admin.from("vessel_occupancies")
+      .select("id, vessel_id, initial_bbl, ended_at").eq("batch_id", batch.id).throwOnError();
+    expect(occupancies.data).toEqual([
+      expect.objectContaining({ vessel_id: vessel.id, initial_bbl: 20, ended_at: null }),
+    ]);
+    const day = await runCommand("get_brew_day", { batchId: batch.id }, ctx) as {
+      batch: { brewed_on: string };
+    };
+    expect(day.batch.brewed_on).toBe("2026-10-01");
+    const records = await runCommand("get_brew_record", { batchId: batch.id }, ctx) as {
+      records: { turn: number; initial_bbl: number; occupancy_id: string; corrects_id: string | null; brewed_on: string }[];
+    };
+    expect(records.records).toHaveLength(2);
+    expect(records.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ turn: 1, initial_bbl: 10, occupancy_id: occupancies.data![0].id, corrects_id: null, brewed_on: "2026-10-01" }),
+      expect.objectContaining({ turn: 2, initial_bbl: 10, occupancy_id: occupancies.data![0].id, corrects_id: null, brewed_on: "2026-10-02" }),
+    ]));
+  });
+});
+
 // Vessels, scheduling and the brew day. A batch is scheduled before it is
 // brewed and may carry no brand: identity is only required at packaging
 // (§16.9). `record_brew_day` is the one call that stamps brewed_on and opens
@@ -143,9 +195,9 @@ describe("vessels, scheduling and brew day", () => {
     expect(day.batch).toMatchObject({ id: batch.id, brewed_on: "2026-10-01" });
     expect(day.occupancy).toMatchObject({ initial_bbl: 29.5, vessel_name: "FV-1" });
 
-    // The same batch cannot be brewed twice.
+    // Another turn cannot exceed this tank's remaining capacity.
     await expect(runCommand("record_brew_day",
-      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv, initialBbl: 10, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/already brewed/);
+      { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv, initialBbl: 10, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/capacity|holds|fit/i);
 
     // Nor can a second batch move into a vessel whose occupancy is still open.
     const second = (await runCommand("schedule_batch", { plannedOn: "2026-10-02", plannedBbl: 30 }, ctx)) as { id: string };

@@ -445,6 +445,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id: string | null
+          turn: number
           volume_adjustment_id: string | null
         }
         Insert: {
@@ -461,6 +462,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Update: {
@@ -477,6 +479,7 @@ export type Database = {
           plan_snapshot?: Json
           process?: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Relationships: [
