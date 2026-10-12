@@ -406,6 +406,8 @@ material_movement_type, unit_cost_cents int` (receipts only), `note, created_by`
 `(material_id)`.
 
 ### `purchase_orders`
+
+`closed_at`, `closed_by`, and `close_reason` record cancellation or short closure together. Cancellation uses `cancelled`; short closure uses `received`. A closed header makes every line's `qty_open` zero without altering counted receipts or stock. Receipt corrections retain the closed status.
 `po_no bigint` (trigger), `vendor_id → vendors, status po_status default 'draft',
 ordered_on date, expected_on date, note, created_by`. unique `(brewery_id, po_no)`. idx
 `(brewery_id, status, expected_on)`. `received`/`partially_received` are set by the

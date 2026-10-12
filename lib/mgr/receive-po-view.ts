@@ -21,6 +21,9 @@ export type ReceivePoViewModel = {
   info?: string;
   state?: string;
   correctionReason?: string;
+  closure?: "cancel" | "short";
+  closureReason?: string;
+  closedReason?: string;
   note?: string;
   locationId?: string;
   binId?: string;

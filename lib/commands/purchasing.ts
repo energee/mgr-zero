@@ -190,6 +190,22 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "cancel_purchase_order", description: "Cancel a draft or sent purchase order without receipts, recording the reason and releasing its unreceived remainder",
+  input: z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) }), roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_purchase_order", {
+    p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "close_purchase_order_short", description: "Close a purchase order's unreceived remainder with a reason; counted receipts and stock remain unchanged",
+  input: z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) }), roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("close_purchase_order_short", {
+    p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
+  })),
+});
+
 const receiptCountLine = z.object({
   poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
@@ -222,7 +238,7 @@ defineCommand({
   })),
 });
 
-const PO_COLUMNS = "id, po_no, vendor_id, status, ordered_on, expected_on, sent_via, sent_by, note, created_at";
+const PO_COLUMNS = "id, po_no, vendor_id, status, ordered_on, expected_on, sent_via, sent_by, note, created_at, closed_at, closed_by, close_reason";
 const OPEN_STATUSES = ["draft", "sent", "partially_received"] as const;
 
 defineQuery({

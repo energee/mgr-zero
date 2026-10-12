@@ -86,6 +86,31 @@ describe("Purchase orders", () => {
     expect(body.props.model).toEqual(receivePoCountryMalt);
   });
 
+  it("prevents Enter in the closure reason from submitting the receipt or send form", () => {
+    const view = ReceivePoView({ model: receivePoCountryMalt });
+    const fields = (view.props.children as ReactNode[]).filter(node => isValidElement(node) && node.type === "fieldset");
+    const closure = fields.at(-1) as { props: { onKeyDown?: (event: { key: string; target: { tagName: string }; preventDefault: () => void }) => void } };
+    const preventDefault = vi.fn();
+    closure.props.onKeyDown?.({ key: "Enter", target: { tagName: "INPUT" }, preventDefault });
+    expect(preventDefault).toHaveBeenCalledOnce();
+    preventDefault.mockClear();
+    closure.props.onKeyDown?.({ key: "a", target: { tagName: "INPUT" }, preventDefault });
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("renders reason-bearing closure controls on the shared receive view", () => {
+    const cancel = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    expect(cancel).toContain("Cancel purchase order");
+    expect(cancel).toContain("Closure reason");
+    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
+    expect(short).toContain("Close short");
+    expect(short).not.toContain("Cancel purchase order");
+    const closed = htmlOf(createElement(ReceivePoView, { model: { title: "Closed PO", state: "received", closedReason: "Vendor cancelled remainder" } }));
+    expect(closed).toContain("Vendor cancelled remainder");
+    expect(closed).not.toContain("Close short");
+    expect(closed).not.toContain("Receive purchase order");
+  });
+
   it("renders Receive purchase order without leaking live hrefs", () => {
     expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).toMatch(/>Receive purchase order</);
     expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toMatch(/href="\/purchase-orders"/);

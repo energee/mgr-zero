@@ -10,7 +10,8 @@ export type { ReceivePoViewModel };
 export type ReceivePoControls = {
   quantity?: (id: string, value: string) => void; lot?: (id: string, value: string) => void;
   bestBy?: (id: string, value: string) => void; location?: (id: string) => void;
-  reason?: (value: string) => void; bin?: (id: string) => void; receivedOn?: (value: string) => void; sentVia?: (value: string) => void;
+  reason?: (value: string) => void; closureReason?: (value: string) => void; close?: () => void;
+  bin?: (id: string) => void; receivedOn?: (value: string) => void; sentVia?: (value: string) => void;
 };
 
 export function ReceivePoView({ model, controls = {}, messages, submitting = false, disabled = false, footer }: {
@@ -24,6 +25,7 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
     {E.back("Purchase orders", model.title, undefined, model.backHref)}
     {model.status && E.fld("Status", model.status)}
     {model.note && E.fld("Note", model.note)}
+    {model.closedReason && E.fld("Closure reason", model.closedReason)}
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {correcting && E.edit("Correction reason", model.correctionReason ?? "", "text", undefined, { onChange: controls.reason, required: true })}
       {mode === "receive" && model.locations && <>
@@ -55,6 +57,15 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       {model.info && E.info(model.info)}
     </>}
     {model.history?.length ? <>{E.ttl("Receipts")}{model.history.map(receipt => <Fragment key={receipt.key}>{E.nav(receipt.label, receipt.detail, "", undefined, receipt.href)}</Fragment>)}</> : null}
+    {model.closure && <fieldset disabled={submitting} className="flex flex-col gap-3" onKeyDown={event => {
+      // The closure reason must not implicitly submit the surrounding receipt form.
+      if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault();
+    }}>
+      {E.ttl(model.closure === "cancel" ? "Cancel purchase order" : "Close remaining quantity")}
+      {E.edit("Closure reason", model.closureReason ?? "", "text", undefined, { onChange: controls.closureReason })}
+      {E.info("Only the unreceived remainder is released. Posted receipts and stock stay in history.")}
+      <Button type="button" variant="destructive" onClick={controls.close} disabled={submitting || !model.closureReason?.trim()}>{model.closure === "cancel" ? "Cancel purchase order" : "Close short"}</Button>
+    </fieldset>}
     {messages}
     {E.sp()}
     {footer !== undefined ? footer : (receiving || mode === "draft") && <Button type="submit" data-variant={receiving ? "irreversible" : undefined} className={receiving ? "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" : ""} disabled={submitting || disabled}>{submitting ? "Saving…" : { draft: "Mark sent", correct: "Correct receipt", receive: "Receive purchase order", view: "" }[mode]}</Button>}

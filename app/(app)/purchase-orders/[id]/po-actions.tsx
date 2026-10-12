@@ -26,6 +26,7 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
   const [lots, setLots] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.expected_lot_code ?? ""])));
   const [bestBy, setBestBy] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.recorded_best_by ?? ""])));
   const [reason, setReason] = useState("");
+  const [closureReason, setClosureReason] = useState("");
   const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
   const binsHere = bins.filter(bin => bin.location_id === locationId);
   const [binId, setBinId] = useState(binsHere[0]?.id ?? "");
@@ -49,7 +50,7 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
     });
   }}>
     <ReceivePoView model={{
-      ...model, locationId, binId, locations, bins: binsHere, receivedOn, sentVia: via, correctionReason: reason,
+      ...model, locationId, binId, locations, bins: binsHere, receivedOn, sentVia: via, correctionReason: reason, closureReason,
       lotSuggestionsUnavailable: open.some(line => line.material?.lot_tracked),
       lines: open.map(line => ({
         key: line.id, title: line.material?.name ?? `Line ${line.id}`,
@@ -71,6 +72,11 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
       bestBy: (id, value) => setBestBy(prev => ({ ...prev, [id]: value })),
       location: value => { setLocationId(value); setBinId(bins.find(bin => bin.location_id === value)?.id ?? ""); },
       bin: setBinId, receivedOn: setReceivedOn, sentVia: setVia, reason: setReason,
+      closureReason: setClosureReason,
+      close: () => {
+        if (busy || !model.closure || !closureReason.trim()) return;
+        void run(model.closure === "cancel" ? "cancel_purchase_order" : "close_purchase_order_short", { poId, reason: closureReason });
+      },
     }} submitting={busy} disabled={receiving && !ready} messages={<CommandFormMessage error={error} />} />
   </form>;
 }

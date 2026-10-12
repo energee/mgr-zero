@@ -723,6 +723,8 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 ### Purchase orders
 
+Use **Cancel purchase order** with a **Closure reason** on a draft or sent order with no receipts. After a receipt, use **Close short** with a reason when the vendor will not supply the remainder. The reason, actor, and closure time remain recorded. Closed orders leave the open Work and purchasing lists, and their unreceived remainder stops counting as on order. Existing receipts and stock remain unchanged; receipt corrections do not reopen the order. Corrected receipt expectations still use the ordered amount less other effective receipts, not the closed order's zero operational remainder. New receipts on a closed order are refused.
+
 <Screen name="New PO" />
 <Screen name="Receipt" />
 
@@ -914,7 +916,7 @@ Do not hunt for hidden controls for these:
 
 - public account sign-up
 - resending or revoking an invitation, or assigning multiple staff roles
-- cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
+- editing a purchase order after it is saved, or sending one by email from MGR
 - deleting a customer that has history, a single ship-to, inventory history, orders, invoices, or credit memos
 - recording payments
 - a printed lot trace packet

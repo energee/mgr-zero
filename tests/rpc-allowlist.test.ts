@@ -78,6 +78,8 @@ const AUTHENTICATED_RPCS = [
   "create_location(uuid,text,location_kind[],uuid)",
   "create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid)",
   "create_purchase_order(uuid,uuid,date,text,jsonb,uuid)",
+  "cancel_purchase_order(uuid,uuid,text,uuid)",
+  "close_purchase_order_short(uuid,uuid,text,uuid)",
   "create_recipe(uuid,uuid,text,text,uuid)",
   "create_recipe_version(uuid,uuid,jsonb,jsonb,jsonb,numeric,numeric,integer,numeric,text,jsonb,uuid)",
   "create_replenishment_order(uuid,uuid,jsonb,uuid)",
