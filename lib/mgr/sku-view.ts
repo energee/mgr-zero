@@ -36,6 +36,7 @@ export type KegPoolOption = { id: string; name: string; active: boolean };
 
 export function toSkuViewProps({ sku, formats, pools = [] }: SkuSnapshot): SkuViewModel {
   const fromJoin = sku?.formats?.name;
+  // Preserve the existing first-format default; saved live edits supply their joined format.
   const selectedFormat = formats.find(f => f.id === sku?.format_id) ?? formats[0];
   const fromList = selectedFormat?.name;
   return {
