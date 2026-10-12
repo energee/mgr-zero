@@ -25,7 +25,7 @@ const matrix = {
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
-  stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", pos_connections: "deny",
+  stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
@@ -44,10 +44,14 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   pos_catalog_items: ["connection_id", "brand_id", "catalog_group"],
   pos_catalog_ownership: ["connection_id", "format_id", "brand_id"],
   catalog_categories: ["brewery_id", "name"],
+  qbo_customer_snapshots: ["realm_id", "qbo_customer_id"],
 };
 const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
 // These tables intentionally have no authenticated SELECT privilege, in addition to RLS.
 const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_reclassifications", "notification_occurrences", "notification_deliveries", "chat_callback_receipts", "chat_action_intents"]);
+// These tables grant service_role no SELECT either (writes arrive only through future definer RPCs), so the
+// service positive control reads them with privileged SQL instead of widening the grant for the harness.
+const privilegedRead = new Set<Table>(["qbo_customer_snapshots", "qbo_customer_decisions"]);
 const day = "2026-09-08";
 const now = "2026-09-08T12:00:00Z";
 
@@ -131,6 +135,9 @@ async function fixtures() {
   const qboConnection = await put("qbo_connections", { realm_id: `realm-${brewery.id}` });
   await put("qbo_pushes", { invoice_id: invoice.id, connection_id: qboConnection.id, realm_id: `realm-${brewery.id}`,
     entity_type: "Invoice", provider_request_id: crypto.randomUUID(), request_body: "{}", local_snapshot: {}, attempt_reason: "initial" });
+  const realm = `realm-${brewery.id}`;
+  await put("qbo_customer_snapshots", { realm_id: realm, qbo_customer_id: "Q1", display_name: "Fixture QB customer", active: true, sync_token: "0", qbo_updated_at: now, read_at: now });
+  await put("qbo_customer_decisions", { realm_id: realm, qbo_customer_id: "Q1", customer_id: customer.customerId, decision: "not_a_match", decided_by: owner.id });
   const pos = await put("pos_connections", { merchant_id: `merchant-${brewery.id}` });
   await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id });
   const poured = await put("formats", { brand_id: cat.brandId, name: "Pint", basis: "poured", ounces: 16 });
@@ -176,6 +183,9 @@ async function tenantRows(db: SupabaseClient<Database>, table: Table, f: Fixture
   if (table === "breweries") query = query.eq("id", f.brewery.id);
   else if (table === "customer_users") query = query.eq("customer_id", f.customer.customerId);
   else query = query.eq("brewery_id", f.brewery.id);
+  if (db === admin && privilegedRead.has(table)) {
+    return sql(`select to_jsonb(t)::text from public.${table} t where brewery_id='${f.brewery.id}'`, true).map(r => JSON.parse(r) as Row);
+  }
   const result = await query;
   if (db !== admin && serviceOnly.has(table)) {
     expect(result.error?.code, `${table} service-only ACL`).toBe("42501");
