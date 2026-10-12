@@ -8000,7 +8000,12 @@ export type Database = {
         Returns: Json
       }
       complete_batch: {
-        Args: { p_batch: string; p_brewery: string; p_request_id: string }
+        Args: {
+          p_batch: string
+          p_brewery: string
+          p_confirm_in_tank?: boolean
+          p_request_id: string
+        }
         Returns: Json
       }
       complete_chat_callback_receipt: {

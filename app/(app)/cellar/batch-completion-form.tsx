@@ -3,13 +3,9 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
-import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BatchCompletionView, type BatchCompletionPreview } from "@/components/mgr/views/batch-completion";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
-import { bblExact } from "@/lib/volume";
 import {
   canCloseBatchCompletion,
   isCurrentBatchCompletionReview,
@@ -17,10 +13,7 @@ import {
 } from "@/lib/mgr/batch-completion-state";
 
 type Batch = { id: string; label: string };
-type Preview = {
-  batchId: string; closedAt: string | null; baselineBbl: number; packagedBbl: number;
-  attributedBbl: number; residualBbl: number; thresholdBbl: number; adjustmentId: string | null;
-};
+
 
 export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const breweryId = useBrewery();
@@ -28,7 +21,8 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState("");
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<BatchCompletionPreview | null>(null);
+  const [confirmInTank, setConfirmInTank] = useState(false);
   const [phase, setPhase] = useState<BatchCompletionPhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef<string | null>(null);
@@ -40,10 +34,11 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     selectedBatchId.current = id;
     setBatchId(id);
     setPreview(null);
+    setConfirmInTank(false);
     setError(null);
     setPhase("loading");
     try {
-      const next = await command(breweryId, "get_batch_completion_preview", { batchId: id }) as Preview;
+      const next = await command(breweryId, "get_batch_completion_preview", { batchId: id }) as BatchCompletionPreview;
       if (!isCurrentBatchCompletionReview(startedReview, reviewSequence.current, id, selectedBatchId.current)) return;
       setPreview(next);
       setPhase("ready");
@@ -63,7 +58,7 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     setError(null);
     setPhase("submitting");
     try {
-      setPreview(await command(breweryId, "complete_batch", { batchId: reviewedBatchId }, requestId.current, expectedContext.current) as Preview);
+      setPreview(await command(breweryId, "complete_batch", { batchId: reviewedBatchId, confirmInTank }, requestId.current, expectedContext.current) as BatchCompletionPreview);
       requestId.current = null;
       setPhase("saved");
     } catch (cause) {
@@ -85,37 +80,12 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     reviewSequence.current += 1;
     selectedBatchId.current = "";
     if (phase === "saved") router.refresh();
+    setConfirmInTank(false);
     setBatchId(""); setPreview(null); setError(null); setPhase("idle"); requestId.current = null;
   }
 
-  const none = batches.length === 0;
-  return <><CommandForm open={open} onOpenChange={changeOpen} title="Complete batch" trigger={<Button size="sm" variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="completion-batch">Batch</Label>
-        <Select value={batchId} onValueChange={review} disabled={phase === "loading" || phase === "submitting" || phase === "unknown" || phase === "saved"}>
-          <SelectTrigger id="completion-batch"><SelectValue placeholder="Batch to complete" /></SelectTrigger>
-          <SelectContent>{batches.map((batch) => <SelectItem key={batch.id} value={batch.id}>{batch.label}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      {phase === "loading" && <p className="text-sm text-muted-foreground">Calculating from the cellar ledger…</p>}
-      {preview && <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <dt className="text-muted-foreground">Baseline</dt><dd className="text-right">{bblExact(preview.baselineBbl, 8)}</dd>
-        <dt className="text-muted-foreground">Frozen packaged</dt><dd className="text-right">{bblExact(preview.packagedBbl, 8)}</dd>
-        <dt className="text-muted-foreground">Prior attributed</dt><dd className="text-right">{bblExact(preview.attributedBbl, 8)}</dd>
-        <dt className="text-muted-foreground">Threshold</dt><dd className="text-right">{bblExact(preview.thresholdBbl, 8)}</dd>
-        <dt className="font-medium">Predicted residual</dt><dd className="text-right font-medium">{bblExact(preview.residualBbl, 8)}</dd>
-      </dl>}
-      {preview && phase !== "saved" && <p className="text-xs text-muted-foreground">Completing closes every open occupancy for this batch. A residual at or above the threshold becomes one automatic loss reconciliation.</p>}
-      {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
-      {phase === "saved" && <CommandFormMessage tone="warning">Batch completed and saved.</CommandFormMessage>}
-      <CommandFormMessage error={error} />
-      <CommandFormFooter>
-        <Button data-variant="irreversible" type="submit" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={!preview || phase === "submitting" || phase === "saved"}>
-          {phase === "unknown" ? "Retry unchanged completion" : phase === "submitting" ? "Completing…" : phase === "saved" ? "Batch completed" : "Complete batch"}
-        </Button>
-      </CommandFormFooter>
-    </form>
-  </CommandForm>
-  {none && <p id="completion-none" className="text-xs text-muted-foreground">No brewed batch is open to complete.</p>}</>;
+  return <BatchCompletionView batches={batches} open={open} onOpenChange={changeOpen}
+    batchId={batchId} preview={preview} phase={phase} error={error}
+    confirmInTank={confirmInTank} onConfirmInTank={setConfirmInTank}
+    onReview={review} onSubmit={submit} />;
 }

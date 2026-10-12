@@ -553,3 +553,8 @@ vocabulary, both audience shells, and access boundaries for every later screen.
   screens, required carrier/tracking, UPC/bins/waves, disconnect-QBO, CBMA settings,
   dashboards (finished-goods cost and COGS are #810), command palette frame, keg CIP status, DTC, export flow, free-form
   credit memos. No `container_source` editor: the SKU's Keg pool derives it (#809).
+
+
+### Batch completion in-tank acknowledgement
+
+Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), completion refuses unless `confirmInTank: true`. The acknowledgement names the beer and tanks being written off as loss. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.

@@ -55,7 +55,7 @@ async function waitForLock(observer: Client, pid: number) {
   await expect.poll(async () => (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
 }
 
-const completionSql = "select public.complete_batch($1,$2,$3) result";
+const completionSql = "select public.complete_batch($1,$2,$3,true) result";
 
 describe.sequential("cellar workflow serialization", () => {
   it("locks the observed occupancy through a first reading while completed retries bypass closure", async () => {

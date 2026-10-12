@@ -446,11 +446,12 @@ defineQuery({
 
 defineCommand({
   name: "complete_batch",
-  description: "Close a brewed batch and all of its open occupancies, adding one exact nonphysical reconciliation loss when the server-derived residual meets the threshold",
-  input: z.object({ batchId: z.string().uuid() }),
+  description: "Close a brewed batch and its open occupancies; beer still in tanks at the threshold requires explicit confirmation of the loss",
+  input: z.object({ batchId: z.string().uuid(), confirmInTank: z.boolean().optional() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("complete_batch", {
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_request_id: execution.requestId,
+    p_confirm_in_tank: i.confirmInTank ?? false,
   })),
 });
 

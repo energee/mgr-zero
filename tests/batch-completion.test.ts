@@ -13,6 +13,8 @@ type Completion = {
   residualBbl: number | string;
   thresholdBbl: number | string;
   adjustmentId: string | null;
+  inTankBbl: number | string;
+  inTank: { occupancyId: string; vesselId: string; vesselName: string; bbl: number | string }[];
 };
 
 let breweryId: string;
@@ -59,12 +61,59 @@ async function packageBeer(source: Awaited<ReturnType<typeof brew>>, packagedBbl
 }
 
 const preview = (batchId: string, actor = ctx) => runCommand("get_batch_completion_preview", { batchId }, actor) as Promise<Completion>;
-const complete = (batchId: string, actor = ctx, requestId = crypto.randomUUID()) => runCommand(
-  "complete_batch", { batchId }, actor, { requestId, correlationId: crypto.randomUUID() },
+const complete = (batchId: string, actor = ctx, requestId = crypto.randomUUID(), confirmInTank = true) => runCommand(
+  "complete_batch", { batchId, confirmInTank }, actor, { requestId, correlationId: crypto.randomUUID() },
 ) as Promise<Completion>;
 const n = (value: number | string) => Number(value);
 
 describe("batch completion reconciliation", () => {
+  it("refuses to write off beer still in a named tank without acknowledgement (#808)", async () => {
+    const source = await brew(20);
+    await packageBeer(source, 2);
+    const tank = (await admin.from("vessels").select("name").eq("id", source.vesselId).single()).data!;
+    const reviewed = await preview(source.batchId);
+    expect(n(reviewed.inTankBbl)).toBe(18);
+    expect(reviewed.inTank).toEqual([{ occupancyId: source.occupancyId, vesselId: source.vesselId, vesselName: tank.name, bbl: 18 }]);
+
+    const requestId = crypto.randomUUID();
+    await expect(complete(source.batchId, ctx, requestId, false)).rejects.toMatchObject({ code: "bad_request" });
+    await expect(complete(source.batchId, ctx, requestId, false)).rejects.toThrow(`18 bbl in ${tank.name}`);
+    expect(sql(`select (closed_at is null)::text from batches where id='${source.batchId}'`, true)).toEqual(["true"]);
+    expect(sql(`select (ended_at is null)::text from vessel_occupancies where id='${source.occupancyId}'`, true)).toEqual(["true"]);
+    expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["0"]);
+
+    const confirmed = () => runCommand("complete_batch", { batchId: source.batchId, confirmInTank: true }, ctx, { requestId, correlationId: crypto.randomUUID() }) as Promise<Completion>;
+    const saved = await confirmed();
+    expect(n(saved.residualBbl)).toBe(18);
+    expect(await confirmed()).toEqual(saved);
+    await expect(complete(source.batchId, ctx, requestId, false)).rejects.toMatchObject({ code: "conflict" });
+    expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["1"]);
+  });
+
+  it("names every open tank in the write-off confirmation preview (#808)", async () => {
+    const source = await brew(20);
+    const tank = await runCommand("upsert_vessel", { name: `BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, ctx) as { id: string };
+    const moved = await runCommand("record_cellar_transfer", { fromOccupancyId: source.occupancyId, toVesselId: tank.id, volumeBbl: 8, lossBbl: 0 }, ctx) as { to_occupancy: { id: string } };
+    const reviewed = await preview(source.batchId);
+    expect(n(reviewed.inTankBbl)).toBe(20);
+    expect(reviewed.inTank).toHaveLength(2);
+    expect(reviewed.inTank.map((entry) => ({ occupancyId: entry.occupancyId, bbl: n(entry.bbl) }))).toEqual(expect.arrayContaining([
+      { occupancyId: source.occupancyId, bbl: 12 },
+      { occupancyId: moved.to_occupancy.id, bbl: 8 },
+    ]));
+    await expect(complete(source.batchId, ctx, crypto.randomUUID(), false)).rejects.toThrow(/20 bbl/);
+    expect(sql(`select count(*) from vessel_occupancies where batch_id='${source.batchId}' and ended_at is null`, true)).toEqual(["2"]);
+  });
+
+  it("requires acknowledgement at the in-tank threshold but not below it (#808)", async () => {
+    const exact = await brew(10);
+    await packageBeer(exact, 9.95);
+    await expect(complete(exact.batchId, ctx, crypto.randomUUID(), false)).rejects.toThrow(/0\.05 bbl/);
+    const below = await brew(10);
+    await packageBeer(below, 9.96);
+    expect((await complete(below.batchId, ctx, crypto.randomUUID(), false)).adjustmentId).toBeNull();
+  });
+
   it("refuses an open packaging run without changing the batch or occupancies", async () => {
     const source = await brew(10);
     await runCommand("schedule_packaging_run", {
@@ -72,7 +121,7 @@ describe("batch completion reconciliation", () => {
     }, ctx);
     await expect(complete(source.batchId)).rejects.toThrow(/packaging run.*open/i);
     expect(sql(`select (closed_at is null)::text from batches where id='${source.batchId}'`, true)).toEqual(["true"]);
-    expect(sql(`select count(*) from volume_adjustments where brewery_id='${breweryId}' and affects_occupancy=false`, true)).toEqual(["0"]);
+    expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["0"]);
   });
 
   it("writes one exact nonphysical root at the threshold and none below it", async () => {

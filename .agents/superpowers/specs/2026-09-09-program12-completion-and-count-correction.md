@@ -256,3 +256,8 @@ At each card: write the meaningful red first; edit only the baseline migration; 
 ## Explicit exclusions
 
 No historical count cascade, correction of a correction, mistaken-high count correction, mutable original rows, generic correction framework, extra loss-cause enum, raw lot/history access for Taproom, PDF/label dependency, provider action, legal filing-line mapping, hosted change, second migration, or schema work outside these accepted contracts.
+
+
+### Batch completion in-tank acknowledgement
+
+Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), completion refuses unless `confirmInTank: true`. The acknowledgement names the beer and tanks being written off as loss. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.

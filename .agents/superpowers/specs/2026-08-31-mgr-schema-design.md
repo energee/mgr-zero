@@ -1424,3 +1424,8 @@ semantic notification, and SDK-state dedupe remain separate.
 
 The chat tables and grants in §17 are implemented in the baseline migration and
 covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.
+
+
+### Batch completion in-tank acknowledgement
+
+Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), completion refuses unless `confirmInTank: true`. The acknowledgement names the beer and tanks being written off as loss. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.
