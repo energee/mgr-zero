@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { brewCorrectionModel, brewSourceKey, canRecordBrewDay, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, canRecordBrewDay, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
 import { INGREDIENT_STAGES, type IngredientStage } from "@/lib/mgr/recipe-process-view";
 
@@ -40,7 +40,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
       {E.fld("Brewed on", model.brewedOn || "Unavailable")}
       {!(model.records?.length) && E.note("Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}
       {(model.records ?? []).map(record => <section key={record.id} className="flex flex-col gap-2 rounded border p-3">
-        {E.ttl(record.corrects_id ? "Corrected brew record" : "Original brew record")}
+        {E.ttl(`Turn ${record.turn} · ${record.corrects_id ? "Corrected brew record" : "Original brew record"}`)}
         {E.fld("Confirmed knockout", `${record.initial_bbl} bbl`)}
         {record.correction_reason && E.fld("Correction reason", record.correction_reason)}
         <BrewPlanSheet plan={record.plan_snapshot} frozen />
@@ -48,11 +48,12 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
         {!record.additions.length && E.note("Confirmed no ingredients used.")}
         {processFields.map(([key, label]) => record.process[key] === undefined ? null : <Fragment key={key}>{E.fld(label, String(record.process[key]))}</Fragment>)}
       </section>)}
-      {model.records?.length && model.vesselId ? E.act("Correct brew record", "attention", undefined, () => change(brewCorrectionModel(model, model.records!.at(-1)!)), busy) : null}
+      {model.vesselId && currentBrewRecords(model.records ?? []).map(record => <Fragment key={record.id}>{E.act(`Correct turn ${record.turn}`, "attention", undefined, () => change(brewCorrectionModel(model, record)), busy)}</Fragment>)}
+      {model.vesselId && model.records?.length ? E.act("Add brew turn", "attention", undefined, () => change(brewTurnModel(model)), busy) : null}
       {E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
-      {E.pick("Vessel", value.vesselId, value.vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` })), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.correctionRecordId), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
+      {E.pick("Vessel", value.vesselId, value.vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` })), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.correctionRecordId) || Boolean(value.addingTurn), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
       {E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: (nextValue: string) => change({ initialBbl: nextValue }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" })}
       <fieldset disabled={busy || Boolean(value.correctionRecordId)}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>
       {E.fld("Knockout baseline", ready ? <>{value.initialBbl} bbl {E.arrow()} {vessel?.name}</> : "Choose a vessel, positive barrels and a brew date")}
@@ -73,7 +74,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
       {processFields.map(([key, label]) => <Fragment key={key}>{E.edit(label, value.process?.[key] ?? "", "number", undefined, { disabled: busy, step: key.endsWith("Minutes") ? "1" : "any", onChange: next => change({ process: { ...value.process, [key]: next } }) })}</Fragment>)}
       {ready && E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])}
       <CommandFormMessage error={error} />
-      <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit" disabled={busy || !ready}>{value.correctionRecordId ? "Confirm correction" : "Record brew day"}</Button>
+      <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit" disabled={busy || !ready}>{value.correctionRecordId ? "Confirm correction" : value.addingTurn ? "Record brew turn" : "Record brew day"}</Button>
     </form>}
   </>;
 }

@@ -188,7 +188,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayTurnsHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -1718,9 +1718,9 @@ export const SCREENS: Screen[] = [
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day · get_brew_day_plan · get_brew_record · list_vessels",
     writes: "cancel_batch, reschedule_batch, record_brew_day [confirmed actual sources + frozen sheet + knockout occupancy], correct_brew_record [unused revision with linked compensation]",
-    states: permitted("brewer or admin required"),
-    spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} />,
+    states: [...permitted("brewer or admin required"), ["multiple turns", "Add brew turn and correct each current turn"]],
+    spec: "Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    body: <BrewDayView model={brewDayTurnsHazy} planActions={<PlanActions plannedOn="2026-09-04" />} />,
   },
   {
     step: 7,
