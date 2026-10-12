@@ -8290,6 +8290,7 @@ export type Database = {
           p_brand: string
           p_brewery: string
           p_format: string
+          p_keg_pool?: string
           p_name: string
           p_request_id: string
           p_upc: string
@@ -9788,7 +9789,9 @@ export type Database = {
         Args: {
           p_active: boolean
           p_brewery: string
+          p_clear_keg_pool?: boolean
           p_id: string
+          p_keg_pool?: string
           p_request_id: string
           p_upc: string
         }
