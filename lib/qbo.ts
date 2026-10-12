@@ -28,6 +28,26 @@ export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting";
 export const QBO_TAX_SCOPE = "indirect-tax.tax-calculation.quickbooks";
 
 export type QboConfig = { clientId: string; clientSecret: string; redirectUri: string; apiBaseUrl: string; taxApiBaseUrl?: string };
+/** A QuickBooks Customer as read from the query API; absent optional contact fields are null. */
+export type QboCustomer = {
+  id: string; displayName: string; companyName: string | null;
+  email: string | null; phone: string | null;
+  billAddress1: string | null; billAddress2: string | null;
+  billCity: string | null; billState: string | null; billZip: string | null;
+  active: boolean; syncToken: string;
+  /** MetaData.LastUpdatedTime exactly as QuickBooks sent it (precision and offset preserved). */
+  updatedAt: string;
+};
+/** Outcome of a Customer create/update POST. A definite answer only: lost or malformed responses throw (outcome unknown). */
+export type QboCustomerWriteResult =
+  | { ok: true; customer: QboCustomer }
+  | { ok: false; status: number; code: string | null; message: string;
+      /** Intuit's per-response id for support, read from the `intuit_tid` response header (header name unconfirmed by rendered docs); null when absent. */
+      intuitRequestId: string | null; requestId: string;
+      /** authorization: 401/403. stale_token: code 5010. validation: 400/422 only, the one definite "not written" answer. retryable: every other status (408, 409, 429, 5xx...), outcome unknown. */
+      kind: "authorization" | "stale_token" | "retryable" | "validation" };
+const CUSTOMER_PAGE_SIZE = 1000; // documented MAXRESULTS ceiling for a query
+const QBO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):?(\d{2}))$/;
 export type QboTaxInput = {
   transactionDate: string;
   customerId: string;
@@ -417,6 +437,10 @@ const cents = (value: unknown) => {
 };
 
 class QboInvalidGrantError extends Error {}
+/** A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status. */
+export class QboHttpError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
 
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
@@ -443,6 +467,100 @@ export class QboOAuthClient {
 
   refresh(refreshToken: string) {
     return this.token(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
+  }
+
+  /**
+   * Reads every Customer (active and inactive) in the realm, optionally only those whose
+   * Metadata.LastUpdatedTime is at or after `changedSince` (inclusive `>=`; the timestamp is sent
+   * unchanged, so callers own any overlap they want).
+   *
+   * All-or-error: pages are buffered and returned only when the last page has been read and every
+   * row validated; any HTTP, network, or shape failure rejects the whole call, never a partial list.
+   * `realmId` and `accessToken` are trusted as provided by the stored connection (not validated here).
+   * Limitations: paging is STARTPOSITION/MAXRESULTS over an unordered query (no ORDERBY: sortability
+   * of Id is not documented), so customers created or deleted in QuickBooks while paging can shift
+   * rows between pages and cause a skip or a repeat. A repeat is rejected as invalid (duplicate id);
+   * a skip is not detectable here, and the next refresh must be allowed to cover it.
+   */
+  async queryCustomers(realmId: string, accessToken: string, changedSince?: string): Promise<QboCustomer[]> {
+    if (changedSince !== undefined && !isQboTimestamp(changedSince)) {
+      throw new Error("QuickBooks customer query changedSince must be an ISO-8601 timestamp with a time zone");
+    }
+    const where = `Active IN (true, false)${changedSince === undefined ? "" : ` AND Metadata.LastUpdatedTime >= '${changedSince}'`}`;
+    const customers: QboCustomer[] = [];
+    const seen = new Set<string>();
+    for (let start = 1; ; start += CUSTOMER_PAGE_SIZE) {
+      const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
+      url.searchParams.set("query", `SELECT * FROM Customer WHERE ${where} STARTPOSITION ${start} MAXRESULTS ${CUSTOMER_PAGE_SIZE}`);
+      url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+      const response = await this.transport(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+        redirect: "error",
+      });
+      if (!response.ok) throw new QboHttpError(`QuickBooks customer query failed (${response.status})`, response.status);
+      const rows = parseCustomerPage(await response.json().catch(() => null));
+      for (const customer of rows) {
+        if (seen.has(customer.id)) throw new Error("QuickBooks customer response was invalid");
+        seen.add(customer.id);
+        customers.push(customer);
+      }
+      if (rows.length < CUSTOMER_PAGE_SIZE) return customers;
+    }
+  }
+
+  /**
+   * POSTs a new Customer. `body` is the complete frozen JSON text and is sent byte-for-byte; the same
+   * `requestId` + `body` must be reused for any retry. VERIFIED: the API takes a `requestid` query
+   * parameter. NOT VERIFIED (no official statement found): that a repeated requestid returns the original
+   * result, or for how long. Callers must not treat a lost response as "not created" on the strength of this.
+   * Fault 6240 (duplicate name) is surfaced as kind "validation" with code "6240".
+   */
+  async createCustomer(realmId: string, requestId: string, body: string, accessToken: string): Promise<QboCustomerWriteResult> {
+    const sent = asObject(parseFrozenBody(body));
+    if (!sent || "Id" in sent || "SyncToken" in sent) throw new Error("QuickBooks customer create body must be a customer without Id or SyncToken");
+    return this.postCustomer(realmId, requestId, body, accessToken);
+  }
+
+  /**
+   * POSTs a sparse Customer update. `body` is the complete frozen sparse JSON text; its Id, SyncToken and
+   * `sparse: true` must equal the arguments or this throws before any request. Sent unchanged. A stale token
+   * (fault 5010) returns kind "stale_token"; this never fetches a new token or retries. Clearing a field
+   * is NOT handled here: Intuit's sparse-update clearing semantics are unverified, so serializing a clear is
+   * the caller's evidence-gated job. Documented: omitted fields are preserved by a sparse update.
+   */
+  async updateCustomer(realmId: string, requestId: string, id: string, syncToken: string, body: string, accessToken: string): Promise<QboCustomerWriteResult> {
+    const sent = asObject(parseFrozenBody(body));
+    if (!sent || sent.Id !== id || sent.SyncToken !== syncToken || sent.sparse !== true || !id || !syncToken) {
+      throw new Error("QuickBooks customer update body does not match its Id, SyncToken and sparse envelope");
+    }
+    return this.postCustomer(realmId, requestId, body, accessToken, id);
+  }
+
+  private async postCustomer(realmId: string, requestId: string, body: string, accessToken: string, expectedId?: string): Promise<QboCustomerWriteResult> {
+    if (!requestId.trim()) throw new Error("QuickBooks customer write needs a request id");
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/customer`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    url.searchParams.set("requestid", requestId);
+    const response = await this.transport(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      body,
+      redirect: "error",
+    });
+    const intuitRequestId = response.headers.get("intuit_tid")?.slice(0, 100) || null;
+    if (!response.ok) {
+      const { code, message } = customerFault(await response.json().catch(() => null));
+      const kind = response.status === 401 || response.status === 403 ? "authorization"
+        : code === "5010" ? "stale_token"
+        : response.status === 400 || response.status === 422 ? "validation" : "retryable";
+      return { ok: false, status: response.status, code, message: message ?? `QuickBooks customer write failed (${response.status})`, intuitRequestId, requestId, kind };
+    }
+    const payload = asObject(await response.json().catch(() => null));
+    if (!payload || payload.Fault !== undefined) throw invalidCustomer();
+    const customer = parseCustomer(payload.Customer);
+    if (expectedId !== undefined && customer.id !== expectedId) throw invalidCustomer();
+    return { ok: true, customer };
   }
 
   /** Confirms the token can read this realm's CompanyInfo; returns its CompanyName (trimmed), or null when blank. */
@@ -714,6 +832,69 @@ export class QboOAuthClient {
     }
     return parseTokens(await response.json(), receivedAt);
   }
+}
+
+function parseFrozenBody(body: string): unknown {
+  try { return JSON.parse(body); } catch { throw new Error("QuickBooks customer body is not valid JSON"); }
+}
+
+function isQboTimestamp(value: string) {
+  // Components are checked directly because Date.parse silently rolls Feb 30 or 24:00 into a later real moment.
+  const m = QBO_TIMESTAMP.exec(value);
+  if (!m) return false;
+  const [year, month, day, hour, minute, second] = m.slice(1, 7).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth
+    && hour <= 23 && minute <= 59 && second <= 59
+    && (m[7] === undefined || (Number(m[7]) <= 23 && Number(m[8]) <= 59));
+}
+
+const invalidCustomer = () => new Error("QuickBooks customer response was invalid");
+const asObject = (v: unknown) => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null;
+
+function parseCustomer(raw: unknown): QboCustomer {
+  // Raw string values are kept as QuickBooks sent them; trim only decides emptiness.
+  const required = (v: unknown) => { if (typeof v !== "string" || !v.trim()) throw invalidCustomer(); return v; };
+  const optional = (v: unknown) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v !== "string") throw invalidCustomer();
+    return v.trim() ? v : null; // raw value kept so drift mirrors QuickBooks; trim only decides emptiness
+  };
+  const nested = (v: unknown) => {
+    if (v === undefined || v === null) return {};
+    const o = asObject(v);
+    if (!o) throw invalidCustomer();
+    return o;
+  };
+  const c = asObject(raw);
+  if (!c || typeof c.Active !== "boolean") throw invalidCustomer();
+  const updatedAt = asObject(c.MetaData)?.LastUpdatedTime;
+  if (typeof updatedAt !== "string" || !isQboTimestamp(updatedAt)) throw invalidCustomer();
+  const bill = nested(c.BillAddr);
+  return {
+    id: required(c.Id), displayName: required(c.DisplayName), companyName: optional(c.CompanyName),
+    email: optional(nested(c.PrimaryEmailAddr).Address), phone: optional(nested(c.PrimaryPhone).FreeFormNumber),
+    billAddress1: optional(bill.Line1), billAddress2: optional(bill.Line2), billCity: optional(bill.City),
+    billState: optional(bill.CountrySubDivisionCode), billZip: optional(bill.PostalCode),
+    active: c.Active, syncToken: required(c.SyncToken), updatedAt,
+  };
+}
+
+function parseCustomerPage(payload: unknown): QboCustomer[] {
+  const response = asObject(asObject(payload)?.QueryResponse);
+  if (!response || response.Fault !== undefined || asObject(payload)?.Fault !== undefined) throw invalidCustomer();
+  if (response.Customer === undefined) return [];
+  if (!Array.isArray(response.Customer) || response.Customer.length > CUSTOMER_PAGE_SIZE) throw invalidCustomer();
+  return response.Customer.map(parseCustomer);
+}
+
+/** Fault fields safe to keep: code and Message only (Detail can echo customer data), length-capped; never headers or credentials. */
+function customerFault(payload: unknown) {
+  const errors = asObject(asObject(payload)?.Fault)?.Error;
+  const first = Array.isArray(errors) ? asObject(errors[0]) : null;
+  const text = (v: unknown, max: number) => typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+  return { code: text(first?.code, 20), message: text(first?.Message, 200) };
 }
 
 function meaningfulInvoiceContent(invoice: Record<string, unknown>) {
