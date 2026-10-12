@@ -1,7 +1,7 @@
 import type { AccountingViewModel } from "@/lib/mgr/accounting-view";
 
 export const accountingExpired: AccountingViewModel = {
-  connected: false, canDisconnect: true, company: "Demo Brewing LLC", status: "authorization expired · company 9341", reconnect: true,
+  connected: false, canDisconnect: true, company: "Demo Brewing LLC", status: "authorization expired · production", companyId: "9341", reconnect: true,
   error: "QuickBooks authorization expired. Push, payment links and paid-date sync are paused.",
   syncStatus: {
     latest: { at: "Sep 27, 2026, 10:30 AM", operator: "alex@example.test", completed: false },
