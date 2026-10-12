@@ -213,7 +213,7 @@ describe("leave deliveries for later (#813)", () => {
     expect(await runCommand("confirm_delivery", input, adminCtx, { requestId, correlationId: requestId })).toEqual(stored);
     const freshId = crypto.randomUUID();
     await expect(runCommand("confirm_delivery", input, adminCtx, { requestId: freshId, correlationId: freshId })).rejects.toThrow(/closed|refusal reason/i);
-    expect(sql(`select count(*) from private.command_requests where actor_id='${adminCtx.userId}' and request_id='${freshId}'`)).toBe("0");
+    expect(sql(`select count(*) from private.command_requests where actor_id='${adminCtx.userId}' and request_id='${freshId}'`)).toEqual(["0"]);
     expect((await admin.from("deliveries").select("outcome").eq("id", stop!.id).single()).data?.outcome).toBeNull();
   });
   it.each(["now", "on_delivery"] as const)("frees an unattempted %s shipment without refusal, money, stock, or keg changes", async (invoiceTiming) => {

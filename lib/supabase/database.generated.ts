@@ -8825,6 +8825,10 @@ export type Database = {
           superseded: boolean
         }[]
       }
+      leave_delivery_for_later: {
+        Args: { p_delivery: string; p_request_id: string; p_route: string }
+        Returns: Json
+      }
       list_chat_conversations: { Args: { p_brewery: string }; Returns: Json }
       list_chat_scan_targets: { Args: never; Returns: string[] }
       list_chat_user_links: { Args: { p_brewery: string }; Returns: Json }
@@ -9467,10 +9471,6 @@ export type Database = {
           p_next_attempt_at: string
         }
         Returns: undefined
-      }
-      leave_delivery_for_later: {
-        Args: { p_delivery: string; p_request_id: string; p_route: string }
-        Returns: Json
       }
       return_route: {
         Args: { p_request_id: string; p_route: string }
