@@ -26,6 +26,13 @@ export function LotTraceView({
       {E.row(model.sku, model.skuDetail, model.skuTrailing)}
       {E.fld("Tank · batch", model.tankBatch)}
       {E.fld("Drawn", model.drawn)}
+      {E.ttl("Member batches")}
+      {model.memberBatches.map(row => <Fragment key={row.key}>{E.fld(row.title, row.detail ?? "")}</Fragment>)}
+      {E.note("Recorded membership, not percentages or estimated shares.")}
+      {model.sourceTransfers.length > 0 && <>
+        {E.ttl("Recorded source transfers")}
+        {model.sourceTransfers.map(row => <Fragment key={row.key}>{E.fld(row.title, [row.detail, row.trailing].filter(Boolean).join(" · "))}</Fragment>)}
+      </>}
       {tape !== undefined ? tape : E.tape(model.tape.map((row) => [row.label, row.when]))}
       {E.ttl("Recorded balances by SKU and bin")}
       {balances !== undefined ? balances : model.balances.map((row) => (
