@@ -182,6 +182,10 @@ describe("depart, confirm, and return a route", () => {
     await expect(runCommand("return_route", { routeId }, driver)).rejects.toThrow(/stop/i);
     const c2 = await runCommand("confirm_delivery", { deliveryId: stops![1].id, signedBy: "Dana" }, adminCtx) as { invoice_id: string | null };
     expect(c2.invoice_id).not.toBeNull();
+    const invoiceDates = (await admin.from("invoices").select("issued_on,due_on").eq("id", c2.invoice_id!).single()).data!;
+    const expectedDue = new Date(`${invoiceDates.issued_on}T12:00:00Z`);
+    expectedDue.setUTCDate(expectedDue.getUTCDate() + 30);
+    expect(invoiceDates.due_on).toBe(expectedDue.toISOString().slice(0, 10));
     await runCommand("return_route", { routeId }, driver);
     const { data: r2 } = await admin.from("routes").select("returned_at").eq("id", routeId).single();
     expect(r2!.returned_at).not.toBeNull();

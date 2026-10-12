@@ -35,8 +35,9 @@ export const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
 // Payment terms, one list for customers and vendors (#491; lib/commands/customers.ts,
-// lib/commands/purchasing.ts, lib/import-csv.ts). Nothing computes a due date
-// from them yet. Labels: PAYMENT_TERM_LABEL in lib/mgr/labels.ts.
+// lib/commands/purchasing.ts, lib/import-csv.ts). Customer terms freeze invoice
+// due_on at insert (issue date + 0/15/30 days); vendor terms are display-only.
+// Labels: PAYMENT_TERM_LABEL in lib/mgr/labels.ts.
 export const PAYMENT_TERMS = ["due_on_receipt", "net15", "net30"] as const;
 export type PaymentTerm = (typeof PAYMENT_TERMS)[number];
 
