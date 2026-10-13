@@ -1171,6 +1171,39 @@ describe("Packaged on dates the stock (#821)", () => {
     expect(sql(`select figures::text from report_filings where id='${filed.id}'`, true)).toEqual(before);
   });
 
+  it("refuses Packaged on inside a filed state-jurisdiction period", async () => {
+    const f = await setup();
+    await runCommand("file_compliance_report", { jurisdiction: "US-PA", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner);
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", f.input, f.owner, execution)).rejects.toThrow(/filed report period/);
+    expectNoClose(f, execution.requestId);
+  });
+
+  it("refuses Packaged on the last day of a filed period and accepts the next day", async () => {
+    const f = await setup();
+    await runCommand("file_compliance_report", { jurisdiction: "TTB", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner);
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", { ...f.input, packagedOn: f.previousEnd }, f.owner, execution)).rejects.toThrow(/filed report period/);
+    expectNoClose(f, execution.requestId);
+    await runCommand("close_packaging_run", { ...f.input, packagedOn: f.currentStart }, f.owner);
+    expect(sql(`select occurred_on from inventory_movements where ref='${f.run.id}'`, true)).toEqual([f.currentStart]);
+  });
+
+  it("accepts Packaged on today in the brewery's timezone, even when UTC is on another day", async () => {
+    const f = await setup();
+    // Pick whichever far-offset zone is on a different calendar day than UTC right now.
+    const [zone] = sql(`select case when (now() at time zone 'Pacific/Kiritimati')::date <> (now() at time zone 'UTC')::date
+      then 'Pacific/Kiritimati' else 'Pacific/Pago_Pago' end`, true);
+    sql(`update breweries set timezone='${zone}' where id='${f.brewery.id}'`);
+    const [localToday, localTomorrow] = sql(`select concat_ws('|', (now() at time zone '${zone}')::date,
+      (now() at time zone '${zone}')::date + 1)`, true)[0].split("|");
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", { ...f.input, packagedOn: localTomorrow }, f.owner, execution)).rejects.toThrow(/after today/);
+    expectNoClose(f, execution.requestId);
+    await runCommand("close_packaging_run", { ...f.input, packagedOn: localToday }, f.owner);
+    expect(sql(`select occurred_on from inventory_movements where ref='${f.run.id}'`, true)).toEqual([localToday]);
+  });
+
   it("an exact retry replays the original close", async () => {
     const f = await setup();
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };

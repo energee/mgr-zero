@@ -151,6 +151,20 @@ describe("generate_compliance_report", () => {
     expect(movement.occurred_on).toBe("2025-09-30");
   });
 
+  it("occurred_on stays frozen when the brewery timezone changes later (#821)", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const catalog = await seedCatalog(brewery.id);
+    const location = await seedLocation(brewery.id);
+    const [movement] = insertFixture<{ id: string; occurred_on: string }>("inventory_movements", {
+      brewery_id: brewery.id, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId,
+      created_by: owner.userId, qty: 1, type: "opening_balance", created_at: "2025-10-01T02:00:00Z",
+    });
+    expect(movement.occurred_on).toBe("2025-09-30");
+    sql(`update breweries set timezone='Asia/Tokyo' where id='${brewery.id}'`);
+    expect(sql(`select occurred_on from inventory_movements where id='${movement.id}'`, true)).toEqual(["2025-09-30"]);
+  });
+
   it("cross-foots every package class from the ledger and keys removals by frozen tax treatment", async () => {
     const r = await runCommand("generate_compliance_report", PERIOD, sales) as Report;
     const by = Object.fromEntries(r.figures.lines.map((l) => [l.class, l]));
