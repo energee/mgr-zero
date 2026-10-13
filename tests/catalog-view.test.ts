@@ -303,8 +303,8 @@ describe("SKU list view", () => {
     const model = toSkuListViewProps(skuListHazy);
     expect(model.title).toBe(`${brandOf(SKU_HAZY)} · SKUs`);
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
-      ["½ bbl keg", `${formatVolume("0.50000000")} · active`],
-      ["⅙ bbl keg", `${formatVolume("0.16666667")} · active`],
+      ["½ bbl keg", `${formatVolume("0.50000000")} · active · No keg pool, no deposit`],
+      ["⅙ bbl keg", `${formatVolume("0.16666667")} · active · No keg pool, no deposit`],
       ["case · 24×16 oz", `${formatVolume("0.09677419")} · active`],
       ["Pint", "16 oz · pour · drawn from keg"],
     ]);

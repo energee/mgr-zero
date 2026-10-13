@@ -33,15 +33,14 @@ export async function ctxForBearer(db: SupabaseClient<Database>, userId: string,
   if (role && !customerId) return { db, userId, breweryId, role };
 
   let customerQuery = db
-    .from("customer_users")
-    .select("customer_id, customers!inner(brewery_id)")
-    .eq("user_id", userId)
-    .eq("customers.brewery_id", breweryId)
+    .from("portal_customers")
+    .select("id")
+    .eq("brewery_id", breweryId)
     .limit(1);
-  if (customerId) customerQuery = customerQuery.eq("customer_id", customerId);
+  if (customerId) customerQuery = customerQuery.eq("id", customerId);
   const customer = await unwrap(customerQuery);
-  if (customer?.length) {
-    return { db, userId, breweryId, role: "customer", customerId: customer[0].customer_id };
+  if (customer?.[0]?.id) {
+    return { db, userId, breweryId, role: "customer", customerId: customer[0].id };
   }
 
   throw notMember();

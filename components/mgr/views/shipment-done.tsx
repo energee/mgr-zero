@@ -19,6 +19,7 @@ export function ShipmentDoneView({
       {E.back(model.backTo, model.title, undefined, model.backHref)}
       {E.fld("Invoice", model.invoiceHref ? <Link href={model.invoiceHref} className="underline underline-offset-2">{model.invoice}</Link> : model.invoice)}
       {E.tape(tape ?? model.tape)}
+      {model.warnings.map((warning) => <div key={warning}>{E.note(warning)}</div>)}
       {E.info(model.info)}
     </>
   );

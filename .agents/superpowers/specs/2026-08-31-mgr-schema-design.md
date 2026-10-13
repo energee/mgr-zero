@@ -136,7 +136,9 @@ creates the brewery and its first admin.
 
 ### `customers` — unchanged + composite parent key
 Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (added after
-`price_lists`). `unique (brewery_id, name)`. RLS: `staff_all`, `customer_read_own`.
+`price_lists`). `unique (brewery_id, name)`. Staff-only base-table reads;
+buyers read `portal_customers` identity (`id`, `brewery_id`, `name`,
+`sale_channel_id`) through a function scoped to `my_customer_ids()` (#793).
 
 ### `customer_users` — unchanged
 ### `ship_tos` — unchanged, but `customer_id` becomes composite → `customers`
@@ -640,21 +642,25 @@ customer_id → customers, shipment_id → shipments, at timestamptz, note, crea
   `(shipment_id)`.
 Fill = FG `production_in` of a keg SKU; empty-at-brewery is derived, never stored:
 `fleet_total − at_customers − filled_on_hand`.
-**Keg events are recorded separately (owner decision 2026-09-26, #577, PR #605).**
-`ship_order` and `return_shipment` post no keg event. Shipping charges the keg
-deposit; returning beer issues the deposit refund as a credit memo. The fleet
-movement (`shipped`, `returned`, `lost`, `found`) is its own explicitly recorded
-`record_keg_event`. The deposit refund and the Returned keg event stay separate
-records.
-Amended 2026-10-11 by #815 (physical half only): `ship_order` will post `shipped` for
-returnable keg lines and a full keg returned with its beer will post `returned`; deposit
-refunds and later empties stay separate. Only automatic `shipped` events may take a
-location's shell balance negative, which is flagged, never refused.
+**Physical keg events (owner amendment 2026-10-11, #815).**
+`ship_order` posts Shipped events for returnable keg lines. Full kegs returned with
+beer post Returned at the beer's return bin. Both events link to the shipment. Internal shipped order-event payload freezes
+`keg_shells` per order line: SKU, physical pool, size, and shipped quantity.
+Returns use that snapshot rather than mutable SKU configuration or financial
+deposit lines. Buyer event projections continue to exclude payload.
+Deposit-only refunds and later empty pickups remain separate records; later
+empties use `record_keg_event`. Historical shipments without automatic Shipped
+shells post no automatic Returned event. Automatic shipping may overdraw shells,
+which warns on Shipment done and flags the pool/size/location on Keg fleet. The
+shipped payload saves each shortfall as `{ pool, keg_size, location, short }`;
+Keg fleet reads the same shape from the `keg_location_shortages` view.
+Manual events, transfers, and bin moves retain their negative-balance guards.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
 - `keg_customer_balances` — per `(customer, pool, size)`: `shipped − returned − lost@customer`.
 - `keg_loss_rates` — lost / shipped per pool over trailing 12 months.
+- `keg_location_shortages` — per `(pool, size, location)` whose bins net below zero in `keg_bin_on_hand`; Keg fleet flags each.
 
 ## 13. Deliveries (self-distribution)
 

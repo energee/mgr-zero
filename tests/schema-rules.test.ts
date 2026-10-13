@@ -130,6 +130,17 @@ describe("schema rules", () => {
     select string_agg(attname, ',' order by attnum) from pg_attribute
     where attrelid = 'public.${view}'::regclass and attnum > 0 and not attisdropped`)[0];
 
+  it("pins customer identity to safe owned columns and removes unused catalog policies (#793)", () => {
+    expect(sql(`
+      select c.relname || ':' || p.polname from pg_policy p join pg_class c on c.oid = p.polrelid
+      where c.oid in ('public.customers'::regclass, 'public.brands'::regclass, 'public.formats'::regclass, 'public.channel_prices'::regclass)
+      and p.polcmd = 'r' order by 1
+    `)).toEqual(["brands:staff_read", "channel_prices:staff_read", "customers:staff_read", "formats:staff_read"]);
+    expect(columns("portal_customers")).toBe("id,brewery_id,name,sale_channel_id");
+    expect(sql(`select pg_get_function_result('public.portal_customer_rows()'::regprocedure)`))
+      .toEqual(["TABLE(id uuid, brewery_id uuid, name text, sale_channel_id uuid)"]);
+  });
+
   it("pins buyer reads of invoices, invoice lines, order events, shipments and deliveries to portal projections (#754)", () => {
     // Same reason as portal_brewery: a customer policy on the base table would
     // expose every column, since staff and customers share the table grant.

@@ -32,6 +32,18 @@ it("shares an editable mixed preview and prevents all-invalid batches from commi
   expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 ready rows/);
 });
 
+it("shows only usable packaged format references when mapping product imports (#819)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: {
+    ...importPreview, kind: "products_skus", step: 1, rows: [], validation: [],
+    lookups: { ...importPreview.lookups, formats: [
+      { id: "package-id", name: "Half keg", basis: "packaged" },
+      { id: "pour-id", name: "Draft pint", basis: "poured", price_group_id: "group-id" },
+    ] },
+  } }));
+  expect(html).toContain("Half keg");
+  expect(html).not.toContain("Draft pint");
+});
+
 it("retains exact-batch recovery identity and does not claim uncertain writes failed completely", () => {
   const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step: 3, batchId: "frozen-request", error: "Some rows may have committed" } }));
   expect(html).toContain("frozen-request");
