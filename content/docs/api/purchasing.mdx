@@ -12,6 +12,12 @@ A purchase order is drafted (optionally from computed material requirements),
 sent to a vendor, then received. Receiving is what writes material stock, so an
 unreceived PO never inflates what a packaging run believes it has.
 
+An order that will not arrive in full is closed with a reason. A draft or sent
+order with no receipts is cancelled (`cancel_purchase_order`); one with at
+least one receipt is closed short (`close_purchase_order_short`), which keeps
+the received stock and releases only the unreceived remainder. Each call is
+refused for the other case, and the actor and time are recorded with the reason.
+
 {/* ops:purchasing */}
 
 ## cancel_purchase_order [#cancel_purchase_order]
