@@ -243,6 +243,33 @@ defineQuery({
   },
 });
 
+export type OrderCogs = { cost_cents: number; revenue_cents: number; uncosted_qty: number; margin_pct: number | null };
+
+defineQuery({
+  name: "get_order_cogs", description: "What the shipped beer on one order cost (frozen packaging-close cost of its lots, returns netted out), its revenue at the order-line prices, and the margin percent; margin is null while any shipped unit has no cost",
+  roles: [...salesRoles],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: async (ctx, i): Promise<OrderCogs> => {
+    const order = await unwrap(ctx.db.from("orders").select("id").eq("brewery_id", ctx.breweryId).eq("id", i.orderId).maybeSingle());
+    if (!order) throw new CommandError("Order not found", 404, "not_found");
+    const [costs, prices] = await Promise.all([
+      completeRows("Order cost", start => ctx.db.from("order_line_cogs").select("sku_id, qty, cost_cents, uncosted_qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Order lines", start => ctx.db.from("order_lines").select("sku_id, unit_price_cents", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
+    ]);
+    // Revenue prices the units still sold (shipped minus returned), not invoice lines: a deferred-invoice order has none yet.
+    const price = new Map(prices.map(p => [p.sku_id, p.unit_price_cents]));
+    const rows = costs;
+    const cost_cents = rows.reduce((n, r) => n + Number(r.cost_cents), 0);
+    const revenue_cents = rows.reduce((n, r) => n + Number(r.qty) * (price.get(r.sku_id) ?? 0), 0);
+    const uncosted_qty = rows.reduce((n, r) => n + Number(r.uncosted_qty), 0);
+    // A partial cost must never read as a full one, so any uncosted unit withholds the margin.
+    const margin_pct = uncosted_qty > 0 || revenue_cents <= 0 ? null : Math.round((revenue_cents - cost_cents) / revenue_cents * 1000) / 10;
+    return { cost_cents: Math.round(cost_cents), revenue_cents: Math.round(revenue_cents), uncosted_qty: Math.round(uncosted_qty * 100) / 100, margin_pct };
+  },
+});
+
 defineQuery({
   name: "get_order", description: "One order with lines, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],

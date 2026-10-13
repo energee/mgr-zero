@@ -1,6 +1,7 @@
 // app/(app)/orders/[id]/page.tsx — Order (screen record): the staff home for
 // one order: state and next action, lines with ATP, the event history, and
-// the restock flag. The drawing is OrderView (shared with the inventory);
+// the restock flag, and (Admin and Sales, shipped only) Cost and margin from
+// get_order_cogs. The drawing is OrderView (shared with the inventory);
 // lifecycle-buttons.tsx holds the status-gated verbs (Submit, Confirm, Adjust,
 // Pick, Ship, Cancel). Draft edits use /orders/[id]/edit. Confirm has its own
 // two-tap review at /orders/[id]/confirm. Adjust lines is /orders/[id]/adjust;
@@ -8,6 +9,7 @@
 // /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
 // or malformed id renders not-found.tsx.
 import { canRun } from "@/lib/commands/registry";
+import type { OrderCogs } from "@/lib/commands/orders";
 import { OrderView } from "@/components/mgr/views/order";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -30,8 +32,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ order, lines, events, atp }, locations] = (await Promise.all([
     orNotFound(runCommand("get_order", { orderId: id }, ctx)), runCommand("list_locations", {}, ctx),
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[] }, { id: string; name: string }[]];
+  // Cost and margin are for Admin and Sales (#810); only a shipped order has any.
+  const cogs = order.status === "shipped" && canRun(ctx, "get_order_cogs") ? (await runCommand("get_order_cogs", { orderId: id }, ctx)) as OrderCogs : undefined;
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
-  const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone });
+  const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone, cogs });
   if (!canSell) model.confirmHref = undefined;
   if (!canRun(ctx, "update_draft_order")) model.editHref = undefined;
   if (!canFulfill) { model.putBackHref = undefined; model.completeHref = undefined; }

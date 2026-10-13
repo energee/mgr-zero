@@ -7,6 +7,7 @@ import { money } from "./money";
 import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
+import type { OrderCogs } from "@/lib/commands/orders";
 
 export type OrderLineView = {
   key: string;
@@ -26,6 +27,8 @@ export type OrderViewModel = {
   customerPo?: string;
   requested?: string;
   note?: string;
+  /** "$X · margin Y%" for a shipped order, when the caller may run get_order_cogs (#810). */
+  costLine?: string;
   restockNote?: string;
   /** Set while a picked order awaits the re-pick of lines changed after it was picked (#811). */
   repickNote?: string;
@@ -75,6 +78,8 @@ export type OrderSnapshot = {
     created_at: string;
   }[];
   atp: { sku_id: string; qty: number }[];
+  /** get_order_cogs, passed only for roles that may run it. */
+  cogs?: OrderCogs;
 };
 
 const titled = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
@@ -121,9 +126,16 @@ function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lin
   return `Put back ${bits.join(", ")}. They stayed staged after the order changed.`;
 }
 
+/** Cost, then margin; with uncosted units the margin is withheld and the gap named, so a partial cost never reads as a full one. */
+function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | undefined {
+  if (!cogs || order.status !== "shipped") return undefined;
+  if (cogs.uncosted_qty > 0) return `${money(cogs.cost_cents)} · ${cogs.uncosted_qty} units without cost, margin withheld`;
+  return cogs.margin_pct === null ? money(cogs.cost_cents) : `${money(cogs.cost_cents)} · margin ${cogs.margin_pct}%`;
+}
+
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
@@ -142,6 +154,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
     customerPo: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
+    costLine: costLineFor(order, cogs),
     restockNote: restockNoteFor(order, lines),
     repickNote: order.repick_since && order.status === "confirmed" ? "Changed after pick: count the added or raised lines; the rest is already staged." : undefined,
     putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
