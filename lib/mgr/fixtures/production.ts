@@ -74,6 +74,15 @@ export const brewDayHazy: BrewDayViewModel = {
   ],
 };
 
+export const brewDayTurnsHazy: BrewDayViewModel = {
+  ...brewDayHazy, recorded: true, plannedBbl: 20, today: "2026-09-06", initialBbl: "14.6", vesselName: "FV2",
+  vessels: [{ id: "fv2", name: "FV2", kind: "fermenter", capacity_bbl: 20 }],
+  records: [1, 2].map(turn => ({
+    id: `hazy-turn-${turn}`, turn, initial_bbl: 7.3, brewed_on: `2026-09-0${turn + 3}`, created_at: `2026-09-0${turn + 3}`,
+    corrects_id: null, correction_reason: null, plan_snapshot: brewDayHazy.plan!, process: { knockoutTempF: 68 }, additions: [],
+  })),
+};
+
 export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
   occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", verb: "Open batch", warning: true },

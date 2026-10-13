@@ -10,7 +10,7 @@ export type BrewActualDraft = { key: string; source: string; recipeIngredientId?
 export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[] } | null;
   ingredients?: { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number }[];
   waterAdditions?: { materialName: string; qty: number; unit: string; baseUnit: string }[] };
-export type BrewRecordView = { id: string; initial_bbl: number; brewed_on: string; created_at: string; correction_reason: string | null; corrects_id: string | null;
+export type BrewRecordView = { id: string; turn: number; initial_bbl: number; brewed_on: string; created_at: string; correction_reason: string | null; corrects_id: string | null;
   plan_snapshot: BrewPlan; process: Record<string, number>; additions: { id: string; material_name: string; unit: string; confirmed_qty: number; stage: IngredientStage; recipe_ingredient_id: string | null; lot_code: string | null; location_name: string; bin_name: string;
     source: { material_id: string; location_id: string; bin_id: string; lot_id: string | null } }[] };
 export type BrewDayViewModel = {
@@ -33,6 +33,9 @@ export type BrewDayViewModel = {
   brewedOn: string;
   vessels: BrewDayVessel[];
   recorded?: boolean;
+  addingTurn?: boolean;
+  plannedBbl?: number;
+  today?: string;
   /** A cancelled plan shows only its planned facts and the cancelled notice. */
   cancelled?: boolean;
   sheet?: { title: string; detail: string };
@@ -75,14 +78,28 @@ export function brewActualPayload(model: BrewDayViewModel) {
   });
 }
 
-/** The command and input the form's current values submit: a correction of
- *  the latest record, or the first brew-day record. Blank observations are omitted. */
+/** Submit the selected turn's correction or a new brew turn. Blank observations are omitted. */
 export function brewRecordPayload(values: BrewDayViewModel, batchId: string): [string, Record<string, unknown>] {
   const process = Object.fromEntries(Object.entries(values.process ?? {}).filter(([, value]) => value !== "").map(([key, value]) => [key, Number(value)]));
   const facts = { initialBbl: Number(values.initialBbl), actuals: brewActualPayload(values), process, confirmEmpty: Boolean(values.confirmEmpty) };
   return values.correctionRecordId
     ? ["correct_brew_record", { ...facts, recordId: values.correctionRecordId, reason: values.correctionReason }]
     : ["record_brew_day", { ...facts, batchId, vesselId: values.vesselId, brewedOn: values.brewedOn }];
+}
+
+/** Only the latest revision of each turn contributes to confirmed totals. */
+export function currentBrewRecords(records: BrewRecordView[]): BrewRecordView[] {
+  const corrected = new Set(records.map(record => record.corrects_id));
+  return records.filter(record => !corrected.has(record.id));
+}
+
+/** Start another turn in the same tank; its actuals begin with the remaining plan. */
+export function brewTurnModel(model: BrewDayViewModel): BrewDayViewModel {
+  const recordedBbl = currentBrewRecords(model.records ?? []).reduce((sum, record) => sum + record.initial_bbl, 0);
+  const remaining = fromTicks(toTicks(Math.max(0, (model.plannedBbl ?? 0) - recordedBbl)));
+  return { ...model, recorded: false, addingTurn: true, correctionRecordId: undefined, correctionReason: undefined,
+    initialBbl: remaining > 0 ? String(remaining) : "", brewedOn: model.today ?? "", process: {}, confirmEmpty: false,
+    actuals: brewPlanActuals(model.plan ?? {}, remaining, model.sources ?? []) };
 }
 
 export function brewCorrectionModel(model: BrewDayViewModel, record: BrewRecordView): BrewDayViewModel {
