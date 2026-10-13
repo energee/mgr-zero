@@ -129,6 +129,9 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   it("MG409 (request-id reuse) → 409 conflict", async () => {
     await expect(unwrap(failing("MG409"))).rejects.toMatchObject({ status: 409, code: "conflict" });
   });
+  it("MG404 (a scoped RPC hides an absent or other-tenant identity) → 404 not_found with its message", async () => {
+    await expect(unwrap(failing("MG404"))).rejects.toMatchObject({ status: 404, code: "not_found", message: "boom" });
+  });
   it("P0001 (a domain rule raised by our own RPCs) → 400 bad_request with its message", async () => {
     await expect(unwrap(failing("P0001"))).rejects.toMatchObject({ status: 400, code: "bad_request", message: "boom" });
   });

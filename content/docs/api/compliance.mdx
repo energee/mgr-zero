@@ -169,6 +169,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "trace_lot", "input": { "lotId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## trace_material_lot [#trace_material_lot]
+
+`query` · admin, sales
+
+One ingredient or packaging-material lot: effective consumption in batches and runs, finished lots through recorded blend lineage, actual shipment recipients, and remaining recorded material; corrections reverse prior usage
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `materialLotId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "trace_material_lot", "input": { "materialLotId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## upsert_brand_approval [#upsert_brand_approval]
 
 `command` · admin, sales

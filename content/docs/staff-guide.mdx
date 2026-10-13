@@ -552,6 +552,10 @@ Each movement shows its actual bin and recorded barrels. Returns link to the ori
 
 A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the receiving tank and batch, every member batch brought in by recorded transfers, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Dates on the trace use short month/day form, such as **8/31**. Every movement and balance row repeats the full **Brand · SKU** identity. Shipping records the source bin and lot for every quantity. The trace lists actual customer recipients, ship-to addresses, orders and invoices, and recorded balances separately for each SKU and bin with total barrels. Recorded source transfers show their original tanks, dates and barrels. Membership is not a percentage or estimated share of the blend. Transfers after packaging, or after an upstream tank sent its beer onward, do not add members to that lot. Historical untracked movements cannot be assigned to a lot; there is no per-pint POS trace.
 
+**Ingredient lots** (Admin and Sales) are found by their supplier lot code in header **Search**, including lots that are fully used up. A finished lot's **Ingredients** section links to the same material-lot trace. The trace shows effective recorded consumption from every brew turn, cellar additions and packaging runs, affected finished lots through recorded blends, and actual shipment recipients. Reversed consumption disappears from both trace directions. Recorded remaining material is shown for quarantine; consumption without a batch or run link is named separately rather than attributed to beer. Material quantities are actual usage, not estimated blend shares.
+
+<Screen name="Material lot trace" />
+
 ## Keg fleet [#kegs]
 
 <Screen name="Keg fleet" />

@@ -9918,8 +9918,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      trace_lot_ingredients: {
+        Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
       trace_lot_sources: {
         Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
+      trace_material_lot: {
+        Args: { p_brewery: string; p_material_lot: string }
         Returns: Json
       }
       unlink_chat_user: {

@@ -19,7 +19,7 @@ import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
 import { excludeSeen, restrictToOptions, searchCacheKey, searchLoading, searchDestinations } from "@/lib/mgr/search-palette-state";
 
-const HEADING: Record<SearchKind, string> = { sku: "SKUs", order: "Orders", invoice: "Invoices", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches" };
+const HEADING: Record<SearchKind, string> = { sku: "SKUs", order: "Orders", invoice: "Invoices", material_lot: "Ingredient lots", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches" };
 
 const SearchCache = createContext<Map<string, SearchHit[]> | null>(null);
 

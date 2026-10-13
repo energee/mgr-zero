@@ -4,7 +4,7 @@ import { closeWithConfirmedMaterials } from "./packaging-fixture";
 // generated from the movement ledger, the immutable filed snapshot, and the
 // lot trace. MGR never transmits a filing.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, seedMaterial, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -284,6 +284,115 @@ describe("file_compliance_report", () => {
     // a different jurisdiction may cover the same days as a TTB month
     const filed = await runCommand("file_compliance_report", { jurisdiction: "US-PA", periodStart: "2025-08-01", periodEnd: "2025-08-31" }, ctx) as { figures: Report["figures"] };
     expect(filed.figures.lines.map((l) => l.end)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("material lot recall (#817)", () => {
+  it("traces a consumed hop lot through every brew turn to a packaged lot and recipient", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const cat = await seedCatalog(brewery.id, { product: "Recall pale", sku: "Recall keg", packageType: "keg", bblPerUnit: 0.5 });
+    const location = await seedLocation(brewery.id);
+    const materialId = await seedMaterial(brewery.id, { name: "Recall hops", category: "hop", lotTracked: true });
+    const materialLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "H-77", received_on: "2026-10-01" });
+    await seedMovement(brewery.id, { materialId, locationId: location.id, binId: location.binId, lotId: materialLot.id, qty: 20, type: "receipt", createdBy: owner.userId });
+    const vessel = await runCommand("upsert_vessel", { name: "FV recall", kind: "fermenter", capacityBbl: 20 }, owner) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 10, intendedBrandId: cat.brandId }, owner) as { id: string };
+    const actual = { materialId, stage: "boil", locationId: location.id, binId: location.binId, lotId: materialLot.id, qty: 2 };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 5, brewedOn: "2026-10-01", actuals: [actual] }, owner) as { occupancy: { id: string } };
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 5, brewedOn: "2026-10-02", actuals: [actual] }, owner);
+    const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2026-10-03", occupancyId: brewed.occupancy.id, outputs: [{ skuId: cat.skuId, qtyPlanned: 10 }] }, owner) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-10-03T14:00:00Z" }, owner);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 5, outputs: [{ skuId: cat.skuId, qtyActual: 10 }], lotCode: "RECALL-LOT", packagedOn: "2026-10-03", locationId: location.id, binId: location.binId }, owner);
+    const lot = (await admin.from("lots").select("id").eq("packaging_run_id", run.id).single().throwOnError()).data!;
+    const customer = await seedCustomer(brewery.id, { name: "Recall recipient" });
+    await priceSku(brewery.id, { saleChannelId: customer.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
+    const order = await runCommand("create_order", { kind: "wholesale", customerId: customer.customerId, shipToId: customer.shipToId, fromLocationId: location.id, lines: [{ skuId: cat.skuId, qty: 2 }] }, owner) as { order_id: string };
+    await runCommand("submit_order", { orderId: order.order_id }, owner);
+    await runCommand("confirm_order", { orderId: order.order_id }, owner);
+    const line = (await admin.from("order_lines").select("id").eq("order_id", order.order_id).single().throwOnError()).data!;
+    await runCommand("record_pick", { orderId: order.order_id, picks: [{ lineId: line.id, qty: 2 }] }, owner);
+    await runCommand("ship_order", { orderId: order.order_id, ship: [{ lineId: line.id, qty: 2, sources: [{ binId: location.binId, lotId: lot.id, qty: 2 }] }] }, owner);
+    const trace = await runCommand("trace_material_lot", { materialLotId: materialLot.id }, owner) as { batches: { id: string }[]; lots: { id: string }[]; recipients: { id: string }[]; used: { qty: number }[]; on_hand: number };
+    expect(trace.batches.map(b => b.id)).toEqual([batch.id]);
+    expect(trace.lots.map(l => l.id)).toEqual([lot.id]);
+    expect(trace.recipients.map(r => r.id)).toEqual([order.order_id]);
+    expect(trace.used.reduce((total, use) => total + Number(use.qty), 0)).toBe(4);
+    expect(Number(trace.on_hand)).toBe(16);
+    const reverse = await runCommand("trace_lot", { lotId: lot.id }, owner) as { ingredients: { lot_id: string; qty: number }[] };
+    expect(reverse.ingredients).toContainEqual(expect.objectContaining({ lot_id: materialLot.id, qty: 4 }));
+    const sales = await makeStaffCtx(brewery.id, "sales");
+    expect((await runCommand("search_entities", { q: "H-77", kinds: ["material_lot"] }, sales) as { id: string }[]).map(r => r.id)).toEqual([materialLot.id]);
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    await expect(runCommand("trace_material_lot", { materialLotId: materialLot.id }, warehouse)).rejects.toMatchObject({ status: 403 });
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await expect(runCommand("trace_material_lot", { materialLotId: materialLot.id }, foreign)).rejects.toMatchObject({ status: 404 });
+    // An ingredient added after run close never entered the already-packaged lot.
+    const lateLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "H-LATE", received_on: "2026-10-04" });
+    await seedMovement(brewery.id, { materialId, locationId: location.id, binId: location.binId, lotId: lateLot.id, qty: 10, createdBy: owner.userId });
+    await runCommand("record_batch_addition", { batchId: batch.id, occupancyId: brewed.occupancy.id, materialId, stage: "dry_hop", locationId: location.id, binId: location.binId, lotId: lateLot.id, qty: 1 }, owner);
+    const lateTrace = await runCommand("trace_material_lot", { materialLotId: lateLot.id }, owner) as { lots: unknown[] };
+    expect(lateTrace.lots).toEqual([]);
+    expect((await runCommand("trace_lot", { lotId: lot.id }, owner) as { ingredients: { lot_id: string }[] }).ingredients.map(row => row.lot_id)).not.toContain(lateLot.id);
+
+  });
+});
+
+describe("material lot correction (#817)", () => {
+  it("excludes exactly reversed brew consumption from supplier recall", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const loc = await seedLocation(brewery.id);
+    const materialId = await seedMaterial(brewery.id, { name: "Corrected hops", category: "hop", lotTracked: true });
+    const oldLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "OLD-HOPS", received_on: "2026-10-01" });
+    const newLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "NEW-HOPS", received_on: "2026-10-01" });
+    for (const lot of [oldLot, newLot]) await seedMovement(brewery.id, { materialId, locationId: loc.id, binId: loc.binId, lotId: lot.id, qty: 4, createdBy: owner.userId });
+    const vessel = await runCommand("upsert_vessel", { name: "FV corrected", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 2 }, owner) as { id: string };
+    const actual = { materialId, stage: "boil", locationId: loc.id, binId: loc.binId, lotId: oldLot.id, qty: 4 };
+    const original = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 2, brewedOn: "2026-10-01", actuals: [actual] }, owner) as { record: { id: string } };
+    await runCommand("correct_brew_record", { recordId: original.record.id, reason: "Supplier lot corrected", initialBbl: 2, actuals: [{ ...actual, lotId: newLot.id }] }, owner);
+    const oldTrace = await runCommand("trace_material_lot", { materialLotId: oldLot.id }, owner) as { used: unknown[]; batches: unknown[]; on_hand: number };
+    expect(oldTrace.used).toEqual([]);
+    expect(oldTrace.batches).toEqual([]);
+    expect(Number(oldTrace.on_hand)).toBe(4);
+    const newTrace = await runCommand("trace_material_lot", { materialLotId: newLot.id }, owner) as { used: { qty: number }[]; batches: { id: string }[]; on_hand: number };
+    expect(newTrace.batches.map(row => row.id)).toEqual([batch.id]);
+    expect(newTrace.used.map(row => Number(row.qty))).toEqual([4]);
+    expect(Number(newTrace.on_hand)).toBe(0);
+    expect((await runCommand("search_entities", { q: "NEW-HOPS", kinds: ["material_lot"] }, owner) as { id: string }[]).map(row => row.id)).toEqual([newLot.id]);
+  });
+});
+
+describe("packaging material recall (#817)", () => {
+  it("follows tracked packaging consumption and excludes reversed packaging lots", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const cat = await seedCatalog(brewery.id, { product: "Packaging recall", sku: "Packaging case", packageType: "can", bblPerUnit: 0.001 });
+    const loc = await seedLocation(brewery.id);
+    const materialId = await seedMaterial(brewery.id, { name: "Tracked sleeves", category: "packaging", uom: "each", lotTracked: true });
+    await ins("format_bom", { brewery_id: brewery.id, format_id: cat.formatId, material_id: materialId, qty_per_unit: 1 });
+    const oldLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "SLEEVE-OLD", received_on: "2026-10-01" });
+    const newLot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "SLEEVE-NEW", received_on: "2026-10-01" });
+    for (const lot of [oldLot, newLot]) await seedMovement(brewery.id, { materialId, locationId: loc.id, binId: loc.binId, lotId: lot.id, qty: 20, type: "receipt", createdBy: owner.userId });
+    const vessel = await runCommand("upsert_vessel", { name: "FV sleeves", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
+    const batch = await runCommand("schedule_batch", { intendedBrandId: cat.brandId, plannedBbl: 1, plannedOn: "2026-10-01" }, owner) as { id: string };
+    const brewed = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: "2026-10-01", actuals: [], confirmEmpty: true }, owner) as { occupancy: { id: string } };
+    const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, occupancyId: brewed.occupancy.id, plannedOn: "2026-10-02", outputs: [{ skuId: cat.skuId, qtyPlanned: 10 }] }, owner) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-10-02T14:00:00Z" }, owner);
+    const plan = await runCommand("get_packaging_close_plan", { runId: run.id }, owner) as { revision: string };
+    const actual = { materialId, locationId: loc.id, binId: loc.binId, lotId: oldLot.id, used: 10, loss: 0, unused: 0 };
+    await runCommand("close_packaging_run", { runId: run.id, planRevision: plan.revision, bblDrawn: 0.01, outputs: [{ skuId: cat.skuId, qtyActual: 10 }], lotCode: "PACKAGING-RECALL", packagedOn: "2026-10-02", locationId: loc.id, binId: loc.binId, actuals: [actual] }, owner);
+    const lot = (await admin.from("lots").select("id").eq("packaging_run_id", run.id).single().throwOnError()).data!;
+    expect((await runCommand("trace_material_lot", { materialLotId: oldLot.id }, owner) as { lots: { id: string }[] }).lots.map(row => row.id)).toEqual([lot.id]);
+    const history = await runCommand("get_packaging_material_record", { runId: run.id }, owner) as { records: { id: string }[] };
+    await runCommand("correct_packaging_material_record", { recordId: history.records[0].id, reason: "Supplier lot corrected", actuals: [{ ...actual, lotId: newLot.id }] }, owner);
+    expect((await runCommand("trace_material_lot", { materialLotId: oldLot.id }, owner) as { used: unknown[]; lots: unknown[] }).lots).toEqual([]);
+    const trace = await runCommand("trace_material_lot", { materialLotId: newLot.id }, owner) as { batches: { id: string }[]; runs: { id: string }[]; lots: { id: string }[] };
+    expect(trace.batches.map(row => row.id)).toEqual([batch.id]);
+    expect(trace.runs.map(row => row.id)).toEqual([run.id]);
+    expect(trace.lots.map(row => row.id)).toEqual([lot.id]);
+    expect((await runCommand("trace_lot", { lotId: lot.id }, owner) as { ingredients: { lot_id: string }[] }).ingredients.map(row => row.lot_id)).toEqual([newLot.id]);
   });
 });
 
