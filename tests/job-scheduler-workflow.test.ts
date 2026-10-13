@@ -30,6 +30,8 @@ describe("hosted jobs workflow", () => {
       const step = workflow.jobs[job].steps[0];
       expect(step.run).toContain(`-X POST "$MGR_URL${path}"`);
       expect(step.run).toContain("--fail-with-body");
+      // --fail passes a 302, which is what Vercel Deployment Protection returns.
+      expect(step.run).toContain("--location --max-redirs 0");
       expect(step.env?.SECRET).toBe(`\${{ secrets.${secret} }}`);
     }
     // Calling a public URL needs no repository access.
