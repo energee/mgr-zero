@@ -317,6 +317,94 @@ describe("file_compliance_report", () => {
 });
 
 describe("trace_lot", () => {
+  it("traces blended member batches through intermediate tanks, excluding arrivals after packaging (#818)", async () => {
+    const brewery = await makeBrewery();
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const cat = await seedCatalog(brewery.id, { product: "Trace Blend", sku: "Blend keg", packageType: "keg", bblPerUnit: 0.5 });
+    const loc = await seedLocation(brewery.id);
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 60 }, brewer) as Promise<{ id: string }>;
+    const [sourceTank, intermediateTank, receivingTank, lateTank] = await Promise.all([
+      vessel("TRACE-SOURCE"), vessel("TRACE-INTERMEDIATE"), vessel("TRACE-RECEIVING"), vessel("TRACE-LATE"),
+    ]);
+    const brew = async (vesselId: string) => {
+      const batch = await runCommand("schedule_batch", { plannedOn: "2025-11-01", plannedBbl: 15, intendedBrandId: cat.brandId }, brewer) as { id: string };
+      const result = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId, initialBbl: 15, brewedOn: "2025-11-01" }, brewer) as { occupancy: { id: string } };
+      return { batchId: batch.id, occupancyId: result.occupancy.id };
+    };
+    const source = await brew(sourceTank.id);
+    const receiving = await brew(receivingTank.id);
+    const late = await brew(lateTank.id);
+    const transfer = (fromOccupancyId: string, toVesselId: string, volumeBbl: number) =>
+      runCommand("record_cellar_transfer", { fromOccupancyId, toVesselId, volumeBbl, lossBbl: 0 }, brewer) as Promise<{
+        transfer: { id: string; bbl: number; at: string };
+        to_occupancy: { id: string };
+      }>;
+    const first = await transfer(source.occupancyId, intermediateTank.id, 10);
+    const second = await transfer(first.to_occupancy.id, receivingTank.id, 10);
+    const returned = await transfer(receiving.occupancyId, sourceTank.id, 2);
+    const repeated = await transfer(source.occupancyId, receivingTank.id, 2);
+    // This arrival predates packaging but follows the source's outgoing leg.
+    const afterOutgoing = await transfer(late.occupancyId, sourceTank.id, 5);
+    const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2025-12-01", occupancyId: receiving.occupancyId, outputs: [{ skuId: cat.skuId, qtyPlanned: 10 }] }, brewer) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2025-12-01T14:00:00Z" }, brewer);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 5, outputs: [{ skuId: cat.skuId, qtyActual: 10 }], lotCode: "L-251201-BL", packagedOn: "2025-12-01", locationId: loc.id, binId: loc.binId }, brewer);
+    const { data: lot, error } = await admin.from("lots").select("id").eq("packaging_run_id", run.id).single();
+    expect(error).toBeNull();
+    const later = await transfer(late.occupancyId, receivingTank.id, 5);
+
+    const trace = await runCommand("trace_lot", { lotId: lot!.id }, owner) as {
+      batches: { id: string }[];
+      transfers: { id: string; bbl: number; at: string }[];
+    };
+    expect(trace.batches.map(batch => batch.id).sort()).toEqual([source.batchId, receiving.batchId].sort());
+    expect(trace.transfers.map(row => row.id).sort()).toEqual([first.transfer.id, second.transfer.id, returned.transfer.id, repeated.transfer.id].sort());
+    expect(Number(trace.transfers.find(row => row.id === first.transfer.id)?.bbl)).toBe(10);
+    expect(Number(trace.transfers.find(row => row.id === second.transfer.id)?.bbl)).toBe(10);
+    expect(trace.transfers.find(row => row.id === first.transfer.id)?.at).toBe(first.transfer.at);
+    expect(trace.transfers.find(row => row.id === second.transfer.id)?.at).toBe(second.transfer.at);
+    expect(trace.transfers.map(row => row.id)).not.toContain(afterOutgoing.transfer.id);
+    expect(trace.transfers.map(row => row.id)).not.toContain(later.transfer.id);
+    expect(trace.batches.map(batch => batch.id)).not.toContain(late.batchId);
+    for (const batchId of [source.batchId, receiving.batchId]) {
+      const lots = await owner.db.rpc("trace_batch_lots", { p_brewery: brewery.id, p_batch: batchId });
+      expect(lots.error).toBeNull();
+      expect(lots.data?.map(row => row.id)).toContain(lot!.id);
+    }
+    const lateLots = await owner.db.rpc("trace_batch_lots", { p_brewery: brewery.id, p_batch: late.batchId });
+    expect(lateLots.error).toBeNull();
+    expect(lateLots.data).toEqual([]);
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    expect((await warehouse.db.rpc("trace_lot_sources", { p_brewery: brewery.id, p_lot: lot!.id })).error?.code).toBe("42501");
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "admin");
+    expect((await foreign.db.rpc("trace_lot_sources", { p_brewery: brewery.id, p_lot: lot!.id })).error?.code).toBe("42501");
+    expect((await owner.db.rpc("trace_lot_sources", { p_brewery: brewery.id, p_lot: crypto.randomUUID() })).error?.code).toBe("MG404");
+
+    // Equal-time historical legs exercise cycles without enumerating every path.
+    sql(`insert into public.transfers(brewery_id,from_occupancy_id,to_occupancy_id,bbl,at,created_by)
+      select '${brewery.id}',
+        case when n % 2 = 0 then '${source.occupancyId}'::uuid else '${receiving.occupancyId}'::uuid end,
+        case when n % 2 = 0 then '${receiving.occupancyId}'::uuid else '${source.occupancyId}'::uuid end,
+        0.001, '${first.transfer.at}'::timestamptz, '${brewer.userId}'
+      from generate_series(1,20) n`, true);
+    const planRows = sql(`set local statement_timeout = '5s'; do $check$
+      declare body text; plan json; node json; expanded bigint;
+      begin
+        select prosrc into body from pg_proc where oid = 'private.lot_lineage(uuid,uuid)'::regprocedure;
+        body := replace(replace(body, 'p_brewery', quote_literal('${brewery.id}') || '::uuid'), 'p_lot', quote_literal('${lot!.id}') || '::uuid');
+        execute 'explain (analyze, format json) ' || body into plan;
+        with recursive nodes(value) as (
+          select plan->0->'Plan'
+          union all select child from nodes, json_array_elements(coalesce(value->'Plans', '[]'::json)) child
+        ) select value into node from nodes where value->>'Node Type' = 'Recursive Union';
+        expanded := (node->>'Actual Rows')::bigint;
+        if expanded is null or expanded > 1 + 26 * 26 then
+          raise exception 'lineage expanded % states for 26 transfer legs', expanded;
+        end if;
+      end $check$`, true);
+    expect(planRows).toEqual([]);
+  });
+
   it("follows the lot to its run, tank, and batch, and lists every ledger movement tagged with it", async () => {
     const brewer = await makeStaffCtx(b.id, "brewer");
     const cat = await seedCatalog(b.id, { product: "Trace Porter", sku: "Porter case", packageType: "can", bblPerUnit: 0.0645 });

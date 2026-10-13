@@ -283,12 +283,11 @@ defineQuery({
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_brew_record", { p_brewery: ctx.breweryId, p_batch: i.batchId })),
 });
 
-// One call: it stamps batches.brewed_on and opens the vessel occupancy that
-// makes the beer findable. Brewing into a vessel whose occupancy overlaps the
-// brew day is refused — including a backdated day that falls inside a stretch
-// the vessel was full but has since been emptied.
+// The first turn stamps batches.brewed_on and opens its vessel occupancy.
+// Later same-batch turns top up that open tank without moving the first date.
+// A first turn still refuses overlapping occupancies, including backdated ones.
 defineCommand({
-  name: "record_brew_day", description: "Record actual ingredient sources, confirmed process and a frozen brew sheet with the batch date and knockout occupancy",
+  name: "record_brew_day", description: "Record a same-batch brew turn with actual ingredient sources and frozen process, opening or topping up its tank",
   input: z.object({
     batchId: z.string().uuid(),
     vesselId: z.string().uuid(),

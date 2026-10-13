@@ -32,6 +32,15 @@ const body = (name: string) => {
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
+  it("documents overdue invoices alongside the shared rendered warning", () => {
+    const invoices = SCREENS.find(s => s.name === "Invoices")!;
+    expect((invoices.states ?? []).map(([name]) => name)).toContain("overdue");
+    const spec = renderToStaticMarkup(createElement("div", null, invoices.spec));
+    expect(spec).toContain("brewery-local today");
+    expect(spec).toContain("Credit memos and settled");
+    expect(text("Invoices")).toContain("overdue Oct 3, 2026");
+  });
+
   it("gives brew day its pinned sheet and explicit actual confirmation", () => {
     const brew = text("Brew day");
     expect(brew).toMatch(/Pinned recipe plan/);
@@ -325,7 +334,7 @@ describe("SCREENS", () => {
 
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
-      "Correct receipt",
+      "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",

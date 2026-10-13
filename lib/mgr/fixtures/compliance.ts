@@ -52,6 +52,8 @@ export const lotTraceHazy: LotTraceSnapshot = {
   lot: { code: "L-240831-HZ", brand: "Hazy IPA", packaged_on: "2026-08-31", best_by: "2027-02-27" },
   run: { run_no: 28, bbl_drawn: 25, vessel: "FV-3" },
   batch: { batch_no: 41, brewed_on: "2026-08-10" },
+  batches: [{ id: "batch-40", batch_no: 40, brewed_on: "2026-08-09" }, { id: "batch-41", batch_no: 41, brewed_on: "2026-08-10" }],
+  transfers: [{ id: "blend", from_occupancy_id: "source", to_occupancy_id: "receiving", from_batch_id: "batch-40", to_batch_id: "batch-41", from_vessel: "FV-2", to_vessel: "FV-3", bbl: 10, at: "2026-08-30T12:00:00Z" }],
   movements: [
     { id: "in", type: "production_in", qty: 120, bbl: 7.74, bin: "Cooler", ref: null, source_movement_id: null, created_at: "2026-08-31T12:00:00Z", sku: "16 oz case", location: "Warehouse" },
     { id: "sample", type: "sample", qty: -2, bbl: -0.13, bin: "Cooler", ref: null, source_movement_id: null, created_at: "2026-09-02T12:00:00Z", sku: "16 oz case", location: "Warehouse" },

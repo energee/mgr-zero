@@ -41,3 +41,15 @@ it("prints an unpaid invoice's due day the way the rest of the app does (#493)",
   expect(unpaid.detail).toContain("due Sep 12, 2026");
   expect(unpaid.detail).not.toContain("2026-09-12");
 });
+
+it("marks outstanding invoices overdue only after the brewery-local due day", () => {
+  const now = new Date("2026-09-13T02:00:00Z");
+  const owed = { ...invoice, qbo_balance_cents: 104000 };
+  expect(toInvoiceListRow(owed, "admin", true, "UTC", now).detail).toContain("overdue Sep 12, 2026");
+  expect(toInvoiceListRow(owed, "admin", true, "UTC", now).tone).toBe("w");
+  expect(toInvoiceListRow(owed, "admin", true, "America/New_York", now).detail).toContain("due Sep 12, 2026");
+  expect(toInvoiceListRow(owed, "admin", true, "America/New_York", now).detail).not.toContain("overdue");
+  for (const change of [{ qbo_balance_cents: 0 }, { paid_at: "2026-09-12", qbo_balance_cents: 0 }, { written_off_at: "2026-09-12" }, { qbo_remote_state: "voided" as const }, { qbo_remote_state: "deleted" as const }, { kind: "credit_memo" as const }, { due_on: null }]) {
+    expect(toInvoiceListRow({ ...owed, ...change }, "admin", true, "UTC", now).detail).not.toContain("overdue");
+  }
+});

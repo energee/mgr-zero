@@ -20,6 +20,22 @@ async function plannedBrew(stock = 200) {
   return { brewery, brewer, materialId, location, lot, recipe, version, batch, vessel, input };
 }
 
+describe("brew turn record revisions (#807)", () => {
+  it("keeps each turn's materials and correction identity independent", async () => {
+    const f = await plannedBrew(400);
+    const first = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string }; occupancy: { id: string } };
+    const second = await runCommand("record_brew_day", { ...f.input, brewedOn: "2026-10-02" }, f.brewer) as { record: { id: string } };
+    const corrected = await runCommand("correct_brew_record", { recordId: first.record.id, reason: "Reweighed first turn", initialBbl: 1.8, actuals: [{ ...f.input.actuals[0], qty: 100 }] }, f.brewer) as { record: { turn: number; corrects_id: string } };
+    expect(corrected.record).toMatchObject({ turn: 1, corrects_id: first.record.id });
+    const records = await runCommand("get_brew_record", { batchId: f.batch.id }, f.brewer) as { records: { id: string; turn: number; corrects_id: string | null }[] };
+    expect(records.records).toContainEqual(expect.objectContaining({ id: second.record.id, turn: 2, corrects_id: null }));
+    const stock = await admin.from("material_movements").select("qty").eq("brewery_id", f.brewery.id).throwOnError();
+    expect(stock.data!.reduce((sum, movement) => sum + Number(movement.qty), 0)).toBe(185);
+    const volume = await admin.from("occupancy_volumes").select("bbl").eq("occupancy_id", first.occupancy.id).single().throwOnError();
+    expect(Number(volume.data!.bbl)).toBe(3.8);
+  });
+});
+
 describe("actual brew-day record (#622)", () => {
   it("replays a completed legacy request with the originally accepted quantity precision", async () => {
     const f = await plannedBrew();

@@ -286,6 +286,9 @@ This is a fulfillment mode, not a workflow status.
 ### `invoices`
 `invoice_no bigint` (trigger), `kind invoice_kind`, `customer_id → customers`,
 `shipment_id → shipments unique` (null for credit memos), `issued_on date`, `due_on date`,
+with an insert trigger freezing customer terms at issue date + 0/15/30 days unless
+an explicit due date is supplied. Credit memos have no inferred due date. Historical
+null dates use current customer terms because issue-time terms were not stored.
 `qbo_invoice_id text`, `qbo_sync_status default 'pending'`, `qbo_sync_error text`,
 `qbo_idempotency_key uuid not null default gen_random_uuid() unique`,
 `qbo_tax_cents int`, `qbo_total_cents int`, `qbo_balance_cents int`, `paid_at timestamptz`
@@ -502,7 +505,7 @@ planned_on)`, `(intended_brand_id)`.
 timestamptz, initial_bbl numeric >= 0` (wort/beer put in directly; 0 when filled by
 transfer). Exclusion: `exclude using gist (vessel_id with =, tstzrange(started_at,
 ended_at) with &&)` — one open occupancy per vessel; blends are transfers *into* an
-occupancy, so the trail is in `transfers`. idx `(batch_id)`, `(brewery_id) where ended_at
+occupancy, so the trail is in `transfers`. Lot trace reports member batches and stored transfer facts, not proportional shares. `private.lot_lineage` walks incoming transfers before the packaging run closes, tightening the cutoff to each upstream outgoing transfer time. `trace_lot_sources` and the forward `trace_batch_lots` recall lookup share that walk; later arrivals are excluded. idx `(batch_id)`, `(brewery_id) where ended_at
 is null`.
 
 ### `transfers` — ledger
