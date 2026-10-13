@@ -137,10 +137,10 @@ of `/` after login — that's the wholesale customer portal, not a bug.
 
 Importing from Lolev Manager (catalog and recipes; `docs/plans/lolev-import.md`):
 point `scripts/import-lolev.ts` at a Lolev `mongodump` directory and sign in as
-an admin or brewer of the target brewery. It writes through `upsert_material`,
-`upsert_water_profile`, `create_recipe` and `create_recipe_version`, refuses a
-non-local Supabase URL, and skips any name the brewery already has, so a rerun
-writes nothing. `--dry-run` prints counts and dropped lines without signing in.
+an admin or brewer of the target brewery. It writes only through the existing
+material, water-profile and recipe commands (named in the script's header),
+refuses a non-local Supabase URL, and skips any name the brewery already has,
+so a rerun writes nothing. `--dry-run` prints counts and dropped lines without signing in.
 
 ```bash
 LOLEV_IMPORT_PASSWORD=dev-password-1 bun --env-file=.env.local scripts/import-lolev.ts <dump>/lolev-manager --email dev@mgr.local
