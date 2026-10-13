@@ -29,7 +29,7 @@ export function SkuListView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, rowAction ? rowAction(row) : E.act("Edit", "primary", linkRows ? row.href : undefined))}
+            {E.row(row.title, row.detail, rowAction ? rowAction(row) : E.act("Edit", "primary", linkRows ? row.href : undefined), row.warn ? "w" : "")}
           </Fragment>
         ))}
       {footer}

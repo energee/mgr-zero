@@ -178,6 +178,17 @@ describe("registry sheets", () => {
 });
 
 describe("Lot trace", () => {
+  it("renders blend members and stored transfer facts without proportional attribution", () => {
+    const model = toLotTraceViewProps(lotTraceHazy);
+    expect(model.memberBatches.map(row => row.title)).toEqual(["Batch 40", "Batch 41"]);
+    expect(model.sourceTransfers).toEqual([{ key: "blend", title: "FV-2 to FV-3", detail: "8/30", trailing: "10.00 bbl transferred" }]);
+    const html = htmlOf(createElement(LotTraceView, { model }));
+    expect(html).toMatch(/Member batches/);
+    expect(html).toMatch(/Recorded source transfers/);
+    expect(html).toMatch(/Recorded membership, not percentages or estimated shares/);
+    expect(html).not.toMatch(/\d+%/);
+  });
+
   it("the Lot trace inventory record is LotTraceView", () => {
     const body = screen("Lot trace").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LotTraceView);
