@@ -207,6 +207,16 @@ describe("mapRecipes", () => {
     expect(recipes.map((r) => [r.lolevId, r.name])).toEqual([["old", "Test IPA (2024-03-04)"], ["new", "Test IPA"]]);
   });
 
+  it("renames a duplicate's custom source profile with the recipe, so profiles stay distinct", () => {
+    const water = { calcium: 10, magnesium: 0, sodium: 0, sulfate: 0, chloride: 0, bicarbonate: 0 };
+    const { recipes } = mapRecipes([
+      recipe({ _id: "old", createdAt: "2024-03-04T10:00:00.000Z", sourceWaterProfile: water }),
+      recipe({ _id: "new", createdAt: "2025-05-06T10:00:00.000Z", sourceWaterProfile: { ...water, calcium: 20 } }),
+    ], byLolevId, catalog.yeasts);
+    const names = recipes.map((r) => (r.sourceProfile as { name: string }).name);
+    expect(names).toEqual(["Test IPA (2024-03-04) source water", "Test IPA source water"]);
+  });
+
   it("trims recipe names before finding duplicates", () => {
     const { recipes } = mapRecipes([
       recipe({ _id: "old", name: "Test IPA ", createdAt: "2024-03-04T10:00:00.000Z" }),

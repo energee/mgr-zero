@@ -196,6 +196,11 @@ function dedupeNames(recipes: RecipeImport[], createdAt: Map<string, string>) {
   for (const group of groups.values()) {
     if (group.length < 2) continue;
     const newest = group.reduce((a, b) => (createdAt.get(b.lolevId)! > createdAt.get(a.lolevId)! ? b : a));
-    for (const r of group) if (r !== newest) r.name = `${r.name} (${createdAt.get(r.lolevId)!.slice(0, 10)})`;
+    for (const r of group) {
+      if (r === newest) continue;
+      r.name = `${r.name} (${createdAt.get(r.lolevId)!.slice(0, 10)})`;
+      // A custom source profile is named after its recipe; rename it too, or two recipes share one profile.
+      if (r.sourceProfile && r.sourceProfile !== "default") r.sourceProfile.name = `${r.name} source water`;
+    }
   }
 }
