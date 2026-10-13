@@ -3,6 +3,7 @@ import { APPROVAL_KINDS, type BrandApprovalViewModel } from "@/lib/mgr/brand-app
 import type { ComplianceMonthsViewModel } from "@/lib/mgr/compliance-months-view";
 import type { LicensesSnapshot } from "@/lib/mgr/licenses-view";
 import type { LicenseViewModel } from "@/lib/mgr/license-view";
+import type { MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import type { LotTraceSnapshot } from "@/lib/mgr/lot-trace-view";
 import type { StateRegistrationViewModel } from "@/lib/mgr/state-registration-view";
 
@@ -53,6 +54,7 @@ export const lotTraceHazy: LotTraceSnapshot = {
   run: { run_no: 28, bbl_drawn: 25, vessel: "FV-3" },
   batch: { batch_no: 41, brewed_on: "2026-08-10" },
   batches: [{ id: "batch-40", batch_no: 40, brewed_on: "2026-08-09" }, { id: "batch-41", batch_no: 41, brewed_on: "2026-08-10" }],
+  ingredients: [{ material_id: "hops", material: "Citra hops", lot_id: "h77", code: "H-77", unit: "lb", source: "boil", qty: 8 }],
   transfers: [{ id: "blend", from_occupancy_id: "source", to_occupancy_id: "receiving", from_batch_id: "batch-40", to_batch_id: "batch-41", from_vessel: "FV-2", to_vessel: "FV-3", bbl: 10, at: "2026-08-30T12:00:00Z" }],
   movements: [
     { id: "in", type: "production_in", qty: 120, bbl: 7.74, bin: "Cooler", ref: null, source_movement_id: null, created_at: "2026-08-31T12:00:00Z", sku: "16 oz case", location: "Warehouse" },
@@ -64,4 +66,16 @@ export const lotTraceHazy: LotTraceSnapshot = {
   ],
   recipients: [],
   warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
+};
+
+
+export const materialLotTraceCitra: MaterialLotTraceSnapshot = {
+  lot: { id: "h77", code: "H-77", material: "Citra hops", unit: "lb", vendor: "Fictional Hop Supply", received_on: "2026-08-01", best_by: null },
+  on_hand: 12,
+  used: [{ id: "use40", qty: 4, at: "2026-08-09T12:00:00Z", stage: "boil", batch_id: "batch40", run_id: null }, { id: "use41", qty: 4, at: "2026-08-10T12:00:00Z", stage: "boil", batch_id: "batch41", run_id: null }],
+  batches: [{ id: "batch40", batch_no: 40, brewed_on: "2026-08-09", closed_at: null }, { id: "batch41", batch_no: 41, brewed_on: "2026-08-10", closed_at: null }],
+  runs: [], lots: [{ id: "finished", code: "L-240831-HZ", packaged_on: "2026-08-31" }],
+  recipients: [{ id: "order1", order_no: 101, customers: { id: "customer1", name: "Fictional Corner Bar" }, ship_tos: { label: "main", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" }, shipments: [{ id: "shipment1", carrier: null, tracking: null, invoices: [{ id: "invoice1", invoice_no: 101 }] }] }],
+  unlinked_qty: 0,
+  warning: "Only recorded material identities and effective consumption are traced. Historical untracked stock cannot be assigned to a lot; recorded blend membership is not a proportional share.",
 };

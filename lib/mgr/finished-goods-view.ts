@@ -1,5 +1,7 @@
-// lib/mgr/finished-goods-view.ts — view-model for Finished goods (get_on_hand / get_atp).
+// lib/mgr/finished-goods-view.ts — Finished goods stock and authorized get_inventory_value totals.
 import type { EmptyState } from "./empty-state";
+import { money } from "./money";
+import type { InventoryValue } from "@/lib/commands/inventory";
 export type FinishedGoodsRowView = {
   key: string;
   title: string;
@@ -14,6 +16,7 @@ export type FinishedGoodsRowView = {
 export type FinishedGoodsViewModel = {
   backHref?: string;
   rows: FinishedGoodsRowView[];
+  valueLine?: string;
   empty?: EmptyState;
 };
 
@@ -27,6 +30,7 @@ export type FinishedGoodsSku = {
 
 export type FinishedGoodsSnapshot = {
   skus: FinishedGoodsSku[];
+  value?: { cents: number; uncostedUnits: number };
   backHref?: string;
 };
 
@@ -38,6 +42,7 @@ export function assembleFinishedGoods(
   skus: Omit<FinishedGoodsSku, "on_hand" | "atp">[],
   onHandRows: StockRow[],
   atpRows: StockRow[],
+  value?: InventoryValue,
 ): FinishedGoodsSnapshot {
   // qty is numeric(12,2); round each running total so 0.10 + 0.20 stays 0.3.
   const sum = (rows: StockRow[]) => rows.reduce(
@@ -47,6 +52,8 @@ export function assembleFinishedGoods(
   const onHand = sum(onHandRows);
   const atp = new Map(atpRows.map((row) => [row.sku_id, Number(row.qty)]));
   return {
+    // Uncosted units contribute no dollars, but their count stays explicit.
+    ...(value ? { value: { cents: Math.round(value.value_cents), uncostedUnits: round2(value.uncosted_qty) } } : {}),
     skus: skus.filter((sku) => onHand.has(sku.id) || atp.has(sku.id)).map((sku) => ({
       ...sku,
       on_hand: onHand.get(sku.id) ?? 0,
@@ -59,9 +66,10 @@ export function assembleFinishedGoods(
 export const skuLabel = (sku: { name: string; brands?: { name: string } | null }) =>
   sku.brands?.name && !sku.name.startsWith(sku.brands.name) ? `${sku.brands.name} · ${sku.name}` : sku.name;
 
-export function toFinishedGoodsViewProps({ skus, backHref }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
+export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
     backHref: backHref ?? "/beer",
+    valueLine: value ? `${money(value.cents)}${value.uncostedUnits ? ` · ${value.uncostedUnits} units without cost` : ""}` : undefined,
     empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
     rows: skus.map((s) => {
       const allocated = round2(s.on_hand - s.atp);

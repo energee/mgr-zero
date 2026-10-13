@@ -13,6 +13,8 @@ const COMMAND: [OrderStatus, boolean, string][] = [
   ["confirmed", false, "record_pick"],
   ["picked", false, "ship_order"],
   ["picked", true, "confirm_restock"],
+  // #811: a mixed adjust leaves staged beer on a confirmed order; Put back still comes first
+  ["confirmed", true, "confirm_restock"],
 ];
 
 describe("nextAction", () => {

@@ -23,12 +23,17 @@ export const warehouseRoles = ["admin", "warehouse"] as const;
 /** Whether `role` is in a command's role list. */
 export const hasRole = (roles: readonly string[], role: string) => roles.includes(role);
 
+/** Staged beer waits for Put back on a picked order, and on a confirmed one a
+ * mixed adjust sent back for a re-pick (#811): put back first, then count. */
+export const stagedOnOpenOrder = (status: OrderStatus, needsRestock: boolean) =>
+  needsRestock && (status === "picked" || status === "confirmed");
+
 /** The verb a staff list offers on this order, and where it goes. Only a role
  * the next step's command allows gets the verb; anyone else gets Open. */
 export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, role: string): { verb: string; tone: ActionTone; href: string } {
   const roles = status === "draft" || status === "submitted" ? salesRoles : warehouseRoles;
   if (!hasRole(roles, role)) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
-  if (status === "picked" && needsRestock) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
+  if (stagedOnOpenOrder(status, needsRestock)) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
   const [verb, tone, path] = ACTION[status];
   return { verb, tone, href: `/orders/${id}${path}` };
 }
@@ -39,7 +44,7 @@ const NEXT_STATE: Record<OrderStatus, string> = {
 
 /** What the next lifecycle step is called, for the order page's state row. */
 export const nextState = (status: OrderStatus, needsRestock: boolean) =>
-  (status === "picked" && needsRestock ? "put back" : NEXT_STATE[status]);
+  (stagedOnOpenOrder(status, needsRestock) ? "put back" : NEXT_STATE[status]);
 
 /** Buyer wording: the portal never prints a staff lifecycle word. */
 const BUYER: Record<OrderStatus, string> = {

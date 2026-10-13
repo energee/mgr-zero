@@ -17,7 +17,7 @@ never copy it into a second place.
 | `lib/commands/transfers.ts` | Internal bin-to-bin and cross-location `stock_transfers` (create/submit/pick/receive/cancel) — a document distinct from priced customer `orders`; bin-to-bin moves inside one location are structurally barred from becoming deliveries. |
 | `lib/commands/landings.ts`, `lib/commands/search.ts`, `lib/commands/settings.ts`, `lib/commands/tenancy.ts` | The Beer/Work/More landing aggregates; cross-entity `search_entities` (parallel per-entity RLS-bound reads, not a definer function — RLS already decides the rows); brewery/team settings (`update_brewery`, `update_staff_role`, `revoke_staff`, always keeps one admin); the pre-tenant `provision_brewery` caller. |
 | `lib/commands/qbo.ts` | QuickBooks Online: OAuth connect/disconnect, customer/item mapping, invoice push and payment sync, and issued-token revoke on a failed OAuth completion. |
-| `lib/commands/taproom.ts` | Keg pools/events, durable explicit-bucket taproom counts, and tap interval reads plus atomic tap/kick/swap RPCs. Intervals freeze nominal size, never write inventory, and keep guest identity separate from own SKUs absent stock. Completed-period brand variance reads count-owned frozen depletion against immutable `pos_sale_expectations`; the draft projection reads expected consumption from the latest durable count through its server as-of without posting inventory or allocating lots. Both reuse `private.taproom_pos_allocations`; `pos_sales_coverage` records explicit source/location observation windows. `private.reconcile_pos_sale` owns first serving interpretation of raw order/line facts, with no application or service execute grant until the provider owner lands. |
+| `lib/commands/taproom.ts` | Keg pools/events, durable explicit-bucket taproom counts, and tap interval reads plus atomic tap/kick/swap RPCs. Intervals freeze nominal size, never write inventory, and keep guest identity separate from own SKUs absent stock. Completed-period brand variance reads count-owned frozen sold depletion (with destruction reported separately) against immutable `pos_sale_expectations`; the draft projection reads expected consumption from the latest durable count through its server as-of without posting inventory or allocating lots. Both reuse `private.taproom_pos_allocations`; `pos_sales_coverage` records explicit source/location observation windows. `private.reconcile_pos_sale` owns first serving interpretation of raw order/line facts, with no application or service execute grant until the provider owner lands. |
 | `lib/commands/production.ts` | Recipe, batch, vessel, cellar and fermentation operations. Batch completion previews and commits one database-owned formula over all batch occupancies, frozen closed-run output movements, transfers and typed adjustments; completion accepts no caller amount or classification. |
 | `lib/commands/compliance.ts` | Compliance registry, lot trace, generated and immutable filed reports, and completion-loss review. Loss reattribution allocates one exact part of a completion root through a frozen append-only signed pair; report removal totals include it once, while the cellar breakdown is explanatory. Direct cellar Taproom volume retains an explicit external-mapping filing gate. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
@@ -71,9 +71,10 @@ never copy it into a second place.
 | `content/docs/{index,staff-guide,portal-guide}.mdx` | Customer documentation as Fumadocs MDX, served at `/docs` by `app/(docs)/docs` (`lib/source.ts` is the content index, `components/mdx.tsx` the component set, `app/api/search` the search index); `fumadocs-ui/css/shadcn.css` maps the docs theme onto the app tokens: `index.mdx` is the master audience chooser; staff and portal guides separately cover every available screen and action for their users. Uses customer language only and never exposes implementation phases or internals. |
 | `content/docs/{screens,screens-explore,integrations}.mdx` | Generated design-inventory pages in the same Fumadocs tree (`screens.mdx` renders `components/mgr/screen-index.tsx` over `SCREENS` directly, `screens-explore.mdx` the filterable `screen-explorer.tsx`, `integrations.mdx` the venue frames grouped by product) — not hand-written, cannot drift, and deliberately outside `documentation-agent.yml`'s allowlist (`tests/design-docs.test.ts`). |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
-| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge and manual customer-documentation contract and automation. Claude may edit only the three guide MDX files in a read-only GitHub job whose sandbox deny list is `.github/claude-ci-settings.json` (shared with dreaming); a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
+| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge, weekly, and manual customer-documentation contract and automation. Claude may edit only the three guide MDX files in a read-only GitHub job whose sandbox deny list is `.github/claude-ci-settings.json` (shared with dreaming); a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
 | `content/docs/api/` (index plus one page per area), `lib/mgr/api-operations.ts`, `lib/mgr/api-schema.ts`, `lib/mgr/api-errors.ts` | The HTTP API reference, served at `/docs/api`. Generated blocks (envelope, role matrix, per-area operations with field tables and self-validating curl examples) are written between markers by `bun run docs:api`, deriving available operations from the command registry and designed operations from each screen's declared `reads`/`writes`; `tests/api-docs.test.ts` fails on drift in either direction. |
-| `.agents/agents/http-api.md`, `.github/workflows/http-api-agent.yml` | Post-merge HTTP API reference maintenance, mirroring the documentation agent. Claude may edit the `content/docs/api/*.mdx` prose and a screen's `reads:`/`writes:` annotations only — never hand-write the generated tables (`Bash` is absent from its allowlist; the workflow runs `bun run docs:api`) — and opens the reviewable `docs/http-api` pull request via the MGR App token. |
+| `.github/workflows/doc-agent-watch.yml` | Opens one GitHub issue per problem when Dreaming, the documentation agent or the HTTP API agent fails, or when no `dream:` commit lands on main for 3 days. |
+| `.agents/agents/http-api.md`, `.github/workflows/http-api-agent.yml` | Post-merge and weekly HTTP API reference maintenance, mirroring the documentation agent; a PR body with `API: none` skips it. Claude may edit the `content/docs/api/*.mdx` prose and a screen's `reads:`/`writes:` annotations only — never hand-write the generated tables (`Bash` is absent from its allowlist; the workflow runs `bun run docs:api`) — and opens the reviewable `docs/http-api` pull request via the MGR App token. |
 | `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
 | `.agents/agents/dreaming.md`, `.agents/DRIFT.md`, `.github/workflows/dreaming.yml`, `.github/claude-ci-settings.json` | Daily/manual agent-doc curation and its unresolved read-only drift ledger. Claude edits documents with read-only GitHub access under the shared CI deny list (read from main, not the checked-out dream branch); the workflow validates and publishes through the MGR GitHub App (`mgr[bot]`). |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
@@ -166,8 +167,10 @@ a gap to close, not a convention to trust.
    A definer projection is never inlined, so a filter on its view runs after
    every caller row is built; single-row reads pass an id to the rows function
    instead (`portal_order_rows(p_order)`).
-   Still open (#793): `customers`, `brands`, `formats` and `channel_prices`
-   keep customer policies that expose whole rows.
+   Buyers read customer identity through `portal_customers` (`id`,
+   `brewery_id`, `name`, `sale_channel_id`). Membership discovery uses this
+   projection too, not a base-table embed. `customers`, `brands`, `formats`
+   and `channel_prices` have no customer SELECT policies (#793).
    QuickBooks customer reconciliation adds nine `customers` columns (billing
    email, phone, five billing-address parts, `qbo_sync_token`, `qbo_sync_state`)
    and the `qbo_customer_snapshots` and `qbo_customer_decisions` tables. The
@@ -176,11 +179,10 @@ a gap to close, not a convention to trust.
    with privileged SQL. A unique index allows one QuickBooks customer per MGR
    customer within a brewery and realm; legacy rows with a NULL realm sit
    outside that uniqueness. The new `customers` columns are not admin/sales
-   only: until #793 lands, a buyer can read them on their own customer row, and
-   warehouse already reads whole `customers` rows (`list_customers` and
-   `get_customer` select `*`) through the existing staff policy, so it now sees
-   these columns too. That is inherited access, not a new role grant. This work
-   must not reach main before the #793 fix.
+   only: warehouse already reads whole `customers` rows (`list_customers` and
+   `get_customer` select `*`) through the existing staff policy, so it sees
+   these columns too. That is inherited access, not a new role grant. A buyer
+   cannot read them: the customer policy on `customers` is gone (#793).
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none

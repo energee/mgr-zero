@@ -21,6 +21,7 @@ import {
   updateCorrectionQuantity,
   updateCorrectionReason,
   updateCountQuantity,
+  updateCountDisposition,
   type TaproomCountSnapshot,
   type TaproomCorrectionLine,
 } from "@/lib/mgr/taproom-count-state";
@@ -165,6 +166,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
   return <WeeklyCountDraftView state={state} role={role} lotLabels={lotLabels} timeZone={timeZone} print={print}
     priorHref={state.draft.priorCount ? `/taproom?location=${state.draft.locationId}&count=${state.draft.priorCount.id}` : undefined}
     projectionBusy={projectionBusy} projectionError={projectionError} onRefreshExpected={refreshProjection} onRefreshSnapshot={refreshSnapshot}
+    onDisposition={(key, value) => setState(current => updateCountDisposition(current, key, value))}
     onQuantity={(key, value) => setState(current => updateCountQuantity(current, key, value))} onSubmit={submit} />;
 }
 

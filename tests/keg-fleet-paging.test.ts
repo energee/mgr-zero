@@ -10,7 +10,7 @@ const id = (n: number) => String(n).padStart(5, "0");
 
 function fixture() {
   const tables: Record<string, Row[]> = {
-    keg_pools: [], locations: [], bins: [], customers: [], keg_bin_on_hand: [], keg_customer_balances: [],
+    keg_pools: [], locations: [], bins: [], customers: [], keg_bin_on_hand: [], keg_location_shortages: [], keg_customer_balances: [],
   };
   for (let n = 0; n < 1001; n++) {
     tables.keg_pools.push({ id: id(n), name: `Pool ${id(n)}`, active: n !== 1000 });
@@ -19,6 +19,7 @@ function fixture() {
     tables.customers.push({ id: id(n), name: `Customer ${id(n)}` });
     tables.keg_bin_on_hand.push({ pool_id: id(n), keg_size: "half_bbl", location_id: id(n), bin_id: id(n), qty: n === 1000 ? 0 : 2 });
     tables.keg_customer_balances.push({ customer_id: id(n), pool_id: id(n), keg_size: "half_bbl", qty: 3 });
+    tables.keg_location_shortages.push({ pool_id: id(n), pool: `Pool ${id(n)}`, keg_size: "half_bbl", location_id: id(n), location: `Location ${id(n)}`, short: 1 });
   }
   // One customer's holdings cross both pool and size, including a later page.
   tables.keg_customer_balances.push({ customer_id: id(0), pool_id: id(1000), keg_size: "sixth_bbl", qty: 7 });
@@ -37,6 +38,7 @@ function context(tables: Record<string, Row[]>, failure?: PageFailure, reads?: P
 type Fleet = {
   pools: { id: string; active: boolean }[];
   rows: { pool_id: string; qty: number; location_name: string; bin_name: string }[];
+  shortages: { pool: string; short: number }[];
   customers: { customer_id: string; name: string; kegs_out: number }[];
 };
 const fleet = (ctx: Ctx) => runCommand("get_keg_fleet", {}, ctx) as Promise<Fleet>;
@@ -58,9 +60,10 @@ describe("complete keg fleet (#726)", () => {
     expect(result.rows).toHaveLength(1001);
     expect(result.rows.at(-1)).toMatchObject({ qty: 0, location_name: "Location 01000", bin_name: "Bin 01000" });
     expect(result.rows.reduce((total, row) => total + row.qty, 0)).toBe(2000);
+    expect(result.shortages).toHaveLength(1001);
   });
 
-  it.each(["keg_pools", "keg_bin_on_hand", "locations", "bins", "keg_customer_balances", "customers"])("fails explicitly when a later %s page fails", async table => {
+  it.each(["keg_pools", "keg_bin_on_hand", "keg_location_shortages", "locations", "bins", "keg_customer_balances", "customers"])("fails explicitly when a later %s page fails", async table => {
     await expect(fleet(context(fixture(), { table, start: 500 }))).rejects.toThrow();
   });
 
@@ -72,7 +75,7 @@ describe("complete keg fleet (#726)", () => {
     const reads: PageRead[] = [];
     await fleet(context(fixture(), undefined, reads));
     const expected: Record<string, string[]> = {
-      keg_pools: ["name", "id"], keg_bin_on_hand: ["pool_id", "keg_size", "location_id", "bin_id"],
+      keg_pools: ["name", "id"], keg_bin_on_hand: ["pool_id", "keg_size", "location_id", "bin_id"], keg_location_shortages: ["pool_id", "keg_size", "location_id"],
       locations: ["id"], bins: ["id"], keg_customer_balances: ["customer_id", "pool_id", "keg_size"], customers: ["id"],
     };
     expect(new Set(reads.map(read => read.table))).toEqual(new Set(Object.keys(expected)));
@@ -80,7 +83,7 @@ describe("complete keg fleet (#726)", () => {
   });
 
   it("preserves empty-tenant results", async () => {
-    expect(await fleet(context({}))).toEqual({ pools: [], rows: [], customers: [] });
+    expect(await fleet(context({}))).toEqual({ pools: [], rows: [], shortages: [], customers: [] });
   });
 
   it.each(["sales", "brewer", "taproom", "customer"] as const)("denies %s before reading fleet data", async role => {

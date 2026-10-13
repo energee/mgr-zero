@@ -4,6 +4,9 @@ import type { Database } from "./database.generated";
 import type { TaproomCountSnapshot } from "@/lib/mgr/taproom-count-state";
 import type { CommandPreview } from "@/lib/commands/registry";
 
+// A saved count line's effective ledger movement type; null when the line matched stock.
+export type TaproomLineMovementType = Database["public"]["Enums"]["movement_type"] | null;
+
 type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][Name]["Row"];
 export type TaproomCount = {
   id: string; root_id: string; effective_id: string; location_id: string;
@@ -11,7 +14,7 @@ export type TaproomCount = {
   prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null;
   correction_reason: string | null; correction_eligible: boolean;
   lines: (Row<"taproom_count_lines"> & {
-    bbl: number | null; effective_line_id: string; corrects_line_id: string | null; bin_name: string | null; sku_name: string | null;
+    bbl: number | null; movement_type: TaproomLineMovementType; effective_line_id: string; corrects_line_id: string | null; bin_name: string | null; sku_name: string | null;
   })[];
 };
 
