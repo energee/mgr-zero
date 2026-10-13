@@ -36,7 +36,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     </> : E.info("Supporting destination-state facts were not captured in this snapshot.")}
     {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "gross taxable shipments · before returns", row.bbl)}</Fragment>)}
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
-    {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
+    {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
     {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}<FileSnapshotControl /></>}
   </>;
 }
