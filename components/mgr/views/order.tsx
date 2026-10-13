@@ -35,6 +35,7 @@ export function OrderView({
       {model.customerPo ? E.fld("Customer PO", model.customerPo) : null}
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.note ? E.fld("Note", model.note) : null}
+      {model.costLine ? E.fld("Cost", model.costLine) : null}
       {model.restockNote ? E.note(model.restockNote) : null}
       {model.repickNote ? E.note(model.repickNote) : null}
       {model.lines.map((line) => (

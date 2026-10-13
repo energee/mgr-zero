@@ -7,7 +7,7 @@ export type { Json } from "./database.generated";
 type Tables = GeneratedDatabase["public"]["Tables"];
 type LedgerInsert = Tables["inventory_movements"]["Insert"];
 type Views = GeneratedDatabase["public"]["Views"];
-type NonNullStockView = "on_hand" | "bin_on_hand" | "atp" | "inventory_value";
+type NonNullStockView = "on_hand" | "bin_on_hand" | "atp" | "inventory_value" | "order_line_cogs";
 type Functions = GeneratedDatabase["public"]["Functions"];
 export type Database = Omit<GeneratedDatabase, "public"> & {
   public: Omit<GeneratedDatabase["public"], "Functions" | "Views" | "Tables"> & {

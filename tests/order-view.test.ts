@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { OrderView } from "../components/mgr/views/order";
 import { orderPickedRestock } from "../lib/mgr/fixtures/orders";
-import { toOrderViewProps } from "../lib/mgr/order-view";
+import { toOrderViewProps, type OrderSnapshot } from "../lib/mgr/order-view";
 
 const PAGE = "app/(app)/orders/[id]/page.tsx";
 
@@ -49,6 +49,32 @@ describe("Order view loop", () => {
   it("a cancelled order that was changed after pick carries no re-pick note (#811)", () => {
     const cancelled = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "cancelled" as const, repick_since: "2026-09-02T14:00:00.000Z" } };
     expect(toOrderViewProps(cancelled).repickNote).toBeUndefined();
+  });
+
+  describe("Cost line (#810 PR2)", () => {
+    const shipped = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "shipped" as const, needs_restock: false } };
+    const costLine = (cogs?: { cost_cents: number; revenue_cents: number; uncosted_qty: number; margin_pct: number | null }, snapshot: OrderSnapshot = shipped) =>
+      toOrderViewProps({ ...snapshot, cogs }).costLine;
+
+    it("shows cost and margin on a shipped order", () => {
+      expect(costLine({ cost_cents: 150000, revenue_cents: 360000, uncosted_qty: 0, margin_pct: 58.3 })).toBe("$1,500.00 · margin 58.3%");
+      const html = renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps({ ...shipped, cogs: { cost_cents: 150000, revenue_cents: 360000, uncosted_qty: 0, margin_pct: 58.3 } }) }));
+      expect(html).toContain("$1,500.00 · margin 58.3%");
+    });
+
+    it("withholds the margin and names the gap while any unit has no cost", () => {
+      expect(costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty: 2, margin_pct: null })).toBe("$10.00 · 2 units without cost, margin withheld");
+    });
+
+    it("draws nothing without get_order_cogs data or before the order ships", () => {
+      expect(costLine(undefined)).toBeUndefined();
+      expect(costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty: 0, margin_pct: 95.8 }, orderPickedRestock)).toBeUndefined();
+      expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(shipped) }))).not.toContain("margin");
+    });
+
+    it("the live page asks only roles that may run get_order_cogs", () => {
+      expect(readFileSync(PAGE, "utf8")).toMatch(/canRun\(ctx, "get_order_cogs"\)/);
+    });
   });
 
   it("a confirmed order with staged beer still offers Put back (#811)", () => {
