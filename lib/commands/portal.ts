@@ -129,7 +129,7 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    const customer = await unwrap(ctx.db.from("customers").select("sale_channel_id").eq("id", customerId).eq("brewery_id", ctx.breweryId).single()) as { sale_channel_id: string };
+    const customer = await unwrap(ctx.db.from("portal_customers").select("sale_channel_id").eq("id", customerId).eq("brewery_id", ctx.breweryId).single()) as { sale_channel_id: string };
     // portal_sku_prices is sku_prices (the grid cell where the selected
     // customer's channel meets the brand's price group and SKU format) limited
     // to active SKUs on the caller's channels; buyers cannot read skus (#788).
@@ -199,7 +199,7 @@ defineQuery({
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
     const [customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
-      unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
+      unwrap(ctx.db.from("portal_customers").select("id, name").eq("id", customerId).single()),
       unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("portal_keg_deposits").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
       // Only this brewery's explicitly configured warehouse, never an

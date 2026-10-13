@@ -1,6 +1,7 @@
 // lib/mgr/keg-fleet-view.ts — view-model for Keg fleet: the pool and event
 // form values both the inventory and the live forms draw through
 // components/mgr/views/keg-fleet.tsx, and the rules those forms share.
+import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
 
@@ -23,6 +24,7 @@ export type KegEventValue = { poolId: string; kegSize: KegSize; reason: KegEvent
 export type KegEventOptions = { pools: KegOption[]; locations: KegOption[]; bins: KegOption[]; customers: KegOption[] };
 
 export type KegFleetViewModel = {
+  shortages?: string[];
   backHref?: string;
   pools?: KegFleetPoolRow[];
   bins?: KegFleetBinRow[];
@@ -69,4 +71,13 @@ export const kegPoolReady = (v: KegPoolValue) =>
 export function kegEventUnavailable({ activePools, locations }: { activePools: number; locations: number }): string | null {
   const missing = [activePools ? null : "a keg pool in service", locations ? null : "a location"].filter(Boolean);
   return missing.length ? `Recording a keg event needs ${missing.join(" and ")}.` : null;
+}
+
+/** A pool/size whose recorded shells at one location net below zero; saved by
+ *  ship_order and read from keg_location_shortages, so both screens agree. */
+export type KegShortage = { pool: string; keg_size: string; location: string; short: number };
+
+/** The one wording staff see for a shell shortage, on Shipment done and Keg fleet. */
+export function kegShortageText({ pool, keg_size, location, short }: KegShortage): string {
+  return `${pool} ${SIZE_LABEL[keg_size] ?? keg_size} · ${location}: ${short} kegs short · record Acquired kegs to reconcile`;
 }

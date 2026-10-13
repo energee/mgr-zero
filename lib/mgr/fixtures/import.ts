@@ -4,7 +4,7 @@ import { validateImportRow } from "@/lib/import-csv";
 const channel = "00000000-0000-4000-8000-000000000001";
 const lookups = { channels: [{ id: channel, name: "Wholesale" }], customers: [], formats: [], groups: [], skus: [], locations: [], bins: [] };
 const rows = [
-  { name: "Ridgeline + Main", type: "retailer", state: "PA", saleChannelId: channel },
+  { name: "Ridgeline + Main", type: "retailer", state: "PA", saleChannelId: "Wholesale" },
   { name: "Al’s Bar", type: "retailer", state: "PA", saleChannelId: "" },
   { name: "Teresa’s", type: "retailer", state: "PA", saleChannelId: channel },
 ];

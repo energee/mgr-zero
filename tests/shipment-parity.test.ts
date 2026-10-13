@@ -84,7 +84,7 @@ it.each(["now", "on_delivery"] as const)("shows durable confirmation after route
   query.mockImplementation(async name => {
     if (name === "get_order") return {
       order: { ...order, status: "shipped" }, lines: lines.map(line => ({ ...line, qty_shipped: 1 })),
-      shipment: { invoice_timing: invoiceTiming }, events: [{ event: "shipped", payload: { invoice_id: invoiceTiming === "now" ? "invoice" : null } }],
+      shipment: { invoice_timing: invoiceTiming }, events: [{ event: "shipped", payload: { invoice_id: invoiceTiming === "now" ? "invoice" : null, warnings: [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }] } }],
     };
     if (name === "list_locations") return [];
     if (name === "get_invoice") return { invoice: { invoice_no: 83 } };
@@ -94,5 +94,6 @@ it.each(["now", "on_delivery"] as const)("shows durable confirmation after route
   expect(page.type).toBe(ShipmentDoneView);
   expect(page.props.model.invoice).toBe(invoiceTiming === "now" ? "INV-0083 · assigned" : "Deferred to delivery");
   expect(page.props.model.invoiceHref).toBe(invoiceTiming === "now" ? "/invoices/invoice" : undefined);
+  expect(page.props.model.warnings).toEqual(["Owned ½ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile"]);
   expect(query.mock.calls.some(call => call[0] === "get_order_ship_sources")).toBe(false);
 });

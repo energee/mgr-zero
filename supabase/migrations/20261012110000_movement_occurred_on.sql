@@ -60,6 +60,7 @@ declare
   v_occupancy public.vessel_occupancies;
   v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
   v_movement uuid; v_packaged numeric; v_balance jsonb; v_drawn numeric;
+  v_liquid numeric; v_knockout_bbl numeric; v_cost_per_bbl numeric;
   -- Allow half the stored tank/draw precision (numeric(10,3)); compare frozen
   -- output volume without rounding it to that precision.
   c_epsilon constant numeric := 0.0005;
@@ -205,6 +206,36 @@ begin
     raise exception 'packaged % bbl across this batch''s runs, but the batch had % bbl; check the package counts',
       round((v_balance->>'packagedBbl')::numeric, 2),
       round((v_balance->>'baselineBbl')::numeric - (v_balance->>'attributedBbl')::numeric, 2);
+  end if;
+
+  -- Freeze after all conservation checks. Knockout is every brew turn's current
+  -- revision (correct_brew_record leaves vessel_occupancies.initial_bbl at the
+  -- original value), not the transfer-adjusted baseline; draw loss is absorbed here.
+  if v_packaged > 0 then
+    v_liquid := private.batch_material_cost(p_brewery, v_occupancy.batch_id);
+    select sum(record.initial_bbl) into v_knockout_bbl from public.brew_records record
+      where record.brewery_id=p_brewery and record.batch_id=v_occupancy.batch_id
+        and not exists(select 1 from public.brew_records later where later.corrects_id=record.id);
+    v_cost_per_bbl := v_liquid / nullif(v_knockout_bbl,0);
+    update public.packaging_run_outputs output set unit_cost_cents =
+      v_cost_per_bbl * v_drawn / v_packaged * (movement.bbl / movement.qty)
+      + (select case when count(*)=0 then 0
+                when bool_and(cost.unit_cost_cents is not null)
+                then sum(bom.qty_per_unit * cost.unit_cost_cents) end
+         from public.format_bom bom
+         left join lateral (
+           select actual.lot_id from public.packaging_material_actuals actual
+           where actual.record_id=v_record and actual.material_id=bom.material_id
+           order by actual.qty_used desc,actual.lot_id limit 1
+         ) actual_source on true
+         cross join lateral (
+           select private.material_source_cost(p_brewery,bom.material_id,actual_source.lot_id) as unit_cost_cents
+         ) cost
+         where bom.brewery_id=p_brewery and bom.format_id=sku.format_id)
+      from public.inventory_movements movement, public.skus sku
+      where output.brewery_id=p_brewery and output.run_id=p_run and output.qty_actual>0
+        and movement.id=output.movement_id and movement.brewery_id=p_brewery
+        and sku.id=output.sku_id and sku.brewery_id=p_brewery;
   end if;
 
   return private.complete_command_request(p_request_id, to_jsonb(v_run));

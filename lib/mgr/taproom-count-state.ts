@@ -1,5 +1,6 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import { bblExact } from "@/lib/volume";
+import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 
 export type TaproomCountSnapshotLine = {
   bin_id: string;
@@ -27,7 +28,7 @@ export type TaproomCountInput = {
   locationId: string;
   countedOn: string;
   revision: string;
-  lines: { binId: string; skuId: string; lotId: string | null; qtyCounted: number }[];
+  lines: { binId: string; skuId: string; lotId: string | null; qtyCounted: number; disposition?: "destroyed" }[];
 };
 
 export type CountDraftLine = {
@@ -42,6 +43,7 @@ export type CountDraftLine = {
   lotId: string | null;
   qtyBefore: number;
   quantity: string;
+  disposition?: "sold" | "destroyed";
 };
 
 type FrozenAttempt = { kind: "submitting" | "unknown"; requestId: string; payload: TaproomCountInput; message?: string };
@@ -61,6 +63,7 @@ export type TaproomCorrectionLine = {
   lot_id: string | null;
   qty_before: number;
   qty_counted: number;
+  movement_type?: TaproomLineMovementType;
 };
 
 export type TaproomCorrectionInput = {
@@ -92,7 +95,7 @@ function correctionLocked(state: TaproomCorrectionState) {
 
 export function updateCorrectionQuantity(state: TaproomCorrectionState, lineId: string, quantity: string): TaproomCorrectionState {
   if (correctionLocked(state)) return state;
-  return { ...state, attempt: { kind: "idle" }, lines: state.lines.map((line) => line.id === lineId ? { ...line, quantity } : line) };
+  return { ...state, attempt: { kind: "idle" }, lines: state.lines.map((line) => line.id === lineId && line.movement_type !== "destruction" ? { ...line, quantity } : line) };
 }
 
 export function updateCorrectionReason(state: TaproomCorrectionState, reason: string): TaproomCorrectionState {
@@ -104,6 +107,7 @@ function correctionPayload(state: TaproomCorrectionState): TaproomCorrectionInpu
   const reason = state.reason.trim();
   if (!reason) throw new Error("Enter a reason for the count correction.");
   const corrections = state.lines.flatMap((line) => {
+    if (line.movement_type === "destruction") return [];
     if (!/^\d+$/.test(line.quantity)) throw new Error("Correct to whole packaged units.");
     const qtyCounted = Number(line.quantity);
     if (!Number.isSafeInteger(qtyCounted)) throw new Error("Correct to whole packaged units.");
@@ -144,7 +148,7 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
       lines: snapshot.lines.map((line) => ({
         key: bucketKey(line), binId: line.bin_id, binName: line.bin_name, skuId: line.sku_id, skuName: line.sku_name,
         brandId: line.brand_id, brandName: line.brand_name, bblPerUnit: Number(line.bbl_per_unit),
-        lotId: line.lot_id, qtyBefore: Number(line.qty_before), quantity: "",
+        lotId: line.lot_id, qtyBefore: Number(line.qty_before), quantity: "", disposition: "sold",
       })),
     },
     projection,
@@ -153,9 +157,26 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
   return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
 }
 
+// A frozen or stale count accepts no edits until it is recovered or recounted.
+export function countLocked(state: TaproomCountState) {
+  return state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
+}
+
+// True when the entered quantity is a whole number of units below the recorded stock.
+export function isShortage(line: Pick<CountDraftLine, "quantity" | "qtyBefore">) {
+  return /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) < line.qtyBefore;
+}
+
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
-  if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale") return state;
-  return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity } : line) } };
+  if (countLocked(state)) return state;
+  return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity, disposition: isShortage({ quantity, qtyBefore: line.qtyBefore }) ? line.disposition : "sold" } : line) } };
+}
+
+// A disposition belongs only to a real shortage and freezes with the same request.
+export function updateCountDisposition(state: TaproomCountState, key: string, disposition: "sold" | "destroyed"): TaproomCountState {
+  if (countLocked(state)) return state;
+  return { ...state, draft: { ...state.draft, lines: state.draft.lines.map(line =>
+    line.key === key && isShortage(line) ? { ...line, disposition } : line) } };
 }
 
 type ProjectionPrior = { id: string; counted_on: string } | null;
@@ -203,7 +224,7 @@ export function countBrandComparison(state: TaproomCountState): CountBrandCompar
     const group = grouped.get(line.brandId) ?? { brandName: line.brandName, actualBbl: 0, complete: true };
     const valid = /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) <= line.qtyBefore;
     group.complete &&= valid;
-    if (valid) group.actualBbl += (line.qtyBefore - Number(line.quantity)) * line.bblPerUnit;
+    if (valid && line.disposition !== "destroyed") group.actualBbl += (line.qtyBefore - Number(line.quantity)) * line.bblPerUnit;
     grouped.set(line.brandId, group);
   }
   const ids = new Set([...grouped.keys(), ...projected.keys()]);
@@ -236,7 +257,7 @@ function payload(state: TaproomCountState): TaproomCountInput {
     const qtyCounted = Number(line.quantity);
     if (!Number.isSafeInteger(qtyCounted)) throw new Error("Count remaining whole packaged units; a partial keg counts as one until gone.");
     if (qtyCounted > line.qtyBefore) throw new Error("Count exceeds recorded stock; ask Warehouse to investigate.");
-    return { binId: line.binId, skuId: line.skuId, lotId: line.lotId, qtyCounted };
+    return { binId: line.binId, skuId: line.skuId, lotId: line.lotId, qtyCounted, ...(line.disposition === "destroyed" ? { disposition: "destroyed" as const } : {}) };
   });
   return { locationId: state.draft.locationId, countedOn: state.draft.countedOn, revision: state.draft.revision, lines };
 }
