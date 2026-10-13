@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
-import { countBrandComparison, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
+import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
@@ -63,7 +63,7 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
   const state = onQuantity ? controlledState : internalState;
   const changeQuantity = onQuantity ?? ((key: string, value: string) => setInternalState(current => updateCountQuantity(current, key, value)));
   const changeDisposition = onDisposition ?? ((key: string, value: "sold" | "destroyed") => setInternalState(current => updateCountDisposition(current, key, value)));
-  const locked = state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
+  const locked = countLocked(state);
   const aligned = projectionMatchesCountDraft(state);
   const projection = state.projection as { expected_bbl: number | null; starts_at?: string | null; as_of?: string; reason?: string | null; unmapped_lines?: number; ignored_lines?: number; excluded_bbl?: number; unattributed_bbl?: number; coverage_complete?: boolean } | null;
   const expected = projectionExpectedText(projection ?? { expected_bbl: null });
@@ -95,7 +95,7 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
           const lot = line.lotId ? (role === "taproom" ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
-          return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}{/^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) < line.qtyBefore && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}</div>;
+          return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}{isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}</div>;
         })}
       </fieldset>
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}

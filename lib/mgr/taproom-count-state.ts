@@ -1,5 +1,6 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import { bblExact } from "@/lib/volume";
+import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 
 export type TaproomCountSnapshotLine = {
   bin_id: string;
@@ -62,7 +63,7 @@ export type TaproomCorrectionLine = {
   lot_id: string | null;
   qty_before: number;
   qty_counted: number;
-  movement_type?: string | null;
+  movement_type?: TaproomLineMovementType;
 };
 
 export type TaproomCorrectionInput = {
@@ -156,17 +157,26 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
   return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
 }
 
+// A frozen or stale count accepts no edits until it is recovered or recounted.
+export function countLocked(state: TaproomCountState) {
+  return state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
+}
+
+// True when the entered quantity is a whole number of units below the recorded stock.
+export function isShortage(line: Pick<CountDraftLine, "quantity" | "qtyBefore">) {
+  return /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) < line.qtyBefore;
+}
+
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
-  if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale") return state;
-  return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity, disposition: /^\d+$/.test(quantity) && Number.isSafeInteger(Number(quantity)) && Number(quantity) < line.qtyBefore ? line.disposition : "sold" } : line) } };
+  if (countLocked(state)) return state;
+  return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity, disposition: isShortage({ quantity, qtyBefore: line.qtyBefore }) ? line.disposition : "sold" } : line) } };
 }
 
 // A disposition belongs only to a real shortage and freezes with the same request.
 export function updateCountDisposition(state: TaproomCountState, key: string, disposition: "sold" | "destroyed"): TaproomCountState {
-  if (["unknown", "submitting", "stale"].includes(state.attempt.kind)) return state;
+  if (countLocked(state)) return state;
   return { ...state, draft: { ...state.draft, lines: state.draft.lines.map(line =>
-    line.key === key && /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) < line.qtyBefore
-      ? { ...line, disposition } : line) } };
+    line.key === key && isShortage(line) ? { ...line, disposition } : line) } };
 }
 
 type ProjectionPrior = { id: string; counted_on: string } | null;
