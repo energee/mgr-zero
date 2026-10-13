@@ -38,6 +38,15 @@ function save(storage: RecoveryStorage, context: CommandContextExpectation, atte
 export function recoveryKey(name: string, target?: string) {
   return JSON.stringify([name, target ?? null]);
 }
+/**
+ * Whether any saved request acts on this row, whichever command it runs. A
+ * screen with two competing verbs on one row (a delivery stop's Delivered and
+ * Not delivered) passes the same `target` to both and checks this before
+ * offering either, since their recovery keys differ by command name.
+ */
+export function hasRecoveryForTarget(storage: RecoveryStorage, context: CommandContextExpectation, target: string) {
+  return readRecoveries(storage, context).some(attempt => attempt.target === target);
+}
 /** Request ids this tab is sending right now: their outcome is still coming, so the panel neither shows nor discards them. */
 export const inFlightRequests = new Set<string>();
 /**

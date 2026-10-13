@@ -50,7 +50,7 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
   }
   const hasRefusal = transfer ? transferRefused : Object.values(refused).some((qty) => qty > 0);
   const fullRefusal = transfer ? transferRefused : lines.length > 0 && lines.every((l) => (refused[l.key] ?? 0) === Number(l.qty));
-  const disabled = busy || (!fullRefusal && !signedBy.trim()) || (hasRefusal && (!reason || (reason === "other" && !note.trim())));
+  const disabled = (!fullRefusal && !signedBy.trim()) || (hasRefusal && (!reason || (reason === "other" && !note.trim())));
   return <>
     {blocked && E.note("An earlier delivery action may have completed. Use Retry saved request before editing or choosing either action.")}
     <fieldset disabled={busy || blocked} className="flex min-w-0 flex-col gap-2">
@@ -65,7 +65,7 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
     </>}
     {E.edit("Received by", signedBy, "text", receivedSuggestions, { onChange: setSignedBy, required: !fullRefusal })}
     {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
-    {E.btn("Not delivered · leave for a later route", busy ? "g disabled" : "g", undefined, onLeave ?? (() => {}))}
+    {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
     {error && E.status(error, "w")}
     {E.btn(busy ? "Saving…" : fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", disabled ? "irr disabled" : "irr", undefined, submit)}
     </fieldset>
