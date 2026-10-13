@@ -25,7 +25,7 @@ export function OrderView({
     <>
       {E.back("Orders", model.title, undefined, model.backHref)}
       {E.ttl(model.where)}
-      {E.row("Current state", model.currentState, E.status(model.next), model.restockNote ? "w" : "")}
+      {E.row("Current state", model.currentState, model.repickNote ? <>{E.status("changed after pick", "w")}{E.status(model.next)}</> : E.status(model.next), model.restockNote || model.repickNote ? "w" : "")}
       {model.editHref ? E.act("Edit draft", "primary", model.editHref) : null}
       {model.putBackHref ? E.act("Put back", "attention", model.putBackHref) : null}
       {model.confirmHref ? E.act("Review and confirm", "success", model.confirmHref) : null}
@@ -36,6 +36,7 @@ export function OrderView({
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.note ? E.fld("Note", model.note) : null}
       {model.restockNote ? E.note(model.restockNote) : null}
+      {model.repickNote ? E.note(model.repickNote) : null}
       {model.lines.map((line) => (
         <Fragment key={line.key}>
           {E.row(line.name, line.detail, adjustLines ? E.act("Adjust", "attention") : "", line.tone ?? "")}

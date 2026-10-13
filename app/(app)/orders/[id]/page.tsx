@@ -18,7 +18,7 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { LifecycleButtons } from "./lifecycle-buttons";
 
-type Order = { id: string; order_no: number | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; from_location_id?: string; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null };
+type Order = { id: string; order_no: number | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; repick_since: string | null; from_location_id?: string; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null };
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; skus: { name: string } | null };
 type OrderEvent = { id: string; event: string; actor: string; payload: Record<string, unknown>; created_at: string };
 type Atp = { sku_id: string; qty: number };

@@ -32,6 +32,14 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[0]?.totals).toBe("Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22");
   });
 
+  it("marks a row whose order was changed after pick (#811)", () => {
+    const orders = pickSheet.orders.map((o, i) => i === 1 ? { ...o, repick_since: "2026-09-02T14:00:00.000Z" } : o);
+    const rows = toPickSheetViewProps({ orders }).groups[0]!.rows;
+    expect(rows.map((r) => r.changedAfterPick)).toEqual([undefined, true, undefined]);
+    expect(html(toPickSheetViewProps({ orders }))).toContain("changed after pick");
+    expect(html()).not.toContain("changed after pick");
+  });
+
   it("names an empty sheet without inventing rows", () => {
     const model = toPickSheetViewProps({ orders: [] });
     expect(model.empty?.title).toBe("Nothing confirmed to pick");

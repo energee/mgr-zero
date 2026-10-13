@@ -34,7 +34,7 @@ The legacy invoice `paid_at` field is a payment-confirmation/state marker, not a
 
 `command` · admin, sales
 
-Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked
+Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -472,7 +472,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason); returnable keg lines post Shipped shells and warn, never refuse, when shells are short
+Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason); returnable keg lines post Shipped shells and warn, never refuse, when shells are short
 
 | Field | Type | Required |
 | --- | --- | --- |

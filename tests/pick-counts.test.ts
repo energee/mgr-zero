@@ -61,3 +61,8 @@ it("isolates actor, brewery and order and retires completed or abandoned drafts"
   tab.removeItem(key);
   expect(readPickCounts(lines, tab.getItem(key))).toEqual({ short: "5", other: "8" });
 });
+
+it("never starts a count above the ordered amount after a line was lowered (#811)", () => {
+  const lowered: PickSnapshot["lines"] = [{ id: "low", sku_id: "sku-a", qty_ordered: 6, qty_picked: 10, skus: null }];
+  expect(readPickCounts(lowered, null)).toEqual({ low: "6" });
+});
