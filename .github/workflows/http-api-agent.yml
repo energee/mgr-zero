@@ -15,6 +15,8 @@ on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * 1' # weekly full audit, so a failed or skipped merge run heals
 
 concurrency:
   group: http-api-agent
@@ -24,7 +26,8 @@ jobs:
   maintain:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'docs/http-api')
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'docs/http-api' && !contains(github.event.pull_request.body, 'API: none'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,7 +58,7 @@ jobs:
             gh pr view "$PR_NUMBER" --json number,title,body,author,mergedAt,baseRefName,headRefName,files > .api-agent-pr.json
           else
             : > .api-agent-pr.diff
-            printf '{"event":"workflow_dispatch","ref":"%s","sha":"%s","title":"manual API reference audit"}\n' "$GITHUB_REF" "$GITHUB_SHA" > .api-agent-pr.json
+            printf '{"event":"%s","ref":"%s","sha":"%s","title":"%s API reference audit"}\n' "$EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA" "${EVENT_NAME/workflow_dispatch/manual}" > .api-agent-pr.json
           fi
 
       - name: Maintain the HTTP API reference
@@ -189,7 +192,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             api_source="PR #$PR_NUMBER"
           else
-            api_source="manual API reference audit"
+            api_source="${EVENT_NAME/workflow_dispatch/manual} API reference audit"
           fi
           git commit -m "docs: refresh HTTP API reference after $api_source"
           git push -f origin docs/http-api

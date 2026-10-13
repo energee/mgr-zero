@@ -54,6 +54,28 @@ describe("customer guides (MDX)", () => {
     }
   });
 
+  // The maintainer's prompt calls this a hard rule; a prompt alone let 23 through.
+  it("uses no em dashes in the customer guides", () => {
+    const hits = CUSTOMER_GUIDES.flatMap((guide) =>
+      read(`content/docs/${guide}.mdx`)
+        .split("\n")
+        // **—** is an on-screen value (Catalog shows it for a format with no volume), not punctuation.
+        .flatMap((line, i) => (line.replaceAll("**\u2014**", "").includes("\u2014") ? [`${guide}.mdx:${i + 1}`] : [])),
+    );
+    expect(hits).toEqual([]);
+  });
+
+  // Every top-level route a customer can open is named in its audience's guide.
+  it("names every staff and portal route in its guide", () => {
+    const segments = (dir: string) =>
+      [...new Set(gitFiles(`${dir}/**/page.tsx`).map((p) => p.slice(dir.length + 1).split("/")[0]))].filter((s) => s !== "page.tsx");
+    const missing = (guide: string, dir: string) => {
+      const mdx = read(`content/docs/${guide}.mdx`).toLowerCase();
+      return segments(dir).filter((s) => !mdx.includes(s.replace(/-/g, " ")) && !mdx.includes(s)).map((s) => `${guide}: ${s}`);
+    };
+    expect([...missing("staff-guide", "app/(app)"), ...missing("portal-guide", "app/(portal)/portal")]).toEqual([]);
+  });
+
   it("points every in-page link at an anchor the guide actually declares", () => {
     const broken = CUSTOMER_GUIDES.flatMap((guide) => {
       const mdx = read(`content/docs/${guide}.mdx`);

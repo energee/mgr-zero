@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * 1' # weekly full audit, so a failed or skipped merge run heals
 
 concurrency:
   group: documentation-agent
@@ -13,6 +15,7 @@ jobs:
   maintain:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'schedule' ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'documentation/user-guide' && !contains(github.event.pull_request.body, 'DOCS: none'))
     runs-on: ubuntu-latest
     permissions:
@@ -38,7 +41,7 @@ jobs:
             gh pr view "$PR_NUMBER" --json number,title,body,author,mergedAt,baseRefName,headRefName,files > .docs-agent-pr.json
           else
             : > .docs-agent-pr.diff
-            printf '{"event":"workflow_dispatch","ref":"%s","sha":"%s","title":"manual documentation audit"}\n' "$GITHUB_REF" "$GITHUB_SHA" > .docs-agent-pr.json
+            printf '{"event":"%s","ref":"%s","sha":"%s","title":"%s documentation audit"}\n' "$EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA" "${EVENT_NAME/workflow_dispatch/manual}" > .docs-agent-pr.json
           fi
 
       - name: Maintain customer documentation
@@ -148,7 +151,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             doc_source="PR #$PR_NUMBER"
           else
-            doc_source="manual documentation audit"
+            doc_source="${EVENT_NAME/workflow_dispatch/manual} documentation audit"
           fi
           git commit -m "docs: refresh customer field manual after $doc_source"
           git push -f origin documentation/user-guide
