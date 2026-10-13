@@ -24,7 +24,54 @@ it("maps explicit fields and rejects blank, fractional cents and nondecimal numb
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.234" })).toEqual(["qty must be a positive number with at most two decimal places"]);
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.230" })).toEqual([]);
   expect(validateImportRow("channel_prices", { saleChannelId: ids.skuId, priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1.2" })).not.toEqual([]);
-  expect(validateImportRow("channel_prices", { saleChannelId: "not-a-uuid", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" })).not.toEqual([]);
+  expect(validateImportRow("channel_prices", { saleChannelId: "Missing channel", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" }, { channels: [] })).toContain("saleChannelId was not found");
+});
+
+describe("named import references (#819)", () => {
+  const channel = "2dcfae24-3898-4a49-9a7a-6b699302adcc";
+  const location = "405a16c9-8b19-4f21-9d5c-c48dccddcfa5";
+  const bin = "65d01e96-1635-4626-a5b8-4d57f2d7fb4f";
+  const sku = "c4fba617-d414-450c-9d71-28f599456169";
+  const lookups = {
+    channels: [{ id: channel, name: "Wholesale" }],
+    skus: [{ id: sku, name: "Lager half keg" }],
+    locations: [{ id: location, name: "Cooler A" }],
+    bins: [{ id: bin, name: "Shelf 1", location_id: location }],
+  };
+  const customer = { name: "Named reference", type: "retailer", state: "PA", saleChannelId: "  wHoLeSaLe  " };
+  it("accepts a trimmed exact reference name without rewriting the command payload", () => {
+    expect(validateImportRow("customers", customer)).toEqual([]);
+    expect(validateImportRow("customers", customer, lookups)).toEqual([]);
+    expect(customer.saleChannelId).toBe("  wHoLeSaLe  ");
+    expect(validateImportRow("customers", { ...customer, saleChannelId: channel.toUpperCase() }, lookups)).toEqual([]);
+  });
+  it("reads any hex id as an id, as the RPC does, not only RFC-variant UUIDs", () => {
+    const legacy = "00000000-0000-0000-0000-000000000001";
+    expect(validateImportRow("customers", { ...customer, saleChannelId: legacy }, { ...lookups, channels: [{ id: legacy, name: "Legacy" }] })).toEqual([]);
+  });
+  it("blocks missing and ambiguous names instead of picking the first match", () => {
+    expect(validateImportRow("customers", { ...customer, saleChannelId: "Whole" }, lookups)).toEqual(["saleChannelId was not found"]);
+    expect(validateImportRow("customers", customer, { ...lookups, channels: [...lookups.channels, { id: crypto.randomUUID(), name: " WHOLESALE " }] })).toEqual(['saleChannelId: "wHoLeSaLe" matches 2 records; use the ID']);
+  });
+  it("matches a bin name only within the resolved location", () => {
+    const bins = [...lookups.bins, { id: crypto.randomUUID(), name: "Shelf 1", location_id: crypto.randomUUID() }];
+    expect(validateImportRow("opening_balances", { skuId: sku, locationId: "Cooler A", binId: "Shelf 1", qty: "2" }, { ...lookups, bins })).toEqual([]);
+  });
+  it("matches price formats within their resolved group and products against packaged formats", () => {
+    const group = "a7d14f15-d9d4-45b2-b6d9-e5d96ae654a3";
+    const formats = [
+      { id: bin, name: "Pint", basis: "poured", price_group_id: group },
+      { id: location, name: "Pint", basis: "poured", price_group_id: channel },
+    ];
+    const references = { ...lookups, groups: [{ id: group, name: "House beer" }], formats };
+    expect(validateImportRow("channel_prices", { saleChannelId: "Wholesale", priceGroupId: "House beer", formatId: "Pint", unitPriceCents: "600" }, references)).toEqual([]);
+    expect(validateImportRow("products_skus", { product: "Lager", formatId: "Pint" }, references)).toEqual(["formatId was not found"]);
+  });
+  it("checks bin membership using resolved location and bin identities", () => {
+    const row = { skuId: "Lager half keg", locationId: "cooler a", binId: "Shelf 1", qty: "2" };
+    expect(validateImportRow("opening_balances", row, lookups)).toEqual([]);
+    expect(validateImportRow("opening_balances", { ...row, binId: bin }, { ...lookups, bins: [{ ...lookups.bins[0], location_id: crypto.randomUUID() }] })).toEqual(["binId must belong to locationId"]);
+  });
 });
 
 it("keeps only the rows the preview marked ready", () => {
