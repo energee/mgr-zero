@@ -35,8 +35,9 @@ this batch-owned completion flow.
 Add an append-only `brew_records` header with brewery, batch, first occupancy,
 pinned recipe-version ID, brewed date, confirmed knockout BBL, process snapshot,
 author, recorded time, optional corrected-record ID and correction reason.
-A partial unique index permits one original per batch (#807 will allow a second brew-day turn into the batch's own tank). A unique corrected-record
-ID permits one successor to each revision. Every reference is tenant-bound.
+A partial unique index permits one original per batch and brew turn. Later
+turns top up the batch's existing open tank and keep the first batch brew date.
+A correction retains its turn identity and permits one successor to each revision. Every reference is tenant-bound.
 The snapshot captures recipe name/version and these existing values:
 
 | Value | Frozen interpretation |
