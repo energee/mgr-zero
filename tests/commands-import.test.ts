@@ -65,6 +65,23 @@ describe("import_csv rows", () => {
     expect(cell.error).toBeNull();
     expect(cell.data?.unit_price_cents).toBe(250);
   });
+  it("treats any hex UUID as a UUID when ordering mixed price rows (#819)", async () => {
+    // Version nibble 0 fails z.uuid(), but private.import_ref reads it as an id.
+    const id = `00000000-0000-0000-0000-${crypto.randomUUID().slice(-12)}`;
+    const name = `Legacy id ${id.slice(-8)}`;
+    const inserted = await admin.from("price_groups").insert({ id, brewery_id: ctx.breweryId, name, position: 200 }).select("id").single();
+    expect(inserted.error).toBeNull();
+    const rows = [
+      { saleChannelId: channel, priceGroupId: name, formatId: format, unitPriceCents: "100" },
+      { saleChannelId: channel, priceGroupId: id, formatId: format, unitPriceCents: "275" },
+    ];
+    const { result, peak } = await concurrentImport("channel_prices", rows, row => row === 0);
+    expect(result.committed).toBe(2);
+    expect(peak).toBe(1);
+    const cell = await admin.from("channel_prices").select("unit_price_cents").eq("sale_channel_id", channel).eq("price_group_id", id).eq("format_id", format).single();
+    expect(cell.error).toBeNull();
+    expect(cell.data?.unit_price_cents).toBe(275);
+  });
   it("keeps all-name price files concurrent across distinct cells (#819)", async () => {
     const tag = crypto.randomUUID().slice(0, 8);
     // Positions 100+ stay clear of the groups other tests pin at low positions.

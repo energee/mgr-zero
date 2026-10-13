@@ -45,6 +45,10 @@ describe("named import references (#819)", () => {
     expect(customer.saleChannelId).toBe("  wHoLeSaLe  ");
     expect(validateImportRow("customers", { ...customer, saleChannelId: channel.toUpperCase() }, lookups)).toEqual([]);
   });
+  it("reads any hex id as an id, as the RPC does, not only RFC-variant UUIDs", () => {
+    const legacy = "00000000-0000-0000-0000-000000000001";
+    expect(validateImportRow("customers", { ...customer, saleChannelId: legacy }, { ...lookups, channels: [{ id: legacy, name: "Legacy" }] })).toEqual([]);
+  });
   it("blocks missing and ambiguous names instead of picking the first match", () => {
     expect(validateImportRow("customers", { ...customer, saleChannelId: "Whole" }, lookups)).toEqual(["saleChannelId was not found"]);
     expect(validateImportRow("customers", customer, { ...lookups, channels: [...lookups.channels, { id: crypto.randomUUID(), name: " WHOLESALE " }] })).toEqual(['saleChannelId: "wHoLeSaLe" matches 2 records; use the ID']);

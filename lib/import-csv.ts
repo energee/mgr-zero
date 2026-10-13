@@ -47,6 +47,11 @@ export function importRowKey(kind: ImportKind, row: Record<string, string>, inde
 // third significant decimal does not.
 const openingQty = z.number().positive().multipleOf(0.01);
 
+/** True when a reference cell is an id rather than a name. Matches private.import_ref:
+ * any 8-4-4-4-12 hex string, not only the RFC-variant UUIDs z.uuid() accepts. */
+export const isImportUuid = (value?: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value?.trim() ?? "");
+
 /** Reference cells keep their raw UUID/name for durable replay. With lookup data,
  * preview requires one trimmed, case-insensitive exact match; the RPC resolves
  * references authoritatively when lookup data is absent. */
@@ -59,7 +64,7 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     if (f.values && !f.values.includes(value)) errors.push(`${f.name}: choose ${f.values.join(", ")}`);
     // Preview resolves identities only for validation; the RPC receives the original cells.
     if (f.lookup && lookups) {
-      const uuid = z.uuid().safeParse(value).success;
+      const uuid = isImportUuid(value);
       let candidates = lookups[f.lookup] ?? [];
       if (f.lookup === "bins" && !uuid) candidates = candidates.filter(item => item.location_id?.toLowerCase() === references.locationId?.id.toLowerCase());
       if (f.lookup === "formats") candidates = candidates.filter(item => item.basis === "packaged" || (kind === "channel_prices" && item.price_group_id === references.priceGroupId?.id));
