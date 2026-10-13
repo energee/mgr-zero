@@ -3,7 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
-import type { LotTraceViewModel } from "@/lib/mgr/lot-trace-view";
+import type { LotTraceRecipientView, LotTraceViewModel } from "@/lib/mgr/lot-trace-view";
 
 export type { LotTraceViewModel };
 
@@ -26,6 +26,8 @@ export function LotTraceView({
       {E.row(model.sku, model.skuDetail, model.skuTrailing)}
       {E.fld("Tank · batch", model.tankBatch)}
       {E.fld("Drawn", model.drawn)}
+      {E.ttl("Ingredients")}
+      {model.ingredients.length ? model.ingredients.map(row => <Fragment key={row.key}>{row.tracked ? E.nav(row.title, row.detail, "", undefined, row.href) : E.fld(row.title, row.detail ?? "")}</Fragment>) : E.blank("No recorded ingredient lots")}
       {E.ttl("Member batches")}
       {model.memberBatches.map(row => <Fragment key={row.key}>{E.fld(row.title, row.detail ?? "")}</Fragment>)}
       {E.note("Recorded membership, not percentages or estimated shares.")}
@@ -39,14 +41,7 @@ export function LotTraceView({
         <Fragment key={row.key}>{E.row(row.title, row.detail ?? "", row.trailing ?? "")}</Fragment>
       ))}
       {E.ttl("Recipients")}
-      {recipients !== undefined ? recipients : (model.recipients?.length ? model.recipients.map((recipient) => (
-        <div key={recipient.id} className="flex flex-col gap-2 border-b py-3">
-          {recipient.orderHref ? <Link href={recipient.orderHref} className="underline">Order {recipient.orderNo}</Link> : <p>Order {recipient.orderNo}</p>}
-          {recipient.customer && (recipient.customer.href ? <Link href={recipient.customer.href} className="underline">{recipient.customer.name}</Link> : <p>{recipient.customer.name}</p>)}
-          {recipient.shipTo && <p>{recipient.shipTo}</p>}
-          {recipient.shipments.map((shipment) => <div key={shipment.id}><p>{shipment.label}</p>{shipment.invoices.map((invoice) => invoice.href ? <Link key={invoice.id} href={invoice.href} className="underline">Invoice {invoice.number}</Link> : <p key={invoice.id}>Invoice {invoice.number}</p>)}</div>)}
-        </div>
-      )) : (model.recipientsEmpty ? E.blank(model.recipientsEmpty) : null))}
+      {recipients !== undefined ? recipients : <LotRecipients recipients={model.recipients ?? []} empty={model.recipientsEmpty} />}
       {movements !== undefined ? movements : (tape === null && model.movements?.length ? <>
         {E.ttl("Movements")}
         {model.movements.map((movement) => <div key={movement.id} id={`movement-${movement.id}`} className="border-b py-3">
@@ -58,4 +53,15 @@ export function LotTraceView({
       {E.note(model.note)}
     </>
   );
+}
+
+
+/** Shared recorded recipients; trace screens do not draw a second shipment/customer block. */
+export function LotRecipients({ recipients, empty }: { recipients: LotTraceRecipientView[]; empty?: string }) {
+  return recipients.length ? recipients.map(recipient => <div key={recipient.id} className="flex flex-col gap-2 border-b py-3">
+    {recipient.orderHref ? <Link href={recipient.orderHref} className="underline">Order {recipient.orderNo}</Link> : <p>Order {recipient.orderNo}</p>}
+    {recipient.customer && (recipient.customer.href ? <Link href={recipient.customer.href} className="underline">{recipient.customer.name}</Link> : <p>{recipient.customer.name}</p>)}
+    {recipient.shipTo && <p>{recipient.shipTo}</p>}
+    {recipient.shipments.map(shipment => <div key={shipment.id}><p>{shipment.label}</p>{shipment.invoices.map(invoice => invoice.href ? <Link key={invoice.id} href={invoice.href} className="underline">Invoice {invoice.number}</Link> : <p key={invoice.id}>Invoice {invoice.number}</p>)}</div>)}
+  </div>) : empty ? E.blank(empty) : null;
 }

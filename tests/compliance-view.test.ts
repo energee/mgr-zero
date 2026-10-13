@@ -10,10 +10,12 @@ import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
 import { LicensesView } from "../components/mgr/views/licenses";
 import { LicenseView } from "../components/mgr/views/license";
+import { MaterialLotTraceView } from "../components/mgr/views/material-lot-trace";
+import { toMaterialLotTraceViewProps } from "../lib/mgr/material-lot-trace-view";
 import { LotTraceView } from "../components/mgr/views/lot-trace";
 import { StateRegistrationView } from "../components/mgr/views/state-registration";
 import {
-  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
 } from "../lib/mgr/fixtures/compliance";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
@@ -263,5 +265,41 @@ describe("Lot trace", () => {
     expect(html).toMatch(/Hazy IPA · 16 oz case/);
     expect(html).not.toMatch(/Hazy IPA · Hazy IPA/);
     expect(html).toMatch(/No recorded shipments of this lot/);
+  });
+});
+
+
+describe("Material lot trace (#817)", () => {
+  it("shows current vessel/status for unpackaged batch use", () => {
+    const snapshot = { ...materialLotTraceCitra, batches: materialLotTraceCitra.batches.map(batch => ({ ...batch, in_vessel: "FV-RECALL" })) };
+    expect(htmlOf(createElement(MaterialLotTraceView, { model: toMaterialLotTraceViewProps(snapshot) }))).toContain("FV-RECALL");
+  });
+  it("does not offer an Open action for untracked ingredient facts", () => {
+    const snapshot = { ...lotTraceHazy, ingredients: [{ ...lotTraceHazy.ingredients[0], lot_id: null, code: null }] };
+    const html = htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps(snapshot) }));
+    const section = html.split("Ingredients")[1].split("Member batches")[0];
+    expect(section).toContain("Untracked");
+    expect(section).not.toContain("data-tap");
+  });
+
+  it("inventory and live mount the same view and preserve recorded use and recipient data", () => {
+    const model = toMaterialLotTraceViewProps(materialLotTraceCitra);
+    const record = screen("Material lot trace").body as { type: unknown; props: { model: unknown } };
+    expect(record.type).toBe(MaterialLotTraceView);
+    expect(record.props.model).toEqual(model);
+    const html = htmlOf(createElement(MaterialLotTraceView, { model }));
+    expect(html).toContain("H-77");
+    expect(html).toContain("B-0040");
+    expect(html).toContain("B-0041");
+    expect(html).toContain("Fictional Corner Bar");
+    expect(model.lots[0].href).toBeUndefined();
+    expect(toMaterialLotTraceViewProps(materialLotTraceCitra, "/compliance").lots[0].href).toBe("/compliance/lots/finished");
+    expect(src("app/(app)/compliance/material-lots/[id]/page.tsx")).toMatch(/<MaterialLotTraceView\b/);
+  });
+  it("finished-lot ingredient links are explicit live destinations and inert fixture links", () => {
+    const fixture = toLotTraceViewProps(lotTraceHazy);
+    expect(fixture.ingredients[0].href).toBeUndefined();
+    expect(toLotTraceViewProps(lotTraceHazy, "/compliance").ingredients[0].href).toBe("/compliance/material-lots/h77");
+    expect(screen("Lot trace").to).toMatchObject({ "Citra hops": "Material lot trace" });
   });
 });

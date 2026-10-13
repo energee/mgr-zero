@@ -31,7 +31,7 @@ function unpagedReads(src: string): string[] {
 const ALLOWED: Record<string, number> = {
   "catalog.ts": 7,
   "chat.ts": 2,
-  "compliance.ts": 6,
+  "compliance.ts": 5,
   "customers.ts": 1,
   "delivery.ts": 4,
   "inventory.ts": 6,

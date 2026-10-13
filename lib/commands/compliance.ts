@@ -7,8 +7,10 @@
 import { z } from "zod";
 import { periodKey } from "@/lib/compliance-period";
 import type { LotTraceSources } from "@/lib/mgr/lot-trace-view";
+import { recipientsFor } from "./material-trace";
+import type { MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import { isoDate } from "./packaging";
-import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
+import { CommandError, breweryToday, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 // The three registry upserts below keep a saved value when the caller omits
@@ -204,8 +206,8 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as LotMovement[];
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
     // Small batches keep URL size bounded; each unique order has one shipment.
-    const recipients = await inChunks(orderIds, async chunk => (await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
-      .eq("brewery_id", ctx.breweryId).in("id", chunk))) ?? []);
+    const recipients = await recipientsFor(ctx, orderIds);
+    const ingredients = await unwrap(ctx.db.rpc("trace_lot_ingredients", { p_brewery: ctx.breweryId, p_lot: i.lotId }));
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
     const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
@@ -220,11 +222,32 @@ defineQuery({
       run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, vessel: occ?.vessels?.name ?? "" } : null,
       batch: occ?.batches ?? null,
       ...sources,
+      ingredients,
       movements: moves,
       balances: [...balances.values()], on_hand_bbl: moves.reduce((n, m) => n + m.bbl, 0), recipients,
       // Compatibility only when all units are the same SKU; never sum package units.
       on_hand: new Set(moves.map(m => m.sku_id)).size <= 1 ? moves.reduce((n, m) => n + m.qty, 0) : null,
       warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
+    };
+  },
+});
+
+
+defineQuery({
+  name: "trace_material_lot",
+  description: "One ingredient or packaging-material lot: effective consumption in batches and runs, finished lots through recorded blend lineage, actual shipment recipients, and remaining recorded material; corrections reverse prior usage",
+  roles: [...ROLES],
+  input: z.object({ materialLotId: z.string().uuid() }),
+  handler: async (ctx, input) => {
+    const result = await ctx.db.rpc("trace_material_lot", { p_brewery: ctx.breweryId, p_material_lot: input.materialLotId });
+    // This scoped read deliberately hides both absent and other-tenant identities.
+    if (result.error?.code === "MG404") throw new CommandError("material lot not found", 404, "not_found");
+    const trace = await unwrap(Promise.resolve(result)) as unknown as MaterialLotTraceSnapshot & { order_ids: string[] };
+    const { order_ids, ...snapshot } = trace;
+    return {
+      ...snapshot,
+      recipients: await recipientsFor(ctx, order_ids),
+      warning: "Only recorded material identities and effective consumption are traced. Historical untracked stock cannot be assigned to a lot; recorded blend membership is not a proportional share.",
     };
   },
 });

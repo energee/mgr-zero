@@ -6,7 +6,7 @@ Refreshed 2026-10-10 against main at `b180c6e7`. Waves 1–4 and 6 are done:
 every issue they listed is closed. What is done is in `.agents/PROGRESS.md`;
 what is in flight is the open PR list.
 
-Inventory baseline: 184 MGR screens: 184 ungated and mapped, 0 gated, and 0 ungated without a live route.
+Inventory baseline: 185 MGR screens: 185 ungated and mapped, 0 gated, and 0 ungated without a live route.
 These counts describe route coverage, not finished workflow behavior.
 
 Local sources for implementation and verification:
