@@ -240,13 +240,13 @@ describe("portal user revocation", () => {
     const { user, ctx: live } = await buyer();
     const order = { shipToId, lines: [{ skuId, qty: 1 }] };
     await expect(runCommand("portal_create_order", order, live)).resolves.toHaveProperty("order_id");
-    expect((await live.db.from("customers").select("id")).data).toHaveLength(1);
+    expect((await live.db.from("portal_customers").select("id")).data).toHaveLength(1);
 
     await runCommand("revoke_customer_user", { customerId, userId: user.id }, sales);
 
     expect((await list(staff)).some((u) => u.userId === user.id)).toBe(false);
     expect((await admin.auth.admin.getUserById(user.id)).data.user?.id).toBe(user.id);
-    expect((await live.db.from("customers").select("id")).data).toEqual([]);
+    expect((await live.db.from("portal_customers").select("id")).data).toEqual([]);
     expect((await live.db.from("orders").select("id")).data).toEqual([]);
     await expect(runCommand("portal_orders", {}, live)).resolves.toEqual({ rows: [], nextCursor: null });
     await expect(runCommand("portal_create_order", order, live)).rejects.toMatchObject({ code: "permission_denied" });

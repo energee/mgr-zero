@@ -7,6 +7,8 @@ import { sql } from "./helpers";
 const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
   "trace_lot_sources(uuid,uuid)",
+  "trace_lot_ingredients(uuid,uuid)",
+  "trace_material_lot(uuid,uuid)",
   "trace_batch_lots(uuid,uuid)",
   "get_taproom_draft_projection(uuid,uuid)",
   "get_taproom_variance(uuid,uuid,integer)",
@@ -107,6 +109,7 @@ const AUTHENTICATED_RPCS = [
   "my_customer_ids()",
   "portal_availability(uuid)",
   "portal_brewery_rows()",
+  "portal_customer_rows()",
   "portal_invoice_rows()",
   "portal_keg_deposit_rows()",
   "portal_order_event_rows()",

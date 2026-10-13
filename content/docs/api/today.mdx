@@ -7,6 +7,10 @@ Today is the one read a member starts from: work assigned to them, due now, or
 overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
 `now`, which is what makes the view testable at a fixed moment.
 
+Confirmed orders without a requested ship date emit `pick_due` with `dueAt: null`
+and detail `pick due · no ship date`. Null dates are always due and sort after
+dated work. Work and chat read this same projection.
+
 Notification `reason` is `submitted_order`, `pick_due`, `restock_due`,
 `delivery_next`, `fermentation_reading_overdue`, `invoice_question`, or
 `operations_digest`. A preference enables or mutes one reason for the calling
@@ -350,12 +354,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
+Search SKUs, orders, invoices, lots, material lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `q` | string | yes |
-| `kinds` | array of sku or order or invoice or lot or customer or po or batch | no |
+| `kinds` | array of sku or order or invoice or lot or customer or po or batch or material_lot | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -7047,6 +7047,18 @@ export type Database = {
           },
         ]
       }
+      keg_location_shortages: {
+        Row: {
+          brewery_id: string | null
+          keg_size: Database["public"]["Enums"]["keg_size"] | null
+          location: string | null
+          location_id: string | null
+          pool: string | null
+          pool_id: string | null
+          short: number | null
+        }
+        Relationships: []
+      }
       keg_loss_rates: {
         Row: {
           brewery_id: string | null
@@ -7534,6 +7546,15 @@ export type Database = {
           name: string | null
           portal_fulfillment_location_id: string | null
           timezone: string | null
+        }
+        Relationships: []
+      }
+      portal_customers: {
+        Row: {
+          brewery_id: string | null
+          id: string | null
+          name: string | null
+          sale_channel_id: string | null
         }
         Relationships: []
       }
@@ -9092,6 +9113,15 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_customer_rows: {
+        Args: never
+        Returns: {
+          brewery_id: string
+          id: string
+          name: string
+          sale_channel_id: string
+        }[]
+      }
       portal_invoice_rows: {
         Args: never
         Returns: {
@@ -10028,8 +10058,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      trace_lot_ingredients: {
+        Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
       trace_lot_sources: {
         Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
+      trace_material_lot: {
+        Args: { p_brewery: string; p_material_lot: string }
         Returns: Json
       }
       unlink_chat_user: {

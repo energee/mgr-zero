@@ -5,13 +5,13 @@
 // Reads go through the RLS-bound ctx.db, so RLS decides the rows either way
 // and `kinds` only narrows. A kind whose page the caller's role cannot open is
 // not searched at all (openableKinds), so no hit links to No access (#478).
-// ponytail: seven prefix queries in parallel rather than one definer SQL function; a trigram index is the upgrade path if a
+// ponytail: eight prefix queries in parallel rather than one definer SQL function; a trigram index is the upgrade path if a
 // brewery's catalog outgrows prefix matching.
 import { z } from "zod";
 import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 
-export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch"] as const;
+export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
 export type SearchHit = { kind: SearchKind; id: string; label: string; detail: string; href: string; exact: boolean };
 
@@ -24,6 +24,7 @@ const DOC: [RegExp, SearchKind, string][] = [[/^ORD-?(\d+)$/i, "order", "order_n
 const PAGE_READS: Record<SearchKind, readonly string[]> = {
   sku: ["list_brands", "list_formats", "list_price_groups"], // /catalog
   customer: ["get_customer", "list_sale_channels"], // /customers/[id]
+  material_lot: ["trace_material_lot"], // /compliance/material-lots/[id]
   lot: ["trace_lot"], // /compliance/lots/[id]
   order: ["get_order", "list_locations", "list_skus"], // /orders/[id]
   invoice: ["get_invoice"], // /invoices/[id]; its other reads are role-conditional
@@ -56,6 +57,10 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
       const rows = await unwrap(ctx.db.from("customers").select("id, name, state").eq("brewery_id", b).ilike("name", prefix).limit(LIMIT)) as Row[];
       return rows.map((r) => hit(r.id as string, r.name as string, `customer · ${r.state}`, `/customers/${r.id}`));
     }
+    case "material_lot": {
+      const rows = await unwrap(ctx.db.from("material_lots").select("id,lot_code,materials(name)").eq("brewery_id", b).ilike("lot_code", prefix).limit(LIMIT)) as Row[];
+      return rows.map(row => hit(row.id as string, row.lot_code as string, `${(row.materials as { name: string } | null)?.name ?? "Material"} · ingredient lot`, `/compliance/material-lots/${row.id}`, (row.lot_code as string).toLowerCase() === q.toLowerCase()));
+    }
     case "lot": {
       const rows = await unwrap(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", b).ilike("code", prefix).limit(LIMIT)) as Row[];
       return rows.map((r) => hit(r.id as string, r.code as string, `${(r.brands as { name: string } | null)?.name ?? "lot"} · packaged ${r.packaged_on}`, `/compliance/lots/${r.id}`, (r.code as string).toLowerCase() === q.toLowerCase()));
@@ -85,7 +90,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
 
 defineQuery({
   name: "search_entities",
-  description: "Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped",
+  description: "Search SKUs, orders, invoices, lots, material lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped",
   input: z.object({ q: z.string().trim().min(1).max(80), kinds: z.array(z.enum(SEARCH_KINDS)).optional() }),
   roles: ["admin", "sales", "warehouse", "brewer"],
   aiExposed: true,

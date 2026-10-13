@@ -47,3 +47,13 @@ it("marks the count quantities invalid when the save was rejected", () => {
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: rejected, role: "taproom", lotLabels: {}, timeZone: "America/New_York" }));
   expect(html).toContain('aria-invalid="true"');
 });
+
+it("#814 shows the shared shortage disposition picker and freezes it on uncertain retry", () => {
+  let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Keg", brand_id: "brand", brand_name: "Brand", bbl_per_unit: .5, lot_id: null, qty_before: 3 }] }, null);
+  state = updateCountQuantity(state, state.draft.lines[0].key, "2");
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, role: "taproom", lotLabels: {}, timeZone: "America/New_York" }));
+  expect(html).toContain("Shortage disposition");
+  expect(html).toContain("Sold");
+  const frozen = failCountAttempt(beginCountAttempt(state, "request"), "unknown", "No response");
+  expect(renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: frozen, role: "taproom", lotLabels: {}, timeZone: "America/New_York" }))).toContain('data-disabled');
+});
