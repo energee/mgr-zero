@@ -21,6 +21,15 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Finished goods view", () => {
+  it("renders authorized inventory value and counts uncosted units without valuing them (#810)", () => {
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Costed keg" }], [{ sku_id: "s1", qty: 4 }], [{ sku_id: "s1", qty: 4 }], { value_cents: 2000.4, uncosted_qty: 1.5 });
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot) }));
+    expect(html).toContain("Inventory value");
+    expect(html).toContain("$20.00");
+    expect(html).toContain("1.5 units without cost");
+    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }) }))).not.toContain("Inventory value");
+  });
+
   it("maps on-hand and ATP onto Review / Shortfall rows", () => {
     const model = toFinishedGoodsViewProps(finishedGoodsList);
     expect(model.rows.map((r) => [r.title, r.detail, r.verb])).toEqual([

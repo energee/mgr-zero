@@ -768,10 +768,10 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     name: "Finished goods",
     job: "See sellable beer by SKU and act on shortages",
-    reads: "get_on_hand · get_atp",
+    reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
-    spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow.",
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
+    spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {

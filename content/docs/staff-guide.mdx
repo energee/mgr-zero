@@ -227,10 +227,11 @@ Wholesale Shop shows the packages the brewery has designated for wholesale (½ k
 
 <Screen name="Finished goods" />
 
-*Admin, Sales, and Warehouse can view inventory. Admin and Warehouse can record movements and reverse eligible standalone adjustments and losses.*
+*Admin, Sales, and Warehouse can view inventory. Admin and Sales also see Inventory value. Admin and Warehouse can record movements and reverse eligible standalone adjustments and losses.*
 
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
+  <Card title="Inventory value">Current stock valued at the per-package cost frozen at packaging close. Units without receipt costs, opening balances, historical runs, and repacked children are counted but not valued.</Card>
   <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
   <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card>
 </Cards>
@@ -682,6 +683,8 @@ Select **Complete batch**, choose the batch, and review its server-calculated **
 Select **Reading** on Vessel detail to open the reading sheet directly and record the next one. The sheet names the tank that receives the reading and, when known, its batch number and brand, so you can confirm the tank before saving, including when you arrive from Today. **Observed at** and **Temperature** are required; **Gravity**, **pH**, and a note are each optional, because a quick temperature check is a legitimate reading on its own. Temperature must be between 25 and 212 °F and pH between 0 and 14; MGR refuses a value outside those ranges rather than saving or queueing it. Each of Temperature, Gravity, and pH shows the prior reading's value beneath it for reference. Saving while online returns you to Vessel detail, where the new row appears first in **Reading history**; closing the sheet without saving returns you there too. If the connection or response is lost, **Retry exact reading** keeps the original time and request ID; it never substitutes the reconnect time. When the shell sends that saved reading after reconnection, the open sheet unlocks without another Retry or Fix; open Vessel detail to see it added to **Reading history**. If the tank closed before the first send, choose **Fix as new reading** only after reviewing a fresh observation. A reading that the server already committed still replays its one original result after the tank closes. Readings never overwrite one another. Each is its own row on Vessel detail, newest first. The gravity field is labelled and read in whatever unit you chose under [Gravity units](#gravity-units); MGR stores degrees Plato either way. If what you type there is not a gravity MGR can read, the field says so and **Save reading** stays disabled until you correct it or clear the field. A mistyped gravity is never quietly dropped from an otherwise saved reading.
 
 ## Packaging [#packaging]
+
+Closing a run freezes package cost from its batch ingredient receipts divided by knockout volume (as corrected on the brew record), charged by barrels drawn, plus its standard packaging BOM at the used source receipt costs. Draw loss is absorbed; packaging material loss is not. Later brew, packaging-material, or receipt corrections do not change that cost. Later ingredient additions affect only later closes. A blend receiver currently includes only its own ingredients and knockout; incoming beer cost is not apportioned. Historical runs are not backfilled, and repack children without original output costs remain uncosted.
 
 Open an unstarted run to **Reschedule** its planned date or **Cancel plan** and confirm. Admin, Brewer and Warehouse can change these plans. Cancellation retains the run and planned outputs in history, removes their material and beer demand, and stops the run from blocking batch completion. It moves no beer or stock. Started or closed runs cannot be cancelled or rescheduled. An active old plan continues to count as demand until it is cancelled.
 

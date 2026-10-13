@@ -551,5 +551,5 @@ vocabulary, both audience shells, and access boundaries for every later screen.
 - Deferred on purpose (YAGNI at this scope): portal change-request or persistent cart,
   warehouse FG cycle count, packaging-day actuals, refused-delivery and deposit-only
   screens, required carrier/tracking, UPC/bins/waves, disconnect-QBO, CBMA settings,
-  dashboards (finished-goods cost and COGS are #810), command palette frame, keg CIP status, DTC, export flow, free-form
+  dashboards (finished-goods cost and inventory value freeze at packaging close; per-order COGS/margin is #810 PR2), command palette frame, keg CIP status, DTC, export flow, free-form
   credit memos. No `container_source` editor: the SKU's Keg pool derives it (#809).
