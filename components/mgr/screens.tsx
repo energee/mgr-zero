@@ -1,3 +1,4 @@
+import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
@@ -1634,9 +1635,9 @@ export const SCREENS: Screen[] = [
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [mutable single rows] · complete_batch",
-    states: [["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
-    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold and residual, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
-    body: <CellarMapView model={cellarMapBrewer} />,
+    states: [["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
+    body: <CellarMapView model={cellarMapBrewer} complete={<BatchCompletionFixture />} />,
   },
   {
     step: 7,

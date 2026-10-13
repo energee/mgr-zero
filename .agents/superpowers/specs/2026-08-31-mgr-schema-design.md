@@ -1440,3 +1440,10 @@ The chat tables and grants in §17 are implemented in the baseline migration and
 covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.
 
 Taproom count shortages have one sold/default or destroyed disposition per bucket (#814). Sold keys are omitted at the command boundary to preserve legacy replay identity. Destruction has no channel/tax/state; only sold shortage lines are correctable.
+
+### Batch completion in-tank acknowledgement
+
+Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), the preview sets `inTankRequiresConfirmation`. Completion then refuses unless `confirmInTankBbl` equals the previewed `inTankBbl`. The acknowledgement names the beer and tanks being written off as loss. If tank volume changes after review, completion refuses with the new figures; review and confirm again. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.
+=======
+Taproom count shortages have one sold/default or destroyed disposition per bucket (#814). Sold keys are omitted at the command boundary to preserve legacy replay identity. Destruction has no channel/tax/state; only sold shortage lines are correctable.
+>>>>>>> origin/main

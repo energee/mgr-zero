@@ -65,7 +65,7 @@ async function exactCompletion(setup = { breweryId, brewerCtx, location, fixture
     runId: run.id, bblDrawn: 0.95, outputs: [{ skuId, qtyActual: 1 }],
     lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);
-  const completion = await runCommand("complete_batch", { batchId: batch.id }, brewerCtx) as { adjustmentId: string; residualBbl: string };
+  const completion = await runCommand("complete_batch", { batchId: batch.id, confirmInTankBbl: Number((await runCommand("get_batch_completion_preview", { batchId: batch.id }, brewerCtx) as { inTankBbl: string }).inTankBbl) }, brewerCtx) as { adjustmentId: string; residualBbl: string };
   return { batchId: batch.id, adjustmentId: completion.adjustmentId, residualBbl: completion.residualBbl, period: adjustmentPeriod(completion.adjustmentId) };
 }
 
@@ -103,7 +103,7 @@ describe("completion loss review", () => {
     await runCommand("record_brew_day", { actuals: [], confirmEmpty: true,
       batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: futureStart,
     }, futureBrewer);
-    const completed = await runCommand("complete_batch", { batchId: batch.id }, futureBrewer) as { adjustmentId: string; closedAt: string };
+    const completed = await runCommand("complete_batch", { batchId: batch.id, confirmInTankBbl: Number((await runCommand("get_batch_completion_preview", { batchId: batch.id }, futureBrewer) as { inTankBbl: string }).inTankBbl) }, futureBrewer) as { adjustmentId: string; closedAt: string };
 
     expect(completed.closedAt.slice(0, 10)).toBe(futureStart);
     const report = await runCommand("generate_compliance_report", {
@@ -280,9 +280,9 @@ describe("completion loss review", () => {
     expect(sql(`select has_table_privilege('authenticated','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text,has_table_privilege('service_role','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text`, true)).toEqual(["false|false"]);
     expect(sql(`select concat_ws('|',
       has_function_privilege('authenticated','get_batch_completion_preview(uuid,uuid)','execute'),
-      has_function_privilege('authenticated','complete_batch(uuid,uuid,uuid)','execute'),
+      has_function_privilege('authenticated','complete_batch(uuid,uuid,uuid,numeric)','execute'),
       has_function_privilege('service_role','get_batch_completion_preview(uuid,uuid)','execute'),
-      has_function_privilege('service_role','complete_batch(uuid,uuid,uuid)','execute'))`, true)).toEqual(["t|t|f|f"]);
+      has_function_privilege('service_role','complete_batch(uuid,uuid,uuid,numeric)','execute'))`, true)).toEqual(["t|t|f|f"]);
     for (const role of ["authenticated", "service_role"]) {
       expectSqlState(`begin; set local role ${role}; truncate volume_adjustment_reclassifications; commit`, "42501");
       expectSqlState(`begin; set local role ${role}; select private.lock_cellar_workflow('${breweryId}'); commit`, "42501");
