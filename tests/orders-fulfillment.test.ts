@@ -751,6 +751,24 @@ describe("adjust after pick (#811)", () => {
     expect(Number((await lineFor(id, skuId)).qty_picked)).toBe(7);
   });
 
+  it("raising a line the staged count already covers keeps the count and the order picked", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 6 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "picked", needs_restock: true });
+    expect((await adjust(id, [{ sku_id: skuId, qty: 8 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "picked", needs_restock: true, repick_since: null });
+    expect(Number((await lineOf(id)).qty_picked)).toBe(10);
+  });
+
+  it("raising a short-picked line clears its stale short reason with its count", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    expect((await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "dented", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await adjust(id, [{ sku_id: skuId, qty: 12 }])).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_picked: null, short_reason: null });
+  });
+
   it("ship refuses a picked order with an uncounted line", async () => {
     const id = await confirmedOrder(10);
     await pickAll(id);

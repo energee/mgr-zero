@@ -46,6 +46,18 @@ describe("Order view loop", () => {
     expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderPickedRestock) }))).not.toContain("changed after pick");
   });
 
+  it("a cancelled order that was changed after pick carries no re-pick note (#811)", () => {
+    const cancelled = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "cancelled" as const, repick_since: "2026-09-02T14:00:00.000Z" } };
+    expect(toOrderViewProps(cancelled).repickNote).toBeUndefined();
+  });
+
+  it("a confirmed order with staged beer still offers Put back (#811)", () => {
+    const mixed = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "confirmed" as const, repick_since: "2026-09-02T14:00:00.000Z" } };
+    const model = toOrderViewProps(mixed);
+    expect(model.putBackHref).toBe("#");
+    expect(model.next).toBe("Next: put back");
+  });
+
   it("the Order inventory record is OrderView painted from that fixture", () => {
     const screen = SCREENS.find((s) => s.name === "Order");
     expect(isValidElement(screen!.body)).toBe(true);

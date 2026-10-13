@@ -122,9 +122,16 @@ begin
     values (o.brewery_id, p_order, l.sku_id, l.qty,
             case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end)
     on conflict (order_id, sku_id) do update set qty_ordered = excluded.qty_ordered,
-      -- #811: a raised line is unpicked work; Pick recounts it from ordered
+      -- #811: a raised line is unpicked work; Pick recounts it from ordered.
+      -- A staged count that already covers the new quantity stays (lowered,
+      -- then raised again): the beer is on the floor. A recount also drops the
+      -- old shortage reason, which described the count it replaces.
       qty_picked = case when o.status = 'picked' and excluded.qty_ordered > public.order_lines.qty_ordered
-                        then null else public.order_lines.qty_picked end
+                          and excluded.qty_ordered > coalesce(public.order_lines.qty_picked, 0)
+                        then null else public.order_lines.qty_picked end,
+      short_reason = case when o.status = 'picked' and excluded.qty_ordered > public.order_lines.qty_ordered
+                          and excluded.qty_ordered > coalesce(public.order_lines.qty_picked, 0)
+                        then null else public.order_lines.short_reason end
     returning id into v_line;
     update public.allocations set qty = l.qty
       where source = 'order_line' and ref = v_line and status = 'open';
