@@ -445,6 +445,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id: string | null
+          turn: number
           volume_adjustment_id: string | null
         }
         Insert: {
@@ -461,6 +462,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Update: {
@@ -477,6 +479,7 @@ export type Database = {
           plan_snapshot?: Json
           process?: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Relationships: [
@@ -1111,42 +1114,69 @@ export type Database = {
       }
       customers: {
         Row: {
+          bill_address1: string | null
+          bill_address2: string | null
+          bill_city: string | null
+          bill_state: string | null
+          bill_zip: string | null
+          billing_email: string | null
           brewery_id: string
           created_at: string
           id: string
           license_no: string | null
           name: string
           payment_terms: string
+          phone: string | null
           qbo_customer_id: string | null
           qbo_realm_id: string | null
+          qbo_sync_state: string | null
+          qbo_sync_token: string | null
           sale_channel_id: string
           state: string
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
           type: Database["public"]["Enums"]["customer_type"]
         }
         Insert: {
+          bill_address1?: string | null
+          bill_address2?: string | null
+          bill_city?: string | null
+          bill_state?: string | null
+          bill_zip?: string | null
+          billing_email?: string | null
           brewery_id: string
           created_at?: string
           id?: string
           license_no?: string | null
           name: string
           payment_terms?: string
+          phone?: string | null
           qbo_customer_id?: string | null
           qbo_realm_id?: string | null
+          qbo_sync_state?: string | null
+          qbo_sync_token?: string | null
           sale_channel_id: string
           state: string
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
           type?: Database["public"]["Enums"]["customer_type"]
         }
         Update: {
+          bill_address1?: string | null
+          bill_address2?: string | null
+          bill_city?: string | null
+          bill_state?: string | null
+          bill_zip?: string | null
+          billing_email?: string | null
           brewery_id?: string
           created_at?: string
           id?: string
           license_no?: string | null
           name?: string
           payment_terms?: string
+          phone?: string | null
           qbo_customer_id?: string | null
           qbo_realm_id?: string | null
+          qbo_sync_state?: string | null
+          qbo_sync_token?: string | null
           sale_channel_id?: string
           state?: string
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
@@ -4611,6 +4641,126 @@ export type Database = {
             foreignKeyName: "qbo_connections_brewery_id_fkey"
             columns: ["brewery_id"]
             isOneToOne: true
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qbo_customer_decisions: {
+        Row: {
+          brewery_id: string
+          customer_id: string | null
+          decided_at: string
+          decided_by: string
+          decision: string
+          id: string
+          qbo_customer_id: string
+          realm_id: string
+        }
+        Insert: {
+          brewery_id: string
+          customer_id?: string | null
+          decided_at?: string
+          decided_by: string
+          decision: string
+          id?: string
+          qbo_customer_id: string
+          realm_id: string
+        }
+        Update: {
+          brewery_id?: string
+          customer_id?: string | null
+          decided_at?: string
+          decided_by?: string
+          decision?: string
+          id?: string
+          qbo_customer_id?: string
+          realm_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_customer_decisions_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qbo_customer_decisions_brewery_id_realm_id_qbo_customer_id_fkey"
+            columns: ["brewery_id", "realm_id", "qbo_customer_id"]
+            isOneToOne: false
+            referencedRelation: "qbo_customer_snapshots"
+            referencedColumns: ["brewery_id", "realm_id", "qbo_customer_id"]
+          },
+          {
+            foreignKeyName: "qbo_customer_decisions_customer_id_brewery_id_fkey"
+            columns: ["customer_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
+      qbo_customer_snapshots: {
+        Row: {
+          active: boolean
+          bill_address1: string | null
+          bill_address2: string | null
+          bill_city: string | null
+          bill_state: string | null
+          bill_zip: string | null
+          brewery_id: string
+          company_name: string | null
+          display_name: string
+          email: string | null
+          phone: string | null
+          qbo_customer_id: string
+          qbo_updated_at: string
+          read_at: string
+          realm_id: string
+          sync_token: string
+        }
+        Insert: {
+          active: boolean
+          bill_address1?: string | null
+          bill_address2?: string | null
+          bill_city?: string | null
+          bill_state?: string | null
+          bill_zip?: string | null
+          brewery_id: string
+          company_name?: string | null
+          display_name: string
+          email?: string | null
+          phone?: string | null
+          qbo_customer_id: string
+          qbo_updated_at: string
+          read_at: string
+          realm_id: string
+          sync_token: string
+        }
+        Update: {
+          active?: boolean
+          bill_address1?: string | null
+          bill_address2?: string | null
+          bill_city?: string | null
+          bill_state?: string | null
+          bill_zip?: string | null
+          brewery_id?: string
+          company_name?: string | null
+          display_name?: string
+          email?: string | null
+          phone?: string | null
+          qbo_customer_id?: string
+          qbo_updated_at?: string
+          read_at?: string
+          realm_id?: string
+          sync_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qbo_customer_snapshots_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
             referencedRelation: "breweries"
             referencedColumns: ["id"]
           },
@@ -8299,6 +8449,7 @@ export type Database = {
           p_brand: string
           p_brewery: string
           p_format: string
+          p_keg_pool?: string
           p_name: string
           p_request_id: string
           p_upc: string
@@ -8320,14 +8471,23 @@ export type Database = {
       customers_missing_portal_email: {
         Args: { p_brewery: string }
         Returns: {
+          bill_address1: string | null
+          bill_address2: string | null
+          bill_city: string | null
+          bill_state: string | null
+          bill_zip: string | null
+          billing_email: string | null
           brewery_id: string
           created_at: string
           id: string
           license_no: string | null
           name: string
           payment_terms: string
+          phone: string | null
           qbo_customer_id: string | null
           qbo_realm_id: string | null
+          qbo_sync_state: string | null
+          qbo_sync_token: string | null
           sale_channel_id: string
           state: string
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
@@ -9727,6 +9887,29 @@ export type Database = {
       }
       taproom_can: { Args: { b: string; t: string }; Returns: boolean }
       today_live_reasons: { Args: never; Returns: string[] }
+      trace_batch_lots: {
+        Args: { p_batch: string; p_brewery: string }
+        Returns: {
+          best_by: string | null
+          brand_id: string
+          brewery_id: string
+          code: string
+          created_at: string
+          id: string
+          packaged_on: string
+          packaging_run_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lots"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      trace_lot_sources: {
+        Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
       unlink_chat_user: {
         Args: { p_brewery: string; p_link: string; p_request_id: string }
         Returns: Json
@@ -9806,7 +9989,9 @@ export type Database = {
         Args: {
           p_active: boolean
           p_brewery: string
+          p_clear_keg_pool?: boolean
           p_id: string
+          p_keg_pool?: string
           p_request_id: string
           p_upc: string
         }

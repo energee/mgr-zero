@@ -22,6 +22,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_brands": return [brand];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: null, price_group_id: "group", price_groups: { name: "Core" } }].filter(f => !input?.basis || f.basis === input.basis);
+    case "list_keg_pools": return [];
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
