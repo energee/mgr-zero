@@ -48,6 +48,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Capture change context
+        id: context
         env:
           EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
@@ -57,11 +58,18 @@ jobs:
             gh pr diff "$PR_NUMBER" > .api-agent-pr.diff
             gh pr view "$PR_NUMBER" --json number,title,body,author,mergedAt,baseRefName,headRefName,files > .api-agent-pr.json
           else
+            # A weekly audit of the same main as last week's spends a model run for nothing. Only scheduled
+            # runs count: a PR-closed run can succeed with maintain skipped, which audited nothing.
+            last=$(gh run list --workflow http-api-agent.yml --event schedule --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+            if [ "$EVENT_NAME" = "schedule" ] && [ "$last" = "$GITHUB_SHA" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
             : > .api-agent-pr.diff
             printf '{"event":"%s","ref":"%s","sha":"%s","title":"%s API reference audit"}\n' "$EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA" "${EVENT_NAME/workflow_dispatch/manual}" > .api-agent-pr.json
           fi
 
       - name: Maintain the HTTP API reference
+        if: steps.context.outputs.skip != 'true'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
