@@ -73,15 +73,11 @@ export function kegEventUnavailable({ activePools, locations }: { activePools: n
   return missing.length ? `Recording a keg event needs ${missing.join(" and ")}.` : null;
 }
 
-/** One reconciliation flag per negative pool/size/location, across its bins. */
-export function kegShortages(pools: { id: string; name: string }[], rows: { pool_id: string; keg_size: string; location_id: string; location_name: string; qty: number }[]): string[] {
-  const totals = new Map<string, { pool: string; size: string; location: string; qty: number }>();
-  for (const row of rows) {
-    const key = `${row.pool_id}|${row.keg_size}|${row.location_id}`;
-    const total = totals.get(key) ?? { pool: row.pool_id, size: row.keg_size, location: row.location_name, qty: 0 };
-    total.qty += Number(row.qty);
-    totals.set(key, total);
-  }
-  return [...totals.values()].filter(row => row.qty < 0).map(row =>
-    `${pools.find(pool => pool.id === row.pool)?.name ?? row.pool} ${SIZE_LABEL[row.size] ?? row.size} · ${row.location}: ${-row.qty} below zero · record Acquired kegs to reconcile`);
+/** A pool/size whose recorded shells at one location net below zero; saved by
+ *  ship_order and read from keg_location_shortages, so both screens agree. */
+export type KegShortage = { pool: string; keg_size: string; location: string; short: number };
+
+/** The one wording staff see for a shell shortage, on Shipment done and Keg fleet. */
+export function kegShortageText({ pool, keg_size, location, short }: KegShortage): string {
+  return `${pool} ${SIZE_LABEL[keg_size] ?? keg_size} · ${location}: ${short} kegs short · record Acquired kegs to reconcile`;
 }

@@ -107,7 +107,7 @@ export const orderShipOnDelivery: ShipSnapshot = {
 
 /** Post-commit of Ship and invoice: INV-1042 assigned. */
 export const orderShipmentDone: ShipmentDoneSnapshot = {
-  warnings: ["2 kegs short at Warehouse · record Acquired kegs to reconcile"],
+  warnings: [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }],
   order: { id: ORDER_231, order_no: 231, ship_tos: ridgeline.ship_tos },
   invoice: { invoice_no: 1042 },
   lines: [

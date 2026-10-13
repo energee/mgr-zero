@@ -649,13 +649,16 @@ deposit lines. Buyer event projections continue to exclude payload.
 Deposit-only refunds and later empty pickups remain separate records; later
 empties use `record_keg_event`. Historical shipments without automatic Shipped
 shells post no automatic Returned event. Automatic shipping may overdraw shells,
-which warns on Shipment done and flags the pool/size/location on Keg fleet.
+which warns on Shipment done and flags the pool/size/location on Keg fleet. The
+shipped payload saves each shortfall as `{ pool, keg_size, location, short }`;
+Keg fleet reads the same shape from the `keg_location_shortages` view.
 Manual events, transfers, and bin moves retain their negative-balance guards.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
 - `keg_customer_balances` — per `(customer, pool, size)`: `shipped − returned − lost@customer`.
 - `keg_loss_rates` — lost / shipped per pool over trailing 12 months.
+- `keg_location_shortages` — per `(pool, size, location)` whose bins net below zero in `keg_bin_on_hand`; Keg fleet flags each.
 
 ## 13. Deliveries (self-distribution)
 

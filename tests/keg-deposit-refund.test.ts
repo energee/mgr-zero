@@ -4,6 +4,7 @@
 // keg_deposit_balances. Beer lines keep their return_in path.
 import { beforeEach, describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
+import type { Json } from "@/lib/supabase/database.generated";
 import "@/lib/commands/all";
 import { admin, asUser, ins, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
 
@@ -35,7 +36,7 @@ describe("keg deposit refund credit memo", () => {
     expect(shipment.error).toBeNull();
     const event = await admin.from("order_events").select("payload").eq("order_id", shipment.data!.order_id!).eq("event", "shipped").single();
     expect(event.error).toBeNull();
-    expect(event.data!.payload).toMatchObject({ warnings: ["2 kegs short at Deposit warehouse · record Acquired kegs to reconcile"] });
+    expect(event.data!.payload).toMatchObject({ warnings: [{ pool: "Returnable fleet", keg_size: "half_bbl", location: "Deposit warehouse", short: 2 }] });
   });
 
   it("#815 records the shell returned with a full keg of beer, not a deposit-only refund", async () => {
@@ -120,7 +121,10 @@ describe("keg deposit refund credit memo", () => {
     expect(shipment.error).toBeNull();
     const event = await admin.from("order_events").select("payload").eq("order_id", shipment.data!.order_id!).eq("event", "shipped").single();
     expect(event.error).toBeNull();
-    expect(event.data!.payload).toMatchObject({ warnings: ["4 kegs short at Deposit warehouse · record Acquired kegs to reconcile"] });
+    expect(event.data!.payload).toMatchObject({ warnings: [{ pool: "Returnable fleet", keg_size: "half_bbl", location: "Deposit warehouse", short: 4 }] });
+    // Keg fleet reads the same location net, not the drained bin alone.
+    const fleet = await runCommand("get_keg_fleet", {}, f.adminCtx) as { shortages: unknown[] };
+    expect(fleet.shortages).toEqual([{ pool: "Returnable fleet", keg_size: "half_bbl", location: "Deposit warehouse", short: 4 }]);
   });
 
   it("#815 drains shell bins by name, posts only the remainder below zero, and ignores later pool retirement", async () => {
@@ -142,8 +146,15 @@ describe("keg deposit refund credit memo", () => {
     const invoiceId = await shipTwoKegs(f);
     const invoice = await admin.from("invoices").select("shipment_id").eq("id", invoiceId).single();
     expect(invoice.error).toBeNull();
-    // Delete only this test fixture's events to represent a pre-migration shipment.
+    // A pre-migration shipment has neither automatic Shipped events nor a keg_shells snapshot.
     expect((await admin.from("keg_events").delete().eq("shipment_id", invoice.data!.shipment_id!)).error).toBeNull();
+    const shipment = await admin.from("shipments").select("order_id").eq("id", invoice.data!.shipment_id!).single();
+    expect(shipment.error).toBeNull();
+    const shipped = await admin.from("order_events").select("id,payload").eq("order_id", shipment.data!.order_id!).eq("event", "shipped").single();
+    expect(shipped.error).toBeNull();
+    const legacy = { ...(shipped.data!.payload as { [key: string]: Json | undefined }) };
+    delete legacy.keg_shells;
+    expect((await admin.from("order_events").update({ payload: legacy }).eq("id", shipped.data!.id)).error).toBeNull();
     const line = await admin.from("invoice_lines").select("id").eq("invoice_id", invoiceId).eq("kind", "sku").single();
     expect(line.error).toBeNull();
     const requestId = crypto.randomUUID();

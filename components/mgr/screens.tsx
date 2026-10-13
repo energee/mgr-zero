@@ -1057,7 +1057,7 @@ export const SCREENS: Screen[] = [
     job: "The invoice number after a ship, and the named correction",
     reads: "get_order · get_invoice",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the shipping location shell shortfall", 1]],
+    states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the short pool, size and shipping location", 1]],
     spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },

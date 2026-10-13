@@ -6976,6 +6976,18 @@ export type Database = {
           },
         ]
       }
+      keg_location_shortages: {
+        Row: {
+          brewery_id: string | null
+          keg_size: Database["public"]["Enums"]["keg_size"] | null
+          location: string | null
+          location_id: string | null
+          pool: string | null
+          pool_id: string | null
+          short: number | null
+        }
+        Relationships: []
+      }
       keg_loss_rates: {
         Row: {
           brewery_id: string | null
