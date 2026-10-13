@@ -83,7 +83,7 @@ describe("AI composer", () => {
 
   it("offers the browser's full timezone index in a searchable control", () => {
     const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, {
-      initial: { name: "Demo", timezone: "America/New_York", ttb: "", pa: "", phone: "", hours: "24" },
+      initial: { name: "Demo", timezone: "America/New_York", ttb: "", pa: "", phone: "", hours: "24", booksOpenedOn: "" },
     }));
     expect(Intl.supportedValuesOf("timeZone").length).toBeGreaterThan(400);
     expect(html).toContain('placeholder="Search timezones…"');
