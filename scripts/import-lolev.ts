@@ -20,15 +20,15 @@ import { DEFAULT_PROFILE_NAME, fromEjson, mapMaterials, mapRecipes, mapWaterProf
 type Doc = Record<string, unknown>;
 
 /** One collection of the dump as plain objects; a missing file is an empty collection.
- *  T is asserted, not checked: the mapper reads every field defensively (lib/import/lolev.ts). */
-export function readCollection<T = Doc>(dir: string, name: string): T[] {
+ *  Shapes are asserted at the call site, not checked: the mapper reads every field defensively (lib/import/lolev.ts). */
+export function readCollection(dir: string, name: string): Doc[] {
   const file = readdirSync(dir).find((f) => f === `${name}.bson.gz` || f === `${name}.bson`);
   if (!file) return [];
   const path = join(dir, file);
   const raw = file.endsWith(".gz") ? execFileSync("gunzip", ["-c", path]) : undefined;
   // bsondump reads stdin when given no file argument (it does not accept "-").
   const out = execFileSync("bsondump", raw ? ["--quiet"] : ["--quiet", path], { input: raw, maxBuffer: 1 << 30, encoding: "utf8" });
-  return out.split("\n").filter(Boolean).map((line) => fromEjson(JSON.parse(line)) as T);
+  return out.split("\n").filter(Boolean).map((line) => fromEjson(JSON.parse(line)) as Doc);
 }
 
 async function staffCtx(email: string, password: string): Promise<Ctx> {
@@ -48,15 +48,16 @@ async function existingIds(ctx: Ctx, table: "materials" | "water_profiles" | "re
   return new Map(data.map((r) => [r.name, r.id]));
 }
 
-export async function importLolev(dir: string, ctx: Ctx | null) {
-  const catalog: LolevCatalog = {
-    malts: readCollection(dir, "malts"), hops: readCollection(dir, "hops"), yeasts: readCollection(dir, "yeasts"),
-    sugars: readCollection(dir, "sugars"), adjuncts: readCollection(dir, "adjuncts"),
-  };
+/** `read` defaults to the dump on disk; the DB test passes synthetic collections instead. */
+export async function importLolev(dir: string, ctx: Ctx | null, read: (dir: string, name: string) => Doc[] = readCollection) {
+  const catalog = {
+    malts: read(dir, "malts"), hops: read(dir, "hops"), yeasts: read(dir, "yeasts"),
+    sugars: read(dir, "sugars"), adjuncts: read(dir, "adjuncts"),
+  } as LolevCatalog;
   const { materials, byLolevId } = mapMaterials(catalog);
-  const defaultIons = readCollection(dir, "globals").find((g) => g.globalType === "water-profile");
+  const defaultIons = read(dir, "globals").find((g) => g.globalType === "water-profile");
   // Yeasts go in so a recipe without a target attenuation uses its yeast's range midpoint.
-  const { recipes, skipped } = mapRecipes(readCollection<LolevRecipe>(dir, "recipes"), byLolevId, catalog.yeasts);
+  const { recipes, skipped } = mapRecipes(read(dir, "recipes") as LolevRecipe[], byLolevId, catalog.yeasts);
   const counts = { materials: 0, waterProfiles: 0, recipes: 0, existing: 0 };
   if (!ctx) return { counts: { ...counts, materials: materials.length, recipes: recipes.length }, skipped };
 
