@@ -102,7 +102,7 @@ const positiveBblNumber = z.number().finite().positive()
 const exactPositiveBbl = z.union([positiveBblText, positiveBblNumber]);
 
 defineQuery({
-  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored",
+  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored",
   roles: [...ROLES], input: period,
   handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
 });
@@ -154,7 +154,7 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
   roles: [...ROLES],
   // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(

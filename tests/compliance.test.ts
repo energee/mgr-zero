@@ -122,6 +122,49 @@ describe("generate_compliance_report", () => {
     ])).not.toThrow();
   });
 
+  it("buckets a movement by occurred_on, not created_at (#821)", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const catalog = await seedCatalog(brewery.id, { bblPerUnit: 0.5 });
+    const location = await seedLocation(brewery.id);
+    insertFixture("inventory_movements", { brewery_id: brewery.id, sku_id: catalog.skuId,
+      location_id: location.id, bin_id: location.binId, created_by: owner.userId,
+      qty: 4, type: "production_in", created_at: "2025-10-02T12:00:00Z", occurred_on: "2025-09-20" });
+    const september = await runCommand("generate_compliance_report", SEPT, owner) as Report;
+    const october = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2025-10-01", periodEnd: "2025-10-31" }, owner) as Report;
+    expect(september.figures.packaged).toBe(2);
+    expect(september.figures.lines.find(line => line.class === "can")).toMatchObject({ begin: 0, in: 2, end: 2 });
+    expect(october.figures.packaged).toBe(0);
+    expect(october.figures.lines.find(line => line.class === "can")).toMatchObject({ begin: 2, in: 0, end: 2 });
+  });
+
+  it("a movement inserted without occurred_on takes the brewery-local date of created_at (#821)", async () => {
+    const brewery = await makeBrewery();
+    expect(brewery.timezone).toBe("America/New_York");
+    const owner = await makeStaffCtx(brewery.id);
+    const catalog = await seedCatalog(brewery.id);
+    const location = await seedLocation(brewery.id);
+    const [movement] = insertFixture<{ occurred_on: string }>("inventory_movements", {
+      brewery_id: brewery.id, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId,
+      created_by: owner.userId, qty: 1, type: "opening_balance", created_at: "2025-10-01T02:00:00Z",
+    });
+    expect(movement.occurred_on).toBe("2025-09-30");
+  });
+
+  it("occurred_on stays frozen when the brewery timezone changes later (#821)", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const catalog = await seedCatalog(brewery.id);
+    const location = await seedLocation(brewery.id);
+    const [movement] = insertFixture<{ id: string; occurred_on: string }>("inventory_movements", {
+      brewery_id: brewery.id, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId,
+      created_by: owner.userId, qty: 1, type: "opening_balance", created_at: "2025-10-01T02:00:00Z",
+    });
+    expect(movement.occurred_on).toBe("2025-09-30");
+    sql(`update breweries set timezone='Asia/Tokyo' where id='${brewery.id}'`);
+    expect(sql(`select occurred_on from inventory_movements where id='${movement.id}'`, true)).toEqual(["2025-09-30"]);
+  });
+
   it("cross-foots every package class from the ledger and keys removals by frozen tax treatment", async () => {
     const r = await runCommand("generate_compliance_report", PERIOD, sales) as Report;
     const by = Object.fromEntries(r.figures.lines.map((l) => [l.class, l]));
