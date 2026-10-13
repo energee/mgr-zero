@@ -5,7 +5,8 @@
 // so validation, roles and RPCs apply unchanged. Local Supabase only. A rerun
 // skips every material, water profile and recipe whose name already exists.
 //
-//   LOLEV_IMPORT_PASSWORD=... bunx tsx scripts/import-lolev.ts <dump-dir> --email <staff email> [--dry-run]
+//   LOLEV_IMPORT_PASSWORD=... bun --env-file=.env.local scripts/import-lolev.ts <dump-dir> --email <staff email> [--dry-run]
+// The staff user must be an admin or brewer of exactly one brewery (upsert_material and the recipe commands allow both).
 import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";

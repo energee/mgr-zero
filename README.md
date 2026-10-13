@@ -135,6 +135,23 @@ never used outside local development). A customer-only account (a
 `customer_users` row with no `brewery_users` row) lands on `/portal` instead
 of `/` after login — that's the wholesale customer portal, not a bug.
 
+Importing from Lolev Manager (catalog and recipes; `docs/plans/lolev-import.md`):
+point `scripts/import-lolev.ts` at a Lolev `mongodump` directory and sign in as
+an admin or brewer of the target brewery. It writes through `upsert_material`,
+`upsert_water_profile`, `create_recipe` and `create_recipe_version`, refuses a
+non-local Supabase URL, and skips any name the brewery already has, so a rerun
+writes nothing. `--dry-run` prints counts and dropped lines without signing in.
+
+```bash
+LOLEV_IMPORT_PASSWORD=dev-password-1 bun --env-file=.env.local scripts/import-lolev.ts <dump>/lolev-manager --email dev@mgr.local
+```
+
+It imports materials (malts, hops, yeasts, sugars, adjuncts, the five water
+salts), the default water profile, and every recipe as version 1 with per-bbl
+ingredients and water additions. It does not import batches, stock, lots,
+customers or orders: Lolev never deducted ingredients, so MGR starts stock from
+an opening count.
+
 Working in a worktree: create it with `scripts/worktree.sh <branch> [base]`.
 It checks out `.agents/worktrees/<branch>`, symlinks the gitignored
 `.env.local` and `.env.test.local` from the main checkout, and runs
