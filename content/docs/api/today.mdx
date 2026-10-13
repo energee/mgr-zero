@@ -7,6 +7,10 @@ Today is the one read a member starts from: work assigned to them, due now, or
 overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
 `now`, which is what makes the view testable at a fixed moment.
 
+Confirmed orders without a requested ship date emit `pick_due` with `dueAt: null`
+and detail `pick due · no ship date`. Null dates are always due and sort after
+dated work. Work and chat read this same projection.
+
 Notification `reason` is `submitted_order`, `pick_due`, `restock_due`,
 `delivery_next`, `fermentation_reading_overdue`, `invoice_question`, or
 `operations_digest`. A preference enables or mutes one reason for the calling
