@@ -53,7 +53,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {model.headers && <Button onClick={() => onStep?.(1)}>Map {model.csvRowCount} rows</Button>}
     </>}
     {step === 1 && <>
-      <p>Map CSV columns to fields. Required fields are marked *. References use IDs from the lists below.</p>
+      <p>Map CSV columns to fields. Required fields are marked *. References accept a name or ID from the lists below. Names use a trimmed, case-insensitive exact match; ambiguous names need an ID.</p>
       {fields.map(field => <Field key={field.name}>
 
         {E.pick(field.name + (field.required ? " *" : ""), String(mapping[field.name] ?? -1), [{ value: "-1", label: "Not mapped" }, ...(model.headers?.map((header, index) => ({ value: String(index), label: header })) ?? [])], { onChange: onMapping ? value => onMapping?.(field.name, Number(value)) : undefined })}
@@ -62,9 +62,9 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       <Button onClick={() => onStep?.(2)}>Preview {rows.length} rows</Button><Button variant="outline" onClick={() => onStep?.(0)}>Back to upload</Button>
     </>}
     {(step === 1 || step === 2) && <>
-      {kind === "products_skus" && <p>Use an existing packaged formatId; create missing formats in Beer / Formats first. product is the brand name. Existing brands keep their style and ABV; new brands use these fields. Every row creates a SKU.</p>}
-      {kind === "opening_balances" && E.note("qty is a positive count of SKU units. Both locationId and its binId are required. Posting appends opening stock; importing the same stock as a new batch would add it again.")}
-      {fields.filter(field => field.lookup).map(field => <details key={field.name}><summary>{field.name} reference IDs</summary><ul className="space-y-1 break-all text-sm">{lookups[field.lookup!]?.map(item => <li key={item.id}>{item.name}{item.location_id ? ` · ${lookups.locations.find(location => location.id === item.location_id)?.name}` : ""} · <code>{item.id}</code></li>)}</ul></details>)}
+      {kind === "products_skus" && <p>Use an existing packaged format name or ID for formatId; create missing formats in Beer / Formats first. product is the brand name. Existing brands keep their style and ABV; new brands use these fields. Every row creates a SKU.</p>}
+      {kind === "opening_balances" && E.note("qty is a positive count of SKU units. Both locationId and its binId accept names or IDs and are required. A bin name is looked up within its location. Posting appends opening stock; importing the same stock as a new batch would add it again.")}
+      {fields.filter(field => field.lookup).map(field => <details key={field.name}><summary>{field.name} reference names and IDs</summary><ul className="space-y-1 break-all text-sm">{lookups[field.lookup!]?.filter(item => field.lookup !== "formats" || kind !== "products_skus" || item.basis === "packaged").map(item => <li key={item.id}>{item.name}{item.location_id ? ` · ${lookups.locations.find(location => location.id === item.location_id)?.name}` : ""} · <code>{item.id}</code></li>)}</ul></details>)}
     </>}
     {step === 2 && <>
       <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Only ready rows are sent, and each commits independently; fix blocked rows first or they are left out.</p>
