@@ -3096,6 +3096,7 @@ export type Database = {
           note: string | null
           order_no: number | null
           po_number: string | null
+          repick_since: string | null
           requested_ship_date: string | null
           sale_channel_id: string
           ship_to_id: string | null
@@ -3115,6 +3116,7 @@ export type Database = {
           note?: string | null
           order_no?: number | null
           po_number?: string | null
+          repick_since?: string | null
           requested_ship_date?: string | null
           sale_channel_id: string
           ship_to_id?: string | null
@@ -3134,6 +3136,7 @@ export type Database = {
           note?: string | null
           order_no?: number | null
           po_number?: string | null
+          repick_since?: string | null
           requested_ship_date?: string | null
           sale_channel_id?: string
           ship_to_id?: string | null

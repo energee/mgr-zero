@@ -118,6 +118,16 @@ describe("get_today (registered reader)", () => {
     );
   });
 
+  it("a dated picked order raised after pick shows pick_due and no restock_due (#811)", async () => {
+    const id = await createOrder("2026-09-07", true, true);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    await adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
+    expect(adjusted.error).toBeNull();
+    const rows = (await today(warehouse, "2026-09-07T12:00:00Z")).filter((i) => i.subjectId === id);
+    expect(rows.map((i) => i.reason)).toEqual(["pick_due"]);
+  });
+
   it("keeps a picked order on pick_due while any line is still owed", async () => {
     const id = await createOrder("2026-09-07", true, true);
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();

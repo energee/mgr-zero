@@ -973,7 +973,7 @@ describe("order lifecycle labels", () => {
     // stop leaves the order shipped, drawn as the composite below.
     const { Constants } = await import("../lib/supabase/database.generated");
     const statuses = new Set<string>(Constants.public.Enums.order_status);
-    const notLifecycle = new Set(["stale", "permission", "adjusted", "shipped · stop delivered"]);
+    const notLifecycle = new Set(["stale", "permission", "adjusted", "changed after pick", "shipped · stop delivered"]);
     for (const name of ["Order", "Order detail"]) {
       const labels = SCREENS.find((s) => s.name === name)!.states!.map(([label]) => label);
       const bad = labels.flatMap((label) => notLifecycle.has(label) ? [] : label.split(" / ").filter((part) => !statuses.has(part)));

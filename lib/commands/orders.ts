@@ -63,7 +63,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked",
+  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
@@ -122,7 +122,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason)",
+  name: "ship_order", description: "Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason)",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
