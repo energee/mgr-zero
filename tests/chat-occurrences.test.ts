@@ -19,7 +19,7 @@ async function linkWithDm(ctx: Ctx) {
   return ins("notification_destinations", { brewery_id: b.id, installation_id: inst.id, kind: "personal", external_destination_id: `D-${ctx.userId.slice(0, 8)}`, user_id: ctx.userId, privacy_class: "direct" });
 }
 
-async function createOrder(requested = "2026-09-05") {
+async function createOrder(requested: string | null = "2026-09-05") {
   const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: requested, p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 1 }],
@@ -102,6 +102,31 @@ describe("notification occurrences", () => {
     expect(result.resolved).toBeGreaterThanOrEqual(1);
     expect((await deliveriesFor(occs[0].id)).every((d) => d.state === "suppressed" && d.resolved_at !== null)).toBe(true);
     expect((await recipientsOf(await deliveriesFor(occs[1].id))).sort()).toEqual([adminCtx.userId, warehouse.userId].sort());
+  });
+
+  it("scans undated confirmed picks once and resolves them when scheduled in the future (#820)", async () => {
+    const id = await createOrder(null);
+    expect((await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id })).error).toBeNull();
+    expect((await adminCtx.db.rpc("confirm_order", { p_request_id: crypto.randomUUID(), p_order: id })).error).toBeNull();
+    await scan("2026-09-05T15:00:00Z");
+    const picks = (await occurrences(id)).filter((o) => o.reason === "pick_due");
+    expect(picks).toHaveLength(1);
+    const [pick] = picks;
+    expect(pick).toMatchObject({
+      state: "active", owner_query: "picks", due_at: null,
+      payload: { detail: "pick due · no ship date", due_at: null, href: `/orders/${id}`, recipient_roles: ["admin", "warehouse"] },
+    });
+    const deliveries = await deliveriesFor(pick.id);
+    expect((await recipientsOf(deliveries)).sort()).toEqual([adminCtx.userId, warehouse.userId].sort());
+    const rendered = renderSlackMessage(toNotification(occurrenceSchema.parse(pick)), { intentId: "fixture", mgrBaseUrl: "https://mgr.test" });
+    expect(JSON.stringify(rendered)).toContain("pick due · no ship date");
+    await scan("2026-09-05T16:00:00Z");
+    expect((await occurrences(id)).filter((o) => o.reason === "pick_due")).toHaveLength(1);
+    expect(await deliveriesFor(pick.id)).toHaveLength(deliveries.length);
+    expect((await admin.from("orders").update({ requested_ship_date: "2026-09-06" }).eq("id", id)).error).toBeNull();
+    await scan("2026-09-05T17:00:00Z");
+    expect((await occurrences(id)).find((o) => o.id === pick.id)?.state).toBe("resolved");
+    expect((await deliveriesFor(pick.id)).every((d) => d.state === "suppressed")).toBe(true);
   });
 
   it("re-queues sent deliveries once for a resolved update, keeping the message id", async () => {
