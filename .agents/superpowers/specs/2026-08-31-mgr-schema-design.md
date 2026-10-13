@@ -580,7 +580,7 @@ material movements. Owned-keg fills are FG inventory, not keg events (§12).
 function; the client never inserts the parent and planned outputs separately.
 
 ### `packaging_run_outputs`
-`unit_cost_cents numeric >= 0` is nullable and frozen at packaging close per run/SKU. Null means uncosted; old runs are not backfilled. Ingredient costs use consumed lot receipts and batch knockout volume; standard BOM costs exclude packaging loss. `sku_inventory_value` is a security-invoker current-stock valuation view. Admin/Sales command permission hides value in other role screens; staff table/view access is unchanged.
+`unit_cost_cents numeric >= 0` is nullable and frozen at packaging close per run/SKU. Null means uncosted; old runs are not backfilled. Ingredient costs use consumed lot receipts (ordered by `material_receipt_costs`, which `material_last_cost` also reads) and the batch knockout volume summed from current brew-record revisions; standard BOM costs exclude packaging loss. `sku_inventory_value` is a security-invoker current-stock valuation view per SKU, and `inventory_value` sums it to one row per brewery. Admin/Sales command permission hides value in other role screens; staff table/view access is unchanged.
 `run_id → packaging_runs, sku_id → skus, qty_planned numeric >= 0, qty_actual numeric
 >= 0, movement_id → inventory_movements unique`. unique `(run_id, sku_id)`. Yield view
 below.

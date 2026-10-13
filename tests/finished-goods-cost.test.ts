@@ -5,7 +5,6 @@ import { closeWithConfirmedMaterials } from "./packaging-fixture";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-type Value = { sku_id: string; qty: number; value_cents: number | null; uncosted_qty: number };
 async function costedBatch(receiptCost: number | null = 100) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "admin");
@@ -39,7 +38,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     const f = await costedBatch();
     const saved = await f.close();
     expect(Number(saved.cost)).toBe(500);
-    expect(await runCommand("get_inventory_value", {}, f.ctx)).toContainEqual({ sku_id: f.catalog.skuId, qty: 4, value_cents: 2000, uncosted_qty: 0 });
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 2000, uncosted_qty: 0 });
     // Receipt prices can change later; an exact completed close must not re-cost its output.
     await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: f.lot.id, qty: 10, type: "receipt", unitCostCents: 120, createdBy: f.ctx.userId });
     expect(await closeWithConfirmedMaterials(saved.input, f.ctx, saved.execution)).toEqual(saved.receipt);
@@ -56,7 +55,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     const newer = await ins("material_lots", { brewery_id: f.brewery.id, material_id: f.materialId, lot_code: "OTHER-LOT", received_on: "2026-10-02" });
     await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: newer.id, qty: 100, type: "receipt", unitCostCents: 150, createdBy: f.ctx.userId });
     expect((await f.close()).cost).toBeNull();
-    expect(await runCommand("get_inventory_value", {}, f.ctx)).toContainEqual({ sku_id: f.catalog.skuId, qty: 4, value_cents: null, uncosted_qty: 4 });
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 0, uncosted_qty: 4 });
   });
 
   it("does not raise the rate when beer is transferred into another batch", async () => {
@@ -78,7 +77,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     const f = await costedBatch();
     await seedMovement(f.brewery.id, { materialId: f.materialId, locationId: f.location.id, binId: f.location.binId, lotId: f.lot.id, qty: 10, type: "receipt", createdBy: f.ctx.userId });
     expect((await f.close()).cost).toBeNull();
-    expect(await runCommand("get_inventory_value", {}, f.ctx)).toContainEqual({ sku_id: f.catalog.skuId, qty: 4, value_cents: null, uncosted_qty: 4 });
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 0, uncosted_qty: 4 });
   });
 
   it("uses the consumed lot rather than a later receipt of another lot", async () => {
@@ -136,11 +135,18 @@ describe("finished-goods cost (#810 PR1)", () => {
     expect(Number((await f.close()).cost)).toBe(450);
   });
 
+  it("divides by the corrected knockout volume, not the original turn volume", async () => {
+    const f = await costedBatch();
+    await runCommand("correct_brew_record", { recordId: f.brewed.record.id, reason: "First turn measured lower", initialBbl: 4, actuals: f.turn.actuals }, f.ctx);
+    // 10,000 cents over 9 bbl, 2 bbl drawn into four 0.5-bbl kegs.
+    expect(Number((await f.close()).cost)).toBeCloseTo(5000 / 9);
+  });
+
   it("values remaining tracked stock after shipping and reports opening units as uncosted", async () => {
     const f = await costedBatch();
     const saved = await f.close();
     await runCommand("record_movement", { skuId: f.catalog.skuId, locationId: f.location.id, binId: f.location.binId, qty: 2, type: "opening_balance" }, f.ctx);
-    expect(await runCommand("get_inventory_value", {}, f.ctx)).toContainEqual({ sku_id: f.catalog.skuId, qty: 6, value_cents: 2000, uncosted_qty: 2 });
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 2000, uncosted_qty: 2 });
     const customer = await seedCustomer(f.brewery.id);
     await priceSku(f.brewery.id, { saleChannelId: customer.saleChannelId, brandId: f.catalog.brandId, formatId: f.catalog.formatId, cents: 12000 });
     const order = await runCommand("create_order", { kind: "wholesale", customerId: customer.customerId, shipToId: customer.shipToId, fromLocationId: f.location.id, lines: [{ skuId: f.catalog.skuId, qty: 1 }] }, f.ctx) as { order_id: string };
@@ -150,7 +156,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     await runCommand("record_pick", { orderId: order.order_id, picks: [{ lineId: line.id, qty: 1 }] }, f.ctx);
     const lot = (await admin.from("lots").select("id").eq("packaging_run_id", saved.runId).single().throwOnError()).data!;
     await runCommand("ship_order", { orderId: order.order_id, ship: [{ lineId: line.id, qty: 1, sources: [{ binId: f.location.binId, lotId: lot.id, qty: 1 }] }] }, f.ctx);
-    expect(await runCommand("get_inventory_value", {}, f.ctx)).toContainEqual({ sku_id: f.catalog.skuId, qty: 5, value_cents: 1500, uncosted_qty: 2 });
+    expect(await runCommand("get_inventory_value", {}, f.ctx)).toEqual({ value_cents: 1500, uncosted_qty: 2 });
   });
 
   it("prices tracked BOM at its used source and does not absorb packaging loss", async () => {
@@ -168,7 +174,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     const f = await costedBatch();
     await f.close();
     const sales = await makeStaffCtx(f.brewery.id, "sales");
-    expect((await runCommand("get_inventory_value", {}, sales) as Value[])[0].value_cents).toBe(2000);
+    expect(await runCommand("get_inventory_value", {}, sales)).toEqual({ value_cents: 2000, uncosted_qty: 0 });
     for (const role of ["warehouse", "brewer"] as const) {
       const ctx = await makeStaffCtx(f.brewery.id, role);
       await expect(runCommand("get_inventory_value", {}, ctx)).rejects.toThrow(/permission|role|allowed|forbidden/i);
@@ -176,5 +182,7 @@ describe("finished-goods cost (#810 PR1)", () => {
     const foreign = await makeBrewery();
     const outsider = await makeStaffCtx(foreign.id, "admin");
     expect((await outsider.db.from("sku_inventory_value").select("*").eq("brewery_id", f.brewery.id).throwOnError()).data).toEqual([]);
+    expect((await outsider.db.from("inventory_value").select("*").eq("brewery_id", f.brewery.id).throwOnError()).data).toEqual([]);
+    expect(await runCommand("get_inventory_value", {}, outsider)).toEqual({ value_cents: 0, uncosted_qty: 0 });
   });
 });

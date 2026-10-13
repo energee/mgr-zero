@@ -153,6 +153,13 @@ export type Database = {
             referencedColumns: ["id", "brewery_id"]
           },
           {
+            foreignKeyName: "batch_additions_movement_id_brewery_id_fkey"
+            columns: ["movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
+          },
+          {
             foreignKeyName: "batch_additions_occupancy_id_brewery_id_fkey"
             columns: ["occupancy_id", "brewery_id"]
             isOneToOne: false
@@ -2349,6 +2356,13 @@ export type Database = {
             referencedRelation: "material_movements"
             referencedColumns: ["id", "brewery_id"]
           },
+          {
+            foreignKeyName: "material_count_lines_movement_id_brewery_id_fkey"
+            columns: ["movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
+          },
         ]
       }
       material_counts: {
@@ -2528,6 +2542,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "material_movements"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "material_movements_compensates_id_brewery_id_fkey"
+            columns: ["compensates_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
           },
           {
             foreignKeyName: "material_movements_location_id_brewery_id_fkey"
@@ -3274,6 +3295,13 @@ export type Database = {
             referencedColumns: ["id", "brewery_id"]
           },
           {
+            foreignKeyName: "packaging_material_actuals_loss_movement_id_brewery_id_fkey"
+            columns: ["loss_movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
+          },
+          {
             foreignKeyName: "packaging_material_actuals_lot_id_brewery_id_fkey"
             columns: ["lot_id", "brewery_id"]
             isOneToOne: false
@@ -3300,6 +3328,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "material_movements"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_material_actuals_used_movement_id_brewery_id_fkey"
+            columns: ["used_movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
           },
         ]
       }
@@ -3405,6 +3440,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "material_movements"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "packaging_run_consumptions_movement_id_brewery_id_fkey"
+            columns: ["movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
           },
           {
             foreignKeyName: "packaging_run_consumptions_run_id_brewery_id_fkey"
@@ -4956,6 +4998,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "material_movements"
             referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "receipt_lines_movement_id_brewery_id_fkey"
+            columns: ["movement_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_receipt_costs"
+            referencedColumns: ["movement_id", "brewery_id"]
           },
           {
             foreignKeyName: "receipt_lines_po_line_id_brewery_id_fkey"
@@ -6818,6 +6867,22 @@ export type Database = {
           },
         ]
       }
+      inventory_value: {
+        Row: {
+          brewery_id: string | null
+          uncosted_qty: number | null
+          value_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_totals: {
         Row: {
           brewery_id: string | null
@@ -7248,6 +7313,40 @@ export type Database = {
           },
         ]
       }
+      material_receipt_costs: {
+        Row: {
+          brewery_id: string | null
+          cost_at: string | null
+          cost_order_key: string | null
+          lot_id: string | null
+          material_id: string | null
+          movement_id: string | null
+          unit_cost_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_movements_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_movements_lot_id_material_id_brewery_id_fkey"
+            columns: ["lot_id", "material_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "material_lots"
+            referencedColumns: ["id", "material_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "material_movements_material_id_brewery_id_fkey"
+            columns: ["material_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
       material_requirements: {
         Row: {
           base_uom: Database["public"]["Enums"]["uom"] | null
@@ -7664,7 +7763,6 @@ export type Database = {
       sku_inventory_value: {
         Row: {
           brewery_id: string | null
-          qty: number | null
           sku_id: string | null
           uncosted_qty: number | null
           value_cents: number | null

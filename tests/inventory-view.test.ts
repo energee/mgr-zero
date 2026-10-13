@@ -22,9 +22,7 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Finished goods view", () => {
   it("renders authorized inventory value and counts uncosted units without valuing them (#810)", () => {
-    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Costed keg" }], [{ sku_id: "s1", qty: 4 }], [{ sku_id: "s1", qty: 4 }], [
-      { sku_id: "s1", qty: 4, value_cents: 2000.4, uncosted_qty: 1.5 },
-    ]);
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Costed keg" }], [{ sku_id: "s1", qty: 4 }], [{ sku_id: "s1", qty: 4 }], { value_cents: 2000.4, uncosted_qty: 1.5 });
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot) }));
     expect(html).toContain("Inventory value");
     expect(html).toContain("$20.00");

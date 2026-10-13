@@ -6,7 +6,7 @@ description: "Stock on hand, available-to-promise, movements, bins, locations an
 `reverse_inventory_movement` accepts only standalone adjustments and losses. Its required note and selected movement form the retry identity; it appends an exact linked opposite with frozen package class and volume in the original bin and lot. Insufficient stock prevents removing a positive adjustment. Count/depletion and compound correction owners remain unchanged. Completed retries return the original result; changed inputs conflict. Corrections post in their own period and never rewrite filed snapshots.
 
 
-`get_inventory_value` returns current frozen-cost value and uncosted units per SKU for Admin and Sales. Cost freezes at packaging close from consumed-lot receipt costs (or last cost for untracked materials), batch knockout volume, barrels drawn, and standard packaging BOM. It has no as-of date or historical backfill.
+`get_inventory_value` returns the brewery's current frozen-cost stock value and its uncosted units, as one total, for Admin and Sales. Cost freezes at packaging close from consumed-lot receipt costs (or last cost for untracked materials), batch knockout volume after brew-record corrections, barrels drawn, and standard packaging BOM. It has no as-of date or historical backfill.
 
 The ledger is immutable. A movement is appended, never edited or deleted, and a
 correction is a new movement in the opposite direction. That is what makes the
@@ -191,11 +191,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Current finished-goods value per SKU at frozen packaging-close cost, with units lacking a cost
+Current finished-goods value at frozen packaging-close cost, with the units lacking a cost
 
-| Field | Type | Required |
-| --- | --- | --- |
-| `skuId` | uuid | no |
+Takes no input.
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

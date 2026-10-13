@@ -7,10 +7,7 @@ export type { Json } from "./database.generated";
 type Tables = GeneratedDatabase["public"]["Tables"];
 type LedgerInsert = Tables["inventory_movements"]["Insert"];
 type Views = GeneratedDatabase["public"]["Views"];
-type NonNullStockView = "on_hand" | "bin_on_hand" | "atp";
-type InventoryValueView = Omit<Views["sku_inventory_value"], "Row"> & { Row: {
-  brewery_id: string; sku_id: string; qty: number; value_cents: number | null; uncosted_qty: number;
-} };
+type NonNullStockView = "on_hand" | "bin_on_hand" | "atp" | "inventory_value";
 type Functions = GeneratedDatabase["public"]["Functions"];
 export type Database = Omit<GeneratedDatabase, "public"> & {
   public: Omit<GeneratedDatabase["public"], "Functions" | "Views" | "Tables"> & {
@@ -21,7 +18,7 @@ export type Database = Omit<GeneratedDatabase, "public"> & {
     // These stock views group non-null keys/quantities or coalesce totals.
     Views: { [Name in keyof Views]: Name extends NonNullStockView
       ? Omit<Views[Name], "Row"> & { Row: { [Col in keyof Views[Name]["Row"]]: NonNullable<Views[Name]["Row"][Col]> } }
-      : Name extends "sku_inventory_value" ? InventoryValueView : Views[Name] };
+      : Views[Name] };
     // Postgres accepts NULL for function arguments; the generator does not encode
     // argument nullability. Domain requirements remain enforced inside each RPC.
     Functions: {

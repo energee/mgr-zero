@@ -12,7 +12,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext, isUuid } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { canRun } from "@/lib/commands/registry";
-import type { InventoryValueRow } from "@/lib/commands/inventory";
+import type { InventoryValue } from "@/lib/commands/inventory";
 import { assembleFinishedGoods, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
@@ -38,11 +38,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_atp", "Finished goods");
-  const [skus, locations, bins, channels, onHand, atp, movements, valueRows] = (await Promise.all([
+  const [skus, locations, bins, channels, onHand, atp, movements, value] = (await Promise.all([
     runCommand("list_skus", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_sale_channels", {}, ctx),
     runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { limit: 51, offset: page * 50 }, ctx),
     canRun(ctx, "get_inventory_value") ? runCommand("get_inventory_value", {}, ctx) : undefined,
-  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[], InventoryValueRow[] | undefined];
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[], InventoryValue | undefined];
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
@@ -63,7 +63,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   } : undefined;
   return (
     <FinishedGoodsView
-      model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, valueRows))}
+      model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
       createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
       afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
       linkRows

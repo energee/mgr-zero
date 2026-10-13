@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { movementInput } from "./movement-input";
+import type { Database } from "@/lib/supabase/database";
 
 /**
  * Appends an inventory movement through its security-definer RPC. `binId` is
@@ -145,20 +146,16 @@ defineQuery({
   }, row => row.sku_id),
 });
 
-export type InventoryValueRow = { sku_id: string; qty: number; value_cents: number | null; uncosted_qty: number };
+export type InventoryValue = Pick<Database["public"]["Views"]["inventory_value"]["Row"], "value_cents" | "uncosted_qty">;
 
 defineQuery({
-  name: "get_inventory_value", description: "Current finished-goods value per SKU at frozen packaging-close cost, with units lacking a cost",
-  input: bySku, roles: ["admin", "sales"],
-  handler: (ctx, i) => completeRows<InventoryValueRow>("Inventory value", async (_, after) => {
-    let q = ctx.db.from("sku_inventory_value").select("sku_id, qty, value_cents, uncosted_qty").eq("brewery_id", ctx.breweryId).limit(PAGE_SIZE);
-    let counted = ctx.db.from("sku_inventory_value").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
-    if (i.skuId) q = q.eq("sku_id", i.skuId);
-    if (i.skuId) counted = counted.eq("sku_id", i.skuId);
-    if (after) q = q.gt("sku_id", after.sku_id);
-    const [result, count] = await Promise.all([q.order("sku_id"), counted]);
-    return { ...result, count: count.count, error: result.error ?? count.error };
-  }, row => row.sku_id),
+  name: "get_inventory_value", description: "Current finished-goods value at frozen packaging-close cost, with the units lacking a cost",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: async (ctx): Promise<InventoryValue> => {
+    const row = await unwrap(ctx.db.from("inventory_value").select("value_cents, uncosted_qty").eq("brewery_id", ctx.breweryId).maybeSingle());
+    // The view groups stock rows by brewery; no row means no stock, worth nothing.
+    return row ?? { value_cents: 0, uncosted_qty: 0 };
+  },
 });
 
 defineQuery({

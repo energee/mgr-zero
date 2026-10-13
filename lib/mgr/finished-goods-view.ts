@@ -1,6 +1,7 @@
 // lib/mgr/finished-goods-view.ts — Finished goods stock and authorized get_inventory_value totals.
 import type { EmptyState } from "./empty-state";
 import { money } from "./money";
+import type { InventoryValue } from "@/lib/commands/inventory";
 export type FinishedGoodsRowView = {
   key: string;
   title: string;
@@ -33,8 +34,6 @@ export type FinishedGoodsSnapshot = {
   backHref?: string;
 };
 
-export type FinishedGoodsValueRow = { sku_id: string; qty: string | number; value_cents: string | number | null; uncosted_qty: string | number };
-
 type StockRow = { sku_id: string; qty: string | number };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -43,7 +42,7 @@ export function assembleFinishedGoods(
   skus: Omit<FinishedGoodsSku, "on_hand" | "atp">[],
   onHandRows: StockRow[],
   atpRows: StockRow[],
-  valueRows?: FinishedGoodsValueRow[],
+  value?: InventoryValue,
 ): FinishedGoodsSnapshot {
   // qty is numeric(12,2); round each running total so 0.10 + 0.20 stays 0.3.
   const sum = (rows: StockRow[]) => rows.reduce(
@@ -53,11 +52,8 @@ export function assembleFinishedGoods(
   const onHand = sum(onHandRows);
   const atp = new Map(atpRows.map((row) => [row.sku_id, Number(row.qty)]));
   return {
-    ...(valueRows ? { value: {
-      // Null costs contribute no dollars, but their units remain explicit below.
-      cents: Math.round(valueRows.reduce((total, row) => total + Number(row.value_cents ?? 0), 0)),
-      uncostedUnits: round2(valueRows.reduce((total, row) => total + Number(row.uncosted_qty), 0)),
-    } } : {}),
+    // Uncosted units contribute no dollars, but their count stays explicit.
+    ...(value ? { value: { cents: Math.round(value.value_cents), uncostedUnits: round2(value.uncosted_qty) } } : {}),
     skus: skus.filter((sku) => onHand.has(sku.id) || atp.has(sku.id)).map((sku) => ({
       ...sku,
       on_hand: onHand.get(sku.id) ?? 0,

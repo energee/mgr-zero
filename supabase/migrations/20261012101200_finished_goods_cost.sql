@@ -5,22 +5,43 @@ alter table public.packaging_run_outputs add column unit_cost_cents numeric
 comment on column public.packaging_run_outputs.unit_cost_cents is
   'Cost per package frozen at close. Null means an input has no cost; historical runs are not backfilled.';
 
+-- Uncorrected receipts with their economic cost order: correcting an old
+-- receipt does not make it the newest purchase. Newest first is
+-- cost_at desc, cost_order_key desc, movement_id desc. Both material_last_cost
+-- and private.material_source_cost read this one definition.
+create view public.material_receipt_costs with (security_invoker=true) as
+  select movement.brewery_id,movement.material_id,movement.lot_id,movement.id as movement_id,
+    movement.unit_cost_cents,
+    coalesce(receipt.cost_recorded_at,movement.created_at) as cost_at,
+    coalesce(receipt.cost_order_id,receipt.receipt_id,movement.id) as cost_order_key
+  from public.material_movements movement
+  left join public.receipt_lines receipt on receipt.movement_id=movement.id
+    and receipt.brewery_id=movement.brewery_id
+  where movement.type='receipt'
+    and not exists(select 1 from public.material_movements reversal where reversal.compensates_id=movement.id);
+revoke all on public.material_receipt_costs from public,anon,authenticated;
+grant select on public.material_receipt_costs to authenticated;
+grant all on public.material_receipt_costs to postgres,service_role;
+
+-- Same columns and result as 20260928110000_receipt_corrections.sql, now read
+-- from the shared receipt order.
+create or replace view public.material_last_cost with (security_invoker = true) as
+  select distinct on (r.brewery_id,r.material_id)
+    r.brewery_id,r.material_id,r.unit_cost_cents,r.cost_at as created_at
+  from public.material_receipt_costs r
+  where r.unit_cost_cents is not null
+  order by r.brewery_id,r.material_id,r.cost_at desc,r.cost_order_key desc,r.movement_id desc;
+
 -- A tracked lot uses only its own newest uncorrected receipt, never another
 -- lot's latest price. Untracked material uses the existing last-cost owner.
 create function private.material_source_cost(p_brewery uuid,p_material uuid,p_lot uuid)
 returns numeric language sql stable set search_path='' as $$
   select case when material.lot_tracked then
-    -- Use the same economic receipt order as material_last_cost: correcting
-    -- an old receipt does not make it the newest purchase. A newest null
-    -- price, or an absent tracked source, stays uncosted rather than falling back.
-    (select movement.unit_cost_cents from public.material_movements movement
-     left join public.receipt_lines receipt on receipt.movement_id=movement.id
-       and receipt.brewery_id=movement.brewery_id
-     where movement.brewery_id=p_brewery and movement.material_id=p_material and movement.lot_id=p_lot
-       and movement.type='receipt'
-       and not exists(select 1 from public.material_movements reversal where reversal.compensates_id=movement.id)
-     order by coalesce(receipt.cost_recorded_at,movement.created_at) desc,
-       coalesce(receipt.cost_order_id,receipt.receipt_id,movement.id) desc,movement.id desc limit 1)
+    -- A newest null price, or an absent tracked source, stays uncosted rather
+    -- than falling back.
+    (select r.unit_cost_cents from public.material_receipt_costs r
+     where r.brewery_id=p_brewery and r.material_id=p_material and r.lot_id=p_lot
+     order by r.cost_at desc,r.cost_order_key desc,r.movement_id desc limit 1)
   else
     (select cost.unit_cost_cents from public.material_last_cost cost
      where cost.brewery_id=p_brewery and cost.material_id=p_material)
@@ -196,12 +217,14 @@ begin
       round((v_balance->>'baselineBbl')::numeric - (v_balance->>'attributedBbl')::numeric, 2);
   end if;
 
-  -- Freeze after all conservation checks. Knockout includes every brew turn,
-  -- not the transfer-adjusted operational baseline; draw loss is absorbed here.
+  -- Freeze after all conservation checks. Knockout is every brew turn's current
+  -- revision (correct_brew_record leaves vessel_occupancies.initial_bbl at the
+  -- original value), not the transfer-adjusted baseline; draw loss is absorbed here.
   if v_packaged > 0 then
     v_liquid := private.batch_material_cost(p_brewery, v_occupancy.batch_id);
-    select sum(o.initial_bbl) into v_knockout_bbl from public.vessel_occupancies o
-      where o.brewery_id=p_brewery and o.batch_id=v_occupancy.batch_id;
+    select sum(record.initial_bbl) into v_knockout_bbl from public.brew_records record
+      where record.brewery_id=p_brewery and record.batch_id=v_occupancy.batch_id
+        and not exists(select 1 from public.brew_records later where later.corrects_id=record.id);
     v_cost_per_bbl := v_liquid / nullif(v_knockout_bbl,0);
     update public.packaging_run_outputs output set unit_cost_cents =
       v_cost_per_bbl * v_drawn / v_packaged * (movement.bbl / movement.qty)
@@ -233,7 +256,7 @@ grant execute on function public.close_packaging_run(uuid,uuid,numeric,jsonb,tex
 -- Costed stock is valued at frozen lot/SKU cost. Lot-less stock and repack
 -- children with no original output cost remain explicitly uncosted.
 create view public.sku_inventory_value with (security_invoker=true) as
-  select movement.brewery_id,movement.sku_id,sum(movement.qty) as qty,
+  select movement.brewery_id,movement.sku_id,
     sum(movement.qty * output.unit_cost_cents) filter(where output.unit_cost_cents is not null) as value_cents,
     coalesce(sum(movement.qty) filter(where output.unit_cost_cents is null),0) as uncosted_qty
   from public.inventory_movements movement
@@ -244,3 +267,12 @@ create view public.sku_inventory_value with (security_invoker=true) as
 revoke all on public.sku_inventory_value from public,anon,authenticated;
 grant select on public.sku_inventory_value to authenticated;
 grant all on public.sku_inventory_value to postgres,service_role;
+
+-- One row per brewery for Finished goods: the summed per-SKU value, so the
+-- page reads one row rather than every SKU.
+create view public.inventory_value with (security_invoker=true) as
+  select brewery_id,coalesce(sum(value_cents),0) as value_cents,sum(uncosted_qty) as uncosted_qty
+  from public.sku_inventory_value group by brewery_id;
+revoke all on public.inventory_value from public,anon,authenticated;
+grant select on public.inventory_value to authenticated;
+grant all on public.inventory_value to postgres,service_role;
