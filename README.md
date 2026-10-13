@@ -235,7 +235,7 @@ against it, then
 `bun run lint`, `tsc --noEmit` and `bun run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
 
-After a pull request merges—or when manually dispatched on `main`—
+After a pull request merges, weekly, or when manually dispatched on `main`,
 `.github/workflows/documentation-agent.yml` audits every current user-facing
 route, not only the triggering change, and updates the
 staff and portal field manuals linked from `content/docs/index.mdx` when behavior has drifted. The

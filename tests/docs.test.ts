@@ -3,7 +3,7 @@
 // documentation maintainer must keep, and the legacy URL redirects.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 
@@ -52,6 +52,31 @@ describe("customer guides (MDX)", () => {
     for (const section of ["access", "shop", "statuses", "orders", "invoices", "account", "help"]) {
       expect(portal).toContain(`[#${section}]`);
     }
+  });
+
+  // The maintainer's prompt calls this a hard rule; a prompt alone let 23 through.
+  it("uses no em dashes in the customer guides", () => {
+    const hits = CUSTOMER_GUIDES.flatMap((guide) =>
+      read(`content/docs/${guide}.mdx`)
+        .split("\n")
+        .map((line, i) => ({ line, at: `${guide}.mdx:${i + 1}` }))
+        // **—** is an on-screen value (Catalog shows it for a format with no volume), not punctuation.
+        .filter(({ line }) => line.replaceAll("**\u2014**", "").includes("\u2014"))
+        .map(({ at }) => at),
+    );
+    expect(hits).toEqual([]);
+  });
+
+  // A coarse floor, not proof of coverage: each top-level route's name (dashes as
+  // spaces) appears somewhere in its audience's guide, so a new area cannot ship unmentioned.
+  it("names every staff and portal route in its guide", () => {
+    const segments = (dir: string) =>
+      [...new Set(gitFiles(`${dir}/**/page.tsx`).map((p) => relative(dir, p).split("/")[0]))].filter((s) => s !== "page.tsx");
+    const missing = (guide: string, dir: string) => {
+      const mdx = read(`content/docs/${guide}.mdx`).toLowerCase().replace(/-/g, " ");
+      return segments(dir).filter((s) => !mdx.includes(s.replace(/-/g, " "))).map((s) => `${guide}: ${s}`);
+    };
+    expect([...missing("staff-guide", "app/(app)"), ...missing("portal-guide", "app/(portal)/portal")]).toEqual([]);
   });
 
   it("points every in-page link at an anchor the guide actually declares", () => {
