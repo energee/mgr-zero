@@ -16,11 +16,12 @@ import { RunClosedView } from "../components/mgr/views/run-closed";
 import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
-  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
-import { canRecordBrewDay } from "../lib/mgr/brew-day-view";
+import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
+import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
 import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
@@ -120,6 +121,19 @@ describe("Schedule batch view", () => {
 });
 
 describe("Brew day view", () => {
+  it("keeps plan actions on the first brew but not on an additional turn", () => {
+    const planActions = createElement(PlanActions, { plannedOn: "2026-09-04" });
+    const planned = htmlOf(createElement(BrewDayView, { model: brewDayHazy, planActions }));
+    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(planned).toContain(label);
+    const turn = htmlOf(createElement(BrewDayView, { model: brewTurnModel(brewDayTurnsHazy), planActions }));
+    expect(turn).toContain("Record brew turn");
+    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(turn).not.toContain(label);
+  });
+  it("makes multiple recorded turns reachable in the inventory", () => {
+    const html = htmlOf(screen("Brew day").body);
+    for (const label of ["Add brew turn", "Correct turn 1", "Correct turn 2", "Turn 1", "Turn 2"]) expect(html).toContain(label);
+    expect(screen("Brew day").states).toContainEqual(expect.arrayContaining(["multiple turns"]));
+  });
   it("requires actual form values and never offers to brew an already brewed batch again", () => {
     expect(canRecordBrewDay(brewDayHazy)).toBe(true);
     for (const patch of [{ initialBbl: "0" }, { initialBbl: "Infinity" }, { vesselId: "missing" }, { brewedOn: "" }, { recorded: true }]) expect(canRecordBrewDay({ ...brewDayHazy, ...patch })).toBe(false);
@@ -145,9 +159,9 @@ describe("Brew day view", () => {
     expect(src("app/(app)/batches/[id]/page.tsx")).not.toMatch(/\bbody=/);
   });
   it("the Brew day inventory record is BrewDayView", () => {
-    const body = screen("Brew day").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(BrewDayView);
-    expect(body.props.model).toEqual(brewDayHazy);
+    const body = screen("Brew day").body as { props: { children: { type: unknown; props: { model: unknown } }[] } };
+    expect(body.props.children.map(view => view.type)).toEqual([BrewDayView, BrewDayView]);
+    expect(body.props.children.map(view => view.props.model)).toEqual([brewDayHazy, brewDayTurnsHazy]);
   });
 
   it("renders Record brew day and knockout", () => {

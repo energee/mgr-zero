@@ -8,7 +8,11 @@ format is the physical package (keg, can, bottle); it owns `unitsPerCase` and
 `bblPerUnit`. A poured format (a pint, a taster) never holds stock: it is a
 ratio back to the keg it pours from, belongs to a price group rather than a
 brand, and never becomes a SKU. A SKU is one brand × one packaged format,
-with an optional UPC.
+with an optional UPC. A keg SKU may also name a keg pool (`kegPoolId`, read
+from `list_keg_pools`), whose per-keg deposit wholesale orders charge. The pool
+must be in service and the format a keg with a keg size, or the request fails;
+the pool's kind sets the SKU's container source, so you never send one. A SKU
+already linked to a pool that is later taken out of service keeps the link.
 
 Prices live on a grid, not on SKUs. A price group is a row of that grid and a
 brand sits on one; it also owns the poured formats that become columns on the
@@ -44,7 +48,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create a SKU: one brand × one packaged format; the name defaults to brand · format
+Create a SKU: one brand × one packaged format; the name defaults to brand · format; optional keg pool supplies the per-keg deposit
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -52,6 +56,7 @@ Create a SKU: one brand × one packaged format; the name defaults to brand · fo
 | `formatId` | uuid | yes |
 | `name` | string | no |
 | `upc` | string | no |
+| `kegPoolId` | uuid or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -266,13 +271,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged
+Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clear); brand, format, provider mappings and history stay unchanged
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `skuId` | uuid | yes |
 | `active` | boolean | yes |
 | `upc` | string | no |
+| `kegPoolId` | uuid or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brewCorrectionModel, brewPlanActuals, canRecordBrewDay, type BrewDayViewModel, type BrewRecordView } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewPlanActuals, brewTurnModel, canRecordBrewDay, currentBrewRecords, type BrewDayViewModel, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 
 describe("brew actual confirmation", () => {
   const source = { material_id: "m", material_name: "Malt", unit: "lb", location_id: "l", location_name: "Brewery", bin_id: "b", bin_name: "Stock", lot_id: "lot", lot_code: "M1", qty: 150 };
@@ -27,9 +27,18 @@ describe("brew actual confirmation", () => {
     expect(canRecordBrewDay(model)).toBe(true);
   });
 
+  it("starts another turn from the remaining plan and the brewery-local day", () => {
+    const original = { id: "first", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: {}, process: {}, additions: [] } satisfies BrewRecordView;
+    const correction = { ...original, id: "correction", initial_bbl: 1.8, corrects_id: "first" };
+    const records = [original, correction];
+    expect(currentBrewRecords(records)).toEqual([correction]);
+    const model: BrewDayViewModel = { title: "Batch", vesselId: "v", vessels: [{ id: "v", name: "FV", kind: "fermenter", capacity_bbl: 10 }], initialBbl: "1.8", brewedOn: "2026-10-01", today: "2026-10-12", plannedBbl: 4, recorded: true, records, sources: [source], plan: { ingredients: [{ id: "i", material_id: "m", materialName: "Malt", unit: "lb", stage: "mash", per_bbl_qty: 60 }] } };
+    expect(brewTurnModel(model)).toMatchObject({ recorded: false, addingTurn: true, vesselId: "v", initialBbl: "2.2", brewedOn: "2026-10-12", actuals: [expect.objectContaining({ qty: "132" })] });
+  });
+
   it("restores exact old-source availability for correction without changing the supplied source list", () => {
     const model: BrewDayViewModel = { title: "Batch", vesselId: "v", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", sources: [{ ...source, qty: 0.1 }], recorded: true };
-    const record: BrewRecordView = { id: "record", initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: { recipe: "Frozen recipe" }, process: { knockoutTempF: 68 }, additions: [
+    const record: BrewRecordView = { id: "record", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: { recipe: "Frozen recipe" }, process: { knockoutTempF: 68 }, additions: [
       { id: "addition", material_name: "Old malt", unit: "lb", confirmed_qty: 0.2, stage: "mash", recipe_ingredient_id: null, lot_code: "M1", location_name: "Brewery", bin_name: "Stock", source: { material_id: "m", location_id: "l", bin_id: "b", lot_id: "lot" } },
     ] };
     const correction = brewCorrectionModel(model, record);
