@@ -87,7 +87,7 @@ The plan below assumes **R1**. If R2, tasks 5–7 grow and a schema task is adde
 - Each lot is sold through on its production date (`depletion`), so on-hand is
   never touched. A depletion needs a sale channel and a tax treatment
   (`removal_shape`, `00001_baseline.sql:665`): default the Taproom channel,
-  taxpaid. ponytail: same-day sell-through; real sell-out dates are unknown,
+  `taxable` (the report's taxpaid removal). ponytail: same-day sell-through; real sell-out dates are unknown,
   and any pre-books date is invisible to reports.
 - Brands: history needs `brand_id` on runs and lots, so Lolev beers become
   brands here (the deferred "beers → brands" pass folds in).
@@ -156,6 +156,6 @@ after 3 and 5.
 - **Books-opened date for Lolev Beer.** Default: the day after the last
   historical batch closes, or the go-live date you give.
 - **Sell-through date.** Default: same day as packaging.
-- **Sell-through channel and tax treatment.** Default: Taproom, taxpaid.
+- **Sell-through channel and tax treatment.** Default: Taproom, `taxable`.
 - **Batches with no `initialVolume` (38).** Default: planned volume from the
   recipe's batch size; skipped and reported if neither exists.
