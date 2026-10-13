@@ -341,7 +341,7 @@ Dialog/Sheet on desk.
 | **POS setup / mapping** (7) | Ingest and classify Square facts | Connection health; idempotent sales sync; exact package SKU + `qty_per_sale` conversion; the reconcile list includes **refund** lines (preview inventory credit as a positive `adjustment`); same Square-vs-weekly-count rule as Taproom; reconciliation disabled until valid | Connect/sync/map/diff; one `reconcile_pos_sales` RPC |
 | **Planning** (8) | Show demand/supply gap | Read shortfall cards | Calendar + draft PO; no planning status table |
 | **Keg fleet / deposits** (9) | Configure pools and know who holds containers | Create/edit pool; customer/pool balance; intent chips **acquire · return empty · lost/found · retire**; return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment (#577); no CIP/clean status | Pools, deposit history, loss rates |
-| **Routes / truck loading** (10) | Build route and verify load | Route/load list; **unassigned shipment → stop** with driver, vehicle and stop order; checks are local/session-only, then **Depart route**. A refused delivery closes with an outcome on Confirm delivery; a stop the driver could not attempt will use **Not delivered · leave for a later route** (#813) | **Route builder** saves route + existing shipments/stops atomically |
+| **Routes / truck loading** (10) | Build route and verify load | Route/load list; **unassigned shipment → stop** with driver, vehicle and stop order; checks are local/session-only, then **Depart route**. A refused delivery closes with an outcome on Confirm delivery; a stop the driver could not attempt uses **Not delivered · leave for a later route** and becomes unassigned for a later route (#813) | **Route builder** saves route + existing shipments/stops atomically |
 | **Driver delivery** (10) | Confirm existing shipment arrived | Next stop, shipment quantities, `signed_by`, copper **Delivered** | Route progress; `confirm_delivery` records delivery + deferred invoice, never ships |
 | **Sign in / invite / reset / set password** (1) | Enter correct shell | Auth forms; token chooses staff Today vs portal Order. **Set new password** is the recovery-token landing (Choose a password → Save), distinct from Accept invite | Same |
 | **Me** | Who am I, which brewery, leave | Header sheet: signed-in email, current brewery, SaaS brewery switcher (hidden in dedicated mode), Sign out | Same as dialog |
@@ -554,6 +554,10 @@ vocabulary, both audience shells, and access boundaries for every later screen.
   dashboards (finished-goods cost and inventory value freeze at packaging close; per-order COGS/margin is #810 PR2), command palette frame, keg CIP status, DTC, export flow, free-form
   credit memos. No `container_source` editor: the SKU's Keg pool derives it (#809).
 
+
+### Unattempted stops (#813)
+
+An open stop on a departed route leaves through `leave_delivery_for_later`. The command deletes the delivery row and records `delivery_not_attempted` for a shipment. Its document becomes unassigned for a later route without a refusal, invoice or stock change. There is no driver note. `closed` is retained only for historical database rows, not the refusal picker.
 
 ### Batch completion in-tank acknowledgement
 

@@ -42,6 +42,7 @@ const AUTHENTICATED_RPCS = [
   "save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)",
   "depart_route(uuid,uuid)",
   "return_route(uuid,uuid)",
+  "leave_delivery_for_later(uuid,uuid,uuid)",
   "update_keg_pool(uuid,uuid,text,uuid,integer,integer,boolean,uuid)",
   "create_keg_pool(uuid,text,keg_pool_kind,uuid,integer,integer,uuid)",
   "adjust_order_lines(uuid,jsonb,text,uuid)",

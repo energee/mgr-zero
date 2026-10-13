@@ -100,7 +100,8 @@ defineCommand({
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().optional(),
     refused: z.array(z.object({ orderLineId: z.string().uuid(), qty: z.number().int().positive() })).default([]),
-    reason: z.enum(REFUSAL_REASONS).optional(),
+    // Compatibility only: SQL replays completed old closed refusals, then rejects fresh ones.
+    reason: z.enum([...REFUSAL_REASONS, "closed"]).optional(),
     note: z.string().optional(), transferRefused: z.boolean().default(false),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", {
