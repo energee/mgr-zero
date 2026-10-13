@@ -14,8 +14,7 @@ create or replace view private.today_candidates with (security_invoker = true) a
   select o.brewery_id, 'pick_due', 'order', o.id::text,
          md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)),
          private.doc_no('ORD', o.order_no),
-         'pick due' || case when o.requested_ship_date is null then ' · no ship date'
-                           else ' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD') end,
+         'pick due · ' || coalesce('ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), 'no ship date'),
          (o.requested_ship_date::timestamp at time zone b.timezone),
          '/orders/' || o.id,
          array['admin','warehouse']::text[],
