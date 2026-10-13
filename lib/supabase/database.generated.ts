@@ -445,6 +445,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id: string | null
+          turn: number
           volume_adjustment_id: string | null
         }
         Insert: {
@@ -461,6 +462,7 @@ export type Database = {
           plan_snapshot: Json
           process: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Update: {
@@ -477,6 +479,7 @@ export type Database = {
           plan_snapshot?: Json
           process?: Json
           recipe_version_id?: string | null
+          turn?: number
           volume_adjustment_id?: string | null
         }
         Relationships: [
@@ -9865,6 +9868,29 @@ export type Database = {
       }
       taproom_can: { Args: { b: string; t: string }; Returns: boolean }
       today_live_reasons: { Args: never; Returns: string[] }
+      trace_batch_lots: {
+        Args: { p_batch: string; p_brewery: string }
+        Returns: {
+          best_by: string | null
+          brand_id: string
+          brewery_id: string
+          code: string
+          created_at: string
+          id: string
+          packaged_on: string
+          packaging_run_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lots"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      trace_lot_sources: {
+        Args: { p_brewery: string; p_lot: string }
+        Returns: Json
+      }
       unlink_chat_user: {
         Args: { p_brewery: string; p_link: string; p_request_id: string }
         Returns: Json

@@ -188,7 +188,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -1718,9 +1718,9 @@ export const SCREENS: Screen[] = [
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day · get_brew_day_plan · get_brew_record · list_vessels",
     writes: "cancel_batch, reschedule_batch, record_brew_day [confirmed actual sources + frozen sheet + knockout occupancy], correct_brew_record [unused revision with linked compensation]",
-    states: permitted("brewer or admin required"),
-    spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} />,
+    states: [...permitted("brewer or admin required"), ["multiple turns", "Add brew turn and correct each current turn"]],
+    spec: "Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    body: <><BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} /><BrewDayView model={brewDayTurnsHazy} /></>,
   },
   {
     step: 7,
@@ -1808,11 +1808,11 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     group: "Global",
     name: "Lot trace",
-    job: "Trace a lot from its tank and batch through every ledger movement that names it",
+    job: "Trace a lot through its member batches, recorded transfers and ledger movements",
     reads: "trace_lot",
     writes: "none",
-    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
-    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
+    states: [["blended", "member batches and stored source transfers, without percentages", 1], ["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
+    spec: "The lot is one packaging run. Trace follows recorded transfers backward from its tank before run close, tightening the time cutoff at every upstream transfer. Member batches and original transfer quantities are shown without proportional attribution or estimated shares; later arrivals are excluded. Trace lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
     body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
   },
   {
