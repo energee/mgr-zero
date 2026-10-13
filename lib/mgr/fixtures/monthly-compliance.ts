@@ -26,7 +26,6 @@ export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
       byState: { PA: 38.1, OH: 3.1 },
     },
     warnings: [],
-    externalMappingRequired: [],
   },
 };
 
