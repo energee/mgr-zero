@@ -68,6 +68,11 @@ describe("brewery column exposure", () => {
     if (customerError) throw customerError;
     customer = c;
     customerUser = await makeCustomerUser(c.id);
+    // A ship-to the buyer can still read, so the breweries(*) embed is exercised.
+    const { error: shipToError } = await admin
+      .from("ship_tos")
+      .insert({ brewery_id: brewery.id, customer_id: c.id, label: "Dock", address1: "1 Main", city: "Philadelphia", state: "PA", zip: "19100" });
+    if (shipToError) throw shipToError;
     // Other brewery has its own customer so a projection that only checks
     // "has some customer" (dropping my_customer_ids) would leak it.
     const { error: otherCustomerError } = await admin
@@ -89,12 +94,13 @@ describe("brewery column exposure", () => {
     expect(error).toBeNull();
     expect(data ?? []).toEqual([]);
 
-    const { data: embedded } = await db
-      .from("customers")
+    const { data: embedded, error: embedError } = await db
+      .from("ship_tos")
       .select("id, breweries(*)")
-      .eq("id", customer.id)
+      .eq("customer_id", customer.id)
       .single();
-    expect(embedded).toBeNull(); // Buyers cannot read the customer base row either (#793).
+    expect(embedError).toBeNull();
+    expect(embedded?.breweries).toBeNull();
   });
 
   it("exposes only the portal brewery projection to a customer", async () => {
