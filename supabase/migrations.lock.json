@@ -109,5 +109,6 @@
   "20261012100300_blended_lot_lineage.sql": "b5d0de8cfb2cf87d052cae77d5b6cca6f4e0a513c4dbd989da3fdf4f3fc66395",
   "20261012100400_brew_turns.sql": "9b4d895a128170751b895b481c1c2fc2041f845c3fceeed3ca8993063f1e2b32",
   "20261012100600_sku_keg_pool_legacy_replay.sql": "39ccf613d286c1baa4978efdc50cc84cb7ef8d9b1a133e58c03b51a038bf1827",
+  "20261012100700_import_resolve_names.sql": "d8ac941c7c6e9ad96c1a4b201728a140accc3d05a0df52583f4009440be6fa96",
   "20261012100800_undated_confirmed_pick_due.sql": "c8ceba33af2a930f4f07545b539dbba2ed542b51cf39f7005a83b88dfcb1d031"
 }
