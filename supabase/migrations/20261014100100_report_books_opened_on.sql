@@ -1,15 +1,15 @@
 -- Compliance reports start counting at breweries.books_opened_on
 -- (20261014100000_books_opened_on.sql; docs/plans/lolev-history.md task 3).
--- Every ledger figure reaches the report through three helpers, so bounding
--- them below is the whole change: rows dated before the books opened (imported
--- history) leave the beginning balance, In/Out, removals, packaged and state
--- facts, and stay everywhere else (ledger, lot trace, batch screens). A null
--- date bounds nothing, which is today's behavior.
+-- Two changes. (1) report_movements, the one reader that looks back to the
+-- beginning of time (for the beginning balance), skips rows dated before the
+-- books opened, so imported history leaves every movement figure but stays in
+-- the ledger, lot trace and batch screens. (2) Generating or filing a period
+-- that starts before the books opened is refused. With (2), every other
+-- period-bounded read (cellar removals, invoice facts) already starts on or
+-- after the date, so it needs no bound of its own. A null date changes nothing.
 --
 -- Copied from: report_movements 20261012110000_movement_occurred_on.sql;
--- report_cellar_removals and destination_state_facts
--- 20260928236000_destination_state_facts_on_ledger.sql. Only the
--- books_opened_on bound is new. create or replace keeps existing grants.
+-- only the books_opened_on bound is new. create or replace keeps its grants.
 
 create or replace function private.report_movements(p_brewery uuid, p_end date)
 returns table (class public.package_type, bbl numeric, type public.movement_type, tax_treatment public.tax_treatment,
@@ -30,53 +30,6 @@ language sql stable set search_path = '' as $$
     and m.occurred_on >= coalesce(b.books_opened_on, '-infinity'::date)
   left join public.inventory_movements original on original.id = m.compensates_id and original.brewery_id = m.brewery_id
   where b.id = p_brewery
-$$;
-
-create or replace function private.report_cellar_removals(p_brewery uuid, p_start date, p_end date)
-returns table (id uuid, removal_class text, tax_treatment text, dest_state text, d date, bbl numeric)
-language sql stable set search_path = '' as $$
-  select a.id, a.removal_class::text, a.tax_treatment::text, a.dest_state, (a.created_at at time zone b.timezone)::date, a.bbl
-  from public.breweries b
-  join public.volume_adjustments a on a.brewery_id = b.id
-    and a.created_at >= (greatest(p_start, coalesce(b.books_opened_on, p_start))::timestamp at time zone b.timezone)
-    and a.created_at < ((p_end + 1)::timestamp at time zone b.timezone)
-  where b.id = p_brewery and a.removal_class is not null
-$$;
-
--- Movement facts come through report_movements, cellar facts through
--- report_cellar_removals; only the invoice branch reads its own dates.
-create or replace function private.destination_state_facts(p_brewery uuid, p_start date, p_end date)
-returns table(state text, kind text, event_date date, source_id uuid, original_source_id uuid,
-  volume_bbl numeric, sales_cents bigint, source_status text, tax_treatment text)
-language sql stable security definer set search_path = '' as $$
-  with r as materialized (select * from private.report_movements(p_brewery, p_end)),
-  shipped_state as (
-    select ref as order_id, sku_id, case when count(distinct dest_state) = 1 then min(dest_state) end as state
-    from public.inventory_movements
-    where brewery_id = p_brewery and type = 'sale_removal' and ref is not null
-    group by ref, sku_id)
-  select coalesce(m.dest_state, original.dest_state, 'Unassigned'), m.type::text, m.d, m.id, m.original_id,
-    -m.bbl, 0::bigint, 'posted'::text, m.tax_treatment::text
-  from r m left join r original on original.id = m.original_id
-  where m.d >= p_start
-    and (m.dest_state is not null or m.type in ('return_in', 'adjustment') or original.dest_state is not null)
-  union all
-  select a.dest_state, 'cellar_' || a.removal_class, a.d, a.id, null::uuid, -a.bbl, 0::bigint, 'posted'::text, a.tax_treatment
-  from private.report_cellar_removals(p_brewery, p_start, p_end) a
-  where a.dest_state is not null
-  union all
-  select coalesce(destination.state, 'Unassigned'), i.kind::text, i.issued_on,
-    line.id, line.credited_invoice_line_id, 0::numeric,
-    case when i.qbo_remote_state = 'live' then line.amount_cents::bigint else 0::bigint end,
-    i.qbo_remote_state::text, null::text
-  from public.invoice_lines line join public.invoices i on i.id = line.invoice_id and i.brewery_id = line.brewery_id
-  join public.breweries b on b.id = i.brewery_id
-  left join public.invoice_lines original_line on original_line.id = line.credited_invoice_line_id and original_line.brewery_id = line.brewery_id
-  left join public.invoices original_invoice on original_invoice.id = original_line.invoice_id and original_invoice.brewery_id = line.brewery_id
-  left join public.shipments shipment on shipment.id = coalesce(i.shipment_id, original_invoice.shipment_id) and shipment.brewery_id = i.brewery_id
-  left join shipped_state destination on destination.order_id = shipment.order_id and destination.sku_id = line.sku_id
-  where i.brewery_id = p_brewery and i.issued_on between p_start and p_end and line.kind = 'sku'
-    and i.issued_on >= coalesce(b.books_opened_on, '-infinity'::date);
 $$;
 
 -- A period that starts before the books opened would mix counted and
@@ -112,8 +65,8 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'file_compliance_report', p_request_id,
     jsonb_build_object('jurisdiction', p_jurisdiction, 'start', p_start, 'end', p_end, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  perform private.lock_cellar_workflow(p_brewery);
   perform private.assert_period_after_books_opened(p_brewery, p_start);
+  perform private.lock_cellar_workflow(p_brewery);
   if p_jurisdiction = 'TTB' and not (
       p_end = (p_start + interval '1 month - 1 day')::date and p_start = date_trunc('month', p_start)::date
       or p_end = (p_start + interval '3 months - 1 day')::date and p_start = date_trunc('quarter', p_start)::date

@@ -69,4 +69,12 @@ describe("compliance period keys", () => {
     expect(recentPeriods("2026-01-15", "quarter")).toEqual(["2026-Q1", "2025-Q4", "2025-Q3", "2025-Q2"]);
     expect(recentPeriods("2026-01-15", "year")).toEqual(["2026", "2025"]);
   });
+
+  it("leaves out periods that start before the books opened, which no report can cover", () => {
+    expect(recentPeriods("2026-01-15", "month", "2025-12-01")).toEqual(["2026-01", "2025-12"]);
+    expect(recentPeriods("2026-01-15", "month", "2025-12-15")).toEqual(["2026-01"]);
+    expect(recentPeriods("2026-01-15", "quarter", "2025-07-01")).toEqual(["2026-Q1", "2025-Q4", "2025-Q3"]);
+    expect(recentPeriods("2026-01-15", "year", "2026-01-01")).toEqual(["2026"]);
+    expect(recentPeriods("2026-01-15", "month", null)).toEqual(["2026-01", "2025-12", "2025-11"]);
+  });
 });

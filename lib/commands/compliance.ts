@@ -101,7 +101,7 @@ const positiveBblNumber = z.number().finite().positive()
 const exactPositiveBbl = z.union([positiveBblText, positiveBblNumber]);
 
 defineQuery({
-  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored",
+  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored; refused for a period that starts before the books opened",
   roles: [...ROLES], input: period,
   handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
 });
@@ -153,7 +153,7 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
   roles: [...ROLES],
   // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(
@@ -166,15 +166,16 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today for the month list",
+  name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today and books-opened date for the month list",
   roles: [...ROLES], input: period.partial(),
   handler: async (ctx, i) => {
     let q = ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction");
     if (i.jurisdiction) q = q.eq("jurisdiction", i.jurisdiction);
     if (i.periodStart) q = q.eq("period_start", i.periodStart);
     if (i.periodEnd) q = q.eq("period_end", i.periodEnd);
-    const [filings, today] = await Promise.all([rows<Filing>(q), breweryToday(ctx)]);
-    return { filings, today };
+    const [filings, today, brewery] = await Promise.all([rows<Filing>(q), breweryToday(ctx),
+      unwrap(ctx.db.from("breweries").select("books_opened_on").eq("id", ctx.breweryId).single())]);
+    return { filings, today, booksOpenedOn: brewery?.books_opened_on ?? null };
   },
 });
 

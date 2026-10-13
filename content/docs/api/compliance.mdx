@@ -29,7 +29,7 @@ breakdown is explanatory and must not be added to `figures.removals`.
 
 `command` · admin, sales
 
-Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored
+Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored; refused for a period that starts before the books opened
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today for the month list
+Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today and books-opened date for the month list
 
 | Field | Type | Required |
 | --- | --- | --- |
