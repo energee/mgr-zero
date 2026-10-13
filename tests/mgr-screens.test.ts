@@ -227,7 +227,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(201);
+    expect(SCREENS).toHaveLength(202);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -973,7 +973,7 @@ describe("order lifecycle labels", () => {
     // stop leaves the order shipped, drawn as the composite below.
     const { Constants } = await import("../lib/supabase/database.generated");
     const statuses = new Set<string>(Constants.public.Enums.order_status);
-    const notLifecycle = new Set(["stale", "permission", "adjusted", "shipped · stop delivered"]);
+    const notLifecycle = new Set(["stale", "permission", "adjusted", "changed after pick", "shipped · stop delivered"]);
     for (const name of ["Order", "Order detail"]) {
       const labels = SCREENS.find((s) => s.name === name)!.states!.map(([label]) => label);
       const bad = labels.flatMap((label) => notLifecycle.has(label) ? [] : label.split(" / ").filter((part) => !statuses.has(part)));

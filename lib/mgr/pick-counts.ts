@@ -16,13 +16,15 @@ export function pickCountDraftKey(context: CommandContextExpectation, orderId: s
   return `mgr:pick-counts:${context.actorId}:${context.breweryId}:${orderId}`;
 }
 
-/** Server-changed lines win; unchanged lines keep their unsaved text, including a cleared field. */
+/** Server-changed lines win; unchanged lines keep their unsaved text, including a cleared field.
+ *  A fresh count starts at the picked amount, capped at ordered: an order adjusted down can still
+ *  carry a larger staged count, and Pick refuses a count above ordered (#811). */
 export function readPickCounts(lines: PickSnapshot["lines"], saved: string | null): Record<string, string> {
   const draft = saved === null ? {} : pickDraft.parse(JSON.parse(saved));
   return Object.fromEntries(lines.map(line => {
     const kept = draft[line.id];
     return [line.id, kept && kept.ordered === line.qty_ordered && kept.picked === line.qty_picked && kept.shortPickEventId === line.shortPickEventId
-      ? kept.value : String(line.qty_picked ?? line.qty_ordered)];
+      ? kept.value : String(Math.min(line.qty_picked ?? line.qty_ordered, line.qty_ordered))];
   }));
 }
 

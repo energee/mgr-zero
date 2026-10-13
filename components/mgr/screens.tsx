@@ -91,6 +91,8 @@ import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
+import { MaterialLotTraceView } from "@/components/mgr/views/material-lot-trace";
+import { toMaterialLotTraceViewProps } from "@/lib/mgr/material-lot-trace-view";
 import { LotTraceView } from "@/components/mgr/views/lot-trace";
 import { MaterialView } from "@/components/mgr/views/material";
 import { MaterialsView } from "@/components/mgr/views/materials";
@@ -210,7 +212,7 @@ import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
-  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+  brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
 } from "@/lib/mgr/fixtures/compliance";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
@@ -767,10 +769,10 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     name: "Finished goods",
     job: "See sellable beer by SKU and act on shortages",
-    reads: "get_on_hand · get_atp",
+    reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
-    spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow.",
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
+    spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
@@ -956,8 +958,8 @@ export const SCREENS: Screen[] = [
     to: { Adjust: "Adjust lines", "Edit draft": "Edit draft", "Add line": "New order", Cancel: "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp",
-    writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
-    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
+    writes: "submit_order · adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock] · confirm_order · cancel_order [needs_restock while quantities are staged]",
+    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["changed after pick", "count only the added or raised lines · the rest is already staged", 1], ["shipped", "read-only tape · Return shipment is the correction"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: <OrderView model={toOrderViewProps(orderPickedRestock)} adjustLines showAddLine complianceNote={OHIO_STOUT_NOTE} />,
   },
@@ -994,9 +996,9 @@ export const SCREENS: Screen[] = [
     to: { "Save lines": "Order" },
     job: "Replace the lines on a confirmed or picked order and say why",
     reads: "get_order · list_skus",
-    writes: "adjust_order_lines [sets needs_restock on a picked order]",
-    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back"], ["stale", "another user changed a line · refresh", 1]],
-    spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC.",
+    writes: "adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock]",
+    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back; an added or raised line sends the order back to confirmed · Pick again"], ["stale", "another user changed a line · refresh", 1]],
+    spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
     body: <AdjustLinesView model={toAdjustLinesViewProps(orderAdjustLines)} reason="customer cut" />,
   },
   {
@@ -1045,7 +1047,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
     reads: "get_order · get_order_ship_sources",
-    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment; each line below picked carries its shortage reason, saved on the line in the same transaction]",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; returnable keg lines post Shipped shells and warn, never refuse, when recorded shells are short; invoice timing = now persisted with the shipment; each line below picked carries its shortage reason, saved on the line in the same transaction]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["no reason", "a short line without a reason is refused", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears under each line whose qty &lt; picked, prefilled with the reason saved at short pick so an unchanged one is not retyped; it is saved on the line, where the order and the buyer’s portal show it. The same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
     body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipInvoice.lines)} />} model={toShipViewProps(orderShipInvoice)} />,
@@ -1058,8 +1060,8 @@ export const SCREENS: Screen[] = [
     job: "The invoice number after a ship, and the named correction",
     reads: "get_order · get_invoice",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"]],
-    spec: "Post-commit of Ship and invoice. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
+    states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the short pool, size and shipping location", 1]],
+    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
@@ -1070,7 +1072,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order · get_order_ship_sources",
-    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later; a line below picked carries its shortage reason]",
+    writes: "ship_order [returnable keg lines post Shipped shells and warn, never refuse, when recorded shells are short; invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later; a line below picked carries its shortage reason]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
     body: <ShipView sources={<ShipmentSourcesView {...shipmentSources(orderShipOnDelivery.lines)} />} model={toShipViewProps(orderShipOnDelivery)} invoiceTiming={1} />,
@@ -1137,7 +1139,7 @@ export const SCREENS: Screen[] = [
     job: "Group confirmed demand by ship date",
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
-    states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
+    states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["changed after pick", "the row carries the marker · count only the added or raised lines", 1], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
     spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
     body: <PickSheetView model={toPickSheetViewProps(pickSheet)} filters={E.chips(PICK_SHEET_DATE_CHIPS, 1)} />,
   },
@@ -1151,7 +1153,7 @@ export const SCREENS: Screen[] = [
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
-    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
+    spec: "The physical count is the source of truth. Shortages default to Sold; Destroyed posts destruction with no channel or tax facts. Matching Sold is a no-op; matching Destroyed is refused. One choice applies to each bin/SKU/lot bucket and freezes with the request. Destroyed lines cannot be corrected; mixed counts retain their sold-line correction. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
     body: <WeeklyCountView model={weeklyCount} />,
   },
   {
@@ -1164,7 +1166,7 @@ export const SCREENS: Screen[] = [
     reads: "list_locations · get_taproom_variance",
     writes: "none · Recurring brand trend [SCHEMA-GATE: post-v1 scope; the report has no brand-by-period trend projection]",
     states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "mapped expected and variance remain visible; coverage is labeled incomplete"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
-    spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen count depletion, and variance is expected minus actual. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
+    spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen sold count depletion, and variance is expected minus actual. Destroyed volume is reported separately by brand and completed period. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
     body: <TaproomVarianceView model={taproomVariance} />,
   },
   {
@@ -1188,9 +1190,9 @@ export const SCREENS: Screen[] = [
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
     reads: "get_invoice · get_invoice_return_sources · list_bins",
-    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price, with a deposit refund line for each refunded keg deposit; it posts no keg event, so the empty keg's Returned is a separate record_keg_event in Keg fleet]",
+    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price, with a deposit refund line for each refunded keg deposit; a returnable keg returned with beer posts Returned shells; deposit-only refunds and later empty pickups remain separate]",
     states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
-    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. Keg deposit lines refund in whole kegs on the same credit memo and move no stock; the empty keg itself is a Keg fleet event. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
+    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. Keg deposit lines refund in whole kegs on the same credit memo and move no stock; full kegs returned with beer post Returned shells; later empty pickups remain manual. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: <ReturnCreditView sources={<ReturnSourcesView groups={[{ key: "l-hazy", name: orderReturnCredit.lines[0].skus?.name ?? "Line", sources: [{ id: "shipped-hazy", label: "L-240831-HZ · shipped from Cooler", shipped: 4 }] }]} quantities={{ "shipped-hazy": "1" }} />} bins={[{ id: "cooler", name: "Cooler" }]} binId="cooler" model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
@@ -1759,8 +1761,8 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run · get_packaging_close_plan · list_locations · list_bins",
     writes: "close_packaging_run [atomic lot, outputs, tank draw and explicit source material usage/loss]",
-    states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1]],
-    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry.",
+    states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1], ["future date", "packaged on cannot be after today", 1], ["filed period", "packaged on falls in a filed report period", 1]],
+    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
     body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {
@@ -1809,12 +1811,22 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     group: "Global",
     name: "Lot trace",
+    to: { "Citra hops": "Material lot trace" },
     job: "Trace a lot through its member batches, recorded transfers and ledger movements",
     reads: "trace_lot",
     writes: "none",
     states: [["blended", "member batches and stored source transfers, without percentages", 1], ["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
-    spec: "The lot is one packaging run. Trace follows recorded transfers backward from its tank before run close, tightening the time cutoff at every upstream transfer. Member batches and original transfer quantities are shown without proportional attribution or estimated shares; later arrivals are excluded. Trace lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
+    spec: "The lot is one packaging run. Ingredients link to material-lot recall; exact reversals are excluded and additions from every recorded member batch are included before its downstream departure. Trace follows recorded transfers backward from its tank before run close, tightening the time cutoff at every upstream transfer. Member batches and original transfer quantities are shown without proportional attribution or estimated shares; later arrivals are excluded. Trace lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
     body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
+  },
+  {
+    step: 7, slice: 5, tab: "Beer", group: "Global", name: "Material lot trace",
+    job: "Find recorded beer and recipients affected by an ingredient lot",
+    reads: "trace_material_lot", writes: "none",
+    to: { "L-240831-HZ": "Lot trace" },
+    states: [["still on hand", "remaining recorded material can be quarantined", 1], ["unpackaged batch", "consumption without a finished lot remains visible"], ["no shipments", "no recorded customer shipments"], ["unknown lot", "not found"]],
+    spec: "Header Search finds material lot codes, even when exhausted, for Admin and Sales. Trace follows effective consumption into every brew turn and cellar addition, packaging-material consumption and recorded blend membership, then finished lots and actual recipients. Exact reversed consumptions are excluded. Unlinked tracked consumption is shown explicitly; historical untracked material cannot be assigned a lot. Quantities show recorded use, not estimated shares. The same MaterialLotTraceView serves inventory and live reads.",
+    body: <MaterialLotTraceView model={toMaterialLotTraceViewProps(materialLotTraceCitra)} />,
   },
   {
     step: 7,
@@ -2247,8 +2259,8 @@ export const SCREENS: Screen[] = [
     job: "Manage pools and record events without confusing beer returns",
     reads: "get_keg_fleet · list_customers · list_locations · list_bins · list_vendors",
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
-    states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"], ["unavailable", "no pool in service or no location · Record keg event says what is missing", 1]],
-    spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts no keg event. The two stay separate records; Customer keg balance and Keg report flag a customer with a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost. No dirty/clean CIP status.",
+    states: [["negative shells", "pool, size and location below zero · record Acquired kegs to reconcile", 1], ["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"], ["unavailable", "no pool in service or no location · Record keg event says what is missing", 1]],
+    spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts Returned only when the beer comes back in a full keg. The two stay separate records; Customer keg balance and Keg report flag a customer with a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost. No dirty/clean CIP status.",
     body: <KegFleetView model={toKegFleetViewProps(kegFleetMicrostar)} />,
   },
   {
@@ -2261,7 +2273,7 @@ export const SCREENS: Screen[] = [
     reads: "get_customer_keg_balance · list_customers",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["mismatch", "a deposit was refunded and kegs on deposit disagree with kegs out plus kegs lost · flagged", 1], ["none", "no kegs currently out"]],
-    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was refunded and the kegs on deposit differ from kegs out plus kegs lost at the customer is flagged. A shipped order charges the deposit but records no keg event, so a row with no refund is never flagged; a deposit still held with no keg out is a row too.",
+    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was refunded and the kegs on deposit differ from kegs out plus kegs lost at the customer is flagged. A shipped order charges the deposit and posts Shipped shells; a row with no refund is never flagged; a deposit still held with no keg out is a row too.",
     body: <KegBalanceView model={toKegBalanceViewProps(kegBalanceRidgeline)} />,
   },
   {

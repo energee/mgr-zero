@@ -667,3 +667,139 @@ describe("frozen tax treatment on a wholesale ship", () => {
     expect(ws!.tax_treatment).toBe("taxable");
   });
 });
+
+// #811: an added or raised line on a picked order is unpicked work. Adjust
+// sends the order back to confirmed (the line uncounted), Ship stays hidden
+// until Pick counts it, and ship refuses any line that has no count.
+describe("adjust after pick (#811)", () => {
+  let pilsSkuId: string;
+  beforeAll(async () => {
+    const cat2 = await seedCatalog(b.id, { product: "Helles", sku: "Helles 1/2bbl #811", packageType: "keg", bblPerUnit: 0.5, format: "Helles keg #811" });
+    pilsSkuId = cat2.skuId;
+    await priceSku(b.id, { saleChannelId, brandId: cat2.brandId, formatId: cat2.formatId, cents: 11000 });
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: pilsSkuId, location_id: whId, bin_id: whBinId, qty: 50, type: "opening_balance", created_by: staffId });
+  });
+  const lineFor = async (orderId: string, sku: string) =>
+    (await admin.from("order_lines").select().eq("order_id", orderId).eq("sku_id", sku).single()).data!;
+  const pickAll = async (id: string) => {
+    const { data } = await admin.from("order_lines").select("id, qty_ordered").eq("order_id", id);
+    const r = await staffDb.rpc("record_pick", { p_order: id, p_picks: data!.map((l) => ({ line_id: l.id, qty_picked: Number(l.qty_ordered) })), p_request_id: crypto.randomUUID() });
+    expect(r.error).toBeNull();
+  };
+  const adjust = (id: string, lines: { sku_id: string; qty: number }[], requestId = crypto.randomUUID()) =>
+    staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: lines, p_reason: "customer call", p_request_id: requestId });
+  const orderRow = async (id: string) => (await admin.from("orders").select("status,needs_restock,repick_since").eq("id", id).single()).data!;
+
+  it("adding a line sends the order back to confirmed; ship is refused until it is picked", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "confirmed", needs_restock: false });
+    const ipa = await lineFor(id, skuId), pils = await lineFor(id, pilsSkuId);
+    const refused = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: ipa.id, qty_shipped: 10 }, { line_id: pils.id, qty_shipped: 5 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(refused.error?.message).toMatch(/order is confirmed/);
+    expect((await admin.from("shipments").select("id").eq("order_id", id)).data).toEqual([]);
+    await pickAll(id);
+    expect((await orderRow(id)).status).toBe("picked");
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: ipa.id, qty_shipped: 10 }, { line_id: pils.id, qty_shipped: 5 }],
+      p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(shipped.error).toBeNull();
+    const inv = (shipped.data as { invoice_id: string }).invoice_id;
+    expect((await admin.from("invoice_lines").select("sku_id").eq("invoice_id", inv).eq("kind", "sku")).data?.map((r) => r.sku_id).sort())
+      .toEqual([skuId, pilsSkuId].sort());
+  });
+
+  it("raising a picked line uncounts it and sends the order back to confirmed without a restock flag", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 20 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "confirmed", needs_restock: false });
+    expect((await lineOf(id)).qty_picked).toBeNull();
+  });
+
+  it("lowering one line and adding another both re-picks and flags restock", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 6 }, { sku_id: pilsSkuId, qty: 5 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "confirmed", needs_restock: true });
+  });
+
+  it("dropping a counted line flags restock and stays picked", async () => {
+    const id = await confirmedOrder(10);
+    const base = await lineOf(id);
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason: "add", p_request_id: crypto.randomUUID() });
+    expect(base.id).toBeTruthy();
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 10 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "picked", needs_restock: true });
+  });
+
+  it("a keep_owed line left unchanged does not reopen the order", async () => {
+    const id = await confirmedOrder(10);
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 5 }], p_reason: "add", p_request_id: crypto.randomUUID() });
+    const ipa = await lineFor(id, skuId), pils = await lineFor(id, pilsSkuId);
+    expect((await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: ipa.id, p_qty_picked: 7, p_reason: "short", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: pils.id, qty_picked: 5 }], p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await orderRow(id)).status).toBe("picked");
+    expect((await adjust(id, [{ sku_id: skuId, qty: 10 }, { sku_id: pilsSkuId, qty: 4 }])).error).toBeNull();
+    expect((await orderRow(id)).status).toBe("picked");
+    expect(Number((await lineFor(id, skuId)).qty_picked)).toBe(7);
+  });
+
+  it("raising a line the staged count already covers keeps the count and the order picked", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await adjust(id, [{ sku_id: skuId, qty: 6 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "picked", needs_restock: true });
+    expect((await adjust(id, [{ sku_id: skuId, qty: 8 }])).error).toBeNull();
+    expect(await orderRow(id)).toMatchObject({ status: "picked", needs_restock: true, repick_since: null });
+    expect(Number((await lineOf(id)).qty_picked)).toBe(10);
+  });
+
+  it("raising a short-picked line clears its stale short reason with its count", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    expect((await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "dented", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await adjust(id, [{ sku_id: skuId, qty: 12 }])).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_picked: null, short_reason: null });
+  });
+
+  it("ship refuses a picked order with an uncounted line", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await admin.from("order_lines").update({ qty_picked: null }).eq("order_id", id)).error).toBeNull();
+    const line = await lineOf(id);
+    const r = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 0 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    expect(r.error?.message).toMatch(/every line must be picked/);
+    expect((await admin.from("shipments").select("id").eq("order_id", id)).data).toEqual([]);
+  });
+
+  it("the changed-after-pick marker is set on demotion and cleared on re-pick", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    expect((await orderRow(id)).repick_since).toBeNull();
+    await adjust(id, [{ sku_id: skuId, qty: 20 }]);
+    expect((await orderRow(id)).repick_since).not.toBeNull();
+    await pickAll(id);
+    expect(await orderRow(id)).toMatchObject({ status: "picked", repick_since: null });
+    await adjust(id, [{ sku_id: skuId, qty: 15 }]);
+    expect((await orderRow(id)).repick_since).toBeNull();
+  });
+
+  it("a replayed adjust with the same requestId returns the stored result and does not demote twice", async () => {
+    const id = await confirmedOrder(10);
+    await pickAll(id);
+    const requestId = crypto.randomUUID();
+    const first = await adjust(id, [{ sku_id: skuId, qty: 20 }], requestId);
+    const second = await adjust(id, [{ sku_id: skuId, qty: 20 }], requestId);
+    expect(first.error).toBeNull();
+    expect(second.error).toBeNull();
+    expect(second.data).toEqual(first.data);
+    expect((await admin.from("order_events").select("id").eq("order_id", id).eq("event", "lines_adjusted")).data).toHaveLength(1);
+  });
+});

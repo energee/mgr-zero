@@ -191,6 +191,10 @@ All existing columns, `removal_shape` check, `bbl` trigger, revoke, indexes, and
 policies carried forward verbatim. `lot_id → lots` composite FK added after `lots` exists
 (nullable). `ref uuid` stays (order id / pos sale id / run id; typed context lives on the
 domain row's `movement_id`).
+`occurred_on date not null` is the frozen brewery-local effective date. A before-insert
+trigger defaults it to the local date of `created_at`; `close_packaging_run` sets it
+to Packaged on and reports bucket by it. Existing rows retain their insert-time local
+date, so historical reports do not move. Later timezone changes do not re-bucket them.
 
 **FG correction identity (resolved):** `inventory_movements.compensates_id`
 links a compensating row to its original (a composite FK, unique per original).
@@ -582,6 +586,7 @@ material movements. Owned-keg fills are FG inventory, not keg events (§12).
 function; the client never inserts the parent and planned outputs separately.
 
 ### `packaging_run_outputs`
+`unit_cost_cents numeric >= 0` is nullable and frozen at packaging close per run/SKU. Null means uncosted; old runs are not backfilled. Ingredient costs use consumed lot receipts (ordered by `material_receipt_costs`, which `material_last_cost` also reads) and the batch knockout volume summed from current brew-record revisions; standard BOM costs exclude packaging loss. `sku_inventory_value` is a security-invoker current-stock valuation view per SKU, and `inventory_value` sums it to one row per brewery. Admin/Sales command permission hides value in other role screens; staff table/view access is unchanged.
 `run_id → packaging_runs, sku_id → skus, qty_planned numeric >= 0, qty_actual numeric
 >= 0, movement_id → inventory_movements unique`. unique `(run_id, sku_id)`. Yield view
 below.
@@ -617,6 +622,9 @@ unique `(brewery_id, state, kind)`. Destination-state supplier registrations (OH
 filed_by, note`. unique `(brewery_id, jurisdiction, period_start, period_end)`. The
 ledger stays recomputable; this is the snapshot that was actually filed (decision).
 Report generators are code, not schema; CBMA rates are code (§14).
+Finished-goods figures bucket by `inventory_movements.occurred_on`; cellar removals
+still bucket by `volume_adjustments.created_at`. `file_compliance_report` takes the
+cellar workflow lock, serializing filing with packaging closes.
 Generated figures keep `removals` as the one additive filing total and expose
 `cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
 their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
@@ -642,21 +650,25 @@ customer_id → customers, shipment_id → shipments, at timestamptz, note, crea
   `(shipment_id)`.
 Fill = FG `production_in` of a keg SKU; empty-at-brewery is derived, never stored:
 `fleet_total − at_customers − filled_on_hand`.
-**Keg events are recorded separately (owner decision 2026-09-26, #577, PR #605).**
-`ship_order` and `return_shipment` post no keg event. Shipping charges the keg
-deposit; returning beer issues the deposit refund as a credit memo. The fleet
-movement (`shipped`, `returned`, `lost`, `found`) is its own explicitly recorded
-`record_keg_event`. The deposit refund and the Returned keg event stay separate
-records.
-Amended 2026-10-11 by #815 (physical half only): `ship_order` will post `shipped` for
-returnable keg lines and a full keg returned with its beer will post `returned`; deposit
-refunds and later empties stay separate. Only automatic `shipped` events may take a
-location's shell balance negative, which is flagged, never refused.
+**Physical keg events (owner amendment 2026-10-11, #815).**
+`ship_order` posts Shipped events for returnable keg lines. Full kegs returned with
+beer post Returned at the beer's return bin. Both events link to the shipment. Internal shipped order-event payload freezes
+`keg_shells` per order line: SKU, physical pool, size, and shipped quantity.
+Returns use that snapshot rather than mutable SKU configuration or financial
+deposit lines. Buyer event projections continue to exclude payload.
+Deposit-only refunds and later empty pickups remain separate records; later
+empties use `record_keg_event`. Historical shipments without automatic Shipped
+shells post no automatic Returned event. Automatic shipping may overdraw shells,
+which warns on Shipment done and flags the pool/size/location on Keg fleet. The
+shipped payload saves each shortfall as `{ pool, keg_size, location, short }`;
+Keg fleet reads the same shape from the `keg_location_shortages` view.
+Manual events, transfers, and bin moves retain their negative-balance guards.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
 - `keg_customer_balances` — per `(customer, pool, size)`: `shipped − returned − lost@customer`.
 - `keg_loss_rates` — lost / shipped per pool over trailing 12 months.
+- `keg_location_shortages` — per `(pool, size, location)` whose bins net below zero in `keg_bin_on_hand`; Keg fleet flags each.
 
 ## 13. Deliveries (self-distribution)
 
@@ -1427,7 +1439,11 @@ semantic notification, and SDK-state dedupe remain separate.
 The chat tables and grants in §17 are implemented in the baseline migration and
 covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.
 
+Taproom count shortages have one sold/default or destroyed disposition per bucket (#814). Sold keys are omitted at the command boundary to preserve legacy replay identity. Destruction has no channel/tax/state; only sold shortage lines are correctable.
 
 ### Batch completion in-tank acknowledgement
 
 Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), the preview sets `inTankRequiresConfirmation`. Completion then refuses unless `confirmInTankBbl` equals the previewed `inTankBbl`. The acknowledgement names the beer and tanks being written off as loss. If tank volume changes after review, completion refuses with the new figures; review and confirm again. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.
+=======
+Taproom count shortages have one sold/default or destroyed disposition per bucket (#814). Sold keys are omitted at the command boundary to preserve legacy replay identity. Destruction has no channel/tax/state; only sold shortage lines are correctable.
+>>>>>>> origin/main

@@ -11,6 +11,8 @@ export type PickSheetRowView = {
   detail: string;
   href: string;
   verb: "Pick" | "Open";
+  /** Order was changed after pick (#811): count only the added or raised lines. */
+  changedAfterPick?: boolean;
 };
 
 export type PickSheetGroupView = {
@@ -31,6 +33,7 @@ export type PickSheetSnapshot = {
     order_no: number | null;
     status: string;
     requested_ship_date: string | null;
+    repick_since?: string | null;
     customers: { name: string } | null;
     order_lines: {
       id: string;
@@ -61,6 +64,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
           detail: `${o.status} · ${plural(o.order_lines.length, "line")}`,
           href: `/orders/${o.id}`,
           verb: o.status === "confirmed" ? "Pick" as const : "Open" as const,
+          changedAfterPick: o.repick_since ? true : undefined,
         };
       });
       return {
