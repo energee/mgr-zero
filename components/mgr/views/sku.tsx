@@ -17,6 +17,7 @@ type Controls = {
   format?: (value: string) => void;
   active?: (value: boolean) => void;
   upc?: (value: string) => void;
+  kegPool?: (value: string) => void;
 };
 
 export function SkuView({
@@ -58,6 +59,7 @@ export function SkuView({
           <Switch checked={controls.active ? model.active : undefined} defaultChecked={controls.active ? undefined : model.active} onCheckedChange={controls.active} aria-label="Active" />)}
       {fields}
       <RegistryInput label="UPC (optional)" value={model.upc} onChange={controls.upc} />
+      {model.showKegPool ? <>{E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { onChange: controls.kegPool })}{E.info("Wholesale orders charge this pool's deposit per keg. None charges no deposit.")}</> : null}
       {E.info(model.volumeInfo)}
       </>}
       {messages}
