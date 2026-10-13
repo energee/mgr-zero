@@ -6,6 +6,8 @@ import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
+  "trace_lot_sources(uuid,uuid)",
+  "trace_batch_lots(uuid,uuid)",
   "get_taproom_draft_projection(uuid,uuid)",
   "get_taproom_variance(uuid,uuid,integer)",
   "tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid)",
@@ -81,7 +83,7 @@ const AUTHENTICATED_RPCS = [
   "create_recipe(uuid,uuid,text,text,uuid)",
   "create_recipe_version(uuid,uuid,jsonb,jsonb,jsonb,numeric,numeric,integer,numeric,text,jsonb,uuid)",
   "create_replenishment_order(uuid,uuid,jsonb,uuid)",
-  "create_sku(uuid,uuid,uuid,text,text,uuid)",
+  "create_sku(uuid,uuid,uuid,text,text,uuid,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",
   "delete_bin(uuid,uuid,uuid)",
   "delete_catalog_category(uuid,text,uuid)",
@@ -174,7 +176,7 @@ const AUTHENTICATED_RPCS = [
   "update_bin(uuid,uuid,text,uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean,uuid,uuid)",
   "update_location(uuid,uuid,text,location_kind[],uuid)",
-  "update_sku(uuid,uuid,boolean,text,uuid)",
+  "update_sku(uuid,uuid,boolean,text,uuid,uuid,boolean)",
   "update_brewery(uuid,text,text,text,text,text,integer,uuid)",
   "list_team_members(uuid)",
   "update_staff_role(uuid,uuid,staff_role,uuid)",
