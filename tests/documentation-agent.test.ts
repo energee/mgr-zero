@@ -48,7 +48,8 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
     expect(workflow).toContain("github.event.pull_request.merge_commit_sha || github.sha");
     expect(workflow).toContain('EVENT_NAME: ${{ github.event_name }}');
-    expect(workflow).toContain("manual documentation audit");
+    // A dispatched run is labelled "manual"; a scheduled one keeps its event name.
+    expect(workflow).toContain("${EVENT_NAME/workflow_dispatch/manual} documentation audit");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("pull-requests: write");
     // The agent may write only the guides, and only vitest specifies their
