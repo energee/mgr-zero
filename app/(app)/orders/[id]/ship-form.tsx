@@ -12,6 +12,7 @@ import { ShipmentSourcesView, type ShipmentAllocations } from "@/components/mgr/
 import { toShipViewProps, type ShipSnapshot } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps, type ShipmentDoneViewModel } from "@/lib/mgr/shipment-done-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
+import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
 
 export type ShippingSnapshot = ShipSnapshot & { order: ShipSnapshot["order"] & { kind: string; to_location_id: string | null } };
 
@@ -65,8 +66,8 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming, ship,
     }, data => {
       if (transfer) { router.push(`/orders/${snapshot.order.id}`); return; }
-      const invoiceId = (data as { invoice_id: string | null }).invoice_id;
-      setResult(toShipmentDoneViewProps({ ...proposed, lines: shippedLines(snapshot.lines, ship), invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
+      const { invoice_id: invoiceId, warnings } = data as { invoice_id: string | null; warnings?: KegShortage[] };
+      setResult(toShipmentDoneViewProps({ ...proposed, warnings, lines: shippedLines(snapshot.lines, ship), invoice: invoiceId ? { invoice_no: null } : null, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined }));
     });
   }}>
     {transfer

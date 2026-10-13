@@ -32,8 +32,9 @@ type StaffMembershipRow = {
 };
 
 type CustomerMembershipRow = {
-  customer_id: string;
-  customers: { brewery_id: string; name: string };
+  id: string;
+  brewery_id: string;
+  name: string;
 };
 
 type RequestClientFactory = (headers?: Record<string, string>) => Promise<SupabaseClient<Database>>;
@@ -106,23 +107,23 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
 
     const db = await getSupabaseClient();
     const { data, error } = await db
-      .from("customer_users")
-      .select("customer_id, customers!inner(brewery_id, name)")
-      .eq("user_id", requestIdentity.userId)
+      // A customers embed would disappear with the buyer base-table policy.
+      .from("portal_customers")
+      .select("id, brewery_id, name")
       .returns<CustomerMembershipRow[]>();
     if (error) throw error;
 
-    const breweryIds = [...new Set((data ?? []).map(({ customers }) => customers.brewery_id))];
+    const breweryIds = [...new Set((data ?? []).map(({ brewery_id }) => brewery_id))];
     const { data: breweries, error: breweryError } = breweryIds.length
       ? await db.from("portal_brewery").select("id, name").in("id", breweryIds)
       : { data: [], error: null };
     if (breweryError) throw breweryError;
     const breweryNames = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery.name]));
 
-    return (data ?? []).map(({ customer_id, customers }) => {
-      const breweryName = breweryNames.get(customers.brewery_id);
+    return (data ?? []).map(({ id, brewery_id, name }) => {
+      const breweryName = breweryNames.get(brewery_id);
       if (!breweryName) throw new Error("customer membership brewery is unavailable");
-      return { customerId: customer_id, breweryId: customers.brewery_id, breweryName, customerName: customers.name };
+      return { customerId: id, breweryId: brewery_id, breweryName, customerName: name };
     });
   })());
 

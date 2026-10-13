@@ -1,5 +1,6 @@
 // lib/mgr/shipment-done-view.ts — view-model for Shipment done (post-commit).
 import { docNo } from "./doc-no";
+import { kegShortageText, type KegShortage } from "./keg-fleet-view";
 import { saleVolume } from "@/lib/volume";
 
 export type ShipmentDoneViewModel = {
@@ -10,9 +11,12 @@ export type ShipmentDoneViewModel = {
   invoiceHref?: string;
   tape: [string, string][];
   info: string;
+  warnings: string[];
 };
 
 export type ShipmentDoneSnapshot = {
+  /** Saved shell shortages from the shipped order event; legacy receipts have none. */
+  warnings?: KegShortage[];
   backHref?: string;
   invoiceHref?: string;
   invoiceTiming?: "now" | "on_delivery";
@@ -33,7 +37,7 @@ export type ShipmentDoneSnapshot = {
 };
 
 /** Map get_order + get_invoice onto ShipmentDoneView. */
-export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, invoiceTiming }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
+export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, invoiceTiming, warnings }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
   const dest = order.ship_tos?.state ?? "";
   const inv = docNo("INV", invoice?.invoice_no ?? null, "Invoice");
   const tape: [string, string][] = [];
@@ -53,5 +57,6 @@ export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoi
     invoiceHref: invoice ? invoiceHref : undefined,
     tape,
     info: "To correct this shipment, Return shipment.",
+    warnings: (warnings ?? []).map(kegShortageText),
   };
 }

@@ -4,8 +4,10 @@
 // portal_* projection with no customer policy on the base table (the
 // portal_brewery pattern, iron rule 3).
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCustomer, seedLocation } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCustomer, seedLocation, seedCatalog, priceSku } from "./helpers";
 import { rawDatabase } from "./raw-database";
+import { ctxForBearer } from "../lib/commands/context";
+import { createRequestAuthContext } from "../lib/auth/request-context";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -14,6 +16,7 @@ const HIDDEN_INVOICE_COLUMNS = ["qbo_sync_error", "qbo_sync_token", "qbo_idempot
 let customerDb: Awaited<ReturnType<typeof asUser>>;
 let staffDb: Awaited<ReturnType<typeof asUser>>;
 let invoiceId: string, invoiceLineId: string, orderId: string, shipmentId: string, deliveryId: string, foreignInvoiceId: string;
+let ownCustomerId: string, otherCustomerId: string;
 let custCtx: { db: typeof customerDb; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
@@ -22,6 +25,10 @@ beforeAll(async () => {
   staffDb = staff.db;
   const mine = await seedCustomer(b.id, { name: "Buyer" });
   const other = await seedCustomer(b.id, { name: "Other buyer", saleChannelId: mine.saleChannelId });
+  ownCustomerId = mine.customerId;
+  otherCustomerId = other.customerId;
+  const catalog = await seedCatalog(b.id);
+  await priceSku(b.id, { saleChannelId: mine.saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 1000 });
   const wh = await seedLocation(b.id);
   const order = await ins("orders", {
     brewery_id: b.id, kind: "wholesale", customer_id: mine.customerId, ship_to_id: mine.shipToId,
@@ -94,5 +101,40 @@ describe("portal customers cannot read internal columns (#754)", () => {
     expect(ev.data!.payload).toEqual({ reason: "internal short-pick note" });
     const del = await staffDb.from("deliveries").select("note").eq("id", deliveryId).single();
     expect(del.data!.note).toBe("driver-only note");
+  });
+});
+
+// #793 closes the same exposure on customer identity and the price-grid tables.
+describe("portal customer identity boundary (#793)", () => {
+  it("hides customer and catalog base rows but keeps staff reads", async () => {
+    for (const table of ["customers", "brands", "formats", "channel_prices"]) {
+      const buyer = await rawDatabase(customerDb).from(table).select("*");
+      expect(buyer.error, table).toBeNull();
+      expect(buyer.data, table).toEqual([]);
+      const staff = await rawDatabase(staffDb).from(table).select("*");
+      expect(staff.error, table).toBeNull();
+      expect(staff.data?.length, table).toBeGreaterThan(0);
+    }
+  });
+
+  it("projects only owned customer identity and preserves membership discovery", async () => {
+    const rows = await rawDatabase(customerDb).from("portal_customers").select("*");
+    expect(rows.error).toBeNull();
+    expect(rows.data).toEqual([{ id: ownCustomerId, brewery_id: custCtx.breweryId, name: "Buyer", sale_channel_id: expect.any(String) }]);
+    const foreign = await rawDatabase(customerDb).from("portal_customers").select("*").eq("id", otherCustomerId);
+    expect(foreign.error).toBeNull();
+    expect(foreign.data).toEqual([]);
+    const request = createRequestAuthContext(async () => customerDb);
+    expect(await request.getCustomerMemberships()).toEqual([{
+      customerId: ownCustomerId, customerName: "Buyer", breweryId: custCtx.breweryId, breweryName: expect.any(String),
+    }]);
+    expect(await request.getCustomerMembership(custCtx.breweryId, otherCustomerId)).toBeNull();
+    expect(await ctxForBearer(customerDb, custCtx.userId, custCtx.breweryId, ownCustomerId)).toMatchObject({ role: "customer", customerId: ownCustomerId });
+    await expect(ctxForBearer(customerDb, custCtx.userId, custCtx.breweryId, otherCustomerId)).rejects.toMatchObject({ code: "not_member" });
+  });
+
+  it("keeps account identity and the buyer's catalog usable without base-table reads", async () => {
+    expect(await runCommand("get_portal_account", {}, custCtx)).toMatchObject({ customer: { id: ownCustomerId, name: "Buyer" } });
+    expect(await runCommand("portal_catalog", {}, custCtx)).toEqual([expect.objectContaining({ unitPriceCents: 1000 })]);
   });
 });

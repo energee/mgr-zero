@@ -11,7 +11,7 @@ import { KegFleetView } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
+import { kegShortageText, toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
 import { toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -19,6 +19,12 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Keg fleet", () => {
+  it("#815 prints each saved location shortage with its pool and size", () => {
+    const shortages = [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }];
+    const model = toKegFleetViewProps({ ...kegFleetMicrostar, shortages: shortages.map(kegShortageText) });
+    expect(model.shortages).toEqual(["Owned ½ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile"]);
+    expect(htmlOf(createElement(KegFleetView, { model }))).toContain(model.shortages![0]);
+  });
   it("does not restore fixture controls when live slots are explicitly disabled", () => {
     const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools: [], navRows: [] }), eventForm: null }));
     expect(html).not.toContain("Record keg event");
