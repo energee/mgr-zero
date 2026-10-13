@@ -67,7 +67,7 @@ const listPools = (ctx: Ctx) => completeRows("Keg pools", start => ctx.db.from("
   .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + PAGE_SIZE - 1));
 
 defineQuery({
-  name: "list_keg_pools", description: "Keg pools, alphabetical, active and retired alike", input: z.object({}), roles: ROLES,
+  name: "list_keg_pools", description: "Keg pools, alphabetical, active and retired alike", input: z.object({}), roles: ["admin", "warehouse", "sales"],
   handler: (ctx) => listPools(ctx),
 });
 

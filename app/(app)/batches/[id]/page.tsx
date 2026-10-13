@@ -3,7 +3,7 @@
 // get_brew_day is the read; only open vessels not already occupied make
 // sense to offer, but record_brew_day itself is the one place that refuses
 // an overlap, so every vessel is offered here.
-import { brewPlanActuals, type BrewPlan, type BrewMaterialSource, type BrewRecordView } from "@/lib/mgr/brew-day-view";
+import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { breweryToday } from "@/lib/commands/registry";
@@ -34,13 +34,13 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[], string, { plan: BrewPlan; sources: BrewMaterialSource[] }, { records: BrewRecordView[] }];
 
   const recorded = Boolean(batch.brewed_on || occupancy);
-  const currentRecord = history.records.at(-1);
+  const confirmedBbl = currentBrewRecords(history.records).reduce((sum, record) => sum + record.initial_bbl, 0);
   const model = {
     plan: plan.plan, sources: plan.sources, records: history.records, actuals: brewPlanActuals(plan.plan, Number(batch.planned_bbl), plan.sources), process: {}, confirmEmpty: false,
     title: batNo(batch.batch_no), backHref: "/batches",
     planned: Number(batch.planned_bbl) + " bbl · " + batch.planned_on, note: batch.note ?? undefined,
-    recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
-    initialBbl: currentRecord ? String(currentRecord.initial_bbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
+    today, plannedBbl: Number(batch.planned_bbl), recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
+    initialBbl: history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),
   };
   return <RecordBrewDayForm key={`${batch.id}:${history.records.length}`} batchId={batch.id} model={model} planActions={<ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />} />;
