@@ -130,6 +130,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   explicit `null` (`upsert_brand_approval`, `upsert_state_registration`,
   `upsert_brewery_state_license`). Stated in `content/docs/api/index.mdx`'s
   Conventions section — read it before adding a new `upsert_*` command.
+- **Finished-goods cost is frozen at packaging close and read from the ledger (2026-10-13, #810, PRs #845, #858).** A run's unit cost is frozen in `packaging_run_outputs.unit_cost_cents` from the consumed lot's newest uncorrected receipt; missing prices stay null and nothing is backfilled. Per-order COGS (`order_line_cogs`, `get_order_cogs`) is never stored: shipped `sale_removal` rows minus linked `return_in` rows at the shipped lot's frozen cost, margin withheld while any shipped unit is uncosted. Admin/Sales gating is command-level only, so cost columns follow table RLS and Brewer or Warehouse can read them through the Data API (owner-approved).
+- **A movement's report date is its frozen `occurred_on`, not insert time (2026-10-13, #821, PR #847).** `close_packaging_run` dates stock by Packaged on and refuses a future date or one inside a filed period; other writers default to their insert day. Cellar losses still count on the day recorded. Any function redefining `file_compliance_report` or `private.generate_compliance_report` must start from migration `20261013100000` (#816, PR #857), which retired the `externalMappingRequired` filing gate: cellar Taproom removals file as taxpaid under the frozen Taproom channel treatment.
+- **Hosted scheduled jobs run from GitHub Actions, not Vercel cron (2026-10-13, PR #861).** Hobby cron fires at most daily, so `hosted-jobs.yml` POSTs the bearer-authenticated email and retention routes.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
