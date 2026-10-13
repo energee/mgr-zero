@@ -29,6 +29,7 @@ import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { poLineCounts } from "../lib/mgr/new-po-view";
+import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -86,16 +87,10 @@ describe("Purchase orders", () => {
     expect(body.props.model).toEqual(receivePoCountryMalt);
   });
 
-  it("prevents Enter in the closure reason from submitting the receipt or send form", () => {
-    const view = ReceivePoView({ model: receivePoCountryMalt });
-    const fields = (view.props.children as ReactNode[]).filter(node => isValidElement(node) && node.type === "fieldset");
-    const closure = fields.at(-1) as { props: { onKeyDown?: (event: { key: string; target: { tagName: string }; preventDefault: () => void }) => void } };
-    const preventDefault = vi.fn();
-    closure.props.onKeyDown?.({ key: "Enter", target: { tagName: "INPUT" }, preventDefault });
-    expect(preventDefault).toHaveBeenCalledOnce();
-    preventDefault.mockClear();
-    closure.props.onKeyDown?.({ key: "a", target: { tagName: "INPUT" }, preventDefault });
-    expect(preventDefault).not.toHaveBeenCalled();
+  it("submits closure through its own form, so Enter in the reason never submits the receipt or send form", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    expect(html).toMatch(new RegExp(`<input[^>]*aria-label="Closure reason"[^>]*form="${CLOSURE_FORM_ID}"|<input[^>]*form="${CLOSURE_FORM_ID}"[^>]*aria-label="Closure reason"`));
+    expect(html).toMatch(new RegExp(`<button[^>]*type="submit"[^>]*form="${CLOSURE_FORM_ID}"|<button[^>]*form="${CLOSURE_FORM_ID}"[^>]*type="submit"`));
   });
 
   it("renders reason-bearing closure controls on the shared receive view", () => {
@@ -105,7 +100,7 @@ describe("Purchase orders", () => {
     const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
     expect(short).toContain("Close short");
     expect(short).not.toContain("Cancel purchase order");
-    const closed = htmlOf(createElement(ReceivePoView, { model: { title: "Closed PO", state: "received", closedReason: "Vendor cancelled remainder" } }));
+    const closed = htmlOf(createElement(ReceivePoView, { model: { title: "Closed PO", state: "received", status: "closed short · Vendor cancelled remainder" } }));
     expect(closed).toContain("Vendor cancelled remainder");
     expect(closed).not.toContain("Close short");
     expect(closed).not.toContain("Receive purchase order");

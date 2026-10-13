@@ -23,7 +23,6 @@ export type ReceivePoViewModel = {
   correctionReason?: string;
   closure?: "cancel" | "short";
   closureReason?: string;
-  closedReason?: string;
   note?: string;
   locationId?: string;
   binId?: string;
@@ -45,3 +44,11 @@ export function receiveMode(state: string | undefined): "draft" | "receive" | "c
   if (state === "draft") return "draft";
   return state === undefined || state === "sent" || state === "partially_received" ? "receive" : "view";
 }
+
+/** The purchase-order statuses still owed by the vendor: the PO list shows
+ *  these by default, and only these offer cancel or close short. */
+export const OPEN_PO_STATUSES = ["draft", "sent", "partially_received"] as const;
+
+/** The form the closure reason and button submit, a sibling of the receive form
+ *  (forms cannot nest), so Enter in the reason submits closure, not a receipt. */
+export const CLOSURE_FORM_ID = "purchase-order-closure";

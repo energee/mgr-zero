@@ -22,41 +22,43 @@ create or replace view public.po_open_balances with (security_invoker = true) as
     )
   ) r on true;
 
-create function public.cancel_purchase_order(p_brewery uuid,p_po uuid,p_reason text,p_request_id uuid)
-returns jsonb language plpgsql security definer set search_path = '' as $$
+-- Both closures share one body: they differ only in which statuses may close,
+-- whether receipts must exist (close short) or must not (cancel), and the
+-- status the order ends in.
+create function private.close_purchase_order(p_brewery uuid,p_po uuid,p_reason text,p_request_id uuid,
+  p_command text,p_allowed public.po_status[],p_requires_receipts boolean,p_status public.po_status)
+returns jsonb language plpgsql set search_path = '' as $$
 declare v_actor uuid; v_replay jsonb; v_po public.purchase_orders;
 begin
   v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery,'cancel_purchase_order',p_request_id,
+  v_replay := private.claim_command_request(p_brewery,p_command,p_request_id,
     jsonb_build_object('brewery',p_brewery,'po',p_po,'reason',p_reason));
   if v_replay is not null then return v_replay; end if;
-  if nullif(btrim(p_reason),'') is null then raise exception 'a cancellation reason is required'; end if;
-  v_po := private.lock_purchase_order(p_brewery,p_po,array['draft','sent']::public.po_status[]);
-  if exists(select 1 from public.receipts where po_id=p_po and brewery_id=p_brewery) then
+  if nullif(btrim(p_reason),'') is null then
+    raise exception 'a % reason is required', case when p_requires_receipts then 'closure' else 'cancellation' end;
+  end if;
+  v_po := private.lock_purchase_order(p_brewery,p_po,p_allowed);
+  if exists(select 1 from public.receipts where po_id=p_po and brewery_id=p_brewery) <> p_requires_receipts then
+    if p_requires_receipts then raise exception 'a purchase order without receipts must be cancelled instead'; end if;
     raise exception 'a purchase order with receipts cannot be cancelled; close it short instead';
   end if;
-  update public.purchase_orders set status='cancelled',closed_at=now(),closed_by=v_actor,close_reason=btrim(p_reason)
+  update public.purchase_orders set status=p_status,closed_at=now(),closed_by=v_actor,close_reason=btrim(p_reason)
     where id=p_po returning * into v_po;
   return private.complete_command_request(p_request_id,to_jsonb(v_po));
 end $$;
+revoke all on function private.close_purchase_order(uuid,uuid,text,uuid,text,public.po_status[],boolean,public.po_status) from public,anon,authenticated,service_role;
+
+create function public.cancel_purchase_order(p_brewery uuid,p_po uuid,p_reason text,p_request_id uuid)
+returns jsonb language sql security definer set search_path = '' as $$
+  select private.close_purchase_order(p_brewery,p_po,p_reason,p_request_id,'cancel_purchase_order',
+    array['draft','sent']::public.po_status[],false,'cancelled');
+$$;
 
 create function public.close_purchase_order_short(p_brewery uuid,p_po uuid,p_reason text,p_request_id uuid)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_actor uuid; v_replay jsonb; v_po public.purchase_orders;
-begin
-  v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery,'close_purchase_order_short',p_request_id,
-    jsonb_build_object('brewery',p_brewery,'po',p_po,'reason',p_reason));
-  if v_replay is not null then return v_replay; end if;
-  if nullif(btrim(p_reason),'') is null then raise exception 'a closure reason is required'; end if;
-  v_po := private.lock_purchase_order(p_brewery,p_po,array['sent','partially_received']::public.po_status[]);
-  if not exists(select 1 from public.receipts where po_id=p_po and brewery_id=p_brewery) then
-    raise exception 'a purchase order without receipts must be cancelled instead';
-  end if;
-  update public.purchase_orders set status='received',closed_at=now(),closed_by=v_actor,close_reason=btrim(p_reason)
-    where id=p_po returning * into v_po;
-  return private.complete_command_request(p_request_id,to_jsonb(v_po));
-end $$;
+returns jsonb language sql security definer set search_path = '' as $$
+  select private.close_purchase_order(p_brewery,p_po,p_reason,p_request_id,'close_purchase_order_short',
+    array['sent','partially_received']::public.po_status[],true,'received');
+$$;
 
 revoke all on function public.cancel_purchase_order(uuid,uuid,text,uuid) from public,anon;
 revoke all on function public.close_purchase_order_short(uuid,uuid,text,uuid) from public,anon;

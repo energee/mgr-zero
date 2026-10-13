@@ -13,6 +13,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { poNo } from "@/lib/mgr/doc-no";
+import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { ReceiveForm, type PoLine } from "./po-actions";
 
 type Po = {
@@ -57,8 +58,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
-    closedReason: po.close_reason ?? undefined,
-    closure: !po.closed_at && ["draft", "sent", "partially_received"].includes(po.status)
+    closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)
       ? po.receipts.length ? "short" : "cancel" : undefined,
     history: po.receipts.map(receipt => ({
       key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: receiptHref(`/purchase-orders/${po.id}`, receipt.id),

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
-import { CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { receiptHref } from "@/lib/mgr/receipt-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
@@ -36,7 +36,7 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
   const counted = open.filter(line => counts[line.id] !== "" && Number.isFinite(Number(counts[line.id])) && Number(counts[line.id]) >= 0);
   const lotsOk = counted.every(line => !line.material?.lot_tracked || Number(counts[line.id]) === 0 || lots[line.id]?.trim());
   const ready = Boolean((correcting ? reason.trim() && counted.length === open.length : locationId && binId && receivedOn) && counted.length > 0 && lotsOk);
-  return <form className="flex flex-col gap-3" onSubmit={event => {
+  return <><form className="flex flex-col gap-3" onSubmit={event => {
     event.preventDefault();
     if (busy) return;
     if (mode === "draft") { void run("send_purchase_order", { poId, sentVia: via }); return; }
@@ -73,10 +73,12 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
       location: value => { setLocationId(value); setBinId(bins.find(bin => bin.location_id === value)?.id ?? ""); },
       bin: setBinId, receivedOn: setReceivedOn, sentVia: setVia, reason: setReason,
       closureReason: setClosureReason,
-      close: () => {
-        if (busy || !model.closure || !closureReason.trim()) return;
-        void run(model.closure === "cancel" ? "cancel_purchase_order" : "close_purchase_order_short", { poId, reason: closureReason });
-      },
     }} submitting={busy} disabled={receiving && !ready} messages={<CommandFormMessage error={error} />} />
-  </form>;
+  </form>
+  {model.closure && <form id={CLOSURE_FORM_ID} onSubmit={event => {
+    event.preventDefault();
+    if (busy || !model.closure || !closureReason.trim()) return;
+    void run(model.closure === "cancel" ? "cancel_purchase_order" : "close_purchase_order_short", { poId, reason: closureReason });
+  }} />}
+  </>;
 }

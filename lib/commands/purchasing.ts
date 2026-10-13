@@ -7,6 +7,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, cents, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
 const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
@@ -190,9 +191,11 @@ defineCommand({
   })),
 });
 
+const closureInput = z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) });
+
 defineCommand({
   name: "cancel_purchase_order", description: "Cancel a draft or sent purchase order without receipts, recording the reason and releasing its unreceived remainder",
-  input: z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) }), roles: [...PO_ROLES],
+  input: closureInput, roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_purchase_order", {
     p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
@@ -200,7 +203,7 @@ defineCommand({
 
 defineCommand({
   name: "close_purchase_order_short", description: "Close a purchase order's unreceived remainder with a reason; counted receipts and stock remain unchanged",
-  input: z.object({ poId: z.string().uuid(), reason: z.string().trim().min(1) }), roles: [...PO_ROLES],
+  input: closureInput, roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("close_purchase_order_short", {
     p_brewery: ctx.breweryId, p_po: i.poId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
@@ -239,14 +242,13 @@ defineCommand({
 });
 
 const PO_COLUMNS = "id, po_no, vendor_id, status, ordered_on, expected_on, sent_via, sent_by, note, created_at, closed_at, closed_by, close_reason";
-const OPEN_STATUSES = ["draft", "sent", "partially_received"] as const;
 
 defineQuery({
   name: "list_purchase_orders", description: "Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled",
   input: z.object({ includeClosed: z.boolean().optional() }), roles: [...PO_ROLES],
   handler: async (ctx, i) => {
     let q = ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name)`).eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false });
-    if (!i.includeClosed) q = q.in("status", OPEN_STATUSES);
+    if (!i.includeClosed) q = q.in("status", OPEN_PO_STATUSES);
     const [pos, open] = await Promise.all([
       unwrap(q),
       unwrap(ctx.db.from("po_open_balances").select("po_id").eq("brewery_id", ctx.breweryId).gt("qty_open", 0)),
