@@ -8153,7 +8153,7 @@ export type Database = {
         Args: {
           p_batch: string
           p_brewery: string
-          p_confirm_in_tank?: boolean
+          p_confirm_in_tank_bbl?: number
           p_request_id: string
         }
         Returns: Json

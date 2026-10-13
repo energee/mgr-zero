@@ -3,7 +3,7 @@ create or replace function private.batch_completion_calculation(p_brewery uuid, 
 language plpgsql stable security definer set search_path = '' as $$
 declare
   v_batch public.batches; v_balance jsonb; v_baseline numeric; v_residual numeric;
-  v_in_tank jsonb; v_in_tank_bbl numeric;
+  v_in_tank jsonb; v_in_tank_bbl numeric; v_threshold numeric;
 begin
   select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery;
   if v_batch.id is null then raise exception 'batch not found'; end if;
@@ -30,24 +30,32 @@ begin
   from public.occupancy_volumes ov join public.vessels v on v.id = ov.vessel_id
   where ov.brewery_id = p_brewery and ov.batch_id = p_batch
     and ov.ended_at is null and ov.bbl > 0;
+  v_threshold := greatest(0.05::numeric, v_baseline * 0.005::numeric);
+  -- The one place the acknowledgement rule lives; the form reads the flag.
   return v_balance || jsonb_build_object(
     'batchId', p_batch, 'closedAt', null, 'inTank', v_in_tank, 'inTankBbl', v_in_tank_bbl,
-    'thresholdBbl', greatest(0.05::numeric, v_baseline * 0.005::numeric), 'adjustmentId', null);
+    'inTankRequiresConfirmation', v_in_tank_bbl >= v_threshold,
+    'thresholdBbl', v_threshold, 'adjustmentId', null);
 end $$;
 
 drop function public.complete_batch(uuid, uuid, uuid);
 
-create function public.complete_batch(p_brewery uuid, p_batch uuid, p_request_id uuid, p_confirm_in_tank boolean default false) returns jsonb
+-- p_confirm_in_tank_bbl is the exact in-tank total the caller reviewed and acknowledged.
+-- Completion refuses unless it equals the total recalculated under the lock, so an
+-- acknowledgement of one volume can never write off a different one.
+create function public.complete_batch(p_brewery uuid, p_batch uuid, p_request_id uuid, p_confirm_in_tank_bbl numeric default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid; v_replay jsonb; v_result jsonb; v_batch public.batches;
   v_close timestamptz; v_anchor uuid; v_adjustment uuid; v_residual numeric; v_threshold numeric;
-  v_payload jsonb; v_tanks text;
+  v_payload jsonb; v_tanks text; v_in_tank_bbl numeric;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
   -- Retain the pre-upgrade hash for ordinary and recovered unconfirmed requests.
   v_payload := jsonb_build_object('brewery', p_brewery, 'batch', p_batch);
-  if p_confirm_in_tank then v_payload := v_payload || jsonb_build_object('confirm_in_tank', true); end if;
+  if p_confirm_in_tank_bbl is not null then
+    v_payload := v_payload || jsonb_build_object('confirm_in_tank_bbl', p_confirm_in_tank_bbl);
+  end if;
   v_replay := private.claim_command_request(p_brewery, 'complete_batch', p_request_id, v_payload);
   if v_replay is not null then return v_replay; end if;
 
@@ -60,11 +68,17 @@ begin
   v_result := private.batch_completion_calculation(p_brewery, p_batch);
   v_residual := (v_result->>'residualBbl')::numeric;
   v_threshold := (v_result->>'thresholdBbl')::numeric;
-  if (v_result->>'inTankBbl')::numeric >= v_threshold and not coalesce(p_confirm_in_tank, false) then
+  v_in_tank_bbl := (v_result->>'inTankBbl')::numeric;
+  if (v_result->>'inTankRequiresConfirmation')::boolean
+    and p_confirm_in_tank_bbl is distinct from v_in_tank_bbl then
     select string_agg(trim_scale((tank->>'bbl')::numeric)::text || ' bbl in ' || (tank->>'vesselName'), ', ' order by tank->>'vesselName')
     into v_tanks from jsonb_array_elements(v_result->'inTank') tank;
-    raise exception 'Completing writes off % bbl still in tanks (%). Confirm this loss explicitly.',
-      trim_scale((v_result->>'inTankBbl')::numeric), v_tanks;
+    if p_confirm_in_tank_bbl is null then
+      raise exception 'Completing writes off % bbl still in tanks (%). Confirm this loss explicitly.',
+        trim_scale(v_in_tank_bbl), v_tanks;
+    end if;
+    raise exception 'Tanks now hold % bbl (%), not the % bbl acknowledged. Review the batch and confirm again.',
+      trim_scale(v_in_tank_bbl), v_tanks, trim_scale(p_confirm_in_tank_bbl);
   end if;
 
   select o.id into v_anchor from public.vessel_occupancies o
@@ -88,5 +102,5 @@ begin
   return private.complete_command_request(p_request_id, v_result);
 end $$;
 
-revoke all on function public.complete_batch(uuid, uuid, uuid, boolean) from public, anon, authenticated, service_role;
-grant execute on function public.complete_batch(uuid, uuid, uuid, boolean) to authenticated;
+revoke all on function public.complete_batch(uuid, uuid, uuid, numeric) from public, anon, authenticated, service_role;
+grant execute on function public.complete_batch(uuid, uuid, uuid, numeric) to authenticated;

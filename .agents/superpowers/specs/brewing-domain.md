@@ -64,7 +64,7 @@ Yeast health is modeled as a daily decay: liquid yeast loses roughly 2% of its v
 
 ### Batch completion in-tank acknowledgement
 
-Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), completion refuses unless `confirmInTank: true`. The acknowledgement names the beer and tanks being written off as loss. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.
+Completion previews name the current barrels in every open tank. When their total reaches max(0.05 bbl, 0.5% of the batch baseline), the preview sets `inTankRequiresConfirmation`. Completion then refuses unless `confirmInTankBbl` equals the previewed `inTankBbl`. The acknowledgement names the beer and tanks being written off as loss. If tank volume changes after review, completion refuses with the new figures; review and confirm again. Below-threshold residue needs no acknowledgement. Existing loss reconciliation and eight-decimal precision remain unchanged. Unknown-outcome retries keep the exact acknowledgement and request; this does not add reopening or undo.
 
 ### Blended lot trace membership
 

@@ -55,7 +55,8 @@ async function waitForLock(observer: Client, pid: number) {
   await expect.poll(async () => (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
 }
 
-const completionSql = "select public.complete_batch($1,$2,$3,true) result";
+// The fourth argument acknowledges the exact barrels the completion writes off from open tanks.
+const completionSql = "select public.complete_batch($1,$2,$3,$4) result";
 
 describe.sequential("cellar workflow serialization", () => {
   it("locks the observed occupancy through a first reading while completed retries bypass closure", async () => {
@@ -107,7 +108,7 @@ describe.sequential("cellar workflow serialization", () => {
     ]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
-    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID()]);
+    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 0.05]);
     pending.catch(() => {});
     await waitForLock(a, pid);
     await a.query("commit");
@@ -124,7 +125,7 @@ describe.sequential("cellar workflow serialization", () => {
     await a.query("select public.record_cellar_transfer($1,$2,$3,4,0.2,$4)", [breweryId, f.occupancyId, target.id, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
-    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID()]);
+    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 9.8]);
     pending.catch(() => {});
     await waitForLock(a, pid);
     await a.query("commit");
@@ -139,7 +140,7 @@ describe.sequential("cellar workflow serialization", () => {
       const unattached = mode === "update" ? await runCommand("schedule_packaging_run", { brandId: f.brandId, plannedOn: "2026-09-03", outputs: [] }, brewer) as { id: string } : null;
       const a = await client(brewer.userId, true);
       const b = await client(brewer.userId, false);
-      await a.query(completionSql, [breweryId, f.batchId, crypto.randomUUID()]);
+      await a.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 1]);
       await a.query("reset role");
       const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
       const pending = mode === "schedule"
@@ -163,7 +164,7 @@ describe.sequential("cellar workflow serialization", () => {
     await a.query("select public.schedule_packaging_run($1,$2,'2026-09-03',$3,'[]'::jsonb,$4)", [breweryId, f.brandId, f.occupancyId, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
-    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID()]);
+    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 1]);
     pending.catch(() => {});
     await waitForLock(a, pid);
     await a.query("commit");
@@ -180,7 +181,7 @@ describe.sequential("cellar workflow serialization", () => {
     ]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
-    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID()]);
+    const pending = b.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 1]);
     pending.catch(() => {});
     await waitForLock(a, pid);
     await a.query("commit");

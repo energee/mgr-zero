@@ -10,7 +10,7 @@ import { bblExact } from "@/lib/volume";
 export type BatchCompletionPreview = {
   batchId: string; closedAt: string | null; baselineBbl: number; packagedBbl: number;
   attributedBbl: number; residualBbl: number; thresholdBbl: number; adjustmentId: string | null;
-  inTankBbl: number; inTank: { occupancyId: string; vesselId: string; vesselName: string; bbl: number }[];
+  inTankBbl: number; inTankRequiresConfirmation: boolean; inTank: { occupancyId: string; vesselId: string; vesselName: string; bbl: number }[];
 };
 
 export function BatchCompletionView({ batches, open, onOpenChange, batchId, preview, phase, error,
@@ -38,7 +38,7 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
         <dt>Predicted residual</dt><dd className="text-right">{bblExact(preview.residualBbl, 8)}</dd>
       </dl>}
       {preview && phase !== "saved" && <p className="text-xs text-muted-foreground">Completing closes every open occupancy. A residual at or above the threshold becomes one automatic loss reconciliation.</p>}
-      {acknowledgement && <div className="flex items-center justify-between gap-3"><span>{acknowledgement}</span>{E.sw(confirmInTank, acknowledgement, onConfirmInTank, frozen)}</div>}
+      {acknowledgement && <div className="flex items-center justify-between gap-3"><span>{acknowledgement}</span><fieldset disabled={frozen}>{E.sw(confirmInTank, acknowledgement, onConfirmInTank)}</fieldset></div>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
       {phase === "saved" && <CommandFormMessage tone="warning">Batch completed and saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />

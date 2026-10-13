@@ -171,7 +171,7 @@ async function fixtures() {
   await put("chat_action_intents", { installation_id: installation.id, user_id: taproom.id, provider: "slack", action_origin_hash: "fixture", command_name: "get_gravity_unit", input_hash: "fixture", subject_type: "brewery", subject_id: brewery.id, subject_version: "1", request_id: crypto.randomUUID(), preview_token_hash: "fixture", allowed_action: "confirm", expires_at: "2099-01-01T00:00:00Z" });
   sql(`update batches set brewed_on='${day}' where id='${batch.id}'`, true);
   const ownerCtx = { breweryId: brewery.id, userId: owner.id, role: "admin" as const, db: await asUser(owner.email) };
-  const completed = await runCommand("complete_batch", { batchId: batch.id, confirmInTank: true }, ownerCtx) as { adjustmentId: string };
+  const completed = await runCommand("complete_batch", { batchId: batch.id, confirmInTankBbl: Number((await runCommand("get_batch_completion_preview", { batchId: batch.id }, ownerCtx) as { inTankBbl: string }).inTankBbl) }, ownerCtx) as { adjustmentId: string };
   await runCommand("reattribute_loss", { adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction" }, ownerCtx);
   return { brewery, owner, taproom, taps, wh, storage, pool, customer, cat, vendor, material, recipe, version, batch, vessel, occupancy, run, po, poLine, order, line, invoice, transfer, installation, occurrence, composed, poured };
 }
@@ -365,7 +365,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_packaging_material_record: [B,readyRun.id],
     correct_packaging_material_record: [B,R(),"Correction",[],R()],
     close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R(),[],"reviewed"],
-    complete_batch: [B,f.batch.id,R(),true],
+    complete_batch: [B,f.batch.id,R(),1],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
     create_recipe_version: [B,f.recipe.id,[{name:"Sacc",kind:"infusion",tempF:152,minutes:60}],[],{},0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],

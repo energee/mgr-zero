@@ -8,7 +8,7 @@ import type { BatchCompletionPhase } from "@/lib/mgr/batch-completion-state";
 const preview: BatchCompletionPreview = {
   batchId: "batch-0168", closedAt: null, baselineBbl: 15, packagedBbl: 11.8,
   attributedBbl: 0, residualBbl: 3.2, thresholdBbl: 0.075, adjustmentId: null,
-  inTankBbl: 3.2, inTank: [{ occupancyId: "occupancy-0168", vesselId: "fv-2", vesselName: "FV-2", bbl: 3.2 }],
+  inTankBbl: 3.2, inTankRequiresConfirmation: true, inTank: [{ occupancyId: "occupancy-0168", vesselId: "fv-2", vesselName: "FV-2", bbl: 3.2 }],
 };
 
 export function BatchCompletionFixture() {

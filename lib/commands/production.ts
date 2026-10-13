@@ -445,12 +445,12 @@ defineQuery({
 
 defineCommand({
   name: "complete_batch",
-  description: "Close a brewed batch and its open occupancies; beer still in tanks at the threshold requires explicit confirmation of the loss",
-  input: z.object({ batchId: z.string().uuid(), confirmInTank: z.boolean().optional() }),
+  description: "Close a brewed batch and its open occupancies; beer still in tanks at the threshold requires confirmInTankBbl equal to the previewed inTankBbl being written off as loss",
+  input: z.object({ batchId: z.string().uuid(), confirmInTankBbl: z.number().nonnegative().optional() }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("complete_batch", {
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_request_id: execution.requestId,
-    p_confirm_in_tank: i.confirmInTank ?? false,
+    p_confirm_in_tank_bbl: i.confirmInTankBbl,
   })),
 });
 

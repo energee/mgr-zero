@@ -22,9 +22,10 @@ describe("batch completion form attempt ownership", () => {
     expect(view.props).toHaveProperty("data-preview-action");
   });
   it("names the exact beer and tanks being acknowledged at the threshold", () => {
-    expect(batchCompletionAcknowledgement({ inTankBbl: 3.2, thresholdBbl: 0.05, inTank: [{ vesselName: "FV-2", bbl: 3.2 }] })).toBe("Write off 3.2 bbl in FV-2 as loss");
-    expect(batchCompletionAcknowledgement({ inTankBbl: 0.05, thresholdBbl: 0.05, inTank: [{ vesselName: "BT-1", bbl: 0.03 }, { vesselName: "FV-2", bbl: 0.02 }] })).toBe("Write off 0.03 bbl in BT-1 and 0.02 bbl in FV-2 as loss");
-    expect(batchCompletionAcknowledgement({ inTankBbl: 0.04, thresholdBbl: 0.05, inTank: [{ vesselName: "FV-2", bbl: 0.04 }] })).toBeNull();
+    expect(batchCompletionAcknowledgement({ inTankRequiresConfirmation: true, inTank: [{ vesselName: "FV-2", bbl: 3.2 }] })).toBe("Write off 3.2 bbl in FV-2 as loss");
+    expect(batchCompletionAcknowledgement({ inTankRequiresConfirmation: true, inTank: [{ vesselName: "BT-1", bbl: 0.03 }, { vesselName: "FV-2", bbl: 0.02 }] })).toBe("Write off 0.03 bbl in BT-1 and 0.02 bbl in FV-2 as loss");
+    expect(batchCompletionAcknowledgement({ inTankRequiresConfirmation: false, inTank: [{ vesselName: "FV-2", bbl: 0.04 }] })).toBeNull();
+    expect(batchCompletionAcknowledgement({})).toBeNull();
   });
   it("keeps an in-flight or unknown command open so its exact request can be recovered", () => {
     expect(canCloseBatchCompletion("submitting")).toBe(false);

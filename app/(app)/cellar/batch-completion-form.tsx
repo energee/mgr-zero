@@ -14,7 +14,6 @@ import {
 
 type Batch = { id: string; label: string };
 
-
 export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const breweryId = useBrewery();
   const expectedContext = useRef(useCommandContext());
@@ -58,7 +57,11 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     setError(null);
     setPhase("submitting");
     try {
-      setPreview(await command(breweryId, "complete_batch", { batchId: reviewedBatchId, confirmInTank }, requestId.current, expectedContext.current) as BatchCompletionPreview);
+      setPreview(await command(breweryId, "complete_batch", {
+        batchId: reviewedBatchId,
+        // Bind the acknowledgement to the exact volume reviewed; the server refuses if tanks changed.
+        ...(confirmInTank && preview.inTankRequiresConfirmation ? { confirmInTankBbl: preview.inTankBbl } : {}),
+      }, requestId.current, expectedContext.current) as BatchCompletionPreview);
       requestId.current = null;
       setPhase("saved");
     } catch (cause) {

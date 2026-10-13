@@ -14,6 +14,7 @@ type Completion = {
   thresholdBbl: number | string;
   adjustmentId: string | null;
   inTankBbl: number | string;
+  inTankRequiresConfirmation: boolean;
   inTank: { occupancyId: string; vesselId: string; vesselName: string; bbl: number | string }[];
 };
 
@@ -61,9 +62,14 @@ async function packageBeer(source: Awaited<ReturnType<typeof brew>>, packagedBbl
 }
 
 const preview = (batchId: string, actor = ctx) => runCommand("get_batch_completion_preview", { batchId }, actor) as Promise<Completion>;
-const complete = (batchId: string, actor = ctx, requestId = crypto.randomUUID(), confirmInTank = true) => runCommand(
-  "complete_batch", { batchId, confirmInTank }, actor, { requestId, correlationId: crypto.randomUUID() },
-) as Promise<Completion>;
+// Acknowledges whatever volume the preview names, as the form does; a preview that
+// refuses (open run, negative residual) leaves no acknowledgement and completion repeats the refusal.
+const complete = async (batchId: string, actor = ctx, requestId = crypto.randomUUID(), acknowledge = true) => {
+  const reviewed = acknowledge ? await preview(batchId, actor).catch(() => null) : null;
+  return runCommand("complete_batch", {
+    batchId, ...(reviewed?.inTankRequiresConfirmation ? { confirmInTankBbl: Number(reviewed.inTankBbl) } : {}),
+  }, actor, { requestId, correlationId: crypto.randomUUID() }) as Promise<Completion>;
+};
 const n = (value: number | string) => Number(value);
 
 describe("batch completion reconciliation", () => {
@@ -82,12 +88,32 @@ describe("batch completion reconciliation", () => {
     expect(sql(`select (ended_at is null)::text from vessel_occupancies where id='${source.occupancyId}'`, true)).toEqual(["true"]);
     expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["0"]);
 
-    const confirmed = () => runCommand("complete_batch", { batchId: source.batchId, confirmInTank: true }, ctx, { requestId, correlationId: crypto.randomUUID() }) as Promise<Completion>;
+    expect(reviewed.inTankRequiresConfirmation).toBe(true);
+    const confirmed = () => runCommand("complete_batch", { batchId: source.batchId, confirmInTankBbl: 18 }, ctx, { requestId, correlationId: crypto.randomUUID() }) as Promise<Completion>;
     const saved = await confirmed();
     expect(n(saved.residualBbl)).toBe(18);
     expect(await confirmed()).toEqual(saved);
     await expect(complete(source.batchId, ctx, requestId, false)).rejects.toMatchObject({ code: "conflict" });
     expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["1"]);
+  });
+
+  it("refuses an acknowledgement for a volume other than the one now in tanks (#808)", async () => {
+    const source = await brew(20);
+    const reviewed = await preview(source.batchId);
+    expect(n(reviewed.inTankBbl)).toBe(20);
+    // Another session adds beer to the tank after the brewer reviewed 20 bbl.
+    insertFixture("volume_adjustments", {
+      brewery_id: breweryId, occupancy_id: source.occupancyId, bbl: 2, reason: "measurement", created_by: ctx.userId,
+    });
+    const requestId = crypto.randomUUID();
+    const stale = () => runCommand("complete_batch", { batchId: source.batchId, confirmInTankBbl: 20 }, ctx, { requestId, correlationId: crypto.randomUUID() });
+    await expect(stale()).rejects.toThrow(/22 bbl.*not the 20 bbl acknowledged/);
+    // An unchanged retry carries the same stale acknowledgement and is refused again.
+    await expect(stale()).rejects.toThrow(/not the 20 bbl acknowledged/);
+    expect(sql(`select (closed_at is null)::text from batches where id='${source.batchId}'`, true)).toEqual(["true"]);
+    expect(sql(`select count(*) from volume_adjustments where occupancy_id='${source.occupancyId}' and affects_occupancy=false`, true)).toEqual(["0"]);
+    const saved = await runCommand("complete_batch", { batchId: source.batchId, confirmInTankBbl: 22 }, ctx) as Completion;
+    expect(n(saved.residualBbl)).toBe(22);
   });
 
   it("names every open tank in the write-off confirmation preview (#808)", async () => {
@@ -97,6 +123,7 @@ describe("batch completion reconciliation", () => {
     const reviewed = await preview(source.batchId);
     expect(n(reviewed.inTankBbl)).toBe(20);
     expect(reviewed.inTank).toHaveLength(2);
+    expect(reviewed.inTankRequiresConfirmation).toBe(true);
     expect(reviewed.inTank.map((entry) => ({ occupancyId: entry.occupancyId, bbl: n(entry.bbl) }))).toEqual(expect.arrayContaining([
       { occupancyId: source.occupancyId, bbl: 12 },
       { occupancyId: moved.to_occupancy.id, bbl: 8 },
@@ -108,9 +135,11 @@ describe("batch completion reconciliation", () => {
   it("requires acknowledgement at the in-tank threshold but not below it (#808)", async () => {
     const exact = await brew(10);
     await packageBeer(exact, 9.95);
+    expect((await preview(exact.batchId)).inTankRequiresConfirmation).toBe(true);
     await expect(complete(exact.batchId, ctx, crypto.randomUUID(), false)).rejects.toThrow(/0\.05 bbl/);
     const below = await brew(10);
     await packageBeer(below, 9.96);
+    expect((await preview(below.batchId)).inTankRequiresConfirmation).toBe(false);
     expect((await complete(below.batchId, ctx, crypto.randomUUID(), false)).adjustmentId).toBeNull();
   });
 
@@ -237,8 +266,10 @@ describe("batch completion reconciliation", () => {
   it("replays exactly, refuses a fresh completion, and denies wrong roles and tenants without residue", async () => {
     const source = await brew(2);
     const requestId = crypto.randomUUID();
-    const first = await complete(source.batchId, ctx, requestId);
-    expect(await complete(source.batchId, ctx, requestId)).toEqual(first);
+    // A retry resends the original acknowledgement; it does not re-review the closed batch.
+    const send = () => runCommand("complete_batch", { batchId: source.batchId, confirmInTankBbl: 2 }, ctx, { requestId, correlationId: crypto.randomUUID() });
+    const first = await send();
+    expect(await send()).toEqual(first);
     await expect(complete(source.batchId)).rejects.toThrow(/already completed/i);
     const sales = await makeStaffCtx(breweryId, "sales");
     await expect(preview(source.batchId, sales)).rejects.toMatchObject({ code: "permission_denied" });
