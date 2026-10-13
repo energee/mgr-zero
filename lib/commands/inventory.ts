@@ -145,6 +145,22 @@ defineQuery({
   }, row => row.sku_id),
 });
 
+export type InventoryValueRow = { sku_id: string; qty: number; value_cents: number | null; uncosted_qty: number };
+
+defineQuery({
+  name: "get_inventory_value", description: "Current finished-goods value per SKU at frozen packaging-close cost, with units lacking a cost",
+  input: bySku, roles: ["admin", "sales"],
+  handler: (ctx, i) => completeRows<InventoryValueRow>("Inventory value", async (_, after) => {
+    let q = ctx.db.from("sku_inventory_value").select("sku_id, qty, value_cents, uncosted_qty").eq("brewery_id", ctx.breweryId).limit(PAGE_SIZE);
+    let counted = ctx.db.from("sku_inventory_value").select("sku_id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+    if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.skuId) counted = counted.eq("sku_id", i.skuId);
+    if (after) q = q.gt("sku_id", after.sku_id);
+    const [result, count] = await Promise.all([q.order("sku_id"), counted]);
+    return { ...result, count: count.count, error: result.error ?? count.error };
+  }, row => row.sku_id),
+});
+
 defineQuery({
   name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation",
   input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),

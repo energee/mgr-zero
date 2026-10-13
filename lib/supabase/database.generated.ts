@@ -3438,6 +3438,7 @@ export type Database = {
           qty_planned: number
           run_id: string
           sku_id: string
+          unit_cost_cents: number | null
         }
         Insert: {
           brewery_id: string
@@ -3447,6 +3448,7 @@ export type Database = {
           qty_planned?: number
           run_id: string
           sku_id: string
+          unit_cost_cents?: number | null
         }
         Update: {
           brewery_id?: string
@@ -3456,6 +3458,7 @@ export type Database = {
           qty_planned?: number
           run_id?: string
           sku_id?: string
+          unit_cost_cents?: number | null
         }
         Relationships: [
           {
@@ -7654,6 +7657,45 @@ export type Database = {
             columns: ["shipment_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "shipments"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
+      sku_inventory_value: {
+        Row: {
+          brewery_id: string | null
+          qty: number | null
+          sku_id: string | null
+          uncosted_qty: number | null
+          value_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "atp"
+            referencedColumns: ["sku_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "sku_prices"
+            referencedColumns: ["sku_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "skus"
             referencedColumns: ["id", "brewery_id"]
           },
         ]

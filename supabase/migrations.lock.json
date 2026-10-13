@@ -108,5 +108,6 @@
   "20261012100000_qbo_customer_data.sql": "3edd1bf6c238b9ce5e615c201bc7061e4ddbb475b4da31fea371a5e8f73db45f",
   "20261012100300_blended_lot_lineage.sql": "b5d0de8cfb2cf87d052cae77d5b6cca6f4e0a513c4dbd989da3fdf4f3fc66395",
   "20261012100400_brew_turns.sql": "9b4d895a128170751b895b481c1c2fc2041f845c3fceeed3ca8993063f1e2b32",
-  "20261012100600_sku_keg_pool_legacy_replay.sql": "39ccf613d286c1baa4978efdc50cc84cb7ef8d9b1a133e58c03b51a038bf1827"
+  "20261012100600_sku_keg_pool_legacy_replay.sql": "39ccf613d286c1baa4978efdc50cc84cb7ef8d9b1a133e58c03b51a038bf1827",
+  "20261012101200_finished_goods_cost.sql": "a35bd052bbd19372150ce421881b619e545cec9160c0cb687c4aee988cc1c640"
 }
