@@ -179,7 +179,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse and the books-opened date
 
 Takes no input.
 
@@ -549,6 +549,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "revoke_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## set_books_opened_on [#set_books_opened_on]
+
+`command` · admin
+
+Set or clear the day compliance reports start counting the ledger (admin); refused after the start of a filed period
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `booksOpenedOn` | date (YYYY-MM-DD) or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_books_opened_on", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "booksOpenedOn": "2026-01-31" } }'
 ```
 
 ## set_brewery_ai_model [#set_brewery_ai_model]
