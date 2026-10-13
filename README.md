@@ -258,9 +258,12 @@ status `accepted` means Resend accepted it, not that it reached an inbox.
 The internal `POST /api/email/jobs/deliver` worker requires a bearer token
 matching `ORDER_EMAIL_JOB_SECRET`. It uses `RESEND_API_KEY` and
 `ORDER_EMAIL_FROM`; missing configuration refuses the job before any lease.
-Each call processes at most ten emails. A scheduler must call it regularly;
-this repository change does not configure one or enable hosted sending.
-Domain, provider credentials and scheduler setup require user approval (#311).
+Each call processes at most ten emails. `.github/workflows/hosted-jobs.yml`
+calls it every 5 minutes (Vercel Hobby cron is daily at most). It needs the
+repository variable `MGR_URL` and the secret `ORDER_EMAIL_JOB_SECRET`, equal to
+the Vercel value. Jobs skip until `MGR_URL` is set; after that a failed call
+fails the run.
+Domain and provider credentials require user approval (#311).
 Tests mock the provider and send no real mail.
 
 ### Data retention and closing a brewery (#766)
@@ -269,7 +272,8 @@ Tests mock the provider and send no real mail.
 `RETENTION_JOB_SECRET`. It removes command replay records
 (`private.command_requests`) older than 90 days, keeping unfinished ones and any
 that QuickBooks/Square sync history or portal quotes still reference. A
-scheduler must call it (daily is enough); this repository does not configure one.
+`.github/workflows/hosted-jobs.yml` calls it daily, with the secret
+`RETENTION_JOB_SECRET` equal to the Vercel value.
 
 Closing a brewery and exporting its records are admin-run, with a direct
 service-role `DATABASE_URL`:

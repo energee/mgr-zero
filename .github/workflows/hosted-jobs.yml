@@ -1,0 +1,46 @@
+# .github/workflows/hosted-jobs.yml — the scheduler for the hosted job routes.
+#
+# Vercel Hobby cron runs at most once a day, too slow for order confirmations,
+# so this POSTs the existing bearer-authenticated routes instead:
+#   - order email every 5 minutes (each call sends at most ten)
+#   - retention prune daily (#766)
+# GitHub may delay or skip a scheduled run under load; the next run catches up.
+# Needs repository variable MGR_URL (production origin, no trailing slash) and
+# secrets ORDER_EMAIL_JOB_SECRET and RETENTION_JOB_SECRET matching Vercel.
+# Jobs skip while MGR_URL is unset (not yet deployed); once set, a failed call
+# fails the run so GitHub notifies.
+name: hosted jobs
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  MGR_URL: ${{ vars.MGR_URL }}
+
+jobs:
+  order-email:
+    if: vars.MGR_URL != '' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Deliver queued order email
+        env:
+          SECRET: ${{ secrets.ORDER_EMAIL_JOB_SECRET }}
+        run: |
+          curl -sS --fail-with-body --max-time 240 -X POST "$MGR_URL/api/email/jobs/deliver" -H "Authorization: Bearer $SECRET"
+
+  retention:
+    if: vars.MGR_URL != '' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prune expired command records
+        env:
+          SECRET: ${{ secrets.RETENTION_JOB_SECRET }}
+        run: |
+          curl -sS --fail-with-body --max-time 240 -X POST "$MGR_URL/api/retention/jobs/prune" -H "Authorization: Bearer $SECRET"
