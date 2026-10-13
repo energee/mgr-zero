@@ -44,7 +44,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create a SKU: one brand × one packaged format; the name defaults to brand · format
+Create a SKU: one brand × one packaged format; the name defaults to brand · format; optional keg pool supplies the per-keg deposit
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ Create a SKU: one brand × one packaged format; the name defaults to brand · fo
 | `formatId` | uuid | yes |
 | `name` | string | no |
 | `upc` | string | no |
+| `kegPoolId` | uuid or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -266,13 +267,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged
+Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clear); brand, format, provider mappings and history stay unchanged
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `skuId` | uuid | yes |
 | `active` | boolean | yes |
 | `upc` | string | no |
+| `kegPoolId` | uuid or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
