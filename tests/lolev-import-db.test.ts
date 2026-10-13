@@ -4,13 +4,13 @@
 // quantities, and a second run writes nothing.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx } from "./helpers";
-import { importLolev } from "@/scripts/import-lolev";
+import { importLolev, type LolevDump } from "@/scripts/import-lolev";
 import { DEFAULT_PROFILE_NAME, SALT_NAMES } from "@/lib/import/lolev";
 import "@/lib/commands/all";
 
-const dump: Record<string, Record<string, unknown>[]> = {
-  globals: [{ globalType: "water-profile", name: "Default", calcium: 27, magnesium: 6, sodium: 25, sulfate: 12, chloride: 36, bicarbonate: 63, pH: 7 }],
-  malts: [{ _id: "m1", name: "Test Pale", weight: 55, yieldOnGrind: 80 }],
+const dump: LolevDump = {
+  defaultIons: { globalType: "water-profile", name: "Default", calcium: 27, magnesium: 6, sodium: 25, sulfate: 12, chloride: 36, bicarbonate: 63, pH: 7 },
+  malts: [{ _id: "m1", name: "Test Pale", yieldOnGrind: 80 }],
   hops: [{ _id: "h1", name: "Test Hop" }, { _id: "h2", name: "Test Hop " }],
   yeasts: [{ _id: "y1", name: "Test Ale", attenuation: { low: 70, high: 80 } }],
   sugars: [], adjuncts: [],
@@ -29,7 +29,6 @@ const dump: Record<string, Record<string, unknown>[]> = {
     },
   ],
 };
-const read = (_dir: string, name: string) => dump[name] ?? [];
 
 let breweryId: string;
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
@@ -38,7 +37,7 @@ let first: Awaited<ReturnType<typeof importLolev>>;
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   ctx = await makeStaffCtx(breweryId, "brewer");
-  first = await importLolev("unused", ctx, read);
+  first = await importLolev(dump, ctx);
 });
 
 const rows = async (table: "materials" | "water_profiles" | "recipes") => {
@@ -51,7 +50,7 @@ describe("importLolev", () => {
   it("creates one material per trimmed name plus the five salts", async () => {
     const names = (await rows("materials")).map((m) => m.name).sort();
     expect(names).toEqual(["Test Ale", "Test Hop", "Test Pale", ...Object.values(SALT_NAMES)].sort());
-    expect(first.counts).toMatchObject({ materials: 8, recipes: 2, existing: 0 });
+    expect(first.created).toMatchObject({ materials: 8, recipes: 2, skippedExisting: 0 });
   });
 
   it("creates the default profile and one source profile for the custom recipe", async () => {
@@ -74,8 +73,8 @@ describe("importLolev", () => {
 
   it("writes nothing on a second run", async () => {
     const before = await Promise.all([rows("materials"), rows("water_profiles"), rows("recipes")]);
-    const again = await importLolev("unused", ctx, read);
-    expect(again.counts).toMatchObject({ materials: 0, waterProfiles: 0, recipes: 0 });
+    const again = await importLolev(dump, ctx);
+    expect(again.created).toMatchObject({ materials: 0, waterProfiles: 0, recipes: 0 });
     expect(await Promise.all([rows("materials"), rows("water_profiles"), rows("recipes")])).toEqual(before);
   });
 });

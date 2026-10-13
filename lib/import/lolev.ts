@@ -8,23 +8,11 @@
 // `skipped`, never silently lost. Plan: docs/plans/lolev-import.md.
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES } from "@/lib/mgr/enums";
 import type { IngredientStage } from "@/lib/mgr/recipe-process-view";
+import { IONS, type Ions } from "@/lib/water-chemistry";
 
 type MashKind = (typeof MASH_STEP_KINDS)[number];
 type FermentationKind = (typeof FERMENTATION_STAGE_KINDS)[number];
 type WaterStage = (typeof WATER_ADDITION_STAGES)[number];
-
-/** Turns canonical extended JSON (bsondump output) into plain numbers, id strings and ISO dates. */
-export function fromEjson(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(fromEjson);
-  if (v === null || typeof v !== "object") return v;
-  const o = v as Record<string, unknown>;
-  if ("$oid" in o) return o.$oid;
-  if ("$numberInt" in o) return Number(o.$numberInt);
-  if ("$numberLong" in o) return Number(o.$numberLong);
-  if ("$numberDouble" in o) return Number(o.$numberDouble);
-  if ("$date" in o) return new Date(fromEjson(o.$date) as number | string).toISOString();
-  return Object.fromEntries(Object.entries(o).map(([k, x]) => [k, fromEjson(x)]));
-}
 
 type Doc = { _id: string; name: string };
 export type LolevCatalog = {
@@ -36,7 +24,7 @@ export type LolevCatalog = {
 };
 
 /** upsert_material input, without an id (the runner skips names that exist). */
-export type MaterialInput = {
+type MaterialInput = {
   name: string; category: "malt" | "hop" | "yeast" | "adjunct" | "chemical";
   baseUom: "lb" | "g" | "each"; purchaseUom: "lb" | "g" | "each"; purchaseUomFactor: 1; extractPotential?: number;
 };
@@ -54,7 +42,7 @@ type Mineral = keyof typeof SALT_NAMES;
 // upsert_material refuses a potential outside [1, 1.05], so an out-of-range
 // value is left off (the material imports without one) rather than clamped
 // into a number Lolev never had.
-const potential = (p: number) => (p >= 1 && p <= 1.05 ? p : undefined);
+const potentialInRange = (p: number) => (p >= 1 && p <= 1.05 ? p : undefined);
 
 /** One material per distinct name, plus the five water salts; byLolevId maps every Lolev id to its material name. */
 export function mapMaterials(catalog: LolevCatalog): { materials: MaterialInput[]; byLolevId: Map<string, string> } {
@@ -69,8 +57,8 @@ export function mapMaterials(catalog: LolevCatalog): { materials: MaterialInput[
     byName.set(name, { name, ...rest, purchaseUom: m.baseUom, purchaseUomFactor: 1, ...(extractPotential === undefined ? {} : { extractPotential }) });
   };
   // Malt: 46 PPG (sucrose) times the grind yield.
-  for (const d of catalog.malts) add(d, { category: "malt", baseUom: "lb", extractPotential: d.yieldOnGrind ? potential(1 + 0.046 * d.yieldOnGrind / 100) : undefined });
-  for (const d of catalog.sugars) add(d, { category: "adjunct", baseUom: "lb", extractPotential: d.ppg ? potential(1 + d.ppg / 1000) : undefined });
+  for (const d of catalog.malts) add(d, { category: "malt", baseUom: "lb", extractPotential: d.yieldOnGrind ? potentialInRange(1 + 0.046 * d.yieldOnGrind / 100) : undefined });
+  for (const d of catalog.sugars) add(d, { category: "adjunct", baseUom: "lb", extractPotential: d.ppg ? potentialInRange(1 + d.ppg / 1000) : undefined });
   for (const d of catalog.hops) add(d, { category: "hop", baseUom: "lb" });
   for (const d of catalog.adjuncts) add(d, { category: "adjunct", baseUom: "lb" });
   for (const d of catalog.yeasts) add(d, { category: "yeast", baseUom: "each" });
@@ -79,15 +67,13 @@ export function mapMaterials(catalog: LolevCatalog): { materials: MaterialInput[
 }
 
 export const DEFAULT_PROFILE_NAME = "Lolev default";
-type Ions = { calcium?: number; magnesium?: number; sodium?: number; sulfate?: number; chloride?: number; bicarbonate?: number; pH?: number };
-export type WaterProfileInput = { name: string; calciumPpm: number; magnesiumPpm: number; sodiumPpm: number; sulfatePpm: number; chloridePpm: number; bicarbonatePpm: number };
+// Lolev also stores pH; MGR profiles have no pH column, so it is ignored.
+type LolevIons = Partial<Ions> & { pH?: number };
+export type WaterProfileInput = { name: string } & Record<`${keyof Ions}Ppm`, number>;
 
-/** upsert_water_profile input; a missing ion reads as 0 ppm. Lolev's pH has no MGR column. */
-export function mapWaterProfile(name: string, ions: Ions): WaterProfileInput {
-  return {
-    name, calciumPpm: ions.calcium ?? 0, magnesiumPpm: ions.magnesium ?? 0, sodiumPpm: ions.sodium ?? 0,
-    sulfatePpm: ions.sulfate ?? 0, chloridePpm: ions.chloride ?? 0, bicarbonatePpm: ions.bicarbonate ?? 0,
-  };
+/** upsert_water_profile input; a missing ion reads as 0 ppm. Built from IONS so a new ion cannot be skipped. */
+export function mapWaterProfile(name: string, ions: LolevIons): WaterProfileInput {
+  return { name, ...Object.fromEntries(IONS.map((ion) => [`${ion}Ppm`, ions[ion] ?? 0])) } as WaterProfileInput;
 }
 
 export type LolevRecipe = {
@@ -100,21 +86,21 @@ export type LolevRecipe = {
   yeast?: string;
   mashSchedule?: { stepType?: string; temperature: number; duration: number }[];
   fermentationSchedule?: { stage: string; temperature: number; duration: number }[];
-  useDefaultWaterProfile?: boolean; sourceWaterProfile?: Ions;
+  useDefaultWaterProfile?: boolean; sourceWaterProfile?: LolevIons;
   waterAdditions?: { mineral: string | null; amount: number; unit: string; target?: string }[];
 };
 
 type Ingredient = { materialName: string; perBblQty: number; stage: IngredientStage; timingMinutes?: number };
 /** create_recipe_version input without recipeId; materials are named, and the source profile is RecipeImport.sourceProfile. */
-export type VersionInput = {
+type VersionInput = {
   mashSchedule: { name: string; kind: MashKind; tempF: number; minutes: number }[];
   fermentationSchedule: { name: string; kind: FermentationKind; tempF: number; days: number }[];
   water: { additions: { materialName: string; qty: number; unit: "g"; stage: WaterStage }[] };
   brewhouseEfficiency: number; yeastAttenuation: number; boilMinutes?: number;
   ingredients: Ingredient[];
 };
-export type RecipeImport = { lolevId: string; name: string; note: string; sourceProfile: "default" | WaterProfileInput | null; version: VersionInput };
-export type Skipped = { lolevId: string; name: string; reason: string };
+type RecipeImport = { lolevId: string; name: string; note: string; sourceProfile: "default" | WaterProfileInput | null; version: VersionInput };
+type Skipped = { lolevId: string; name: string; reason: string };
 
 const positiveInt = (n: unknown): n is number => Number.isInteger(n) && (n as number) > 0;
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -128,7 +114,7 @@ const isOneOf = <T extends string>(list: readonly T[], v: string | undefined): v
  * addition is reported in `skipped` and the recipe is kept. Yeasts supply the
  * attenuation midpoint when the recipe has no target.
  */
-export function mapRecipes(recipes: LolevRecipe[], byLolevId: Map<string, string>, yeasts: LolevCatalog["yeasts"] = []): { recipes: RecipeImport[]; skipped: Skipped[] } {
+export function mapRecipes(recipes: LolevRecipe[], byLolevId: Map<string, string>, yeasts: LolevCatalog["yeasts"]): { recipes: RecipeImport[]; skipped: Skipped[] } {
   const skipped: Skipped[] = [];
   const out: RecipeImport[] = [];
   for (const r of recipes) {
@@ -137,21 +123,21 @@ export function mapRecipes(recipes: LolevRecipe[], byLolevId: Map<string, string
     if (!bbl || bbl <= 0) { skip("no batch size"); continue; }
 
     const ingredients: Ingredient[] = [];
-    const line = (id: string | undefined, lb: number, stage: IngredientStage, label: string, timingMinutes?: number) => {
+    const addIngredient = (id: string | undefined, lb: number, stage: IngredientStage, label: string, timingMinutes?: number) => {
       const materialName = id ? byLolevId.get(id) : undefined;
       if (!materialName) return skip(`${label} ${id ?? "(none)"}: material not found`);
       if (!(lb > 0)) return skip(`${label} ${materialName}: weight ${lb}`);
       ingredients.push({ materialName, perBblQty: Math.round((lb / bbl) * 1e6) / 1e6, stage, ...(timingMinutes === undefined ? {} : { timingMinutes }) });
     };
-    for (const m of r.malts ?? []) line(m.malt, m.weight, "mash", "malt");
+    for (const m of r.malts ?? []) addIngredient(m.malt, m.weight, "mash", "malt");
     for (const h of r.hops ?? []) {
       const stage = HOP_STAGES[h.hopTiming ?? ""] ?? "other";
-      line(h.hop, h.weight, stage, "hop", stage === "boil" && positiveInt(h.boilTime) ? h.boilTime : undefined);
+      addIngredient(h.hop, h.weight, stage, "hop", stage === "boil" && positiveInt(h.boilTime) ? h.boilTime : undefined);
     }
-    for (const s of r.sugars ?? []) line(s.sugar, s.weight, "boil", "sugar");
-    for (const a of r.adjuncts ?? []) line(a.adjunct, a.weight, a.timing === "mash" ? "mash" : "boil", "adjunct");
+    for (const s of r.sugars ?? []) addIngredient(s.sugar, s.weight, "boil", "sugar");
+    for (const a of r.adjuncts ?? []) addIngredient(a.adjunct, a.weight, a.timing === "mash" ? "mash" : "boil", "adjunct");
     // ponytail: one pitch per batch; refine when MGR models a pitch rate.
-    if (r.yeast) line(r.yeast, 1, "fermentation", "yeast");
+    if (r.yeast) addIngredient(r.yeast, 1, "fermentation", "yeast");
     if (ingredients.length === 0) { skip("no ingredients"); continue; }
 
     const mashSchedule = (r.mashSchedule ?? []).map((s) => {
@@ -174,10 +160,9 @@ export function mapRecipes(recipes: LolevRecipe[], byLolevId: Map<string, string
     }
 
     // Only the six ions decide a custom profile; pH alone does not make one.
-    const custom = r.sourceWaterProfile && mapWaterProfile(`${r.name} source water`, r.sourceWaterProfile);
-    const sourceProfile = r.useDefaultWaterProfile ? "default"
-      : custom && Object.values(custom).some((x) => typeof x === "number" && x > 0) ? custom
-      : null;
+    const custom = r.sourceWaterProfile && IONS.some((ion) => (r.sourceWaterProfile![ion] ?? 0) > 0)
+      ? mapWaterProfile(`${r.name.trim()} source water`, r.sourceWaterProfile) : null;
+    const sourceProfile = r.useDefaultWaterProfile ? "default" : custom;
 
     out.push({
       lolevId: r._id, name: r.name.trim(), // trimmed before the duplicate check: recipe names are unique per brewery

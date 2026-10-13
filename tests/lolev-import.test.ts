@@ -1,9 +1,8 @@
 // Pure tests for lib/import/lolev.ts: Lolev Manager documents → MGR command
 // inputs. Synthetic fixtures only; no database.
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_PROFILE_NAME, SALT_NAMES, fromEjson, mapMaterials, mapRecipes, mapWaterProfile,
-} from "@/lib/import/lolev";
+import { DEFAULT_PROFILE_NAME, SALT_NAMES, mapMaterials, mapRecipes, mapWaterProfile } from "@/lib/import/lolev";
+import { fromEjson } from "@/scripts/import-lolev";
 import { FERMENTATION_STAGE_KINDS, MASH_STEP_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
 
