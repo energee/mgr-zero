@@ -44,8 +44,8 @@ const hazySkus = [
 ];
 
 const packagedFormats = [
-  { id: FMT_HALF, name: "½ bbl keg" },
-  { id: FMT_SIXTH, name: "⅙ bbl keg" },
+  { id: FMT_HALF, name: "½ bbl keg", package_type: "keg" },
+  { id: FMT_SIXTH, name: "⅙ bbl keg", package_type: "keg" },
   { id: FMT_CASE, name: "case · 24×16 oz" },
 ];
 
@@ -120,9 +120,10 @@ export const skuHazyHalf: SkuSnapshot = {
     upc: "00810123450127",
     active: true,
     format_id: FMT_HALF,
-    formats: { name: "½ bbl keg" },
+    formats: { name: "½ bbl keg", package_type: "keg" },
   },
   formats: packagedFormats,
+  pools: [{ id: "house-fleet", name: "House fleet", active: true }],
 };
 
 /** Hazy IPA SKUs: ½ bbl, ⅙ bbl, case. */
@@ -135,14 +136,14 @@ export const skuListHazy: SkuListSnapshot = {
       name: SKU_HAZY.name,
       active: true,
       format_id: FMT_HALF,
-      formats: { name: "½ bbl keg", bbl_per_unit: "0.50000000" },
+      formats: { package_type: "keg", name: "½ bbl keg", bbl_per_unit: "0.50000000" },
     },
     {
       id: SKU_HAZY_SIXTH,
       name: `${HAZY} · ⅙ bbl keg`,
       active: true,
       format_id: FMT_SIXTH,
-      formats: { name: "⅙ bbl keg", bbl_per_unit: "0.16666667" },
+      formats: { package_type: "keg", name: "⅙ bbl keg", bbl_per_unit: "0.16666667" },
     },
     {
       id: SKU_HAZY_CASE,

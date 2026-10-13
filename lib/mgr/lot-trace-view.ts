@@ -25,6 +25,11 @@ export type LotTraceMovementView = {
   referenceHref?: string;
 };
 
+export type LotTraceSources = {
+  batches: { id: string; batch_no: number | null; brewed_on: string | null }[];
+  transfers: { id: string; from_occupancy_id: string; to_occupancy_id: string; from_batch_id: string; to_batch_id: string; from_vessel: string; to_vessel: string; bbl: number; at: string }[];
+};
+
 export type LotTraceViewModel = {
   backHref?: string;
   backTo?: string;
@@ -34,6 +39,8 @@ export type LotTraceViewModel = {
   skuTrailing: string;
   tankBatch: string;
   drawn: string;
+  memberBatches: LotTraceRowView[];
+  sourceTransfers: LotTraceRowView[];
   tape: LotTraceTapeView[];
   balances: LotTraceRowView[];
   recipientsEmpty?: string;
@@ -42,9 +49,10 @@ export type LotTraceViewModel = {
   note: string;
 };
 
-export type LotTraceSnapshot = {
+export type LotTraceSnapshot = LotTraceSources & {
   lot: { code: string; brand: string; packaged_on: string; best_by: string | null };
   run: { run_no: number | null; bbl_drawn: number | null; vessel: string } | null;
+  // The receiving packaging batch; `batches` includes every recorded lineage member.
   batch: { batch_no: number | null; brewed_on: string | null } | null;
   movements: { id: string; type: string; qty: number; bbl: number; bin: string; ref: string | null; source_movement_id: string | null; created_at: string; sku: string; location: string }[];
   on_hand_bbl: number;
@@ -66,6 +74,8 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): Lot
     skuTrailing: `${bblFixed(s.on_hand_bbl)} recorded balance`,
     tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? `batch ${s.batch.batch_no}` : null, s.batch?.brewed_on ? `brewed ${calendarDay(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
+    memberBatches: s.batches.map(batch => ({ key: batch.id, title: `Batch ${batch.batch_no ?? "?"}`, detail: batch.brewed_on ? `brewed ${calendarDay(batch.brewed_on)}` : "Brew date not recorded" })),
+    sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} to ${transfer.to_vessel}`, detail: calendarDay(transfer.at), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
     tape: s.movements.map((movement) => ({
       key: movement.id,
       label: `${movement.qty > 0 ? "+" : "−"}${Math.abs(movement.qty)} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)} · ${movement.location}`,
