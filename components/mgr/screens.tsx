@@ -1450,10 +1450,10 @@ export const SCREENS: Screen[] = [
     name: "SKU",
     to: { "Save SKU": "SKU list" },
     job: "Add a packaged SKU to a brand, or edit a pour its price group owns",
-    reads: "list_formats",
+    reads: "list_formats · list_keg_pools",
     writes: "create_sku · update_sku · upsert_format",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU is one brand in a packaged or poured format. New SKU picks a packaged format; a pour is added on its price group and opens here locked. Packaged SKUs hold stock; poured SKUs draw from keg stock. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1]],
+    spec: "A SKU is one brand in a packaged or poured format. New SKU picks a packaged format; a pour is added on its price group and opens here locked. Packaged SKUs hold stock; poured SKUs draw from keg stock. It owns active state, optional UPC, and provider mappings. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
   },
   {
