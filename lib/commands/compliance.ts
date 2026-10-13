@@ -7,10 +7,10 @@
 import { z } from "zod";
 import { periodKey } from "@/lib/compliance-period";
 import type { LotTraceSources } from "@/lib/mgr/lot-trace-view";
-import { recipientsFor } from "./material-trace";
+import { recipientsFor } from "./recall-recipients";
 import type { MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import { isoDate } from "./packaging";
-import { CommandError, breweryToday, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
+import { breweryToday, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 // The three registry upserts below keep a saved value when the caller omits
@@ -201,13 +201,14 @@ defineQuery({
     const lot = await unwrap(ctx.db.from("lots")
       .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
       .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
-    const sources = await unwrap(ctx.db.rpc("trace_lot_sources", { p_brewery: ctx.breweryId, p_lot: i.lotId })) as unknown as LotTraceSources;
-    const movements = await completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as LotMovement[];
+    const [sources, movements, ingredients] = await Promise.all([
+      unwrap(ctx.db.rpc("trace_lot_sources", { p_brewery: ctx.breweryId, p_lot: i.lotId })) as unknown as Promise<LotTraceSources>,
+      completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<LotMovement[]>,
+      unwrap(ctx.db.rpc("trace_lot_ingredients", { p_brewery: ctx.breweryId, p_lot: i.lotId })),
+    ]);
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
-    // Small batches keep URL size bounded; each unique order has one shipment.
     const recipients = await recipientsFor(ctx, orderIds);
-    const ingredients = await unwrap(ctx.db.rpc("trace_lot_ingredients", { p_brewery: ctx.breweryId, p_lot: i.lotId }));
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
     const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
@@ -239,10 +240,7 @@ defineQuery({
   roles: [...ROLES],
   input: z.object({ materialLotId: z.string().uuid() }),
   handler: async (ctx, input) => {
-    const result = await ctx.db.rpc("trace_material_lot", { p_brewery: ctx.breweryId, p_material_lot: input.materialLotId });
-    // This scoped read deliberately hides both absent and other-tenant identities.
-    if (result.error?.code === "MG404") throw new CommandError("material lot not found", 404, "not_found");
-    const trace = await unwrap(Promise.resolve(result)) as unknown as MaterialLotTraceSnapshot & { order_ids: string[] };
+    const trace = await unwrap(ctx.db.rpc("trace_material_lot", { p_brewery: ctx.breweryId, p_material_lot: input.materialLotId })) as unknown as MaterialLotTraceSnapshot & { order_ids: string[] };
     const { order_ids, ...snapshot } = trace;
     return {
       ...snapshot,

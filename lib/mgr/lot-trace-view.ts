@@ -1,5 +1,4 @@
 // lib/mgr/lot-trace-view.ts — view-model for Lot trace.
-import { toRecipientViews } from "./material-lot-trace-view";
 import { calendarDay } from "./calendar-day";
 import { sentenceCase } from "./labels";
 import { bblFixed } from "@/lib/volume";
@@ -66,6 +65,16 @@ export type LotTraceSnapshot = LotTraceSources & {
 
 const ownedSku = (brand: string, sku: string) =>
   sku.startsWith(`${brand} ·`) ? sku : [brand, sku].filter(Boolean).join(" · ");
+
+/** Both recall directions display the same authorized orders, addresses, shipments and invoices. */
+export function toRecipientViews(recipients: LotTraceSnapshot["recipients"], backHref?: string): LotTraceRecipientView[] {
+  return recipients.map(recipient => ({
+    id: recipient.id, orderNo: recipient.order_no, orderHref: backHref ? `/orders/${recipient.id}` : undefined,
+    customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
+    shipTo: recipient.ship_tos ? `${recipient.ship_tos.label} · ${recipient.ship_tos.address1}, ${recipient.ship_tos.city}, ${recipient.ship_tos.state} ${recipient.ship_tos.zip}` : undefined,
+    shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: `${shipment.carrier ?? "Shipment"} ${shipment.tracking ?? ""}`, invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: invoice.invoice_no, href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
+  }));
+}
 
 export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): LotTraceViewModel {
   const sku = ownedSku(s.lot.brand, s.movements[0]?.sku ?? "");

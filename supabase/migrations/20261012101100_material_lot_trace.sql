@@ -1,6 +1,8 @@
 -- Material-lot recall shares effective consumption and the existing temporal blend lineage.
 -- Compensation reverses an exact original; losses never entered the finished beer.
-create function private.material_trace_consumptions(p_brewery uuid)
+-- Callers narrow the read: one material lot, or the batches and runs of one
+-- finished lot. A null filter does not narrow that dimension.
+create function private.material_trace_consumptions(p_brewery uuid, p_material_lot uuid, p_batches uuid[], p_runs uuid[])
 returns table (id uuid, material_id uuid, lot_id uuid, qty numeric, at timestamptz,
   batch_id uuid, occupancy_id uuid, run_id uuid, stage text)
 language sql stable security definer set search_path = '' as $$
@@ -10,14 +12,18 @@ language sql stable security definer set search_path = '' as $$
   left join public.batch_additions a on a.movement_id = m.id and a.brewery_id = m.brewery_id
   left join public.packaging_run_consumptions c on c.movement_id = m.id and c.brewery_id = m.brewery_id
   where m.brewery_id = p_brewery and m.type = 'consumption'
+    and (p_material_lot is null or m.lot_id = p_material_lot)
+    and ((p_batches is null and p_runs is null) or a.batch_id = any(p_batches) or c.run_id = any(p_runs))
     and not exists (select 1 from public.material_movements reversal
       where reversal.brewery_id = m.brewery_id and reversal.compensates_id = m.id);
 $$;
-revoke all on function private.material_trace_consumptions(uuid) from public, anon, authenticated;
+revoke all on function private.material_trace_consumptions(uuid,uuid,uuid[],uuid[]) from public, anon, authenticated;
 
 -- An upstream ingredient must precede its outgoing transfer, not merely packaging.
+-- One row per material, material lot and stage that entered the finished lot.
 create function private.lot_ingredients(p_brewery uuid, p_lot uuid)
-returns jsonb language sql stable security definer set search_path = '' as $$
+returns table (material_id uuid, material text, lot_id uuid, code text, unit text, source text, qty numeric)
+language sql stable security definer set search_path = '' as $$
   with run as (
     select r.id, r.closed_at from public.lots l
     join public.packaging_runs r on r.id = l.packaging_run_id and r.brewery_id = l.brewery_id
@@ -29,18 +35,18 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     cross join run
     left join public.transfers t on t.id = lineage.transfer_id and t.brewery_id = p_brewery
     group by o.id, o.batch_id
-  ), ingredients as (
-    select use.material_id, m.name as material, use.lot_id, l.lot_code as code,
-      m.base_uom as unit, use.stage as source, sum(use.qty) as qty
-    from private.material_trace_consumptions(p_brewery) use
+  )
+    select use.material_id, m.name, use.lot_id, l.lot_code,
+      m.base_uom::text, use.stage, sum(use.qty)
+    from private.material_trace_consumptions(p_brewery, null,
+      coalesce((select array_agg(batch_id) from member_cutoffs), '{}'), coalesce((select array_agg(id) from run), '{}')) use
     join public.materials m on m.id = use.material_id and m.brewery_id = p_brewery
     left join public.material_lots l on l.id = use.lot_id and l.brewery_id = p_brewery
     where use.run_id in (select id from run) or exists (
       select 1 from member_cutoffs member where member.batch_id = use.batch_id
         and (use.occupancy_id is null or use.occupancy_id = member.id) and use.at <= member.cutoff
     )
-    group by use.material_id, m.name, use.lot_id, l.lot_code, m.base_uom, use.stage
-  ) select coalesce(jsonb_agg(to_jsonb(ingredients) order by material, code, source), '[]'::jsonb) from ingredients;
+    group by use.material_id, m.name, use.lot_id, l.lot_code, m.base_uom, use.stage;
 $$;
 revoke all on function private.lot_ingredients(uuid,uuid) from public, anon, authenticated;
 
@@ -51,7 +57,8 @@ begin
   if not exists (select 1 from public.lots where brewery_id = p_brewery and id = p_lot) then
     raise exception using errcode = 'MG404', message = 'lot not found';
   end if;
-  return private.lot_ingredients(p_brewery, p_lot);
+  return (select coalesce(jsonb_agg(to_jsonb(ingredient) order by material, code, source), '[]'::jsonb)
+    from private.lot_ingredients(p_brewery, p_lot) ingredient);
 end $$;
 revoke all on function public.trace_lot_ingredients(uuid,uuid) from public, anon;
 grant execute on function public.trace_lot_ingredients(uuid,uuid) to authenticated;
@@ -71,7 +78,7 @@ begin
     left join public.vendors v on v.id = l.vendor_id and v.brewery_id = l.brewery_id
     where l.brewery_id = p_brewery and l.id = p_material_lot
   ), uses as materialized (
-    select * from private.material_trace_consumptions(p_brewery) where lot_id = p_material_lot
+    select * from private.material_trace_consumptions(p_brewery, p_material_lot, null, null)
   ), batches as (
     select distinct b.id, b.batch_no, b.brewed_on, b.closed_at,
       (select v.name from public.vessel_occupancies current_occupancy
@@ -90,8 +97,8 @@ begin
   ), lots as (
     select l.id, l.code, l.packaged_on from candidate_lots candidate
     join public.lots l on l.id = candidate.id and l.brewery_id = p_brewery
-    where exists (select 1 from jsonb_array_elements(private.lot_ingredients(p_brewery, l.id)) ingredient
-      where ingredient->>'lot_id' = p_material_lot::text)
+    where exists (select 1 from private.lot_ingredients(p_brewery, l.id) ingredient
+      where ingredient.lot_id = p_material_lot)
   ), runs as (
     select distinct r.id, r.run_no, r.closed_at from uses
     join public.packaging_runs r on r.id = uses.run_id and r.brewery_id = p_brewery

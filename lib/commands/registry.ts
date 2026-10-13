@@ -182,6 +182,8 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     case "42501":
       console.error("database error 42501:", error.message);
       return new CommandError("permission denied", 403, "permission_denied");
+    // Scoped reads raise MG404 for both absent and other-tenant identities.
+    case "MG404": return new CommandError(error.message, 404, "not_found");
     case "MG409": return new CommandError(error.message, 409, "conflict");
     // A reviewed plan (packaging close) changed underneath the form: nothing
     // was written, so the client may drop its retained request.
