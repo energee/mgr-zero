@@ -37,6 +37,8 @@ removals = ending. Rules that v1 got wrong at least once:
   month it was ordered or allocated. Beginning/ending inventory key on the same date, so
   a filed month is never rewritten by a later fulfilment. Store the filed snapshot
   (`report_filings`).
+- Production into finished goods belongs to the Packaged-on month; packaging cannot
+  be dated into a filed month or after today.
 - Zero cells print as `0.00`, never blank.
 - The cellar column is the one identity exemption: beer leaves the cellar by being
   packaged, which is not a removal; its balance is carried on the beer-in-process line.

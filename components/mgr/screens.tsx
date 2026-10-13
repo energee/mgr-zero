@@ -1758,8 +1758,8 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run · get_packaging_close_plan · list_locations · list_bins",
     writes: "close_packaging_run [atomic lot, outputs, tank draw and explicit source material usage/loss]",
-    states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1]],
-    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry.",
+    states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1], ["future date", "packaged on cannot be after today", 1], ["filed period", "packaged on falls in a filed report period", 1]],
+    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
     body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {

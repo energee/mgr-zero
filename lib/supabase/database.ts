@@ -11,9 +11,9 @@ type NonNullStockView = "on_hand" | "bin_on_hand" | "atp";
 type Functions = GeneratedDatabase["public"]["Functions"];
 export type Database = Omit<GeneratedDatabase, "public"> & {
   public: Omit<GeneratedDatabase["public"], "Functions" | "Views" | "Tables"> & {
-    // enforce_bbl_integrity derives both fields on INSERT.
+    // INSERT triggers derive BBL, package type, and the local effective date.
     Tables: Omit<Tables, "inventory_movements"> & { inventory_movements: Omit<Tables["inventory_movements"], "Insert"> & {
-      Insert: Omit<LedgerInsert, "bbl" | "package_type"> & Partial<Pick<LedgerInsert, "bbl" | "package_type">>;
+      Insert: Omit<LedgerInsert, "bbl" | "package_type" | "occurred_on"> & Partial<Pick<LedgerInsert, "bbl" | "package_type" | "occurred_on">>;
     } };
     // These stock views group non-null keys/quantities or coalesce totals.
     Views: { [Name in keyof Views]: Name extends NonNullStockView

@@ -1499,6 +1499,7 @@ export type Database = {
           location_id: string
           lot_id: string | null
           note: string | null
+          occurred_on: string
           package_type: Database["public"]["Enums"]["package_type"]
           qty: number
           ref: string | null
@@ -1521,6 +1522,7 @@ export type Database = {
           location_id: string
           lot_id?: string | null
           note?: string | null
+          occurred_on: string
           package_type: Database["public"]["Enums"]["package_type"]
           qty: number
           ref?: string | null
@@ -1543,6 +1545,7 @@ export type Database = {
           location_id?: string
           lot_id?: string | null
           note?: string | null
+          occurred_on?: string
           package_type?: Database["public"]["Enums"]["package_type"]
           qty?: number
           ref?: string | null

@@ -189,6 +189,10 @@ All existing columns, `removal_shape` check, `bbl` trigger, revoke, indexes, and
 policies carried forward verbatim. `lot_id → lots` composite FK added after `lots` exists
 (nullable). `ref uuid` stays (order id / pos sale id / run id; typed context lives on the
 domain row's `movement_id`).
+`occurred_on date not null` is the frozen brewery-local effective date. A before-insert
+trigger defaults it to the local date of `created_at`; `close_packaging_run` sets it
+to Packaged on and reports bucket by it. Existing rows retain their insert-time local
+date, so historical reports do not move. Later timezone changes do not re-bucket them.
 
 **FG correction identity (resolved):** `inventory_movements.compensates_id`
 links a compensating row to its original (a composite FK, unique per original).
@@ -612,6 +616,9 @@ unique `(brewery_id, state, kind)`. Destination-state supplier registrations (OH
 filed_by, note`. unique `(brewery_id, jurisdiction, period_start, period_end)`. The
 ledger stays recomputable; this is the snapshot that was actually filed (decision).
 Report generators are code, not schema; CBMA rates are code (§14).
+Finished-goods figures bucket by `inventory_movements.occurred_on`; cellar removals
+still bucket by `volume_adjustments.created_at`. `file_compliance_report` takes the
+cellar workflow lock, serializing filing with packaging closes.
 Generated figures keep `removals` as the one additive filing total and expose
 `cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
 their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
