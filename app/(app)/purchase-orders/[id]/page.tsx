@@ -1,8 +1,8 @@
 // app/(app)/purchase-orders/[id]/page.tsx — one purchase order
 // (get_purchase_order): header, lines with ordered / received / still due
 // (derived from receipts, never stored), receipts so far, and the one next
-// action for its state (po-actions.tsx): Mark sent on a draft, Receive on a
-// sent or partially received one.
+// action for its state (po-actions.tsx): Mark sent or Receive, plus reason-bearing
+// cancellation before receipts or short closure after receiving.
 import { ReceiptView } from "@/components/mgr/views/receipt";
 import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
@@ -13,11 +13,13 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { poNo } from "@/lib/mgr/doc-no";
+import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { ReceiveForm, type PoLine } from "./po-actions";
 
 type Po = {
   id: string; po_no: number; vendor_id: string; status: string; ordered_on: string | null; expected_on: string | null;
   sent_via: string | null; note: string | null; vendor: { name: string; email: string | null } | null;
+  closed_at: string | null; close_reason: string | null;
   lines: PoLine[];
   receipts: ReceiptSnapshot[];
   correction_receipt: ReceiptSnapshot | null; correction_lines: PoLine[];
@@ -28,6 +30,7 @@ type Bin = { id: string; location_id: string; name: string };
 const VIA: Record<string, string> = { mailto: "from a mail client", external: "outside MGR" };
 
 function statusLine(po: Po) {
+  if (po.closed_at) return `${po.status === "cancelled" ? "cancelled" : "closed short"} · ${po.close_reason}`;
   if (po.status === "draft") return "draft · not yet sent";
   const sent = po.ordered_on ? `Marked sent ${po.ordered_on}${po.sent_via ? ` · ${VIA[po.sent_via] ?? po.sent_via}` : ""}` : po.status;
   const expected = po.expected_on ? ` · expected ${po.expected_on}` : "";
@@ -55,6 +58,8 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
+    closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)
+      ? po.receipts.length ? "short" : "cancel" : undefined,
     history: po.receipts.map(receipt => ({
       key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: receiptHref(`/purchase-orders/${po.id}`, receipt.id),
       detail: receipt.receipt_lines.map(count => {

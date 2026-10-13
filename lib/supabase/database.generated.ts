@@ -4572,6 +4572,9 @@ export type Database = {
       purchase_orders: {
         Row: {
           brewery_id: string
+          close_reason: string | null
+          closed_at: string | null
+          closed_by: string | null
           created_at: string
           created_by: string
           expected_on: string | null
@@ -4586,6 +4589,9 @@ export type Database = {
         }
         Insert: {
           brewery_id: string
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           created_by: string
           expected_on?: string | null
@@ -4600,6 +4606,9 @@ export type Database = {
         }
         Update: {
           brewery_id?: string
+          close_reason?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           created_by?: string
           expected_on?: string | null
@@ -8139,6 +8148,15 @@ export type Database = {
         Args: { p_brewery: string; p_request_id: string; p_run: string }
         Returns: Json
       }
+      cancel_purchase_order: {
+        Args: {
+          p_brewery: string
+          p_po: string
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       cancel_stock_transfer: {
         Args: { p_reason: string; p_request_id: string; p_transfer: string }
         Returns: Json
@@ -8313,6 +8331,15 @@ export type Database = {
           p_plan_revision?: string
           p_request_id: string
           p_run: string
+        }
+        Returns: Json
+      }
+      close_purchase_order_short: {
+        Args: {
+          p_brewery: string
+          p_po: string
+          p_reason: string
+          p_request_id: string
         }
         Returns: Json
       }

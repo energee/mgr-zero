@@ -34,7 +34,7 @@ export const newPoCountryMalt: NewPoViewModel = {
 };
 
 export const receivePoCountryMalt: ReceivePoViewModel = {
-  state: "sent", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
+  state: "sent", closure: "cancel", closureReason: "Vendor cannot fulfil this order", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
   locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "shelf", name: "Shelf" }],
   title: "PO-0142 · Country Malt",
   status: "sent Mon · expected Thu · nothing received yet",
