@@ -5,12 +5,13 @@ import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TaproomCountSnapshot } from "@/lib/mgr/taproom-count-state";
 import { plural } from "@/lib/mgr/plural";
+import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
 
 type Location = { id: string; name: string; uses: string[] };
-type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units?: number };
-type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null; movement_type?: string | null };
+type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units: number };
+type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null; movement_type: TaproomLineMovementType };
 type Receipt = CountHeader & { correction_eligible: boolean; lines: ReceiptLine[] };
 const key = (binId: string, skuId: string, lotId: string | null) => `${binId}:${skuId}:${lotId ?? "untracked"}`;
 
@@ -56,7 +57,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
           result: line.movement_id ? `movement ${line.movement_id}` : "matched · no movement" };
       }),
     } : undefined,
-    history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units ?? 0, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
+    history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
   }}
     draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={role} timeZone={brewery.timeZone}
       print={<TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />} />}

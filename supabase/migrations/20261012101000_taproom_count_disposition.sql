@@ -1,5 +1,28 @@
 -- Classify each count shortage as sold or destroyed, retaining legacy sold request identities.
 
+-- Expose the effective movement's type beside its bbl so readers need no second ledger lookup.
+-- Same columns and joins as the baseline view, with movement_type appended last (replace keeps grants).
+CREATE OR REPLACE VIEW private.taproom_effective_counts AS
+  select root.brewery_id,root.location_id,root.id root_id,coalesce(correction.id,root.id) effective_id,
+    root.counted_on,root.observed_at,root.created_at,root.counted_by,
+    coalesce(correction.prior_count_id,root.prior_count_id) prior_count_id,
+    correction.created_at corrected_at,correction.counted_by corrected_by,correction.correction_reason,
+    effective_line.id line_id,root_line.id root_line_id,effective_line.bin_id,effective_line.sku_id,effective_line.lot_id,
+    effective_line.qty_before,effective_line.qty_counted,
+    case when correction.id is not null and effective_line.qty_counted=root_line.qty_counted
+      then root_line.movement_id else effective_line.movement_id end movement_id,
+    case when correction.id is not null and effective_line.qty_counted=root_line.qty_counted
+      then root_movement.bbl else effective_movement.bbl end bbl,
+    case when correction.id is not null and effective_line.qty_counted=root_line.qty_counted
+      then root_movement.type else effective_movement.type end movement_type
+  from public.taproom_counts root
+  left join public.taproom_counts correction on correction.corrects_count_id=root.id and correction.brewery_id=root.brewery_id
+  left join public.taproom_count_lines effective_line on effective_line.count_id=coalesce(correction.id,root.id) and effective_line.brewery_id=root.brewery_id
+  left join public.taproom_count_lines root_line on root_line.id=coalesce(effective_line.corrects_line_id,effective_line.id) and root_line.brewery_id=root.brewery_id
+  left join public.inventory_movements root_movement on root_movement.id=root_line.movement_id and root_movement.brewery_id=root.brewery_id
+  left join public.inventory_movements effective_movement on effective_movement.id=effective_line.movement_id and effective_movement.brewery_id=root.brewery_id
+  where root.corrects_count_id is null;
+
 CREATE OR REPLACE FUNCTION private.get_taproom_count(p_brewery uuid, p_count uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -15,7 +38,7 @@ begin
     'counted_by',h.counted_by,'created_at',h.created_at,'prior_count_id',h.prior_count_id,
     'corrected_at',h.corrected_at,'corrected_by',h.corrected_by,'correction_reason',h.correction_reason,
     'correction_eligible',h.corrected_at is null
-      and exists(select 1 from public.taproom_count_lines shortage where shortage.count_id=h.root_id and shortage.brewery_id=h.brewery_id and shortage.qty_counted<shortage.qty_before and exists(select 1 from public.inventory_movements sm where sm.id=shortage.movement_id and sm.brewery_id=h.brewery_id and sm.type='depletion'))
+      and exists(select 1 from private.taproom_effective_counts shortage where shortage.brewery_id=h.brewery_id and shortage.root_id=h.root_id and shortage.qty_counted<shortage.qty_before and shortage.movement_type='depletion')
       and not exists(select 1 from private.taproom_effective_counts newer
       where newer.brewery_id=h.brewery_id and newer.location_id=h.location_id and newer.root_id<>h.root_id
         and (newer.observed_at,newer.root_id)>(h.observed_at,h.root_id)),
@@ -23,7 +46,7 @@ begin
       'corrects_line_id',case when e.line_id=e.root_line_id then null else e.root_line_id end,
       'brewery_id',e.brewery_id,'count_id',e.effective_id,'location_id',e.location_id,
       'bin_id',e.bin_id,'bin_name',b.name,'sku_id',e.sku_id,'sku_name',s.name,'lot_id',e.lot_id,
-      'qty_before',e.qty_before,'qty_counted',e.qty_counted,'movement_id',e.movement_id,'bbl',e.bbl,'movement_type',(select m.type from public.inventory_movements m where m.id=e.movement_id and m.brewery_id=e.brewery_id))
+      'qty_before',e.qty_before,'qty_counted',e.qty_counted,'movement_id',e.movement_id,'bbl',e.bbl,'movement_type',e.movement_type)
       order by e.bin_id,e.sku_id,e.lot_id nulls first),'[]'::jsonb)
       from private.taproom_effective_counts e
       left join public.bins b on b.id=e.bin_id and b.brewery_id=e.brewery_id
@@ -138,9 +161,8 @@ begin
     left join counts prior on prior.effective_id=c.prior_count_id and prior.brewery_id=c.brewery_id and prior.location_id=c.location_id
     where c.counted_on between v_start and v_today
   ), actual as materialized (
-    select p.count_id,s.brand_id,-sum(case when m.type='depletion' then coalesce(l.bbl,0) else 0 end) actual_bbl, -sum(case when m.type='destruction' then coalesce(l.bbl,0) else 0 end) destroyed_bbl
+    select p.count_id,s.brand_id,-sum(case when l.movement_type='depletion' then coalesce(l.bbl,0) else 0 end) actual_bbl, -sum(case when l.movement_type='destruction' then coalesce(l.bbl,0) else 0 end) destroyed_bbl
     from periods p join private.taproom_effective_counts l on l.effective_id=p.count_id and l.brewery_id=p_brewery
-    left join public.inventory_movements m on m.id=l.movement_id and m.brewery_id=l.brewery_id
     join public.skus s on s.id=l.sku_id and s.brewery_id=p_brewery
     group by p.count_id,s.brand_id
   ), sources as (
@@ -208,8 +230,8 @@ begin
   with headers as (
     select root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason,
       count(line_id) observations,count(movement_id) movements,
-      coalesce(sum(case when exists(select 1 from public.inventory_movements m where m.id=movement_id and m.brewery_id=p_brewery and m.type='depletion') then qty_before-qty_counted else 0 end),0) depleted_units,
-      coalesce(sum(case when exists(select 1 from public.inventory_movements m where m.id=movement_id and m.brewery_id=p_brewery and m.type='destruction') then qty_before-qty_counted else 0 end),0) destroyed_units
+      coalesce(sum(case when movement_type='depletion' then qty_before-qty_counted else 0 end),0) depleted_units,
+      coalesce(sum(case when movement_type='destruction' then qty_before-qty_counted else 0 end),0) destroyed_units
     from private.taproom_effective_counts where brewery_id=p_brewery and location_id=p_location
     group by root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason
     order by observed_at desc,effective_id desc limit 50
