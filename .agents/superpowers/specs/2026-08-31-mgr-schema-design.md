@@ -136,7 +136,9 @@ creates the brewery and its first admin.
 
 ### `customers` — unchanged + composite parent key
 Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (added after
-`price_lists`). `unique (brewery_id, name)`. RLS: `staff_all`, `customer_read_own`.
+`price_lists`). `unique (brewery_id, name)`. Staff-only base-table reads;
+buyers read `portal_customers` identity (`id`, `brewery_id`, `name`,
+`sale_channel_id`) through a function scoped to `my_customer_ids()` (#793).
 
 ### `customer_users` — unchanged
 ### `ship_tos` — unchanged, but `customer_id` becomes composite → `customers`

@@ -129,6 +129,8 @@ describe("request context headers", () => {
     ]);
     expect((await portalA.from("portal_brewery").select("id")).data).toEqual([{ id: breweryA }]);
     expect((await portalB.from("portal_brewery").select("id")).data).toEqual([{ id: breweryB }]);
+    expect((await portalA.from("portal_customers").select("id")).data).toEqual([{ id: resourcesA.customerId }]);
+    expect((await portalB.from("portal_customers").select("id")).data).toEqual([{ id: customerB }]);
     expect((await portalA.from("customer_users").select("customer_id").eq("user_id", actor.id)).data).toEqual([{ customer_id: resourcesA.customerId }]);
     expect((await portalB.from("customer_users").select("customer_id").eq("user_id", actor.id)).data).toEqual([{ customer_id: customerB }]);
     expect((await portalB.from("orders").select("id")).data).toEqual([]);

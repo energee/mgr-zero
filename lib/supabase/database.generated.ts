@@ -7435,6 +7435,15 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_customers: {
+        Row: {
+          brewery_id: string | null
+          id: string | null
+          name: string | null
+          sale_channel_id: string | null
+        }
+        Relationships: []
+      }
       portal_invoices: {
         Row: {
           brewery_id: string | null
@@ -8956,6 +8965,15 @@ export type Database = {
           p_ship_to: string
         }
         Returns: Json
+      }
+      portal_customer_rows: {
+        Args: never
+        Returns: {
+          brewery_id: string
+          id: string
+          name: string
+          sale_channel_id: string
+        }[]
       }
       portal_invoice_rows: {
         Args: never
