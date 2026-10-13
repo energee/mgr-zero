@@ -85,7 +85,6 @@ export type StateTotal = { state: string; volumeBbl: number; outwardBbl: number;
 export type Report = {
   figures: { stateTransactions?: StateTransaction[]; jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
   warnings: string[];
-  externalMappingRequired: string[];
 };
 
 const period = z.object({ jurisdiction: z.string().regex(/^[A-Z-]+$/, "TTB or US-XX"), periodStart: isoDate, periodEnd: isoDate });
@@ -154,7 +153,7 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
   roles: [...ROLES],
   // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(

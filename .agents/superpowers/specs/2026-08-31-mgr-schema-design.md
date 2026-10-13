@@ -629,9 +629,8 @@ still bucket by `volume_adjustments.created_at`. `file_compliance_report` takes 
 cellar workflow lock, serializing filing with packaging closes.
 Generated figures keep `removals` as the one additive filing total and expose
 `cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
-their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
-mapping requirement and blocks filing until that mapping is separately approved
-(#816 proposes filing it as a taxpaid removal and dropping the gate once the TTB filer confirms);
+their actual creation period. A nonzero direct-cellar Taproom amount files once, as a
+removal under its frozen Taproom tax treatment (#816);
 existing `report_filings.figures` snapshots remain immutable.
 
 ## 12. Kegs (owned / leased / pay-per-fill fleets)

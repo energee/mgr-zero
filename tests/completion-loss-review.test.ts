@@ -308,7 +308,7 @@ describe("completion loss review", () => {
     expectSqlState(`begin; update vessel_occupancies set batch_id='${otherBatch}' where id='${sourceOccupancy}'; commit`, "P0001");
   });
 
-  it("posts signed corrections in their actual period, leaves occupancy unchanged, preserves filed snapshots, and gates cellar Taproom filing", async () => {
+  it("posts signed corrections in their actual period, leaves occupancy unchanged, and preserves filed snapshots", async () => {
     const completed = await exactCompletion();
     const prior = previousPeriod(completed.period);
     const occupancy = sql(`select occupancy_id::text from volume_adjustments where id='${completed.adjustmentId}'`, true)[0];
@@ -357,22 +357,36 @@ describe("completion loss review", () => {
     expect(Number(currentReport.figures.cellarRemovals.loss) - Number(currentBefore.figures.cellarRemovals.loss ?? 0)).toBeCloseTo(-0.02, 8);
     expect(Number(currentReport.figures.cellarRemovals.sample) - Number(currentBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
     expect(JSON.stringify((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data!.figures)).toBe(frozen);
+  });
 
-    // A previous-month filing must not gate this separate Taproom scenario.
+  it("files direct cellar Taproom volume as a removal under its frozen Taproom tax treatment (#816)", async () => {
+    // A fresh brewery: its Taproom channel keeps the seeded taxable treatment.
     const freshBrewery = await makeBrewery();
     const freshAdmin = await makeStaffCtx(freshBrewery.id, "admin");
     const freshBrewer = await makeStaffCtx(freshBrewery.id, "brewer");
     const freshLocation = await seedLocation(freshBrewery.id);
     const freshDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${freshBrewery.id}'`, true)[0];
     const taproom = await exactCompletion({ breweryId: freshBrewery.id, brewerCtx: freshBrewer, location: freshLocation, fixtureDate: freshDate });
-    await runCommand("reattribute_loss", { adjustmentId: taproom.adjustmentId, bbl: "0.01", classification: "taproom" }, freshAdmin);
-    const report = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, freshAdmin) as import("@/lib/commands/compliance").Report;
-    expect(report.externalMappingRequired).toEqual(["taproom"]);
-    expect(report.warnings.join(" ")).toMatch(/approved external filing-line mapping/i);
-    await expect(runCommand("file_compliance_report", {
-      jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, freshAdmin)).rejects.toThrow(/approved external filing-line mapping/i);
+    const allocation = await runCommand("reattribute_loss", { adjustmentId: taproom.adjustmentId, bbl: "0.01", classification: "taproom" }, freshAdmin) as import("@/lib/commands/compliance").LossAllocation;
+    expect(allocation.tax_treatment).toBe("taxable");
+    // Move the loss and its correction into last month, which has ended and is unfiled.
+    const prior = previousPeriod(taproom.period);
+    sql(`update volume_adjustments set created_at='${prior.start}T12:00:00Z' where id='${taproom.adjustmentId}' or reclassification_id='${allocation.id}';
+      update volume_adjustment_reclassifications set created_at='${prior.start}T12:00:00Z' where id='${allocation.id}';
+      update batches set closed_at='${prior.start}T12:00:00Z' where completion_adjustment_id='${taproom.adjustmentId}'`, true);
+    const range = { jurisdiction: "TTB", periodStart: prior.start, periodEnd: prior.end };
+    const report = await runCommand("generate_compliance_report", range, freshAdmin) as import("@/lib/commands/compliance").Report;
+    expect(report.figures.cellarRemovals.taproom).toBe(0.01);
+    expect(report.figures.removals.taxable).toBeCloseTo(0.01, 8);
+    expect(report.figures.balances).toBe(true);
+    expect(report.warnings.join(" ")).not.toMatch(/mapping/i);
+    expect("externalMappingRequired" in report).toBe(false);
+
+    const requestId = crypto.randomUUID();
+    const meta = { requestId, correlationId: crypto.randomUUID() };
+    const filed = await runCommand("file_compliance_report", range, freshAdmin, meta) as import("@/lib/commands/compliance").Filing;
+    expect(filed.figures.removals).toEqual(report.figures.removals);
+    expect(filed.figures.cellarRemovals).toEqual(report.figures.cellarRemovals);
+    expect(await runCommand("file_compliance_report", range, freshAdmin, meta)).toEqual(filed);
   });
 });

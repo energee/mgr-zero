@@ -88,7 +88,6 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
         <Label htmlFor={`loss-state-${loss.adjustment_id}`}>Destination state</Label>
         <Input id={`loss-state-${loss.adjustment_id}`} value={state} maxLength={2} pattern="[A-Z]{2}" placeholder="PA" disabled={locked} onChange={(event) => setState(event.target.value.toUpperCase())} required />
       </div>}
-      {target === "taproom" && <CommandFormMessage tone="warning">Direct cellar Taproom removals cannot be filed until an external filing-line mapping is approved.</CommandFormMessage>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The amount, target, state, and request ID are frozen. Retry unchanged to recover the saved result.</CommandFormMessage>}
       {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />

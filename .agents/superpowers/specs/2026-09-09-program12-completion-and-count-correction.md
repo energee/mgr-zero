@@ -225,7 +225,7 @@ Extend the existing report with a cellar-removal breakdown while keeping totals 
 - Signed reclassification legs net the old class down and the new class up in the period where the correction is posted. Total removals across all time are unchanged.
 - Filed `report_filings.figures` remain immutable snapshots. Re-running another period never updates one.
 
-The exact external filing-line mapping for direct-from-cellar Taproom pours remains unresolved. When a generated period contains a nonzero cellar `taproom` class, return `externalMappingRequired: ['taproom']` and a clear warning. `file_compliance_report` refuses that generated period until a separately approved mapping exists; no acknowledgment bypass or inferred mapping is added in T4. This is the retained manual compliance gate, not a claim about law.
+The exact external filing-line mapping for direct-from-cellar Taproom pours remains unresolved. When a generated period contains a nonzero cellar `taproom` class, return `externalMappingRequired: ['taproom']` and a clear warning. `file_compliance_report` refuses that generated period until a separately approved mapping exists; no acknowledgment bypass or inferred mapping is added in T4. This is the retained manual compliance gate, not a claim about law. *(2026-10-13, #816: gate retired. Direct cellar Taproom volume files as a removal under its frozen Taproom tax treatment; `externalMappingRequired` is no longer returned.)*
 
 ### UI, docs, and proof
 
@@ -249,7 +249,7 @@ Depends on no count schema semantics but follows T4b because both edit the basel
 
 ### T4d — loss review, reclassification, and report (implemented)
 
-Depends on T4c's typed completion root, candidate key, precision checks, and shared cellar gate. Owners: baseline reclassification ledger, deferred structural proof, `reattribute_loss`, report; `lib/commands/compliance.ts`; compliance month page/forms and screen; report types; API/staff docs; compliance/production/RLS/RPC/screen/browser tests. It closes the loss-review gate while retaining the explicit external mapping block for direct cellar Taproom pours.
+Depends on T4c's typed completion root, candidate key, precision checks, and shared cellar gate. Owners: baseline reclassification ledger, deferred structural proof, `reattribute_loss`, report; `lib/commands/compliance.ts`; compliance month page/forms and screen; report types; API/staff docs; compliance/production/RLS/RPC/screen/browser tests. It closes the loss-review gate while retaining the explicit external mapping block for direct cellar Taproom pours (retired by #816).
 
 At each card: write the meaningful red first; edit only the baseline migration; reset and use the isolated test database; run focused real-Postgres tests plus the applicable pure screen/API tests, `bunx tsc --noEmit`, and `bun run lint`; inspect the rendered desktop and 375 px page; review `git diff`; obtain fresh spec review then quality review. Run the grouped full suite and production build after the combined T4 stack, without claiming CI or merge that did not occur.
 
