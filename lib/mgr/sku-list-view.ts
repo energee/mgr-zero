@@ -9,6 +9,7 @@ export type SkuListRowView = {
   title: string;
   detail: string;
   href: string;
+  warn?: boolean;
 };
 
 export type SkuListViewModel = {
@@ -25,7 +26,8 @@ export type SkuListSnapshot = {
     name: string;
     active: boolean;
     format_id: string;
-    formats: { name: string; bbl_per_unit: string | number | null; effective_bbl_per_unit?: string | number | null } | null;
+    keg_pool_id?: string | null;
+    formats: { package_type?: string | null; name: string; bbl_per_unit: string | number | null; effective_bbl_per_unit?: string | number | null } | null;
   }[];
   pours?: { id: string; name: string; ounces: number | string }[];
   backHref?: string;
@@ -39,10 +41,12 @@ export function toSkuListViewProps({ brand, skus, pours = [], backHref }: SkuLis
     rows: [...skus.map((s) => {
       const bbl = s.formats ? effectiveBbl(s.formats) : null;
       const volume = bbl != null ? formatVolume(bbl) : "—";
+      const warn = s.formats?.package_type === "keg" && !s.keg_pool_id;
       return {
         key: s.id,
         title: s.formats?.name ?? s.name,
-        detail: `${volume} · ${s.active ? "active" : "inactive"}`,
+        detail: `${volume} · ${s.active ? "active" : "inactive"}${warn ? " · No keg pool, no deposit" : ""}`,
+        warn,
         href: "/catalog",
       };
     }), ...pours.map((p) => ({ key: `pour:${p.id}`, kind: "poured" as const, title: p.name, detail: `${Number(p.ounces)} oz · pour · drawn from keg`, href: "#" }))],
