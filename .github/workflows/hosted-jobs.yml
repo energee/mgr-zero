@@ -8,7 +8,8 @@
 # Needs repository variable MGR_URL (production origin, no trailing slash) and
 # secrets ORDER_EMAIL_JOB_SECRET and RETENTION_JOB_SECRET matching Vercel.
 # Jobs skip while MGR_URL is unset (not yet deployed); once set, a failed call
-# fails the run so GitHub notifies.
+# fails the run so GitHub notifies. A redirect fails too: --fail ignores 3xx, and
+# Vercel Deployment Protection answers 302 to its sign-in page.
 name: hosted jobs
 
 on:
@@ -32,7 +33,7 @@ jobs:
         env:
           SECRET: ${{ secrets.ORDER_EMAIL_JOB_SECRET }}
         run: |
-          curl -sS --fail-with-body --max-time 240 -X POST "$MGR_URL/api/email/jobs/deliver" -H "Authorization: Bearer $SECRET"
+          curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/email/jobs/deliver" -H "Authorization: Bearer $SECRET"
 
   retention:
     if: vars.MGR_URL != '' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * *')
@@ -43,4 +44,4 @@ jobs:
         env:
           SECRET: ${{ secrets.RETENTION_JOB_SECRET }}
         run: |
-          curl -sS --fail-with-body --max-time 240 -X POST "$MGR_URL/api/retention/jobs/prune" -H "Authorization: Bearer $SECRET"
+          curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/retention/jobs/prune" -H "Authorization: Bearer $SECRET"
