@@ -14,6 +14,42 @@ unreceived PO never inflates what a packaging run believes it has.
 
 {/* ops:purchasing */}
 
+## cancel_purchase_order [#cancel_purchase_order]
+
+`command` · admin, warehouse
+
+Cancel a draft or sent purchase order without receipts, recording the reason and releasing its unreceived remainder
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "cancel_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "reason": "string" } }'
+```
+
+## close_purchase_order_short [#close_purchase_order_short]
+
+`command` · admin, warehouse
+
+Close a purchase order's unreceived remainder with a reason; counted receipts and stock remain unchanged
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "close_purchase_order_short", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "reason": "string" } }'
+```
+
 ## correct_purchase_receipt [#correct_purchase_receipt]
 
 `command` · admin, warehouse

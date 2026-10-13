@@ -173,11 +173,14 @@ are normal work. Run them on the throwaway `mgr_test` stack
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
    in the PR description; the dreaming workflow reads merged PRs and writes the
-   logs serially on its own `dreaming/main` PR. Two lines in the description
+   logs serially on its own `dreaming/main` PR. Three lines in the description
    are read by scripts, not the model (`scripts/pr-directives.ts`): `TODO:
    <text>` names the open `TODO.md` item this PR finishes, and CI rejects one
    that does not match exactly one item; the literal `DOCS: none` skips the
-   documentation agent.
+   documentation agent, and `API: none` skips the HTTP API agent.
+   `.github/pull_request_template.md` prompts for all three. Both doc agents
+   also re-audit weekly, and `.github/workflows/doc-agent-watch.yml` opens an
+   issue when any doc workflow fails or no dream lands for 3 days.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.

@@ -93,10 +93,11 @@ const actualRows = (rows: z.infer<typeof packagingActual>[]) => rows.map(row => 
 // the run is history once it closes, so "we filled none of those" is stated,
 // not left null. The occupancy stays open on purpose: emptying the tank is a
 // cellar decision (`record_cellar_transfer` / ending the occupancy), not a
-// side effect of packaging.
+// side effect of packaging. Stock belongs to Packaged on; future and filed dates
+// are refused without closing the run.
 defineCommand({
   name: "close_packaging_run",
-  description: "Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed",
+  description: "Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed; the production_in stock is dated Packaged on, which may not be after today or inside a filed report period",
   input: z.object({
     runId: z.string().uuid(),
     bblDrawn: z.number().nonnegative(),

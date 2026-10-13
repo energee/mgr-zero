@@ -11,7 +11,7 @@ import "@/lib/commands/all";
 import { PrintButton } from "./print-button";
 
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
-type Order = { id: string; order_no: number | null; status: string; requested_ship_date: string | null; customers: { name: string } | null; order_lines: OrderLine[] };
+type Order = { id: string; order_no: number | null; status: string; requested_ship_date: string | null; repick_since: string | null; customers: { name: string } | null; order_lines: OrderLine[] };
 
 export default async function PickSheetPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { date } = await searchParams;

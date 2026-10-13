@@ -29,6 +29,7 @@ import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { poLineCounts } from "../lib/mgr/new-po-view";
+import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -84,6 +85,25 @@ describe("Purchase orders", () => {
     const body = screen("Receive PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceivePoView);
     expect(body.props.model).toEqual(receivePoCountryMalt);
+  });
+
+  it("submits closure through its own form, so Enter in the reason never submits the receipt or send form", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    expect(html).toMatch(new RegExp(`<input[^>]*aria-label="Closure reason"[^>]*form="${CLOSURE_FORM_ID}"|<input[^>]*form="${CLOSURE_FORM_ID}"[^>]*aria-label="Closure reason"`));
+    expect(html).toMatch(new RegExp(`<button[^>]*type="submit"[^>]*form="${CLOSURE_FORM_ID}"|<button[^>]*form="${CLOSURE_FORM_ID}"[^>]*type="submit"`));
+  });
+
+  it("renders reason-bearing closure controls on the shared receive view", () => {
+    const cancel = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    expect(cancel).toContain("Cancel purchase order");
+    expect(cancel).toContain("Closure reason");
+    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
+    expect(short).toContain("Close short");
+    expect(short).not.toContain("Cancel purchase order");
+    const closed = htmlOf(createElement(ReceivePoView, { model: { title: "Closed PO", state: "received", status: "closed short · Vendor cancelled remainder" } }));
+    expect(closed).toContain("Vendor cancelled remainder");
+    expect(closed).not.toContain("Close short");
+    expect(closed).not.toContain("Receive purchase order");
   });
 
   it("renders Receive purchase order without leaking live hrefs", () => {

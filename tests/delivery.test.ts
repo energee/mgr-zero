@@ -452,6 +452,13 @@ describe("route edges", () => {
     expect(await runCommand("check_in_refused_return", input, warehouse, { requestId, correlationId: requestId })).toEqual(checked);
     const { data: returned } = await admin.from("inventory_movements").select("qty, lot_id").eq("source_movement_id", source!.id).eq("type", "return_in").eq("ref", stop!.id);
     expect(returned).toEqual([{ qty: 1, lot_id: lotId }]);
+    // #815: accepted beer returned by credit and refused damaged beer each
+    // return one shell; exact replay must not add another physical event.
+    const shellEvents = await admin.from("keg_events").select("reason,qty").eq("shipment_id", sh);
+    expect(shellEvents.error).toBeNull();
+    expect(shellEvents.data).toHaveLength(3);
+    expect(shellEvents.data?.filter(event => event.reason === "shipped")).toEqual([{ reason: "shipped", qty: 10 }]);
+    expect(shellEvents.data?.filter(event => event.reason === "returned")).toEqual([{ reason: "returned", qty: 1 }, { reason: "returned", qty: 1 }]);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, warehouse)).toMatchObject([{ outstanding_qty: 1 }]);
     expect(await runCommand("get_today", {}, warehouse)).toContainEqual(expect.objectContaining({ reason: "refused_return", subjectId: stop!.id }));
     const stranger = await makeStaffCtx((await makeBrewery()).id, "admin");

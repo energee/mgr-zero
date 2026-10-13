@@ -63,7 +63,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked",
+  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
@@ -123,7 +123,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason)",
+  name: "ship_order", description: "Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason); returnable keg lines post Shipped shells and warn, never refuse, when shells are short",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
@@ -195,7 +195,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "return_shipment", description: "Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
+  name: "return_shipment", description: "Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
@@ -208,7 +208,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "create_credit_memo", description: "Credit an invoice: negative lines at original prices + return_in movements",
+  name: "create_credit_memo", description: "Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Credit an invoice: negative lines at original prices + return_in movements",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1),

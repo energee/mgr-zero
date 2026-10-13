@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { movementInput } from "./movement-input";
+import type { Database } from "@/lib/supabase/database";
 
 /**
  * Appends an inventory movement through its security-definer RPC. `binId` is
@@ -143,6 +144,18 @@ defineQuery({
     const [result, count] = await Promise.all([q.order("sku_id").limit(PAGE_SIZE), counted]);
     return { ...result, count: count.count, error: result.error ?? count.error };
   }, row => row.sku_id),
+});
+
+export type InventoryValue = Pick<Database["public"]["Views"]["inventory_value"]["Row"], "value_cents" | "uncosted_qty">;
+
+defineQuery({
+  name: "get_inventory_value", description: "Current finished-goods value at frozen packaging-close cost, with the units lacking a cost",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: async (ctx): Promise<InventoryValue> => {
+    const row = await unwrap(ctx.db.from("inventory_value").select("value_cents, uncosted_qty").eq("brewery_id", ctx.breweryId).maybeSingle());
+    // The view groups stock rows by brewery; no row means no stock, worth nothing.
+    return row ?? { value_cents: 0, uncosted_qty: 0 };
+  },
 });
 
 defineQuery({

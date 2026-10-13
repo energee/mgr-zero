@@ -368,3 +368,21 @@ it("authorizes the draft projection by tenant and Taproom role and aggregates be
   const warehouse = await seedLocation(f.brewery.id, { name: "Warehouse" });
   expect((await f.ctx.db.rpc("get_taproom_draft_projection", { p_brewery: f.brewery.id, p_location: warehouse.id })).error).not.toBeNull();
 });
+
+it("#814 separates destroyed brand volume from comparable sold actual", async () => {
+  const f = await fixture();
+  const baseline = await count(f, -14, null, 0);
+  const ending = await count(f, -7, baseline, 2);
+  const bin = await ins("bins", { brewery_id: f.brewery.id, location_id: f.location.id, name: "Destroyed stock" });
+  const destroyed = await ins("inventory_movements", { brewery_id: f.brewery.id, location_id: f.location.id,
+    bin_id: bin.id, sku_id: f.cat.skuId, qty: -2, type: "destruction", created_by: f.ctx.userId, ref: ending });
+  await ins("taproom_count_lines", { brewery_id: f.brewery.id, count_id: ending, location_id: f.location.id,
+    bin_id: bin.id, sku_id: f.cat.skuId, qty_before: 2, qty_counted: 0, movement_id: destroyed.id });
+  await coverage(f);
+  reconcile(f, (await sale(f, -10)).id);
+  const r = await report(f) as Report & { rows: { destroyed_bbl: number }[]; periods: { destroyed_bbl: number }[] };
+  expect(r.rows).toMatchObject([{ brand_id: f.cat.brandId, actual_bbl: 2, destroyed_bbl: 1, expected_bbl: 3, variance_bbl: 1 }]);
+  expect(r.periods).toHaveLength(2);
+  expect(r.periods.find(period => period.count_id === ending)).toMatchObject({ actual_bbl: 2, destroyed_bbl: 1 });
+  expect(r.periods.find(period => period.count_id === baseline)).toMatchObject({ actual_bbl: 0, destroyed_bbl: 0, reason: "missing_baseline" });
+});

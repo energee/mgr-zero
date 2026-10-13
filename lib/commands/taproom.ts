@@ -72,16 +72,18 @@ defineQuery({
 });
 
 // The Keg fleet page: every pool, what each bin physically holds per pool ×
-// size, and the customers holding kegs. Zero rows are kept so a bin that
+// size, each pool/size/location netting below zero, and the customers holding kegs. Zero rows are kept so a bin that
 // emptied still shows; a customer with nothing out is not listed. Page every
 // balance and label read past the row cap; order views by their full grain (#726).
 defineQuery({
-  name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, and customers with kegs out", input: z.object({}), roles: ROLES,
+  name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, shell shortages per pool, size and location, and customers with kegs out", input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
-    const [pools, rows, locations, bins, out, customers] = await Promise.all([
+    const [pools, rows, shortages, locations, bins, out, customers] = await Promise.all([
       listPools(ctx),
       completeRows("Keg fleet", start => ctx.db.from("keg_bin_on_hand").select("pool_id, keg_size, location_id, bin_id, qty", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("pool_id").order("keg_size").order("location_id").order("bin_id").range(start, start + PAGE_SIZE - 1)),
+      completeRows("Keg shortages", start => ctx.db.from("keg_location_shortages").select("pool, keg_size, location, short", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("pool_id").order("keg_size").order("location_id").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg fleet locations", start => ctx.db.from("locations").select("id, name", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg fleet bins", start => ctx.db.from("bins").select("id, name", { count: "exact" })
@@ -97,6 +99,7 @@ defineQuery({
     return {
       pools: pools ?? [],
       rows: (rows ?? []).map((r) => ({ ...r, qty: Number(r.qty), location_name: name(locations, r.location_id as string), bin_name: name(bins, r.bin_id as string) })),
+      shortages: (shortages ?? []).map((r) => ({ ...r, short: Number(r.short) })),
       customers: [...kegsOut].filter(([, n]) => n !== 0).map(([customer_id, kegs_out]) => ({ customer_id, name: name(customers, customer_id), kegs_out }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     };
@@ -244,13 +247,14 @@ defineQuery({
   handler: (ctx, i) => unwrap(ctx.db.rpc("list_taproom_counts", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineCommand({
-  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused",
+  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages post sold depletion by default or destruction when explicitly classified. Stale, incomplete, duplicate and overcounts are refused",
   input: z.object({ locationId: z.string().uuid(), countedOn: z.string().date(), revision: z.string().min(1),
-    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative() })) }),
+    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative(), disposition: z.enum(["sold", "destroyed"]).optional() })) }),
   roles: [...COUNT_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
-    p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted })), p_request_id: execution.requestId,
+    // Omit the default key so pre-disposition requests retain their exact replay hash.
+    p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted, ...(l.disposition === "destroyed" ? { disposition: "destroyed" } : {}) })), p_request_id: execution.requestId,
   })),
 });
 defineCommand({

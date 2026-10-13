@@ -4,7 +4,7 @@
 import type { ReactNode } from "react";
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { nextState, type OrderStatus } from "./order-status";
+import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
 
@@ -27,6 +27,8 @@ export type OrderViewModel = {
   requested?: string;
   note?: string;
   restockNote?: string;
+  /** Set while a picked order awaits the re-pick of lines changed after it was picked (#811). */
+  repickNote?: string;
   putBackHref?: string;
   confirmHref?: string;
   editHref?: string;
@@ -48,6 +50,8 @@ export type OrderSnapshot = {
     requested_ship_date: string | null;
     note: string | null;
     needs_restock: boolean;
+    /** orders.repick_since: when an adjustment sent a picked order back to confirmed (#811). */
+    repick_since?: string | null;
     from_location_id?: string;
     customers: { name: string } | null;
     ship_tos: { label: string; city: string; state: string } | null;
@@ -139,7 +143,8 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
     restockNote: restockNoteFor(order, lines),
-    putBackHref: order.status === "picked" && order.needs_restock ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
+    repickNote: order.repick_since && order.status === "confirmed" ? "Changed after pick: count the added or raised lines; the rest is already staged." : undefined,
+    putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
     editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
     completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? (backHref ? `/orders/${order.id}/complete` : "#") : undefined,

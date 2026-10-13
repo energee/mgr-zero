@@ -9,6 +9,7 @@ import type { ReverseMovementSnapshot } from "@/lib/mgr/reverse-movement-view";
 
 /** Beer → Finished goods: Hazy / Pils shortfall / Stout. */
 export const finishedGoodsList: FinishedGoodsSnapshot = {
+  value: { cents: 1248000, uncostedUnits: 6 },
   skus: [
     { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, on_hand: 15, atp: 11 },
     { id: SKU_PILS.sku_id, name: SKU_PILS.name, on_hand: 18, atp: -6 },

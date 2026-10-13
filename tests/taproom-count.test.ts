@@ -19,6 +19,95 @@ async function fixture(qty = 7) {
 }
 
 describe("durable explicit taproom counts", () => {
+  it("#814 posts a destroyed shortage without a sale channel or tax facts", async () => {
+    const f = await fixture();
+    const input = await args(f);
+    const saved = await f.ctx.db.rpc("record_taproom_count", {
+      ...input,
+      p_lines: input.p_lines.map(line => ({ ...line, qty_counted: 5, disposition: "destroyed" })),
+    });
+    expect(saved.error).toBeNull();
+    expect(saved.data).toMatchObject({ correction_eligible: false, lines: [{ movement_type: "destruction" }] });
+    const movements = await admin.from("inventory_movements")
+      .select("type,qty,bbl,sale_channel_id,tax_treatment,dest_state")
+      .eq("brewery_id", f.brewery.id).neq("type", "opening_balance");
+    expect(movements.error).toBeNull();
+    expect(movements.data).toEqual([{ type: "destruction", qty: -2, bbl: -1,
+      sale_channel_id: null, tax_treatment: null, dest_state: null }]);
+  });
+  it("#814 accepts sold as the matching default and rejects matching destruction atomically", async () => {
+    const f = await fixture();
+    const input = await args(f);
+    const before = state(f);
+    const rejected = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: input.p_lines.map(line => ({ ...line, disposition: "destroyed" })) });
+    expect(rejected.error?.message).toMatch(/shortage/);
+    expect(state(f)).toEqual(before);
+    const saved = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: input.p_lines.map(line => ({ ...line, disposition: "sold" })) });
+    expect(saved.error).toBeNull();
+    expect(saved.data).toMatchObject({ correction_eligible: false, lines: [{ movement_id: null }] });
+  });
+
+  it("#814 preserves legacy command replay when sold is explicitly supplied", async () => {
+    const f = await fixture();
+    const input = await args(f);
+    input.p_lines[0].qty_counted = 5;
+    const original = await f.ctx.db.rpc("record_taproom_count", input);
+    expect(original.error).toBeNull();
+    const replay = await runCommand("record_taproom_count", { locationId: f.location.id, countedOn: f.day,
+      revision: input.p_revision, lines: [{ binId: f.location.binId, skuId: f.cat.skuId, lotId: null, qtyCounted: 5, disposition: "sold" }] }, f.ctx, { requestId: input.p_request_id, correlationId: crypto.randomUUID() });
+    expect(replay).toEqual(original.data);
+  });
+
+  it("#814 keeps destruction unchanged when correcting only a sold shortage", async () => {
+    const f = await fixture(0);
+    const trackedLot = await lot(f, "DESTROYED");
+    await movement(f, 7, trackedLot);
+    await movement(f, 7);
+    const input = await args(f);
+    const saved = await f.ctx.db.rpc("record_taproom_count", { ...input,
+      p_lines: input.p_lines.map(line => ({ ...line, qty_counted: 5, ...(line.lot_id ? { disposition: "destroyed" } : {}) })) });
+    expect(saved.error).toBeNull();
+    const receipt = saved.data as unknown as { id: string; correction_eligible: boolean; lines: { id: string; movement_type: string; movement_id: string }[] };
+    expect(receipt.correction_eligible).toBe(true);
+    const destroyed = receipt.lines.find(line => line.movement_type === "destruction")!;
+    const sold = receipt.lines.find(line => line.movement_type === "depletion")!;
+    const ctx = await makeStaffCtx(f.brewery.id, "admin");
+    await expect(runCommand("correct_taproom_count", { countId: receipt.id,
+      corrections: [{ lineId: destroyed.id, qtyCounted: 6 }], reason: "Not a count error" }, ctx)).rejects.toThrow(/depletion/);
+    const corrected = await runCommand("correct_taproom_count", { countId: receipt.id,
+      corrections: [{ lineId: sold.id, qtyCounted: 6 }], reason: "Misread sold units" }, ctx) as { lines: { movement_type: string; qty_counted: number }[] };
+    expect(corrected.lines).toContainEqual(expect.objectContaining({ movement_type: "destruction", qty_counted: 5 }));
+    expect((await admin.from("inventory_movements").select("qty,bbl").eq("id", destroyed.movement_id)).data).toEqual([{ qty: -2, bbl: -1 }]);
+    const history = await f.ctx.db.rpc("list_taproom_counts", { p_brewery: f.brewery.id, p_location: f.location.id });
+    expect(history.error).toBeNull();
+    expect(history.data).toMatchObject([{ depleted_units: 1, destroyed_units: 2 }]);
+    const report = await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location: f.location.id, p_weeks: 4 });
+    expect(report.error).toBeNull();
+    expect(report.data).toMatchObject({ periods: [{ actual_bbl: 0.5, destroyed_bbl: 1 }] });
+  });
+
+  it("#814 records destruction without a Taproom channel and rejects invalid or changed disposition", async () => {
+    const f = await fixture();
+    expect((await admin.from("sale_channels").delete().eq("brewery_id", f.brewery.id).eq("system_code", "taproom")).error).toBeNull();
+    const input = await args(f);
+    const lines = input.p_lines.map(line => ({ ...line, qty_counted: 5, disposition: "destroyed" }));
+    const before = state(f);
+    const invalid = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: lines.map(line => ({ ...line, disposition: "sample" })) });
+    expect(invalid.error?.message).toMatch(/sold or destroyed/);
+    expect(state(f)).toEqual(before);
+    const saved = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: lines });
+    expect(saved.error).toBeNull();
+    expect((await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: lines })).data).toEqual(saved.data);
+    const changed = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: lines.map(line => ({ ...line, disposition: "sold" })) });
+    expect(changed.error?.code).toBe("MG409");
+    const ctx = await makeStaffCtx(f.brewery.id, "admin");
+    const monthStart = `${f.day.slice(0, 7)}-01`;
+    const monthEnd = new Date(Date.UTC(Number(f.day.slice(0, 4)), Number(f.day.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: monthStart, periodEnd: monthEnd }, ctx) as { figures: { removals: Record<string, number> } };
+    expect(Number(report.figures.removals.destruction)).toBe(1);
+    expect(Number(report.figures.removals.taxable ?? 0)).toBe(0);
+  });
+
   it("persists a matching count and every explicit line without posting", async () => {
     const f = await fixture();
     const snapshot = await f.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id });
@@ -701,7 +790,7 @@ it("count tables are append-only with tenant-safe references and direct DML deni
   expect(() => insertFixture("taproom_counts", { ...row, prior_count_id: foreignPrior.id })).toThrow(/SQLSTATE 23503/);
 
   const line: Partial<typeof result.data.lines[number]> = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
-  delete line.effective_line_id;
+  delete line.effective_line_id; delete line.movement_type;
   delete line.bin_name; delete line.sku_name;
   expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow(/SQLSTATE 23503/);
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");

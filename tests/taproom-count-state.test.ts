@@ -16,6 +16,7 @@ import {
   updateCorrectionQuantity,
   updateCorrectionReason,
   updateCountQuantity,
+  updateCountDisposition,
 } from "@/lib/mgr/taproom-count-state";
 
 const ids = {
@@ -36,6 +37,33 @@ const snapshot = {
 };
 
 describe("taproom count controlled state", () => {
+  it("#814 sends only destroyed disposition and freezes it with the request", () => {
+    let state = countDraftFromSnapshot(snapshot, null);
+    const [tracked, untracked] = state.draft.lines;
+    state = updateCountQuantity(state, tracked.key, "2");
+    state = updateCountQuantity(state, untracked.key, "2");
+    state = updateCountDisposition(state, tracked.key, "destroyed");
+    const frozen = beginCountAttempt(state, crypto.randomUUID());
+    expect(frozen.attempt).toMatchObject({ payload: { lines: [
+      { qtyCounted: 2, disposition: "destroyed" }, { qtyCounted: 2 },
+    ] } });
+    expect(updateCountDisposition(frozen, tracked.key, "sold")).toBe(frozen);
+    const unknown = failCountAttempt(frozen, "unknown", "No response");
+    expect(updateCountDisposition(unknown, tracked.key, "sold")).toBe(unknown);
+    expect(updateCountQuantity(state, tracked.key, "4").draft.lines[0].disposition).toBe("sold");
+    expect(updateCountQuantity(state, tracked.key, "invalid").draft.lines[0].disposition).toBe("sold");
+  });
+  it("#814 omits destroyed lines from correction requests", () => {
+    let state = correctionStateFromReceipt("count", [
+      { id: "destroyed", sku_name: "Keg", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 5, movement_type: "destruction" },
+      { id: "sold", sku_name: "Keg", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 5, movement_type: "depletion" },
+    ]);
+    expect(updateCorrectionQuantity(state, "destroyed", "6").lines[0].quantity).toBe("5");
+    state = updateCorrectionQuantity(state, "sold", "6");
+    state = updateCorrectionReason(state, "Miscount");
+    expect(beginCorrectionAttempt(state, "request").attempt).toMatchObject({ payload: { corrections: [{ lineId: "sold", qtyCounted: 6 }] } });
+  });
+
   it("freezes a correction request and sends only increased lines on an exact retry", () => {
     const lineIds = [
       "00000000-0000-4000-8000-000000000011",

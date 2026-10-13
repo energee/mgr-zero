@@ -40,7 +40,8 @@ beforeAll(async () => {
   fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${breweryId}'`, true)[0];
 });
 
-async function exactCompletion() {
+async function exactCompletion(setup = { breweryId, brewerCtx, location, fixtureDate }) {
+  const { breweryId, brewerCtx, location, fixtureDate } = setup;
   const { brandId, skuId } = await seedCatalog(breweryId, {
     product: `Loss review ${crypto.randomUUID()}`,
     sku: `Exact case ${crypto.randomUUID()}`,
@@ -64,7 +65,7 @@ async function exactCompletion() {
     runId: run.id, bblDrawn: 0.95, outputs: [{ skuId, qtyActual: 1 }],
     lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);
-  const completion = await runCommand("complete_batch", { batchId: batch.id }, brewerCtx) as { adjustmentId: string; residualBbl: string };
+  const completion = await runCommand("complete_batch", { batchId: batch.id, confirmInTankBbl: Number((await runCommand("get_batch_completion_preview", { batchId: batch.id }, brewerCtx) as { inTankBbl: string }).inTankBbl) }, brewerCtx) as { adjustmentId: string; residualBbl: string };
   return { batchId: batch.id, adjustmentId: completion.adjustmentId, residualBbl: completion.residualBbl, period: adjustmentPeriod(completion.adjustmentId) };
 }
 
@@ -102,7 +103,7 @@ describe("completion loss review", () => {
     await runCommand("record_brew_day", { actuals: [], confirmEmpty: true,
       batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: futureStart,
     }, futureBrewer);
-    const completed = await runCommand("complete_batch", { batchId: batch.id }, futureBrewer) as { adjustmentId: string; closedAt: string };
+    const completed = await runCommand("complete_batch", { batchId: batch.id, confirmInTankBbl: Number((await runCommand("get_batch_completion_preview", { batchId: batch.id }, futureBrewer) as { inTankBbl: string }).inTankBbl) }, futureBrewer) as { adjustmentId: string; closedAt: string };
 
     expect(completed.closedAt.slice(0, 10)).toBe(futureStart);
     const report = await runCommand("generate_compliance_report", {
@@ -279,9 +280,9 @@ describe("completion loss review", () => {
     expect(sql(`select has_table_privilege('authenticated','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text,has_table_privilege('service_role','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text`, true)).toEqual(["false|false"]);
     expect(sql(`select concat_ws('|',
       has_function_privilege('authenticated','get_batch_completion_preview(uuid,uuid)','execute'),
-      has_function_privilege('authenticated','complete_batch(uuid,uuid,uuid)','execute'),
+      has_function_privilege('authenticated','complete_batch(uuid,uuid,uuid,numeric)','execute'),
       has_function_privilege('service_role','get_batch_completion_preview(uuid,uuid)','execute'),
-      has_function_privilege('service_role','complete_batch(uuid,uuid,uuid)','execute'))`, true)).toEqual(["t|t|f|f"]);
+      has_function_privilege('service_role','complete_batch(uuid,uuid,uuid,numeric)','execute'))`, true)).toEqual(["t|t|f|f"]);
     for (const role of ["authenticated", "service_role"]) {
       expectSqlState(`begin; set local role ${role}; truncate volume_adjustment_reclassifications; commit`, "42501");
       expectSqlState(`begin; set local role ${role}; select private.lock_cellar_workflow('${breweryId}'); commit`, "42501");
@@ -357,15 +358,21 @@ describe("completion loss review", () => {
     expect(Number(currentReport.figures.cellarRemovals.sample) - Number(currentBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
     expect(JSON.stringify((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data!.figures)).toBe(frozen);
 
-    const taproom = await exactCompletion();
-    await reattribute(taproom.adjustmentId, "0.01", "taproom");
+    // A previous-month filing must not gate this separate Taproom scenario.
+    const freshBrewery = await makeBrewery();
+    const freshAdmin = await makeStaffCtx(freshBrewery.id, "admin");
+    const freshBrewer = await makeStaffCtx(freshBrewery.id, "brewer");
+    const freshLocation = await seedLocation(freshBrewery.id);
+    const freshDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${freshBrewery.id}'`, true)[0];
+    const taproom = await exactCompletion({ breweryId: freshBrewery.id, brewerCtx: freshBrewer, location: freshLocation, fixtureDate: freshDate });
+    await runCommand("reattribute_loss", { adjustmentId: taproom.adjustmentId, bbl: "0.01", classification: "taproom" }, freshAdmin);
     const report = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, adminCtx) as import("@/lib/commands/compliance").Report;
+    }, freshAdmin) as import("@/lib/commands/compliance").Report;
     expect(report.externalMappingRequired).toEqual(["taproom"]);
     expect(report.warnings.join(" ")).toMatch(/approved external filing-line mapping/i);
     await expect(runCommand("file_compliance_report", {
       jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, adminCtx)).rejects.toThrow(/approved external filing-line mapping/i);
+    }, freshAdmin)).rejects.toThrow(/approved external filing-line mapping/i);
   });
 });
