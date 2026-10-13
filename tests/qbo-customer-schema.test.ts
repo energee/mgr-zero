@@ -1,7 +1,7 @@
 // tests/qbo-customer-schema.test.ts — QuickBooks customer data foundation:
 // the nine customer columns, one-QBO-customer-per-realm uniqueness, and the
 // admin/sales-only snapshot and decision tables. Whether buyers can read the new
-// customer columns is #793's concern and is not asserted here.
+// customer columns is asserted in rls-portal-columns.test.ts (#793 removed the buyer policy).
 import { describe, it, expect } from "vitest";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCustomer, sql } from "./helpers";
 

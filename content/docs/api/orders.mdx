@@ -105,7 +105,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Credit an invoice: negative lines at original prices + return_in movements
+Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Credit an invoice: negative lines at original prices + return_in movements
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -472,7 +472,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason)
+Ship a picked order (refused while any line has no picked count): movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock, and a wholesale line shipped below picked needs a shortReason (saved as the line's short reason); returnable keg lines post Shipped shells and warn, never refuse, when shells are short
 
 | Field | Type | Required |
 | --- | --- | --- |

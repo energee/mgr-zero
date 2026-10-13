@@ -21,9 +21,11 @@ import { Client } from "pg";
 import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import type { BinMoveStock } from "@/lib/commands/inventory";
+import type { Report } from "@/lib/commands/compliance";
 import "@/lib/commands/all";
 
 let b: { id: string };
+let fixtureDate: string;
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let stout: { brandId: string; skuId: string; formatId: string };
 let pils: { brandId: string; skuId: string };
@@ -58,6 +60,7 @@ const insert = async (table: string, row: Record<string, unknown>) => (await ins
 
 beforeAll(async () => {
   b = await makeBrewery();
+  fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${b.id}'`, true)[0];
   ctx = await makeStaffCtx(b.id, "brewer");
   stout = await seedCatalog(b.id, { product: "Stout", sku: "Stout case", bblPerUnit: 0.0645 });
   pils = await seedCatalog(b.id, { product: "Pils", sku: "Pils case", bblPerUnit: 0.0645 });
@@ -355,7 +358,7 @@ describe("closing the run", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-10T14:00:00Z" }, ctx);
     const close = (qtyActual: number) => closeWithConfirmedMaterials({
       runId: run.id, bblDrawn: 1, outputs: [{ skuId: cat.skuId, qtyActual }],
-      lotCode: `L-${label}`, packagedOn: "2026-12-10", locationId: wh.id, binId: wh.binId,
+      lotCode: `L-${label}`, packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx);
     return { runId: run.id, close, adminCtx };
   }
@@ -398,7 +401,7 @@ describe("closing the run", () => {
   });
 
   // A run standing in a tank with `bbl` in it, started and ready to close.
-  async function startedRun(vessel: string, bbl: number, plannedOn: string, on = "2026-11-10") {
+  async function startedRun(vessel: string, bbl: number, plannedOn: string, on = fixtureDate) {
     const { occupancyId } = await brewInto(vessel, stout.brandId, bbl, on);
     const run = (await runCommand("schedule_packaging_run", {
       brandId: stout.brandId, plannedOn, occupancyId,
@@ -414,7 +417,7 @@ describe("closing the run", () => {
     const materialsBefore = sql(`select id::text from material_movements where brewery_id='${b.id}' order by id`, true);
     await expect(closeWithConfirmedMaterials({
       runId, bblDrawn: 1, outputs: [{ skuId: stout.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 3 }],
-      lotCode: "DRAW-GUARD", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+      lotCode: "DRAW-GUARD", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx, { requestId, correlationId: crypto.randomUUID() })).rejects.toThrow(/packaged .* bbl but .* drawn/i);
     expect(sql(`select (closed_at is null and bbl_drawn is null)::text from packaging_runs where id='${runId}'`, true)).toEqual(["true"]);
     expect(sql(`select count(*) from lots where packaging_run_id='${runId}'`, true)).toEqual(["0"]);
@@ -427,7 +430,7 @@ describe("closing the run", () => {
     expect(sql(`select bbl from occupancy_volumes where occupancy_id='${occupancyId}'`, true)).toEqual(["10.000"]);
     await expect(closeWithConfirmedMaterials({
       runId, bblDrawn: 3, outputs: [{ skuId: stout.skuId, qtyActual: 10 }, { skuId: kegSkuId, qtyActual: 3 }],
-      lotCode: "DRAW-GUARD", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+      lotCode: "DRAW-GUARD", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx, { requestId, correlationId: crypto.randomUUID() })).resolves.toMatchObject({ bbl_drawn: 3 });
   });
 
@@ -441,7 +444,7 @@ describe("closing the run", () => {
       await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
       const close = closeWithConfirmedMaterials({
         runId: run.id, bblDrawn: 1, outputs: [{ skuId: cat.skuId, qtyActual: 1 }],
-        lotCode: `PRECISION-${excess}-${index}`, packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId,
+        lotCode: `PRECISION-${excess}-${index}`, packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
       }, ctx);
       if (excess > 0.0005) await expect(close).rejects.toThrow(/packaged .* bbl but .* drawn/i);
       else await expect(close).resolves.toMatchObject({ bbl_drawn: 1 });
@@ -462,7 +465,7 @@ describe("closing the run", () => {
     }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
     const input = { runId: run.id, bblDrawn: draw, outputs: [{ skuId: cat.skuId, qtyActual: 1 }],
-      lotCode: `CANONICAL-${output}`, packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId };
+      lotCode: `CANONICAL-${output}`, packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId };
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
     if (accepted) {
       const closed = await closeWithConfirmedMaterials(input, ctx, execution);
@@ -483,7 +486,7 @@ describe("closing the run", () => {
     const result = await ctx.db.rpc("close_packaging_run", {
       p_brewery: b.id, p_run: runId, p_bbl_drawn: draw as unknown as number,
       p_outputs: [{ sku_id: kegSkuId, qty_actual: 1 }], p_lot_code: `INVALID-${draw}`,
-      p_packaged_on: "2026-12-01", p_best_by: null as unknown as string, p_location: wh.id, p_bin: wh.binId,
+      p_packaged_on: fixtureDate, p_best_by: null as unknown as string, p_location: wh.id, p_bin: wh.binId,
       p_request_id: requestId, p_plan_revision: plan.revision, p_actuals: plan.planned.map(row => ({
         material_id: row.materialId, location_id: wh.id, bin_id: wh.binId, lot_id: null, used: 0, loss: 0, unused: 0,
       })),
@@ -505,7 +508,7 @@ describe("closing the run", () => {
     const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2026-12-01", occupancyId, outputs: [{ skuId: catalog.skuId, qtyPlanned: 10 }] }, ctx) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
     await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: tray, qtyPerUnit: 1 }] }, editor);
-    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 2, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }], lotCode: "CORRECTION", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId }, ctx);
+    await closeWithConfirmedMaterials({ runId: run.id, bblDrawn: 2, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }], lotCode: "CORRECTION", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId }, ctx);
     const yieldBefore = await admin.from("packaging_run_yields").select("*").eq("run_id", run.id).single();
     expect(yieldBefore.data).toMatchObject({ bbl_packaged: 1, loss_bbl: 1 });
     const links = await ctx.db.from("packaging_run_consumptions").select("movement_id").eq("run_id", run.id);
@@ -529,7 +532,7 @@ describe("closing the run", () => {
 
     const closed = (await closeWithConfirmedMaterials({
       runId, bblDrawn: 26, outputs: [{ skuId: stout.skuId, qtyActual: 396 }],
-      lotCode: "L2026-336", packagedOn: "2026-12-01", bestBy: "2027-06-01",
+      lotCode: "L2026-336", packagedOn: fixtureDate, bestBy: "2027-06-01",
       locationId: wh.id, binId: wh.binId,
     }, ctx)) as { closed_at: string; bbl_drawn: string };
     expect(closed.closed_at).toBeTruthy();
@@ -538,7 +541,7 @@ describe("closing the run", () => {
     const lot = (await admin.from("lots").select("id, code, brand_id, packaged_on, best_by")
       .eq("packaging_run_id", runId).single()).data!;
     expect(lot).toMatchObject({
-      code: "L2026-336", brand_id: stout.brandId, packaged_on: "2026-12-01", best_by: "2027-06-01",
+      code: "L2026-336", brand_id: stout.brandId, packaged_on: fixtureDate, best_by: "2027-06-01",
     });
 
     const moves = (await admin.from("inventory_movements")
@@ -577,7 +580,7 @@ describe("closing the run", () => {
     const { runId } = await startedRun("FV-CLOSE-2", 20, "2026-12-02");
     const close = (over: Record<string, unknown> = {}) => closeWithConfirmedMaterials({
       runId, bblDrawn: 10, outputs: [{ skuId: stout.skuId, qtyActual: 100 }],
-      lotCode: `L-${Math.random().toString(36).slice(2, 8)}`, packagedOn: "2026-12-02",
+      lotCode: `L-${Math.random().toString(36).slice(2, 8)}`, packagedOn: fixtureDate,
       locationId: wh.id, binId: wh.binId, ...over,
     }, ctx);
 
@@ -595,7 +598,7 @@ describe("closing the run", () => {
     const noTank = (await runCommand("schedule_packaging_run",
       { brandId: stout.brandId, plannedOn: "2026-12-03", outputs: [] }, ctx)) as { id: string };
     const args = {
-      bblDrawn: 1, outputs: [], lotCode: "L-notank", packagedOn: "2026-12-03",
+      bblDrawn: 1, outputs: [], lotCode: "L-notank", packagedOn: fixtureDate,
       locationId: wh.id, binId: wh.binId,
     };
     await expect(closeWithConfirmedMaterials({ runId: noTank.id, ...args }, ctx))
@@ -605,7 +608,7 @@ describe("closing the run", () => {
     const unstarted = (await runCommand("schedule_packaging_run",
       { brandId: stout.brandId, plannedOn: "2026-12-04", occupancyId, outputs: [] }, ctx)) as { id: string };
     await expect(closeWithConfirmedMaterials(
-      { runId: unstarted.id, ...args, lotCode: "L-nostart", packagedOn: "2026-12-04" }, ctx))
+      { runId: unstarted.id, ...args, lotCode: "L-nostart", packagedOn: fixtureDate }, ctx))
       .rejects.toThrow(/start the run before closing it/);
   });
 
@@ -664,7 +667,7 @@ describe("closing the run", () => {
       { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 2 }, ctx);
     await closeWithConfirmedMaterials({
       runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
-      lotCode: "L-keeps-run", packagedOn: "2026-12-06", locationId: wh.id, binId: wh.binId,
+      lotCode: "L-keeps-run", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx);
 
     // With the run closed, the heel goes out and the tank is freed.
@@ -686,7 +689,7 @@ describe("closing the run", () => {
     if (endError) throw endError;
 
     await expect(closeWithConfirmedMaterials({
-      runId, bblDrawn: 0, outputs: [], lotCode: "L-emptied", packagedOn: "2026-12-06",
+      runId, bblDrawn: 0, outputs: [], lotCode: "L-emptied", packagedOn: fixtureDate,
       locationId: wh.id, binId: wh.binId,
     }, ctx)).rejects.toThrow(/the tank was emptied before this run closed; close runs before transferring the heel out/);
   });
@@ -696,7 +699,7 @@ describe("closing the run", () => {
     await expect(closeWithConfirmedMaterials({
       runId, bblDrawn: 5,
       outputs: [{ skuId: stout.skuId, qtyActual: 100 }, { skuId: stout.skuId, qtyActual: 50 }],
-      lotCode: "L-dupe", packagedOn: "2026-12-07", locationId: wh.id, binId: wh.binId,
+      lotCode: "L-dupe", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx)).rejects.toThrow(/listed twice; give it one line with the total/);
 
     // The whole close is one transaction: nothing of it may survive the refusal.
@@ -710,13 +713,13 @@ describe("closing the run", () => {
     const first = await startedRun("FV-LOT-1", 20, "2026-12-08");
     await closeWithConfirmedMaterials({
       runId: first.runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
-      lotCode: "L-taken", packagedOn: "2026-12-08", locationId: wh.id, binId: wh.binId,
+      lotCode: "L-taken", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx);
 
     const second = await startedRun("FV-LOT-2", 20, "2026-12-09");
     await expect(closeWithConfirmedMaterials({
       runId: second.runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
-      lotCode: "L-taken", packagedOn: "2026-12-09", locationId: wh.id, binId: wh.binId,
+      lotCode: "L-taken", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx)).rejects.toThrow(/lot code "L-taken" is already used/);
   });
 });
@@ -886,7 +889,7 @@ describe("record_repack", () => {
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-20T14:00:00Z" }, ctx);
     await closeWithConfirmedMaterials({
       runId: run.id, bblDrawn: 4, outputs: [{ skuId: caseSku, qtyActual: 10 }],
-      lotCode: "AUDIT-LOT", packagedOn: "2026-12-20", locationId: wh.id, binId: wh.binId,
+      lotCode: "AUDIT-LOT", packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
     }, ctx);
     const [lotId] = sql(`select id from lots where brewery_id = '${b.id}' and code = 'AUDIT-LOT'`);
 
@@ -1077,7 +1080,7 @@ describe("packaging refuses other tenants and other roles", () => {
     }, sales)).rejects.toThrow(/permission denied/);
     await expect(closeWithConfirmedMaterials({
       runId: crypto.randomUUID(), bblDrawn: 1, outputs: [], lotCode: "L-SALES",
-      packagedOn: "2026-11-05", locationId: repackLocationId, binId: repackBinId,
+      packagedOn: fixtureDate, locationId: repackLocationId, binId: repackBinId,
     }, sales)).rejects.toThrow(/permission denied/);
     await expect(runCommand("record_repack", {
       locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
@@ -1092,5 +1095,121 @@ describe("packaging refuses other tenants and other roles", () => {
       locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
       childSkuId: fourPackSkuId, childQty: PER_CASE,
     }, ctx)).rejects.toThrow(/permission denied/);
+  });
+});
+
+// Each case owns its tenant so a filing cannot gate another case's close.
+describe("Packaged on dates the stock (#821)", () => {
+  async function setup() {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const location = await seedLocation(brewery.id);
+    const catalog = await seedCatalog(brewery.id, { bblPerUnit: 0.5 });
+    const [today, tomorrow, previousStart, previousEnd, currentStart, currentEnd] = sql(`select concat_ws('|',
+      (now() at time zone timezone)::date, (now() at time zone timezone)::date + 1,
+      (date_trunc('month', now() at time zone timezone) - interval '1 month')::date,
+      (date_trunc('month', now() at time zone timezone) - interval '1 day')::date,
+      date_trunc('month', now() at time zone timezone)::date,
+      (date_trunc('month', now() at time zone timezone) + interval '1 month - 1 day')::date)
+      from breweries where id='${brewery.id}'`, true)[0].split("|");
+    const vessel = await runCommand("upsert_vessel", { name: "Effective date FV", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
+    const batch = await runCommand("schedule_batch", { plannedOn: previousStart, plannedBbl: 10, intendedBrandId: catalog.brandId }, owner) as { id: string };
+    const brewed = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 10, brewedOn: previousStart }, owner) as { occupancy: { id: string } };
+    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: previousStart, occupancyId: brewed.occupancy.id, outputs: [{ skuId: catalog.skuId, qtyPlanned: 4 }] }, owner) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: `${previousStart}T12:00:00Z` }, owner);
+    const plan = await runCommand("get_packaging_close_plan", { runId: run.id }, owner) as { revision: string };
+    const input = { runId: run.id, bblDrawn: 2, outputs: [{ skuId: catalog.skuId, qtyActual: 4 }],
+      lotCode: "EFFECTIVE", packagedOn: previousStart, locationId: location.id, binId: location.binId, actuals: [], planRevision: plan.revision };
+    return { brewery, owner, run, input, today, tomorrow, previousStart, previousEnd, currentStart, currentEnd, occupancyId: brewed.occupancy.id };
+  }
+
+  function expectNoClose(f: Awaited<ReturnType<typeof setup>>, requestId: string) {
+    expect(sql(`select (closed_at is null and bbl_drawn is null)::text from packaging_runs where id='${f.run.id}';
+      select count(*) from lots where packaging_run_id='${f.run.id}';
+      select count(*) from inventory_movements where ref='${f.run.id}';
+      select count(*) from packaging_material_records where run_id='${f.run.id}';
+      select count(*) from packaging_run_consumptions where run_id='${f.run.id}';
+      select count(*) from material_movements where brewery_id='${f.brewery.id}';
+      select count(*) from packaging_run_outputs where run_id='${f.run.id}' and (qty_actual is not null or movement_id is not null);
+      select count(*) from private.command_requests where request_id='${requestId}';
+      select bbl from occupancy_volumes where occupancy_id='${f.occupancyId}'`, true))
+      .toEqual(["true", "0", "0", "0", "0", "0", "0", "0", "10.000"]);
+  }
+
+  it("dates each production_in by Packaged on, not by when the run closed", async () => {
+    const f = await setup();
+    await runCommand("close_packaging_run", f.input, f.owner);
+    expect(sql(`select concat_ws('|', m.occurred_on, (m.created_at at time zone b.timezone)::date)
+      from inventory_movements m join breweries b on b.id=m.brewery_id
+      where m.ref='${f.run.id}' and m.type='production_in'`, true)).toEqual([`${f.previousStart}|${f.today}`]);
+  });
+
+  it("the report counts the packaged volume in the Packaged-on month", async () => {
+    const f = await setup();
+    await runCommand("close_packaging_run", f.input, f.owner);
+    const previous = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner) as Report;
+    const current = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: f.currentStart, periodEnd: f.currentEnd }, f.owner) as Report;
+    expect(previous.figures.packaged).toBe(2);
+    expect(current.figures.packaged).toBe(0);
+    for (const line of previous.figures.lines) expect(current.figures.lines.find(next => next.class === line.class)?.begin).toBe(line.end);
+  });
+
+  it("refuses Packaged on after today", async () => {
+    const f = await setup();
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", { ...f.input, packagedOn: f.tomorrow }, f.owner, execution)).rejects.toThrow(/after today/);
+    expectNoClose(f, execution.requestId);
+  });
+
+  it("refuses Packaged on inside a filed report period", async () => {
+    const f = await setup();
+    const filed = await runCommand("file_compliance_report", { jurisdiction: "TTB", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner) as { id: string };
+    const before = sql(`select figures::text from report_filings where id='${filed.id}'`, true);
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", f.input, f.owner, execution)).rejects.toThrow(/filed report period/);
+    expectNoClose(f, execution.requestId);
+    expect(sql(`select figures::text from report_filings where id='${filed.id}'`, true)).toEqual(before);
+  });
+
+  it("refuses Packaged on inside a filed state-jurisdiction period", async () => {
+    const f = await setup();
+    await runCommand("file_compliance_report", { jurisdiction: "US-PA", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner);
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", f.input, f.owner, execution)).rejects.toThrow(/filed report period/);
+    expectNoClose(f, execution.requestId);
+  });
+
+  it("refuses Packaged on the last day of a filed period and accepts the next day", async () => {
+    const f = await setup();
+    await runCommand("file_compliance_report", { jurisdiction: "TTB", periodStart: f.previousStart, periodEnd: f.previousEnd }, f.owner);
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", { ...f.input, packagedOn: f.previousEnd }, f.owner, execution)).rejects.toThrow(/filed report period/);
+    expectNoClose(f, execution.requestId);
+    await runCommand("close_packaging_run", { ...f.input, packagedOn: f.currentStart }, f.owner);
+    expect(sql(`select occurred_on from inventory_movements where ref='${f.run.id}'`, true)).toEqual([f.currentStart]);
+  });
+
+  it("accepts Packaged on today in the brewery's timezone, even when UTC is on another day", async () => {
+    const f = await setup();
+    // Pick whichever far-offset zone is on a different calendar day than UTC right now.
+    const [zone] = sql(`select case when (now() at time zone 'Pacific/Kiritimati')::date <> (now() at time zone 'UTC')::date
+      then 'Pacific/Kiritimati' else 'Pacific/Pago_Pago' end`, true);
+    sql(`update breweries set timezone='${zone}' where id='${f.brewery.id}'`);
+    const [localToday, localTomorrow] = sql(`select concat_ws('|', (now() at time zone '${zone}')::date,
+      (now() at time zone '${zone}')::date + 1)`, true)[0].split("|");
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("close_packaging_run", { ...f.input, packagedOn: localTomorrow }, f.owner, execution)).rejects.toThrow(/after today/);
+    expectNoClose(f, execution.requestId);
+    await runCommand("close_packaging_run", { ...f.input, packagedOn: localToday }, f.owner);
+    expect(sql(`select occurred_on from inventory_movements where ref='${f.run.id}'`, true)).toEqual([localToday]);
+  });
+
+  it("an exact retry replays the original close", async () => {
+    const f = await setup();
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const closed = await runCommand("close_packaging_run", f.input, f.owner, execution);
+    expect(await runCommand("close_packaging_run", f.input, f.owner, execution)).toEqual(closed);
+    expect(sql(`select count(*) from lots where packaging_run_id='${f.run.id}'`, true)).toEqual(["1"]);
+    expect(sql(`select count(*) from inventory_movements where ref='${f.run.id}'`, true)).toEqual(["1"]);
   });
 });

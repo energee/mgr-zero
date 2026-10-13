@@ -41,6 +41,7 @@ export type LotTraceViewModel = {
   drawn: string;
   memberBatches: LotTraceRowView[];
   sourceTransfers: LotTraceRowView[];
+  ingredients: (LotTraceRowView & { href?: string; tracked: boolean })[];
   tape: LotTraceTapeView[];
   balances: LotTraceRowView[];
   recipientsEmpty?: string;
@@ -54,6 +55,7 @@ export type LotTraceSnapshot = LotTraceSources & {
   run: { run_no: number | null; bbl_drawn: number | null; vessel: string } | null;
   // The receiving packaging batch; `batches` includes every recorded lineage member.
   batch: { batch_no: number | null; brewed_on: string | null } | null;
+  ingredients: { material_id: string; material: string; lot_id: string | null; code: string | null; unit: string; source: string; qty: number }[];
   movements: { id: string; type: string; qty: number; bbl: number; bin: string; ref: string | null; source_movement_id: string | null; created_at: string; sku: string; location: string }[];
   on_hand_bbl: number;
   warning: string;
@@ -63,6 +65,16 @@ export type LotTraceSnapshot = LotTraceSources & {
 
 const ownedSku = (brand: string, sku: string) =>
   sku.startsWith(`${brand} ·`) ? sku : [brand, sku].filter(Boolean).join(" · ");
+
+/** Both recall directions display the same authorized orders, addresses, shipments and invoices. */
+export function toRecipientViews(recipients: LotTraceSnapshot["recipients"], backHref?: string): LotTraceRecipientView[] {
+  return recipients.map(recipient => ({
+    id: recipient.id, orderNo: recipient.order_no, orderHref: backHref ? `/orders/${recipient.id}` : undefined,
+    customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
+    shipTo: recipient.ship_tos ? `${recipient.ship_tos.label} · ${recipient.ship_tos.address1}, ${recipient.ship_tos.city}, ${recipient.ship_tos.state} ${recipient.ship_tos.zip}` : undefined,
+    shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: `${shipment.carrier ?? "Shipment"} ${shipment.tracking ?? ""}`, invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: invoice.invoice_no, href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
+  }));
+}
 
 export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): LotTraceViewModel {
   const sku = ownedSku(s.lot.brand, s.movements[0]?.sku ?? "");
@@ -76,6 +88,7 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): Lot
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
     memberBatches: s.batches.map(batch => ({ key: batch.id, title: `Batch ${batch.batch_no ?? "?"}`, detail: batch.brewed_on ? `brewed ${calendarDay(batch.brewed_on)}` : "Brew date not recorded" })),
     sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} to ${transfer.to_vessel}`, detail: calendarDay(transfer.at), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
+    ingredients: s.ingredients.map(row => ({ key: `${row.material_id}:${row.lot_id}:${row.source}`, title: row.material, tracked: row.lot_id !== null, detail: `${row.code ?? "Untracked"} · ${row.source} · ${Number(row.qty)} ${row.unit}`, href: backHref && row.lot_id ? `/compliance/material-lots/${row.lot_id}` : undefined })),
     tape: s.movements.map((movement) => ({
       key: movement.id,
       label: `${movement.qty > 0 ? "+" : "−"}${Math.abs(movement.qty)} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)} · ${movement.location}`,
@@ -83,14 +96,7 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, backHref?: string): Lot
     })),
     balances: s.balances.map((balance) => ({ key: `${balance.sku_id}:${balance.bin_id}`, title: ownedSku(s.lot.brand, balance.sku), detail: `${balance.location} · ${balance.bin}`, trailing: `${balance.qty} units · ${bblFixed(balance.bbl)}` })),
     recipientsEmpty: s.recipients.length ? undefined : "No recorded shipments of this lot",
-    recipients: s.recipients.map((recipient) => ({
-      id: recipient.id,
-      orderNo: recipient.order_no,
-      orderHref: backHref ? `/orders/${recipient.id}` : undefined,
-      customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
-      shipTo: recipient.ship_tos ? `${recipient.ship_tos.label} · ${recipient.ship_tos.address1}, ${recipient.ship_tos.city}, ${recipient.ship_tos.state} ${recipient.ship_tos.zip}` : undefined,
-      shipments: recipient.shipments.map((shipment) => ({ id: shipment.id, label: `${shipment.carrier ?? "Shipment"} ${shipment.tracking ?? ""}`, invoices: shipment.invoices.map((invoice) => ({ id: invoice.id, number: invoice.invoice_no, href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
-    })),
+    recipients: toRecipientViews(s.recipients, backHref),
     movements: s.movements.map((movement) => ({
       id: movement.id,
       title: `${movement.qty > 0 ? "+" : ""}${movement.qty} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)}`,

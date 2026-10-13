@@ -30,7 +30,7 @@ breakdown is explanatory and must not be added to `figures.removals`.
 
 `command` · admin, sales
 
-Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a TTB period that is not exactly one calendar month, quarter, or year, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored
+Compute a period report from finished-goods and cellar ledgers (each finished-goods movement counts on its effective date, Packaged on for a packaging close): package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, beer in process, and exact destination-state movement/invoice facts (per-state totals are sums of those facts); nothing is stored
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -167,6 +167,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "trace_lot", "input": { "lotId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## trace_material_lot [#trace_material_lot]
+
+`query` · admin, sales
+
+One ingredient or packaging-material lot: effective consumption in batches and runs, finished lots through recorded blend lineage, actual shipment recipients, and remaining recorded material; corrections reverse prior usage
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `materialLotId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "trace_material_lot", "input": { "materialLotId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## upsert_brand_approval [#upsert_brand_approval]

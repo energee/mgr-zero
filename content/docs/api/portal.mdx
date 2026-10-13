@@ -8,6 +8,10 @@ their own customer's data, and these are the only operations that role can call.
 The scope is enforced server-side, not by which operations the client chooses
 to show.
 
+A portal user sees their customer's id, name, and sale channel, and the prices
+for their own catalog. Customer bookkeeping, tax, license, and payment terms,
+and the brewery's full price grid, are never returned to a portal user.
+
 Portal orders are wholesale orders shipped from the brewery's warehouse, and
 they move through the same lifecycle staff orders do. A portal user drafts,
 updates, and submits. Confirming, picking, and shipping stay with the brewery.

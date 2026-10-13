@@ -5,6 +5,7 @@
 //   DOCS: none     the documentation agent has nothing to do for this PR
 //                  (matched by the workflow with a plain substring test, so
 //                  write exactly that; nothing here parses it)
+//   API: none      the HTTP API agent has nothing to do (same substring test)
 //
 // dropClosed also retires TODO.md items whose linked issue closed as completed,
 // so an issue closed without a `TODO:` line does not leave its item behind.

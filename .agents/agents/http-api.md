@@ -116,7 +116,7 @@ command, run this before calling the work done.
 ## In CI
 
 `.github/workflows/http-api-agent.yml` runs this prompt after every merge to
-`main`, with a narrower reach than you have interactively. There you may edit
+`main` (skipped when the PR body says `API: none`) and weekly, with a narrower reach than you have interactively. There you may edit
 only `content/docs/api/*.mdx`, `components/mgr/screens.tsx` and
 `lib/mgr/api-operations.ts`, and you have no shell. So:
 

@@ -40,7 +40,8 @@ beforeAll(async () => {
   fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${breweryId}'`, true)[0];
 });
 
-async function exactCompletion() {
+async function exactCompletion(setup = { breweryId, brewerCtx, location, fixtureDate }) {
+  const { breweryId, brewerCtx, location, fixtureDate } = setup;
   const { brandId, skuId } = await seedCatalog(breweryId, {
     product: `Loss review ${crypto.randomUUID()}`,
     sku: `Exact case ${crypto.randomUUID()}`,
@@ -357,15 +358,21 @@ describe("completion loss review", () => {
     expect(Number(currentReport.figures.cellarRemovals.sample) - Number(currentBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
     expect(JSON.stringify((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data!.figures)).toBe(frozen);
 
-    const taproom = await exactCompletion();
-    await reattribute(taproom.adjustmentId, "0.01", "taproom");
+    // A previous-month filing must not gate this separate Taproom scenario.
+    const freshBrewery = await makeBrewery();
+    const freshAdmin = await makeStaffCtx(freshBrewery.id, "admin");
+    const freshBrewer = await makeStaffCtx(freshBrewery.id, "brewer");
+    const freshLocation = await seedLocation(freshBrewery.id);
+    const freshDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${freshBrewery.id}'`, true)[0];
+    const taproom = await exactCompletion({ breweryId: freshBrewery.id, brewerCtx: freshBrewer, location: freshLocation, fixtureDate: freshDate });
+    await runCommand("reattribute_loss", { adjustmentId: taproom.adjustmentId, bbl: "0.01", classification: "taproom" }, freshAdmin);
     const report = await runCommand("generate_compliance_report", {
       jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, adminCtx) as import("@/lib/commands/compliance").Report;
+    }, freshAdmin) as import("@/lib/commands/compliance").Report;
     expect(report.externalMappingRequired).toEqual(["taproom"]);
     expect(report.warnings.join(" ")).toMatch(/approved external filing-line mapping/i);
     await expect(runCommand("file_compliance_report", {
       jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
-    }, adminCtx)).rejects.toThrow(/approved external filing-line mapping/i);
+    }, freshAdmin)).rejects.toThrow(/approved external filing-line mapping/i);
   });
 });

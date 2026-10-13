@@ -55,5 +55,5 @@ it("returns complete named bin/customer holdings agreeing with the full keg repo
   expect.soft(report.fleet.total).toBe(out + fleet.rows.reduce((n, r) => n + r.qty, 0));
   const empty = await makeBrewery();
   const emptyCtx = await makeStaffCtx(empty.id, "warehouse");
-  expect(await runCommand("get_keg_fleet", {}, emptyCtx)).toEqual({ pools: [], rows: [], customers: [] });
+  expect(await runCommand("get_keg_fleet", {}, emptyCtx)).toEqual({ pools: [], rows: [], shortages: [], customers: [] });
 }, 60000);

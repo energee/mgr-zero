@@ -7,6 +7,7 @@ import { admin, asUser, channelId, DB, ins, makeBrewery, makeCustomerUser, makeS
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
 import type { TodayItem } from "@/lib/commands/today";
 import { docNo } from "@/lib/mgr/doc-no";
+import type { WorkRow } from "@/lib/commands/landings";
 import "@/lib/commands/all";
 
 const sql = new pg.Pool({ connectionString: DB });
@@ -15,7 +16,7 @@ type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, warehouse: Ctx, brewer: Ctx;
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
-async function createOrder(requested: string, submit = false, confirm = false) {
+async function createOrder(requested: string | null, submit = false, confirm = false) {
   const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: requested, p_po: null, p_note: null,
@@ -63,6 +64,29 @@ describe("get_today (registered reader)", () => {
     expect((await today(warehouse, "2026-09-05T03:00:00Z")).map((i) => i.reason)).toEqual([]);
     expect((await today(warehouse, "2026-09-05T05:00:00Z")).map((i) => i.reason)).toEqual(["pick_due"]);
     expect(forWarehouse[0].dueAt).toBe("2026-09-05T04:00:00+00:00");
+  });
+
+  it("keeps an undated confirmed order always pick due, after dated work (#820)", async () => {
+    const dated = await createOrder("2026-09-05", true, true);
+    const id = await createOrder(null, true, true);
+    const item = (await today(warehouse, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id);
+    expect(item).toMatchObject({
+      reason: "pick_due", subjectType: "order", subjectId: id, dueAt: null,
+      detail: "pick due · no ship date", href: `/orders/${id}`,
+      recipientRoles: ["admin", "warehouse"],
+    });
+    expect((await today(adminCtx, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id)).toEqual(item);
+    for (const ctx of [sales, brewer]) {
+      expect((await today(ctx, "2026-09-05T12:00:00Z")).find((i) => i.subjectId === id)).toBeUndefined();
+    }
+    const picks = (await today(warehouse, "2026-09-05T12:00:00Z")).filter((i) => i.reason === "pick_due");
+    expect(picks.find((i) => i.subjectId === dated)?.dueAt).toBe("2026-09-05T04:00:00+00:00");
+    expect(picks.findIndex((i) => i.subjectId === dated)).toBeLessThan(picks.findIndex((i) => i.subjectId === id));
+    expect(picks.at(-1)?.subjectId).toBe(id);
+    const work = await runCommand("list_work", {}, warehouse) as WorkRow[];
+    expect(work.find((r) => r.href === `/orders/${id}`)).toMatchObject({
+      kind: "orders", verb: "Pick", dueAt: null, detail: "pick due · no ship date",
+    });
   });
 
   it("uses safe labels and MGR hrefs, never customer names", async () => {

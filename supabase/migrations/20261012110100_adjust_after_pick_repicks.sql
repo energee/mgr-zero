@@ -6,7 +6,7 @@
 -- email now fires only on submitted -> confirmed, so a demotion's second
 -- confirmed transition neither emails again nor trips the outbox's unique key.
 -- Bodies copied from 20260923130000_deposits_on_every_order.sql (adjust),
--- 20260927080000_ship_short_reason.sql (ship), 20260925114519 (mark_picked) and
+-- 20261012101000_ship_and_return_keg_events.sql (ship), 20260925114519 (mark_picked) and
 -- 20260928050000_buyer_confirmation_email.sql (trigger function).
 
 alter table public.orders add column repick_since timestamptz;
@@ -172,7 +172,8 @@ CREATE OR REPLACE FUNCTION private.ship_order_impl(p_order uuid, p_ship jsonb, p
 AS $function$
 declare
   o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
-  v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric;
+  v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric; v_pool uuid; v_size public.keg_size;
+  v_drain jsonb; v_warnings jsonb := '[]'::jsonb; v_shells jsonb := '[]'::jsonb;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
   if o.needs_restock then raise exception 'order is waiting for restock'; end if;
@@ -183,6 +184,7 @@ begin
   -- ponytail: serialize ledger consumers globally; use shared per-stock-key
   -- locks in every writer if warehouse write throughput outgrows this lock.
   lock table public.inventory_movements in share row exclusive mode;
+  lock table public.keg_events in share row exclusive mode;
   if jsonb_typeof(p_ship) is distinct from 'array' then raise exception 'ship list must cover every order line exactly once'; end if;
   if jsonb_array_length(p_ship) <> (select count(*) from public.order_lines where order_id = p_order)
      or (select count(distinct (e->>'line_id')::uuid) from jsonb_array_elements(p_ship) e) <> jsonb_array_length(p_ship)
@@ -248,6 +250,37 @@ begin
         insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
         select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric,
           'sale_removal', v_channel, v_tax, v_state, p_order, auth.uid() from jsonb_array_elements(v_sources) e;
+        -- Automatic Shipped alone may overdraw shells: beer must still leave.
+        select s.keg_pool_id, f.keg_size into v_pool, v_size
+          from public.skus s join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+          where s.id=v_line.sku_id and s.brewery_id=o.brewery_id
+            and s.container_source in ('owned_fleet','per_fill_rental');
+        if v_pool is not null then
+          if sp.qty <> trunc(sp.qty) then raise exception 'returnable kegs ship in whole kegs'; end if;
+          v_shells := v_shells || jsonb_build_array(jsonb_build_object('order_line_id',v_line.id,'sku_id',v_line.sku_id,
+            'pool_id',v_pool,'keg_size',v_size,'qty',sp.qty));
+          -- Drain bins holding shells by name. A remainder the bins cannot cover
+          -- stays at the last bin drained; when none held shells, first_bin is
+          -- the existing location fallback, not FG stock. Earlier lines' Shipped
+          -- events are already in the ledger, so the next line sees them.
+          with held as (
+            select bin_id,bin_name,qty,
+                   coalesce(sum(qty) over (order by bin_name,bin_id rows between unbounded preceding and 1 preceding),0) before
+              from private.keg_location_bins(o.brewery_id,o.from_location_id)
+             where pool_id=v_pool and keg_size=v_size and qty>0),
+          taken as (
+            select bin_id,bin_name,least(qty,sp.qty::integer-before) qty from held where before<sp.qty::integer),
+          rest as (
+            select coalesce((select bin_id from taken order by bin_name desc,bin_id desc limit 1),
+                            private.first_bin(o.from_location_id)) bin_id,
+                   sp.qty::integer-coalesce((select sum(qty) from taken),0) qty)
+          select jsonb_agg(jsonb_build_object('bin_id',bin_id,'qty',qty)) into v_drain
+            from (select bin_id,qty from taken union all select bin_id,qty from rest where qty>0) d;
+          insert into public.keg_events(brewery_id,pool_id,keg_size,location_id,bin_id,qty,reason,customer_id,shipment_id,note,created_by)
+            select o.brewery_id,v_pool,v_size,o.from_location_id,(d->>'bin_id')::uuid,(d->>'qty')::integer,'shipped',
+                   o.customer_id,v_shipment,private.doc_no('ORD',o.order_no),auth.uid()
+              from jsonb_array_elements(v_drain) d;
+        end if;
         if v_invoice is not null then
           insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
           select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
@@ -269,6 +302,19 @@ begin
         where source = 'order_line' and ref = sp.line_id and status = 'open';
     end if;
   end loop;
+  -- Reconcile the net location balance, not only the bins we could drain.
+  -- An older negative bin remains a shortfall even when another bin held enough.
+  -- Saved structured so Shipment done and Keg fleet print one wording
+  -- (kegShortageText in lib/mgr/keg-fleet-view.ts).
+  select coalesce(jsonb_agg(jsonb_build_object('pool',p.name,'keg_size',n.keg_size,'location',l.name,'short',-n.qty)
+                            order by p.name,n.keg_size),'[]'::jsonb) into v_warnings
+    from (select k.pool_id,k.keg_size,sum(k.qty) qty from private.keg_location_bins(o.brewery_id,o.from_location_id) k
+           where (k.pool_id,k.keg_size) in (select pool_id,keg_size from public.keg_events
+                                             where brewery_id=o.brewery_id and shipment_id=v_shipment and reason='shipped')
+           group by 1,2) n
+    join public.keg_pools p on p.id=n.pool_id and p.brewery_id=o.brewery_id
+    join public.locations l on l.id=o.from_location_id and l.brewery_id=o.brewery_id
+   where n.qty<0;
   -- anything picked but held back is staged on the floor: put it back
   update public.orders
      set status = 'shipped', shipped_at = now(),
@@ -279,7 +325,7 @@ begin
    where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'shipped',
-          jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice));
-  return jsonb_build_object('order_id', p_order, 'invoice_id', v_invoice);
+          jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice, 'warnings', v_warnings, 'keg_shells', v_shells));
+  return jsonb_build_object('order_id', p_order, 'invoice_id', v_invoice, 'warnings', v_warnings);
 end $function$;
 

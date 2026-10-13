@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
-import { countBrandComparison, projectionExpectedText, projectionMatchesCountDraft, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
+import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
@@ -53,15 +53,17 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
   </>;
 }
 
-export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, timeZone, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onSubmit }: {
+export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, timeZone, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onDisposition, onSubmit }: {
   state: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>; timeZone: string; priorHref?: string; print?: ReactNode;
   projectionBusy?: boolean; projectionError?: string | null; onRefreshExpected?: () => void; onRefreshSnapshot?: () => void;
+  onDisposition?: (key: string, value: "sold" | "destroyed") => void;
   onQuantity?: (key: string, value: string) => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const [internalState, setInternalState] = useState(controlledState);
   const state = onQuantity ? controlledState : internalState;
   const changeQuantity = onQuantity ?? ((key: string, value: string) => setInternalState(current => updateCountQuantity(current, key, value)));
-  const locked = state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
+  const changeDisposition = onDisposition ?? ((key: string, value: "sold" | "destroyed") => setInternalState(current => updateCountDisposition(current, key, value)));
+  const locked = countLocked(state);
   const aligned = projectionMatchesCountDraft(state);
   const projection = state.projection as { expected_bbl: number | null; starts_at?: string | null; as_of?: string; reason?: string | null; unmapped_lines?: number; ignored_lines?: number; excluded_bbl?: number; unattributed_bbl?: number; coverage_complete?: boolean } | null;
   const expected = projectionExpectedText(projection ?? { expected_bbl: null });
@@ -93,7 +95,7 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
           const lot = line.lotId ? (role === "taproom" ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
-          return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}</div>;
+          return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}{isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}</div>;
         })}
       </fieldset>
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}
@@ -136,7 +138,8 @@ export function WeeklyCountCorrectionView({ state: controlledState, open: contro
           <p className="font-medium">{line.sku_name ?? "Saved SKU"}</p>
           <p className="text-sm text-muted-foreground">{line.bin_name ?? "Saved bin"} · saved row {index + 1} · {line.lot_id ? `tracked lot ${line.lot_id}` : "untracked stock"} · counted {line.qty_counted} · recorded before {line.qty_before}</p>
         </div>
-        {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.qty_counted === line.qty_before, min: line.qty_counted, max: line.qty_before, step: "1", inputMode: "numeric" })}
+        {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.movement_type === "destruction" || line.qty_counted === line.qty_before, min: line.qty_counted, max: line.qty_before, step: "1", inputMode: "numeric" })}
+        {line.movement_type === "destruction" && <p className="text-sm text-muted-foreground">Destroyed shortages cannot be corrected.</p>}
       </div>)}
       <div className="flex flex-col gap-1">
         <Label htmlFor={`correction-reason-${state.countId}`}>Reason</Label>

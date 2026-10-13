@@ -126,7 +126,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "check_in_refused_return", description: "Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",
+  name: "check_in_refused_return", description: "Full returnable kegs coming back with beer also post Returned shells. Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit",
   roles: [...ROLES],
   input: z.object({ deliveryId: z.string().uuid(), locationId: z.string().uuid(), lines: z.array(z.object({
     orderLineId: z.string().uuid(), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().int().positive(), damaged: z.boolean() })).min(1),

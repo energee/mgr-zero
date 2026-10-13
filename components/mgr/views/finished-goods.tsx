@@ -26,6 +26,7 @@ export function FinishedGoodsView({
   return (
     <>
       {E.back("Beer", "Finished goods", createAction !== undefined ? createAction : E.btn("Add SKU"), model.backHref)}
+      {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
       {afterHeader}
       {model.empty
         ? E.blank(model.empty)

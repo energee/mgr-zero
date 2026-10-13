@@ -39,7 +39,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer, warehouse
 
-Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed
+Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed; the production_in stock is dated Packaged on, which may not be after today or inside a filed report period
 
 | Field | Type | Required |
 | --- | --- | --- |

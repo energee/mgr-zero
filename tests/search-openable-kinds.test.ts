@@ -20,6 +20,6 @@ describe("openableKinds", () => {
     expect(openableKinds(ctxFor("warehouse"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "customer", "po"]);
   });
   it("sales cannot open purchase orders or batches", () => {
-    expect(openableKinds(ctxFor("sales"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "lot", "customer"]);
+    expect(openableKinds(ctxFor("sales"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "lot", "customer", "material_lot"]);
   });
 });

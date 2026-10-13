@@ -37,6 +37,8 @@ removals = ending. Rules that v1 got wrong at least once:
   month it was ordered or allocated. Beginning/ending inventory key on the same date, so
   a filed month is never rewritten by a later fulfilment. Store the filed snapshot
   (`report_filings`).
+- Production into finished goods belongs to the Packaged-on month; packaging cannot
+  be dated into a filed month or after today.
 - Zero cells print as `0.00`, never blank.
 - The cellar column is the one identity exemption: beer leaves the cellar by being
   packaged, which is not a removal; its balance is carried on the beer-in-process line.
@@ -63,4 +65,4 @@ Yeast health is modeled as a daily decay: liquid yeast loses roughly 2% of its v
 
 ### Blended lot trace membership
 
-Lot trace lists batches reachable through recorded incoming transfers before packaging. At each upstream step, only transfers that preceded that tank's outgoing leg qualify. Returning through a tank at an earlier time is valid; identical occupancy, transfer and cutoff states are visited only once. The trace shows original transfer quantities, not percentages or estimated component shares. The forward batch-to-lot recall uses the same membership rule.
+Lot trace lists batches reachable through recorded incoming transfers before packaging. At each upstream step, only transfers that preceded that tank's outgoing leg qualify. Returning through a tank at an earlier time is valid; identical occupancy, transfer and cutoff states are visited only once. The trace shows original transfer quantities, not percentages or estimated component shares. The forward batch-to-lot recall uses the same membership rule. Material-lot recall follows effective consumption from all current brew-turn records, cellar additions and packaging runs. Exact compensated consumption is excluded. Upstream ingredients must precede the transfer that carried their batch onward; later additions cannot affect an earlier packaged lot. Ingredient quantities are recorded usage, not proportional blend attribution.
