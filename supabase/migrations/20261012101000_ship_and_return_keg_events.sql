@@ -337,12 +337,18 @@ end $$;
 
 -- Keg fleet's reconciliation flags: every pool, size and location whose bins
 -- net below zero. Built on keg_bin_on_hand, so the caller's staff scope
--- applies and the arithmetic matches private.keg_location_bins.
+-- applies and the arithmetic matches private.keg_location_bins. The balances
+-- are summed first (materialized) and names joined onto the few short rows:
+-- joined row by row, the planner re-scanned keg_bin_on_hand_rows per pool and
+-- the paged read timed out at 1000 pools (tests/keg-fleet-complete.test.ts).
 create view public.keg_location_shortages with (security_invoker = true) as
-  select h.brewery_id,h.pool_id,p.name pool,h.keg_size,h.location_id,l.name location,(-sum(h.qty))::integer short
-    from public.keg_bin_on_hand h
-    join public.keg_pools p on p.id=h.pool_id and p.brewery_id=h.brewery_id
-    join public.locations l on l.id=h.location_id and l.brewery_id=h.brewery_id
-   group by h.brewery_id,h.pool_id,p.name,h.keg_size,h.location_id,l.name
-  having sum(h.qty)<0;
+  with net as materialized (
+    select h.brewery_id,h.pool_id,h.keg_size,h.location_id,sum(h.qty) qty
+      from public.keg_bin_on_hand h
+     group by h.brewery_id,h.pool_id,h.keg_size,h.location_id
+    having sum(h.qty)<0)
+  select n.brewery_id,n.pool_id,p.name pool,n.keg_size,n.location_id,l.name location,(-n.qty)::integer short
+    from net n
+    join public.keg_pools p on p.id=n.pool_id and p.brewery_id=n.brewery_id
+    join public.locations l on l.id=n.location_id and l.brewery_id=n.brewery_id;
 grant select on public.keg_location_shortages to authenticated;
