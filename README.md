@@ -135,7 +135,8 @@ never used outside local development). A customer-only account (a
 `customer_users` row with no `brewery_users` row) lands on `/portal` instead
 of `/` after login — that's the wholesale customer portal, not a bug.
 
-Importing from Lolev Manager (catalog and recipes; `docs/plans/lolev-import.md`):
+Importing from Lolev Manager (catalog and recipes; `docs/plans/lolev-import.md`).
+Temporary: this script and section go away once the migration is done ([#867](https://github.com/energee/mgr-zero/issues/867)).
 point `scripts/import-lolev.ts` at a Lolev `mongodump` directory and sign in as
 an admin or brewer of the target brewery. It writes only through the existing
 material, water-profile and recipe commands (named in the script's header),

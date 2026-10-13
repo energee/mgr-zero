@@ -1,3 +1,4 @@
+// TEMPORARY: one-off Lolev migration code. Delete with the rest of the import once the migration is done (#867).
 // scripts/import-lolev.ts — imports the Lolev Manager catalog and recipes into
 // one MGR brewery (docs/plans/lolev-import.md, pass 1). Reads a mongodump with
 // `bsondump`, maps it with lib/import/lolev.ts, and writes only through the

@@ -1,6 +1,6 @@
 # Lolev import — catalog and recipes (pass 1)
 
-Status: draft, awaiting approval. Branch `feat/lolev-import`, worktree
+Status: approved and implemented in #866. Temporary: the import code is removed once the migration is done (#867). Branch `feat/lolev-import`, worktree
 `.agents/worktrees/feat-lolev-import`.
 
 ## Goal

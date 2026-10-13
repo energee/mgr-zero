@@ -38,6 +38,10 @@ Square D7 acceptance, QuickBooks/Slack verification, real email acceptance and
 scheduler/pruning. Agents prepare checklists and verify read-only after the
 user's changes. Hosted writes and deploys wait for the user.
 
+## Temporary code to remove
+
+- [ ] [#867](https://github.com/energee/mgr-zero/issues/867) — Remove the Lolev import code after the migration: `lib/import/lolev.ts`, `scripts/import-lolev.ts`, `tests/lolev-import.test.ts`, `tests/lolev-import-db.test.ts` and the README section.
+
 ## Deferred
 
 D8 defers live water-salt suggestions. D9 defers purchase-unit count conversion.

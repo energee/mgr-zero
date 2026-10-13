@@ -1,3 +1,4 @@
+// TEMPORARY: one-off Lolev migration code. Delete with the rest of the import once the migration is done (#867).
 // Pure tests for lib/import/lolev.ts: Lolev Manager documents → MGR command
 // inputs. Synthetic fixtures only; no database.
 import { describe, expect, it } from "vitest";

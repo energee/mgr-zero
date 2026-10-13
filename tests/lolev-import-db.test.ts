@@ -1,3 +1,4 @@
+// TEMPORARY: one-off Lolev migration code. Delete with the rest of the import once the migration is done (#867).
 // tests/lolev-import-db.test.ts — scripts/import-lolev.ts against the test
 // database: a synthetic Lolev dump goes through the real commands, lands as
 // materials, water profiles, recipes and version-1 ingredients with per-bbl

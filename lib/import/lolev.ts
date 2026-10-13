@@ -1,3 +1,4 @@
+// TEMPORARY: one-off Lolev migration code. Delete with the rest of the import once the migration is done (#867).
 // lib/import/lolev.ts — maps Lolev Manager (Payload CMS on MongoDB) documents
 // to the inputs of MGR's existing commands: upsert_material,
 // upsert_water_profile, create_recipe and create_recipe_version. Pure: no I/O
