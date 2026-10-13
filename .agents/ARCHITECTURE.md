@@ -166,8 +166,10 @@ a gap to close, not a convention to trust.
    A definer projection is never inlined, so a filter on its view runs after
    every caller row is built; single-row reads pass an id to the rows function
    instead (`portal_order_rows(p_order)`).
-   Still open (#793): `customers`, `brands`, `formats` and `channel_prices`
-   keep customer policies that expose whole rows.
+   Buyers read customer identity through `portal_customers` (`id`,
+   `brewery_id`, `name`, `sale_channel_id`). Membership discovery uses this
+   projection too, not a base-table embed. `customers`, `brands`, `formats`
+   and `channel_prices` have no customer SELECT policies (#793).
    QuickBooks customer reconciliation adds nine `customers` columns (billing
    email, phone, five billing-address parts, `qbo_sync_token`, `qbo_sync_state`)
    and the `qbo_customer_snapshots` and `qbo_customer_decisions` tables. The
@@ -176,11 +178,10 @@ a gap to close, not a convention to trust.
    with privileged SQL. A unique index allows one QuickBooks customer per MGR
    customer within a brewery and realm; legacy rows with a NULL realm sit
    outside that uniqueness. The new `customers` columns are not admin/sales
-   only: until #793 lands, a buyer can read them on their own customer row, and
-   warehouse already reads whole `customers` rows (`list_customers` and
-   `get_customer` select `*`) through the existing staff policy, so it now sees
-   these columns too. That is inherited access, not a new role grant. This work
-   must not reach main before the #793 fix.
+   only: warehouse already reads whole `customers` rows (`list_customers` and
+   `get_customer` select `*`) through the existing staff policy, so it sees
+   these columns too. That is inherited access, not a new role grant. A buyer
+   cannot read them: the customer policy on `customers` is gone (#793).
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none

@@ -132,12 +132,21 @@ describe("customers and orders carry the channel", () => {
     expect(priced.map(s => s.id)).toContain(cat.skuId);
     expect(await runCommand("list_skus", { saleChannelId: await channelId(b.id, "DTC") }, ctx)).toEqual([]);
   });
-  it("a portal customer reads only its own channel's cells", async () => {
+  it("a portal customer reads only its own channel prices through the portal projection", async () => {
+    const foreignCell = await setCell(taproom, group, 700);
+    expect(foreignCell.error).toBeNull();
     const cust = await seedCustomer(b.id, { name: "Portal Co" });
     const email = (await makeCustomerUser(cust.customerId)).email; const db = await asUser(email);
-    const cells = await db.from("channel_prices").select("sale_channel_id");
-    expect(cells.data!.every((r) => r.sale_channel_id === wholesale)).toBe(true);
-    expect(cells.data!.length).toBeGreaterThan(0);
+    const base = await db.from("channel_prices").select("sale_channel_id");
+    expect(base.error).toBeNull();
+    expect(base.data).toEqual([]);
+    const prices = await db.from("portal_sku_prices").select("sale_channel_id, sku_id, unit_price_cents");
+    expect(prices.error).toBeNull();
+    expect(prices.data!.every((r) => r.sale_channel_id === wholesale)).toBe(true);
+    expect(prices.data).toContainEqual({ sale_channel_id: wholesale, sku_id: cat.skuId, unit_price_cents: 13500 });
+    const foreign = await db.from("portal_sku_prices").select("sku_id").eq("sale_channel_id", taproom);
+    expect(foreign.error).toBeNull();
+    expect(foreign.data).toEqual([]);
     const chans = await db.from("sale_channels").select("id"); expect(chans.data).toEqual([]);
   });
 });
