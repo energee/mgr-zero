@@ -174,7 +174,7 @@ SKU/location; materialize only if it measurably slows.
 count happened, so a count is a durable occurrence: `taproom_counts` with
 `taproom_count_lines`, both in `00001_baseline.sql`. `record_taproom_count`,
 `get_taproom_count_snapshot` and `correct_taproom_count` are registered in
-`lib/commands/taproom.ts`. A shortage posts exact-lot depletion whether or not
+`lib/commands/taproom.ts`. A shortage posts exact-lot sold depletion by default, or destruction when explicitly classified, whether or not
 Square is connected; the movement ledger remains append-only.
 
 DTC readiness: channel enum + dest_state already captured; per-customer annual volume is a query, not new schema.

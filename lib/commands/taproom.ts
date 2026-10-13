@@ -247,13 +247,14 @@ defineQuery({
   handler: (ctx, i) => unwrap(ctx.db.rpc("list_taproom_counts", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineCommand({
-  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused",
+  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages post sold depletion by default or destruction when explicitly classified. Stale, incomplete, duplicate and overcounts are refused",
   input: z.object({ locationId: z.string().uuid(), countedOn: z.string().date(), revision: z.string().min(1),
-    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative() })) }),
+    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative(), disposition: z.enum(["sold", "destroyed"]).optional() })) }),
   roles: [...COUNT_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
-    p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted })), p_request_id: execution.requestId,
+    // Omit the default key so pre-disposition requests retain their exact replay hash.
+    p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted, ...(l.disposition === "destroyed" ? { disposition: "destroyed" } : {}) })), p_request_id: execution.requestId,
   })),
 });
 defineCommand({
