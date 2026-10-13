@@ -111,6 +111,17 @@ describe("New Order SKU picker guide", () => {
   });
 });
 
+// #819: channel-price rows set one cell last-write-wins (set_channel_price), so
+// the CSV import paragraph must not claim the earlier row wins a price cell.
+describe("CSV import collision guide", () => {
+  it("says the last row sets a shared price cell, never the earlier row", () => {
+    const para = read("content/docs/staff-guide.mdx").split("\n").find((line) => line.startsWith("Reference cells accept"));
+    expect(para).toBeDefined();
+    expect(para).not.toMatch(/same price cell[^.]*earlier row wins/);
+    expect(para).toMatch(/last row sets that cell's price/);
+  });
+});
+
 // Process guards from the 2026-10-10 docs reconciliation. Each one catches a
 // class of drift that had piled up unnoticed: dead paths in the agent entry
 // docs, specs still saying to edit the baseline migration, and env names the
