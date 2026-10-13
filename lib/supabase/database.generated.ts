@@ -7467,6 +7467,46 @@ export type Database = {
         }
         Relationships: []
       }
+      order_line_cogs: {
+        Row: {
+          brewery_id: string | null
+          cost_cents: number | null
+          order_id: string | null
+          qty: number | null
+          sku_id: string | null
+          uncosted_qty: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "atp"
+            referencedColumns: ["sku_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "sku_prices"
+            referencedColumns: ["sku_id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
+            columns: ["sku_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "skus"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
       packaging_run_requirements: {
         Row: {
           brewery_id: string | null
