@@ -61,10 +61,12 @@ export function mapMaterials(catalog: LolevCatalog): { materials: MaterialInput[
   const byName = new Map<string, MaterialInput>();
   const byLolevId = new Map<string, string>();
   const add = (doc: Doc, m: Omit<MaterialInput, "name" | "purchaseUom" | "purchaseUomFactor">) => {
-    byLolevId.set(doc._id, doc.name);
-    if (byName.has(doc.name)) return; // same variety, another lot: one material
+    // Trimmed: upsert_material trims too, so "Chinook " and "Chinook" are one name.
+    const name = doc.name.trim();
+    byLolevId.set(doc._id, name);
+    if (byName.has(name)) return; // same variety, another lot: one material
     const { extractPotential, ...rest } = m;
-    byName.set(doc.name, { name: doc.name, ...rest, purchaseUom: m.baseUom, purchaseUomFactor: 1, ...(extractPotential === undefined ? {} : { extractPotential }) });
+    byName.set(name, { name, ...rest, purchaseUom: m.baseUom, purchaseUomFactor: 1, ...(extractPotential === undefined ? {} : { extractPotential }) });
   };
   // Malt: 46 PPG (sucrose) times the grind yield.
   for (const d of catalog.malts) add(d, { category: "malt", baseUom: "lb", extractPotential: d.yieldOnGrind ? potential(1 + 0.046 * d.yieldOnGrind / 100) : undefined });
@@ -178,7 +180,7 @@ export function mapRecipes(recipes: LolevRecipe[], byLolevId: Map<string, string
       : null;
 
     out.push({
-      lolevId: r._id, name: r.name,
+      lolevId: r._id, name: r.name.trim(), // trimmed before the duplicate check: recipe names are unique per brewery
       note: `${typeof r.notes === "string" && r.notes ? `${r.notes}\n` : ""}Imported from Lolev recipe ${r._id}`,
       sourceProfile,
       version: {

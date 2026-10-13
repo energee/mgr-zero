@@ -71,6 +71,13 @@ describe("mapMaterials", () => {
     expect(byLolevId.get("h2")).toBe("Zeta");
   });
 
+  it("trims names, so a trailing space does not make a second material", () => {
+    const { materials: ms, byLolevId: ids } = mapMaterials({ malts: [], yeasts: [], sugars: [], adjuncts: [],
+      hops: [{ _id: "c1", name: "Chinook" }, { _id: "c2", name: "Chinook " }] });
+    expect(ms.filter((m) => m.category === "hop").map((m) => m.name)).toEqual(["Chinook"]);
+    expect(ids.get("c2")).toBe("Chinook");
+  });
+
   it("omits an extract potential outside the command's bounds", () => {
     const { materials: ms } = mapMaterials({ malts: [], hops: [], yeasts: [], adjuncts: [], sugars: [{ _id: "s9", name: "Odd", ppg: 400 }] });
     expect(ms.find((m) => m.name === "Odd")!.extractPotential).toBeUndefined();
@@ -199,5 +206,13 @@ describe("mapRecipes", () => {
       recipe({ _id: "new", createdAt: "2025-05-06T10:00:00.000Z" }),
     ], byLolevId, catalog.yeasts);
     expect(recipes.map((r) => [r.lolevId, r.name])).toEqual([["old", "Test IPA (2024-03-04)"], ["new", "Test IPA"]]);
+  });
+
+  it("trims recipe names before finding duplicates", () => {
+    const { recipes } = mapRecipes([
+      recipe({ _id: "old", name: "Test IPA ", createdAt: "2024-03-04T10:00:00.000Z" }),
+      recipe({ _id: "new", createdAt: "2025-05-06T10:00:00.000Z" }),
+    ], byLolevId, catalog.yeasts);
+    expect(recipes.map((r) => r.name)).toEqual(["Test IPA (2024-03-04)", "Test IPA"]);
   });
 });
