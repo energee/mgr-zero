@@ -8,7 +8,7 @@ import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { kegEventUnavailable, toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { kegShortageText, kegEventUnavailable, toKegFleetViewProps, type KegShortage } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { KegEventForm } from "./event-form";
 import { money } from "@/lib/mgr/money";
@@ -18,6 +18,7 @@ import { PoolForm, type Pool } from "./pool-form";
 type Fleet = {
   pools: (Pool & { vendor_id: string | null })[];
   rows: { pool_id: string; keg_size: string; location_name: string; bin_name: string; qty: number }[];
+  shortages: KegShortage[];
   customers: { customer_id: string; name: string; kegs_out: number }[];
 };
 type Named = { id: string; name: string };
@@ -39,6 +40,7 @@ export default async function KegsPage() {
     <KegFleetView
       model={toKegFleetViewProps({
         backHref: "/inventory",
+        shortages: fleet.shortages.map(kegShortageText),
         pools: fleet.pools.map((p) => {
           const rows = fleet.rows.filter((r) => r.pool_id === p.id && r.qty !== 0);
           const total = rows.reduce((n, r) => n + r.qty, 0);

@@ -16,7 +16,7 @@ puts it back, even after the route has returned.
 
 `command` · admin, warehouse
 
-Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit
+Full returnable kegs coming back with beer also post Returned shells. Physically check in refused on-delivery beer at its shipped source lot; damaged quantities also post loss, without a credit
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -144,7 +144,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction
+Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction
 
 | Field | Type | Required |
 | --- | --- | --- |
