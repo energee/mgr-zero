@@ -39,20 +39,20 @@ defineCommand({
 });
 
 defineCommand({
-  name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format",
-  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: upc.optional() }),
+  name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format; optional keg pool supplies the per-keg deposit",
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
-    p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null,
   })),
 });
 
 defineCommand({
-  name: "update_sku", description: "Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional() }),
+  name: "update_sku", description: "Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
+  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
-    p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null, p_clear_keg_pool: i.kegPoolId === null,
   })),
 });
 
@@ -306,7 +306,7 @@ defineQuery({
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const [brands, pours] = await Promise.all([
-      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId).order("name")),
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);

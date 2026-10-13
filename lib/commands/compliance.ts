@@ -2,10 +2,11 @@
 // COLA/formula approvals and state registrations per brand and the brewery's
 // state licenses. A period report is generated from the movement ledger on
 // demand and filed as an immutable jsonb snapshot; MGR never transmits a
-// filing. trace_lot follows a finished-goods lot back to its batch and through
-// every ledger movement that names it.
+// filing. trace_lot follows a finished-goods lot back through recorded blend
+// membership and every ledger movement that names it.
 import { z } from "zod";
 import { periodKey } from "@/lib/compliance-period";
+import type { LotTraceSources } from "@/lib/mgr/lot-trace-view";
 import { isoDate } from "./packaging";
 import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
@@ -191,13 +192,14 @@ type LotRow = {
 type LotMovement = { id: string; type: string; qty: number; bbl: number; sku_id: string; bin_id: string; ref: string | null; source_movement_id: string | null; created_at: string; skus: { name: string } | null; bins: { name: string } | null; locations: { name: string } | null };
 
 defineQuery({
-  name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand",
+  name: "trace_lot", description: "One finished-goods lot: its packaging run, member batches and recorded transfers before packaging, every ledger movement that names the lot, and units still on hand; membership is not a proportional share",
   roles: [...ROLES],
   input: z.object({ lotId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const lot = await unwrap(ctx.db.from("lots")
       .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
       .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
+    const sources = await unwrap(ctx.db.rpc("trace_lot_sources", { p_brewery: ctx.breweryId, p_lot: i.lotId })) as unknown as LotTraceSources;
     const movements = await completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as LotMovement[];
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
@@ -217,6 +219,7 @@ defineQuery({
       lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
       run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, vessel: occ?.vessels?.name ?? "" } : null,
       batch: occ?.batches ?? null,
+      ...sources,
       movements: moves,
       balances: [...balances.values()], on_hand_bbl: moves.reduce((n, m) => n + m.bbl, 0), recipients,
       // Compatibility only when all units are the same SKU; never sum package units.
