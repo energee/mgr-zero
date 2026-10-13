@@ -65,6 +65,18 @@ describe("import_csv rows", () => {
     expect(cell.error).toBeNull();
     expect(cell.data?.unit_price_cents).toBe(250);
   });
+  it("keeps all-name price files concurrent across distinct cells (#819)", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    // Positions 100+ stay clear of the groups other tests pin at low positions.
+    const groups: string[] = [];
+    for (const i of [0, 1, 2]) groups.push(await seedPriceGroup(ctx.breweryId, `Named ${tag} ${i}`, 100 + i));
+    const formatRow = await admin.from("formats").select("name").eq("id", format).single();
+    expect(formatRow.error).toBeNull();
+    const rows = groups.map((_, i) => ({ saleChannelId: "Wholesale", priceGroupId: `named ${tag} ${i}`, formatId: formatRow.data!.name, unitPriceCents: String(100 + i) }));
+    const { result, peak } = await concurrentImport("channel_prices", rows, row => row === 0);
+    expect(result.committed).toBe(3);
+    expect(peak, "distinct named cells ran concurrently").toBeGreaterThan(1);
+  });
   it("opening balance replay never appends again", async () => {
     const row = { skuId: sku, locationId: location, binId: bin, qty: "12.5" }; const id = crypto.randomUUID();
     const first = await execute("opening_balances", [row], id); expect(first.committed).toBe(1);

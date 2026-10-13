@@ -61,9 +61,9 @@ block the row; use the UUID to distinguish duplicate names. Bin names resolve
 within the row's location; pour formats resolve within its price group. Product
 imports accept packaged formats only. Create missing references before importing.
 Raw cell strings remain part of request identity; replacing a name with its UUID
-is changed input, not an unchanged retry. Channel-price files with any named
-reference run in file order, including mixed UUID/name rows; the final row wins
-when several rows target the same cell. Product imports reuse an existing brand without
+is changed input, not an unchanged retry. Channel-price files run in file order
+when a reference column mixes UUIDs and names; the final row wins when several
+rows target the same cell. Product imports reuse an existing brand without
 changing its metadata and create the SKU in the same row transaction. Duplicate
 customer/SKU creation is blocked; channel-price rows set the existing grid cell.
 Opening quantities are positive SKU-unit quantities with a bin belonging to the

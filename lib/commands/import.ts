@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineCommand, unwrap } from "./registry";
-import { IMPORT_KINDS, IMPORT_ROW_CAP, importRowKey, validateImportRow, type ImportOutcome } from "@/lib/import-csv";
+import { IMPORT_KINDS, IMPORT_ROW_CAP, PRICE_REFERENCE_FIELDS, importRowKey, validateImportRow, type ImportOutcome } from "@/lib/import-csv";
 
 // Imports preserve raw batch identity while resolving existing references per atomic row.
 // Concurrent row RPCs per import. ponytail: fixed; raise it if a 5000-row import is still slow.
@@ -24,10 +24,12 @@ defineCommand({
     // Rows sharing importRowKey run in file order; distinct keys run IMPORT_CONCURRENCY at a time (#758).
     // A UPC can collide across products, so a products file with any UPC runs entirely in order.
     const anyUpc = input.kind === "products_skus" && input.rows.some(r => r.upc?.trim());
-    // A named reference and its UUID can identify the same price cell under different raw keys.
-    const anyName = input.kind === "channel_prices" && input.rows.some(row =>
-      ["saleChannelId", "priceGroupId", "formatId"].some(field => !z.uuid().safeParse(row[field]?.trim()).success));
-    const queues = [...Map.groupBy(input.rows.keys(), row => anyUpc || anyName ? "" : importRowKey(input.kind, input.rows[row], row)).values()];
+    // A name and its UUID can identify the same price cell under different keys, so a
+    // price file runs in order when any reference column mixes names and UUIDs.
+    const isUuid = (value?: string) => z.uuid().safeParse(value?.trim()).success;
+    const mixedRefs = input.kind === "channel_prices" && PRICE_REFERENCE_FIELDS.some(field =>
+      input.rows.some(row => isUuid(row[field])) && input.rows.some(row => !isUuid(row[field])));
+    const queues = [...Map.groupBy(input.rows.keys(), row => anyUpc || mixedRefs ? "" : importRowKey(input.kind, input.rows[row], row)).values()];
     // After one row RPC throws, stop starting rows: the command fails, and rows
     // committed after its error would be invisible to the caller.
     let failed = false, next = 0;

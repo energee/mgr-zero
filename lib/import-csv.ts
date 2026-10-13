@@ -12,6 +12,8 @@ export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
   channel_prices: [{ name: "saleChannelId", required: true, lookup: "channels" }, { name: "priceGroupId", required: true, lookup: "groups" }, { name: "formatId", required: true, lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
   opening_balances: [{ name: "skuId", required: true, lookup: "skus" }, { name: "locationId", required: true, lookup: "locations" }, { name: "binId", required: true, lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
 };
+/** The channel_prices reference columns; together they name one price cell. */
+export const PRICE_REFERENCE_FIELDS = IMPORT_FIELDS.channel_prices.filter(f => f.lookup).map(f => f.name);
 export type ImportLookups = Record<string, { id: string; name: string; location_id?: string; basis?: string; price_group_id?: string | null }[]>;
 export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
@@ -27,15 +29,15 @@ export type ImportResult = { committed: number; blocked: number; outcomes: Impor
  *  - channel_prices: primary key (sale_channel_id, price_group_id, format_id); last write wins
  *  Ship-tos are never imported as default and opening balances only append, so
  *  those rows cannot collide and get a key of their own. A price reference written
- *  once by name and once by UUID has different keys, so import_csv serializes files
- *  containing named price references. */
+ *  once by name and once by UUID has different keys, so import_csv serializes a
+ *  file whose price reference column mixes names and UUIDs. */
 export function importRowKey(kind: ImportKind, row: Record<string, string>, index: number): string {
   // UUIDs are case-insensitive in SQL; lower-case them so one cell has one key.
   const v = (f: string) => (row[f]?.trim() ?? "").toLowerCase();
   switch (kind) {
     case "customers": return `name:${row.name?.trim() ?? ""}`;
     case "products_skus": return `product:${row.product?.trim() ?? ""}`;
-    case "channel_prices": return [v("saleChannelId"), v("priceGroupId"), v("formatId")].join(":");
+    case "channel_prices": return PRICE_REFERENCE_FIELDS.map(v).join(":");
     case "ship_tos": case "opening_balances": return `row:${index}`;
   }
 }
