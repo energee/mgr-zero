@@ -17,7 +17,7 @@ const matrix = {
   customers: "deny", ship_tos: "deny", vendors: "deny", materials: "deny", material_lots: "deny",
   styles: "deny", water_profiles: "deny", price_groups: "deny", brands: "tenant", catalog_categories: "deny", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
-  sale_channels: "deny", channel_prices: "deny", inventory_movements: "deny", allocations: "deny",
+  sale_channels: "deny", channel_prices: "deny", price_group_barcodes: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", packaging_runs: "deny",
@@ -37,7 +37,7 @@ type Row = Record<string, unknown>;
 const compositeKeys: Partial<Record<Table, string[]>> = {
   brewery_users: ["brewery_id", "user_id"], brewery_counters: ["brewery_id", "key"],
   customer_users: ["customer_id", "user_id"], format_components: ["parent_format_id", "child_format_id"],
-  format_bom: ["format_id", "material_id"], channel_prices: ["sale_channel_id", "price_group_id", "format_id"],
+  format_bom: ["format_id", "material_id"], channel_prices: ["sale_channel_id", "price_group_id", "format_id"], price_group_barcodes: ["price_group_id", "format_id"],
   taproom_pars: ["location_id", "sku_id"], pos_locations: ["connection_id", "external_location_id"],
   pos_item_mappings: ["connection_id", "external_item_id", "external_variation_id"],
   pos_catalog_variations: ["connection_id", "external_item_id", "external_variation_id"], pos_sale_expectations: ["sale_id"],
@@ -79,6 +79,7 @@ async function fixtures() {
   await put("format_bom", { format_id: cat.formatId, material_id: material.id, qty_per_unit: 1 });
   const pool = await put("keg_pools", { name: "Fleet", kind: "owned" });
   await put("channel_prices", { sale_channel_id: customer.saleChannelId, price_group_id: group.id, format_id: cat.formatId, unit_price_cents: 1200 });
+  await put("price_group_barcodes", { price_group_id: group.id, format_id: cat.formatId, upc: "850051366040" });
   for (const loc of [wh, ...taps, storage]) {
     await put("inventory_movements", { sku_id: cat.skuId, location_id: loc.id, bin_id: loc.binId, qty: 7, bbl: 7 * 0.0645, type: "opening_balance", created_by: owner.id });
     await put("taproom_pars", { location_id: loc.id, sku_id: cat.skuId, par_qty: 10 });
@@ -254,7 +255,7 @@ describe("taproom complete public RLS read boundary", () => {
       orders: "list_orders", order_lines: "get_order", order_events: "get_order", order_deposit_lines: "get_order", shipments: "get_order",
       invoices: "list_invoices", invoice_lines: "get_invoice", invoice_questions: "list_invoice_questions",
       deliveries: "get_delivery_stop", routes: "list_routes", stock_transfers: "list_stock_transfers", stock_transfer_lines: "get_stock_transfer",
-      lots: "list_movements", channel_prices: "list_channel_prices",
+      lots: "list_movements", channel_prices: "list_channel_prices", price_group_barcodes: "list_price_group_barcodes",
       report_filings: "list_compliance_reports", brand_approvals: "get_compliance_registry",
       state_registrations: "get_compliance_registry", brewery_state_licenses: "get_compliance_registry",
       pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",

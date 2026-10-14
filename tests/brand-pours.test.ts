@@ -22,7 +22,7 @@ const rpc = (extra = {}) => ctx.db.rpc("upsert_format", {
 
 it("list_brands names each brand's price group, which owns its pours", async () => {
   const brands = await runCommand("list_brands", {}, ctx) as { id: string; price_groups: { name: string } | null }[];
-  expect(brands.find((b) => b.id === brandId)?.price_groups).toEqual({ name: "1" });
+  expect(brands.find((b) => b.id === brandId)?.price_groups).toMatchObject({ name: "1" });
 });
 
 it("rejects trimmed-name collisions and ounces at or above 1000", async () => {

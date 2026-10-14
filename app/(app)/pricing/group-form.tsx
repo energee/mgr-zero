@@ -5,7 +5,8 @@
 // delete_price_group and shows its refusal ("price group is in use") inline,
 // the way the channel Delete does. An existing group also adds pours
 // (PourForm) and removes them (delete_format) in the same error slot; both
-// removals confirm first.
+// removals confirm first. Each packaged format's UPC edits in its own sheet
+// (BarcodeForm, set_price_group_barcode).
 "use client";
 
 import { useState } from "react";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { DeletePriceGroupControl, PriceGroupView, RemovePourControl, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { PourForm } from "@/app/(app)/catalog/pour-form";
+import { BarcodeForm } from "./barcode-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toCents } from "@/lib/mgr/money";
 
@@ -48,6 +50,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
           renderPour={(pour) => <RemovePourControl pour={pour.name} group={model.name} busy={form.busy} error={form.error}
             onDelete={() => form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id })} />}
+          renderBarcode={groupId ? (b) => <BarcodeForm key={b.upc} priceGroupId={groupId} groupName={model.name} formatId={b.formatId} format={b.format} upc={b.upc} /> : undefined}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
             {groupId && (

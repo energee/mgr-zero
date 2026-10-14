@@ -134,11 +134,11 @@ describe("SCREENS", () => {
     expect(drawn).toContain("Position");
     expect(drawn).toContain("Cost ceiling");
     expect(drawn).toMatch(/suggest/i);
-    // An empty ceiling is a finished state, not unfinished setup, so it reads
-    // "none" and earns no states entry. The barcode per group × format is a
-    // follow-on table (price_group_barcodes), not part of the price grid.
+    // An empty ceiling or barcode is a finished state, not unfinished setup, so
+    // it reads "none" and earns no states entry (spec D4). The group owns a UPC
+    // per packaged format (price_group_barcodes).
     expect(drawn).toContain("none");
-    expect(drawn).not.toContain("UPC");
+    expect(drawn).toContain("UPC · case · 24×16oz");
     expect((group.states ?? []).map(([name]) => name)).not.toContain("no barcode");
   });
 

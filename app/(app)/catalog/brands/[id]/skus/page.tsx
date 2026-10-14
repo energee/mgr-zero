@@ -1,4 +1,5 @@
-// One brand’s sellable SKUs: stocked packages and non-stock pours.
+// One brand’s sellable SKUs: stocked packages and non-stock pours. Each row
+// names its barcode, its own UPC or its price group’s (list_brands embeds the codes).
 // Existing serving identities remain the boundary for poured POS activity.
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { notFound } from "next/navigation";
@@ -12,7 +13,7 @@ import { PourForm } from "../../../pour-form";
 import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null };
-type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
+type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string; price_group_barcodes?: { format_id: string; upc: string }[] } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
 type Format = { package_type: string | null; id: string; name: string; bbl_per_unit: string | null; effective_bbl_per_unit: string | number | null };
 
 export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,7 +34,7 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const options: FormatOption[] = formats.map((f) => ({ id: f.id, name: f.name, package_type: f.package_type }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, pours: brand.pours, backHref: `/catalog/brands/${id}` })}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes: brand.price_groups?.price_group_barcodes, backHref: `/catalog/brands/${id}` })}
       createAction={canWrite ? <SkuForm brandId={id} formats={options} pools={pools} /> : null}
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {

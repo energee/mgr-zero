@@ -22,7 +22,11 @@ export type PriceGroupsViewModel = {
 };
 
 /** One row of list_price_groups: the grid row and its $/bbl ceiling. */
-export type PriceGroupRow = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
+export type PriceGroupRow = {
+  id: string; name: string; position: number; cost_ceiling_cents: number | null;
+  /** The group's UPC per packaged format (list_price_groups embeds them; admin and sales only). */
+  price_group_barcodes?: { format_id: string; upc: string }[];
+};
 export const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
 
 export type PriceGroupsSnapshot = {

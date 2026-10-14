@@ -161,6 +161,22 @@ describe("Price group view", () => {
     expect(model.removeDetail).toMatch(/refused/);
   });
 
+  it("lists one barcode row per packaged format, an empty one reading none (spec D4)", () => {
+    const model = toPriceGroupViewProps(priceGroupTwo);
+    // The fixture's formats carry no basis, so all five read as packaged, as the grid draws them.
+    expect(model.barcodes?.map((b) => [b.format, b.upc])).toEqual([
+      ["½ bbl keg", ""], ["sixtel", ""], ["case · 24×16oz", "00810123450127"], ["pint", ""], ["crowler", ""],
+    ]);
+    // A pour never scans.
+    const pour = { id: "pour-1", name: "Glass", basis: "poured" as const, price_group_id: priceGroupTwo.groupId };
+    expect(toPriceGroupViewProps({ ...priceGroupTwo, formats: [...priceGroupTwo.formats, pour] }).barcodes?.map((b) => b.format)).not.toContain("Glass");
+    const html = htmlOf(createElement(PriceGroupView, { model }));
+    expect(html).toMatch(/UPC · case · 24×16oz/);
+    expect(html).toMatch(/00810123450127/);
+    // The create form has no group yet, so no barcode rows.
+    expect(toPriceGroupViewProps({ ...priceGroupTwo, groupId: undefined }).barcodes).toBeUndefined();
+  });
+
   it("keys each pour row so a group with two pours does not warn", () => {
     const src = readFileSync("components/mgr/views/price-group.tsx", "utf8");
     expect(src).toMatch(/<Fragment key=\{pour\.id\}>/);

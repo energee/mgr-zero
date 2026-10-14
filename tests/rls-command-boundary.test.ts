@@ -448,6 +448,16 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "set_price_group_barcode", rpc: "set_price_group_barcode", allowed: ["admin", "sales"],
+      input: async role => {
+        const data = { id: await seedPriceGroup(brewery.id, unique("matrix barcode group", role)) };
+        return {
+          command: { priceGroupId: data!.id, formatId, upc: "850051366040" },
+          rpc: { p_brewery: brewery.id, p_price_group: data!.id, p_format: formatId, p_upc: "850051366040" },
+        };
+      },
+    },
+    {
       command: "clear_channel_price", rpc: "clear_channel_price", allowed: ["admin", "sales"],
       input: async role => {
         const data = { id: await seedPriceGroup(brewery.id, unique("matrix clear group", role)) };

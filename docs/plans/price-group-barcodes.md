@@ -1,6 +1,6 @@
 # Price group barcodes: a UPC per price group × format
 
-Status: plan, awaiting approval. Branch `feat/price-group-barcodes`, PR to `main`.
+Status: approved 2026-10-14; built on this branch. Branch `feat/price-group-barcodes`, PR to `main`.
 
 ## Why
 
@@ -66,8 +66,7 @@ barcodes cascade with it, because a barcode alone keeps nothing alive.
 
 `SKU → brand → price group → (group × format) UPC`, derived on read (spec
 "Resolution chain"). One helper, `skuBarcode(sku, groupBarcodes)`, in
-`lib/mgr/price-group-view.ts` beside the grid's other lookups; there is no second
-copy in SQL.
+`lib/mgr/sku-list-view.ts`, its only caller; there is no second copy in SQL.
 
 ## Tasks
 
@@ -141,3 +140,17 @@ No conflict, no repeated mistake.
   RLS-EXCEPTION). v2's staff-only policy and its customer test avoid that.
 - Neither version checks the check digit. The format check accepts 8 or 12–14
   digits and keeps leading zeros, so a mistyped code on the sheet imports as-is.
+
+## Deviations while building
+
+- **`list_price_group_barcodes` exists.** Rule #770 (`tests/rls-taproom.test.ts`)
+  needs a command whose roles match a business table's RLS exactly: admin and
+  sales. `list_price_groups` (adds warehouse) and `list_brands` (all staff) both
+  embed the codes too, and RLS empties those embeds for the other roles.
+- **Two embeds name their foreign key.** The new table gives PostgREST a second
+  path from `formats` to `price_groups`. `list_formats` and
+  `get_format_composition` now embed `price_groups!formats_price_group_fk(name)`,
+  or they fail with PGRST201.
+- **Barcodes edit one row at a time.** Each format's UPC has its own sheet
+  (`BarcodeForm`) inside the group dialog, instead of saving with the group
+  form, so one bad code never blocks the group save.

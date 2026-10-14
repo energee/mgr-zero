@@ -9,7 +9,7 @@ customer assigned to a group while the brand also carried one): here the
 customer has a sale channel, the brand has a price group, and the price is
 the cell where they meet. #189's barcode per group × format (D3) is a
 follow-on table, `price_group_barcodes (price_group_id, format_id, upc)`,
-not part of Program 4b. §16.3 (sale channels) stands.
+not part of Program 4b; it shipped 2026-10-14 (docs/plans/price-group-barcodes.md). §16.3 (sale channels) stands.
 
 ## The model
 
@@ -40,6 +40,9 @@ brands           price_group_id uuid null → price_groups (id, brewery_id)   (r
 sale_channels    unchanged (§16.3)
 channel_prices   brewery_id · sale_channel_id · price_group_id · format_id · unit_price_cents int >= 0
                  primary key (sale_channel_id, price_group_id, format_id); composite FKs to all three; on delete restrict
+price_group_barcodes  brewery_id · price_group_id · format_id · upc text (8 or 12–14 digits)
+                 primary key (brewery_id, price_group_id, format_id); cascades with its group; added 2026-10-14
+                 (docs/plans/price-group-barcodes.md)
 customers        sale_channel_id uuid not null → sale_channels (id, brewery_id)   (replaces price_list_id)
 orders           sale_channel_id uuid not null, copied from the customer at creation  (replaces price_list_id)
 ```

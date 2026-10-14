@@ -35,7 +35,7 @@ export const pricingGrid: PriceGroupsSnapshot = {
   ],
   groups: [
     { id: PG1, name: "1", position: 1, cost_ceiling_cents: null },
-    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 6500 },
+    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 6500, price_group_barcodes: [{ format_id: FMT_CASE, upc: "00810123450127" }] },
     { id: PG3, name: "3", position: 3, cost_ceiling_cents: null },
   ],
   formats: [

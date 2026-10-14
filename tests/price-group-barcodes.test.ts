@@ -64,10 +64,25 @@ describe("set_price_group_barcode", () => {
 });
 
 describe("reading barcodes", () => {
+  it("list_price_group_barcodes lists the brewery's codes for sales and refuses a brewer", async () => {
+    await set({ upc: "850051366040" });
+    expect(await runCommand("list_price_group_barcodes", {}, sales)).toContainEqual({ price_group_id: group, format_id: can, upc: "850051366040" });
+    await expect(runCommand("list_price_group_barcodes", {}, brewer)).rejects.toThrow();
+  });
+
   it("list_price_groups carries each group's codes for staff", async () => {
     await set({ upc: "850051366040" });
     const groups = (await runCommand("list_price_groups", {}, sales)) as { id: string; price_group_barcodes: Barcode[] }[];
     expect(groups.find((g) => g.id === group)?.price_group_barcodes).toContainEqual(expect.objectContaining({ format_id: can, upc: "850051366040" }));
+  });
+
+  it("list_brands carries the brand's group codes for sales, and none for a brewer", async () => {
+    await set({ upc: "850051366040" });
+    type Brand = { name: string; price_groups: { price_group_barcodes: Barcode[] } | null };
+    const forSales = (await runCommand("list_brands", {}, sales)) as Brand[];
+    expect(forSales.find((b) => b.name === "Alma")?.price_groups?.price_group_barcodes).toContainEqual(expect.objectContaining({ upc: "850051366040" }));
+    const forBrewer = (await runCommand("list_brands", {}, brewer)) as Brand[];
+    expect(forBrewer.find((b) => b.name === "Alma")?.price_groups?.price_group_barcodes ?? []).toEqual([]);
   });
 
   it("a brewer and a portal customer read no barcode row", async () => {

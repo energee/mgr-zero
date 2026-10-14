@@ -1,5 +1,6 @@
 // components/mgr/views/price-group.tsx — one price-group row. Inventory
-// draws name / position / ceiling edits; live keeps GroupForm as the wrapper.
+// draws name / position / ceiling edits and the group's UPC per packaged
+// format; live keeps GroupForm as the wrapper and slots a barcode editor in.
 // Removing a pour and deleting the group confirm first; both surfaces draw the
 // same two controls below, live binding onDelete to the commands.
 import { Fragment, type ReactNode } from "react";
@@ -27,9 +28,11 @@ export function DeletePriceGroupControl({ group, ...rest }: ConfirmProps & { gro
 
 type Controls = Partial<Record<"name" | "position" | "costCeiling", (value: string) => void>>;
 
-export function PriceGroupView({ model, controls = {}, back, messages, footer, addPour, renderPour }: {
+export function PriceGroupView({ model, controls = {}, back, messages, footer, addPour, renderPour, renderBarcode }: {
   model: PriceGroupViewModel; controls?: Controls; back?: ReactNode; messages?: ReactNode; footer?: ReactNode; addPour?: ReactNode;
   renderPour?: (pour: { id: string; name: string; ounces: string }) => ReactNode;
+  /** Live: the row's edit control for one format's UPC. Inventory draws the code, or "none". */
+  renderBarcode?: (barcode: { formatId: string; format: string; upc: string }) => ReactNode;
 }) {
   return (
     <>
@@ -53,6 +56,17 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
               </Fragment>
             ))}
           {addPour}
+        </>
+      )}
+      {model.barcodes && (
+        <>
+          {E.ttl("Barcodes")}
+          {E.info("Every SKU on this group scans as the group's code for its format, unless the SKU has its own. A format with no code is fine: kegs usually have none.")}
+          {model.barcodes.map((b) => (
+            <Fragment key={b.formatId}>
+              {renderBarcode ? renderBarcode(b) : E.fld(`UPC · ${b.format}`, b.upc || "none")}
+            </Fragment>
+          ))}
         </>
       )}
       {messages}

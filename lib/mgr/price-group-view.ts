@@ -1,5 +1,5 @@
 // lib/mgr/price-group-view.ts — view-model for one Price group row. Name,
-// position and cost ceiling come from list_price_groups; the Prices line
+// position, cost ceiling and barcodes come from list_price_groups; the Prices line
 // summarises list_channel_prices for that group. Without a groupId it is the
 // same row before it exists (the create form): blank name, next position,
 // under the last group's ceiling, no Prices line.
@@ -21,6 +21,8 @@ export type PriceGroupViewModel = {
   removeDetail?: string;
   /** Pours this group owns. Absent on the create form. */
   pours?: { id: string; name: string; ounces: string }[];
+  /** The group's UPC per packaged format; "" when it has none, which is a finished state (spec D4). Absent on the create form. */
+  barcodes?: { formatId: string; format: string; upc: string }[];
 };
 
 export type PriceGroupSnapshot = PriceGroupsSnapshot & { groupId?: string };
@@ -58,6 +60,9 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
       removeDetail: "refused while a brand sits on it, a cell prices it, or it owns a pour",
       pours: snapshot.formats.filter((f) => f.basis === "poured" && f.price_group_id === group.id).map((f) => ({
         id: f.id, name: f.name, ounces: f.ounces != null ? String(f.ounces) : "",
+      })),
+      barcodes: snapshot.formats.filter((f) => f.basis !== "poured").map((f) => ({
+        formatId: f.id, format: formatLabel(f), upc: group.price_group_barcodes?.find((b) => b.format_id === f.id)?.upc ?? "",
       })),
     }),
   };

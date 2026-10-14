@@ -137,7 +137,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Brands with their style, price group, SKUs and the pours that group owns, alphabetical
+Brands with their style, price group (and its barcodes for admin and sales), SKUs and the pours that group owns, alphabetical
 
 Takes no input.
 
@@ -178,6 +178,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": {} }'
+```
+
+## list_price_group_barcodes [#list_price_group_barcodes]
+
+`query` · admin, sales
+
+Every price group × packaged format UPC: each SKU on the group scans as its format's code unless it has its own
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_group_barcodes", "input": {} }'
 ```
 
 ## list_price_groups [#list_price_groups]

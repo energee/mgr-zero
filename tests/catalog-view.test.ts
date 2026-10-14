@@ -28,7 +28,7 @@ import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
 import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
-import { toSkuListViewProps } from "../lib/mgr/sku-list-view";
+import { skuBarcode, toSkuListViewProps } from "../lib/mgr/sku-list-view";
 import { toSkuViewProps } from "../lib/mgr/sku-view";
 import { formatVolume } from "../lib/volume";
 
@@ -326,6 +326,17 @@ describe("SKU list view", () => {
       ["case · 24×16 oz", `${formatVolume("0.09677419")} · active`],
       ["Pint", "16 oz · pour · drawn from keg"],
     ]);
+  });
+
+  it("shows each SKU's barcode: its own as an override, else its price group's code for the format", () => {
+    const [half, sixth, cased] = skuListHazy.skus;
+    const model = toSkuListViewProps({ ...skuListHazy, pours: [],
+      skus: [{ ...half, upc: "012345678905" }, sixth, cased],
+      barcodes: [{ format_id: cased.format_id, upc: "850051366040" }, { format_id: half.format_id, upc: "860009737631" }] });
+    expect(model.rows.map((r) => r.detail.split(" · ").filter((p) => p.startsWith("UPC")))).toEqual([
+      ["UPC 012345678905 (SKU override)"], [], ["UPC 850051366040"],
+    ]);
+    expect(skuBarcode({ upc: null, format_id: "f" }, [])).toBeNull();
   });
 
   it("renders Add SKU, Edit, and the three packages", () => {
