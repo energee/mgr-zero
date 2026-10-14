@@ -1,0 +1,148 @@
+# Price group barcodes: a UPC per price group × format
+
+Status: plan, awaiting approval. Branch `feat/price-group-barcodes`, PR to `main`.
+
+## Why
+
+Lolev's price sheet ("Pricing - Beer.csv", 2026-10-14) gives each price tier one
+UPC. The can label carries it, and the buyer may use it for any format; kegs
+may carry one later (user, 2026-10-14). MGR has nowhere to keep it.
+`skus.upc` is the only UPC column, and its unique index (`skus_upc_uidx`) stops
+two SKUs from sharing one, which is exactly what a tier UPC does.
+
+MGR already decided where it goes. Spec `2026-09-07-mgr-price-groups.md`:
+
+- **D2.** The group owns the barcode; every SKU on the group scans as the
+  group's code for its format.
+- **D3.** The barcode is per group × format, and nullable: a keg can stay empty.
+- **D4.** An empty UPC is quiet; only an empty price is loud.
+
+`2026-09-07-mgr-pricing-grid-naming.md` names the deferred table:
+`price_group_barcodes (price_group_id, format_id, upc)`. This plan builds it.
+
+## Decisions (user, 2026-10-14)
+
+| Question | Answer |
+|---|---|
+| UPC per tier, or per tier × format? | Per tier on the sheet; stored per tier × format (D3), so a keg code can be added later without a schema change |
+| Which formats get the sheet's UPC on import? | The can formats: Four Pack and Case. Kegs stay empty |
+| Source of truth | The sheet. The import writes it as-is |
+
+## Open question (needs the user's call)
+
+- **`skus.upc` versus D2.** Spec D2 says "no SKU-level override": every SKU
+  scans as its group's code. But `skus.upc` exists, the SKU form edits it, and
+  no SKU in dev has one. v1 planned the same override ("overridden by brand UPC
+  if set") and never used it. Choose one:
+  - **(a) Follow D2.** The SKU shows only the group code. `skus.upc` is left
+    alone for now and dropped in a separate change.
+  - **(b) Amend D2.** A SKU's own UPC, when set, wins and is labelled
+    "SKU override". The spec's D2 is edited in this PR.
+
+  Task 4 changes with the choice; nothing else does.
+
+## Schema — `20261014120000_price_group_barcodes.sql`
+
+(`…110000` is open on `feat/historical-batch-close`; re-check the max when writing.)
+
+```sql
+create table public.price_group_barcodes (
+  brewery_id uuid not null references public.breweries(id),
+  price_group_id uuid not null,
+  format_id uuid not null,
+  upc text not null check (upc ~ '^(\d{8}|\d{12,14})$'),
+  primary key (price_group_id, format_id),
+  foreign key (price_group_id, brewery_id) references public.price_groups (id, brewery_id) on delete cascade,
+  foreign key (format_id, brewery_id) references public.formats (id, brewery_id) on delete restrict
+);
+-- No unique on upc: one tier's code covers several formats (the user's cans).
+alter table public.price_group_barcodes enable row level security;
+-- Same read as channel_prices (20261008170000_staff_role_business_reads.sql:42).
+create policy staff_read on public.price_group_barcodes for select to authenticated
+  using (brewery_id in (select public.my_staff_brewery_ids(array['admin', 'sales']::public.staff_role[])));
+
+-- set_price_group_barcode(p_brewery, p_group, p_format, p_upc, p_request_id):
+--   admin|sales; null p_upc clears; normalize_upc like create_sku; packaged formats only.
+```
+
+`delete_price_group` already refuses a group with cells or pours; a group's
+barcodes cascade with it, because a barcode alone keeps nothing alive.
+
+## Resolution
+
+`SKU → brand → price group → (group × format) UPC`, derived on read (spec
+"Resolution chain"). One helper, `skuBarcode(sku, groupBarcodes)`, in
+`lib/mgr/price-group-view.ts` beside the grid's other lookups; there is no second
+copy in SQL.
+
+## Tasks
+
+Each one starts by writing its failing test.
+
+1. **Migration, RLS and `set_price_group_barcode`.**
+   - Test first: `tests/price-group-barcodes.test.ts` (DB):
+     - set, read back, replace and clear a barcode;
+     - a bad UPC, a poured format and another brewery's group are refused;
+     - admin and sales may set and read one, warehouse and brewer may not, and a portal customer reads none;
+     - the request replays;
+     - deleting the group removes its barcodes.
+   - Write the migration, add the RPC to `tests/rpc-allowlist.test.ts` and the table to
+     `tests/schema-rls-indexes.test.ts` where it lists tables, then
+     run `bun run migrations:lock`.
+   - Deps: none.
+2. **Commands: `set_price_group_barcode`, and `list_price_group_barcodes`.**
+   - Test in the same file, through `runCommand`; add an `API_AREAS` rule.
+   - Search for a list query to extend first. `list_price_groups` could embed
+     the barcodes instead of a new query.
+   - Deps: 1.
+3. **Price group screen: one UPC row per packaged format.**
+   - TDD `lib/mgr/price-group-view.ts`: the model lists every packaged format
+     with its UPC, and an empty one reads "none" (D4).
+   - Draw the rows with `E.edit` (registry input, like the SKU UPC) in
+     `components/mgr/views/price-group.tsx`; live saves through
+     `set_price_group_barcode`.
+   - Update `screens.tsx` "Price group" (`writes`, `spec`) and
+     `lib/mgr/fixtures/pricing.ts`.
+   - Deps: 2.
+4. **The SKU shows its barcode.**
+   - TDD `skuBarcode` and `lib/mgr/sku-view.ts`: the group code (and, under
+     open question (b), the SKU's own when set, with its source).
+   - The SKU page shows it read-only beside the existing optional UPC field.
+   - Deps: 2.
+5. **Types and docs.**
+   - Run `bash scripts/generate-db-types.sh` and `bun run docs:api`.
+   - Schema design: the new table. Mark the specs' follow-on as built.
+   - Staff guide, Pricing / Price group: one code per group and format, kegs
+     may stay empty, and the SKU override.
+   - Deps: 3, 4.
+
+The group code is staff-only. It must never join into a portal projection
+(`portal_sku_price_rows`), just as `skus.upc` is hidden from the portal
+(`20261009100000_portal_hide_internal_columns.sql:13`). Task 1's test proves a
+customer reads nothing.
+
+Then the full proof, an eyeball check of /pricing, a price group page and a SKU
+page, `/simplify`, and the PR.
+
+Parallelism: 1 → 2 → {3, 4} → 5.
+
+## Import (local only, git-ignored; after merge)
+
+The `--prices` pass sets each tier's sheet UPC on Four Pack and Case. That is
+16 barcodes, written through `set_price_group_barcode`, and idempotent like the
+rest of the pass.
+
+## v1 cross-check (2026-10-14)
+
+No conflict, no repeated mistake.
+
+- v1 had a bare `pricing_tiers.default_upc` (`00077_pricing_tiers_redesign.sql`,
+  nullable, no check, no unique), and nothing read it: not labels, POS,
+  QuickBooks, the portal or exports. The "group code reaches labels, POS and
+  QuickBooks" path is new ground; this plan only stores the code and shows it.
+- v1's column comment says "overridden by brand UPC if set", but the override
+  never shipped. That raised the open question above.
+- v1 left pricing tiers readable to every signed-in user (`00198`
+  RLS-EXCEPTION). v2's staff-only policy and its customer test avoid that.
+- Neither version checks the check digit. The format check accepts 8 or 12–14
+  digits and keeps leading zeros, so a mistyped code on the sheet imports as-is.
