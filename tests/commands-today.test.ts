@@ -152,6 +152,21 @@ describe("get_today (registered reader)", () => {
     expect(rows.map((i) => i.reason)).toEqual(["pick_due"]);
   });
 
+  it("marks a pick row changed after pick until the changed lines are counted again (#811)", async () => {
+    const plain = await createOrder("2026-09-07", true, true);
+    const id = await createOrder("2026-09-07", true, true);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    const pick = (qty: number) => adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: qty }], p_request_id: crypto.randomUUID() });
+    await pick(1);
+    const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
+    expect(adjusted.error).toBeNull();
+    const rows = async () => (await today(warehouse, "2026-09-07T12:00:00Z")).filter((i) => i.reason === "pick_due");
+    expect((await rows()).find((i) => i.subjectId === id)?.detail).toBe("pick due · ships Mon 9/7 · changed after pick");
+    expect((await rows()).find((i) => i.subjectId === plain)?.detail).toBe("pick due · ships Mon 9/7");
+    expect((await pick(3)).error).toBeNull();
+    expect((await rows()).find((i) => i.subjectId === id)).toBeUndefined();
+  });
+
   it("keeps a picked order on pick_due while any line is still owed", async () => {
     const id = await createOrder("2026-09-07", true, true);
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
