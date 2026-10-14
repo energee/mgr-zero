@@ -543,6 +543,7 @@ export type Database = {
       }
       breweries: {
         Row: {
+          books_opened_on: string | null
           closed_at: string | null
           created_at: string
           customer_phone: string | null
@@ -557,6 +558,7 @@ export type Database = {
           ttb_registry_no: string | null
         }
         Insert: {
+          books_opened_on?: string | null
           closed_at?: string | null
           created_at?: string
           customer_phone?: string | null
@@ -571,6 +573,7 @@ export type Database = {
           ttb_registry_no?: string | null
         }
         Update: {
+          books_opened_on?: string | null
           closed_at?: string | null
           created_at?: string
           customer_phone?: string | null
@@ -9836,6 +9839,14 @@ export type Database = {
       }
       set_brewery_ai_model: {
         Args: { p_brewery: string; p_model: string; p_request_id: string }
+        Returns: Json
+      }
+      set_brewery_books_opened_on: {
+        Args: {
+          p_books_opened_on: string
+          p_brewery: string
+          p_request_id: string
+        }
         Returns: Json
       }
       set_brewery_gravity_unit: {

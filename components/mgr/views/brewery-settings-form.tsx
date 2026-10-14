@@ -7,7 +7,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
-export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string };
+export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string; booksOpenedOn: string };
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
@@ -49,6 +49,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
     {field("ttb", "TTB registry number")}
     {field("pa", "PA license")}
     {field("phone", "Customer-facing phone", "tel")}
+    {field("booksOpenedOn", "Books opened on · optional", "date")}
     <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
       <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
       {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168 })}
