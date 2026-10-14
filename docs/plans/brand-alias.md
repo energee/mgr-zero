@@ -48,7 +48,7 @@ no alias. The renames are import data (local, git-ignored), not this PR.
 | `search_entities` | `lib/commands/search.ts` (no brand kind today) | **yes**: the `sku` and `batch` branches also match `brands.alias`, so "Animal #14" finds the SKUs and batches. No new kind. |
 | `brandNames()` (batches, packaging runs) | `lib/commands/packaging.ts:258` | no: rows keep the name; the alias shows on brand surfaces |
 | Portal, Square/POS menu, public menu, SKU names (QBO, invoices) | `portal.ts:137`, `lib/pos.ts:77`, `get_published_pos_menu`, `00001_baseline.sql:3488` | **no**: they read `brands.name`, so a new column changes nothing there |
-| **Portal customers reading `brands` rows directly** | `customer_read on brands` (`00001_baseline.sql:6469`) | **yes, a leak**: the policy is row-level only, so a customer could `select alias from brands` through PostgREST. The portal never reads `brands` directly: it gets `brand_name` from the `portal_sku_price_rows` projection (`20261009100000…:64`). So the policy is dropped, as #788 dropped the customer policies on orders and SKUs. |
+| Portal customers reading `brands` rows directly | `customer_read on brands` was dropped by `20261012100800_portal_customer_columns.sql:25` | **no leak**: `brands` has only `staff_read`. The portal gets `brand_name` through security-definer projections (`portal_sku_price_rows`, `portal_schedule_rows`). A test proves a customer still reads no alias. |
 
 ### Recipe brand
 
@@ -66,9 +66,7 @@ no alias. The renames are import data (local, git-ignored), not this PR.
 
 ```sql
 alter table public.brands add column alias text check (alias is null or length(trim(alias)) > 0);
--- Staff-only by construction: customers read brand names through the portal
--- projections (#788), never the table, so the leftover row policy goes.
-drop policy customer_read on public.brands;
+-- Staff-only already: brands has no customer policy (dropped in 20261012100800).
 -- upsert_brand gains p_alias text default null (drop + recreate; grants re-issued).
 -- set_recipe_brand(p_brewery, p_recipe, p_brand, p_request_id): admin|brewer;
 --   p_brand null clears it; the brand must be this brewery's.
@@ -81,7 +79,8 @@ Each one starts by writing its failing test.
 1. **Migration: `alias` + `upsert_brand(p_alias)`.**
    - Test first: `tests/brand-alias.test.ts` (DB):
      - the alias saves and reads back; a blank alias is refused;
-     - an upsert without an alias keeps the existing one; an explicit null clears it;
+     - upsert_brand replaces every field (style, hops…), so an upsert without an
+       alias clears it, like the rest; the form always sends the current alias;
      - both CSV-import callers still work;
      - **a portal customer reads no `brands` row** (so no alias), and the portal
        catalog still names the brand (`portal_sku_price_rows.brand_name`). Run the
@@ -132,8 +131,9 @@ No conflict or repeat. v1 had no brand alias and no recipe-brand change
 (`~/Repos/mgr/supabase/migrations/00003_brands.sql:6`). One lesson, adopted:
 v1's RLS audit (`docs/security/rls-policy-audit.md:115`, #604) found that a
 new column on a row-readable table leaks to portal customers. v2's
-`customer_read on brands` would have done exactly that, so this plan drops it
-and tests it (task 1).
+baseline `customer_read on brands` would have done exactly that. It turned out
+already dropped (`20261012100800…:25`; the cross-check read only the baseline),
+so no policy change is needed. Task 1 keeps a test that a customer reads no alias.
 
 ## Import (local only, git-ignored; after merge)
 
