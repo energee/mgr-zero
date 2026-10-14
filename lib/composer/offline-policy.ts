@@ -9,14 +9,17 @@ export const READING_BOUNDS = {
   ph: { min: 0, max: 14 },
 } as const;
 
+// A reading names its tank, its batch, or both (docs/plans/readings-on-batch.md).
+// The cellar form always sends the tank; a batch alone is for imported history.
 export const fermentationReadingInput = z.object({
-  occupancyId: z.string().uuid(),
+  occupancyId: z.string().uuid().optional(),
+  batchId: z.string().uuid().optional(),
   at: z.string().datetime({ offset: true }),
   tempF: z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max),
   gravityPlato: z.number().optional(),
   ph: z.number().min(READING_BOUNDS.ph.min).max(READING_BOUNDS.ph.max).optional(),
   note: z.string().optional(),
-}).strict();
+}).strict().refine((i) => i.occupancyId || i.batchId, { message: "a reading needs a tank or a batch" });
 
 export const fermentationReadingOfflinePolicy = {
   name: "record_fermentation_reading" as const,

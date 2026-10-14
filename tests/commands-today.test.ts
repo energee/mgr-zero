@@ -198,7 +198,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     const brand = await ins("brands", { brewery_id: b.id, name: `Hazy ${vesselName}` });
     const batch = await ins("batches", { brewery_id: b.id, intended_brand_id: brand.id, planned_on: "2026-09-01", planned_bbl: 15, created_by: adminCtx.userId });
     const occupancy = await ins("vessel_occupancies", { brewery_id: b.id, vessel_id: vessel.id, batch_id: batch.id, started_at: "2026-09-04T00:00:00Z" });
-    await ins("fermentation_readings", { brewery_id: b.id, occupancy_id: occupancy.id, at: "2026-09-04T06:00:00Z", created_by: adminCtx.userId });
+    await ins("fermentation_readings", { brewery_id: b.id, batch_id: batch.id, occupancy_id: occupancy.id, at: "2026-09-04T06:00:00Z", created_by: adminCtx.userId });
     return occupancy.id;
   }
 

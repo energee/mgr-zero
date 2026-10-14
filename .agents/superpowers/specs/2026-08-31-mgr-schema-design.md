@@ -558,9 +558,15 @@ allocations to the root. Neither application nor service roles can mutate either
 append-only table directly.
 
 ### `fermentation_readings`
-`occupancy_id, at timestamptz, temp_f numeric(5,1), ph numeric(4,2), gravity_plato
-numeric(5,2), note, created_by`. Manual entry only (decision). idx `(occupancy_id, at)`.
-Mutable (typo fixes), staff only.
+`batch_id → batches (required), occupancy_id (optional), at timestamptz, temp_f
+numeric(5,1), ph numeric(4,2), gravity_plato numeric(5,2), note, created_by`. Manual
+entry only (decision). A set occupancy must hold the batch: composite FK
+`(occupancy_id, batch_id, brewery_id) → vessel_occupancies (id, batch_id, brewery_id)`.
+A batch-only reading is imported history or a reading with no tank; live readings
+always name the tank, so "reading due" stays per tank. idx `(occupancy_id, at)`,
+`(batch_id, at)`. Mutable (typo fixes), staff only. `brew_records.occupancy_id` is
+optional on the same composite FK; only `record_historical_batch` writes a tankless
+record (`20261014100300_history_without_tanks.sql`).
 
 ### `batch_additions`
 `batch_id → batches, occupancy_id → vessel_occupancies, recipe_ingredient_id →

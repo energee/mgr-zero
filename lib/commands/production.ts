@@ -313,6 +313,21 @@ defineCommand({
   })),
 });
 
+// Imported history (docs/plans/readings-on-batch.md): brew and close a planned
+// batch on past dates with no tank and no completion loss, only before the
+// books opened. An actual OG is a gravity reading dated the brew day, not a
+// process field.
+defineCommand({
+  name: "record_historical_batch", description: "Admin only: record a past batch brewed and closed before the books opened, with its knockout volume and process but no tank stay and no completion loss",
+  input: z.object({ batchId: z.string().uuid(), brewedOn: isoDate, closedOn: isoDate,
+    knockoutBbl: z.number().positive().multipleOf(0.001), process: brewProcess.default({}) }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_brewed_on: i.brewedOn, p_closed_on: i.closedOn,
+    p_knockout_bbl: i.knockoutBbl, p_process: i.process, p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "cancel_batch", description: "Cancel an unstarted batch plan; retains history and refuses recorded physical work",
   input: z.object({ batchId: z.string().uuid() }),
@@ -477,16 +492,16 @@ defineCommand({
 
 // Manual entry only, in °F and °Plato (brewing-domain.md). Gravity and pH are
 // optional because a quick temperature check is a legitimate reading; a closed
-// occupancy takes none at all.
+// occupancy takes none at all, and neither does a live closed batch.
 defineCommand({
   name: "record_fermentation_reading",
-  description: "Log one timestamped fermentation reading against an open occupancy; this is the only current operation eligible for exact offline replay",
+  description: "Log one timestamped fermentation reading against an open occupancy, a brewed batch, or both (the occupancy must hold the batch); this is the only current operation eligible for exact offline replay",
   input: fermentationReadingInput,
   roles: [...fermentationReadingOfflinePolicy.roles],
   idempotency: fermentationReadingOfflinePolicy.idempotency,
   offlineReplay: fermentationReadingOfflinePolicy.offlineReplay,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_fermentation_reading", {
-    p_brewery: ctx.breweryId, p_occupancy: i.occupancyId, p_at: i.at, p_temp_f: i.tempF,
+    p_brewery: ctx.breweryId, p_batch: i.batchId ?? null, p_occupancy: i.occupancyId ?? null, p_at: i.at, p_temp_f: i.tempF,
     p_gravity_plato: i.gravityPlato ?? null, p_ph: i.ph ?? null, p_note: i.note ?? null,
     p_request_id: execution.requestId,
   })),

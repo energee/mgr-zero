@@ -64,7 +64,7 @@ describe.sequential("cellar workflow serialization", () => {
     const requestId = crypto.randomUUID();
     const a = await client(brewer.userId, true);
     const first = (await a.query(
-      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'frozen',$4) result",
+      "select public.record_fermentation_reading($1,null,$2,$3,68,4.2,4.1,'frozen',$4) result",
       [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
     )).rows[0].result;
     await a.query("reset role");
@@ -79,18 +79,18 @@ describe.sequential("cellar workflow serialization", () => {
 
     const retry = await client(brewer.userId, false);
     const replay = (await retry.query(
-      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'frozen',$4) result",
+      "select public.record_fermentation_reading($1,null,$2,$3,68,4.2,4.1,'frozen',$4) result",
       [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
     )).rows[0].result;
     expect(replay.id).toBe(first.id);
     expect((await retry.query("select count(*)::int n from public.fermentation_readings where id=$1", [first.id])).rows[0].n).toBe(1);
     await expect(retry.query(
-      "select public.record_fermentation_reading($1,$2,$3,69,4.2,4.1,'frozen',$4)",
+      "select public.record_fermentation_reading($1,null,$2,$3,69,4.2,4.1,'frozen',$4)",
       [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
     )).rejects.toThrow(/different payload/);
     const firstFlushId = crypto.randomUUID();
     await expect(retry.query(
-      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'late',$4)",
+      "select public.record_fermentation_reading($1,null,$2,$3,68,4.2,4.1,'late',$4)",
       [breweryId, f.occupancyId, "2026-09-10T15:00:00.000Z", firstFlushId],
     )).rejects.toThrow(/occupancy is closed/);
     expect((await b.query("select count(*)::int n from private.command_requests where actor_id=$1 and request_id=$2", [brewer.userId, firstFlushId])).rows[0].n).toBe(0);
