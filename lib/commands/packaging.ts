@@ -92,6 +92,25 @@ const actualRows = (rows: z.infer<typeof packagingActual>[]) => rows.map(row => 
 // otherwise have nowhere to land. Missing planned packages settle at zero --
 // the run is history once it closes, so "we filled none of those" is stated,
 // not left null. The occupancy stays open on purpose: emptying the tank is a
+// Imported history (docs/plans/historical-packaging.md): a historical batch's
+// packaging as a closed run and lot with the actual quantities, but no stock
+// movement, so it never sits on hand. Admin only, before the books opened.
+defineCommand({
+  name: "record_historical_packaging_run",
+  description: "Admin only: record a historical batch's packaging (closed before the books opened) as a closed run and lot with its actual quantities; writes no stock, so nothing goes on hand",
+  input: z.object({
+    batchId: z.string().uuid(),
+    packagedOn: isoDate,
+    lotCode: z.string().trim().min(1),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1),
+  }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_packaging_run", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_packaged_on: i.packagedOn, p_lot_code: i.lotCode,
+    p_outputs: i.outputs.map((o) => ({ sku_id: o.skuId, qty: o.qty })), p_request_id: execution.requestId,
+  })),
+});
+
 // cellar decision (`record_cellar_transfer` / ending the occupancy), not a
 // side effect of packaging. Stock belongs to Packaged on; future and filed dates
 // are refused without closing the run.

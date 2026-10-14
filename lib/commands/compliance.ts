@@ -187,9 +187,10 @@ defineQuery({
   handler: (ctx) => rows<LotRowOut>(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50)),
 });
 
+type TraceBatch = { id: string; batch_no: number | null; brewed_on: string | null };
 type LotRow = {
   id: string; code: string; packaged_on: string; best_by: string | null; brands: { name: string } | null;
-  packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; vessel_occupancies: { vessels: { name: string } | null; batches: { id: string; batch_no: number | null; brewed_on: string | null } | null } | null } | null;
+  packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; vessel_occupancies: { vessels: { name: string } | null; batches: TraceBatch | null } | null; batches: TraceBatch | null } | null;
 };
 type LotMovement = { id: string; type: string; qty: number; bbl: number; sku_id: string; bin_id: string; ref: string | null; source_movement_id: string | null; created_at: string; skus: { name: string } | null; bins: { name: string } | null; locations: { name: string } | null };
 
@@ -199,7 +200,7 @@ defineQuery({
   input: z.object({ lotId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const lot = await unwrap(ctx.db.from("lots")
-      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
+      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)), batches(id, batch_no, brewed_on))")
       .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
     const [sources, movements, ingredients] = await Promise.all([
       unwrap(ctx.db.rpc("trace_lot_sources", { p_brewery: ctx.breweryId, p_lot: i.lotId })) as unknown as Promise<LotTraceSources>,
@@ -221,7 +222,8 @@ defineQuery({
     return {
       lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
       run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, vessel: occ?.vessels?.name ?? "" } : null,
-      batch: occ?.batches ?? null,
+      // A historical run has no tank; it names its batch directly (historical-packaging.md).
+      batch: occ?.batches ?? run?.batches ?? null,
       ...sources,
       ingredients,
       movements: moves,

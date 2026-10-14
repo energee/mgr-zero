@@ -591,7 +591,12 @@ in one transaction: sets `closed_at, bbl_drawn`; inserts the `lots` row; inserts
 `production_in` movements per output (with `lot_id`); inserts consumption/return/loss
 material movements. Owned-keg fills are FG inventory, not keg events (§12).
 `schedule_packaging_run` creates the run plus all planned output rows in one
-function; the client never inserts the parent and planned outputs separately.
+function; the client never inserts the parent and planned outputs separately. `batch_id → batches`
+(optional) names the batch of a tankless historical run: a started or closed run needs
+`occupancy_id` **or** `batch_id`. Only `record_historical_packaging_run` sets it, for a
+historical batch before `books_opened_on`: a closed run, outputs with `qty_actual` and no
+`movement_id`, and a lot, with no stock (`20261014100400_historical_packaging.sql`). Lot
+trace falls back to it when the run has no tank.
 
 ### `packaging_run_outputs`
 `unit_cost_cents numeric >= 0` is nullable and frozen at packaging close per run/SKU. Null means uncosted; old runs are not backfilled. Ingredient costs use consumed lot receipts (ordered by `material_receipt_costs`, which `material_last_cost` also reads) and the batch knockout volume summed from current brew-record revisions; standard BOM costs exclude packaging loss. `sku_inventory_value` is a security-invoker current-stock valuation view per SKU, and `inventory_value` sums it to one row per brewery. Admin/Sales command permission hides value in other role screens; staff table/view access is unchanged.

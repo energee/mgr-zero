@@ -126,5 +126,6 @@
   "20261014100000_books_opened_on.sql": "bfc444077942b89942b277dc9ce97d91ae2f06d7ccc26492429ad59d16bfd8a4",
   "20261014100100_report_books_opened_on.sql": "ad6783e62c297d6feb74fa663445546864019030c61f4b7b56aa0bc424df7bcb",
   "20261014100200_today_repick_marker.sql": "adaf126ec420c4a08df6a9888376b9db0ae7d3b2cee31eacc3673114e3d3556e",
-  "20261014100300_history_without_tanks.sql": "2c270ceeecb14de38bab62ed5f6a08197f2e5161c52ac6e3ccdbf7706bad3a24"
+  "20261014100300_history_without_tanks.sql": "2c270ceeecb14de38bab62ed5f6a08197f2e5161c52ac6e3ccdbf7706bad3a24",
+  "20261014100400_historical_packaging.sql": "922ae22d21bf2d1b0f1a56562f353aa2139eb02bca0a32254cc5db96b13273f6"
 }
