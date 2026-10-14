@@ -244,10 +244,11 @@ defineCommand({
 // price grid. A brand sits on one; a cell prices that row on a channel for a
 // format. Warehouse reads them (they name a brand's price group) but never prices.
 defineQuery({
-  name: "list_price_groups", description: "Rows of the price grid in position order",
+  name: "list_price_groups", description: "Rows of the price grid in position order, each with its barcodes (a UPC per packaged format; admin and sales read them, warehouse gets none)",
   roles: ["admin", "sales", "warehouse"],
   input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*").eq("brewery_id", ctx.breweryId).order("position")),
+  // RLS lets only admin and sales read price_group_barcodes, so a warehouse caller's embed is empty, not an error.
+  handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*, price_group_barcodes(format_id, upc)").eq("brewery_id", ctx.breweryId).order("position")),
 });
 
 // The cost a brand's recipe implies, for the price-group suggestion on Brand.
@@ -284,6 +285,15 @@ defineCommand({
   input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), position: z.number().int().positive(), costCeilingCents: cents.optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_group", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_position: i.position, p_cost_ceiling_cents: i.costCeilingCents ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_price_group_barcode", description: "Set or clear a price group's UPC for one packaged format: every SKU on the group scans as it unless the SKU has its own UPC; null or blank clears it",
+  roles: ["admin", "sales"],
+  input: z.object({ priceGroupId: z.string().uuid(), formatId: z.string().uuid(), upc: upc.nullable() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price_group_barcode", {
+    p_brewery: ctx.breweryId, p_price_group: i.priceGroupId, p_format: i.formatId, p_upc: i.upc || null, p_request_id: execution.requestId,
   })),
 });
 

@@ -4491,6 +4491,56 @@ export type Database = {
           },
         ]
       }
+      price_group_barcodes: {
+        Row: {
+          brewery_id: string
+          format_id: string
+          price_group_id: string
+          upc: string
+        }
+        Insert: {
+          brewery_id: string
+          format_id: string
+          price_group_id: string
+          upc: string
+        }
+        Update: {
+          brewery_id?: string
+          format_id?: string
+          price_group_id?: string
+          upc?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_group_barcodes_brewery_id_fkey"
+            columns: ["brewery_id"]
+            isOneToOne: false
+            referencedRelation: "breweries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_group_barcodes_format_id_brewery_id_fkey"
+            columns: ["format_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "format_volumes"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "price_group_barcodes_format_id_brewery_id_fkey"
+            columns: ["format_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "formats"
+            referencedColumns: ["id", "brewery_id"]
+          },
+          {
+            foreignKeyName: "price_group_barcodes_price_group_id_brewery_id_fkey"
+            columns: ["price_group_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "price_groups"
+            referencedColumns: ["id", "brewery_id"]
+          },
+        ]
+      }
       price_groups: {
         Row: {
           brewery_id: string
@@ -10020,6 +10070,16 @@ export type Database = {
           p_format: string
           p_published: boolean
           p_request_id: string
+        }
+        Returns: Json
+      }
+      set_price_group_barcode: {
+        Args: {
+          p_brewery: string
+          p_format: string
+          p_price_group: string
+          p_request_id: string
+          p_upc: string
         }
         Returns: Json
       }
