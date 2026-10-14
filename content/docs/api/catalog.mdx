@@ -291,7 +291,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops
+Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and a staff-only alias (an informal name such as a series number); every field is replaced, so omit the alias to clear it
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -303,6 +303,7 @@ Create or edit a brand: name, style (added to the brewery's styles when new), AB
 | `category` | string | no |
 | `priceGroupId` | uuid | no |
 | `hops` | string | no |
+| `alias` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

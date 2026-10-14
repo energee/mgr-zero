@@ -4,13 +4,14 @@
 // not here).
 "use client";
 
+import { brandLabel } from "@/lib/mgr/brand-view";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
 import { NONE } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-type Brand = { id: string; name: string };
+type Brand = { id: string; name: string; alias?: string | null };
 type RecipeVersion = { id: string; label: string };
 
 export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; recipeVersions: RecipeVersion[] }) {
@@ -35,7 +36,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     recipeOptions: recipeVersions,
     brandId: intendedBrandId,
     brand: brands.find(({ id }) => id === intendedBrandId)?.name ?? "Not decided",
-    brandOptions: brands.map(({ id, name: label }) => ({ id, label })),
+    brandOptions: brands.map((b) => ({ id: b.id, label: brandLabel(b) })),
     plannedBbl,
     date: plannedOn,
     note,

@@ -4,6 +4,7 @@
 // stored). Create recipe version opens ./new, where recipe-version-form.tsx
 // makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
+import { RecipeBrandPicker } from "./recipe-brand-picker";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -31,12 +32,14 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ recipe, version, ingredients, waterAdditions, ogPlato, fgPlato, abv }, materials, gravityUnit, profiles] = (await Promise.all([
+  const [{ recipe, version, ingredients, waterAdditions, ogPlato, fgPlato, abv }, materials, gravityUnit, profiles, brands] = (await Promise.all([
     orNotFound(runCommand("get_recipe", { recipeId: id }, ctx)),
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
-  ])) as [GetRecipe, RecipeMaterial[], { effective: GravityUnit }, Profile[]];
+    runCommand("list_brands", {}, ctx),
+  ])) as [GetRecipe, RecipeMaterial[], { effective: GravityUnit }, Profile[], { id: string; name: string; alias: string | null }[]];
+  const parent = { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" };
   const material = materialLookup(materials);
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
 
@@ -45,12 +48,13 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   return (
     <RecipeView
       readOnly
+      parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} parent={parent} />}
       model={{
         title: version ? `${recipe.name} v${version.version}` : recipe.name,
         backHref: "/recipes",
         createHref: `/recipes/${recipe.id}/new`,
         empty: version ? undefined : "No version yet: create the first one",
-        parent: { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" },
+        parent,
         ingredients: ingredients.map((i) => ({
           key: i.id, title: material.name(i.material_id),
           detail: ingredientDetail(i.stage, i.timing_minutes, Number(i.per_bbl_qty), material.unit(i.material_id)),

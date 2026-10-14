@@ -25,16 +25,17 @@ defineCommand({
 // brewery's own styles list; description, category, price group and hops are
 // the optional Brand-screen facts.
 defineCommand({
-  name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
+  name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops, and a staff-only alias (an informal name such as a series number); every field is replaced, so omit the alias to clear it",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().min(BRAND_ABV.min, BRAND_ABV.message).max(BRAND_ABV.max, BRAND_ABV.message).optional(),
     description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
+    alias: z.string().trim().min(1).optional(),
   }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_style: i.style ?? null, p_abv: i.abv ?? null,
     p_description: i.description ?? null, p_category: i.category ?? null, p_price_group: i.priceGroupId ?? null, p_hops: i.hops ?? null,
-    p_request_id: execution.requestId,
+    p_alias: i.alias ?? null, p_request_id: execution.requestId,
   })),
 });
 

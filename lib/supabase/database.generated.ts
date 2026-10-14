@@ -369,6 +369,7 @@ export type Database = {
       brands: {
         Row: {
           abv: number | null
+          alias: string | null
           brewery_id: string
           category: string | null
           created_at: string
@@ -382,6 +383,7 @@ export type Database = {
         }
         Insert: {
           abv?: number | null
+          alias?: string | null
           brewery_id: string
           category?: string | null
           created_at?: string
@@ -395,6 +397,7 @@ export type Database = {
         }
         Update: {
           abv?: number | null
+          alias?: string | null
           brewery_id?: string
           category?: string | null
           created_at?: string
@@ -10051,6 +10054,15 @@ export type Database = {
         }
         Returns: Json
       }
+      set_recipe_brand: {
+        Args: {
+          p_brand: string
+          p_brewery: string
+          p_recipe: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       set_standing_allocation: {
         Args: {
           p_location: string
@@ -10306,6 +10318,7 @@ export type Database = {
       upsert_brand: {
         Args: {
           p_abv: number
+          p_alias?: string
           p_brewery: string
           p_category: string
           p_description: string

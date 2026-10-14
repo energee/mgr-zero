@@ -9,9 +9,14 @@ import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-sugg
 import type { PriceGroupRow } from "./price-groups-view";
 import { expires, type RegistryRowView } from "./registry-rows";
 
+/** A brand as staff see it: its name, then its staff-only alias when it has one ("Appaloosa · Animal #14"). */
+export const brandLabel = (b: { name: string; alias?: string | null }) => (b.alias ? `${b.name} · ${b.alias}` : b.name);
+
 export type BrandViewModel = {
   backHref?: string;
   name: string;
+  /** Staff-only informal name; "" when none. */
+  alias: string;
   style: string;
   styleOptions: string[];
   abv: string;
@@ -37,6 +42,7 @@ export type BrandSnapshot = {
   brand: {
     id: string;
     name: string;
+    alias?: string | null;
     abv: number | string | null;
     description: string | null;
     category: string | null;
@@ -94,6 +100,7 @@ export function toBrandViewProps({
   return {
     backHref,
     name: brand.name,
+    alias: brand.alias ?? "",
     style,
     styleOptions,
     // Echoed as typed: a live form's "12x" stays "12x" for the person to fix, never "NaN".

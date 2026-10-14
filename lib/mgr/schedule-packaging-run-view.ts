@@ -2,6 +2,7 @@
 // model, and the pure adapter that builds it from the packaging page's reads
 // (list_brands, list_occupancies, list_skus) plus the form's draft. The
 // inventory fixture is lib/mgr/fixtures/packaging.ts.
+import { brandLabel } from "./brand-view";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatVolume } from "@/lib/volume";
 
@@ -30,7 +31,7 @@ export type SchedulePackagingRunViewModel = {
 };
 
 export type ScheduleRunData = {
-  brands: { id: string; name: string }[];
+  brands: { id: string; name: string; alias?: string | null }[];
   occupancies: { occupancy_id: string; vessel_name: string | null; brand_name: string | null; batch_no: number | null; bbl: number }[];
   skus: { id: string; name: string; brand_id: string; format_volume: { bbl_per_unit: number | null } | null }[];
 };
@@ -60,7 +61,7 @@ export function toSchedulePackagingRunView(data: ScheduleRunData, draft: Schedul
   return {
     plannedOn: draft.plannedOn,
     brandId: draft.brandId,
-    brandOptions: data.brands.map((brand) => ({ value: brand.id, label: brand.name })),
+    brandOptions: data.brands.map((brand) => ({ value: brand.id, label: brandLabel(brand) })),
     occupancyId: draft.occupancyId,
     sourceOptions: [{ value: "", label: "No source yet" }, ...data.occupancies.map((o) => ({ value: o.occupancy_id, label: `${tank(o)} · ${formatVolume(o.bbl)}` }))],
     source: occupancy ? tank(occupancy) : "",

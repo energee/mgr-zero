@@ -23,12 +23,12 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   const { busy, error, run } = useCommandAction();
   const categoryAction = useCommandAction();
   const { v: f, set } = useFields({
-    name: brand?.name ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
+    name: brand?.name ?? "", alias: brand?.alias ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
     description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.price_group_id ?? "", hops: brand?.hops ?? "",
   });
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const model = toBrandViewProps({
-    brand: { id: brand?.id ?? "", name: f.name, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
+    brand: { id: brand?.id ?? "", name: f.name, alias: f.alias, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
     styles, categories, priceGroups, compliance, cost, backHref: "/catalog",
   });
   // Sheets need a saved brand.
@@ -43,13 +43,13 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     ? <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>
     : E.info("Save the brand first, then record its COLA and state registrations here.");
   const controls = {
-    name: set("name"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
+    name: set("name"), alias: set("alias"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
     priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
   };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const ok = await run("upsert_brand", {
-      id: brand?.id, name: f.name, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
+      id: brand?.id, name: f.name, alias: f.alias.trim() || undefined, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined, priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
     });
     if (ok) { toast.success("Brand saved"); router.push("/catalog"); }
