@@ -19,12 +19,12 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
   const cadence = CADENCES[on][0];
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ filings, today }, lots] = (await Promise.all([runCommand("list_compliance_reports", {}, ctx), runCommand("list_lots", {}, ctx)])) as [{ filings: Filing[]; today: string }, LotRowOut[]];
+  const [{ filings, today, booksOpenedOn }, lots] = (await Promise.all([runCommand("list_compliance_reports", {}, ctx), runCommand("list_lots", {}, ctx)])) as [{ filings: Filing[]; today: string; booksOpenedOn: string | null }, LotRowOut[]];
   const filed = new Map(filings.filter((f) => f.jurisdiction === JURISDICTION).flatMap((f) => {
     const key = periodKey(f.period_start, f.period_end);
     return key && cadenceOf(key) === cadence ? [[key, f] as const] : [];
   }));
-  const months = [...new Set([...recentPeriods(today, cadence), ...filed.keys()])].sort().reverse();
+  const months = [...new Set([...recentPeriods(today, cadence, booksOpenedOn), ...filed.keys()])].sort().reverse();
   return (
     <ComplianceMonthsView
       model={{

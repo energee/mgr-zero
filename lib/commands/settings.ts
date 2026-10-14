@@ -9,6 +9,7 @@
 // brewery".
 import { z } from "zod";
 import { defineCommand, defineQuery, phone, unwrap, STAFF_ROLES } from "./registry";
+import { isoDate } from "./packaging";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
 
@@ -51,11 +52,11 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id, books_opened_on";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse",
+  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse and the books-opened date",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
@@ -99,6 +100,17 @@ defineQuery({
   input: z.object({}), roles: ["admin"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select("timezone, fermentation_reading_due_hours").eq("id", ctx.breweryId).single()),
 });
+// The day compliance reports start counting. Earlier ledger rows (imported
+// history) stay visible everywhere else; null counts everything. The RPC
+// refuses a date after the start of a filed period.
+defineCommand({
+  name: "set_books_opened_on", description: "Set or clear the day compliance reports start counting the ledger (admin); refused after the start of a filed period",
+  input: z.object({ booksOpenedOn: isoDate.nullable() }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
+    p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "set_brewery_operating_defaults", description: "Change only the brewery fermentation reading cadence, in hours",
   input: z.object({ readingDueHours }), roles: ["admin"],

@@ -39,6 +39,7 @@ export default async function SettingsPage() {
         paLicense: row.pa_license_no ?? "",
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
+        booksOpenedOn: row.books_opened_on ?? "",
         aiModel: ai.model,
         aiModels,
         deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,

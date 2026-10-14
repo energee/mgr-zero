@@ -52,13 +52,15 @@ export function periodLabel(key: string): string {
 const RECENT: Record<Cadence, number> = { month: 3, quarter: 4, year: 2 };
 
 /** The recent periods of one cadence ending with the one holding `today` (YYYY-MM-DD), newest first. */
-export function recentPeriods(today: string, cadence: Cadence): string[] {
+/** Recent periods, newest first; one that starts before the books opened is left out, since no report can cover it. */
+export function recentPeriods(today: string, cadence: Cadence, booksOpenedOn: string | null = null): string[] {
   const [y, mo] = today.split("-").map(Number);
-  return Array.from({ length: RECENT[cadence] }, (_, i) => {
+  const keys = Array.from({ length: RECENT[cadence] }, (_, i) => {
     if (cadence === "year") return String(y - i);
     const step = cadence === "quarter" ? 3 : 1;
     const d = new Date(Date.UTC(y, mo - 1 - i * step, 1));
     const [yy, m] = [d.getUTCFullYear(), d.getUTCMonth() + 1];
     return cadence === "quarter" ? `${yy}-Q${Math.ceil(m / 3)}` : `${yy}-${pad(m)}`;
   });
+  return booksOpenedOn ? keys.filter((key) => periodRange(key)!.periodStart >= booksOpenedOn) : keys;
 }
