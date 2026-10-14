@@ -3585,6 +3585,7 @@ export type Database = {
       }
       packaging_runs: {
         Row: {
+          batch_id: string | null
           bbl_drawn: number | null
           brand_id: string
           brewery_id: string
@@ -3600,6 +3601,7 @@ export type Database = {
           started_at: string | null
         }
         Insert: {
+          batch_id?: string | null
           bbl_drawn?: number | null
           brand_id: string
           brewery_id: string
@@ -3615,6 +3617,7 @@ export type Database = {
           started_at?: string | null
         }
         Update: {
+          batch_id?: string | null
           bbl_drawn?: number | null
           brand_id?: string
           brewery_id?: string
@@ -3630,6 +3633,13 @@ export type Database = {
           started_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "packaging_runs_batch_id_brewery_id_fkey"
+            columns: ["batch_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id", "brewery_id"]
+          },
           {
             foreignKeyName: "packaging_runs_brand_id_brewery_id_fkey"
             columns: ["brand_id", "brewery_id"]
@@ -9548,6 +9558,17 @@ export type Database = {
           p_closed_on: string
           p_knockout_bbl: number
           p_process: Json
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      record_historical_packaging_run: {
+        Args: {
+          p_batch: string
+          p_brewery: string
+          p_lot_code: string
+          p_outputs: Json
+          p_packaged_on: string
           p_request_id: string
         }
         Returns: Json

@@ -264,6 +264,26 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_repack_parents", "input": {} }'
 ```
 
+## record_historical_packaging_run [#record_historical_packaging_run]
+
+`command` · admin
+
+Admin only: record a historical batch's packaging (closed before the books opened) as a closed run and lot with its actual quantities; writes no stock, so nothing goes on hand
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+| `packagedOn` | date (YYYY-MM-DD) | yes |
+| `lotCode` | string | yes |
+| `outputs` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_historical_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "batchId": "00000000-0000-0000-0000-000000000000", "packagedOn": "2026-01-31", "lotCode": "string", "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 ## record_repack [#record_repack]
 
 `command` · admin, warehouse
