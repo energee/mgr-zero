@@ -490,8 +490,8 @@ defineCommand({
   })),
 });
 
-// Manual entry only, in °F and °Plato (brewing-domain.md). Gravity and pH are
-// optional because a quick temperature check is a legitimate reading; a closed
+// Manual entry only, in °F and °Plato (brewing-domain.md). Each of temperature,
+// gravity and pH is optional, but a reading carries at least one; a closed
 // occupancy takes none at all, and neither does a live closed batch.
 defineCommand({
   name: "record_fermentation_reading",
@@ -501,7 +501,7 @@ defineCommand({
   idempotency: fermentationReadingOfflinePolicy.idempotency,
   offlineReplay: fermentationReadingOfflinePolicy.offlineReplay,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_fermentation_reading", {
-    p_brewery: ctx.breweryId, p_batch: i.batchId ?? null, p_occupancy: i.occupancyId ?? null, p_at: i.at, p_temp_f: i.tempF,
+    p_brewery: ctx.breweryId, p_batch: i.batchId ?? null, p_occupancy: i.occupancyId ?? null, p_at: i.at, p_temp_f: i.tempF ?? null,
     p_gravity_plato: i.gravityPlato ?? null, p_ph: i.ph ?? null, p_note: i.note ?? null,
     p_request_id: execution.requestId,
   })),

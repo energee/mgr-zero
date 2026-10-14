@@ -33,6 +33,14 @@ describe("fermentation reading bounds (#468)", () => {
     expect(fermentationReadingInput.safeParse({ ...rest, batchId, tempF: 10 }).success).toBe(false);
   });
 
+  it("temperature is optional when gravity or pH is given; a reading needs at least one value", () => {
+    const { tempF: _t, ...noTemp } = base;
+    expect(fermentationReadingInput.safeParse({ ...noTemp, gravityPlato: 12 }).success).toBe(true);
+    expect(fermentationReadingInput.safeParse({ ...noTemp, ph: 5.2 }).success).toBe(true);
+    expect(fermentationReadingInput.safeParse(noTemp).success).toBe(false);
+    expect(fermentationReadingInput.safeParse({ ...noTemp, note: "looked fine" }).success).toBe(false);
+  });
+
   it("accepts the bounds themselves", () => {
     expect(fermentationReadingInput.safeParse({ ...base, tempF: READING_BOUNDS.tempF.min, ph: READING_BOUNDS.ph.min }).success).toBe(true);
     expect(fermentationReadingInput.safeParse({ ...base, tempF: READING_BOUNDS.tempF.max, ph: READING_BOUNDS.ph.max }).success).toBe(true);

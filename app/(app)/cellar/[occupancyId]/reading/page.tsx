@@ -12,7 +12,7 @@ import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { ReadingForm } from "./reading-form";
 
 type Occupancy = { occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_no: number | null; brand_name: string | null; bbl: number };
-type Reading = { temp_f: number; gravity_plato: number | null; ph: number | null };
+type Reading = { temp_f: number | null; gravity_plato: number | null; ph: number | null };
 
 export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
   const { occupancyId } = await params;
@@ -33,7 +33,7 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
       openByDefault
       returnHref={`/cellar/vessels/${occupancy.vessel_id}`}
       prior={readings[0] ? {
-        tempF: String(readings[0].temp_f),
+        tempF: readings[0].temp_f == null ? undefined : String(readings[0].temp_f),
         gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),
         ph: readings[0].ph == null ? undefined : String(readings[0].ph),
       } : undefined}
