@@ -8,7 +8,9 @@ later recipe change never rewrites the history of beer already made.
 
 The cellar map is the read behind vessel work: what is in each tank, and for how
 long. Fermentation readings are appended per open occupancy and are what an
-overdue reading notification is measured against.
+overdue reading notification is measured against. A reading must carry at
+least one of `tempF`, `gravityPlato` or `ph`; a note alone is refused with
+`400 invalid_input`.
 
 {/* ops:production */}
 
