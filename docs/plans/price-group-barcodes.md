@@ -28,18 +28,12 @@ MGR already decided where it goes. Spec `2026-09-07-mgr-price-groups.md`:
 | Which formats get the sheet's UPC on import? | The can formats: Four Pack and Case. Kegs stay empty |
 | Source of truth | The sheet. The import writes it as-is |
 
-## Open question (needs the user's call)
+## SKU override (user, 2026-10-14: option b)
 
-- **`skus.upc` versus D2.** Spec D2 says "no SKU-level override": every SKU
-  scans as its group's code. But `skus.upc` exists, the SKU form edits it, and
-  no SKU in dev has one. v1 planned the same override ("overridden by brand UPC
-  if set") and never used it. Choose one:
-  - **(a) Follow D2.** The SKU shows only the group code. `skus.upc` is left
-    alone for now and dropped in a separate change.
-  - **(b) Amend D2.** A SKU's own UPC, when set, wins and is labelled
-    "SKU override". The spec's D2 is edited in this PR.
-
-  Task 4 changes with the choice; nothing else does.
+Spec D2 ("no SKU-level override") is amended. A SKU's barcode is its own
+`skus.upc` when set, labelled "SKU override", and otherwise its group's code for
+its format. `skus.upc` keeps its unique index, so an override stays one SKU's
+own. This PR edits D2 in `2026-09-07-mgr-price-groups.md` to say so.
 
 ## Schema — `20261014120000_price_group_barcodes.sql`
 
@@ -105,13 +99,14 @@ Each one starts by writing its failing test.
      `lib/mgr/fixtures/pricing.ts`.
    - Deps: 2.
 4. **The SKU shows its barcode.**
-   - TDD `skuBarcode` and `lib/mgr/sku-view.ts`: the group code (and, under
-     open question (b), the SKU's own when set, with its source).
+   - TDD `skuBarcode` and `lib/mgr/sku-view.ts`: the SKU's own UPC when set
+     ("SKU override"), otherwise the group code ("price group"), otherwise none.
    - The SKU page shows it read-only beside the existing optional UPC field.
    - Deps: 2.
 5. **Types and docs.**
    - Run `bash scripts/generate-db-types.sh` and `bun run docs:api`.
-   - Schema design: the new table. Mark the specs' follow-on as built.
+   - Schema design: the new table. Mark the specs' follow-on as built, and
+     amend D2 for the SKU override.
    - Staff guide, Pricing / Price group: one code per group and format, kegs
      may stay empty, and the SKU override.
    - Deps: 3, 4.
@@ -141,7 +136,7 @@ No conflict, no repeated mistake.
   QuickBooks, the portal or exports. The "group code reaches labels, POS and
   QuickBooks" path is new ground; this plan only stores the code and shows it.
 - v1's column comment says "overridden by brand UPC if set", but the override
-  never shipped. That raised the open question above.
+  never shipped. v2 now adopts it per SKU (option b above).
 - v1 left pricing tiers readable to every signed-in user (`00198`
   RLS-EXCEPTION). v2's staff-only policy and its customer test avoid that.
 - Neither version checks the check digit. The format check accepts 8 or 12–14
