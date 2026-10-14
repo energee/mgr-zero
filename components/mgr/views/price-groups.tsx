@@ -38,7 +38,8 @@ export function PriceGroupsView({
               channel.rows.map((row) => [
                 renderGroup(row),
                 ...row.cells.map((cell, col) => row.formatIds[col]
-                  ? renderCell(channel, row, col, cell ?? <span className="text-muted-foreground">not priced</span>)
+                  // Keyed: the live cell puts the label beside a sibling in its Button's children.
+                  ? renderCell(channel, row, col, cell ?? <span key="label" className="text-muted-foreground">not priced</span>)
                   : null),
               ]),
             )}

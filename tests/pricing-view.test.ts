@@ -92,6 +92,16 @@ describe("Price groups view", () => {
     expect(html).toMatch(/one table per sale channel/);
   });
 
+  it("hands renderCell a keyed unpriced label, since the live cell's Button puts it beside a sibling", () => {
+    // The page renders this view on the server; the label crosses into the
+    // client Button's children array, where React warns on an unkeyed element.
+    const labels: ReactNode[] = [];
+    htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid), renderCell: (_c, _r, _i, label) => { labels.push(label); return label; } }));
+    const elements = labels.filter(isValidElement);
+    expect(elements.length).toBeGreaterThan(0);
+    expect(elements.every((e) => e.key != null)).toBe(true);
+  });
+
   it("draws one blank state: no groups first, then no channels", () => {
     const none = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({ ...pricingGrid, groups: [], channels: [] }) }));
     expect(none).toMatch(/Add a price group/);
