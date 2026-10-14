@@ -84,6 +84,14 @@ describe("record_fermentation_reading: batch, tank, or both", () => {
     await expect(reading({ batchId: live })).rejects.toThrow(/batch is closed/);
   });
 
+  it("takes a reading with no temperature (gravity or pH only)", async () => {
+    const a = await schedule();
+    await historical({ batchId: a });
+    const row = await runCommand("record_fermentation_reading", { batchId: a, at: "2025-06-02T12:00:00Z", ph: 5.3 }, brewer) as { temp_f: number | null; ph: number };
+    expect(row.temp_f).toBeNull();
+    expect(Number(row.ph)).toBe(5.3);
+  });
+
   it("refuses neither batch nor tank", async () => {
     await expect(reading({})).rejects.toThrow();
   });

@@ -152,12 +152,13 @@ export function sampleInput(schema: $ZodType): Record<string, unknown> {
     if (isOptional(node)) continue;
     sample[name] = sampleValue(node);
   }
-  if (!core.safeParse(schema, sample).success) {
-    for (const [name, node] of Object.entries(shape)) {
-      if (!isOptional(node)) continue;
-      const candidate = { ...sample, [name]: sampleValue(node) };
-      if (core.safeParse(schema, candidate).success) return candidate;
-    }
+  // A refine over optional fields (one of a set required) rejects the
+  // required-only sample. Add optional fields in order until it parses: a
+  // schema with two such refines (record_fermentation_reading: a tank or
+  // batch, and a value) needs two.
+  for (const [name, node] of Object.entries(shape)) {
+    if (core.safeParse(schema, sample).success) break;
+    if (isOptional(node)) sample[name] = sampleValue(node);
   }
   return sample;
 }

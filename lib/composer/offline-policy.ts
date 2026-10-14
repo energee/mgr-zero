@@ -15,11 +15,16 @@ export const fermentationReadingInput = z.object({
   occupancyId: z.string().uuid().optional(),
   batchId: z.string().uuid().optional(),
   at: z.string().datetime({ offset: true }),
-  tempF: z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max),
+  tempF: z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max).optional(),
   gravityPlato: z.number().optional(),
   ph: z.number().min(READING_BOUNDS.ph.min).max(READING_BOUNDS.ph.max).optional(),
   note: z.string().optional(),
-}).strict().refine((i) => i.occupancyId || i.batchId, { message: "a reading needs a tank or a batch" });
+}).strict()
+  .refine((i) => i.occupancyId || i.batchId, { message: "a reading needs a tank or a batch" })
+  // Temperature is optional (an imported brew-day pH or gravity check may have
+  // none), but a reading must measure something. The cellar form still asks for it.
+  .refine((i) => i.tempF !== undefined || i.gravityPlato !== undefined || i.ph !== undefined,
+    { message: "a reading needs a temperature, gravity or pH" });
 
 export const fermentationReadingOfflinePolicy = {
   name: "record_fermentation_reading" as const,

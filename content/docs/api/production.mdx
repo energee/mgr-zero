@@ -354,9 +354,9 @@ Log one timestamped fermentation reading against an open occupancy, a brewed bat
 | Field | Type | Required |
 | --- | --- | --- |
 | `at` | string | yes |
-| `tempF` | number | yes |
 | `occupancyId` | uuid | no |
 | `batchId` | uuid | no |
+| `tempF` | number | no |
 | `gravityPlato` | number | no |
 | `ph` | number | no |
 | `note` | string | no |
@@ -365,7 +365,7 @@ Log one timestamped fermentation reading against an open occupancy, a brewed bat
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "at": "2026-01-31T12:00:00Z", "tempF": 25, "occupancyId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "at": "2026-01-31T12:00:00Z", "occupancyId": "00000000-0000-0000-0000-000000000000", "batchId": "00000000-0000-0000-0000-000000000000", "tempF": 25 } }'
 ```
 
 ## record_historical_batch [#record_historical_batch]
