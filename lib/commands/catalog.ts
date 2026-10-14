@@ -295,7 +295,7 @@ defineQuery({
   name: "list_price_group_barcodes", description: "Every price group × packaged format UPC: each SKU on the group scans as its format's code unless it has its own",
   roles: ["admin", "sales"],
   input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("price_group_barcodes").select("price_group_id, format_id, upc").eq("brewery_id", ctx.breweryId)),
+  handler: (ctx) => completeRows("Barcode list", start => ctx.db.from("price_group_barcodes").select("price_group_id, format_id, upc", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("price_group_id").order("format_id").range(start, start + PAGE_SIZE - 1)),
 });
 
 defineCommand({
