@@ -50,7 +50,13 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
   const hit = (id: string, label: string, detail: string, href: string, exact = false): SearchHit => ({ kind, id, label, detail, href, exact });
   switch (kind) {
     case "sku": {
-      const rows = await unwrap(ctx.db.from("skus").select("id, name, brands(name)").eq("brewery_id", b).ilike("name", prefix).limit(LIMIT)) as Row[];
+      // A SKU matches on its own name or its brand's staff-only alias ("Animal #14").
+      // PostgREST cannot `or` a column with an embedded one, so two prefix reads merge.
+      const [byName, byAlias] = await Promise.all([
+        unwrap(ctx.db.from("skus").select("id, name, brands(name)").eq("brewery_id", b).ilike("name", prefix).limit(LIMIT)),
+        unwrap(ctx.db.from("skus").select("id, name, brands!inner(name)").eq("brewery_id", b).ilike("brands.alias", prefix).limit(LIMIT)),
+      ]) as [Row[], Row[]];
+      const rows = [...new Map([...byName, ...byAlias].map((r) => [r.id as string, r])).values()].slice(0, LIMIT);
       return rows.map((r) => hit(r.id as string, r.name as string, (r.brands as { name: string } | null)?.name ?? "SKU", `/catalog`));
     }
     case "customer": {

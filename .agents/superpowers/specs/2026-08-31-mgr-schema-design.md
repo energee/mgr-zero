@@ -758,6 +758,15 @@ Rename `products` → `brands` and every `product_id` → `brand_id` (`skus`,
 `lots`, recipes, compliance). No column semantics change for those. Do it as a
 rename, not an alias — two names for one table is how drift starts.
 
+`brands.alias text` (optional, non-blank): a staff-only informal name beside the
+brand name, such as a series number ("Appaloosa", alias "Animal #14"). Staff
+search matches it, and staff pickers and Catalog rows show "Name · Alias". It is
+never on the portal, Square, the public menu, or SKU names: brands has no
+customer policy, and those surfaces read `brands.name`. `upsert_brand` replaces
+it like every field. `recipes.brand_id` changes after creation through
+`set_recipe_brand`; batches keep the `intended_brand_id` they copied
+(`20261014100500_brand_alias.sql`).
+
 **`batches` is the one exception.** Its column becomes `intended_brand_id` and
 loses `NOT NULL`, because the semantics genuinely change — see §16.9.
 

@@ -1,6 +1,7 @@
 // lib/mgr/catalog-view.ts — view-model for Catalog. list_brands plus
 // list_price_groups (and optional list_sale_channels / water-profile count)
 // paint the inventory Catalog drawing.
+import { brandLabel } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 
@@ -25,6 +26,7 @@ export type CatalogViewModel = {
 export type CatalogBrandRow = {
   id: string;
   name: string;
+  alias?: string | null;
   abv: number | string | null;
   styles: { name: string } | null;
   skus: { id: string }[];
@@ -64,7 +66,7 @@ export function toCatalogViewProps({
       : undefined,
     brands: brands.map((b) => ({
       key: b.id,
-      title: b.name,
+      title: brandLabel(b),
       detail: brandDetail(b),
       href: `/catalog/brands/${b.id}`,
     })),

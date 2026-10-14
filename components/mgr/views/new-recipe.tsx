@@ -7,12 +7,13 @@
 // first version so one save creates both.
 "use client";
 
+import { brandLabel } from "@/lib/mgr/brand-view";
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { NONE } from "@/components/ui/select";
 
 export type NewRecipeValues = { name: string; brandId: string; note: string };
-export type NewRecipeBrand = { id: string; name: string };
+export type NewRecipeBrand = { id: string; name: string; alias?: string | null };
 export const BLANK_RECIPE: NewRecipeValues = { name: "", brandId: "", note: "" };
 
 export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: {
@@ -29,7 +30,7 @@ export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: 
     <>
       {E.edit("Name", v.name, "text", undefined, { onChange: (nextValue: string) => set({ name: nextValue }), id: `${id}-name`, disabled: busy, required: true })}
       {E.gated("Style", "arrives with the recipe style column; the brand carries style today")}
-      {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: b.name })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
+      {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: brandLabel(b) })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
       {E.edit("Note · optional", v.note, "text", undefined, { onChange: (nextValue: string) => set({ note: nextValue }), id: `${id}-note`, disabled: busy })}
       {E.info("The brand is intent only; identity is required at packaging.")}
     </>

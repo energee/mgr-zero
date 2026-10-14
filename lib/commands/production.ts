@@ -47,6 +47,17 @@ defineCommand({
   })),
 });
 
+// A recipe's brand after creation; null clears it. Batches already scheduled
+// keep the brand they copied, so nothing downstream is rewritten.
+defineCommand({
+  name: "set_recipe_brand", description: "Set or clear the brand a recipe brews (a pre-fill for new batches); batches already scheduled keep their brand",
+  input: z.object({ recipeId: z.string().uuid(), brandId: z.string().uuid().nullable() }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_recipe_brand", {
+    p_brewery: ctx.breweryId, p_recipe: i.recipeId, p_brand: i.brandId, p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "create_recipe_version",
   description: "Add the next version of a recipe: its mash and fermentation schedules, whirlpool/knockout/pre-boil, water and additions, assumptions and ingredients; versions are immutable and snapshot each material's extract potential",

@@ -23,7 +23,7 @@ import {
   skuListHazy,
 } from "../lib/mgr/fixtures/catalog";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
-import { toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
+import { brandLabel, toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
 import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
@@ -52,6 +52,24 @@ describe("Catalog view", () => {
     expect(model.priceGroups).toBe("3 channels · 8 groups");
     expect(model.waterProfiles).toBe("3 profiles");
     expect(model.backHref).toBeUndefined();
+  });
+
+  it("a brand's staff-only alias follows its name (brand-alias.md)", () => {
+    expect(brandLabel({ name: "Appaloosa", alias: "Animal #14" })).toBe("Appaloosa · Animal #14");
+    expect(brandLabel({ name: "Lupula", alias: null })).toBe("Lupula");
+    expect(brandLabel({ name: "Lupula" })).toBe("Lupula");
+    const [first, ...rest] = catalogBrands.brands;
+    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, ...rest] });
+    expect(model.brands[0]?.title).toBe(`${first!.name} · Animal #14`);
+  });
+
+  it("the brand page carries and draws the alias field", () => {
+    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Animal #14" } });
+    expect(model.alias).toBe("Animal #14");
+    expect(toBrandViewProps(brandHazy).alias).toBe("");
+    const html = renderToStaticMarkup(createElement(BrandView, { model }));
+    expect(html).toContain("Alias");
+    expect(html).toContain("Animal #14");
   });
 
   it("omits water profiles when the snapshot has no count", () => {

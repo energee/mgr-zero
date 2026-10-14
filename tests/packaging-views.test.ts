@@ -64,7 +64,7 @@ describe("packaging views", () => {
 
   it("builds the live Schedule run model from the page's reads, gating what they cannot say", () => {
     const data = {
-      brands: [{ id: "b1", name: "Pils" }, { id: "b2", name: "Stout" }],
+      brands: [{ id: "b1", name: "Pils" }, { id: "b2", name: "Stout", alias: "Animal #14" }],
       occupancies: [{ occupancy_id: "o1", vessel_name: "FV1", brand_name: "Pils", batch_no: 12, bbl: 20 }],
       skus: [
         { id: "s1", name: "Pils ½ bbl", brand_id: "b1", format_volume: { bbl_per_unit: 0.5 } },
@@ -73,6 +73,8 @@ describe("packaging views", () => {
       ],
     };
     const empty = toSchedulePackagingRunView(data, { brandId: "", occupancyId: "", plannedOn: "", qty: {} });
+    // A brand's staff-only alias follows its name in the picker (brand-alias.md).
+    expect(empty.brandOptions).toEqual([{ value: "b1", label: "Pils" }, { value: "b2", label: "Stout · Animal #14" }]);
     expect(empty.outputs).toEqual([]);
     expect(empty.sourceOptions[0]).toEqual({ value: "", label: "No source yet" });
     expect(empty.source).toBe("");

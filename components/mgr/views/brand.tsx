@@ -17,7 +17,7 @@ import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 
 export type { BrandViewModel };
 
-export type BrandControls = Partial<Record<"name" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
+export type BrandControls = Partial<Record<"name" | "alias" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
 
@@ -57,6 +57,8 @@ export function BrandView({
     <>
       {E.back("Catalog", model.name || "New brand", createAction, model.backHref)}
       <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />
+      {/* Staff-only: an informal name such as a series number. Never on the portal, Square or SKU names. */}
+      <RegistryInput label="Alias" value={model.alias} onChange={controls.alias} />
       {E.cols(
         <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
         E.edit("ABV", model.abv, "number", undefined, { onChange: controls.abv, min: String(BRAND_ABV.min), max: String(BRAND_ABV.max), step: "0.1" }),
