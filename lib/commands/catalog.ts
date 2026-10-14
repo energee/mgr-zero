@@ -123,7 +123,7 @@ defineQuery({
     // A brand with no price group has no pours.
     if (i.brandId && !groupId) return [];
     const [formats, volumes] = await Promise.all([completeRows("Format list", start => {
-      let q = ctx.db.from("formats").select("*, price_groups!formats_price_group_fk(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
+      let q = ctx.db.from("formats").select("*, price_groups(name), components:format_components!format_components_parent_format_id_brewery_id_fkey(parent_format_id, child_format_id, qty)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
       if (i.basis) q = q.eq("basis", i.basis);
       if (i.brandId) q = q.eq("price_group_id", groupId!);
       return q.range(start, start + PAGE_SIZE - 1);
@@ -244,11 +244,10 @@ defineCommand({
 // price grid. A brand sits on one; a cell prices that row on a channel for a
 // format. Warehouse reads them (they name a brand's price group) but never prices.
 defineQuery({
-  name: "list_price_groups", description: "Rows of the price grid in position order, each with its barcodes (a UPC per packaged format; admin and sales read them, warehouse gets none)",
+  name: "list_price_groups", description: "Rows of the price grid in position order",
   roles: ["admin", "sales", "warehouse"],
   input: z.object({}),
-  // RLS lets only admin and sales read price_group_barcodes, so a warehouse caller's embed is empty, not an error.
-  handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*, price_group_barcodes(format_id, upc)").eq("brewery_id", ctx.breweryId).order("position")),
+  handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*").eq("brewery_id", ctx.breweryId).order("position")),
 });
 
 // The cost a brand's recipe implies, for the price-group suggestion on Brand.
@@ -288,9 +287,8 @@ defineCommand({
   })),
 });
 
-// The barcode read's own gate (#770: a business table's RLS roles match the
-// command that lists it). list_price_groups and list_brands also embed the codes;
-// RLS returns them only to these two roles.
+// The one barcode read, gated like its RLS (#770): the pricing page and a
+// brand's SKU list both call it.
 defineQuery({
   name: "list_price_group_barcodes", description: "Every price group × packaged format UPC: each SKU on the group scans as its format's code unless it has its own",
   roles: ["admin", "sales"],
@@ -323,11 +321,11 @@ defineCommand({
 
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
-  name: "list_brands", description: "Brands with their style, price group (and its barcodes for admin and sales), SKUs and the pours that group owns, alphabetical",
+  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const [brands, pours] = await Promise.all([
-      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name, price_group_barcodes(format_id, upc)), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId).order("name")),
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);
@@ -341,7 +339,7 @@ defineQuery({
   name: "get_format_composition", description: "One format with its components, packaging BOM, atomic child options, and material names and base units",
   input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx, i) => {
-    const format = await unwrap(ctx.db.from("formats").select("*, price_groups!formats_price_group_fk(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
+    const format = await unwrap(ctx.db.from("formats").select("*, price_groups(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
     if (!format) throw new CommandError("Format not found", 404, "not_found");
     const [components, lines, formats, materials, parents] = await Promise.all([
       completeRows("Format", start => ctx.db.from("format_components").select("child_format_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id").range(start, start + PAGE_SIZE - 1)),

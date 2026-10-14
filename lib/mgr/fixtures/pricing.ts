@@ -1,4 +1,4 @@
-// lib/mgr/fixtures/pricing.ts — list_sale_channels, list_price_groups,
+// lib/mgr/fixtures/pricing.ts — list_sale_channels, list_price_groups, list_price_group_barcodes,
 // list_formats and list_channel_prices snapshot for the Price groups grid.
 // Views own no sample data. Hazy wholesale ½ bbl and Pils case are cents.
 import type { PriceGroupSnapshot } from "@/lib/mgr/price-group-view";
@@ -35,7 +35,7 @@ export const pricingGrid: PriceGroupsSnapshot = {
   ],
   groups: [
     { id: PG1, name: "1", position: 1, cost_ceiling_cents: null },
-    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 6500, price_group_barcodes: [{ format_id: FMT_CASE, upc: "00810123450127" }] },
+    { id: PG2, name: "2", position: 2, cost_ceiling_cents: 6500 },
     { id: PG3, name: "3", position: 3, cost_ceiling_cents: null },
   ],
   formats: [
@@ -45,6 +45,7 @@ export const pricingGrid: PriceGroupsSnapshot = {
     { id: FMT_PINT, name: "pint" },
     { id: FMT_CROWLER, name: "crowler" },
   ],
+  barcodes: [{ price_group_id: PG2, format_id: FMT_CASE, upc: "00810123450127" }],
   cells: [
     cell(CH_WHOLESALE, PG1, FMT_HALF, 13200),
     cell(CH_WHOLESALE, PG1, FMT_SIXTEL, 5300),

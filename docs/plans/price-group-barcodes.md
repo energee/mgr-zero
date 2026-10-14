@@ -143,14 +143,19 @@ No conflict, no repeated mistake.
 
 ## Deviations while building
 
-- **`list_price_group_barcodes` exists.** Rule #770 (`tests/rls-taproom.test.ts`)
-  needs a command whose roles match a business table's RLS exactly: admin and
-  sales. `list_price_groups` (adds warehouse) and `list_brands` (all staff) both
-  embed the codes too, and RLS empties those embeds for the other roles.
-- **Two embeds name their foreign key.** The new table gives PostgREST a second
-  path from `formats` to `price_groups`. `list_formats` and
-  `get_format_composition` now embed `price_groups!formats_price_group_fk(name)`,
-  or they fail with PGRST201.
+- **The key is `(price_group_id, format_id)`,** the shape `channel_prices` uses,
+  with a brewery guard on the upsert. A key holding both foreign keys' columns
+  made PostgREST read the table as a formats↔price_groups link, so every plain
+  `formats → price_groups(name)` embed failed with PGRST201. This shape avoids
+  that at the root instead of naming the foreign key in each embed.
+- **One barcode read, `list_price_group_barcodes`** (admin, sales; the #770
+  role-matched read). The pricing page and a brand's SKU list call it; for any
+  other role the SKU page skips it (as it does keg pools) and shows only a
+  SKU's own UPC. `list_price_groups` and `list_brands` stay as they were, so
+  their ~15 callers pay nothing.
 - **Barcodes edit one row at a time.** Each format's UPC has its own sheet
   (`BarcodeForm`) inside the group dialog, instead of saving with the group
   form, so one bad code never blocks the group save.
+- **Not done: a `sku_barcodes` view** that would give every staff role the
+  effective code. Warehouse and brewers see only a SKU's own UPC today, since
+  group codes are an admin/sales read. Widening that read is a product decision.

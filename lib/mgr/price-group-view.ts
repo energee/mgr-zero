@@ -1,5 +1,6 @@
 // lib/mgr/price-group-view.ts — view-model for one Price group row. Name,
-// position, cost ceiling and barcodes come from list_price_groups; the Prices line
+// position and cost ceiling come from list_price_groups, barcodes from
+// list_price_group_barcodes; the Prices line
 // summarises list_channel_prices for that group. Without a groupId it is the
 // same row before it exists (the create form): blank name, next position,
 // under the last group's ceiling, no Prices line.
@@ -62,7 +63,8 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
         id: f.id, name: f.name, ounces: f.ounces != null ? String(f.ounces) : "",
       })),
       barcodes: snapshot.formats.filter((f) => f.basis !== "poured").map((f) => ({
-        formatId: f.id, format: formatLabel(f), upc: group.price_group_barcodes?.find((b) => b.format_id === f.id)?.upc ?? "",
+        formatId: f.id, format: formatLabel(f),
+        upc: snapshot.barcodes?.find((b) => b.price_group_id === group.id && b.format_id === f.id)?.upc ?? "",
       })),
     }),
   };

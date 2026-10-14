@@ -8,7 +8,6 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-type Barcode = { price_group_id: string; format_id: string; upc: string };
 let breweryId: string;
 let owner: Ctx;
 let sales: Ctx;
@@ -70,19 +69,20 @@ describe("reading barcodes", () => {
     await expect(runCommand("list_price_group_barcodes", {}, brewer)).rejects.toThrow();
   });
 
-  it("list_price_groups carries each group's codes for staff", async () => {
+  it("list_price_groups and list_brands stay lean: codes come only from list_price_group_barcodes", async () => {
     await set({ upc: "850051366040" });
-    const groups = (await runCommand("list_price_groups", {}, sales)) as { id: string; price_group_barcodes: Barcode[] }[];
-    expect(groups.find((g) => g.id === group)?.price_group_barcodes).toContainEqual(expect.objectContaining({ format_id: can, upc: "850051366040" }));
+    const groups = (await runCommand("list_price_groups", {}, sales)) as Record<string, unknown>[];
+    expect(groups.find((g) => g.id === group)).not.toHaveProperty("price_group_barcodes");
+    const brands = (await runCommand("list_brands", {}, sales)) as { name: string; price_groups: Record<string, unknown> | null }[];
+    expect(brands.find((b) => b.name === "Alma")?.price_groups).toEqual({ name: "Tier 1" });
   });
 
-  it("list_brands carries the brand's group codes for sales, and none for a brewer", async () => {
+  it("a formats → price_groups embed is unambiguous with barcodes present", async () => {
     await set({ upc: "850051366040" });
-    type Brand = { name: string; price_groups: { price_group_barcodes: Barcode[] } | null };
-    const forSales = (await runCommand("list_brands", {}, sales)) as Brand[];
-    expect(forSales.find((b) => b.name === "Alma")?.price_groups?.price_group_barcodes).toContainEqual(expect.objectContaining({ upc: "850051366040" }));
-    const forBrewer = (await runCommand("list_brands", {}, brewer)) as Brand[];
-    expect(forBrewer.find((b) => b.name === "Alma")?.price_groups?.price_group_barcodes ?? []).toEqual([]);
+    const formats = (await runCommand("list_formats", {}, sales)) as { id: string }[];
+    expect(formats.some((f) => f.id === can)).toBe(true);
+    const plain = await admin.from("formats").select("id, price_groups(name)").eq("brewery_id", breweryId);
+    expect(plain.error).toBeNull();
   });
 
   it("a brewer and a portal customer read no barcode row", async () => {
