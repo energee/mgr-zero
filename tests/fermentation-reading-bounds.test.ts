@@ -23,6 +23,16 @@ describe("fermentation reading bounds (#468)", () => {
     expect(fermentationReadingInput.safeParse({ ...base, ph: -1 }).success).toBe(false);
   });
 
+  it("names a tank, a batch, or both, never neither (readings-on-batch); bounds apply to each", () => {
+    const { occupancyId, ...rest } = base;
+    const batchId = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
+    expect(fermentationReadingInput.safeParse({ ...rest, occupancyId }).success).toBe(true);
+    expect(fermentationReadingInput.safeParse({ ...rest, batchId }).success).toBe(true);
+    expect(fermentationReadingInput.safeParse({ ...rest, batchId, occupancyId }).success).toBe(true);
+    expect(fermentationReadingInput.safeParse(rest).success).toBe(false);
+    expect(fermentationReadingInput.safeParse({ ...rest, batchId, tempF: 10 }).success).toBe(false);
+  });
+
   it("accepts the bounds themselves", () => {
     expect(fermentationReadingInput.safeParse({ ...base, tempF: READING_BOUNDS.tempF.min, ph: READING_BOUNDS.ph.min }).success).toBe(true);
     expect(fermentationReadingInput.safeParse({ ...base, tempF: READING_BOUNDS.tempF.max, ph: READING_BOUNDS.ph.max }).success).toBe(true);

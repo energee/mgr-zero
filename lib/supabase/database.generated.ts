@@ -448,7 +448,7 @@ export type Database = {
           created_by: string
           id: string
           initial_bbl: number
-          occupancy_id: string
+          occupancy_id: string | null
           plan_snapshot: Json
           process: Json
           recipe_version_id: string | null
@@ -465,7 +465,7 @@ export type Database = {
           created_by: string
           id?: string
           initial_bbl: number
-          occupancy_id: string
+          occupancy_id?: string | null
           plan_snapshot: Json
           process: Json
           recipe_version_id?: string | null
@@ -482,7 +482,7 @@ export type Database = {
           created_by?: string
           id?: string
           initial_bbl?: number
-          occupancy_id?: string
+          occupancy_id?: string | null
           plan_snapshot?: Json
           process?: Json
           recipe_version_id?: string | null
@@ -512,18 +512,18 @@ export type Database = {
             referencedColumns: ["id", "brewery_id"]
           },
           {
-            foreignKeyName: "brew_records_occupancy_id_brewery_id_fkey"
-            columns: ["occupancy_id", "brewery_id"]
+            foreignKeyName: "brew_records_occupancy_id_batch_id_brewery_id_fkey"
+            columns: ["occupancy_id", "batch_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "occupancy_volumes"
-            referencedColumns: ["occupancy_id", "brewery_id"]
+            referencedColumns: ["occupancy_id", "batch_id", "brewery_id"]
           },
           {
-            foreignKeyName: "brew_records_occupancy_id_brewery_id_fkey"
-            columns: ["occupancy_id", "brewery_id"]
+            foreignKeyName: "brew_records_occupancy_id_batch_id_brewery_id_fkey"
+            columns: ["occupancy_id", "batch_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "vessel_occupancies"
-            referencedColumns: ["id", "brewery_id"]
+            referencedColumns: ["id", "batch_id", "brewery_id"]
           },
           {
             foreignKeyName: "brew_records_recipe_version_id_brewery_id_fkey"
@@ -1286,38 +1286,48 @@ export type Database = {
       fermentation_readings: {
         Row: {
           at: string
+          batch_id: string
           brewery_id: string
           created_by: string
           gravity_plato: number | null
           id: string
           note: string | null
-          occupancy_id: string
+          occupancy_id: string | null
           ph: number | null
           temp_f: number | null
         }
         Insert: {
           at?: string
+          batch_id: string
           brewery_id: string
           created_by: string
           gravity_plato?: number | null
           id?: string
           note?: string | null
-          occupancy_id: string
+          occupancy_id?: string | null
           ph?: number | null
           temp_f?: number | null
         }
         Update: {
           at?: string
+          batch_id?: string
           brewery_id?: string
           created_by?: string
           gravity_plato?: number | null
           id?: string
           note?: string | null
-          occupancy_id?: string
+          occupancy_id?: string | null
           ph?: number | null
           temp_f?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fermentation_readings_batch_id_brewery_id_fkey"
+            columns: ["batch_id", "brewery_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id", "brewery_id"]
+          },
           {
             foreignKeyName: "fermentation_readings_brewery_id_fkey"
             columns: ["brewery_id"]
@@ -1326,18 +1336,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fermentation_readings_occupancy_id_brewery_id_fkey"
-            columns: ["occupancy_id", "brewery_id"]
+            foreignKeyName: "fermentation_readings_occupancy_id_batch_id_brewery_id_fkey"
+            columns: ["occupancy_id", "batch_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "occupancy_volumes"
-            referencedColumns: ["occupancy_id", "brewery_id"]
+            referencedColumns: ["occupancy_id", "batch_id", "brewery_id"]
           },
           {
-            foreignKeyName: "fermentation_readings_occupancy_id_brewery_id_fkey"
-            columns: ["occupancy_id", "brewery_id"]
+            foreignKeyName: "fermentation_readings_occupancy_id_batch_id_brewery_id_fkey"
+            columns: ["occupancy_id", "batch_id", "brewery_id"]
             isOneToOne: false
             referencedRelation: "vessel_occupancies"
-            referencedColumns: ["id", "brewery_id"]
+            referencedColumns: ["id", "batch_id", "brewery_id"]
           },
         ]
       }
@@ -9516,6 +9526,7 @@ export type Database = {
       record_fermentation_reading: {
         Args: {
           p_at: string
+          p_batch: string
           p_brewery: string
           p_gravity_plato: number
           p_note: string
@@ -9523,6 +9534,18 @@ export type Database = {
           p_ph: number
           p_request_id: string
           p_temp_f: number
+        }
+        Returns: Json
+      }
+      record_historical_batch: {
+        Args: {
+          p_batch: string
+          p_brewed_on: string
+          p_brewery: string
+          p_closed_on: string
+          p_knockout_bbl: number
+          p_process: Json
+          p_request_id: string
         }
         Returns: Json
       }

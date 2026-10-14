@@ -384,8 +384,10 @@ describe("completion root structure and privileges", () => {
   it("rejects service-role reparenting of a completed root occupancy and rolls the row back", async () => {
     const ordinary = await brew(1);
     const ordinaryTarget = await brew(1);
-    expect((await admin.from("vessel_occupancies").update({ batch_id: ordinaryTarget.batchId }).eq("id", ordinary.occupancyId)).error)
-      .toBeNull();
+    // A brewed occupancy can never change batch: its brew record names
+    // (occupancy, batch) through a composite FK (readings-on-batch).
+    expect((await admin.from("vessel_occupancies").update({ batch_id: ordinaryTarget.batchId }).eq("id", ordinary.occupancyId)).error?.code)
+      .toBe("23503");
 
     const source = await brew(1);
     expect((await complete(source.batchId)).adjustmentId).toBeTruthy();

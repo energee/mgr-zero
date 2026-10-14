@@ -305,7 +305,9 @@ describe("completion loss review", () => {
     expectSqlState(`begin; update volume_adjustments set bbl=-0.01 where id='${completed.adjustmentId}'; commit`, "P0001");
     expectSqlState(`begin; update volume_adjustments set occupancy_id='${otherOccupancy}' where reclassification_id='${allocation.id}' and reclassification_leg='reverse'; commit`, "P0001");
     const otherBatch = sql(`select batch_id::text from vessel_occupancies where id='${otherOccupancy}'`, true)[0];
-    expectSqlState(`begin; update vessel_occupancies set batch_id='${otherBatch}' where id='${sourceOccupancy}'; commit`, "P0001");
+    // The brew record and readings name (occupancy, batch), so the composite FK
+    // refuses a reparent before the deferred graph check runs (readings-on-batch).
+    expectSqlState(`begin; update vessel_occupancies set batch_id='${otherBatch}' where id='${sourceOccupancy}'; commit`, "23503");
   });
 
   it("posts signed corrections in their actual period, leaves occupancy unchanged, and preserves filed snapshots", async () => {

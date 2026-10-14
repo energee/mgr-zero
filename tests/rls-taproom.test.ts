@@ -105,7 +105,7 @@ async function fixtures() {
   const occupancy2 = await put("vessel_occupancies", { vessel_id: vessel2.id, batch_id: batch.id });
   await put("transfers", { from_occupancy_id: occupancy.id, to_occupancy_id: occupancy2.id, bbl: 1, created_by: owner.id });
   await put("volume_adjustments", { occupancy_id: occupancy.id, bbl: -1, reason: "loss", created_by: owner.id });
-  await put("fermentation_readings", { occupancy_id: occupancy.id, gravity_plato: 5, created_by: owner.id });
+  await put("fermentation_readings", { batch_id: batch.id, occupancy_id: occupancy.id, gravity_plato: 5, created_by: owner.id });
   const consumption = await put("material_movements", { material_id: material.id, location_id: wh.id, bin_id: wh.binId, qty: -1, type: "consumption", created_by: owner.id });
   await put("batch_additions", { batch_id: batch.id, stage: "mash", movement_id: consumption.id });
   const run = await put("packaging_runs", { brand_id: cat.brandId, planned_on: day, created_by: owner.id });
@@ -381,7 +381,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     correct_brew_record: [B,R(),"Test correction",1,[],{},true,R()],
     get_brew_day_plan: [B,plannedBatch.id], get_brew_record: [B,plannedBatch.id], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
     record_batch_addition: [B,f.occupancy.id,MAT,"dry_hop",null,1,null,R()],
-    record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R(),"0".repeat(32)],
+    record_fermentation_reading: [B,null,f.occupancy.id,now,68,5,4.2,null,R()], record_historical_batch: [B,plannedBatch.id,day,day,1,{},R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R(),"0".repeat(32)],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R(),null], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
     cancel_batch: [B,plannedBatch.id,R()], reschedule_batch: [B,plannedBatch.id,day,R()],
     cancel_packaging_run: [B,readyRun.id,R()], reschedule_packaging_run: [B,readyRun.id,day,R()],
