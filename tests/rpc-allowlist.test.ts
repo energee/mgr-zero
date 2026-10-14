@@ -134,6 +134,7 @@ const AUTHENTICATED_RPCS = [
   "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
   "record_fermentation_reading(uuid,uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
   "record_historical_batch(uuid,uuid,date,date,numeric,jsonb,uuid)",
+  "record_historical_packaging_run(uuid,uuid,date,jsonb,text,uuid)",
   "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid,uuid,text,uuid,uuid)",
   "preview_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid,uuid)",
   "create_chat_conversation(uuid,text,uuid)",
