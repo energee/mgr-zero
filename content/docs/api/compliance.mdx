@@ -23,6 +23,14 @@ once, as a removal under that treatment (`taxable` for the default channel:
 taxpaid removals for consumption on premises). The cellar
 breakdown is explanatory and must not be added to `figures.removals`.
 
+`search_colas` reads TTB's public COLA registry live, under the brewery's TTB
+registry number from Settings; nothing it returns is stored. It answers
+`{ permit, rows }`, each row carrying `ttbId`, `serial` (or `null`),
+`completedOn` (`YYYY-MM-DD`), `fancifulName`, `brandName`, `classCode` and
+`className`. A brewery with no registry number gets a 400 `bad_request`; a TTB
+failure gets a 502 `upstream_unavailable`, so an empty `rows` is a real
+no-match. COLAs completed more than 15 years ago are not found.
+
 {/* ops:compliance */}
 
 ## file_compliance_report [#file_compliance_report]
