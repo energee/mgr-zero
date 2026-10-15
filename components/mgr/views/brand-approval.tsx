@@ -1,6 +1,7 @@
 // components/mgr/views/brand-approval.tsx — shared Brand approval sheet body.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { formatDate } from "@/lib/date-format";
 import { RegistryDate, RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { approvalNumberLabel, colaUrl, type BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
 import type { ColaRecord } from "@/lib/ttb/colas";
@@ -23,17 +24,18 @@ function colaLink(ttbId: string) {
 }
 
 /** Find COLA on TTB, then the brand's COLAs under the brewery's permit, each with Use. */
-function findCola(model: BrandApprovalViewModel, controls: Controls) {
-  const colas = model.colas;
+function colaSearchResults(model: BrandApprovalViewModel, controls: Controls) {
+  const { colas, searching } = model;
+  const use = controls.useCola;
   return <>
-    {E.btn(model.searching ? "Searching TTB…" : "Find COLA on TTB", model.searching ? "g disabled" : "g", undefined, controls.findCola)}
+    {E.btn(searching ? "Searching TTB…" : "Find COLA on TTB", searching ? "g disabled" : "g", undefined, controls.findCola)}
     {colas && (colas.rows.length === 0
       ? E.info(`No COLAs on TTB under ${colas.permit} match ${model.brand}.`)
       : colas.rows.map((r) => (
         <Fragment key={r.ttbId}>
           {E.row(r.fancifulName, `${r.ttbId} · ${r.serial ? `serial ${r.serial}` : "no serial"} · ${r.className}`, <>
-            <span className="text-sm text-muted-foreground">{r.completedOn}</span>
-            {E.act("Use", "primary", undefined, controls.useCola && (() => controls.useCola!(r)))}
+            <span className="text-sm text-muted-foreground">{formatDate(r.completedOn)}</span>
+            {E.act("Use", "primary", undefined, use && (() => use(r)))}
           </>)}
         </Fragment>
       )))}
@@ -52,7 +54,7 @@ export function BrandApprovalView({ model, controls = {}, messages, footer }: {
       {cola && <>
         <RegistryInput label="Serial number · optional" value={model.serialNumber ?? ""} onChange={controls.serialNumber} />
         {colaLink(model.number ?? "")}
-        {findCola(model, controls)}
+        {colaSearchResults(model, controls)}
       </>}
       <RegistryDate label="Date submitted · optional" value={model.submittedOn ?? ""} onChange={controls.submittedOn} />
       {messages}

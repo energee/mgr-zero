@@ -54,7 +54,7 @@ Sequential unless marked parallel.
    Pure `parseColaPage(html): { total: number; rows: ColaRecord[]; hasNext: boolean }`,
    pure `matchColas(rows, name)`, and `searchColasByPermit(permit, fetchImpl?)`
    that pages with one cookie over an `https` agent whose `ca` adds
-   `lib/ttb/entrust-ov-tls-rsa-ca2.pem`.
+   the intermediate (inlined as a constant in `colas.ts` after review, so the deployed function needs no file).
    - Test first: `tests/ttb-colas.test.ts` against
      `tests/fixtures/ttb-cola-results.html` (a saved real results page,
      public data): 20 rows, total 144, first row fields, `hasNext`; a page

@@ -93,7 +93,7 @@ defineQuery({
     if (!permit) throw new CommandError("Set the brewery's TTB registry number on Settings to search COLAs.", 400, "bad_request");
     // A TTB failure is an error, never an empty list: no match and no answer differ.
     const found = await searchColasByPermit(permit).catch((error: unknown) => {
-      throw new CommandError(`TTB's COLA registry did not answer: ${error instanceof Error ? error.message : String(error)}`, 502, "ttb_unavailable");
+      throw new CommandError(`TTB's COLA registry did not answer: ${error instanceof Error ? error.message : String(error)}`, 502, "upstream_unavailable");
     });
     return { permit, rows: matchColas(found, i.name) };
   },

@@ -1,6 +1,7 @@
 // tests/compliance-view.test.ts — Compliance months, Licenses, the brand's
 // approval and registration sheets, and lot trace. Views own no sample data.
 // Live sheet wrappers mount the shared bodies.
+import { formatDate } from "@/lib/date-format";
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -158,7 +159,7 @@ describe("registry sheets", () => {
     const first = brandApprovalStout.colas!.rows[0];
     expect(html).toContain(first.fancifulName);
     expect(html).toContain(`${first.ttbId} · serial ${first.serial} · ${first.className}`);
-    expect(html).toContain(first.completedOn);
+    expect(html).toContain(formatDate(first.completedOn));
     expect(html.match(/>Use<\/button>/g) ?? []).toHaveLength(brandApprovalStout.colas!.rows.length);
     const none = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: { permit: "BR-PA-20553", rows: [] } } }));
     expect(none).toContain("No COLAs on TTB under BR-PA-20553 match Stout.");
