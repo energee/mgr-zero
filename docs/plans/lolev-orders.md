@@ -143,10 +143,24 @@ alter table public.inventory_movements add column dest_country text
 `tax_treatment = 'export'`. `ship_order_impl` reads the ship-to's country:
 US gives `dest_state` as today; anything else gives `dest_country`, and is
 refused unless the frozen treatment is `export` ("only an export order can
-ship outside the US"). `destination_state_facts` skips rows with
-`dest_country` (they have no state), so they stop raising `Unassigned`
-(`20260928236000_destination_state_facts_on_ledger.sql:34`). The removals total
-already files them under `export` (`20261013100000_file_cellar_taproom_removals.sql:28`).
+ship outside the US"). The removals total already files them under `export`
+(`20261013100000_file_cellar_taproom_removals.sql:28`).
+
+`private.destination_state_facts`
+(`20260928236000_destination_state_facts_on_ledger.sql:54-78`) has two branches:
+
+- **Movements:** a removal with a null `dest_state` is already dropped
+  (line 64). No change.
+- **Invoice lines:** each `sku` line takes its state from `shipped_state`
+  (line 54), which ignores nulls. So an export line gets no state and becomes
+  `Unassigned`, which raises the compliance warning. The fix leaves out
+  invoice lines whose shipment's removals carry a `dest_country`.
+  `shipped_state` also returns a `has_country` flag, and the branch filters
+  on it.
+
+Historical invoices never reach this function. It reads invoices `issued_on`
+inside the period (line 78), and no period may start before `books_opened_on`
+(`private.assert_period_after_books_opened`, `20261014100100…:38`).
 
 ## Schema — `20261016100200_pickup_orders.sql`
 
@@ -165,13 +179,26 @@ query (AGENTS.md negative 12).
 alter type public.invoice_line_kind add value 'one_way_keg_fee';
 alter table public.breweries add column one_way_keg_fee_cents int not null default 0
   check (one_way_keg_fee_cents >= 0);
+alter table public.order_lines add column one_way_fee_cents int
+  check (one_way_fee_cents is null or one_way_fee_cents > 0);
 ```
 
 One fee for the brewery (Lolev: 1000). A one-way keg is a SKU whose format is
 a keg (`formats.package_type = 'keg'`) with `container_source is null`
-(`tests/one-way-keg.test.ts:41`; `one_way_material` is never written). At
-ship, `ship_order_impl` adds one `one_way_keg_fee` invoice line per shipped
-one-way keg line (qty = shipped qty, price = the brewery fee frozen then).
+(`tests/one-way-keg.test.ts:41`; `one_way_material` is never written).
+
+An invoice is written in one of two places, and both add the fee line:
+
+- **`ship_order_impl`** when `invoice_timing = 'now'`. Quantity is the shipped
+  quantity.
+- **`confirm_delivery`** when `invoice_timing = 'on_delivery'`
+  (`20261012120300_leave_delivery_for_later.sql:78-88`). Quantity is shipped
+  minus refused, as for the `sku` and deposit lines there.
+
+The fee is frozen when the order is shipped. `order_lines` gains
+`one_way_fee_cents int`, set at ship to the brewery fee for one-way keg lines
+and null otherwise. Both invoice writers read it, so a fee changed between
+ship and delivery does not change the invoice.
 `create_credit_memo_impl` never credits it: it copies only `sku` and
 `keg_deposit` lines (`20261012101000…:212`). `start_qbo_push` allows the new
 kind and maps it to a new `qbo_connections.qbo_one_way_fee_item_id`, which
@@ -189,8 +216,9 @@ p_picked_up_on date, p_lines jsonb, p_note text, p_request_id)`, admin only,
 like `record_historical_batch` (`20261014100300_history_without_tanks.sql:73`):
 
 - refused unless `books_opened_on` is set and `p_picked_up_on < books_opened_on`;
-- writes an order (`status shipped`, `shipped_at` = the pickup day), its
-  lines (`qty_shipped = qty_ordered`), a shipment, and an invoice issued that
+- writes an order (`status shipped`, `pickup = true`, `shipped_at` = the
+  pickup day), its lines (`qty_shipped = qty_ordered`), a shipment, and an
+  invoice issued that
   day with `sku` lines at the given unit prices, `paid_at` = the pickup day
   and `qbo_sync_status = 'not_synced'`;
 - writes **no** `inventory_movements`, allocations, deposit lines, fee lines
@@ -199,7 +227,16 @@ like `record_historical_batch` (`20261014100300_history_without_tanks.sql:73`):
   the grid price frozen at import.
 
 `start_qbo_push` refuses a `not_synced` invoice ("historical invoices are not
-sent to QuickBooks"). Return and credit memo refuse a historical invoice
+sent to QuickBooks"). Every Lolev block is a pickup, so `pickup = true` also
+keeps the 261 historical shipments out of the routes screen's unrouted list
+(`lib/commands/delivery.ts:57-60` lists every shipment with no delivery).
+
+The staff presentation must name the new status, or it falls through to
+"pushed to QuickBooks" (`lib/mgr/qbo-ui.ts:95`). `qboInvoicePresentation`
+returns "not in QuickBooks (before the books opened)" with no actions for
+`not_synced`. The `syncStatus` unions in `lib/mgr/qbo-ui.ts`,
+`lib/mgr/invoices-view.ts` and `app/(app)/invoices/[id]/page.tsx` gain
+`"not_synced"`. Return and credit memo refuse a historical invoice
 (no stock left with it to return). A paid `paid_at` with a null QBO balance
 reads as **paid** (`lib/mgr/invoice-state.ts:12`), so history never shows as
 owed or overdue in the staff or portal lists.
@@ -215,7 +252,9 @@ owed or overdue in the staff or portal lists.
 | Customer and ship-to views | `components/mgr/views/customer.tsx:68`, `ship-to.tsx:27` | country pick, alias field, US-only state | **yes** |
 | `ship_order_impl` | `20261012110100…:198` | foreign ship-to: `dest_country`; fee lines | **yes** |
 | `removal_shape` | `00001_baseline.sql:662` | one of state or country | **yes** |
-| `destination_state_facts` | `20260928236000…:34` | skip `dest_country` rows | **yes** |
+| `destination_state_facts` (invoice-line branch) | `20260928236000…:54-78` | export lines read `Unassigned` | **yes**: leave out lines whose removals carry `dest_country` |
+| `confirm_delivery` (on-delivery invoice) | `20261012120300_leave_delivery_for_later.sql:78-88` | copies only `sku` and `keg_deposit` | **yes**: add the fee line, shipped − refused |
+| `qboInvoicePresentation`, `syncStatus` unions | `lib/mgr/qbo-ui.ts:95`, `lib/mgr/invoices-view.ts:8`, `app/(app)/invoices/[id]/page.tsx` | `not_synced` falls through to "pushed to QuickBooks" | **yes** |
 | `report_movements`, compliance totals | `20261014100100…`, `20261013100000…:28` | export already totals by treatment | no |
 | `save_route_impl`, `list_routes` | `00001_baseline.sql:4481`, `lib/commands/delivery.ts:45` | exclude pickup | **yes** |
 | `create_credit_memo_impl` | `20261012101000…:212` | copies `sku`/`keg_deposit` only; refuse historical | **yes** (refusal) |
@@ -265,8 +304,10 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - an Export-channel order to a `JP` ship-to ships with `dest_country = 'JP'`, `dest_state` null;
      - a Wholesale (taxable) order to a `JP` ship-to is refused;
      - a US export (ship-to `PA`) ships with `dest_state = 'PA'` as today;
-     - the compliance removals total counts the `JP` removal under export, and
-       `stateTransactions` has no `Unassigned` row for it.
+     - the compliance removals total counts the `JP` removal under export;
+     - `stateTransactions` has no `Unassigned` row, from either the movement
+       or the invoice line of the `JP` shipment, and the report has no
+       unassigned warning.
    - Existing `tests/compliance.test.ts`, `tests/destination-state-*.test.ts` stay green.
    - Migration `20261016100100`. Deps: 1.
 5. **Pickup orders.** `tests/pickup-orders.test.ts`.
@@ -281,11 +322,16 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
    - Test first:
      - with `one_way_keg_fee_cents = 1000`, shipping 3 one-way sixtels adds a
        `one_way_keg_fee` line, qty 3, $10.00, and no deposit line;
+     - with `invoiceTiming: "on_delivery"`, 3 shipped and 1 refused gives a
+       fee line of qty 2 on the invoice `confirm_delivery` writes;
+     - the fee changed to $12 between ship and delivery still invoices $10;
      - a returnable sixtel line gets its deposit and no fee;
      - a full return credits the beer and leaves the fee uncredited;
      - fee 0 adds no line;
      - `start_qbo_push` with the fee line and no fee mapping is refused with the message.
-   - Migration `20261016100300`; a settings field "One-way keg fee"
+   - Migration `20261016100300` replaces `ship_order_impl` (copied from task 4's
+     migration) and `confirm_delivery` (copied from
+     `20261012120300_leave_delivery_for_later.sql`); a settings field "One-way keg fee"
      (`set_one_way_keg_fee`, admin); the QuickBooks mapping row; invoice
      views label the line "One-way keg fee". Staff guide: kegs, invoices,
      accounting mappings. Portal guide: invoices (the fee line is not refunded).
@@ -297,7 +343,11 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - writes a shipped order, lines, shipment and paid invoice, with **zero**
        `inventory_movements`, allocations, deposit and fee lines;
      - the invoice is `not_synced` and `start_qbo_push` refuses it;
-     - it reads paid in `toInvoiceListRow` (no overdue);
+     - it reads paid in `toInvoiceListRow` (no overdue), and its QuickBooks
+       detail reads "not in QuickBooks", not "pushed to QuickBooks", with
+       QuickBooks connected;
+     - the order is a pickup, and its shipment is not in `list_routes`'
+       unrouted list;
      - refused: no books date, on/after `books_opened_on`, a ship-to of another
        customer, a SKU of another brewery, `qty <= 0`, a non-admin;
      - `return_shipment` and `create_credit_memo` refuse its invoice;
@@ -306,8 +356,13 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
    - Migration `20261016100400`; command `record_historical_order` (admin,
      `lib/commands/orders.ts`). Staff guide: history (orders before the books
      opened: invoiced, paid, not in QuickBooks, no stock). Then `bun run docs:api`.
+   - Also `qboInvoicePresentation` and the three `syncStatus` unions
+     (`lib/mgr/qbo-ui.ts`, `lib/mgr/invoices-view.ts`,
+     `app/(app)/invoices/[id]/page.tsx`); a pure test in
+     `tests/qbo-sync-status.test.ts` (extend) for the `not_synced` text.
    - Deps: 4 and 6, for migration order only (all three replace
      `ship_order_impl` or `create_credit_memo_impl`; each must copy the latest).
+     Also 5: it writes `orders.pickup`.
 8. **Docs and schema design.** `tests/docs.test.ts`, `tests/api-docs.test.ts`.
    - Schema design: `customers.alias`, `customers.country`, `ship_tos.country`,
      `inventory_movements.dest_country`, `orders.pickup`,
