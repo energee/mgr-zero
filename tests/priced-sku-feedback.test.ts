@@ -15,14 +15,15 @@ let customer = "a";
 let kind = "wholesale";
 const setCustomer = (value: string) => { customer = value; };
 function form() {
-  // Exactly eight OrderForm state hooks; fail fast if its state contract changes.
+  // Exactly nine OrderForm state hooks (pickup is the eighth); fail fast if its state contract changes.
   state.useState.mockReset();
   state.useState.mockReturnValueOnce([kind, vi.fn()]).mockReturnValueOnce([customer, setCustomer])
     .mockReturnValueOnce(["dock", vi.fn()]).mockReturnValueOnce(["source", vi.fn()])
     .mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()])
+    .mockReturnValueOnce([false, vi.fn()])
     .mockReturnValueOnce([[{ skuId: "sku", qty: "3" }], vi.fn()]);
   const rendered = OrderForm({ customers, locations: [{ id: "source", name: "Source", kind: "warehouse" }], skus });
-  expect(state.useState).toHaveBeenCalledTimes(8);
+  expect(state.useState).toHaveBeenCalledTimes(9);
   return rendered;
 }
 function view() { return form().props.children.props as Parameters<typeof NewOrderView>[0]; }
