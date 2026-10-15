@@ -6,6 +6,7 @@ links in the release PR. Never paste keys or tokens into the PR.
 Latest recorded review: [2026-09-18 readiness evidence](release-readiness-2026-09-18.md).
 A successful deployment is not release sign-off; retain the evidence boundaries
 and unresolved connected-job gates in that record.
+Ask MGR's hosted composer gate (#329) has its own runbook: [Ask MGR hosted verification](ask-mgr-hosted-verification.md).
 
 ## Stop gates
 
