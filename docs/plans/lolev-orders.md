@@ -127,8 +127,14 @@ alter table public.ship_tos add constraint ship_tos_state_by_country
 `KR`, `NO`), validated against a list in `lib/mgr/enums.ts` (`COUNTRY_CODES`)
 by zod and against the shape by the check. `upsert_customer` and
 `upsert_ship_to` take trailing `p_alias text default null` and `p_country
-text default 'US'`, so `import_csv_row`'s positional calls stay valid
-(`20261012100700_import_resolve_names.sql:86,89`), as `upsert_brand` did.
+text default 'US'`, as `upsert_brand` did.
+
+`import_csv_row` (`20261012100700_import_resolve_names.sql:53-90`) is replaced
+too. It refuses any field outside a fixed list, and requires `state` for both
+kinds. The new version allows `country` and `alias` on customers and
+`country` on ship-tos. It requires `state` only when the country is `US`
+(the default), and passes `v_row->>'alias'` and `coalesce(v_row->>'country',
+'US')` to the two upserts.
 
 ## Schema — `20261016100100_export_destination.sql`
 
@@ -149,8 +155,14 @@ ship outside the US"). The removals total already files them under `export`
 `private.destination_state_facts`
 (`20260928236000_destination_state_facts_on_ledger.sql:54-78`) has two branches:
 
-- **Movements:** a removal with a null `dest_state` is already dropped
-  (line 64). No change.
+- **Movements:** an outgoing removal with a null `dest_state` is already
+  dropped (line 63). But a `return_in` or `adjustment` row is kept whatever
+  its state, and takes `coalesce(m.dest_state, original.dest_state,
+  'Unassigned')` (lines 59-63). Its writers (`create_credit_memo_impl`, the
+  refused check-in) point at the original removal and set no state. So a
+  return, credit or refusal on an export shipment would read `Unassigned`.
+  The fix also leaves out `return_in` and `adjustment` rows whose original
+  removal carries a `dest_country`.
 - **Invoice lines:** each `sku` line takes its state from `shipped_state`
   (line 54), which ignores nulls. So an export line gets no state and becomes
   `Unassigned`, which raises the compliance warning. The fix leaves out
@@ -172,6 +184,15 @@ alter table public.orders add column pickup boolean not null default false;
 boolean default false`. `save_route_impl` refuses a pickup order's shipment,
 and `list_routes` leaves pickup shipments out of the unrouted list, in the
 query (AGENTS.md negative 12).
+
+A pickup order is invoiced when it ships. `ship_order_impl` refuses
+`invoiceTiming: "on_delivery"` for it ("a pickup order is invoiced when it
+ships"). Without this, nothing could ever invoice it: only
+`confirm_delivery` invoices an on-delivery shipment, and that needs a route
+delivery, which a pickup cannot have
+(`20261012120300_leave_delivery_for_later.sql:39-50`). This migration is
+the first of this plan to replace `ship_order_impl`. Tasks 4, 6 and 7 copy
+from it.
 
 ## Schema — `20261016100300_one_way_keg_fee.sql`
 
@@ -197,8 +218,8 @@ An invoice is written in one of two places, and both add the fee line:
 
 The fee is frozen when the order is shipped. `order_lines` gains
 `one_way_fee_cents int`, set at ship to the brewery fee for one-way keg lines
-and null otherwise. Both invoice writers read it, so a fee changed between
-ship and delivery does not change the invoice.
+when that fee is > 0, and null otherwise. Both invoice writers read it, so a
+fee changed between ship and delivery does not change the invoice.
 `create_credit_memo_impl` never credits it: it copies only `sku` and
 `keg_deposit` lines (`20261012101000…:212`). `start_qbo_push` allows the new
 kind and maps it to a new `qbo_connections.qbo_one_way_fee_item_id`, which
@@ -246,7 +267,7 @@ owed or overdue in the staff or portal lists.
 | Reader | Where | Effect of the change | Change? |
 | --- | --- | --- | --- |
 | `upsert_customer`, `upsert_ship_to` | `20260926000000…:33`, `00001_baseline.sql:3830` | must take alias/country, allow null state | **yes** |
-| `import_csv_row` | `20261012100700…:86,89` | positional calls; trailing defaults keep it valid | no |
+| `import_csv_row` | `20261012100700…:53-90` | fixed field allowlist refuses `country`/`alias`; `state` always required; positional upsert calls | **yes**: allow `country`, `alias`; `state` required only for US; pass both to the upserts |
 | `customers` / `ship_tos` zod | `lib/commands/customers.ts:19-56` | country, alias, state required only for US | **yes** |
 | CSV `customers` / `ship_tos` fields | `lib/import-csv.ts:9-10` | country and alias optional columns | **yes** |
 | Customer and ship-to views | `components/mgr/views/customer.tsx:68`, `ship-to.tsx:27` | country pick, alias field, US-only state | **yes** |
@@ -275,7 +296,9 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - a customer in `JP` with no state saves; a `US` one without a state is refused;
      - a `JP` ship-to with only a label and country saves;
      - the alias saves, clears on omit, and `''` is refused;
-     - `import_csv_row` still creates a US customer (positional call);
+     - `import_csv_row` still creates a US customer with no `country` column;
+     - `import_csv_row` creates a `JP` customer with `country`, `alias` and no
+       `state`, and refuses a `US` row with no `state`;
      - the QuickBooks customer push sends the country and no state for a
        `JP` customer (find the push with `grep -rn bill_state lib/qbo*.ts`
        first; v1 sent `Country`, `sync-utils.ts:220-227`).
@@ -305,6 +328,8 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - a Wholesale (taxable) order to a `JP` ship-to is refused;
      - a US export (ship-to `PA`) ships with `dest_state = 'PA'` as today;
      - the compliance removals total counts the `JP` removal under export;
+     - a credit memo returning part of the `JP` shipment adds no `Unassigned`
+       row either;
      - `stateTransactions` has no `Unassigned` row, from either the movement
        or the invoice line of the `JP` shipment, and the report has no
        unassigned warning.
@@ -313,7 +338,8 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
 5. **Pickup orders.** `tests/pickup-orders.test.ts`.
    - Test first: `create_order({ pickup: true })` saves it; its shipment is not
      in `list_routes`' unrouted list; `save_route` with it is refused; a
-     non-pickup shipment still routes.
+     non-pickup shipment still routes; shipping it with `invoiceTiming:
+     "on_delivery"` is refused, and with `"now"` it ships and invoices.
    - Migration `20261016100200`; zod `pickup: z.boolean().optional()` on
      `create_order` and `update_draft_order`; `E.sw` "Pickup" on New order and
      Order draft; order detail says "Pickup". Staff guide: orders and routes.
@@ -373,9 +399,11 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
 Then the full proof (`bun run test && bunx tsc --noEmit && bun run lint`), a
 look at the changed screens (`browse`), `/simplify`, and the PR.
 
-Parallelism: {1, 5} → {2, 4} → {3, 6} → 7 → 8. Tasks 4, 6 and 7 each replace
-`ship_order_impl` or `create_credit_memo_impl`, so they run one after another,
-each copying the previous migration's version.
+Parallelism: {1, 5} → {2, 4} → {3, 6} → 7 → 8. Tasks 5, 4, 6 and 7 each
+replace `ship_order_impl` (and 6 and 7 `create_credit_memo_impl`), so they
+run in that order, each copying the previous migration's version. Tasks 1
+and 5 both regenerate `lib/supabase/database.ts` and the migration lock, so
+they also run one after the other.
 
 ## Import (local only, git-ignored; after merge)
 
@@ -383,7 +411,8 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
 `lib/import/lolev.ts`, through `runCommand` as the other passes do:
 
 1. **Setup.** `set_books_opened_on` 2026-10-15 (refused if a period before it
-   is filed). The `$30` deposit on Lolev kegs (`upsert_keg_pool`). The `$10`
+   is filed). The `$30` deposit on Lolev kegs (`update_keg_pool`; the pool
+   exists from the catalog pass). The `$10`
    one-way fee. The one-way sixtel format and shell material. The Export
    cells (Wholesale sixtel and case per tier) and the one-way sixtel cells
    (= the returnable sixtel cell, per channel and tier).
