@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useRef, useState } from "react";
+import { useEffect, useSyncExternalStore, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
 import { money } from "@/lib/mgr/money";
-import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, clearWorkingCart, restoreWorkingCart, saveWorkingCart, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
@@ -38,9 +38,21 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
     try { return { attempt: restorePortalAttempt(sessionStorage.getItem(portalAttemptKey(scope)), scope), error: null }; }
     catch { return { attempt: null, error: "Order recovery could not be read. Check existing orders or contact the brewery before starting another order." }; }
   });
+  // Only a new cart (not a draft, reorder or pending request) is kept in this
+  // browser between visits (#710). ReadyCart renders only after hydration, so
+  // reading localStorage here cannot mismatch the server render.
+  const keepWorking = !initial && !recovery.attempt;
+  const [working] = useState(() => keepWorking ? restoreWorkingCart(() => localStorage, scope, items, shipTos, Date.now()) : null);
   const initialFields = recovery.attempt?.fields ?? initial?.fields;
-  const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [] });
-  const [qty, setQty] = useState<Record<string, string>>(Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)])));
+  const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [], ...working?.fields });
+  const [qty, setQty] = useState<Record<string, string>>(working?.qty ?? Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)])));
+  const removed = initial?.removed ?? working?.removed ?? [];
+  const untouched = useRef({ fields, qty });
+  useEffect(() => {
+    // Save edits only: re-saving the restored cart would restart its 7-day clock on every visit.
+    if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty)) return;
+    saveWorkingCart(() => localStorage, scope, { fields, qty }, items, Date.now());
+  }, [keepWorking, scope, fields, qty, items]);
   const [draftId, setDraftId] = useState<string | null>(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId ?? null : initial?.draftId ?? null);
   const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
   const ready = !recovery.error;
@@ -80,6 +92,8 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
         if ("orderId" in next.input) setDraftId(next.input.orderId ?? null);
       });
       setAttempt(null);
+      // A new cart's stored copy is cleared even when this success finishes a request recovered after a reload.
+      if (!initial) clearWorkingCart(() => localStorage, scope);
       router.push(`/portal/orders/${id}`);
     } catch (err) {
       // Only a definitive first refusal can unlock edits; a later refusal
@@ -127,7 +141,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
       }}
       messages={<>
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
-        {initial?.removed.length ? E.info(`Removed unavailable or unpriced items: ${initial.removed.join(", ")}. Review the remaining quantities.`) : null}
+        {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`) : null}
         {!lines && E.info("Enter whole quantities of zero or more.")}
         {missingInput && E.info(missingInput)}
         {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`)}
