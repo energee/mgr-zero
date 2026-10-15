@@ -72,7 +72,7 @@ export type BrandSnapshot = {
   compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
   /** The brand as last saved, for the title and badges; defaults to `brand` (the inventory has no typing). */
-  saved?: Pick<BrandSnapshot["brand"], "name" | "alias" | "category" | "price_group_id">;
+  saved?: Pick<BrandSnapshot["brand"], "name" | "alias" | "category" | "price_group_id"> | null;
 };
 
 /** A COLA is listed by its TTB ID (with its serial when known) and never expires; a formula keeps its TTB number; registrations do expire. */
@@ -103,8 +103,9 @@ export function toBrandViewProps({
   compliance = { approvals: [], registrations: [] },
   cost,
   backHref,
-  saved = brand,
+  saved: savedOrNull,
 }: BrandSnapshot): BrandViewModel {
+  const saved = savedOrNull ?? brand;
   // "Unpriced" is a real choice: a brand on no group cannot be ordered.
   const active = brand.skus.filter((s) => s.active).length;
   const style = brand.styles?.name ?? "";
@@ -113,13 +114,11 @@ export function toBrandViewProps({
   const skuList = `${plural(active, "active package")}${brand.pours?.length ? ` · ${plural(brand.pours.length, "pour")}` : ""}`;
   const group = priceGroups.find((g) => g.id === saved.price_group_id);
   const rows = brandComplianceRows(compliance);
-  const badges: BrandBadge[] = isNew ? [] : [
-    ...(rows.some((row) => row.key === "cola-pending") ? [{ key: "cola", label: "COLA pending", tone: "w" as const, href: "#compliance" }] : []),
-    group ? { key: "group", label: group.name, tone: "" as const } : { key: "group", label: "Unpriced", tone: "w" as const },
-    ...(saved.category ? [{ key: "category", label: saved.category, tone: "" as const }] : []),
-    // A brand with nothing to sell yet needs no count; the SKUs section says so.
-    ...(active || brand.pours?.length ? [{ key: "skus", label: skuList, tone: "" as const }] : []),
-  ];
+  const cola: BrandBadge[] = rows.some((row) => row.key === "cola-pending") ? [{ key: "cola", label: "COLA pending", tone: "w", href: "#compliance" }] : [];
+  const category: BrandBadge[] = saved.category ? [{ key: "category", label: saved.category, tone: "" }] : [];
+  // A brand with nothing to sell yet needs no count; the SKUs section says so.
+  const skus: BrandBadge[] = active || brand.pours?.length ? [{ key: "skus", label: skuList, tone: "" }] : [];
+  const badges = isNew ? [] : [...cola, { key: "group", label: group?.name ?? "Unpriced", tone: group ? "" : "w" } satisfies BrandBadge, ...category, ...skus];
   return {
     backHref,
     title: isNew ? "New brand" : brandLabel(saved),
@@ -139,7 +138,7 @@ export function toBrandViewProps({
     description: brand.description ?? "",
     hops: brand.hops ?? "",
     skuList,
-    skuListHref: brand.id ? `/catalog/brands/${brand.id}/skus` : "/catalog",
+    skuListHref: `/catalog/brands/${brand.id}/skus`,
     compliance: rows,
   };
 }

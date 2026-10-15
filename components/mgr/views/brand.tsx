@@ -11,7 +11,7 @@
 // (lib/mgr/price-group-suggestion.ts); Use only fills the select, and Save
 // brand is still the commit. ABV is the shared numeric stepper, bounded by
 // BRAND_ABV like upsert_brand's schema.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
@@ -63,9 +63,7 @@ export function BrandView({
         {E.back("Catalog", model.title, createAction, model.backHref)}
         {model.badges.length ? (
           <div className="flex flex-wrap gap-1.5">
-            {model.badges.map((badge) => badge.href
-              ? <a key={badge.key} href={badge.href}>{E.status(badge.label, badge.tone)}</a>
-              : <span key={badge.key}>{E.status(badge.label, badge.tone)}</span>)}
+            {model.badges.map((badge) => <Fragment key={badge.key}>{E.status(badge.label, badge.tone, badge.href)}</Fragment>)}
           </div>
         ) : null}
       </header>

@@ -179,12 +179,15 @@ export const E = {
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
-  /** A status word. Never clickable. */
-  status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
-    <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">
-      {tone === "ok" ? <Dot cls="ok" /> : null}{t}
-    </Badge>
-  ),
+  /** A status word. Not a button; `href` makes it a jump to where the status is fixed (COLA pending → Compliance). */
+  status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
+    const body = <>{tone === "ok" ? <Dot cls="ok" /> : null}{t}</>;
+    return (
+      <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5" asChild={Boolean(href)}>
+        {href ? <a href={href}>{body}</a> : body}
+      </Badge>
+    );
+  },
   /** An on/off setting. */
   sw: (on: boolean, label: string, onChange?: (checked: boolean) => void) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} />,
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
