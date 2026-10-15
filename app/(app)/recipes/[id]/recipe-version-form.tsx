@@ -139,7 +139,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   // What the draft still lacks, named for the brewer; the submit stays disabled until it is null.
   const blocked = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   const parentLocked = creating && createdId !== "";
-  const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom }));
+  const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${plural(mashSchedule.length, "step")}`, detail: mashRowSummary(mashSchedule) };
   const fermentationRow = { title: `Fermentation schedule · ${plural(fermentationSchedule.length, "stage")}`, detail: fermentationSchedule.length ? fermentationSummary(fermentationSchedule) : "No stages yet" };

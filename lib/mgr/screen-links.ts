@@ -411,7 +411,9 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const l = label.trim();
   const localMapping = l === "Map" && ["QuickBooks mappings", "Invoice mappings"].includes(screen.name);
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
-  return !authored(screen, l, to) && (localMapping || draftSku || INERT.some((k) => matches(k, l)));
+  // The Ingredient sheet's material picker opens its own search; elsewhere "Material" walks to the Material screen.
+  const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
+  return !authored(screen, l, to) && (localMapping || draftSku || ingredientMaterial || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];

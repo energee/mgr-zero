@@ -15,7 +15,7 @@ import { IngredientView } from "../components/mgr/views/ingredient";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
-import { resolveTap } from "../lib/mgr/screen-links";
+import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
 
 const src = (f: string) => readFileSync(f, "utf8");
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -70,6 +70,35 @@ describe("Recipe creation", () => {
     expect(none).toMatch(/No version yet/);
     expect(none).not.toMatch(/Pre-boil volume/);
     expect(none).toMatch(/href="\/recipes\/x\/new"/);
+  });
+
+  describe("the ingredient sheet fields (plan task 13)", () => {
+    const materials = [{ id: "citra", name: "Citra", unit: "lb", category: "hop" }, { id: "cans", name: "Cans", unit: "each" }];
+    const draw = (materialId: string) => renderToStaticMarkup(createElement(IngredientView, { fields: { materialId, stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }, materials }));
+
+    it("an unpicked material reads Choose a material on a searchable trigger, never a Select", () => {
+      const html = draw("");
+      expect(html).toMatch(/<button[^>]*aria-label="Material"[^>]*>Choose a material<\/button>/);
+      expect(html).not.toMatch(/<button[^>]*select-trigger[^>]*aria-label="Material"/);
+    });
+
+    it("an option reads name · category, or the name alone when no category is known", () => {
+      expect(draw("citra")).toMatch(/>Citra · hop<\/button>/);
+      expect(draw("cans")).toMatch(/>Cans<\/button>/);
+    });
+
+    it("the quantity label is tied to its input and names the unit", () => {
+      const html = draw("citra");
+      const forId = /<label[^>]*for="([^"]+)"[^>]*>Quantity per bbl \(lb\)<\/label>/.exec(html)?.[1];
+      expect(forId).toBeTruthy();
+      expect(html).toContain(`id="${forId}"`);
+      expect(html).toMatch(new RegExp(`<input[^>]*id="${forId}"[^>]*>`));
+    });
+
+    it("the material trigger acts in place on the Ingredient record", () => {
+      expect(isInertOn(screen("Ingredient"), "Material")).toBe(true);
+      expect(isInertOn(screen("Cycle count"), "Material")).toBe(false);
+    });
   });
 
   describe("the read-out and the draft blocker (plan task 8)", () => {
