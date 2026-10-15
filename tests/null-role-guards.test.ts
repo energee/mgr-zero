@@ -46,9 +46,9 @@ describe("QuickBooks RPCs refuse a non-member (#895)", () => {
     ["set_qbo_customer_mapping", () => outsider.rpc("set_qbo_customer_mapping", {
       p_brewery: brewery, p_customer: customer, p_qbo_customer_id: "customer", p_request_id: crypto.randomUUID(),
     })],
-    // A null reason is a first push; the generated type omits null, hence the cast.
+    // A null reason is a first push.
     ["start_qbo_push", () => outsider.rpc("start_qbo_push", {
-      p_brewery: brewery, p_invoice: invoice, p_new_attempt_reason: null as unknown as string, p_request_id: crypto.randomUUID(),
+      p_brewery: brewery, p_invoice: invoice, p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
     })],
   ];
 

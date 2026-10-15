@@ -2,8 +2,12 @@
 -- `NULL <> 'admin'` (or `NULL not in (...)`) is NULL, so these QuickBooks
 -- guards never raised for a non-member: any signed-in user could start OAuth,
 -- set mappings and push defaults, or push an invoice on another brewery.
--- Each function is restated exactly as it stood, with only the guard made
--- NULL-safe. create or replace keeps owner, grants and comments.
+-- Each function is restated exactly as it stood except for its guard line.
+-- Five raised 42501 'permission denied', which is what private.assert_staff
+-- raises, so they now call it like every other staff RPC. begin_qbo_oauth
+-- raised a plain exception (P0001), so it keeps an inline guard, made
+-- NULL-safe with `is distinct from`, to keep that error class.
+-- create or replace keeps owner, grants and comments.
 
 CREATE OR REPLACE FUNCTION public.begin_qbo_oauth(p_brewery uuid, p_redirect_uri text, p_state_hash text, p_provider_intent text, p_request_id uuid, p_requested_scopes text[] DEFAULT ARRAY['com.intuit.quickbooks.accounting'::text])
  RETURNS jsonb
@@ -38,7 +42,7 @@ CREATE OR REPLACE FUNCTION public.set_qbo_push_defaults(p_brewery uuid, p_allow_
 AS $function$
 declare v_replay jsonb; v_result jsonb;
 begin
-  if public.staff_role(p_brewery) is distinct from 'admin' then raise insufficient_privilege using message='permission denied'; end if;
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
   v_replay:=private.claim_command_request(p_brewery,'set_qbo_push_defaults',p_request_id,
     jsonb_build_object('allowAch',p_allow_ach,'allowCard',p_allow_card));
   if v_replay is not null then return v_replay; end if;
@@ -58,7 +62,7 @@ CREATE OR REPLACE FUNCTION public.set_qbo_deposit_mapping(p_brewery uuid, p_qbo_
 AS $function$
 declare v_replay jsonb; v_result jsonb;
 begin
-  if public.staff_role(p_brewery) is distinct from 'admin' then raise insufficient_privilege using message='permission denied'; end if;
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
   if nullif(btrim(p_qbo_item_id),'') is null then raise exception 'QuickBooks deposit item mapping required'; end if;
   perform 1 from public.qbo_connections where brewery_id=p_brewery and state='connected' for update;
   if not found then raise exception 'QuickBooks connection required'; end if;
@@ -78,7 +82,7 @@ CREATE OR REPLACE FUNCTION public.set_qbo_item_mapping(p_brewery uuid, p_sku uui
 AS $function$
 declare v_replay jsonb; v_realm text; v_result jsonb;
 begin
-  if coalesce(public.staff_role(p_brewery)::text, '') not in ('admin','sales') then raise insufficient_privilege using message='permission denied'; end if;
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   select realm_id into v_realm from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
   if v_realm is null then raise exception 'QuickBooks connection required'; end if;
   if nullif(btrim(p_qbo_item_id),'') is null then raise exception 'QuickBooks item mapping required'; end if;
@@ -99,7 +103,7 @@ CREATE OR REPLACE FUNCTION public.set_qbo_customer_mapping(p_brewery uuid, p_cus
 AS $function$
 declare v_replay jsonb; v_realm text; v_result jsonb;
 begin
-  if coalesce(public.staff_role(p_brewery)::text, '') not in ('admin','sales') then raise insufficient_privilege using message='permission denied'; end if;
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   select realm_id into v_realm from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
   if v_realm is null then raise exception 'QuickBooks connection required'; end if;
   if nullif(btrim(p_qbo_customer_id),'') is null then raise exception 'QuickBooks customer mapping required'; end if;
@@ -126,7 +130,7 @@ declare
   v_body jsonb; v_address jsonb; v_email text; v_key uuid; v_reason text;
   v_invalid int; v_unmapped int;
 begin
-  if coalesce(public.staff_role(p_brewery)::text, '') not in ('admin','sales') then raise insufficient_privilege using message='permission denied'; end if;
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_new_attempt_reason is not null and p_new_attempt_reason not in ('corrected','remote_deleted') then raise exception 'invalid QuickBooks attempt reason'; end if;
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
