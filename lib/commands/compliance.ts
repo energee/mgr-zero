@@ -3,14 +3,17 @@
 // state licenses. A period report is generated from the movement ledger on
 // demand and filed as an immutable jsonb snapshot; MGR never transmits a
 // filing. trace_lot follows a finished-goods lot back through recorded blend
-// membership and every ledger movement that names it.
+// membership and every ledger movement that names it. search_colas looks up
+// the brewery's label approvals on TTB's public COLA registry by its TTB
+// registry number (lib/ttb/colas.ts), on demand and never stored.
 import { z } from "zod";
 import { periodKey } from "@/lib/compliance-period";
 import type { LotTraceSources } from "@/lib/mgr/lot-trace-view";
 import { recipientsFor } from "./recall-recipients";
 import type { MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import { isoDate } from "./packaging";
-import { breweryToday, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
+import { matchColas, searchColasByPermit, type ColaRecord } from "@/lib/ttb/colas";
+import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 // The three registry upserts below keep a saved value when the caller omits
@@ -75,6 +78,24 @@ defineQuery({
       brands: brands.map((b): RegistryBrand => ({ ...b, approvals: approvals.filter((a) => a.brand_id === b.id), registrations: registrations.filter((r) => r.brand_id === b.id) })),
       licenses,
     };
+  },
+});
+
+export type ColaSearch = { permit: string; rows: ColaRecord[] };
+
+defineQuery({
+  name: "search_colas", description: "Search TTB's public COLA registry for the label approvals under the brewery's TTB registry number, completed in the last 15 years, newest first; name keeps only rows whose fanciful or brand name contains it (ignoring case); refused when the brewery has no registry number; nothing is stored",
+  roles: [...ROLES],
+  input: z.object({ name: z.string().optional() }),
+  handler: async (ctx, i): Promise<ColaSearch> => {
+    const brewery = await unwrap(ctx.db.from("breweries").select("ttb_registry_no").eq("id", ctx.breweryId).single());
+    const permit = brewery?.ttb_registry_no?.trim();
+    if (!permit) throw new CommandError("Set the brewery's TTB registry number on Settings to search COLAs.", 400, "bad_request");
+    // A TTB failure is an error, never an empty list: no match and no answer differ.
+    const found = await searchColasByPermit(permit).catch((error: unknown) => {
+      throw new CommandError(`TTB's COLA registry did not answer: ${error instanceof Error ? error.message : String(error)}`, 502, "upstream_unavailable");
+    });
+    return { permit, rows: matchColas(found, i.name) };
   },
 });
 

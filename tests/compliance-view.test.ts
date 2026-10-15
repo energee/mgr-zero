@@ -1,6 +1,7 @@
 // tests/compliance-view.test.ts — Compliance months, Licenses, the brand's
 // approval and registration sheets, and lot trace. Views own no sample data.
 // Live sheet wrappers mount the shared bodies.
+import { formatDate } from "@/lib/date-format";
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -19,7 +20,7 @@ import {
 } from "../lib/mgr/fixtures/compliance";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
-import { colaUrl } from "../lib/mgr/brand-approval-view";
+import { colaChoice, colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
 import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -108,10 +109,10 @@ describe("registry sheets", () => {
     expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 
-  it("lists a COLA on its brand by serial and submitted date, never an expiry", () => {
+  it("lists a COLA on its brand by serial and approval date, never an expiry", () => {
     const cola = toBrandViewProps(brandHazy).compliance.find((row) => row.title.startsWith("COLA"))!;
     expect(cola.title).toBe("COLA TTB ID 25318001000034");
-    expect(cola.detail).toMatch(/^submitted |^not submitted$/);
+    expect(cola.detail).toMatch(/^approved |^approval date unknown/);
     expect(cola.detail).not.toMatch(/expires/);
   });
 
@@ -127,8 +128,8 @@ describe("registry sheets", () => {
     expect(html).toMatch(/Serial number · optional/);
     expect(html).not.toMatch(/COLA number/);
     expect(html).not.toMatch(/Expires/);
-    expect(html).toMatch(/Date submitted/);
-    expect(html).not.toMatch(/Approved on/);
+    expect(html).toMatch(/Date approved/);
+    expect(html).not.toMatch(/Date submitted/);
   });
 
   it("keeps the formula label on a formula approval, with no serial or COLA link", () => {
@@ -138,12 +139,34 @@ describe("registry sheets", () => {
   });
 
   it("links Open COLA from the TTB ID alone, encoded, on the official origin", () => {
-    expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=25318001000034");
-    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=0012%26x%3D1");
+    expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=25318001000034");
+    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=0012%26x%3D1");
     expect(colaUrl("  ")).toBeNull();
     const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
-    expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&amp;ttbid=25318001000034"');
+    expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&amp;ttbid=25318001000034"');
     expect(html).not.toContain(`ttbid=${brandApprovalStout.serialNumber}`);
+  });
+
+  it("Use takes a COLA's TTB ID, serial (a missing one as blank) and TTB's approval date", () => {
+    const record = { ttbId: "25318001000034", permit: "BR-PA-20553", serial: "260135", completedOn: "2026-02-02", fancifulName: "STOUT", brandName: "LOLEV", classCode: "901", className: "BEER" };
+    expect(colaChoice(record)).toEqual({ ttbId: "25318001000034", serialNumber: "260135", approvedOn: "2026-02-02" });
+    expect(colaChoice({ ...record, serial: null })).toEqual({ ttbId: "25318001000034", serialNumber: "", approvedOn: "2026-02-02" });
+  });
+
+  it("lists TTB COLA matches with Use, says when none match, and shows the search running", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
+    expect(html).toMatch(/Find COLA on TTB/);
+    const first = brandApprovalStout.colas!.rows[0];
+    expect(html).toContain(first.fancifulName);
+    expect(html).toContain(`${first.ttbId} · serial ${first.serial} · ${first.className}`);
+    expect(html).toContain(formatDate(first.completedOn));
+    expect(html.match(/>Use<\/button>/g) ?? []).toHaveLength(brandApprovalStout.colas!.rows.length);
+    const none = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: { permit: "BR-PA-20553", rows: [] } } }));
+    expect(none).toContain("No COLAs on TTB under BR-PA-20553 match Stout.");
+    const searching = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: undefined, searching: true } }));
+    expect(searching).toMatch(/<button[^>]*disabled[^>]*>Searching TTB…<\/button>/);
+    const formula = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));
+    expect(formula).not.toMatch(/Find COLA/);
   });
 
   it("explains the missing link when a COLA has no TTB ID", () => {

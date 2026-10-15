@@ -71,11 +71,12 @@ export function useCommandAction() {
   return { busy, error, failure, setError, run };
 }
 
-/** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them. */
+/** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them; patch sets several fields at once. */
 export function useFields<T extends Record<string, string>>(initial: T) {
   const [v, setV] = useState(initial);
   const set = (k: keyof T) => (x: string) => setV((s) => ({ ...s, [k]: x }));
-  return { v, set, reset: () => setV(initial) };
+  const patch = (p: Partial<T>) => setV((s) => ({ ...s, ...p }));
+  return { v, set, patch, reset: () => setV(initial) };
 }
 
 /** An optional field is sent only when filled. */

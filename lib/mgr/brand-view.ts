@@ -81,7 +81,7 @@ export function brandComplianceRows({ approvals, registrations }: NonNullable<Br
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
-      detail: [approval.approved_on ? `submitted ${approval.approved_on}` : "not submitted", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
+      detail: [approval.approved_on ? `approved ${approval.approved_on}` : "approval date unknown", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
     })),
     ...registrations.map((registration) => ({

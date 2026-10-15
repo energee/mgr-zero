@@ -479,6 +479,7 @@ omitted. They have no roles until they are built.
 | `save_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |  |
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `search_colas` | Compliance | ✓ | ✓ |  |  |  |  |
 | `search_entities` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `send_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `set_books_opened_on` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -648,6 +649,7 @@ one value that ties what your client saw to what the server recorded.
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |
 | 502 | `invite_failed` | The invitation was interrupted before membership completion was confirmed. | Retry the identical input with the same `requestId`; the saved Auth identity is reused. |
+| 502 | `upstream_unavailable` | An outside service the operation reads did not answer: it timed out, errored, or changed its page. The message names the service (today: TTB's public COLA registry for `search_colas`). | Retry later. A failed read is never reported as an empty result, so an empty list is a real no-match. |
 | 503 | `admission_unavailable` | The authenticated admission check was unavailable, so the operation did not run. | Retry later with the same `requestId` for an unchanged write. Report persistent failures with the `correlationId`. |
 {/* end ops:errors */}
 

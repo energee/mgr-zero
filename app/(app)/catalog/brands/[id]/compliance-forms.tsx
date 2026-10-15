@@ -2,26 +2,32 @@
 // compliance sheets (screen records Brand approval, State registration):
 // upsert_brand_approval and upsert_state_registration, each creating (no row)
 // or editing (a row passed in). The brand is fixed: the sheet is only ever
-// opened from one brand, so it is stated, not picked.
+// opened from one brand, so it is stated, not picked. Find COLA runs the
+// search_colas read and Use copies a match's TTB ID, serial and approval
+// date; nothing is saved until Save approval.
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { StateRegistrationView } from "@/components/mgr/views/state-registration";
-import type { Approval, Registration } from "@/lib/commands/compliance";
-import { useCommandForm, useFields } from "@/lib/commands/use-command-form";
-import { APPROVAL_KINDS, approvalInput } from "@/lib/mgr/brand-approval-view";
+import type { Approval, ColaSearch, Registration } from "@/lib/commands/compliance";
+import { useCommandAction, useCommandForm, useFields } from "@/lib/commands/use-command-form";
+import { APPROVAL_KINDS, approvalInput, colaChoice } from "@/lib/mgr/brand-approval-view";
 import { registrationInput } from "@/lib/mgr/state-registration-view";
 type Brand = { id: string; name: string };
 
 export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: Approval }) {
   // No expiry field: a COLA does not expire. The expires_on column and note
   // are not shown; approvalInput omits them, so the upsert keeps them (#438, #522).
-  const { v, set, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", serialNumber: approval?.serial_number ?? "", submittedOn: approval?.approved_on ?? "" });
+  const { v, set, patch, reset } = useFields({ kind: approval?.kind ?? "cola", ttbId: approval?.ttb_id ?? "", serialNumber: approval?.serial_number ?? "", approvedOn: approval?.approved_on ?? "" });
+  // The search is a read: its own error slot, no refresh, no saved request.
+  const search = useCommandAction();
+  const [colas, setColas] = useState<ColaSearch>();
   const form = useCommandForm("upsert_brand_approval", {
     build: () => approvalInput(brand.id, v, approval),
-    reset,
+    reset: () => { reset(); setColas(undefined); search.setError(null); },
   });
   const model = {
     brand: brand.name,
@@ -29,16 +35,22 @@ export function ApprovalForm({ brand, approval }: { brand: Brand; approval?: App
     kindOptions: APPROVAL_KINDS,
     number: v.ttbId,
     serialNumber: v.serialNumber,
-    submittedOn: v.submittedOn,
+    approvedOn: v.approvedOn,
+    searching: search.busy,
+    colas,
   };
-  const controls = { kind: set("kind"), number: set("ttbId"), serialNumber: set("serialNumber"), submittedOn: set("submittedOn") };
+  const controls = {
+    kind: set("kind"), number: set("ttbId"), serialNumber: set("serialNumber"), approvedOn: set("approvedOn"),
+    findCola: () => { void search.run("search_colas", { name: brand.name }, (data) => setColas(data as ColaSearch), { refresh: false, durable: false }); },
+    useCola: (record: ColaSearch["rows"][number]) => patch(colaChoice(record)),
+  };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval", approval && `${approval.kind.toUpperCase()} ${approval.ttb_id}`)}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <BrandApprovalView
           model={model}
           controls={controls}
-          messages={<CommandFormMessage error={form.error} />}
+          messages={<><CommandFormMessage error={search.error} /><CommandFormMessage error={form.error} /></>}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !v.ttbId.trim()}>{form.submitting ? "Saving…" : "Save approval"}</Button></CommandFormFooter>}
         />
       </form>
