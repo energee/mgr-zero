@@ -28,7 +28,6 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
   ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, Profile[], { id: string; name: string; alias: string | null }[]];
-  const parent = { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" };
   const material = materialLookup(materials);
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
 
@@ -37,13 +36,12 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   return (
     <RecipeView
       readOnly
-      parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} parent={parent} />}
+      parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} />}
       model={{
         title: version ? `${recipe.name} v${version.version}` : recipe.name,
         backHref: "/recipes",
         createHref: `/recipes/${recipe.id}/new`,
         empty: version ? undefined : "No version yet: create the first one",
-        parent,
         ingredients: ingredients.map((i) => ({
           key: i.id, title: material.name(i.material_id),
           detail: ingredientDetail(i.stage, i.timing_minutes, Number(i.per_bbl_qty), material.unit(i.material_id)),

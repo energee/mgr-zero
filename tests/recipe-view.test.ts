@@ -1,8 +1,9 @@
 // tests/recipe-view.test.ts — the recipe page's pure view-model: a saved
-// version copied into a draft (versionToDraft, versionNumbers) and the first
-// reason a draft cannot be saved (draftBlocker). No DB.
+// version copied into a draft (versionToDraft, versionNumbers), the first
+// reason a draft cannot be saved (draftBlocker), the read page's model
+// (toRecipePageModel) and why a prediction is missing (gravityBlockerText). No DB.
 import { describe, expect, it } from "vitest";
-import { draftBlocker, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { draftBlocker, gravityBlockerText, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
@@ -93,5 +94,63 @@ describe("draftBlocker", () => {
     expect(fourth).toMatch(/efficiency/i);
     expect(fifth).toMatch(/attenuation/i);
     expect(draftBlocker({ ...ready, efficiency: "101" })).toMatch(/efficiency/i);
+  });
+});
+
+describe("toRecipePageModel", () => {
+  const materials = [
+    { id: "m-malt", name: "CMG White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037 },
+    { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null },
+    { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null },
+  ];
+  const ctx = { materials, profiles: [{ id: "p-target", name: "Pale ale" }], unit: "plato" as const, timeZone: "America/Los_Angeles" };
+  const predicted = { ...snapshot, ogPlato: 12.5, fgPlato: 2.5, abv: 5.25 };
+
+  it("titles the page with the version and reads each ingredient per bbl to three significant digits", () => {
+    const model = toRecipePageModel({ ...predicted, ingredients: [{ ...snapshot.ingredients[0], per_bbl_qty: 40.909091 }] }, ctx);
+    expect(model.title).toBe("Pale v3");
+    expect(model.ingredients?.[0]?.detail).toContain("40.9 lb / bbl");
+    expect(model.predicted).toMatch(/^Predicted: OG /);
+  });
+  it("counts mash steps and fermentation stages, and says No stages yet when there are none", () => {
+    const model = toRecipePageModel({ ...predicted, version: { ...version, fermentation_schedule: [] } }, ctx);
+    expect(model.mash?.title).toBe("Mash schedule · 1 step");
+    expect(model.mash?.detail).toBe("Total 60 min · 152 °F saccharification rest");
+    expect(model.fermentation?.detail).toBe("No stages yet");
+  });
+  it("titles the water row Water and names the target once, in its rows", () => {
+    const model = toRecipePageModel(predicted, ctx);
+    expect(model.water?.title).toBe("Water");
+    expect(model.water?.rows?.filter((r) => r.detail === "Pale ale")).toHaveLength(1);
+  });
+  it("dates the version in the brewery's zone and carries the recipe note", () => {
+    const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
+    expect(model.saved).toBe("Sep 30, 2026");
+    expect(model.note).toBe("House pale");
+  });
+  it("says which saved line had no extract potential instead of a prediction", () => {
+    const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);
+    expect(model.predicted).toBe("CMG White Wheat had no extract potential when this version was saved; set it under Materials, then create the next version.");
+  });
+  it("says a mash line stocked in a volume unit has no weight", () => {
+    const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], materials: { base_uom: "gal" } }] }, ctx);
+    expect(model.predicted).toBe("CMG White Wheat is stocked in gal, which has no weight, so nothing is predicted.");
+  });
+  it("draws the empty recipe with no invented numbers", () => {
+    const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
+    expect(model.title).toBe("Pale");
+    expect(model.empty).toBeTruthy();
+    expect(model.mash).toBeUndefined();
+    expect(model.saved).toBeUndefined();
+  });
+});
+
+describe("gravityBlockerText", () => {
+  it("speaks of a draft in the present tense", () => {
+    expect(gravityBlockerText([{ index: 0, reason: "no_extract" }], () => "Pilsner", () => "lb", { saved: false }))
+      .toBe("Pilsner has no extract potential; set it under Materials.");
+  });
+  it("is null when nothing blocks the prediction", () => {
+    expect(gravityBlockerText([], () => "Pilsner", () => "lb", { saved: true })).toBeNull();
   });
 });

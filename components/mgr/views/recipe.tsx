@@ -50,7 +50,7 @@ export function RecipeView({
   };
   const head = (
     <>
-      {parentForm ?? (model.parent ? E.row(model.parent.title, model.parent.detail) : null)}
+      {parentForm}
       {model.priceGroupOptions
         ? <>
           {E.pick("Default price group · optional", model.priceGroup ?? "", model.priceGroupOptions)}
