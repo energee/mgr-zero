@@ -218,8 +218,9 @@ Each task starts by writing its named failing test. "DB" tests need the
      joins the other QuickBooks mappings).
    - Types: `z.object({ vendorId: z.string().uuid(), qboVendorId: z.string().trim().min(1) })`;
      `z.object({ category: z.enum(MATERIAL_CATEGORIES), qboAccountId: z.string().trim().min(1) })`.
-     Move `MATERIAL_CATEGORIES` from `purchasing.ts` to `lib/mgr/enums.ts` so
-     both modules share one list.
+     Take the category list from `Constants.public.Enums.material_category`
+     (`lib/supabase/database.generated.ts`), as `lib/commands/stock-line.ts`
+     does for keg sizes. No new copy of the list.
    - Test first: extend `tests/qbo-bill-mapping.test.ts` through `runCommand`.
    - Accept: test passes; `bunx tsc --noEmit`.
    - Deps: 1.
@@ -247,36 +248,32 @@ Each task starts by writing its named failing test. "DB" tests need the
    - Test first: extend `tests/qbo-bill-push.test.ts` with a fake transport. A
      lost response retries the identical body and `requestid`. A 401 refreshes
      once. A 400 records `push_failed`. A `corrected` attempt then succeeds. A
-     replay after success makes no HTTP call.
+     replay after success makes no HTTP call. VendorCredit: post a Bill,
+     correct the receipt, then post a `VendorCredit`. Its lines equal the
+     Bill's snapshot lines. The replacement receipt posts its own Bill. A
+     credit for an unposted or unsuperseded receipt is refused.
    - Accept: test passes; `bunx tsc --noEmit`.
    - Deps: 3, 4.
-6. **VendorCredit for a corrected, posted receipt.**
-   - Files: none beyond 3 and 5 unless a case fails.
-   - Test first: extend `tests/qbo-bill-push.test.ts`. Post a Bill, correct
-     the receipt, then post a `VendorCredit`. Its lines equal the Bill's
-     snapshot lines. The replacement receipt posts its own Bill. A credit for
-     an unposted or unsuperseded receipt is refused.
-   - Accept: test passes.
-   - Deps: 5.
-7. **Receipt read carries post status.**
-   - Files: `lib/commands/purchasing.ts` (`get_purchase_order` adds each
-     receipt's latest `qbo_bill_pushes` row: `entity_type`, `status`,
-     `qbo_entity_id`, `error`).
+6. **Receipt read carries post status.**
+   - Files: `lib/commands/purchasing.ts` (`get_purchase_order` embeds
+     `qbo_bill_pushes(entity_type, status, qbo_entity_id, error, created_at)`
+     in its existing receipts select and keeps the latest per receipt; no
+     query per receipt).
    - Types: `ReceiptSnapshot.qbo_bill?: { entity_type: "Bill" | "VendorCredit"; status: "pending" | "pushed" | "push_failed"; qbo_entity_id: string | null; error: string | null } | null`
      in `lib/mgr/receipt-view.ts`.
    - Test first: a case in `tests/purchasing.test.ts` (DB) that a posted
      receipt reads back its status; a brewer reads none.
    - Accept: test passes.
    - Deps: 3.
-8. **Pure presentation rules.**
+7. **Pure presentation rules.**
    - Files: `lib/mgr/qbo-ui.ts`: `qboBillPresentation(input)` returns
      `{ detail, actions }` with actions from `"post" | "retry" | "corrected_post" | "credit" | "fix_mapping"`;
      `qboBillConfirmation(action, receiptLabel)` mirrors `qboPushConfirmation`.
    - Test first: `tests/qbo-ui.test.ts`. Warehouse gets no actions. An
      uncertain post offers only the exact retry. A superseded posted receipt
      offers `credit`.
-   - Deps: none. Parallel with 1–7.
-9. **Receipt screen.**
+   - Deps: none. Parallel with 1–6.
+8. **Receipt screen.**
    - Files: `lib/mgr/receipt-view.ts` (`qbo?: { detail: string; actions: … }`
      on `ReceiptViewModel`), `components/mgr/views/receipt.tsx` (an `E.fld`
      "QuickBooks" row and an action slot), a client action in
@@ -286,8 +283,8 @@ Each task starts by writing its named failing test. "DB" tests need the
    - Test first: `tests/purchasing-view.test.ts` maps a snapshot to the QuickBooks row.
    - Accept: the screen-only proof list in AGENTS.md; a look at the page with
      the `browse` skill.
-   - Deps: 5, 7, 8.
-10. **Mappings screen.**
+   - Deps: 5, 6, 7.
+9. **Mappings screen.**
     - Files: `app/(app)/settings/accounting/mappings/page.tsx` (Vendors and
       Expense accounts sections), `qbo-controls.tsx` and
       `components/mgr/views/qbo-mapping.tsx` (`MappingRow.kind` adds
@@ -296,7 +293,7 @@ Each task starts by writing its named failing test. "DB" tests need the
       for the two new kinds' labels and command inputs.
     - Accept: screen-only proof list; browse check.
     - Deps: 2.
-11. **Docs.**
+10. **Docs.**
     - Files: `content/docs/staff-guide.mdx` (Purchasing → Purchase orders:
       posting, blocks, credits; Accounting: the two new mapping sections),
       `content/docs/api/` via `bun run docs:api`.
@@ -304,13 +301,13 @@ Each task starts by writing its named failing test. "DB" tests need the
       list the four new operations.
     - Accept: `tests/api-docs.test.ts`, `tests/docs.test.ts`,
       `tests/design-docs.test.ts` pass.
-    - Deps: 2, 5, 9, 10.
-12. **Final proof.** `bun run test && bunx tsc --noEmit && bun run lint`,
+    - Deps: 2, 5, 8, 9.
+11. **Final proof.** `bun run test && bunx tsc --noEmit && bun run lint`,
     then `/simplify`, then the same checks again.
     - Deps: all.
 
-Parallelism: 1, 4 and 8 start together. 2 and 3 follow 1, in parallel. 5
-waits on 3 and 4. 6 and 7 follow. 9 and 10 run in parallel. 11 and 12 close.
+Parallelism: 1, 4 and 7 start together. 2 and 3 follow 1, in parallel. 5
+waits on 3 and 4; 6 follows 3. 8 and 9 run in parallel. 10 and 11 close.
 Tasks 1 and 3 edit one migration file, so one agent owns both in sequence.
 
 ## Out of scope
