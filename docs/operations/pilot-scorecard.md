@@ -11,8 +11,8 @@ Technical sign-off lives in [`release-checklist.md`](release-checklist.md).
 Pilot scope (J01 ordering, J02 picked-order adjustment, J06 recovery) is Decision 1 in
 [`release-readiness-2026-09-18.md`](release-readiness-2026-09-18.md).
 
-No external scorecard or runbook was found in this repository.
-If one exists outside it, link it here and drop the duplicate parts.
+No scorecard or runbook exists in this repository.
+If one exists outside it, link it here and cut the duplicate parts.
 
 The document has two parts.
 Part A is defined and signed off before any pilot user starts; #311 lists that as a pilot blocker.
@@ -46,8 +46,8 @@ The pilot starts only when every row is true.
 
 ### Evaluation period
 
-Choose one stopping rule.
-The pilot ends at whichever agreed limit comes first.
+Agree one limit or both.
+The pilot ends at the first agreed limit reached.
 
 | Rule | Proposal | Agreed value |
 | --- | --- | --- |
@@ -56,9 +56,9 @@ The pilot ends at whichever agreed limit comes first.
 
 ### Outcome measures
 
-All measures are recorded by hand in the operator log below.
+Record every measure by hand in the operator log below.
 No analytics package is needed.
-Targets are proposals for the owner to accept or change.
+The owner accepts or changes each proposed target.
 
 | # | Measure | How it is counted | Proposed target | Agreed target |
 | --- | --- | --- | --- | --- |
