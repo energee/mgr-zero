@@ -127,9 +127,8 @@ export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils
 
 export const recipesList: RecipesSnapshot = {
   rows: [
-    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28", verb: "Review", tone: "primary" },
-    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21", verb: "Review", tone: "primary" },
-    { key: "stout", title: "Stout v2", detail: "Stout · draft version", verb: "Finish", tone: "primary", warning: true },
+    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28" },
+    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21" },
   ],
 };
 
