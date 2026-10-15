@@ -154,14 +154,17 @@ from `pg_get_functiondef`.
 `'admin' = any(roles)` in all four places.
 
 The 13 direct policies are dropped and re-created. Every other clause stays as
-`pg_policies` shows it.
+`pg_policies` shows it. Each one moves to the existing helper
+`my_staff_brewery_ids` (#770, `20261008170000_staff_role_business_reads.sql`),
+as the 79 helper-routed policies already use it. Written as
+`brewery_id in (select ...)`, it runs once per statement, not once per row.
 
 | Policies | New predicate |
 |---|---|
-| `chat_installations_admin_read`, `notification_destinations_admin_shared_read` | `(select public.has_staff_role(brewery_id, array['admin']::public.staff_role[]))` |
-| `chat_user_links_self_read`, `notification_destinations_personal_read`, `notification_preferences_self_read` | `(select public.staff_roles(brewery_id)) is not null` |
-| `staff_read` on `pos_catalog_items`, `pos_catalog_ownership`, `pos_catalog_variations`, `pos_menu_lines`, `pos_menus` | `public.has_staff_role(brewery_id, array['admin','warehouse']::public.staff_role[])` |
-| `integration_operator_read` on `pos_connections`, `qbo_connections`, `qbo_pushes` | `public.has_staff_role(brewery_id, array['admin','sales']::public.staff_role[])` |
+| `chat_installations_admin_read`, `notification_destinations_admin_shared_read` | `brewery_id in (select public.my_staff_brewery_ids(array['admin']::public.staff_role[]))` |
+| `chat_user_links_self_read`, `notification_destinations_personal_read`, `notification_preferences_self_read` | `brewery_id in (select public.my_staff_brewery_ids(enum_range(null::public.staff_role)))` |
+| `staff_read` on `pos_catalog_items`, `pos_catalog_ownership`, `pos_catalog_variations`, `pos_menu_lines`, `pos_menus` | `brewery_id in (select public.my_staff_brewery_ids(array['admin','warehouse']::public.staff_role[]))` |
+| `integration_operator_read` on `pos_connections`, `qbo_connections`, `qbo_pushes` | `brewery_id in (select public.my_staff_brewery_ids(array['admin','sales']::public.staff_role[]))` |
 
 Team and invite functions, in the same file:
 
