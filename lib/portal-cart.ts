@@ -1,7 +1,8 @@
 // lib/portal-cart.ts — pure decisions behind the portal cart's Save draft /
 // Submit buttons (app/(portal)/portal/cart.tsx), kept out of the component so
-// vitest can pin them down: which command syncs the cart to the database, and
-// when the buttons are disabled.
+// vitest can pin them down: which command syncs the cart to the database, when
+// the buttons are disabled, exact-request recovery, and the browser-persistent
+// working cart (#710).
 /** Which command writes the cart's current lines/fields to the database. A
  *  first save creates the draft; every later save replaces the saved draft's
  *  lines, so a quantity edited after Save draft (or after a submit that created
@@ -26,6 +27,7 @@ export function cartActionsDisabled(s: { shipToId: string; lineCount: number; bu
 }
 
 import { z } from "zod";
+import { defaultShipToId } from "@/lib/order-form-rules";
 
 const scopeSchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid(), breweryId: z.string().uuid() }).strict();
 const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: z.string().date().nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() }).strict()).min(1) }).strict();
@@ -61,6 +63,55 @@ export function restorePortalAttempt(raw: string | null, scope: PortalScope): Po
 export function storePortalAttempt(storage: Pick<Storage, "setItem">, attempt: PortalAttempt) {
   try { storage.setItem(portalAttemptKey(attempt.scope), JSON.stringify(attemptSchema.parse(attempt))); }
   catch { throw new Error("Could not save order recovery. Enable session storage and retry; no new request was sent."); }
+}
+/** Browser-persistent working cart (#710). The unsaved new Shop cart is kept in
+ *  localStorage under one buyer, customer account and brewery, for seven days
+ *  after the last edit. It holds raw edits only: never a request, quote or
+ *  draft id, so the exact-request recovery above is unaffected. Storage is a
+ *  convenience: every read or write failure behaves as "no saved cart", which
+ *  is the in-memory cart the portal had before. */
+export const WORKING_CART_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const workingCartKey = (s: PortalScope) => `mgr-portal-cart:${s.actorId}:${s.customerId}:${s.breweryId}`;
+type WorkingFields = Omit<PortalFields, "lines">;
+/** A getter, not the storage itself: reading the `localStorage` global can
+ *  throw (blocked storage, no window), and the getter runs inside each try. */
+type CartStorage = () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
+const workingCartSchema = z.object({
+  savedAt: z.number(),
+  fields: z.object({ shipToId: z.string(), poNumber: z.string(), note: z.string(), requestedShipDate: z.string().nullable() }),
+  // The name is kept so a package later removed from the catalog can still be named in the notice.
+  lines: z.array(z.object({ skuId: z.string(), name: z.string(), qty: z.string() })),
+});
+export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
+  const { shipToId, poNumber, note, requestedShipDate } = cart.fields;
+  const lines = Object.entries(cart.qty).filter(([, qty]) => qty.trim()).map(([skuId, qty]) => ({ skuId, qty, name: items.find(i => i.skuId === skuId)?.name ?? skuId }));
+  try { storage().setItem(workingCartKey(scope), JSON.stringify({ savedAt: now, fields: { shipToId, poNumber, note, requestedShipDate }, lines })); }
+  catch { /* Full, blocked or missing storage: the cart stays in memory only. */ }
+}
+export function clearWorkingCart(storage: CartStorage, scope: PortalScope) {
+  try { storage().removeItem(workingCartKey(scope)); }
+  catch { /* Nothing was stored if storage is unavailable. */ }
+}
+/** The saved cart for this scope, or null when none, expired or unreadable.
+ *  Packages no longer in the catalog are dropped and named in `removed`; a
+ *  ship-to that no longer exists falls back to the account default. */
+export function restoreWorkingCart(storage: CartStorage, scope: PortalScope, items: { skuId: string }[], shipTos: { id: string; is_default?: boolean }[], now: number) {
+  let saved;
+  try {
+    const raw = storage().getItem(workingCartKey(scope));
+    saved = raw === null ? null : workingCartSchema.safeParse(JSON.parse(raw)).data;
+  } catch { saved = undefined; }
+  if (!saved || now - saved.savedAt > WORKING_CART_TTL_MS) {
+    if (saved !== null) clearWorkingCart(storage, scope);
+    return null;
+  }
+  const available = new Set(items.map(i => i.skuId));
+  const kept = saved.lines.filter(l => available.has(l.skuId));
+  return {
+    fields: { ...saved.fields, shipToId: shipTos.some(s => s.id === saved.fields.shipToId) ? saved.fields.shipToId : defaultShipToId(shipTos) },
+    qty: Object.fromEntries(kept.map(l => [l.skuId, l.qty])),
+    removed: saved.lines.filter(l => !available.has(l.skuId)).map(l => l.name),
+  };
 }
 export function cartLines(qty: Record<string, string>) {
   const lines = [];

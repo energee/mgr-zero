@@ -50,6 +50,14 @@ it("reload retries the persisted submit directly after a lost response", async (
   expect(sent[1].requestId).toBe(sent[2].requestId);
   expect(raw).toBeNull();
 });
+// The Shop retires the browser-wide working cart in onStage (#710 review):
+// that is only safe if the exact request is already durable and not yet sent.
+it("stages each request durably before sending it", async () => {
+  const events: string[] = [];
+  const storage = { setItem() { events.push("store"); }, removeItem() {} };
+  await executePortalAttempt(attempt as never, storage, async () => { events.push("send"); return { order_id: id }; }, () => events.push("stage"));
+  expect(events.slice(0, 3)).toEqual(["store", "stage", "send"]);
+});
 it("reload retries the identical create and never sends when persistence fails", async () => {
   let raw: string | null = null;
   const storage = { setItem(_key: string, value: string) { raw = value; }, removeItem() { raw = null; } };
