@@ -1,11 +1,14 @@
-// One brand’s sellable SKUs: stocked packages and non-stock pours.
+// One brand’s sellable SKUs: stocked packages and non-stock pours. Each row
+// names its barcode, its own UPC or its price group’s (list_price_group_barcodes).
 // Existing serving identities remain the boundary for poured POS activity.
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
+import type { PriceGroupBarcode } from "@/lib/mgr/price-groups-view";
 import { notFound } from "next/navigation";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
@@ -20,12 +23,15 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canWrite = brewery.role === "admin" || brewery.role === "sales";
-  const [brands, formats, pools] = await Promise.all([
+  const [brands, formats, pools, barcodes] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<Brand[]>,
     // A SKU is always a packaged format, so one filtered read serves both the
     // rows' format names and the New SKU picker.
     runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>,
     canWrite ? runCommand("list_keg_pools", {}, ctx) as Promise<KegPoolOption[]> : Promise.resolve([]),
+    // Only this brand's group's codes, under list_price_group_barcodes' own role
+    // gate; a role without it sees only a SKU's own UPC.
+    canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", { brandId: id }, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
   ]);
   const brand = brands.find((b) => b.id === id) ?? notFound();
   const formatById = new Map(formats.map((f) => [f.id, f]));
@@ -33,7 +39,7 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const options: FormatOption[] = formats.map((f) => ({ id: f.id, name: f.name, package_type: f.package_type }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, pours: brand.pours, backHref: `/catalog/brands/${id}` })}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, backHref: `/catalog/brands/${id}` })}
       createAction={canWrite ? <SkuForm brandId={id} formats={options} pools={pools} /> : null}
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {

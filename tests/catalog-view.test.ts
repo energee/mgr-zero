@@ -29,6 +29,7 @@ import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
 import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
 import { toSkuListViewProps } from "../lib/mgr/sku-list-view";
+import { barcodeOf } from "../lib/mgr/price-groups-view";
 import { toSkuViewProps } from "../lib/mgr/sku-view";
 import { formatVolume } from "../lib/volume";
 
@@ -326,6 +327,24 @@ describe("SKU list view", () => {
       ["case · 24×16 oz", `${formatVolume("0.09677419")} · active`],
       ["Pint", "16 oz · pour · drawn from keg"],
     ]);
+  });
+
+  it("shows each SKU's barcode: its own as an override, else its price group's code for the format", () => {
+    const [half, sixth, cased] = skuListHazy.skus;
+    const barcodes = [
+      { price_group_id: "g1", format_id: cased.format_id, upc: "850051366040" },
+      { price_group_id: "g1", format_id: half.format_id, upc: "860009737631" },
+      // Another group's code for the same format never reaches this brand's rows.
+      { price_group_id: "g2", format_id: sixth.format_id, upc: "860009737600" },
+    ];
+    const model = toSkuListViewProps({ ...skuListHazy, brand: { ...skuListHazy.brand, price_group_id: "g1" }, pours: [],
+      skus: [{ ...half, upc: "012345678905" }, sixth, cased], barcodes });
+    expect(model.rows.map((r) => r.detail.split(" · ").filter((p) => p.startsWith("UPC")))).toEqual([
+      ["UPC 012345678905 (SKU override)"], [], ["UPC 850051366040"],
+    ]);
+    expect(barcodeOf(barcodes, "g2", sixth.format_id)).toBe("860009737600");
+    expect(barcodeOf(barcodes, "g1", sixth.format_id)).toBeUndefined();
+    expect(barcodeOf(barcodes, null, cased.format_id)).toBeUndefined();
   });
 
   it("renders Add SKU, Edit, and the three packages", () => {

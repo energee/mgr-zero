@@ -23,6 +23,8 @@ export type PriceGroupsViewModel = {
 
 /** One row of list_price_groups: the grid row and its $/bbl ceiling. */
 export type PriceGroupRow = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
+/** One list_price_group_barcodes row: a group's UPC for one packaged format. */
+export type PriceGroupBarcode = { price_group_id: string; format_id: string; upc: string };
 export const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
 
 export type PriceGroupsSnapshot = {
@@ -38,6 +40,8 @@ export type PriceGroupsSnapshot = {
     brands?: { name: string } | null;
     price_groups?: { name: string } | null;
   }[];
+  /** list_price_group_barcodes; absent for a role that cannot read them. */
+  barcodes?: PriceGroupBarcode[];
   cells: {
     sale_channel_id: string;
     price_group_id: string;
@@ -47,6 +51,10 @@ export type PriceGroupsSnapshot = {
 };
 
 export const cellKey = (channelId: string, groupId: string, formatId: string) => `${channelId}|${groupId}|${formatId}`;
+
+/** A price group's UPC for one format, if it has one. A group-less brand has none. */
+export const barcodeOf = (barcodes: PriceGroupBarcode[] | undefined, groupId: string | null | undefined, formatId: string) =>
+  groupId ? barcodes?.find((b) => b.price_group_id === groupId && b.format_id === formatId)?.upc : undefined;
 
 /** A format column's label: "Hazy · ½ bbl keg" when the format belongs to a brand. */
 export const formatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;

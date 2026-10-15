@@ -4,7 +4,8 @@ Date: 2026-09-07
 Status: design, approved; table shape and price resolution superseded by
 `2026-09-07-mgr-pricing-grid-naming.md` (no `price_lists`, `price_list_formats` or
 per-SKU override shipped). Decisions D1, D3, D5, D7 and D8 stand; D3's barcode
-table (`price_group_barcodes`) is a deferred follow-on, so no group owns a UPC yet.
+table (`price_group_barcodes`) shipped 2026-10-14 (docs/plans/price-group-barcodes.md),
+with D2 amended below.
 Supersedes naming: "Price lists" / "Price tiers" (see Decisions)
 
 ## Problem
@@ -34,6 +35,11 @@ pattern: a rotating series rings up identically and the retailer never re-keys.
 Considered and rejected: group-defaults-with-SKU-override (a second inheritance
 rule to learn, for a case nobody named) and barcode-on-Format (honest only if
 barcode never varies by band, which defeats the purpose).
+
+*Amended 2026-10-14 (user):* a SKU's own `skus.upc`, when set, wins over the
+group's code and is labelled "SKU override". The group code still covers every
+SKU without one. `skus.upc` stays unique within the brewery, so an override is
+one SKU's own.
 
 **D3 — Barcode is per group × format, and nullable.** A Format already *is*
 package + volume + BOM, so a 12 oz can and a 16 oz can are two Formats and get

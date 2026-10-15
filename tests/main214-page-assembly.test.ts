@@ -25,6 +25,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_keg_pools": return [];
     case "list_price_groups": return [{ id: "group", name: "Core", position: 1, cost_ceiling_cents: null }];
     case "list_channel_prices": return [];
+    case "list_price_group_barcodes": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
     case "get_customer": return { customer, shipTos: [shipTo] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];

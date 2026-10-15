@@ -171,6 +171,7 @@ const AUTHENTICATED_RPCS = [
   "set_pos_price_override(uuid,text,uuid,uuid,integer,uuid)",
   "set_pos_website_publication(uuid,text,uuid,uuid,boolean,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
+  "set_price_group_barcode(uuid,uuid,uuid,text,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
   "set_taproom_par(uuid,uuid,uuid,numeric,uuid)",
   "ship_order(uuid,jsonb,text,text,uuid,text)",

@@ -2751,9 +2751,9 @@ export const SCREENS: Screen[] = [
     to: { "Remove price group": "Price groups" },
     job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
     reads: "list_price_groups",
-    writes: "upsert_price_group · delete_price_group · upsert_format · delete_format",
+    writes: "upsert_price_group · delete_price_group · upsert_format · delete_format · set_price_group_barcode",
     states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group on Brand · a person confirms"], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
-    spec: "A price group is one row of the grid: its name, position, optional cost ceiling, and the pours it owns. Glass sizes are added here (name and ounces), not on a brand. Every beer on the group uses those pours. Remove on a pour and Delete on the group each ask for confirmation first; Remove deletes the pour unless a cell still prices it. Prices are the cells on Price groups. Ceilings are dollars per barrel of recipe cost. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group, a cell prices it, or the group owns a pour.",
+    spec: "A price group is one row of the grid: its name, position, optional cost ceiling, and the pours it owns. Glass sizes are added here (name and ounces), not on a brand. Every beer on the group uses those pours. Remove on a pour and Delete on the group each ask for confirmation first; Remove deletes the pour unless a cell still prices it. Prices are the cells on Price groups. Ceilings are dollars per barrel of recipe cost. Brand reads them: the band a brand’s recipe cost falls in is offered there, and nobody is moved automatically. Removal is refused while a brand sits on the group, a cell prices it, or the group owns a pour. Barcodes: the group owns one UPC per packaged format, and every SKU on it scans as that code unless the SKU has its own. A format with no code reads none and raises no warning, since a keg usually has none; one code may cover several formats. Codes leave with the group.",
     body: <PriceGroupView model={toPriceGroupViewProps(priceGroupTwo)} />,
   },
   {

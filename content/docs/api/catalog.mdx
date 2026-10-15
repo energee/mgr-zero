@@ -180,6 +180,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": {} }'
 ```
 
+## list_price_group_barcodes [#list_price_group_barcodes]
+
+`query` · admin, sales
+
+Every price group × packaged format UPC; brandId keeps that brand's group's: each SKU on the group scans as its format's code unless it has its own
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_group_barcodes", "input": {} }'
+```
+
 ## list_price_groups [#list_price_groups]
 
 `query` · admin, sales, warehouse
@@ -265,6 +282,25 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+```
+
+## set_price_group_barcode [#set_price_group_barcode]
+
+`command` · admin, sales
+
+Set or clear a price group's UPC for one packaged format: every SKU on the group scans as it unless the SKU has its own UPC; null or blank clears it
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `priceGroupId` | uuid | yes |
+| `formatId` | uuid | yes |
+| `upc` | string or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_group_barcode", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "upc": "012345678905" } }'
 ```
 
 ## update_sku [#update_sku]
