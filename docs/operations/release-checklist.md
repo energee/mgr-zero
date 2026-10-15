@@ -82,3 +82,4 @@ and evidence link for every check. Use synthetic brewery/customer data.
   scheduler owners are recorded.
 - Open deferrals name an owner and trigger; none can affect stock, money,
   tenancy, authentication, or recovery truth in the released pilot.
+- The [pilot scorecard](pilot-scorecard.md) Part A is signed off (#729); release sign-off is not pilot success.
