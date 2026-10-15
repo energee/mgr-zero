@@ -8,7 +8,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 
 export type AtpWarning = { sku_id: string; atp: number };
 
-/** Reads the `warnings` array out of a confirm_order (or other lifecycle) result. */
+/** Reads the `warnings` array out of a confirm_order result. */
 export function atpWarnings(data: unknown): AtpWarning[] {
   return (data as { warnings?: AtpWarning[] } | null)?.warnings ?? [];
 }

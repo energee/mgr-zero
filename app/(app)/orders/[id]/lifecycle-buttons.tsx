@@ -12,9 +12,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import type { OrderStatus } from "@/lib/mgr/order-status";
 import { CancelOrderDialog } from "./cancel-order-dialog";
-
-type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 
 export function LifecycleButtons({
   orderId,
@@ -31,19 +30,14 @@ export function LifecycleButtons({
 }) {
   const router = useRouter();
   const action = useCommandAction();
-  const { busy, error, run: runAction } = action;
-
-  async function run(name: string) {
-    await runAction(name, { orderId }, () => router.refresh());
-  }
-
+  const { busy, error } = action;
   const canCancel = canSell && status !== "shipped" && status !== "cancelled";
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         {canSell && status === "draft" && (
-          <Button size="sm" disabled={busy} onClick={() => run("submit_order")}>
+          <Button size="sm" disabled={busy} onClick={() => void action.run("submit_order", { orderId })}>
             Submit
           </Button>
         )}
