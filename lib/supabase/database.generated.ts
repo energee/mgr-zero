@@ -1127,6 +1127,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          alias: string | null
           bill_address1: string | null
           bill_address2: string | null
           bill_city: string | null
@@ -1134,6 +1135,7 @@ export type Database = {
           bill_zip: string | null
           billing_email: string | null
           brewery_id: string
+          country: string
           created_at: string
           id: string
           license_no: string | null
@@ -1145,11 +1147,12 @@ export type Database = {
           qbo_sync_state: string | null
           qbo_sync_token: string | null
           sale_channel_id: string
-          state: string
+          state: string | null
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
           type: Database["public"]["Enums"]["customer_type"]
         }
         Insert: {
+          alias?: string | null
           bill_address1?: string | null
           bill_address2?: string | null
           bill_city?: string | null
@@ -1157,6 +1160,7 @@ export type Database = {
           bill_zip?: string | null
           billing_email?: string | null
           brewery_id: string
+          country?: string
           created_at?: string
           id?: string
           license_no?: string | null
@@ -1168,11 +1172,12 @@ export type Database = {
           qbo_sync_state?: string | null
           qbo_sync_token?: string | null
           sale_channel_id: string
-          state: string
+          state?: string | null
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
           type?: Database["public"]["Enums"]["customer_type"]
         }
         Update: {
+          alias?: string | null
           bill_address1?: string | null
           bill_address2?: string | null
           bill_city?: string | null
@@ -1180,6 +1185,7 @@ export type Database = {
           bill_zip?: string | null
           billing_email?: string | null
           brewery_id?: string
+          country?: string
           created_at?: string
           id?: string
           license_no?: string | null
@@ -1191,7 +1197,7 @@ export type Database = {
           qbo_sync_state?: string | null
           qbo_sync_token?: string | null
           sale_channel_id?: string
-          state?: string
+          state?: string | null
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
           type?: Database["public"]["Enums"]["customer_type"]
         }
@@ -5611,43 +5617,46 @@ export type Database = {
       }
       ship_tos: {
         Row: {
-          address1: string
+          address1: string | null
           address2: string | null
           brewery_id: string
-          city: string
+          city: string | null
+          country: string
           created_at: string
           customer_id: string
           id: string
           is_default: boolean
           label: string
-          state: string
-          zip: string
+          state: string | null
+          zip: string | null
         }
         Insert: {
-          address1: string
+          address1?: string | null
           address2?: string | null
           brewery_id: string
-          city: string
+          city?: string | null
+          country?: string
           created_at?: string
           customer_id: string
           id?: string
           is_default?: boolean
           label: string
-          state: string
-          zip: string
+          state?: string | null
+          zip?: string | null
         }
         Update: {
-          address1?: string
+          address1?: string | null
           address2?: string | null
           brewery_id?: string
-          city?: string
+          city?: string | null
+          country?: string
           created_at?: string
           customer_id?: string
           id?: string
           is_default?: boolean
           label?: string
-          state?: string
-          zip?: string
+          state?: string | null
+          zip?: string | null
         }
         Relationships: [
           {
@@ -8781,6 +8790,7 @@ export type Database = {
       customers_missing_portal_email: {
         Args: { p_brewery: string }
         Returns: {
+          alias: string | null
           bill_address1: string | null
           bill_address2: string | null
           bill_city: string | null
@@ -8788,6 +8798,7 @@ export type Database = {
           bill_zip: string | null
           billing_email: string | null
           brewery_id: string
+          country: string
           created_at: string
           id: string
           license_no: string | null
@@ -8799,7 +8810,7 @@ export type Database = {
           qbo_sync_state: string | null
           qbo_sync_token: string | null
           sale_channel_id: string
-          state: string
+          state: string | null
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
           type: Database["public"]["Enums"]["customer_type"]
         }[]
@@ -10427,7 +10438,9 @@ export type Database = {
       }
       upsert_customer: {
         Args: {
+          p_alias?: string
           p_brewery: string
+          p_country?: string
           p_id: string
           p_license_no: string
           p_name: string
@@ -10516,6 +10529,7 @@ export type Database = {
           p_address2: string
           p_brewery: string
           p_city: string
+          p_country?: string
           p_customer: string
           p_id: string
           p_is_default?: boolean
