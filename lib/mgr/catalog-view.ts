@@ -42,6 +42,8 @@ export type CatalogSnapshot = {
   /** Inventory-only until list_water_profiles exists. */
   waterProfileCount?: number;
   backHref?: string;
+  /** A search or category is on, so an empty list means no match, not no brands. */
+  filtered?: boolean;
 };
 
 function brandDetail(b: CatalogBrandRow): string {
@@ -57,13 +59,14 @@ export function toCatalogViewProps({
   channels,
   waterProfileCount,
   backHref,
+  filtered,
 }: CatalogSnapshot): CatalogViewModel {
   const groupCopy = plural(priceGroups.length, "group");
   return {
     backHref,
-    empty: brands.length === 0
-      ? { title: "No brands yet", description: "Add a brand to start building the catalog." }
-      : undefined,
+    empty: brands.length > 0 ? undefined
+      : filtered ? { title: "No brands match", description: "Clear the search or category to see every brand." }
+      : { title: "No brands yet", description: "Add a brand to start building the catalog." },
     brands: brands.map((b) => ({
       key: b.id,
       title: brandLabel(b),

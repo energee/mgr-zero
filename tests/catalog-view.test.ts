@@ -85,6 +85,19 @@ describe("Catalog view", () => {
     expect(html).toMatch(/Price groups/);
   });
 
+  // docs/plans/list-filters.md: an empty search is not an empty catalog.
+  it("says no brands match, not no brands yet, when a filter is on", () => {
+    const model = toCatalogViewProps({ ...catalogBrands, brands: [], filtered: true });
+    expect(model.empty).toEqual({ title: "No brands match", description: "Clear the search or category to see every brand." });
+    expect(toCatalogViewProps({ ...catalogBrands, brands: [] }).empty?.title).toBe("No brands yet");
+  });
+
+  it("draws the controls slot above the brand rows", () => {
+    const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands), controls: createElement("form", { role: "search" }) }));
+    expect(html.indexOf('role="search"')).toBeGreaterThan(-1);
+    expect(html.indexOf('role="search"')).toBeLessThan(html.indexOf(brandOf(SKU_HAZY)));
+  });
+
   it("renders Add brand, Hazy IPA, Price groups, and Water profiles", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
     expect(html).toMatch(/>Add brand</);

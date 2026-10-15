@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { escapeLike } from "@/lib/escape-like";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
 const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
@@ -332,15 +333,29 @@ defineCommand({
 
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
-  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical",
-  input: z.object({}), roles: STAFF_ROLES,
-  handler: async (ctx) => {
-    const [brands, pours] = await Promise.all([
-      unwrap(ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId).order("name")),
+  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
+  input: z.object({
+    q: z.string().trim().max(100).optional(),
+    sort: z.enum(["name", "abv", "newest"]).optional(),
+    category: z.string().trim().min(1).optional(),
+  }), roles: STAFF_ROLES,
+  handler: async (ctx, i) => {
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId);
+    if (i.q) {
+      // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again.
+      const pattern = `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
+      brands = brands.or(`name.ilike.${pattern},alias.ilike.${pattern}`);
+    }
+    if (i.category) brands = brands.eq("category", i.category);
+    const sorted = i.sort === "abv" ? brands.order("abv", { ascending: false, nullsFirst: false }).order("name")
+      : i.sort === "newest" ? brands.order("created_at", { ascending: false }).order("name")
+      : brands.order("name");
+    const [rows, pours] = await Promise.all([
+      unwrap(sorted),
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);
-    return (brands as { price_group_id: string | null }[]).map((b) => ({ ...b, pours: b.price_group_id ? byGroup.get(b.price_group_id) ?? [] : [] }));
+    return (rows as { price_group_id: string | null }[]).map((b) => ({ ...b, pours: b.price_group_id ? byGroup.get(b.price_group_id) ?? [] : [] }));
   },
 });
 

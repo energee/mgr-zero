@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
+import { escapeLike } from "@/lib/escape-like";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
@@ -37,7 +38,6 @@ export const openableKinds = (ctx: Ctx, kinds: readonly SearchKind[]) =>
   kinds.filter((k) => PAGE_READS[k].every((name) => canRun(ctx, name)));
 
 type Row = Record<string, unknown>;
-const escapeLike = (s: string) => s.replace(/[%_\\]/g, (c) => `\\${c}`);
 
 async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[]> {
   const b = ctx.breweryId;

@@ -1,6 +1,6 @@
 # List filters and sort: search, sort and filter in the URL, applied by the query
 
-Status: draft 2026-10-14, awaiting approval. Branch `feat/list-filters`, PR to `main`.
+Status: approved 2026-10-14 (user: "use shadcn components" — search is `E.search` (shadcn `Input`), sort and category are shadcn `Tabs` via the shared `TabBar` (`E.tabs`)). Branch `feat/list-filters`, PR to `main`.
 
 ## Why
 
@@ -35,7 +35,7 @@ plan adds search and sort the same way, so every later list reuses it.
    renders inside a plain `<form method="get">` (Enter submits). It is still the
    same E control, and the screen record calls it unchanged.
 3. **`components/mgr/list-controls.tsx`** — `ListControls({ search, sorts,
-   filters })`: the `E.search` form, then sort and filter as `LinkTabs` rows
+   filters })`: the `E.search` form, then sort and filter as `TabBar` rows (`E.tabs`'s shadcn Tabs; hrefs make each tab a link)
    built with `hrefWith`. Hidden inputs carry the other params, so a search
    keeps the sort.
 

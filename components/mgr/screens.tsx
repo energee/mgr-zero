@@ -49,6 +49,7 @@ import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { ListControls } from "@/components/mgr/list-controls";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
@@ -1413,11 +1414,11 @@ export const SCREENS: Screen[] = [
     name: "Catalog",
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New Format": "Format", "Open format": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
-    reads: "list_brands · list_skus",
+    reads: "list_brands · list_skus · list_catalog_categories",
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands", value: "", keep: {} }} rows={[{ label: "Sort", names: ["Name", "ABV", "Newest"], on: 0 }, { label: "Category", names: ["All", "Core", "Seasonal"], on: 0 }]} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,
