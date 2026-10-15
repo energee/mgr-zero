@@ -12,21 +12,10 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
-import { fermentationSummary, ingredientDetail, mashSummary, materialLookup, processReadout, type FermentationStage, type MashStep, type ProcessColumns } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ingredientDetail, mashSummary, materialLookup, processReadout } from "@/lib/mgr/recipe-process-view";
+import { versionNumbers, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 
-type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
-type Version = ProcessColumns & {
-  id: string; version: number; mash_temp_f: number | null; brewhouse_efficiency: number; yeast_attenuation: number;
-  boil_minutes: number | null; note: string | null;
-  mash_schedule: MashStep[]; fermentation_schedule: FermentationStage[];
-};
-type WaterAdditionRow = { material_id: string; qty: number; unit: string; stage: string };
 type Profile = { id: string; name: string };
-type Ingredient = { id: string; material_id: string; per_bbl_qty: number; stage: string; timing_minutes: number | null; sort: number; extract_snapshot: number | null };
-type GetRecipe = { recipe: Recipe; version: Version | null; ingredients: Ingredient[]; waterAdditions: WaterAdditionRow[]; ogPlato: number | null; fgPlato: number | null; abv: number | null };
-
-const pct = (n: number) => String(Math.round(n * 100));
-const str = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
 
 export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,7 +27,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
-  ])) as [GetRecipe, RecipeMaterial[], { effective: GravityUnit }, Profile[], { id: string; name: string; alias: string | null }[]];
+  ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, Profile[], { id: string; name: string; alias: string | null }[]];
   const parent = { title: `Recipe parent · ${recipe.name}`, detail: recipe.note ?? "" };
   const material = materialLookup(materials);
   const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
@@ -60,9 +49,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           detail: ingredientDetail(i.stage, i.timing_minutes, Number(i.per_bbl_qty), material.unit(i.material_id)),
           qty: "",
         })),
-        preBoil: str(version?.pre_boil_bbl), boilMin: str(version?.boil_minutes),
-        whirlpoolMin: str(version?.whirlpool_minutes), whirlpoolTemp: str(version?.whirlpool_temp_f), whirlpoolRest: str(version?.whirlpool_rest_minutes), knockoutTemp: str(version?.knockout_temp_f),
-        efficiency: version ? pct(version.brewhouse_efficiency) : "", attenuation: version ? pct(version.yeast_attenuation) : "",
+        ...(version ? versionNumbers(version) : {}),
         mash: version ? { title: `Mash schedule · ${version.mash_schedule.length} steps`, detail: mashSummary(version.mash_schedule), rows: version.mash_schedule.map((s) => ({ title: s.name, detail: `${s.kind} · ${s.tempF} °F · ${s.minutes} min` })) } : undefined,
         fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule), rows: version.fermentation_schedule.map((s) => ({ title: s.name, detail: `${s.tempF} °F · ${s.days} days` })) } : undefined,
         water: version ? {
