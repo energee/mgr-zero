@@ -3,7 +3,8 @@
 // field controlled, the ingredient, mash, fermentation and water rows opening
 // their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview from the same
 // pure recipeGravity the server uses (lib/recipe-gravity.ts). With a recipeId
-// the bottom button runs create_recipe_version; without one (recipes/new) the
+// the bottom button runs create_recipe_version, disabled with draftBlocker's
+// reason until the draft is complete; without one (recipes/new) the
 // shared parent fields sit on top and one save runs create_recipe then
 // create_recipe_version, landing on the recipe. Efficiency and attenuation
 // are typed as percents, as the inventory draws them, and sent as fractions.
@@ -17,7 +18,7 @@ import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/compon
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
-import { RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { draftBlocker, RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type RecipeMaterial, type IngredientLine, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
@@ -77,7 +78,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
     }
     await action.run("create_recipe_version", build(id), () => router.push(`/recipes/${id}`));
   }
-  const ready = mashSchedule.length > 0 && eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0 && (!creating || parent.name.trim() !== "");
+  // What the draft still lacks, named for the brewer; the submit stays disabled until it is null.
+  const blocked = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   const parentLocked = creating && createdId !== "";
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
@@ -102,7 +104,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       </> : undefined}
       controls={{
         set: (key, value) => key === "notes" ? setNotes(value) : setNumbers((n) => ({ ...n, [key]: value })),
-        onSubmit: () => void submit(), busy: action.busy, ready, error: action.error,
+        onSubmit: () => void submit(), busy: action.busy, blocked, error: action.error,
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{

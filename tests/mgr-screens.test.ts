@@ -61,7 +61,9 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Boil time");
     expect(recipe).toContain("Whirlpool rest");
     expect(recipe).toContain("Knockout temp");
-    expect(recipe).toContain("Notes");
+    expect(recipe).toContain("Version note");
+    expect(recipe).toContain("Ingredients");
+    expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
     expect(recipe).toMatch(/Water · /);
