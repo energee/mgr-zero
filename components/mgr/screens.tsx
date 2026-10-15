@@ -194,7 +194,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, recipeBrandOptions, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -294,39 +294,17 @@ import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
-import type { FermentationStage, MashStep, SaltMaterial, WaterDraft, WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import type { SaltMaterial, WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
 import { toAdditionFields, toMashStepFields, toStageFields, toWaterProfileOption } from "@/lib/mgr/recipe-process-view";
-
-/** The drawn mash schedule, in the shape create_recipe_version stores. Rows and
- *  footer both read it, so the total and the conversion rest never disagree. */
-const MASH_STEPS: MashStep[] = [
-  { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
-  { name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 },
-  { name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 },
-];
-
-/** The drawn fermentation schedule. Same rule as MASH_STEPS. */
-const FERM_STAGES: FermentationStage[] = [
-  { name: "Primary", kind: "primary", tempF: 68, days: 4 },
-  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, days: 2 },
-  { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 },
-  { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
-];
 
 const WATER_PROFILE_OPTIONS: WaterProfileIons[] = waterProfiles.map(toWaterProfileOption);
 const SALT_OPTIONS: SaltMaterial[] = [
   { id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "epsom", name: "Epsom salt", salt: "epsom_salt" },
   { id: "lactic", name: "Lactic acid", salt: null }, { id: "phos", name: "Phosphoric acid", salt: null },
 ];
-/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
-const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
-  additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
-};
-
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -2019,12 +1997,12 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Style: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
+    to: { Style: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
-    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["style", "drawn gated: recipes has no style column and the create command takes none; the brand names the style today", 0], ["no price group", "the live page draws Default price group gated until a recipe can carry one", 0]],
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; Create recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["style", "drawn gated: recipes has no style column and the create command takes none; the brand names the style today", 0], ["no version", "a new recipe draws No version yet and Create recipe version, no numbers"], ["draft", "Create recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"]],
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. The page shows the newest version; each batch's Brew day keeps the plan it was brewed from. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; Create recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
   },
   {

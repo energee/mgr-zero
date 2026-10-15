@@ -202,6 +202,8 @@ export const INERT: (string | RegExp)[] = [
   "Main ship-to",
   "Dock ship-to",
   "+ add ingredient",
+  // The Recipe frame's note is a read-out row; the parent form above it edits the note.
+  "Recipe note",
   "1 \u00b7 Add locations",
   "1 \u00b7 Review auto-reconciled losses",
   "2 \u00b7 Review generated figures",

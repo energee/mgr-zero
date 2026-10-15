@@ -66,7 +66,7 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water · /);
+    expect(recipe).toMatch(/Water\s+target /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -75,6 +75,25 @@ describe("SCREENS", () => {
     const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
     expect(gate).not.toMatch(/SCHEMA-GATE/);
     expect(gate).toMatch(/schedules/);
+  });
+
+  it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    const drawn = text("Recipe");
+    // The water row is titled Water, as on the live draft; the Water frame names the source.
+    expect(drawn).not.toContain("Water · Municipal Denver");
+    expect(drawn).toContain("target Hazy target · 3 additions");
+    expect(recipe.to?.Water).toBe("Water");
+    expect(text("Water")).toContain("Municipal · Denver");
+    expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
+    expect(drawn).toContain("Saved");
+    expect(drawn).toContain("Aug 28, 2026");
+    const spec = String(recipe.spec);
+    expect(spec).not.toMatch(/schema gate/i);
+    expect(spec).toContain("each batch's Brew day keeps the plan it was brewed from");
+    const states = (recipe.states ?? []).map(([name]) => name);
+    expect(states).toEqual(expect.arrayContaining(["no version", "draft", "frozen"]));
+    expect(states).not.toContain("no price group");
   });
 
   it("keeps water profiles in the catalog, with their ion values", () => {
