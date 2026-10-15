@@ -13,7 +13,7 @@ export function FermentationScheduleView({ title = "Fermentation schedule", stag
     {E.back("Recipe", title, createAction !== undefined ? createAction : E.btn("Add stage"))}
     {stages.length === 0 ? E.blank({ title: "No stages yet", description: "Add stage is the only action." })
       : stages.map((s, i) => <div key={`${i}-${s.name}`}>{E.row(s.name, `${s.tempF} °F · ${s.days} days`, rowVerbs(i, stages.length, verbs))}</div>)}
-    {E.info(fermentationSummary(stages, dryHopDay))}
+    {stages.length > 0 && E.info(fermentationSummary(stages, dryHopDay))}
   </>;
 }
 
