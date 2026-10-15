@@ -2,6 +2,9 @@
 // version copied into a draft (versionToDraft, versionNumbers), the first
 // reason a draft cannot be saved (draftBlocker), the read page's model
 // (toRecipePageModel) and why a prediction is missing (gravityBlockerText). No DB.
+// The last block reads the page and brand picker sources: the page draws
+// toRecipePageModel, and the picker never disables itself while it saves.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { draftBlocker, gravityBlockerText, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
@@ -152,5 +155,18 @@ describe("gravityBlockerText", () => {
   });
   it("is null when nothing blocks the prediction", () => {
     expect(gravityBlockerText([], () => "Pilsner", () => "lb", { saved: true })).toBeNull();
+  });
+});
+
+describe("the read page and its brand picker", () => {
+  const page = readFileSync("app/(app)/recipes/[id]/page.tsx", "utf8");
+  const picker = readFileSync("app/(app)/recipes/[id]/recipe-brand-picker.tsx", "utf8");
+  it("builds its model with toRecipePageModel", () => {
+    expect(page).toMatch(/import \{[^}]*\btoRecipePageModel\b[^}]*\} from "@\/lib\/mgr\/recipe-view"/);
+    expect(page).toContain("toRecipePageModel(");
+  });
+  it("keeps the brand picker enabled while it saves, and says so when it has", () => {
+    expect(picker).not.toContain("disabled: busy");
+    expect(picker).toContain('toast.success("Brand saved")');
   });
 });

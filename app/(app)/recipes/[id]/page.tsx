@@ -1,64 +1,36 @@
-// app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView exactly
-// as the inventory draws it: its latest version's process numbers,
-// ingredients, schedules and the OG/FG/ABV get_recipe predicts (never
-// stored). Create recipe version opens ./new, where recipe-version-form.tsx
-// makes every field live for create_recipe_version.
+// app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView: its
+// latest version read out as text (toRecipePageModel), with the OG/FG/ABV
+// get_recipe predicts (never stored) or why it predicted none. The page only
+// fetches and renders. Create recipe version opens ./new, where
+// recipe-version-form.tsx makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeBrandPicker } from "./recipe-brand-picker";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
-import { fermentationSummary, ingredientDetail, mashSummary, materialLookup, processReadout } from "@/lib/mgr/recipe-process-view";
-import { versionNumbers, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
-
-type Profile = { id: string; name: string };
+import { toRecipePageModel, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 
 export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ recipe, version, ingredients, waterAdditions, ogPlato, fgPlato, abv }, materials, gravityUnit, profiles, brands] = (await Promise.all([
+  const [snapshot, materials, gravityUnit, profiles, brands] = (await Promise.all([
     orNotFound(runCommand("get_recipe", { recipeId: id }, ctx)),
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
-  ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, Profile[], { id: string; name: string; alias: string | null }[]];
-  const material = materialLookup(materials);
-  const profileName = (pid: string | null) => (pid && profiles.find((p) => p.id === pid)?.name) || null;
-
-  const target = profileName(version?.target_water_profile_id ?? null);
-  const water = version ? processReadout(version, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k)) : [];
+  ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, { id: string; name: string }[], { id: string; name: string; alias: string | null }[]];
+  const { recipe } = snapshot;
   return (
     <RecipeView
       readOnly
       parentForm={<RecipeBrandPicker recipeId={recipe.id} brandId={recipe.brand_id} brands={brands} />}
-      model={{
-        title: version ? `${recipe.name} v${version.version}` : recipe.name,
-        backHref: "/recipes",
-        createHref: `/recipes/${recipe.id}/new`,
-        empty: version ? undefined : "No version yet: create the first one",
-        ingredients: ingredients.map((i) => ({
-          key: i.id, title: material.name(i.material_id),
-          detail: ingredientDetail(i.stage, i.timing_minutes, Number(i.per_bbl_qty), material.unit(i.material_id)),
-          qty: "",
-        })),
-        ...(version ? versionNumbers(version) : {}),
-        mash: version ? { title: `Mash schedule · ${version.mash_schedule.length} steps`, detail: mashSummary(version.mash_schedule), rows: version.mash_schedule.map((s) => ({ title: s.name, detail: `${s.kind} · ${s.tempF} °F · ${s.minutes} min` })) } : undefined,
-        fermentation: version ? { title: `Fermentation schedule · ${version.fermentation_schedule.length} stages`, detail: fermentationSummary(version.fermentation_schedule), rows: version.fermentation_schedule.map((s) => ({ title: s.name, detail: `${s.tempF} °F · ${s.days} days` })) } : undefined,
-        water: version ? {
-          title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${waterAdditions.length} additions`,
-          rows: [...water.map(([k, v]) => ({ title: k, detail: v })), ...waterAdditions.map((a) => ({ title: material.name(a.material_id), detail: `${a.qty} ${a.unit} · ${a.stage}` }))],
-        } : undefined,
-        notes: version?.note ?? "",
-        predicted: ogPlato !== null && fgPlato !== null && abv !== null
-          ? `Predicted: OG ${formatGravity(ogPlato, gravityUnit.effective)} · FG ${formatGravity(fgPlato, gravityUnit.effective)} · ABV ${abv.toFixed(1)}%`
-          : undefined,
-      }}
+      model={toRecipePageModel(snapshot, { materials, profiles, unit: gravityUnit.effective, timeZone: brewery.timeZone })}
     />
   );
 }
