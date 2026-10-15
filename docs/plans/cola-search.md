@@ -5,7 +5,7 @@ COLA registry can be searched by the brewery's permit (the TTB registry number
 on /settings, `breweries.ttb_registry_no`, e.g. `BR-PA-20553`). This adds a
 **Find COLA** list to the Brand approval sheet: MGR searches TTB by that
 permit, shows the brewery's COLAs whose fanciful name matches the brand, and
-picking one fills the TTB ID and serial. Saving still goes through
+picking one fills the TTB ID, serial and approval date. Saving still goes through
 `upsert_brand_approval`; nothing new is written.
 
 ## Verified facts (2026-10-14)
@@ -40,8 +40,9 @@ picking one fills the TTB ID and serial. Saving still goes through
   range of 15 years or more with an error page (checked live 2026-10-14), so
   older COLAs cannot be searched. Pages are fetched until the total is
   reached; a missing Next link before then is an error, not a short list.
-- **No date fill**: TTB's date is the *completed* (approval) date; the sheet's
-  field is *Date submitted*. Picking leaves the date alone. (Open question 1.) Resolved in review: the sheet records *Date approved* (the existing `approved_on` column, no migration) and Use fills it from TTB's completed date.
+- **Date fill**: the sheet records *Date approved* (the existing `approved_on`
+  column; no migration) and Use fills it from TTB's completed date, which is
+  the approval date. (Changed in review from "no date fill".)
 - **No caching, no stored scrape.** One search per click, on demand.
 
 ## Tasks
@@ -74,11 +75,11 @@ Sequential unless marked parallel.
    for a COLA, a `Find COLA` slot listing matches (TTB ID, serial, fanciful,
    completed date, class), each with `Use`;
    `app/(app)/catalog/brands/[id]/compliance-forms.tsx` runs
-   `search_colas({ name: brand.name })` on click, and `Use` sets `ttbId` and
-   `serialNumber`. Reuse `E` controls and rows; no native inputs. Empty:
+   `search_colas({ name: brand.name })` on click, and `Use` sets `ttbId`, `serialNumber` and
+   `approvedOn`. Reuse `E` controls and rows; no native inputs. Empty:
    "No COLAs on TTB under <permit> match <name>." Errors via
    `CommandFormMessage`.
-   - Test first: pure `colaChoice(record) → { ttbId, serialNumber }` in
+   - Test first: pure `colaChoice(record) → { ttbId, serialNumber, approvedOn }` in
      `tests/compliance-view.test.ts`; render checked with `/browse`; inventory
      frame gets fixture rows (screen parity).
    - Accept: AGENTS.md screen-only proof list plus the eyeball check.
@@ -95,9 +96,7 @@ No migration. No new dependency (`node:https` and `node:tls` are stdlib).
 
 ## Open questions
 
-1. TTB's completed date is the approval date; the sheet stores "date
-   submitted". Leave it unfilled (plan default), or start recording approval
-   dates (a migration redefining `approved_on`)?
+1. Resolved: the sheet records the approval date (see Date fill).
 2. Bulk: a one-off script matching all 144 Lolev COLAs to brands by fanciful
    name would fill most brands at once. Out of scope here; separate PR if
    wanted.
