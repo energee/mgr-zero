@@ -36,7 +36,9 @@ picking one fills the TTB ID and serial. Saving still goes through
 - **Filter in the query** (negative 12): the query returns only rows whose
   fanciful or brand name contains `name` (case-insensitive). Without `name`,
   all rows.
-- **Date range**: 2000-01-01 to today. Pages are fetched until the total is
+- **Date range**: the last 15 years less a day, through today. TTB rejects a
+  range of 15 years or more with an error page (checked live 2026-10-14), so
+  older COLAs cannot be searched. Pages are fetched until the total is
   reached; a missing Next link before then is an error, not a short list.
 - **No date fill**: TTB's date is the *completed* (approval) date; the sheet's
   field is *Date submitted*. Picking leaves the date alone. (Open question 1.)
