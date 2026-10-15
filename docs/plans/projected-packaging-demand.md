@@ -18,7 +18,7 @@ scheduled.
 | Piece | Where | Reuse |
 |---|---|---|
 | `material_requirements` view (latest) | `supabase/migrations/20260928040000_unstarted_plans.sql:228` | Gains a third demand source and one appended column. Planning, Today's count (`lib/commands/landings.ts:78`) and the draft RPC read it unchanged. |
-| Run → BOM demand math | same view, second `union all` branch | Copied for projected units: `ceil` per output for `each` materials, as a close draws. |
+| Run → BOM demand math | same view, second `union all` branch | Generalised, not copied: runs and projected units feed one `sku_units` list, and one BOM join turns it into material (`ceil` per row for `each` materials, as a close draws). |
 | `atp` view (on hand less open allocations) | `00001_baseline.sql:2210` | Order shortfall is a negative `atp`. Planning's screen already names "Hazy ATP negative". |
 | `format_bom`, `format_volumes` | `00001_baseline.sql:418` | Units per SKU and material per unit. |
 | `packaging_runs.batch_id` | `20261014100400_historical_packaging.sql:7` | One of the two links that make a run "the batch's run". The other is `occupancy_id → vessel_occupancies.batch_id`. |
@@ -116,27 +116,28 @@ $$;
 revoke all on function public.order_packaging_shortfall_rows() from public, anon, authenticated, service_role;
 grant execute on function public.order_packaging_shortfall_rows() to authenticated;
 
--- Copied from 20260928040000_unstarted_plans.sql; new: the third req branch,
--- req.projected, and the appended `projected` column.
+-- Copied from 20260928040000_unstarted_plans.sql. New: the sku_units list
+-- (open runs plus order shortfall) behind the one BOM join, req.projected,
+-- and the appended `projected` column.
 create or replace view public.material_requirements with (security_invoker = true) as
-  with req as (
+  with sku_units as (
+    select r.brewery_id, o.sku_id, o.qty_planned as units, r.planned_on as needed_by, false as projected
+    from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
+    where r.closed_at is null and r.cancelled_at is null
+    union all
+    select d.brewery_id, d.sku_id, d.units, d.needed_by, true
+    from public.order_packaging_shortfall_rows() d),
+  req as (
     select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required, min(b.planned_on) as needed_by, 0::numeric as projected
     from batches b join recipe_ingredients ri on ri.recipe_version_id = b.recipe_version_id
     where b.brewed_on is null and b.cancelled_at is null group by 1,2
     union all
-    select r.brewery_id, bom.material_id, sum(case when pm.base_uom = 'each' then ceil(o.qty_planned * bom.qty_per_unit) else o.qty_planned * bom.qty_per_unit end), min(r.planned_on), 0
-    from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
-    join skus s on s.id = o.sku_id
-    join format_bom bom on bom.format_id = s.format_id
-    join materials pm on pm.id = bom.material_id
-    where r.closed_at is null and r.cancelled_at is null group by 1,2
-    union all
-    select q.brewery_id, q.material_id, sum(q.qty), min(q.needed_by), sum(q.qty)
+    select q.brewery_id, q.material_id, sum(q.qty), min(q.needed_by), coalesce(sum(q.qty) filter (where q.projected), 0)
     from (
-      select d.brewery_id, bom.material_id, d.needed_by,
-             case when pm.base_uom = 'each' then ceil(d.units * bom.qty_per_unit) else d.units * bom.qty_per_unit end as qty
-      from public.order_packaging_shortfall_rows() d
-      join skus s on s.id = d.sku_id
+      select u.brewery_id, bom.material_id, u.needed_by, u.projected,
+             case when pm.base_uom = 'each' then ceil(u.units * bom.qty_per_unit) else u.units * bom.qty_per_unit end as qty
+      from sku_units u
+      join skus s on s.id = u.sku_id
       join format_bom bom on bom.format_id = s.format_id
       join materials pm on pm.id = bom.material_id
     ) q group by 1,2),
@@ -179,28 +180,20 @@ alter table public.breweries add column days_to_package int not null default 14
   check (days_to_package between 1 and 120);
 ```
 
-The view gains a fourth `req` branch, `projected` = `required`:
+`sku_units` gains a third branch, `projected` = true. The BOM join is
+unchanged:
 
 ```sql
-select u.brewery_id, bom.material_id,
-       sum(case when pm.base_uom = 'each' then ceil(u.units * bom.qty_per_unit) else u.units * bom.qty_per_unit end),
-       min(u.needed_by), <same sum>
-from (
-  select b.brewery_id, s.id as sku_id, s.format_id,
-         floor(b.planned_bbl * s.batch_share / fv.bbl_per_unit) as units,
-         coalesce(b.brewed_on, b.planned_on) + br.days_to_package as needed_by
-  from batches b
-  join breweries br on br.id = b.brewery_id
-  join skus s on s.brand_id = b.intended_brand_id and s.active and s.batch_share is not null
-  join format_volumes fv on fv.id = s.format_id and fv.bbl_per_unit > 0
-  where b.cancelled_at is null and b.closed_at is null
-    and not exists (
-      select 1 from packaging_runs r left join vessel_occupancies o on o.id = r.occupancy_id
-      where r.cancelled_at is null and (r.batch_id = b.id or o.batch_id = b.id))
-) u
-join format_bom bom on bom.format_id = u.format_id
-join materials pm on pm.id = bom.material_id
-group by 1, 2
+select b.brewery_id, s.id, floor(b.planned_bbl * s.batch_share / fv.bbl_per_unit),
+       coalesce(b.brewed_on, b.planned_on) + br.days_to_package, true
+from batches b
+join breweries br on br.id = b.brewery_id
+join skus s on s.brand_id = b.intended_brand_id and s.active and s.batch_share is not null
+join format_volumes fv on fv.id = s.format_id and fv.bbl_per_unit > 0
+where b.cancelled_at is null and b.closed_at is null
+  and not exists (
+    select 1 from packaging_runs r left join vessel_occupancies o on o.id = r.occupancy_id
+    where r.cancelled_at is null and (r.batch_id = b.id or o.batch_id = b.id))
 ```
 
 `order_packaging_shortfall_rows()` also subtracts those projected units of the
@@ -244,40 +237,36 @@ with `bun run migrations:lock` and `bun run types:database`.
 
 ### Phase B — batch demand (needs D1, D2)
 
-5. **Schema.**
-   - Files: Phase B migration (columns only).
-   - Test first: `tests/projected-packaging-demand.test.ts`: `batch_share` 1.2 and `days_to_package` 0 are refused.
+Tasks 5–7 edit one migration file, so one agent owns them in sequence.
+
+5. **SKU share.**
+   - Files: Phase B migration (`skus.batch_share`; `update_sku` replaced with a trailing `p_batch_share numeric default null` plus a clear flag, copied from `20261012100600_sku_keg_pool_legacy_replay.sql:26`); `lib/commands/catalog.ts` (`batchShare` on `update_sku`); `tests/rpc-allowlist.test.ts`.
+   - Test first: `tests/sku-keg-pool.test.ts` pattern, in `tests/projected-packaging-demand.test.ts`: a share saves; 1.2, or one that brings the brand above 1, is refused; omitting it replays an old request unchanged.
    - Deps: 4.
-6. **SKU share.**
-   - Files: `update_sku` replaced in the Phase B migration with a trailing `p_batch_share numeric default null` plus a clear flag, copied from `20261012100600_sku_keg_pool_legacy_replay.sql:26`; `lib/commands/catalog.ts` (`batchShare` on `update_sku`); `tests/rpc-allowlist.test.ts`.
-   - Test first: `tests/sku-keg-pool.test.ts` pattern, in `tests/projected-packaging-demand.test.ts`: a share saves; one that brings the brand above 1 is refused; omitting it replays an old request unchanged.
-   - Deps: 5. Parallel with 7.
-7. **Days to package.**
-   - Files: `set_brewery_operating_defaults` replaced with a trailing `p_days_to_package int default null` (null keeps); `lib/commands/settings.ts` (input and `BREWERY_COLUMNS`); `tests/rpc-allowlist.test.ts`.
-   - Test first: `tests/settings.test.ts`: it saves and reads back; reading hours alone still replays.
-   - Deps: 5. Parallel with 6.
-8. **Batch branch in the view.**
-   - Files: Phase B migration (fourth `req` branch; shortfall function nets projected batch units).
+6. **Days to package.**
+   - Files: Phase B migration (`breweries.days_to_package`; `set_brewery_operating_defaults` replaced with a trailing `p_days_to_package int default null`, null keeps); `lib/commands/settings.ts` (input and `BREWERY_COLUMNS`); `tests/rpc-allowlist.test.ts`.
+   - Test first: `tests/settings.test.ts`: it saves and reads back; 0 is refused; reading hours alone still replays.
+   - Deps: 5.
+7. **Batch branch in the view.**
+   - Files: Phase B migration (third `sku_units` branch; shortfall function nets projected batch units).
    - Test first: `tests/projected-packaging-demand.test.ts`:
      - A planned batch of a brand with a 0.5 can share shows can labels needed by `planned_on + days_to_package`.
      - Scheduling its run with its tank removes the projection, never adding on top (issue acceptance 2).
      - A cancelled batch projects nothing.
      - An order for the same SKU counts once.
-   - Deps: 5.
-9. **Controls.**
+   - Deps: 6.
+8. **Controls.**
    - Files: `lib/mgr/sku-view.ts`, `components/mgr/views/sku.tsx`, `app/(app)/catalog/sku-form.tsx` (share via `E.edit` numeric); `lib/mgr/settings-view.ts`, `components/mgr/views/brewery-settings-form.tsx`, `app/(app)/settings/settings-form.tsx` (days via `E.edit`).
    - Test first: `tests/catalog-view.test.ts` and `tests/settings-view.test.ts`: the adapters map and send the new fields.
    - Accept: screen-only proof list; a look at the SKU sheet and Settings.
-   - Deps: 6, 7. Parallel with 8.
-10. **Docs.**
-    - Files: `content/docs/staff-guide.mdx` (Planning, Create a SKU, Settings); `components/mgr/screens.tsx` (SKU, Settings, Planning); `bun run docs:api`.
-    - Accept: full proof (`bun run test && bunx tsc --noEmit && bun run lint`).
-    - Deps: 8, 9.
+   - Deps: 5, 6. Parallel with 7.
+9. **Docs.**
+   - Files: `content/docs/staff-guide.mdx` (Planning, Create a SKU, Settings); `components/mgr/screens.tsx` (SKU, Settings, Planning); `bun run docs:api`.
+   - Accept: full proof (`bun run test && bunx tsc --noEmit && bun run lint`).
+   - Deps: 7, 8.
 
 ## Risks
 
 - Existing DB tests with a negative `atp` and a BOM may now see extra demand.
   Task 1 runs `tests/packaging.test.ts`, `tests/purchasing.test.ts` and
   `tests/one-way-keg.test.ts` to catch it.
-- Open PR #880 edits `components/mgr/screens.tsx` and the staff guide. Tasks 4
-  and 10 merge `main` first.
