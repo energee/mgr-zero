@@ -14,6 +14,7 @@ and unresolved connected-job gates in that record.
 - #278 is either closed or its non-pilot screens are explicitly deferred.
 - Ted has approved hosted Supabase provisioning, Vercel provisioning, and the
   deployment. Approval of one does not imply the others.
+- Every pilot blocker in the [pilot gate status](pilot-gate-status.md) record is done (#311).
 
 ## Provisioning
 
