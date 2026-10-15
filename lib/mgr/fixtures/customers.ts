@@ -15,7 +15,9 @@ export const customersList: CustomersSnapshot = {
     {
       id: CUST_RIDGELINE,
       name: RIDGELINE.name,
+      alias: null,
       type: "retailer",
+      country: "US",
       state: "PA",
       payment_terms: "net30",
       sale_channels: { name: "Wholesale" },
@@ -24,7 +26,9 @@ export const customersList: CustomersSnapshot = {
     {
       id: CUST_ALS,
       name: ALS.name,
+      alias: null,
       type: "retailer",
+      country: "US",
       state: "OH",
       payment_terms: "net15",
       sale_channels: { name: "Wholesale" },
@@ -43,7 +47,9 @@ export const customerRidgeline: CustomerSnapshot = {
   customer: {
     id: CUST_RIDGELINE,
     name: RIDGELINE.name,
+    alias: null,
     type: "retailer",
+    country: "US",
     state: "PA",
     license_no: "PA R-55821",
     payment_terms: "net30",
@@ -69,6 +75,7 @@ export const customerRidgeline: CustomerSnapshot = {
 /** Main ship-to sheet. */
 export const shipToMain: ShipToSnapshot = {
   label: "Main",
+  country: "US",
   address1: "114 Bridge St",
   city: "Phoenixville",
   state: "PA",

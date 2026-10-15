@@ -10,7 +10,7 @@ import "@/lib/commands/all";
 import { CustomerForm } from "./customer-form";
 
 type SaleChannel = { id: string; name: string };
-type Customer = { id: string; name: string; type: string; state: string; payment_terms: string; sale_channels: { name: string } };
+type Customer = { id: string; name: string; alias: string | null; type: string; country: string; state: string | null; payment_terms: string; sale_channels: { name: string } };
 
 export default async function CustomersPage({ searchParams }: { searchParams?: Promise<{ missingEmail?: string }> } = {}) {
   const missingPortalEmail = (await searchParams)?.missingEmail === "1";

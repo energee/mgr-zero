@@ -13,9 +13,10 @@ import { DeleteCommandButton } from "../../delete-command-button";
 import { DeleteCustomerControl } from "@/components/mgr/views/delete-customer";
 import { RevokePortalUserControl } from "@/components/mgr/views/revoke-portal-user";
 import type { PortalUser } from "@/lib/commands/invites";
+import { shipToAddress } from "@/lib/mgr/ship-to-view";
 
-type Customer = { id: string; name: string; type: CustomerType; state: string; sale_channel_id: string; license_no: string | null; payment_terms: string; tax_treatment: TaxTreatment | null; sale_channels: { name: string } };
-type ShipTo = { id: string; label: string; address1: string; address2: string | null; city: string; state: string; zip: string; is_default: boolean };
+type Customer = { id: string; name: string; alias: string | null; type: CustomerType; country: string; state: string | null; sale_channel_id: string; license_no: string | null; payment_terms: string; tax_treatment: TaxTreatment | null; sale_channels: { name: string } };
+type ShipTo = { id: string; label: string; country: string; address1: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; is_default: boolean };
 type SaleChannel = { id: string; name: string };
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,7 +35,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       shipTos: shipTos.map(s => ({
         key: s.id,
         title: `${s.label}${s.is_default ? " · default" : ""}`,
-        detail: `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`,
+        detail: shipToAddress(s),
         action: canWrite ? <ShipToForm key={JSON.stringify(s)} customerId={customer.id} shipTo={s} /> : null,
       })),
       addShipTo: canWrite ? <ShipToForm customerId={customer.id} /> : null,

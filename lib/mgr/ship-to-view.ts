@@ -1,7 +1,13 @@
-// lib/mgr/ship-to-view.ts — view-model for the Ship-to form sheet.
+// lib/mgr/ship-to-view.ts — view-model for the Ship-to form sheet. A missing
+// (null) street, city, state or zip reads as an empty field: outside the US
+// only the label is required.
+import { countryName } from "./labels";
+
 export type ShipToViewModel = {
   title: string;
   label: string;
+  /** ISO code; the form draws State only for "US". */
+  country: string;
   address: string;
   address2: string;
   city: string;
@@ -12,11 +18,12 @@ export type ShipToViewModel = {
 
 export type ShipToSnapshot = {
   label: string;
-  address1: string;
+  country: string;
+  address1: string | null;
   address2?: string | null;
-  city: string;
-  state: string;
-  zip: string;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   isDefault?: boolean;
 };
 
@@ -24,11 +31,20 @@ export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
   return {
     title: `${s.label || "New"} ship-to`,
     label: s.label,
-    address: s.address1,
+    country: s.country,
+    address: s.address1 ?? "",
     address2: s.address2 ?? "",
-    city: s.city,
-    state: s.state,
-    zip: s.zip,
+    city: s.city ?? "",
+    state: s.state ?? "",
+    zip: s.zip ?? "",
     isDefault: Boolean(s.isDefault),
   };
+}
+
+/** A ship-to as one line on Customer detail: street, then the city, state and
+ *  zip, then the country outside the US. Missing parts drop out. */
+export function shipToAddress(s: Pick<ShipToSnapshot, "country" | "address1" | "address2" | "city" | "state" | "zip">): string {
+  const street = [s.address1, s.address2].filter(Boolean).join(", ");
+  const place = [[s.city, s.state].filter(Boolean).join(", "), s.zip].filter(Boolean).join(" ");
+  return [street, place, s.country === "US" ? "" : countryName(s.country)].filter(Boolean).join(" · ");
 }

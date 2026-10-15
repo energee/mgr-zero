@@ -4,13 +4,14 @@
 import { NONE } from "@/components/ui/select";
 import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
+import { nameWithAlias } from "./labels";
 import { plural } from "./plural";
 import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-suggestion";
 import type { PriceGroupRow } from "./price-groups-view";
 import { expires, type RegistryRowView } from "./registry-rows";
 
 /** A brand as staff see it: its name, then its staff-only alias when it has one ("Appaloosa · Animal #14"). */
-export const brandLabel = (b: { name: string; alias?: string | null }) => (b.alias ? `${b.name} · ${b.alias}` : b.name);
+export const brandLabel = nameWithAlias;
 
 /** A header badge: "w" is a warning; href makes it a jump link (COLA pending → Compliance). */
 export type BrandBadge = { key: string; label: string; tone: "" | "w"; href?: string };

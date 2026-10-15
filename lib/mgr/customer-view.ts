@@ -2,13 +2,14 @@
 import { money } from "./money";
 import { paymentTermLabel, sentenceCase } from "./labels";
 
-/** The stored values the shared Customer detail form edits and saves. */
-export type CustomerEditValues = { name: string; type: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
+/** The stored values the shared Customer detail form edits and saves. state is
+ *  "" outside the US (the form draws it for a US customer only); alias "" is none. */
+export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
 
 export type CustomerViewModel = {
   backHref?: string;
   name: string;
-  state: string;
+  state: string | null;
   type: string;
   license: string;
   terms: string;
@@ -35,8 +36,10 @@ export type CustomerSnapshot = {
   customer: {
     id: string;
     name: string;
+    alias: string | null;
     type: string;
-    state: string;
+    country: string;
+    state: string | null;
     license_no: string | null;
     payment_terms: string | null;
     sale_channel_id: string;
@@ -74,7 +77,7 @@ export function toCustomerViewProps({
     channelOptions: channels,
     taxTreatment: tax,
     editValues: {
-      name: customer.name, type: customer.type, state: customer.state, saleChannelId: customer.sale_channel_id,
+      name: customer.name, alias: customer.alias ?? "", type: customer.type, country: customer.country, state: customer.state ?? "", saleChannelId: customer.sale_channel_id,
       licenseNumber: customer.license_no ?? "", paymentTerms: customer.payment_terms ?? "net30", taxTreatment: customer.tax_treatment ?? "",
     },
     shipTos: shipTos.map((s) => s.label).join(" · ") || "none",

@@ -20,7 +20,7 @@ describe("customer controls", () => {
   it("customer edit sends the prefilled tax override and preserves it on an unrelated name edit", async () => {
     const source = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(source).toContain("customer?.taxTreatment");
-    const input = upsertCustomerInput({ name: "Export account", type: "retailer", state: "pa", saleChannelId: channel, licenseNumber: "", paymentTerms: "net30", taxTreatment: "export" });
+    const input = upsertCustomerInput({ name: "Export account", alias: "", type: "retailer", country: "US", state: "pa", saleChannelId: channel, licenseNumber: "", paymentTerms: "net30", taxTreatment: "export" });
     expect(input).toMatchObject({ state: "PA", taxTreatment: "export", licenseNumber: undefined });
     const saved = await runCommand("upsert_customer", input, ctx) as { id: string; tax_treatment: string };
     const updated = await runCommand("upsert_customer", { ...input, id: saved.id, name: "New name", taxTreatment: saved.tax_treatment }, ctx) as { tax_treatment: string };

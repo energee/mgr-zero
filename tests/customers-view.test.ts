@@ -12,7 +12,7 @@ import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixture
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { toCustomerViewProps } from "../lib/mgr/customer-view";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
-import { toShipToViewProps } from "../lib/mgr/ship-to-view";
+import { shipToAddress, toShipToViewProps } from "../lib/mgr/ship-to-view";
 
 const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -143,4 +143,59 @@ it("keeps Accounting Review in the shared filtered customer inventory", () => {
   const body = screen("Customers missing email").body as { type: unknown; props: { model: { missingPortalEmail?: boolean } } };
   expect(body.type).toBe(CustomersView);
   expect(body.props.model.missingPortalEmail).toBe(true);
+});
+
+// docs/plans/lolev-orders.md task 3: a country pick, a state only for US, and
+// a staff-only alias on the customer and ship-to forms.
+describe("country and alias", () => {
+  const jp = { ...customerRidgeline, customer: { ...customerRidgeline.customer, name: "Unusual Holdings", country: "JP", state: null, alias: "Tokyo" } };
+
+  it("the list titles a customer with its alias and reads its country when it is not the US", () => {
+    const model = toCustomersViewProps({ customers: [
+      { ...customersList.customers[0], alias: "Nano Wine" },
+      { ...customersList.customers[1], country: "JP", state: null },
+    ] });
+    expect(model.rows[0]?.title).toBe(`${RIDGELINE.name} · Nano Wine`);
+    expect(model.rows[0]?.detail).toBe("retailer · PA · 2 portal users");
+    expect(model.rows[1]?.detail).toBe("retailer · Japan · brewery remits");
+  });
+
+  it("customer detail edits country and alias, and draws State only for a US customer", () => {
+    const us = toCustomerViewProps(customerRidgeline);
+    expect(us.editValues).toMatchObject({ country: "US", state: "PA", alias: "" });
+    const usMarkup = html(createElement(CustomerView, { model: us }));
+    expect(usMarkup).toContain(">Country<");
+    expect(usMarkup).toContain(">United States<");
+    expect(usMarkup).toContain(">State<");
+    expect(usMarkup).toContain('placeholder="Staff only"');
+    const foreign = toCustomerViewProps(jp);
+    expect(foreign.editValues).toMatchObject({ country: "JP", state: "", alias: "Tokyo" });
+    const jpMarkup = html(createElement(CustomerView, { model: foreign }));
+    expect(jpMarkup).toContain(">Japan<");
+    expect(jpMarkup).not.toContain(">State<");
+  });
+
+  it("the save input sends country and alias, a state only for US, and drops a blank alias", async () => {
+    const { upsertCustomerInput } = await import("../app/(app)/customers/customer-form");
+    const base = { name: "X", type: "retailer", saleChannelId: "c", licenseNumber: "", paymentTerms: "net30", taxTreatment: "" };
+    expect(upsertCustomerInput({ ...base, country: "US", state: "pa", alias: "" })).toMatchObject({ country: "US", state: "PA", alias: undefined });
+    expect(upsertCustomerInput({ ...base, country: "JP", state: "PA", alias: " Tokyo " })).toMatchObject({ country: "JP", state: undefined, alias: " Tokyo " });
+  });
+
+  it("the ship-to form draws State only for a US address", () => {
+    const us = html(createElement(ShipToView, { model: toShipToViewProps(shipToMain) }));
+    expect(us).toContain(">Country<");
+    expect(us).toContain(">State<");
+    const foreign = toShipToViewProps({ label: "Main", country: "JP", address1: null, city: null, state: null, zip: null });
+    expect(foreign).toMatchObject({ country: "JP", address: "", city: "", state: "", zip: "" });
+    const markup = html(createElement(ShipToView, { model: foreign }));
+    expect(markup).toContain(">Japan<");
+    expect(markup).not.toContain(">State<");
+  });
+});
+
+it("a ship-to reads as one address line; missing parts drop out and a foreign one names its country", () => {
+  expect(shipToAddress({ country: "US", address1: "1 Main St", address2: "Dock 2", city: "Phila", state: "PA", zip: "19107" })).toBe("1 Main St, Dock 2 · Phila, PA 19107");
+  expect(shipToAddress({ country: "JP", address1: null, address2: null, city: null, state: null, zip: null })).toBe("Japan");
+  expect(shipToAddress({ country: "NL", address1: null, address2: null, city: "Amsterdam", state: null, zip: "1011" })).toBe("Amsterdam 1011 · Netherlands");
 });
