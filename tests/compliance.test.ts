@@ -3,10 +3,14 @@ import { closeWithConfirmedMaterials } from "./packaging-fixture";
 // approvals, state registrations, brewery licenses), the period report
 // generated from the movement ledger, the immutable filed snapshot, and the
 // lot trace. MGR never transmits a filing.
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, seedMaterial, seedMovement, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { searchColasByPermit, type ColaRecord } from "@/lib/ttb/colas";
+
+// The TTB client is stubbed: tests never reach ttbonline.gov.
+vi.mock("@/lib/ttb/colas", async (orig) => ({ ...(await orig<typeof import("@/lib/ttb/colas")>()), searchColasByPermit: vi.fn() }));
 
 let b: { id: string };
 let sales: Awaited<ReturnType<typeof makeStaffCtx>>;
@@ -16,6 +20,36 @@ beforeAll(async () => {
   b = await makeBrewery();
   sales = await makeStaffCtx(b.id, "sales");
   ({ brandId } = await seedCatalog(b.id, { product: "Stout", sku: "Stout case" }));
+});
+
+describe("search_colas", () => {
+  const cola = (fancifulName: string, brandName = "Test Brewing"): ColaRecord => ({
+    ttbId: crypto.randomUUID().slice(0, 14), permit: "BR-PA-TEST-1", serial: null, completedOn: "2026-01-02",
+    fancifulName, brandName, classCode: "901", className: "MALT BEVERAGE",
+  });
+
+  it("refuses a brewery with no TTB registry number", async () => {
+    const bare = await makeBrewery();
+    await expect(runCommand("search_colas", { name: "array" }, await makeStaffCtx(bare.id, "sales"))).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("searches TTB by the brewery's registry number and keeps only matching names; warehouse is denied; a TTB failure is an error", async () => {
+    const brewery = await makeBrewery();
+    const { error } = await admin.from("breweries").update({ ttb_registry_no: "BR-PA-TEST-1" }).eq("id", brewery.id);
+    if (error) throw error;
+    const ctx = await makeStaffCtx(brewery.id, "sales");
+    const search = vi.mocked(searchColasByPermit);
+    search.mockResolvedValueOnce([cola("Array of Hops"), cola("Stout"), cola("Lager")]);
+    const found = await runCommand("search_colas", { name: "array" }, ctx) as { permit: string; rows: ColaRecord[] };
+    expect(found.permit).toBe("BR-PA-TEST-1");
+    expect(found.rows.map((r) => r.fancifulName)).toEqual(["Array of Hops"]);
+    expect(search).toHaveBeenCalledWith("BR-PA-TEST-1");
+
+    await expect(runCommand("search_colas", {}, await makeStaffCtx(brewery.id, "warehouse"))).rejects.toMatchObject({ status: 403 });
+
+    search.mockRejectedValueOnce(new Error("TTB COLA search returned HTTP 500"));
+    await expect(runCommand("search_colas", { name: "array" }, ctx)).rejects.toMatchObject({ status: 502 });
+  });
 });
 
 describe("registry", () => {

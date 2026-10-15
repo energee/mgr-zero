@@ -44,6 +44,8 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },
   { code: "invite_failed", status: 502, meaning: "The invitation was interrupted before membership completion was confirmed.",
     remedy: "Retry the identical input with the same `requestId`; the saved Auth identity is reused." },
+  { code: "ttb_unavailable", status: 502, meaning: "`search_colas` could not read TTB's public COLA registry: it timed out, errored, or changed its page. Nothing was searched.",
+    remedy: "Retry later. The message carries TTB's error; an empty `rows` list is only ever a real no-match." },
   { code: "admission_unavailable", status: 503, meaning: "The authenticated admission check was unavailable, so the operation did not run.",
     remedy: "Retry later with the same `requestId` for an unchanged write. Report persistent failures with the `correlationId`." },
   { code: "missing_execution", status: 500, meaning: "A command reached its handler without execution metadata. A server fault.",

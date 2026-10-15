@@ -151,6 +151,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reattribute_loss", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "adjustmentId": "00000000-0000-0000-0000-000000000000", "bbl": "1", "classification": "sample", "destinationState": "CA" } }'
 ```
 
+## search_colas [#search_colas]
+
+`query` · admin, sales
+
+Search TTB's public COLA registry for the label approvals under the brewery's TTB registry number, completed in the last 15 years, newest first; name keeps only rows whose fanciful or brand name contains it (ignoring case); refused when the brewery has no registry number; nothing is stored
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "search_colas", "input": {} }'
+```
+
 ## trace_lot [#trace_lot]
 
 `query` · admin, sales
