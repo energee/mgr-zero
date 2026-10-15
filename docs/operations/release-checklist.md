@@ -86,3 +86,4 @@ Smoke does not measure latency at pilot volumes; see the [pilot latency protocol
   scheduler owners are recorded.
 - Open deferrals name an owner and trigger; none can affect stock, money,
   tenancy, authentication, or recovery truth in the released pilot.
+- The [pilot scorecard](pilot-scorecard.md) Part A is signed off (#729); release sign-off is not pilot success.
