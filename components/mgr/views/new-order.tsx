@@ -16,6 +16,7 @@ export type NewOrderControls = {
   source?: (value: string) => void; destination?: (value: string) => void;
   kind?: (value: "wholesale" | "taproom_transfer") => void;
   requestedShip?: (value: string) => void; po?: (value: string) => void;
+  pickup?: (value: boolean) => void;
   lineSku?: (index: number, value: string) => void;
   lineQty?: (index: number, value: string) => void;
   addLine?: () => void; removeLine?: (index: number) => void;
@@ -42,6 +43,11 @@ export function OrderQuantity({ value, label, onChange, contextualLabels = false
   return E.edit(label, String(value), "number", undefined, { onChange, min: 0, max, step, required, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
 }
 
+/** A wholesale order the customer collects; it is never put on a route. Shared by New order and Edit draft. */
+export function PickupSwitch({ on, onChange, disabled = false }: { on: boolean; onChange?: (value: boolean) => void; disabled?: boolean }) {
+  return <fieldset disabled={disabled}>{E.row("Pickup", "The customer collects it, so it never goes on a route", E.sw(on, "Pickup", onChange))}</fieldset>;
+}
+
 /** SKU request feedback is shared by the line list and its picker surface. */
 export function NewOrderView({ model, controls = {}, messages, feedback, skuFeedback, skuOptionsReady = true, skuEmptyMessage, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; skuFeedback?: ReactNode; skuOptionsReady?: boolean; skuEmptyMessage?: string; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
   const errorPrefix = useId();
@@ -63,6 +69,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       <DatePicker key="date" label="Requested ship" value={controls.requestedShip ? model.requestedShip : undefined} defaultValue={model.requestedShip} onChange={controls.requestedShip} />,
     )}
     {E.edit("Customer PO", model.po, "text", undefined, { onChange: controls.po })}
+    {model.kind === "taproom_transfer" ? null : <PickupSwitch on={Boolean(model.pickup)} onChange={controls.pickup} />}
     {skuFeedback}
     {model.lines.map((line, index) => <div key={index}>
       {E.row(

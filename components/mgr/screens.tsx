@@ -988,7 +988,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_customer · list_skus",
     writes: "update_draft_order",
     states: [["draft", "saved headers and lines prefilled"], ["incomplete line", "Save draft disabled until fixed or removed", 1], ["permission", "Admin and Sales only", 1], ["submitted", "returns to the order; editing refused", 1]],
-    spec: "The shared page editor changes ship-to, requested ship date, customer PO and lines. Customer, kind and fulfillment locations stay fixed. Saving keeps draft status and refreshes line prices; clearing the requested date explicitly removes it. Inventory simulates saving locally, while staff calls the existing authorized draft command.",
+    spec: "The shared page editor changes ship-to, requested ship date, customer PO, Pickup and lines. Customer, kind and fulfillment locations stay fixed. Saving keeps draft status and refreshes line prices; clearing the requested date explicitly removes it. Inventory simulates saving locally, while staff calls the existing authorized draft command.",
     body: <EditDraftOrderView model={editDraftOrder} />,
   },
   {

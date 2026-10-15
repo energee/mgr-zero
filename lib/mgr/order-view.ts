@@ -24,6 +24,8 @@ export type OrderViewModel = {
   next: string;
   fulfillmentSource?: string;
   shipTo?: string;
+  /** Collected at the brewery: never routed (orders.pickup). */
+  pickup: boolean;
   customerPo?: string;
   requested?: string;
   note?: string;
@@ -53,6 +55,7 @@ export type OrderSnapshot = {
     requested_ship_date: string | null;
     note: string | null;
     needs_restock: boolean;
+    pickup?: boolean;
     /** orders.repick_since: when an adjustment sent a picked order back to confirmed (#811). */
     repick_since?: string | null;
     from_location_id?: string;
@@ -151,6 +154,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       ? locations?.find((l) => l.id === order.from_location_id)?.name
       : undefined,
     shipTo: order.ship_tos?.label,
+    pickup: Boolean(order.pickup),
     customerPo: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,

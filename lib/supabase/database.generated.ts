@@ -3135,6 +3135,7 @@ export type Database = {
           needs_restock: boolean
           note: string | null
           order_no: number | null
+          pickup: boolean
           po_number: string | null
           repick_since: string | null
           requested_ship_date: string | null
@@ -3155,6 +3156,7 @@ export type Database = {
           needs_restock?: boolean
           note?: string | null
           order_no?: number | null
+          pickup?: boolean
           po_number?: string | null
           repick_since?: string | null
           requested_ship_date?: string | null
@@ -3175,6 +3177,7 @@ export type Database = {
           needs_restock?: boolean
           note?: string | null
           order_no?: number | null
+          pickup?: boolean
           po_number?: string | null
           repick_since?: string | null
           requested_ship_date?: string | null
@@ -8695,6 +8698,7 @@ export type Database = {
           p_kind: Database["public"]["Enums"]["order_kind"]
           p_lines: Json
           p_note: string
+          p_pickup?: boolean
           p_po: string
           p_request_id: string
           p_requested: string
@@ -10313,6 +10317,7 @@ export type Database = {
           p_lines: Json
           p_note: string
           p_order: string
+          p_pickup?: boolean
           p_po: string
           p_request_id: string
           p_requested: string

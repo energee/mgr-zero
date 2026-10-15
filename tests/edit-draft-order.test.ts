@@ -42,6 +42,10 @@ describe("staff draft editing", () => {
     expect(html).toContain("Edit draft");
     expect(html).not.toMatch(/<button[^>]*type="submit"[^>]*disabled/);
   });
+  it("draws the saved Pickup flag as an on switch", () => {
+    const html = renderToStaticMarkup(createElement(EditDraftOrderView, { model: { ...editDraftOrder, pickup: true } }));
+    expect(html).toMatch(/<button(?=[^>]*aria-label="Pickup")(?=[^>]*aria-checked="true")/);
+  });
   it("keeps editing restricted to Admin and Sales", () => {
     for (const role of ["admin", "sales", "warehouse", "brewer", "customer"] as const) {
       expect(canRun({ role } as Ctx, "update_draft_order")).toBe(role === "admin" || role === "sales");

@@ -43,6 +43,7 @@ export function OrderForm({
   const [toLocationId, setToLocationId] = useState("");
   const [requestedShipDate, setRequestedShipDate] = useState("");
   const [poNumber, setPoNumber] = useState("");
+  const [pickup, setPickup] = useState(false);
   const [lines, setLines] = useState<LineRow[]>([{ skuId: "", qty: "" }]);
 
   const customer = customers.find((c) => c.id === customerId);
@@ -72,6 +73,7 @@ export function OrderForm({
     setToLocationId("");
     setRequestedShipDate("");
     setPoNumber("");
+    setPickup(false);
     setLines([{ skuId: "", qty: "" }]);
   }
 
@@ -84,6 +86,7 @@ export function OrderForm({
       toLocationId: kind === "taproom_transfer" ? toLocationId : undefined,
       requestedShipDate: requestedShipDate || undefined,
       poNumber: poNumber || undefined,
+      pickup: kind === "wholesale" && pickup,
       lines: lines
         .filter(line => !isBlankLine(line))
         .map((l) => ({ skuId: l.skuId, qty: Number(l.qty) })),
@@ -113,7 +116,7 @@ export function OrderForm({
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
-        requestedShip: requestedShipDate, po: poNumber, backHref: "/orders",
+        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders",
         lines: lines.map(line => ({ ...line,
           name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
           skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,
@@ -121,7 +124,7 @@ export function OrderForm({
       }} controls={{
         kind: setKind, customer: value => { setCustomerId(value); setShipToId(defaultShipToId(customers.find(customer => customer.id === value)?.shipTos ?? [])); },
         shipTo: setShipToId, source: setFromLocationId, destination: setToLocationId,
-        requestedShip: setRequestedShipDate, po: setPoNumber,
+        requestedShip: setRequestedShipDate, po: setPoNumber, pickup: setPickup,
         lineSku: (index, skuId) => updateLine(index, { skuId }), lineQty: (index, qty) => updateLine(index, { qty }),
         addLine, removeLine,
       }} messages={<>

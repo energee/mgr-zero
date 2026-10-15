@@ -146,6 +146,7 @@ Create a draft order (wholesale or taproom transfer) with price-snapshot lines
 | `requestedShipDate` | date (YYYY-MM-DD) | no |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `pickup` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -545,6 +546,7 @@ Replace a draft order's header fields and lines
 | `requestedShipDate` | date (YYYY-MM-DD) or null | no |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `pickup` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

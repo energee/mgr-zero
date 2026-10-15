@@ -22,13 +22,15 @@ defineCommand({
     customerId: z.string().uuid().optional(), shipToId: z.string().uuid().optional(),
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid().optional(),
     requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    // A pickup is collected at the brewery: never put on a route, invoiced when it ships.
+    pickup: z.boolean().optional(),
     lines,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_order", {
     p_brewery: ctx.breweryId, p_kind: i.kind, p_customer: i.customerId ?? null, p_ship_to: i.shipToId ?? null,
     p_from_location: i.fromLocationId, p_to_location: i.toLocationId ?? null,
     p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: toLines(i.lines), p_request_id: execution.requestId,
+    p_lines: toLines(i.lines), p_request_id: execution.requestId, p_pickup: i.pickup ?? false,
   })),
 });
 
@@ -39,12 +41,14 @@ defineCommand({
     orderId: z.string().uuid(), shipToId: z.string().uuid().optional(),
     // Omitted preserves the saved date; explicit null clears it via the existing RPC.
     requestedShipDate: z.string().date().nullable().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    // Omitted keeps the saved pickup flag.
+    pickup: z.boolean().optional(),
     lines,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
     p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null,
     p_po: i.poNumber ?? null, p_note: i.note ?? null, p_lines: toLines(i.lines), p_request_id: execution.requestId,
-    p_clear_requested: i.requestedShipDate === null,
+    p_clear_requested: i.requestedShipDate === null, p_pickup: i.pickup ?? null,
   })),
 });
 
