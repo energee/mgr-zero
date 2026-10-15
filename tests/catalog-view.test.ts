@@ -243,6 +243,50 @@ describe("Brand view", () => {
     expect(html).toMatch(/SKU list/);
   });
 
+  it("titles the page with the saved name and alias, not the typed field", () => {
+    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Animal #14" }, saved: { ...brandHazy.brand, alias: "Animal #14" } });
+    expect(model.title).toBe("Hazy IPA · Animal #14");
+    expect(toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, name: "" }, saved: brandHazy.brand }).title).toBe("Hazy IPA");
+    expect(toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, id: "" } }).title).toBe("New brand");
+  });
+
+  it("badges COLA state, price group, category, and active SKU count in the header", () => {
+    expect(toBrandViewProps(brandHazy).badges).toEqual([
+      { key: "group", label: "3", tone: "" },
+      { key: "category", label: "Core", tone: "" },
+      { key: "skus", label: "3 active packages · 1 pour", tone: "" },
+    ]);
+    const bare = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] }, brand: { ...brandHazy.brand, price_group_id: null, category: null, skus: [], pours: [] } });
+    expect(bare.badges).toEqual([
+      { key: "cola", label: "COLA pending", tone: "w", href: "#compliance" },
+      { key: "group", label: "Unpriced", tone: "w" },
+    ]);
+  });
+
+  it("badges the saved price group and category, not the typed ones", () => {
+    const typed = { ...brandHazy.brand, price_group_id: null, category: "Seasonal" };
+    expect(toBrandViewProps({ ...brandHazy, brand: typed, saved: brandHazy.brand }).badges.map((b) => b.label)).toEqual(["3", "Core", "3 active packages · 1 pour"]);
+  });
+
+  it("a new brand is not yet saved: no badges, no SKUs or compliance", () => {
+    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, id: "" } });
+    expect(model.isNew).toBe(true);
+    expect(model.badges).toEqual([]);
+    const html = htmlOf(createElement(BrandView, { model }));
+    expect(html).toMatch(/Save the brand to add SKUs and compliance/);
+    expect(html).not.toMatch(/SKU list|>Compliance</);
+  });
+
+  it("lays the form beside SKUs and Compliance, with Save brand inside the form", () => {
+    const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
+    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="SKUs and compliance"'));
+    expect(form).toMatch(/Selling/);
+    expect(form).toMatch(/>Save brand</);
+    expect(form).not.toMatch(/SKU list/);
+    expect(html).toMatch(/id="compliance"/);
+    expect(html).toMatch(/ABV %/);
+  });
+
   it("the Brand inventory record is BrandView", () => {
     const body = screen("Brand").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrandView);

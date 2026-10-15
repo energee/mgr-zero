@@ -41,7 +41,7 @@ describe("upsert_brand ABV (#489)", () => {
 describe("Brand view ABV field", () => {
   it("is the shared numeric stepper bounded 0 to 99.99, not a text box", () => {
     const html = renderToStaticMarkup(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-    const abvInput = html.match(/<input[^>]*aria-label="ABV"[^>]*>/)?.[0] ?? "";
+    const abvInput = html.match(/<input[^>]*aria-label="ABV %"[^>]*>/)?.[0] ?? "";
     expect(abvInput).toContain('type="number"');
     expect(abvInput).toContain('min="0"');
     expect(abvInput).toContain('max="99.99"');

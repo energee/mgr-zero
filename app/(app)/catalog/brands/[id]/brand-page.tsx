@@ -1,6 +1,7 @@
 // app/(app)/catalog/brands/[id]/brand-page.tsx — binds BrandView to
-// upsert_brand: controlled fields, Save brand, back to Catalog on success,
-// and the brand's compliance sheets (compliance-forms.tsx) on their rows.
+// upsert_brand: controlled fields and Save brand, which stays on the page (a
+// new brand moves to its own page, where SKUs and compliance unlock), and
+// the brand's compliance sheets (compliance-forms.tsx) on their rows.
 // Always writable: page.tsx admits Admin and Sales only.
 "use client";
 
@@ -29,30 +30,33 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const model = toBrandViewProps({
     brand: { id: brand?.id ?? "", name: f.name, alias: f.alias, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
-    styles, categories, priceGroups, compliance, cost, backHref: "/catalog",
+    styles, categories, priceGroups, compliance, cost, backHref: "/catalog", saved: brand ?? undefined,
   });
-  // Sheets need a saved brand.
+  // Sheets need a saved brand; BrandView hides the compliance section until there is one.
   const subject = brand ? { id: brand.id, name: brand.name } : null;
   const actions = subject
     ? Object.fromEntries([
       ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} />] as const),
       ...(compliance?.registrations ?? []).map((registration) => [registration.id, <RegistrationForm key={`${registration.id}-${registration.registration_no}-${registration.expires_on}`} brand={subject} registration={registration} />] as const),
     ])
-    : Object.fromEntries(model.compliance.map((row) => [row.key, null] as const));
+    : {};
   const addCompliance = subject
     ? <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>
-    : E.info("Save the brand first, then record its COLA and state registrations here.");
+    : null;
   const controls = {
     name: set("name"), alias: set("alias"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
     priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
   };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await run("upsert_brand", {
+    await run("upsert_brand", {
       id: brand?.id, name: f.name, alias: f.alias.trim() || undefined, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined, priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
+    }, (saved) => {
+      toast.success("Brand saved");
+      // run() refreshes, which re-reads an edited brand; a new one moves to its own page (upsert_brand returns the row).
+      if (!brand) router.push(`/catalog/brands/${(saved as { id: string }).id}`);
     });
-    if (ok) { toast.success("Brand saved"); router.push("/catalog"); }
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">

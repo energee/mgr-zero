@@ -51,7 +51,7 @@ export function CatalogCategoriesControl({ categories, busy = false, error, onSa
     return true;
   }
   return <CommandForm title="Manage categories" open={open} onOpenChange={next => { if (!busy) { setOpen(next); setName(""); } }}
-    trigger={<Button type="button" variant="outline" data-preview-action>Manage categories</Button>}>
+    trigger={<Button type="button" variant="link" size="sm" className="h-auto self-start px-0" data-preview-action>Manage categories</Button>}>
     <div className="flex flex-col gap-5" data-preview-action>
       <p className="text-sm text-muted-foreground">Categories are shared by this brewery. Renaming updates every brand using that category. Only unused categories can be deleted.</p>
       <CommandFormMessage error={error} />

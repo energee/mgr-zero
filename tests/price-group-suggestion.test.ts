@@ -32,8 +32,13 @@ describe("suggestPriceGroup", () => {
 
   it("refuses to suggest from a partly costed recipe and names the gaps", () => {
     expect(suggestPriceGroup({ costCentsPerBbl: 1200, uncosted: ["Citra", "Mosaic"], groups })).toEqual({
-      kind: "unknown", title: "Recipe cost unknown", detail: "no receipt cost yet for Citra, Mosaic",
+      kind: "unknown", title: "Recipe cost unknown", detail: "2 ingredients have no receipt cost yet: Citra, Mosaic",
     });
+  });
+
+  it("names at most three uncosted ingredients and counts the rest", () => {
+    expect(suggestPriceGroup({ costCentsPerBbl: null, uncosted: ["A", "B", "C", "D", "E"], groups })?.detail)
+      .toBe("5 ingredients have no receipt cost yet: A, B, C and 2 more");
   });
 
   it("bands by position, not array order, and skips a group with no ceiling in the middle", () => {
