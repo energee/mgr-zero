@@ -6,7 +6,7 @@ import { BreweryProvider } from "@/lib/brewery-provider";
 // tests render the page subtree on its own, so they supply it here.
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
-const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[], customerInput: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown> }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
@@ -19,7 +19,8 @@ const shipTo = { id: "ship", label: "Dock", address1: "1 Main", address2: null, 
 async function query(name: string, input?: { basis?: string; missingPortalEmail?: boolean }) {
   state.calls.push(name);
   switch (name) {
-    case "list_brands": return [brand];
+    case "list_brands": state.brandInput = input ?? {}; return [brand];
+    case "list_catalog_categories": return [{ name: "Core" }];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: null, price_group_id: "group", price_groups: { name: "Core" } }].filter(f => !input?.basis || f.basis === input.basis);
     case "list_keg_pools": return [];
@@ -53,6 +54,7 @@ beforeEach(() => { state.role = "admin"; state.calls = []; });
 it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
+  expect(state.brandInput).toEqual({ q: "", sort: "name", category: "" });
   const html = render(page);
   // Packages and pours are one tap further, on the brand's SKU list.
   for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);
@@ -133,4 +135,14 @@ it("asks the registered customer query for the missing-email subset", async () =
   expect(state.customerInput).toEqual({ missingPortalEmail: true });
   expect(page.type).toBe(CustomersView);
   expect(page.props.model.missingPortalEmail).toBe(true);
+});
+
+// docs/plans/list-filters.md: the URL's search, sort and category reach list_brands; a bad sort falls back.
+it("passes Catalog's URL filters to list_brands", async () => {
+  const page = await CatalogPage({ searchParams: Promise.resolve({ q: " hazy ", sort: "bogus", category: "Core" }) });
+  expect(state.brandInput).toEqual({ q: "hazy", sort: "name", category: "Core" });
+  const html = render(page);
+  expect(html).toContain('value="hazy"');
+  expect(html).toContain('href="/catalog?q=hazy&amp;sort=abv&amp;category=Core"');
+  expect(html).toContain('href="/catalog?q=hazy"');
 });

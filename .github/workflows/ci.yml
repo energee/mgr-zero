@@ -99,6 +99,9 @@ jobs:
       - run: supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
       - name: Generated database types match migrations
         if: matrix.shard == '1/3'
+        # gen types pulls postgres-meta with no fallback when ECR Public
+        # throttles anonymous pulls (toomanyrequests); Docker Hub has the image.
+        env: { SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io }
         run: |
           bun run types:database
           git diff --exit-code -- lib/supabase/database.generated.ts

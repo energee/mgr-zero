@@ -137,9 +137,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Brands with their style, price group, SKUs and the pours that group owns, alphabetical
+Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | no |
+| `sort` | name or abv or newest | no |
+| `category` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

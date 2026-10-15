@@ -13,8 +13,11 @@ export function CatalogView({
   linkRows,
   formats,
   formatAction,
+  controls,
 }: {
   model: CatalogViewModel;
+  /** Live: the search, sort and category strip (components/mgr/list-controls.tsx). */
+  controls?: ReactNode;
   createAction?: ReactNode;
   footer?: ReactNode;
   /** Live: brand rows, Price groups and water profiles are links. Inventory leaves them unlabeled taps. */
@@ -25,6 +28,7 @@ export function CatalogView({
   return (
     <>
       {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("Add brand"), model.backHref)}
+      {controls}
       {model.empty
         ? E.blank(model.empty)
         : model.brands.map((row) => (

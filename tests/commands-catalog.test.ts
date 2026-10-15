@@ -69,3 +69,37 @@ describe("update_location", () => {
       .rejects.toMatchObject({ code: "permission_denied" });
   });
 });
+
+// docs/plans/list-filters.md: Catalog's search, sort and category run in Postgres.
+describe("list_brands filters", () => {
+  type B = { name: string };
+  let ctx: typeof salesCtx;
+  const names = (rows: unknown) => (rows as B[]).map((b) => b.name);
+  beforeAll(async () => {
+    const brewery = await makeBrewery();
+    ctx = await makeStaffCtx(brewery.id, "sales");
+    // Created in this order, so "newest" is the reverse.
+    await runCommand("upsert_brand", { name: "Amber", style: "Ale", abv: 5.2, category: "Core" }, ctx);
+    await runCommand("upsert_brand", { name: "Big Stout", style: "Stout", abv: 9.5, category: "Seasonal", alias: "Animal #14" }, ctx);
+    await runCommand("upsert_brand", { name: "Crisp 100% Lager", style: "Lager", category: "Core" }, ctx);
+  });
+
+  it("returns every brand A–Z with no input, as before", async () => {
+    expect(names(await runCommand("list_brands", {}, ctx))).toEqual(["Amber", "Big Stout", "Crisp 100% Lager"]);
+  });
+  it("q matches anywhere in the name or alias, case-insensitively", async () => {
+    expect(names(await runCommand("list_brands", { q: "stout" }, ctx))).toEqual(["Big Stout"]);
+    expect(names(await runCommand("list_brands", { q: "animal" }, ctx))).toEqual(["Big Stout"]);
+  });
+  it("q treats % and _ as literal text", async () => {
+    expect(names(await runCommand("list_brands", { q: "100%" }, ctx))).toEqual(["Crisp 100% Lager"]);
+    expect(names(await runCommand("list_brands", { q: "%" }, ctx))).toEqual(["Crisp 100% Lager"]);
+  });
+  it("sorts by ABV high to low with no ABV last, and by newest", async () => {
+    expect(names(await runCommand("list_brands", { sort: "abv" }, ctx))).toEqual(["Big Stout", "Amber", "Crisp 100% Lager"]);
+    expect(names(await runCommand("list_brands", { sort: "newest" }, ctx))).toEqual(["Crisp 100% Lager", "Big Stout", "Amber"]);
+  });
+  it("category narrows to one category", async () => {
+    expect(names(await runCommand("list_brands", { category: "Core" }, ctx))).toEqual(["Amber", "Crisp 100% Lager"]);
+  });
+});

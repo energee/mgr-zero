@@ -50,3 +50,8 @@ export const US_STATE_CODES = [
   "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
   "DC", "PR", "VI", "GU", "AS", "MP",
 ] as const;
+
+// Catalog brand-list orders (list_brands in lib/commands/catalog.ts, ?sort= on
+// /catalog). Labels: BRAND_SORT_LABEL in lib/mgr/labels.ts.
+export const BRAND_SORTS = ["name", "abv", "newest"] as const;
+export type BrandSort = (typeof BRAND_SORTS)[number];
