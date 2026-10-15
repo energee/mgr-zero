@@ -8,10 +8,10 @@ import type { ColaRecord } from "@/lib/ttb/colas";
 
 export type { BrandApprovalViewModel };
 
-type Controls = Partial<Record<"kind" | "number" | "serialNumber" | "submittedOn", (value: string) => void>> & {
+type Controls = Partial<Record<"kind" | "number" | "serialNumber" | "approvedOn", (value: string) => void>> & {
   /** Runs search_colas for the brand; absent in the inventory, so the button is inert. */
   findCola?: () => void;
-  /** Copies a found COLA's TTB ID and serial into the sheet (colaChoice). */
+  /** Copies a found COLA's TTB ID, serial and approval date into the sheet (colaChoice). */
   useCola?: (record: ColaRecord) => void;
 };
 
@@ -56,7 +56,7 @@ export function BrandApprovalView({ model, controls = {}, messages, footer }: {
         {colaLink(model.number ?? "")}
         {colaSearchResults(model, controls)}
       </>}
-      <RegistryDate label="Date submitted · optional" value={model.submittedOn ?? ""} onChange={controls.submittedOn} />
+      <RegistryDate label="Date approved · optional" value={model.approvedOn ?? ""} onChange={controls.approvedOn} />
       {messages}
       {footer !== undefined ? footer : E.btn("Save approval")}
     </>

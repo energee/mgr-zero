@@ -32,7 +32,7 @@ export const brandApprovalStout: BrandApprovalViewModel = {
   kindOptions: APPROVAL_KINDS,
   number: "25318001000034",
   serialNumber: "260135",
-  submittedOn: "2026-01-15",
+  approvedOn: "2026-02-03",
   colas: {
     permit: "BR-PA-21007",
     rows: [

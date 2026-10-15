@@ -109,10 +109,10 @@ describe("registry sheets", () => {
     expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 
-  it("lists a COLA on its brand by serial and submitted date, never an expiry", () => {
+  it("lists a COLA on its brand by serial and approval date, never an expiry", () => {
     const cola = toBrandViewProps(brandHazy).compliance.find((row) => row.title.startsWith("COLA"))!;
     expect(cola.title).toBe("COLA TTB ID 25318001000034");
-    expect(cola.detail).toMatch(/^submitted |^not submitted$/);
+    expect(cola.detail).toMatch(/^approved |^approval date unknown/);
     expect(cola.detail).not.toMatch(/expires/);
   });
 
@@ -128,8 +128,8 @@ describe("registry sheets", () => {
     expect(html).toMatch(/Serial number · optional/);
     expect(html).not.toMatch(/COLA number/);
     expect(html).not.toMatch(/Expires/);
-    expect(html).toMatch(/Date submitted/);
-    expect(html).not.toMatch(/Approved on/);
+    expect(html).toMatch(/Date approved/);
+    expect(html).not.toMatch(/Date submitted/);
   });
 
   it("keeps the formula label on a formula approval, with no serial or COLA link", () => {
@@ -139,18 +139,18 @@ describe("registry sheets", () => {
   });
 
   it("links Open COLA from the TTB ID alone, encoded, on the official origin", () => {
-    expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=25318001000034");
-    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&ttbid=0012%26x%3D1");
+    expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=25318001000034");
+    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=0012%26x%3D1");
     expect(colaUrl("  ")).toBeNull();
     const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
-    expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&amp;ttbid=25318001000034"');
+    expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&amp;ttbid=25318001000034"');
     expect(html).not.toContain(`ttbid=${brandApprovalStout.serialNumber}`);
   });
 
-  it("Use takes a COLA's TTB ID and serial, a missing serial as blank, and never its date", () => {
+  it("Use takes a COLA's TTB ID, serial (a missing one as blank) and TTB's approval date", () => {
     const record = { ttbId: "25318001000034", permit: "BR-PA-20553", serial: "260135", completedOn: "2026-02-02", fancifulName: "STOUT", brandName: "LOLEV", classCode: "901", className: "BEER" };
-    expect(colaChoice(record)).toEqual({ ttbId: "25318001000034", serialNumber: "260135" });
-    expect(colaChoice({ ...record, serial: null })).toEqual({ ttbId: "25318001000034", serialNumber: "" });
+    expect(colaChoice(record)).toEqual({ ttbId: "25318001000034", serialNumber: "260135", approvedOn: "2026-02-02" });
+    expect(colaChoice({ ...record, serial: null })).toEqual({ ttbId: "25318001000034", serialNumber: "", approvedOn: "2026-02-02" });
   });
 
   it("lists TTB COLA matches with Use, says when none match, and shows the search running", () => {

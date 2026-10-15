@@ -41,7 +41,7 @@ picking one fills the TTB ID and serial. Saving still goes through
   older COLAs cannot be searched. Pages are fetched until the total is
   reached; a missing Next link before then is an error, not a short list.
 - **No date fill**: TTB's date is the *completed* (approval) date; the sheet's
-  field is *Date submitted*. Picking leaves the date alone. (Open question 1.)
+  field is *Date submitted*. Picking leaves the date alone. (Open question 1.) Resolved in review: the sheet records *Date approved* (the existing `approved_on` column, no migration) and Use fills it from TTB's completed date.
 - **No caching, no stored scrape.** One search per click, on demand.
 
 ## Tasks
