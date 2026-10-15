@@ -33,6 +33,13 @@ export const brandApprovalStout: BrandApprovalViewModel = {
   number: "25318001000034",
   serialNumber: "260135",
   submittedOn: "2026-01-15",
+  colas: {
+    permit: "BR-PA-21007",
+    rows: [
+      { ttbId: "25318001000034", permit: "BR-PA-21007", serial: "260135", completedOn: "2026-02-03", fancifulName: "STOUT", brandName: "RIVERSIDE BREWING", classCode: "901", className: "BEER" },
+      { ttbId: "24102001000417", permit: "BR-PA-21007", serial: null, completedOn: "2024-04-19", fancifulName: "OATMEAL STOUT", brandName: "RIVERSIDE BREWING", classCode: "906", className: "MALT BEVERAGES SPECIALITIES - FLAVORED" },
+    ],
+  },
 };
 
 export const stateRegistrationHazy: StateRegistrationViewModel = {

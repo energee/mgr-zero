@@ -19,7 +19,7 @@ import {
 } from "../lib/mgr/fixtures/compliance";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
-import { colaUrl } from "../lib/mgr/brand-approval-view";
+import { colaChoice, colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
 import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -144,6 +144,28 @@ describe("registry sheets", () => {
     const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
     expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicDisplaySearchBasic&amp;ttbid=25318001000034"');
     expect(html).not.toContain(`ttbid=${brandApprovalStout.serialNumber}`);
+  });
+
+  it("Use takes a COLA's TTB ID and serial, a missing serial as blank, and never its date", () => {
+    const record = { ttbId: "25318001000034", permit: "BR-PA-20553", serial: "260135", completedOn: "2026-02-02", fancifulName: "STOUT", brandName: "LOLEV", classCode: "901", className: "BEER" };
+    expect(colaChoice(record)).toEqual({ ttbId: "25318001000034", serialNumber: "260135" });
+    expect(colaChoice({ ...record, serial: null })).toEqual({ ttbId: "25318001000034", serialNumber: "" });
+  });
+
+  it("lists TTB COLA matches with Use, says when none match, and shows the search running", () => {
+    const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
+    expect(html).toMatch(/Find COLA on TTB/);
+    const first = brandApprovalStout.colas!.rows[0];
+    expect(html).toContain(first.fancifulName);
+    expect(html).toContain(`${first.ttbId} · serial ${first.serial} · ${first.className}`);
+    expect(html).toContain(first.completedOn);
+    expect(html.match(/>Use<\/button>/g) ?? []).toHaveLength(brandApprovalStout.colas!.rows.length);
+    const none = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: { permit: "BR-PA-20553", rows: [] } } }));
+    expect(none).toContain("No COLAs on TTB under BR-PA-20553 match Stout.");
+    const searching = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: undefined, searching: true } }));
+    expect(searching).toMatch(/<button[^>]*disabled[^>]*>Searching TTB…<\/button>/);
+    const formula = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));
+    expect(formula).not.toMatch(/Find COLA/);
   });
 
   it("explains the missing link when a COLA has no TTB ID", () => {
