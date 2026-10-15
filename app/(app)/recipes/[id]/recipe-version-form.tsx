@@ -1,6 +1,11 @@
 // app/(app)/recipes/[id]/recipe-version-form.tsx — the live draft of a
 // recipe version: RecipeView (components/mgr/views/recipe.tsx) with every
-// field controlled, the ingredient, mash, fermentation and water rows opening
+// field controlled, starting as a copy of the current version (`initial`, from
+// versionToDraft) or blank before the first one. A changed draft is kept in
+// sessionStorage per actor, brewery and recipe (lib/mgr/recipe-draft.ts),
+// written as each change is made, restored with a notice and Start over on
+// return, and cleared when the version saves; /recipes/new keeps none, since
+// there is no recipe to key it by yet. The the ingredient, mash, fermentation and water rows opening
 // their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview from the same
 // pure recipeGravity the server uses (lib/recipe-gravity.ts). With a recipeId
 // the bottom button runs create_recipe_version, disabled with draftBlocker's
@@ -10,16 +15,19 @@
 // are typed as percents, as the inventory draws them, and sent as fractions.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
-import { recipeGravity } from "@/lib/recipe-gravity";
-import { draftBlocker, RECIPE_NUMBERS, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type FermentationStage, type RecipeMaterial, type IngredientLine, type MashStep, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { useCommandContext } from "@/lib/brewery-provider";
+import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
+import { plural } from "@/lib/mgr/plural";
+import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
+import { draftBlocker, gravityBlockerText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -27,20 +35,64 @@ type Numbers = Record<RecipeNumberKey, string>;
 const DEFAULT_MASH: MashStep[] = [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }];
 const DEFAULTS: Partial<Numbers> = { efficiency: "75", attenuation: "78" };
 const BLANK_NUMBERS = Object.fromEntries(RECIPE_NUMBERS.map(([k]) => [k, DEFAULTS[k] ?? ""])) as Numbers;
+/** The draft before a recipe has a version: the default mash step, 75% efficiency, 78% attenuation, nothing else. */
+const BLANK_DRAFT: RecipeDraft = { numbers: BLANK_NUMBERS, notes: "", lines: [], mashSchedule: DEFAULT_MASH, fermentationSchedule: [], water: EMPTY_WATER };
 const pctToFraction = (s: string) => Number(s) / 100;
 
-export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = [], materials, profiles, unit }: {
-  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[]; materials: RecipeMaterial[]; profiles: WaterProfileIons[]; unit: GravityUnit;
+export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = [], initial, baseVersionId = null, baseVersion, materials, profiles, unit }: {
+  recipeId?: string; title: string; backHref: string; backLabel?: string; brands?: NewRecipeBrand[];
+  /** The current version as a draft (versionToDraft); absent before the first version and on /recipes/new. */
+  initial?: RecipeDraft;
+  /** The id and number of the version `initial` copies; a kept draft from another id is restored as stale. */
+  baseVersionId?: string | null; baseVersion?: number;
+  materials: RecipeMaterial[]; profiles: WaterProfileIons[]; unit: GravityUnit;
 }) {
   const router = useRouter();
   const action = useCommandAction();
+  const context = useCommandContext();
+  const key = recipeId === undefined ? null : recipeDraftKey(context, recipeId);
+  const start = initial ?? BLANK_DRAFT;
   const [parent, setParent] = useState(BLANK_RECIPE);
-  const [numbers, setNumbers] = useState(BLANK_NUMBERS);
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<IngredientLine[]>([]);
-  const [mashSchedule, setMashSchedule] = useState<MashStep[]>(DEFAULT_MASH);
-  const [fermentationSchedule, setFermentationSchedule] = useState<FermentationStage[]>([]);
-  const [water, setWater] = useState<WaterDraft>(EMPTY_WATER);
+  const [draft, setDraft] = useState(start);
+  const [restored, setRestored] = useState<string | null>(null);
+  const { numbers, notes, lines, mashSchedule, fermentationSchedule, water } = draft;
+
+  const { setError } = action;
+  useEffect(() => {
+    if (key === null) return;
+    const restore = () => {
+      let kept: ReturnType<typeof readRecipeDraft>;
+      try { kept = readRecipeDraft(sessionStorage.getItem(key), baseVersionId); }
+      catch {
+        // A record that cannot be read is dropped; starting from the server's version is safe,
+        // because that version is the base the brewer started the draft from.
+        sessionStorage.removeItem(key);
+        setError("Your saved draft could not be read; starting from the current version.");
+        return;
+      }
+      if (!kept) return;
+      setDraft(kept.draft);
+      setRestored(kept.stale ? `Restored your unsaved draft, based on an earlier version; the recipe is now on v${baseVersion}.` : "Restored your unsaved draft");
+    };
+    restore();
+  }, [key, baseVersionId, baseVersion, setError]);
+
+  // Every change goes through here and is kept as it is made, so mounting never writes.
+  // An untouched copy is not kept: its key is removed, so returning shows no notice.
+  function change(patch: Partial<RecipeDraft>) {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    if (key === null) return;
+    try {
+      if (shouldKeepDraft(start, next)) writeRecipeDraft(sessionStorage, key, baseVersionId, next);
+      else sessionStorage.removeItem(key);
+    } catch { setError("Your draft could not be kept in this tab; it is lost if you leave the page before saving."); }
+  }
+  function startOver() {
+    if (key !== null) sessionStorage.removeItem(key);
+    setDraft(start);
+    setRestored(null);
+  }
 
   // Declared before the preview reads it during render (#440).
   const material = materialLookup(materials);
@@ -56,10 +108,13 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   });
 
   // Recomputed every render: a handful of numbers. Null (no "Predicted:"
-  // line) until every mash ingredient's material has an extract_potential.
+  // line) until every mash ingredient's material has an extract_potential and
+  // a weight unit; until then the preview names the first line that blocks it.
+  const gravityLines = validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage, unit: material.unit(l.materialId) }));
   const preview = eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0
-    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage, unit: material.get(l.materialId)?.base_uom })) })
+    ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: gravityLines })
     : null;
+  const gravityWhy = gravityBlockerText(gravityBlockers(gravityLines), (n) => material.name(validLines[n].materialId), (n) => material.unit(validLines[n].materialId), { saved: false });
 
   const creating = recipeId === undefined;
   // A parent that saved before the version failed is kept, so a retry writes
@@ -76,16 +131,19 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       if (!ok) return;
       if (!id) { action.setError("The recipe was created but its id did not come back; open it from Recipes to add the version."); return; }
     }
-    await action.run("create_recipe_version", build(id), () => router.push(`/recipes/${id}`));
+    await action.run("create_recipe_version", build(id), () => {
+      if (key !== null) sessionStorage.removeItem(key);
+      router.push(`/recipes/${id}`);
+    });
   }
   // What the draft still lacks, named for the brewer; the submit stays disabled until it is null.
   const blocked = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   const parentLocked = creating && createdId !== "";
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
-  const mashRow = { title: `Mash schedule · ${mashSchedule.length} steps`, detail: mashSummary(mashSchedule) };
-  const fermentationRow = { title: `Fermentation schedule · ${fermentationSchedule.length} stages`, detail: fermentationSummary(fermentationSchedule) };
-  const waterRow = { title: `Water · ${target ? `target ${target}` : "no target"}`, detail: `${water.additions.length} additions` };
+  const mashRow = { title: `Mash schedule · ${plural(mashSchedule.length, "step")}`, detail: mashRowSummary(mashSchedule) };
+  const fermentationRow = { title: `Fermentation schedule · ${plural(fermentationSchedule.length, "stage")}`, detail: fermentationSchedule.length ? fermentationSummary(fermentationSchedule) : "No stages yet" };
+  const waterRow = { title: "Water", detail: `${target ? `target ${target}` : "no target"} · ${plural(water.additions.length, "addition")}` };
 
   return (
     <RecipeView
@@ -93,25 +151,28 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         title, backHref, backLabel, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
-          action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => setLines((prev) => upsertAt(prev, i, f))} onDelete={() => setLines((prev) => removeAt(prev, i))} trigger={E.act("Edit")} />,
+          action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act("Edit")} />,
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
-        predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : undefined,
+        predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : gravityWhy ?? undefined,
       }}
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />
         {parentLocked ? E.info("The recipe is saved under this name; only the version is still to write.") : null}
+      </> : restored ? <>
+        {E.info(restored)}
+        {E.btn("Start over", "g", undefined, startOver)}
       </> : undefined}
       controls={{
-        set: (key, value) => key === "notes" ? setNotes(value) : setNumbers((n) => ({ ...n, [key]: value })),
+        set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),
         onSubmit: () => void submit(), busy: action.busy, blocked, error: action.error,
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => setLines((prev) => [...prev, f])} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
-        mash: <MashScheduleSheet steps={mashSchedule} onChange={setMashSchedule} trigger={E.nav(mashRow.title, mashRow.detail)} />,
-        fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={setFermentationSchedule} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
-        water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={setWater} trigger={E.nav(waterRow.title, waterRow.detail)} />,
+        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
+        mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
+        fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
+        water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,
       }}
     />
   );

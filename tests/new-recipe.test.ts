@@ -135,8 +135,14 @@ describe("Recipe creation", () => {
     const detail = src("app/(app)/recipes/[id]/page.tsx");
     expect(detail).toMatch(/<RecipeView\b/);
     expect(detail).not.toMatch(/detail=|searchParams/);
-    expect(src("app/(app)/recipes/[id]/new/page.tsx")).toMatch(/<RecipeEditor\b/);
+    const next = src("app/(app)/recipes/[id]/new/page.tsx");
+    expect(next).toMatch(/<RecipeEditor\b/);
+    // The next version starts as a copy of the current one, and a draft left in this tab comes back.
+    expect(next).toMatch(/initial=\{versionToDraft\(snapshot\)/);
     const form = src("app/(app)/recipes/[id]/recipe-version-form.tsx");
+    expect(form).toMatch(/\breadRecipeDraft\b[^]*\bwriteRecipeDraft\b|\bwriteRecipeDraft\b[^]*\breadRecipeDraft\b/);
+    expect(form).toMatch(/import \{[^}]*\breadRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
+    expect(form).toMatch(/import \{[^}]*\bwriteRecipeDraft\b[^}]*\} from "@\/lib\/mgr\/recipe-draft"/);
     expect(form).toMatch(/<RecipeView\b/);
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);

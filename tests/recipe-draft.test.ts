@@ -1,6 +1,6 @@
 // A recipe draft kept in this tab survives leaving the page, and an older base is flagged, not dropped.
 import { expect, it } from "vitest";
-import { readRecipeDraft, recipeDraftKey, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
+import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
 import type { RecipeDraft } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER } from "@/lib/mgr/recipe-process-view";
 
@@ -47,4 +47,15 @@ it("throws on a malformed record", () => {
 
 it("names actor, brewery and recipe in the key", () => {
   expect(recipeDraftKey({ actorId: "actor", breweryId: "brewery" } as Parameters<typeof recipeDraftKey>[0], "recipe")).toBe(key);
+});
+
+it("keeps nothing for an untouched copy, so returning shows no notice", () => {
+  expect(shouldKeepDraft(draft, structuredClone(draft))).toBe(false);
+  // A sheet that hands back the same line with its keys in another order is still untouched.
+  const reordered = { ...draft, lines: [{ timingMinutes: "", stage: "dry_hop" as const, perBblQty: "1.2", materialId: "m1" }] };
+  expect(shouldKeepDraft(draft, reordered)).toBe(false);
+});
+
+it("keeps a draft once one dry hop changes", () => {
+  expect(shouldKeepDraft(draft, { ...draft, lines: [{ ...draft.lines[0], perBblQty: "1.5" }] })).toBe(true);
 });
