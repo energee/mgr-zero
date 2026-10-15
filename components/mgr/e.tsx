@@ -8,6 +8,7 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
+import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { ComposerDrawerView, ComposerStripView } from "@/components/mgr/views/composer";
@@ -361,6 +362,16 @@ export const E = {
         <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
         <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
+    </Field>
+  ),
+  /** A picked value from a list too long for a Select (materials): the trigger opens a
+   *  searchable sheet (phone) or dialog (desk). `placeholder` is the trigger text when
+   *  nothing is picked; `selectedLabel` names a retained value missing from `options`. */
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string }) => (
+    <Field data-disabled={controls?.disabled}>
+      {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={controls?.["aria-describedby"]} selectedLabel={controls?.selectedLabel}
+        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} />
     </Field>
   ),
   // The amber box and the quiet box differed only by tint; the glyph is the

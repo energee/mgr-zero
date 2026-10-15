@@ -1,10 +1,9 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-import { CommandForm } from "@/components/mgr/command-form";
+import { SearchPick } from "@/components/mgr/search-pick";
 import { orderLineErrors } from "@/lib/order-form-rules";
 import { DatePicker } from "@/components/mgr/date-picker";
 import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
@@ -25,17 +24,11 @@ function OrderPick({ label, value, options, onChange }: { label: string; value: 
   return E.pick(label, value, options.map(option => typeof option === "string" ? option : { value: option.id, label: option.label }), { onChange, placeholder: label });
 }
 
-// The adapter supplies options and request feedback. Pending reads must not
-// look empty, and retained unavailable selections keep their visible label.
-export function OrderSkuPicker({ value, label, options, onChange, selectedLabel, feedback, optionsReady = true, emptyMessage = "No matching SKUs", errorId }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void; selectedLabel?: string; feedback?: ReactNode; optionsReady?: boolean; emptyMessage?: string; errorId?: string }) {
-  const [open, setOpen] = useState(false);
-  return <CommandForm title="Select SKU" open={open} onOpenChange={setOpen}
-    trigger={<Button type="button" variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label} aria-describedby={errorId}>{options.find(option => option.id === value)?.label ?? (value && selectedLabel ? selectedLabel : "Select SKU")}</Button>}>
-    {feedback}
-    <Command><CommandInput placeholder="Search SKUs" /><CommandList>{optionsReady && <CommandEmpty>{options.length ? "No matching SKUs" : emptyMessage}</CommandEmpty>}
-      {options.map(option => <CommandItem key={option.id} value={option.id} keywords={[option.label]} onSelect={() => { onChange?.(option.id); setOpen(false); }}>{option.label}</CommandItem>)}
-    </CommandList></Command>
-  </CommandForm>;
+// The adapter supplies options and request feedback. SearchPick keeps pending
+// reads from looking empty and retained unavailable selections labelled.
+// Called as a function so it still returns SearchPick's CommandForm element.
+export function OrderSkuPicker({ options, ...props }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void; selectedLabel?: string; feedback?: ReactNode; optionsReady?: boolean; emptyMessage?: string; errorId?: string }) {
+  return SearchPick({ ...props, options: options.map(option => ({ value: option.id, label: option.label })), title: "Select SKU", placeholder: "Select SKU", searchPlaceholder: "Search SKUs", noMatchMessage: "No matching SKUs" });
 }
 
 export function OrderQuantity({ value, label, onChange, contextualLabels = false, max, step = "any", required = false, invalid = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean }) {
