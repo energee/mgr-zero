@@ -13,11 +13,12 @@ export type ListRowProps = { onEdit?: (index: number) => void; onMove?: (index: 
 
 /** One row of an ordered list. Live (`onEdit`), a tap anywhere on the row opens its editor, except a tap on one of its
  *  buttons; the arrows and Edit carry the row title so a screen reader hears which row they move or open. Inventory
- *  draws a plain Edit. `data-row-index` lets the sheet put focus back on the moved row. */
+ *  draws a plain Edit. `data-row-index` on the row and `data-move` on each arrow let the sheet put focus back on the
+ *  moved row's arrow after a move. */
 export function listRow(title: string, detail: string, index: number, count: number, { onEdit, onMove }: ListRowProps) {
   if (!onEdit) return E.row(title, detail, E.act("Edit"));
-  const arrow = (by: -1 | 1) => <Button type="button" variant="ghost" size="icon-sm" data-row-index={index} onClick={() => onMove!(index, by)} aria-label={`Move ${title} ${by < 0 ? "up" : "down"}`}>{by < 0 ? "↑" : "↓"}</Button>;
-  return <div onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onEdit(index); }}>
+  const arrow = (by: -1 | 1) => <Button type="button" variant="ghost" size="icon-sm" data-move={by} onClick={() => onMove!(index, by)} aria-label={`Move ${title} ${by < 0 ? "up" : "down"}`}>{by < 0 ? "↑" : "↓"}</Button>;
+  return <div data-row-index={index} onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onEdit(index); }}>
     {E.row(title, detail, <span className="flex gap-1">
       {onMove && index > 0 && arrow(-1)}
       {onMove && index < count - 1 && arrow(1)}

@@ -27,15 +27,25 @@ function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onCh
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Editing>(null);
   const [fields, setFields] = useState<F>(() => toFields());
+  const [body, setBody] = useState<HTMLDivElement | null>(null); // a state ref: `move` reads it, and lint forbids reading a ref during render
+  // After a move, keep focus on the moved row: on the arrow that moved it, or on its Edit once that arrow is gone
+  // (the row reached an end). The rows re-render first, so the lookup waits a frame (the composer.tsx precedent).
+  const move = (index: number, by: -1 | 1) => {
+    onChange(moveItem(items, index, by));
+    requestAnimationFrame(() => {
+      const row = body?.querySelector(`[data-row-index="${index + by}"]`);
+      (row?.querySelector<HTMLElement>(`[data-move="${by}"]`) ?? row?.querySelector<HTMLElement>("[data-row-action]"))?.focus();
+    });
+  };
   const begin = (index?: number) => { setFields(toFields(index === undefined ? undefined : items[index])); setEditing({ index }); };
   const footer = editing && <CommandFormFooter>
     {editing.index !== undefined && <Button type="button" variant="outline" onClick={() => { onChange(removeAt(items, editing.index!)); setEditing(null); }}>Delete</Button>}
     <Button type="button" disabled={!ready(fields)} onClick={() => { onChange(upsertAt(items, editing.index, toItem(fields))); setEditing(null); }}>{saveLabel}</Button>
   </CommandFormFooter>;
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }} title={sheetTitle} trigger={typeof trigger === "string" ? <Button type="button" variant="outline" className="justify-start">{trigger}</Button> : asTrigger(trigger)}>
-    <div className="flex flex-col gap-4">
+    <div ref={setBody} className="flex flex-col gap-4">
       {editing === null
-        ? list({ items, onEdit: begin, onMove: (i, by) => onChange(moveItem(items, i, by)), onAdd: () => begin(), add: <Button type="button" size="sm" onClick={() => begin()}>{addLabel}</Button> })
+        ? list({ items, onEdit: begin, onMove: move, onAdd: () => begin(), add: <Button type="button" size="sm" onClick={() => begin()}>{addLabel}</Button> })
         : item({ fields, onChange: (patch) => setFields((f) => ({ ...f, ...patch })), footer })}
     </div>
   </CommandForm>;

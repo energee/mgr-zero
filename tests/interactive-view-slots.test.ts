@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cloneElement, createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
@@ -67,4 +68,17 @@ it("a live schedule row names its arrows and its Edit after the row, and mash ro
   expect(html).not.toContain('aria-label="Move Mash-out down"');
   expect(html).toContain("infusion · 152 °F · 60 min");
   expect(html).not.toContain("mash-out · 168");
+});
+
+// Task 12 (QW21): after a move, focus stays on the moved row; the ingredient Edit carries its row name.
+it("ListSheet puts focus back on the moved row through data-row-index, and the ingredient Edit names its row", () => {
+  const html = renderToStaticMarkup(createElement(MashScheduleView, { steps: STEPS, ...verbs }));
+  expect(html).toMatch(/<div data-row-index="1">/);
+  expect(html).toContain('data-move="-1"');
+  const sheet = readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8");
+  expect(sheet).toMatch(/requestAnimationFrame\(/);
+  expect(sheet).toContain("[data-row-index=");
+  expect(sheet).toMatch(/\[data-move=.*\[data-row-action\]|\[data-row-action\][\s\S]*\[data-move=/);
+  const form = readFileSync("app/(app)/recipes/[id]/recipe-version-form.tsx", "utf8");
+  expect(form).toContain('E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)');
 });
