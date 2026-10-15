@@ -2,9 +2,9 @@
 // one order: state and next action, lines with ATP, the event history, and
 // the restock flag, and (Admin and Sales, shipped only) Cost and margin from
 // get_order_cogs. The drawing is OrderView (shared with the inventory);
-// lifecycle-buttons.tsx holds the status-gated verbs (Submit, Confirm, Adjust,
-// Pick, Ship, Cancel). Draft edits use /orders/[id]/edit. Confirm has its own
-// two-tap review at /orders/[id]/confirm. Adjust lines is /orders/[id]/adjust;
+// lifecycle-buttons.tsx holds the status-gated verbs (Submit, Adjust, Pick,
+// Ship, Cancel). Draft edits use /orders/[id]/edit. Confirming happens only
+// through Review and confirm at /orders/[id]/confirm (#713). Adjust lines is /orders/[id]/adjust;
 // a taproom transfer completes at
 // /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
 // or malformed id renders not-found.tsx.
@@ -43,8 +43,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     <OrderView
       model={model}
       footer={(
-        <LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status}
-          lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id }))} />
+        <LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status} />
       )}
     />
   );

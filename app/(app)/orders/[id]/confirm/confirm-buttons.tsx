@@ -1,7 +1,7 @@
 // app/(app)/orders/[id]/confirm/confirm-buttons.tsx — the two verbs on the
 // Confirm order review: confirm_order and cancel_order with a reason. A clean
 // confirm goes back to Orders; one that returns ATP warnings stays to show them
-// (atp-warnings.tsx, shared with the order detail) until "Back to Orders" —
+// (atp-warnings.tsx) until "Back to Orders" —
 // it skips the post-confirm refresh, which would re-render page.tsx and
 // redirect the now-confirmed order away before the warnings are read. Cancel
 // order is the shared cancel-order-dialog.tsx.

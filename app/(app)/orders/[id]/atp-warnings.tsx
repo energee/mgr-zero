@@ -1,14 +1,14 @@
 // app/(app)/orders/[id]/atp-warnings.tsx — the soft ATP warnings
-// confirm_order returns ({ sku_id, atp } per line left negative), drawn once
-// for both callers: the order detail's lifecycle-buttons.tsx and the Confirm
-// order review's confirm/confirm-buttons.tsx.
+// confirm_order returns ({ sku_id, atp } per line left negative), drawn by the
+// Confirm order review's confirm/confirm-buttons.tsx, the only place an order
+// is confirmed (#713).
 "use client";
 
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
 export type AtpWarning = { sku_id: string; atp: number };
 
-/** Reads the `warnings` array out of a confirm_order (or other lifecycle) result. */
+/** Reads the `warnings` array out of a confirm_order result. */
 export function atpWarnings(data: unknown): AtpWarning[] {
   return (data as { warnings?: AtpWarning[] } | null)?.warnings ?? [];
 }
