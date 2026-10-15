@@ -136,4 +136,25 @@ describe("documentation agent workflow", () => {
       expect(published).toBeUndefined();
     });
   });
+
+  // #864: GitHub transiently rejected the force push ("cannot lock ref"); one failure must not fail the run.
+  it.each(["documentation-agent.yml", "http-api-agent.yml"])("%s retries a transiently rejected branch push", (file) => {
+    const run = (load(readFileSync(`.github/workflows/${file}`, "utf8")) as Workflow).jobs.publish.steps
+      .map((step) => step.run ?? "")
+      .find((script) => script.includes("git push -f"))!;
+    const start = run.indexOf("for attempt");
+    expect(start, "push is not wrapped in a retry loop").toBeGreaterThan(-1);
+    const push = run.slice(start, run.indexOf("done", start) + 4);
+    const root = mkdtempSync(join(tmpdir(), "docs-push-"));
+    try {
+      // Stub git and sleep: the first push fails, later pushes succeed.
+      writeFileSync(join(root, "git"), `#!/bin/sh\necho push >> "${root}/calls"\n[ "$(wc -l < "${root}/calls")" -gt 1 ]\n`, { mode: 0o755 });
+      writeFileSync(join(root, "sleep"), "#!/bin/sh\n", { mode: 0o755 });
+      const result = spawnSync("bash", ["-e", "-c", push], { env: { ...env, PATH: `${root}:${env.PATH}` }, encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(join(root, "calls"), "utf8").trim().split("\n")).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

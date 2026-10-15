@@ -162,7 +162,14 @@ jobs:
             doc_source="${EVENT_NAME/workflow_dispatch/manual} documentation audit"
           fi
           git commit -m "docs: refresh customer field manual after $doc_source"
-          git push -f origin documentation/user-guide
+          # GitHub can transiently reject a force push with "cannot lock ref ...
+          # reference already exists" (run 38670280746, #864); retry before
+          # failing loudly.
+          for attempt in 1 2 3; do
+            git push -f origin documentation/user-guide && break
+            [ "$attempt" = 3 ] && exit 1
+            sleep 10
+          done
 
           open_pr=$(gh pr list --base main --head documentation/user-guide --state open --json number --jq '.[0].number // empty')
           body="Updates the customer-facing MGR field manual after $doc_source. The documentation agent audited every current user-facing route, not only the triggering change."
