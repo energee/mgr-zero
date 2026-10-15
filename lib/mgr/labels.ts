@@ -2,7 +2,7 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import type { PaymentTerm } from "@/lib/mgr/enums";
+import type { BrandSort, PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
@@ -25,3 +25,6 @@ export const PAYMENT_TERM_LABEL: Record<PaymentTerm, string> = { due_on_receipt:
 
 /** A stored payment term as the operator reads it; an unknown value prints as stored. */
 export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as PaymentTerm] ?? term;
+
+/** Catalog's sort tabs, in BRAND_SORTS order (lib/mgr/enums.ts). */
+export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };

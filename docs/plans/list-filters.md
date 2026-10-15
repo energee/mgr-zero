@@ -29,15 +29,16 @@ plan adds search and sort the same way, so every later list reuses it.
 1. **`lib/mgr/list-params.ts`** — `listParams(schema, raw)`: a zod object
    whose fields all have `.catch(default)`, so one bad param falls back to its
    default instead of failing the page. It returns typed params plus
-   `hrefWith(path, patch)`, which builds a link from the current params with
-   one change (a sort tab keeps `q`; clearing a filter keeps `sort`).
+   `queryWith(patch)`, the current params with one change and defaults left
+   out, and `hrefWith(path, patch)`, that query as a link (a sort tab keeps
+   `q`; clearing a filter keeps `sort`).
 2. **`E.search`** gains optional `name` and `defaultValue`. With a name it
    renders inside a plain `<form method="get">` (Enter submits). It is still the
    same E control, and the screen record calls it unchanged.
 3. **`components/mgr/list-controls.tsx`** — `ListControls({ search, sorts,
    filters })`: the `E.search` form, then sort and filter as `TabBar` rows (`E.tabs`'s shadcn Tabs; hrefs make each tab a link)
-   built with `hrefWith`. Hidden inputs carry the other params, so a search
-   keeps the sort.
+   built with `hrefWith`. Hidden inputs carry the other params (`queryWith({ q: "" })`),
+   so a search keeps the sort.
 
 ## Catalog adoption
 

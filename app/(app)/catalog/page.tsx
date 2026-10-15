@@ -17,14 +17,14 @@ import "@/lib/commands/all";
 import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
-import { BRAND_SORTS } from "@/lib/commands/catalog";
+import { BRAND_SORTS } from "@/lib/mgr/enums";
+import { BRAND_SORT_LABEL } from "@/lib/mgr/labels";
 
 type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
 type Brand = { id: string; name: string; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[] };
 type Format = { id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
 
-const SORT_LABELS = { name: "Name", abv: "ABV", newest: "Newest" } satisfies Record<(typeof BRAND_SORTS)[number], string>;
 const catalogParams = z.object({
   q: z.string().trim().max(100).catch(""),
   sort: z.enum(BRAND_SORTS).catch("name"),
@@ -42,9 +42,9 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
   ]);
   // Each tab links to this page with that one choice changed; the other params stay.
   const sortRow = {
-    label: "Sort", names: BRAND_SORTS.map(value => SORT_LABELS[value]),
+    label: "Sort", names: BRAND_SORTS.map(value => BRAND_SORT_LABEL[value]),
     on: BRAND_SORTS.indexOf(params.sort),
-    hrefs: Object.fromEntries(BRAND_SORTS.map(value => [SORT_LABELS[value], hrefWith("/catalog", { sort: value })])),
+    hrefs: Object.fromEntries(BRAND_SORTS.map(value => [BRAND_SORT_LABEL[value], hrefWith("/catalog", { sort: value })])),
   };
   const categoryNames = ["All", ...categories.map(c => c.name)];
   const categoryRow = {

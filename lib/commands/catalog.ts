@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 import { escapeLike } from "@/lib/escape-like";
+import { BRAND_SORTS } from "@/lib/mgr/enums";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
 const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
@@ -331,16 +332,13 @@ defineCommand({
   },
 });
 
-/** list_brands' sort orders; the Catalog page parses ?sort= with the same list. */
-export const BRAND_SORTS = ["name", "abv", "newest"] as const;
-
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
   input: z.object({
     q: z.string().trim().max(100).optional(),
     sort: z.enum(BRAND_SORTS).optional(),
-    // "" means every category, so a page can pass its URL params straight through.
+    // Empty means every category, as an empty q means no search.
     category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
