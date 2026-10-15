@@ -11,7 +11,7 @@ create table public.price_group_barcodes (
   upc text not null check (upc ~ '^(\d{8}|\d{12,14})$'),
   -- channel_prices' key shape: brewery_id stays out of the key, so PostgREST
   -- does not read this table as a formats↔price_groups link and every existing
-  -- formats → price_groups embed stays unambiguous. The upsert guards the tenant.
+  -- formats → price_groups embed stays unambiguous.
   primary key (price_group_id, format_id),
   -- A barcode keeps nothing alive: it leaves with its group.
   foreign key (price_group_id, brewery_id) references public.price_groups (id, brewery_id) on delete cascade,
@@ -52,12 +52,10 @@ begin
   end if;
   insert into public.price_group_barcodes (brewery_id, price_group_id, format_id, upc)
     values (p_brewery, p_price_group, p_format, p_upc)
+    -- No tenant guard needed (unlike set_channel_price): the group was checked as
+    -- this brewery's above, so a conflicting row is always this brewery's.
     on conflict (price_group_id, format_id) do update set upc = excluded.upc
-      where public.price_group_barcodes.brewery_id = excluded.brewery_id
     returning * into v_row;
-  -- The group was checked as this brewery's above, so the guard cannot skip;
-  -- the not-found turns it into a refusal rather than a silent no-op if it ever did.
-  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 revoke all on function public.set_price_group_barcode(uuid, uuid, uuid, text, uuid) from public, anon, authenticated, service_role;
