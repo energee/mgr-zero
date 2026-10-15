@@ -5,6 +5,7 @@
 // previous group's, so the first ceiling that covers the cost is the band.
 // Nothing here assigns: the Brand page offers Use and a person confirms.
 import { money } from "./money";
+import { plural } from "./plural";
 import { byPosition, type PriceGroupRow } from "./price-groups-view";
 
 export type SuggestionInput = {
@@ -19,10 +20,13 @@ export type PriceGroupSuggestion =
   | { kind: "group"; groupId: string; title: string; detail: string }
   | { kind: "above" | "cost" | "unknown"; title: string; detail: string };
 
+// A recipe can miss costs on a dozen ingredients; naming three keeps the line short.
+const namesUpTo3 = (names: string[]) => names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+
 const perBbl = (cents: number) => `${money(cents)}/bbl`;
 
 export function suggestPriceGroup({ costCentsPerBbl, uncosted, groups }: SuggestionInput): PriceGroupSuggestion | null {
-  if (uncosted.length) return { kind: "unknown", title: "Recipe cost unknown", detail: `no receipt cost yet for ${uncosted.join(", ")}` };
+  if (uncosted.length) return { kind: "unknown", title: "Recipe cost unknown", detail: `${plural(uncosted.length, "ingredient has", "ingredients have")} no receipt cost yet: ${namesUpTo3(uncosted)}` };
   if (costCentsPerBbl == null) return null;
   const cost = `recipe cost ${perBbl(costCentsPerBbl)}`;
   const banded = [...groups].sort(byPosition).flatMap((g) => g.cost_ceiling_cents == null ? [] : [{ id: g.id, name: g.name, ceiling: g.cost_ceiling_cents }]);
