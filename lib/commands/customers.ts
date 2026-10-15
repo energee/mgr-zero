@@ -2,10 +2,17 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { cents, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
+import { cents, CommandError, completeRows, countryCode, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { escapeLike } from "@/lib/escape-like";
 
 const roles = ["admin", "sales"] as const;
+
+/** An ISO alpha-2 country, US when omitted. Only a US customer or ship-to has a state. */
+const country = countryCode.default("US");
+/** customers_state_by_country and ship_tos_state_by_country, stated at the command boundary. */
+const stateByCountry = { path: ["state"], message: "a US address needs a state; other countries have none" };
+const hasStateIffUs = (i: { country: string; state?: string }) => (i.country === "US") === (i.state !== undefined);
 
 defineCommand({
   name: "delete_customer", description: "Delete an unused customer and its ship-to addresses; preserve linked history, portal access, invitations and QuickBooks customers",
@@ -21,8 +28,11 @@ defineCommand({
   roles: [...roles],
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().min(1),
+    // Staff only, like a brand alias; an edit without it clears it.
+    alias: z.string().trim().min(1).optional(),
     type: z.enum(CUSTOMER_TYPES),
-    state: stateCode, // customers.state is NOT NULL (home state)
+    country,
+    state: stateCode.optional(), // home state, required for a US customer only
     // The channel is the customer's row into the price grid (§16.3) and is required.
     saleChannelId: z.string().uuid(),
     licenseNumber: z.string().optional(),
@@ -31,27 +41,36 @@ defineCommand({
     // Overrides the sale channel's tax treatment for this customer's removals
     // (§16.3); omit it to inherit the channel default.
     taxTreatment: z.enum(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"]).optional(),
-  }),
+  }).refine(hasStateIffUs, stateByCountry),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
-    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state,
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state ?? null,
     p_sale_channel: i.saleChannelId, p_license_no: i.licenseNumber ?? null,
     p_payment_terms: i.paymentTerms ?? null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
+    p_alias: i.alias ?? null, p_country: i.country,
   })),
 });
 
 defineCommand({
   name: "upsert_ship_to", description: "Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer",
   roles: [...roles],
+  // A US ship-to needs its street, city, state and ZIP; outside the US only the
+  // label is required, so an export customer can be entered before its address.
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
-    address1: z.string().min(1), address2: z.string().optional(),
-    city: z.string().min(1), state: stateCode, zip: z.string().trim().regex(/^\d{5}(-\d{4})?$/, "a 5-digit ZIP code or ZIP+4"),
+    country,
+    address1: z.string().min(1).optional(), address2: z.string().optional(),
+    city: z.string().min(1).optional(), state: stateCode.optional(), zip: z.string().trim().min(1).optional(),
     isDefault: z.boolean().optional(),
-  }),
+  }).refine(hasStateIffUs, stateByCountry)
+    .refine(i => i.country !== "US" || Boolean(i.address1 && i.city && i.zip), { path: ["address1"], message: "a US address needs a street, city and ZIP code" })
+    // `when` runs the ZIP shape check even while another field is missing.
+    .refine(i => i.country !== "US" || !i.zip || /^\d{5}(-\d{4})?$/.test(i.zip), {
+      path: ["zip"], message: "a 5-digit ZIP code or ZIP+4", when: p => typeof (p.value as { zip?: unknown } | undefined)?.zip === "string",
+    }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_customer: i.customerId, p_label: i.label,
-    p_address1: i.address1, p_address2: i.address2 ?? null, p_city: i.city, p_state: i.state,
-    p_zip: i.zip, p_request_id: execution.requestId, p_is_default: i.isDefault ?? null,
+    p_address1: i.address1 ?? null, p_address2: i.address2 ?? null, p_city: i.city ?? null, p_state: i.state ?? null,
+    p_zip: i.zip ?? null, p_request_id: execution.requestId, p_is_default: i.isDefault ?? null, p_country: i.country,
   })),
 });
 
@@ -65,18 +84,24 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_customers", description: "Customers alphabetical with sale channel name",
+  name: "list_customers", description: "Customers alphabetical with sale channel name; optionally only those whose name or alias contains q",
   roles: ["admin", "sales", "warehouse"],
-  input: z.object({ includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer"), missingPortalEmail: z.boolean().optional().describe("Admin/Sales only: customers without a current portal login email") }),
+  input: z.object({
+    includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer"),
+    missingPortalEmail: z.boolean().optional().describe("Admin/Sales only: customers without a current portal login email"),
+    q: z.string().trim().max(100).optional().describe("Only customers whose name or alias contains this text"),
+  }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
   handler: (ctx, i) => {
     if (i.missingPortalEmail && ctx.role !== "admin" && ctx.role !== "sales") throw new CommandError("permission denied", 403, "permission_denied");
+    // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again, as list_brands does.
+    const pattern = i.q && `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
     return completeRows("Customer list", start => {
     const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";
-    const query = (i.missingPortalEmail
+    const base = i.missingPortalEmail
       ? ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact" }).select(columns)
-      : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId))
-      .order("name").order("id");
+      : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId);
+    const query = (pattern ? base.or(`name.ilike.${pattern},alias.ilike.${pattern}`) : base).order("name").order("id");
     return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
     });
   },

@@ -1,7 +1,7 @@
 // tests/commands-customers.test.ts — customer/ship-to CRUD commands and the price grid's cells.
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedPriceGroup, sql } from "./helpers";
-import { runCommand } from "../lib/commands/registry";
+import { getCommandDefinition, runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 let b: { id: string }, ctx: Awaited<ReturnType<typeof makeStaffCtx>>, brandId: string, formatId: string, wholesale: string, group: string;
@@ -127,4 +127,42 @@ describe("list_channel_prices past the 1000-row cap", () => {
     const narrowed = await runCommand("list_channel_prices", { saleChannelId: channel }, staff) as unknown[];
     expect(narrowed).toHaveLength(1005);
   }, 30_000);
+});
+
+// docs/plans/lolev-orders.md task 2: a customer and a ship-to have a country,
+// and only a US one needs a state; outside the US the address is optional.
+describe("country, alias and search", () => {
+  const parse = (command: string, value: Record<string, unknown>) => getCommandDefinition(command)!.input.safeParse(value);
+  const customer = { name: "Odyssey Club", type: "distributor", saleChannelId: crypto.randomUUID() };
+  it("upsert_customer takes a country without a state, needs a state for US, and refuses an unknown code", () => {
+    expect(parse("upsert_customer", { ...customer, country: "CN" }).success).toBe(true);
+    expect(parse("upsert_customer", { ...customer, country: "US" }).success).toBe(false);
+    expect(parse("upsert_customer", customer).success).toBe(false);
+    expect(parse("upsert_customer", { ...customer, state: "PA" }).success).toBe(true);
+    expect(parse("upsert_customer", { ...customer, country: "CN", state: "PA" }).success).toBe(false);
+    expect(parse("upsert_customer", { ...customer, country: "XX" }).success).toBe(false);
+    expect(parse("upsert_customer", { ...customer, country: "CN", alias: "  " }).success).toBe(false);
+  });
+  it("upsert_ship_to outside the US needs only a label; a US one keeps its address and ZIP rules", () => {
+    const shipTo = { customerId: crypto.randomUUID(), label: "Main" };
+    expect(parse("upsert_ship_to", { ...shipTo, country: "JP" }).success).toBe(true);
+    expect(parse("upsert_ship_to", { ...shipTo, country: "JP", zip: "100-0001" }).success).toBe(true);
+    expect(parse("upsert_ship_to", shipTo).success).toBe(false);
+    expect(parse("upsert_ship_to", { ...shipTo, address1: "1 Main", city: "Phila", state: "PA", zip: "19107" }).success).toBe(true);
+    expect(parse("upsert_ship_to", { ...shipTo, address1: "1 Main", city: "Phila", state: "PA", zip: "100-0001" }).success).toBe(false);
+  });
+  it("saves a foreign customer and ship-to with an alias; list_customers q matches the name or the alias", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const c = await runCommand("upsert_customer", { name: `Tavour ${tag}`, alias: `Nano Wine ${tag}`, type: "retailer", state: "WA", saleChannelId: wholesale }, ctx) as { id: string; alias: string };
+    expect(c.alias).toBe(`Nano Wine ${tag}`);
+    const jp = await runCommand("upsert_customer", { name: `Unusual ${tag}`, type: "distributor", country: "JP", saleChannelId: wholesale }, ctx) as { id: string; country: string; state: string | null };
+    expect(jp).toMatchObject({ country: "JP", state: null });
+    const st = await runCommand("upsert_ship_to", { customerId: jp.id, label: "Main", country: "JP" }, ctx) as { country: string; city: string | null };
+    expect(st).toMatchObject({ country: "JP", city: null });
+    const ids = async (q: string) => (await runCommand("list_customers", { q }, ctx) as { id: string }[]).map(r => r.id);
+    expect(await ids(`nano wine ${tag}`)).toEqual([c.id]);
+    expect(await ids(`Tavour ${tag}`)).toEqual([c.id]);
+    expect(await ids(tag)).toEqual([c.id, jp.id]);
+    expect(await ids(`${tag}%`)).toEqual([]);
+  });
 });
