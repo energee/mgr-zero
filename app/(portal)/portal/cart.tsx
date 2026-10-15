@@ -92,7 +92,8 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
         if ("orderId" in next.input) setDraftId(next.input.orderId ?? null);
       });
       setAttempt(null);
-      // A new cart's stored copy is cleared even when this success finishes a request recovered after a reload.
+      // `!initial`, not `keepWorking`: a request recovered after a reload came
+      // from a new cart whose stored copy must also go once it succeeds.
       if (!initial) clearWorkingCart(() => localStorage, scope);
       router.push(`/portal/orders/${id}`);
     } catch (err) {

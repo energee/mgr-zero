@@ -73,6 +73,8 @@ export function storePortalAttempt(storage: Pick<Storage, "setItem">, attempt: P
 export const WORKING_CART_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const workingCartKey = (s: PortalScope) => `mgr-portal-cart:${s.actorId}:${s.customerId}:${s.breweryId}`;
 type WorkingFields = Omit<PortalFields, "lines">;
+/** A getter, not the storage itself: reading the `localStorage` global can
+ *  throw (blocked storage, no window), and the getter runs inside each try. */
 type CartStorage = () => Pick<Storage, "getItem" | "setItem" | "removeItem">;
 const workingCartSchema = z.object({
   savedAt: z.number(),
