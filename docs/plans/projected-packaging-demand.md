@@ -19,7 +19,7 @@ scheduled.
 |---|---|---|
 | `material_requirements` view (latest) | `supabase/migrations/20260928040000_unstarted_plans.sql:228` | Gains a third demand source and one appended column. Planning, Today's count (`lib/commands/landings.ts:78`) and the draft RPC read it unchanged. |
 | Run → BOM demand math | same view, second `union all` branch | Generalised, not copied: runs and projected units feed one `sku_units` list, and one BOM join turns it into material (`ceil` per row for `each` materials, as a close draws). |
-| `atp` view (on hand less open allocations) | `00001_baseline.sql:2210` | Order shortfall is a negative `atp`. Planning's screen already names "Hazy ATP negative". |
+| `atp` view (on hand less open allocations) | `00001_baseline.sql:2210` | A negative `atp` bounds the order shortfall. It nets order and taproom standing allocations alike, so the shortfall caps it at open order quantity (D3). Planning's screen already names "Hazy ATP negative". |
 | `format_bom`, `format_volumes` | `00001_baseline.sql:418` | Units per SKU and material per unit. |
 | `packaging_runs.batch_id` | `20261014100400_historical_packaging.sql:7` | One of the two links that make a run "the batch's run". The other is `occupancy_id → vessel_occupancies.batch_id`. |
 | `draft_purchase_order_from_requirements` | `00001_baseline.sql:5885` | Reads `select *` from the view, so projected rows draft with no change. |
@@ -61,10 +61,15 @@ Each has a recommended default (the simplest that works) and an alternative.
 - **Known gap:** a run scheduled without a tank references no batch, so both
   count until the tank is picked. **Alternative:** subtract open tankless runs'
   planned units of the same SKU from projected batch units.
-- **Orders (recommended):** order shortfall per SKU is open allocations beyond
-  on hand (negative `atp`), less planned units on open packaging runs. In
-  Phase B it is also less projected batch units of that SKU. It drops out as
-  stock or a run covers it.
+- **Orders (recommended):** order shortfall per SKU is the smaller of the
+  negative `atp` and the SKU's open `order_line` allocations, less planned
+  units on open packaging runs. In Phase B it is also less projected batch
+  units of that SKU. It drops out as stock or a run covers it.
+- **Taproom standing allocations** (`source = 'taproom_standing'`, set from a
+  par with no order) never project on their own. They still hold stock, as
+  `atp` already says, so they are served before orders: on hand 100, standing
+  50, orders 80 projects 30. A SKU short only on standing allocations projects
+  nothing. **Alternative:** project standing shortfall too, needed-by today.
 
 ### D4. Marking and drafting
 
@@ -92,26 +97,30 @@ before writing. Today it is `20261014120000_price_group_barcodes.sql`.
 
 ```sql
 -- #869 Phase A: confirmed orders beyond stock project packaging demand.
--- One row per short SKU: units no stock and no open run covers, and the
--- earliest requested ship date. Definer so brewers (who cannot read orders)
--- see the same Planning; atp keeps it to the caller's breweries.
+-- One row per short SKU: order units no stock and no open run covers, and
+-- the earliest requested ship date. atp also nets taproom standing
+-- allocations, so the shortfall is capped at open order quantity: standing
+-- par alone never projects. Definer so brewers (who cannot read orders) see
+-- the same Planning; atp keeps it to the caller's breweries.
 create function public.order_packaging_shortfall_rows()
 returns table (brewery_id uuid, sku_id uuid, units numeric, needed_by date)
 language sql stable security definer set search_path = '' as $$
-  select a.brewery_id, a.sku_id, -a.qty - coalesce(p.qty, 0),
-         coalesce((select min(o.requested_ship_date)
-                   from public.allocations al
-                   join public.order_lines ol on ol.id = al.ref
-                   join public.orders o on o.id = ol.order_id
-                   where al.brewery_id = a.brewery_id and al.sku_id = a.sku_id
-                     and al.source = 'order_line' and al.status = 'open'), current_date)
+  select a.brewery_id, a.sku_id, least(-a.qty, ord.qty) - coalesce(p.qty, 0),
+         coalesce(ord.ship_on, current_date)
   from public.atp a
+  join (
+    select al.brewery_id, al.sku_id, sum(al.qty) as qty, min(o.requested_ship_date) as ship_on
+    from public.allocations al
+    join public.order_lines ol on ol.id = al.ref
+    join public.orders o on o.id = ol.order_id
+    where al.source = 'order_line' and al.status = 'open' group by 1, 2
+  ) ord on ord.brewery_id = a.brewery_id and ord.sku_id = a.sku_id
   left join (
     select r.brewery_id, o.sku_id, sum(o.qty_planned) as qty
     from public.packaging_runs r join public.packaging_run_outputs o on o.run_id = r.id
     where r.closed_at is null and r.cancelled_at is null group by 1, 2
   ) p on p.brewery_id = a.brewery_id and p.sku_id = a.sku_id
-  where -a.qty > coalesce(p.qty, 0);
+  where least(-a.qty, ord.qty) > coalesce(p.qty, 0);
 $$;
 revoke all on function public.order_packaging_shortfall_rows() from public, anon, authenticated, service_role;
 grant execute on function public.order_packaging_shortfall_rows() to authenticated;
@@ -214,6 +223,9 @@ with `bun run migrations:lock` and `bun run types:database`.
        `projected` = `required` and `needed_by` = the requested ship date.
      - Scheduling a run with those units removes the projected part.
      - Receiving stock removes it.
+     - A taproom standing allocation beyond stock, with no order, gives no row.
+     - On hand 100, standing 50, an order of 80 projects 30; with on hand 0,
+       standing 50 and an order of 10, it projects 10, not 60.
      - A brewer reads the same row as an admin.
      - An admin of another brewery reads nothing.
    - Accept: the test file and `tests/rpc-allowlist.test.ts` pass; `tests/packaging.test.ts`,
