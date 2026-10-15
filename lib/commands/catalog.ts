@@ -331,13 +331,17 @@ defineCommand({
   },
 });
 
+/** list_brands' sort orders; the Catalog page parses ?sort= with the same list. */
+export const BRAND_SORTS = ["name", "abv", "newest"] as const;
+
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
   input: z.object({
     q: z.string().trim().max(100).optional(),
-    sort: z.enum(["name", "abv", "newest"]).optional(),
-    category: z.string().trim().min(1).optional(),
+    sort: z.enum(BRAND_SORTS).optional(),
+    // "" means every category, so a page can pass its URL params straight through.
+    category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
     let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId);
@@ -347,11 +351,10 @@ defineQuery({
       brands = brands.or(`name.ilike.${pattern},alias.ilike.${pattern}`);
     }
     if (i.category) brands = brands.eq("category", i.category);
-    const sorted = i.sort === "abv" ? brands.order("abv", { ascending: false, nullsFirst: false }).order("name")
-      : i.sort === "newest" ? brands.order("created_at", { ascending: false }).order("name")
-      : brands.order("name");
+    if (i.sort === "abv") brands = brands.order("abv", { ascending: false, nullsFirst: false });
+    if (i.sort === "newest") brands = brands.order("created_at", { ascending: false });
     const [rows, pours] = await Promise.all([
-      unwrap(sorted),
+      unwrap(brands.order("name")), // name orders the list, or breaks ties in the sort above
       completeRows("Pour list", start => ctx.db.from("formats").select("id, name, ounces, price_group_id", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("basis", "poured").order("name").order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const byGroup = Map.groupBy(pours as { price_group_id: string }[], (pour) => pour.price_group_id);

@@ -54,7 +54,7 @@ beforeEach(() => { state.role = "admin"; state.calls = []; });
 it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
-  expect(state.brandInput).toEqual({ q: undefined, sort: "name", category: undefined });
+  expect(state.brandInput).toEqual({ q: "", sort: "name", category: "" });
   const html = render(page);
   // Packages and pours are one tap further, on the brand's SKU list.
   for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);

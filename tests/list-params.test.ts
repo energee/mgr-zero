@@ -25,4 +25,8 @@ describe("listParams", () => {
     expect(hrefWith("/catalog", { sort: "name" })).toBe("/catalog?q=hazy");
     expect(hrefWith("/catalog", { q: "", sort: "name" })).toBe("/catalog");
   });
+  it("queryWith gives the same params as entries, for a form's hidden inputs", () => {
+    const { queryWith } = listParams(schema, { q: "hazy", sort: "abv", category: "Core" });
+    expect(Object.fromEntries(queryWith({ q: "" }))).toEqual({ sort: "abv", category: "Core" });
+  });
 });
