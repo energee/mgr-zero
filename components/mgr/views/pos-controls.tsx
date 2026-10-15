@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
@@ -53,20 +53,41 @@ export function SquareDisconnectControl({ connectionId, status }: { connectionId
     onDisconnect={() => void action.run("disconnect_square", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/pos/connect") : router.refresh(), { refresh: false })} />;
 }
 
+type ExactCommand = ReturnType<typeof useExactCommand>;
+
+/** A result a screen reader should hear without being interrupted: plain text in a
+ *  polite region that stays mounted, so the announcement fires when text appears. */
+function StatusText({ text }: { text: string | null }) {
+  return <div role="status">{text && <p className="text-sm text-muted-foreground">{text}</p>}</div>;
+}
+
+/** Each sync's outcome: a completed sync reads out in the status region; a
+ *  superseded or failed sync stays an E.note alert, since it asks for action. */
+export function SyncFeedback({ runs }: { runs: [kind: string, action: ExactCommand][] }) {
+  const done: string[] = [], problems: string[] = [];
+  for (const [kind, action] of runs) {
+    const result = syncResultMessage(kind, action.result, action.requestId);
+    const superseded = (action.result as Record<string, unknown> | null)?.superseded === true;
+    if (result && !superseded) done.push(result);
+    else {
+      const problem = result ?? syncFailureMessage(kind, action.failure, action.requestId);
+      if (problem) problems.push(problem);
+    }
+  }
+  return <>
+    <StatusText text={done.join(" · ") || null} />
+    {problems.map(problem => <Fragment key={problem}>{E.note(problem)}</Fragment>)}
+  </>;
+}
+
 export function SquareSyncControls() {
   const catalog = useExactCommand(), sales = useExactCommand();
-  const summary = (kind: string, action: ReturnType<typeof useExactCommand>) => {
-    const result = syncResultMessage(kind, action.result, action.requestId);
-    if (result) return action.result && (action.result as Record<string, unknown>).superseded === true ? E.note(result) : E.info(result);
-    const message = syncFailureMessage(kind, action.failure, action.requestId);
-    return message ? E.note(message) : null;
-  };
   return <PosSyncActions catalogBusy={catalog.busy} salesBusy={sales.busy}
     catalogLabel={catalog.failure?.kind === "unknown" ? "Retry exact catalog sync" : "Sync Square catalog"}
     salesLabel={sales.failure?.kind === "unknown" ? "Retry exact sales sync" : "Sync Square sales"}
     onCatalog={() => void catalog.run("sync_square_catalog", {}, shouldStartNewCommandAttempt(catalog.result, catalog.failure))}
     onSales={() => void sales.run("sync_square_sales", {}, shouldStartNewCommandAttempt(sales.result, sales.failure))}
-    feedback={<>{summary("Catalog", catalog)}{summary("Sales", sales)}</>} />;
+    feedback={<SyncFeedback runs={[["Catalog", catalog], ["Sales", sales]]} />} />;
 }
 
 export function SquareLocationsControl({ rows, locations }: { rows: PosLocationRow[]; locations: { id: string; name: string }[] }) {
@@ -91,16 +112,20 @@ export function PosMappingControl({ variations, targets, sales, coverage, canSyn
     }} />;
 }
 
-function PublicationResult({ action, onRetry, onCorrected }: { action: ReturnType<typeof useExactCommand>; onRetry: () => void; onCorrected: () => void }) {
-  if (!action.requestId) return null;
+/** A publication's outcome. A confirmed publish reads out in the always-mounted
+ *  status region; any other outcome stays an E.note alert with its retry verbs. */
+export function PublicationResult({ action, onRetry, onCorrected }: { action: ExactCommand; onRetry: () => void; onCorrected: () => void }) {
   const outcome = readPublicationOutcome(action.result);
-  if (!outcome && action.failure?.kind !== "unknown") return null;
   const status = outcome?.status ?? "prepared";
-  const notice = publicationNotice({ requestId: outcome?.attemptId ?? action.requestId, status, errorCode: outcome?.errorCode });
+  const notice = action.requestId && (outcome || action.failure?.kind === "unknown")
+    ? publicationNotice({ requestId: outcome?.attemptId ?? action.requestId, status, errorCode: outcome?.errorCode })
+    : null;
+  const text = notice && `${notice.label} · ${notice.detail}`;
   return <div className="flex flex-col gap-2">
-    {notice.tone === "success" ? E.info(`${notice.label} · ${notice.detail}`) : E.note(`${notice.label} · ${notice.detail}`)}
-    {notice.retry && <Button variant="outline" disabled={action.busy} onClick={onRetry}>Retry exact attempt</Button>}
-    {(status === "rejected" || status === "superseded") && <Button variant="outline" disabled={action.busy} onClick={onCorrected}>Start corrected attempt</Button>}
+    <StatusText text={notice?.tone === "success" ? text : null} />
+    {notice && notice.tone !== "success" && E.note(text)}
+    {notice?.retry && <Button variant="outline" disabled={action.busy} onClick={onRetry}>Retry exact attempt</Button>}
+    {notice && (status === "rejected" || status === "superseded") && <Button variant="outline" disabled={action.busy} onClick={onCorrected}>Start corrected attempt</Button>}
   </div>;
 }
 

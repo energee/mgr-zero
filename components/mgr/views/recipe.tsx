@@ -77,7 +77,9 @@ export function RecipeView({
       {schedule(model.fermentation, slots.fermentation)}
       {schedule(model.water, slots.water)}
       {E.edit("Notes", model.notes ?? "", "text", undefined, bind("notes"))}
-      {model.predicted ? E.info(model.predicted) : null}
+      {/* Always mounted and polite: the prediction changes as the draft is typed,
+          and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
+      <div role="status">{model.predicted ? <p className="text-sm text-muted-foreground">{model.predicted}</p> : null}</div>
       {E.tape(model.tape ?? [])}
       {model.actualsNote ? E.note(model.actualsNote) : null}
       {controls ? (
