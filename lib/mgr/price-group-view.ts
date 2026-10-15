@@ -6,7 +6,7 @@
 // under the last group's ceiling, no Prices line.
 import { dollarsInput, money } from "./money";
 import { plural } from "./plural";
-import { byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
+import { barcodeOf, byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
   backHref?: string;
@@ -64,7 +64,7 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
       })),
       barcodes: snapshot.formats.filter((f) => f.basis !== "poured").map((f) => ({
         formatId: f.id, format: formatLabel(f),
-        upc: snapshot.barcodes?.find((b) => b.price_group_id === group.id && b.format_id === f.id)?.upc ?? "",
+        upc: barcodeOf(snapshot.barcodes, group.id, f.id) ?? "",
       })),
     }),
   };

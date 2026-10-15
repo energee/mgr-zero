@@ -8,6 +8,7 @@ import { SkuListView } from "@/components/mgr/views/sku-list";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
@@ -28,8 +29,8 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
     // rows' format names and the New SKU picker.
     runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>,
     canWrite ? runCommand("list_keg_pools", {}, ctx) as Promise<KegPoolOption[]> : Promise.resolve([]),
-    // Group codes are an admin/sales read (list_price_group_barcodes); other roles see only a SKU's own UPC.
-    canWrite ? runCommand("list_price_group_barcodes", {}, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve([]),
+    // Group codes follow list_price_group_barcodes' own role gate; a role without it sees only a SKU's own UPC.
+    canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", {}, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
   ]);
   const brand = brands.find((b) => b.id === id) ?? notFound();
   const formatById = new Map(formats.map((f) => [f.id, f]));
@@ -37,7 +38,7 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const options: FormatOption[] = formats.map((f) => ({ id: f.id, name: f.name, package_type: f.package_type }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes: barcodes.filter((b) => b.price_group_id === brand.price_group_id), backHref: `/catalog/brands/${id}` })}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, backHref: `/catalog/brands/${id}` })}
       createAction={canWrite ? <SkuForm brandId={id} formats={options} pools={pools} /> : null}
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {

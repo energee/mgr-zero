@@ -16,7 +16,7 @@ export function BarcodeForm({ priceGroupId, groupName, formatId, format, upc }: 
 }) {
   const [value, setValue] = useState(upc);
   const form = useCommandForm("set_price_group_barcode", {
-    build: () => ({ priceGroupId, formatId, upc: value.trim() || null }),
+    build: () => ({ priceGroupId, formatId, upc: value || null }),
     reset: () => setValue(upc),
     target: `${priceGroupId}:${formatId}`,
   });

@@ -52,6 +52,10 @@ export type PriceGroupsSnapshot = {
 
 export const cellKey = (channelId: string, groupId: string, formatId: string) => `${channelId}|${groupId}|${formatId}`;
 
+/** A price group's UPC for one format, if it has one. A group-less brand has none. */
+export const barcodeOf = (barcodes: PriceGroupBarcode[] | undefined, groupId: string | null | undefined, formatId: string) =>
+  groupId ? barcodes?.find((b) => b.price_group_id === groupId && b.format_id === formatId)?.upc : undefined;
+
 /** A format column's label: "Hazy · ½ bbl keg" when the format belongs to a brand. */
 export const formatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;
 

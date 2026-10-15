@@ -3,7 +3,7 @@
 import type { EmptyState } from "./empty-state";
 import { formatVolume } from "@/lib/volume";
 import { effectiveBbl } from "./format-view";
-import type { PriceGroupBarcode } from "./price-groups-view";
+import { barcodeOf, type PriceGroupBarcode } from "./price-groups-view";
 
 export type SkuListRowView = {
   key: string;
@@ -22,7 +22,7 @@ export type SkuListViewModel = {
 };
 
 export type SkuListSnapshot = {
-  brand: { id: string; name: string };
+  brand: { id: string; name: string; price_group_id?: string | null };
   skus: {
     id: string;
     name: string;
@@ -33,22 +33,21 @@ export type SkuListSnapshot = {
     formats: { package_type?: string | null; name: string; bbl_per_unit: string | number | null; effective_bbl_per_unit?: string | number | null } | null;
   }[];
   pours?: { id: string; name: string; ounces: number | string }[];
-  /** The brand's price group codes (list_price_group_barcodes, filtered to its group). */
-  barcodes?: Pick<PriceGroupBarcode, "format_id" | "upc">[];
+  /** list_price_group_barcodes; the brand's group picks its own. Absent for a role that cannot read them. */
+  barcodes?: PriceGroupBarcode[];
   backHref?: string;
 };
 
 /**
- * A SKU's barcode: its own UPC when set (an override, spec D2 amended
- * 2026-10-14), else its price group's code for its format, else none.
+ * The SKU row's barcode part: its own UPC when set (an override, spec D2
+ * amended 2026-10-14), else its price group's code for its format, else none.
  */
-export function skuBarcode(sku: { upc?: string | null; format_id: string }, barcodes: Pick<PriceGroupBarcode, "format_id" | "upc">[]): { upc: string; override: boolean } | null {
-  if (sku.upc) return { upc: sku.upc, override: true };
-  const group = barcodes.find((b) => b.format_id === sku.format_id);
-  return group ? { upc: group.upc, override: false } : null;
+function barcodeDetail(upc: string | null | undefined, groupUpc: string | undefined) {
+  if (upc) return `UPC ${upc} (SKU override)`;
+  return groupUpc && `UPC ${groupUpc}`;
 }
 
-export function toSkuListViewProps({ brand, skus, pours = [], barcodes = [], backHref }: SkuListSnapshot): SkuListViewModel {
+export function toSkuListViewProps({ brand, skus, pours = [], barcodes, backHref }: SkuListSnapshot): SkuListViewModel {
   return {
     backHref,
     title: `${brand.name} · SKUs`,
@@ -57,11 +56,10 @@ export function toSkuListViewProps({ brand, skus, pours = [], barcodes = [], bac
       const bbl = s.formats ? effectiveBbl(s.formats) : null;
       const volume = bbl != null ? formatVolume(bbl) : "—";
       const warn = s.formats?.package_type === "keg" && !s.keg_pool_id;
-      const code = skuBarcode(s, barcodes);
       return {
         key: s.id,
         title: s.formats?.name ?? s.name,
-        detail: [volume, s.active ? "active" : "inactive", code && `UPC ${code.upc}${code.override ? " (SKU override)" : ""}`, warn && "No keg pool, no deposit"].filter(Boolean).join(" · "),
+        detail: [volume, s.active ? "active" : "inactive", barcodeDetail(s.upc, barcodeOf(barcodes, brand.price_group_id, s.format_id)), warn && "No keg pool, no deposit"].filter(Boolean).join(" · "),
         warn,
         href: "/catalog",
       };
