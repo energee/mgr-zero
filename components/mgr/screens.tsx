@@ -323,7 +323,7 @@ const SALT_OPTIONS: SaltMaterial[] = [
 ];
 /** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
 const WATER_HAZY: WaterDraft = {
-  targetProfileId: "hazy", sourceProfileId: "", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
+  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
   additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
@@ -2117,7 +2117,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles, which this sheet links to"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggestions locked", "post-v1 scope; Suggest additions and the ion read-out stay locked until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
     spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Source water opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are locked here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
     body: (<>
-      <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} sourceDefault={WATER_PROFILE_OPTIONS.find((p) => p.id === "denver")!.ions} />
+      <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
     </>),
   },
   {

@@ -85,10 +85,11 @@ describe("SCREENS", () => {
     expect(catalogText).toContain("Water profiles");
   });
 
-  it("gives water one stage axis and a brewery-default source", () => {
+  it("gives water one stage axis and a source picked from Water profiles", () => {
     const water = text("Water");
     expect(water).toContain("Gypsum");
-    expect(water).toMatch(/brewery default/);
+    expect(water).toContain("Municipal · Denver");
+    expect(water).not.toMatch(/brewery default/);
     expect(water).toContain("Target mash pH");
     // Spec D7: one stage axis. The addition sheet asks where a salt goes once,
     // never a timing and a target that can contradict each other.

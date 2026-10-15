@@ -43,6 +43,11 @@ describe("WaterView", () => {
     expect(out).toMatch(/<button[^>]* disabled=""[^>]*>Suggest additions/);
     expect(out).not.toMatch(/Against target/);
   });
+  it("an unpicked source reads No source", () => {
+    const out = html({ water: { ...draft, sourceProfileId: "" } });
+    expect(out).toContain("No source");
+    expect(out).not.toMatch(/brewery default/i);
+  });
   it("the enabled verb is a clickable action, the disabled one a plain disabled button", () => {
     expect(html({})).toMatch(/<button[^>]*>Suggest additions/);
     expect(html({})).not.toMatch(/<button[^>]* disabled=""[^>]*>Suggest additions/);

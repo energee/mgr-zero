@@ -1,19 +1,20 @@
 // components/mgr/views/water.tsx — Water (what a version starts from, aims
 // at, and what goes in it) and Water addition (one salt or acid). The source
-// profile is the brewery default unless the version overrides it.
+// is a Water profile the version picks; with none picked it reads "No source".
 "use client";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
-import type { Ions } from "@/lib/water-chemistry";
-import { rowVerbs, type ListRowProps } from "./mash-schedule";
+import { listRow, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
 
-export function WaterView({ title = "Water", water, profiles, materials, sourceDefault, chemistryKnown = false, profilesHref, onChange, onAdd, ...verbs }: {
-  title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; sourceDefault?: Ions;
+export function WaterView({ title = "Water", water, profiles, materials, back, chemistryKnown = false, profilesHref, onChange, onAdd, ...verbs }: {
+  title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[];
+  /** Replaces the whole header; the live sheet passes null because the sheet already says Water. */
+  back?: ReactNode;
   /** Live: the Water profiles page, opened in a new tab so the unsaved version draft survives. Brewer has no Catalog, so this row is Brewer's way in; inventory leaves it unlinked. */
   profilesHref?: string;
   /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
@@ -22,7 +23,7 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
 } & ListRowProps) {
   const name = (list: NamedOption[], id: string) => list.find((x) => x.id === id)?.name ?? id;
   const target = profiles.find((p) => p.id === water.targetProfileId)?.ions;
-  const source = water.sourceProfileId ? profiles.find((p) => p.id === water.sourceProfileId)?.ions : sourceDefault;
+  const source = profiles.find((p) => p.id === water.sourceProfileId)?.ions;
   const mashGal = Number(water.mashGal) || 0, spargeGal = Number(water.spargeGal) || 0;
   // A typed negative volume must never reach the formula (it throws by contract); the verb waits until the entry is corrected.
   const volumesOk = mashGal >= 0 && spargeGal >= 0 && mashGal + spargeGal > 0;
@@ -30,8 +31,8 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
   const chemistry = !chemistryKnown ? "gated" : target && source && volumesOk ? "ready" : "waiting";
   const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
-    {E.back("Recipe", title)}
-    {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "brewery default" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
+    {back !== undefined ? back : E.back("Recipe", title)}
+    {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "No source" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
     {E.pick("Target profile", water.targetProfileId, [{ value: "", label: "No target" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ targetProfileId: nextValue }) : undefined })}
     {/* A new tab: this sheet edits an unsaved version draft, and leaving the page would drop it. */}
     {profilesHref
@@ -43,7 +44,7 @@ export function WaterView({ title = "Water", water, profiles, materials, sourceD
     )}
     {E.edit("Target mash pH", water.targetMashPh, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ targetMashPh: nextValue }) : undefined, min: "4", max: "7", step: "0.01" })}
     {E.ttl("Salts and acids")}
-    {water.additions.map((a, i) => <div key={`${i}-${a.materialId}`}>{E.row(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, rowVerbs(i, water.additions.length, verbs))}</div>)}
+    {water.additions.map((a, i) => <Fragment key={`${i}-${a.materialId}`}>{listRow(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, i, water.additions.length, verbs)}</Fragment>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
     {chemistry === "gated"
       ? E.gated("Suggest additions", "salt suggestions are not part of this release")

@@ -2,17 +2,18 @@
 // temperatures and days a batch holds) and Fermentation stage (one of them).
 // Same shape as mash-schedule.tsx; the live sheet edits a draft version.
 "use client";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FERMENTATION_STAGE_KINDS } from "@/lib/mgr/enums";
 import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
-import { rowVerbs, type ListRowProps } from "./mash-schedule";
+import { listRow, type ListRowProps } from "./mash-schedule";
 
-export function FermentationScheduleView({ title = "Fermentation schedule", stages, dryHopDay, createAction, ...verbs }: { title?: string; stages: readonly FermentationStage[]; dryHopDay?: number; createAction?: ReactNode } & ListRowProps) {
+/** `back` replaces the whole header, as on MashScheduleView. */
+export function FermentationScheduleView({ title = "Fermentation schedule", stages, dryHopDay, back, ...verbs }: { title?: string; stages: readonly FermentationStage[]; dryHopDay?: number; back?: ReactNode } & ListRowProps) {
   return <>
-    {E.back("Recipe", title, createAction !== undefined ? createAction : E.btn("Add stage"))}
+    {back !== undefined ? back : E.back("Recipe", title, E.btn("Add stage"))}
     {stages.length === 0 ? E.blank({ title: "No stages yet", description: "Add stage is the only action." })
-      : stages.map((s, i) => <div key={`${i}-${s.name}`}>{E.row(s.name, `${s.tempF} °F · ${s.days} days`, rowVerbs(i, stages.length, verbs))}</div>)}
+      : stages.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, `${s.tempF} °F · ${s.days} days`, i, stages.length, verbs)}</Fragment>)}
     {stages.length > 0 && E.info(fermentationSummary(stages, dryHopDay))}
   </>;
 }

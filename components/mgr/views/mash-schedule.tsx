@@ -2,27 +2,36 @@
 // and Mash step (one rest). Inventory draws fixtures with no onChange; the
 // live sheet (recipes/[id]/mash-schedule-sheet.tsx) edits a draft version.
 "use client";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { MASH_STEP_KINDS } from "@/lib/mgr/enums";
-import { mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
+import { mashStepDetail, mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
 
 /** The verbs every ordered-list row carries: Edit, and move up or down while a draft is open. */
 export type ListRowProps = { onEdit?: (index: number) => void; onMove?: (index: number, by: -1 | 1) => void };
-export function rowVerbs(index: number, count: number, { onEdit, onMove }: ListRowProps) {
-  if (!onEdit) return E.act("Edit");
-  return <span className="flex gap-1">
-    {onMove && index > 0 && <button type="button" onClick={() => onMove(index, -1)} className="rounded px-2 text-sm text-muted-foreground hover:bg-muted" aria-label="Move up">↑</button>}
-    {onMove && index < count - 1 && <button type="button" onClick={() => onMove(index, 1)} className="rounded px-2 text-sm text-muted-foreground hover:bg-muted" aria-label="Move down">↓</button>}
-    {E.act("Edit", "primary", undefined, () => onEdit(index))}
-  </span>;
+
+/** One row of an ordered list. Live (`onEdit`), a tap anywhere on the row opens its editor, except a tap on one of its
+ *  buttons; the arrows and Edit carry the row title so a screen reader hears which row they move or open. Inventory
+ *  draws a plain Edit. `data-row-index` lets the sheet put focus back on the moved row. */
+export function listRow(title: string, detail: string, index: number, count: number, { onEdit, onMove }: ListRowProps) {
+  if (!onEdit) return E.row(title, detail, E.act("Edit"));
+  const arrow = (by: -1 | 1) => <Button type="button" variant="ghost" size="icon-sm" data-row-index={index} onClick={() => onMove!(index, by)} aria-label={`Move ${title} ${by < 0 ? "up" : "down"}`}>{by < 0 ? "↑" : "↓"}</Button>;
+  return <div onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) onEdit(index); }}>
+    {E.row(title, detail, <span className="flex gap-1">
+      {onMove && index > 0 && arrow(-1)}
+      {onMove && index < count - 1 && arrow(1)}
+      {E.act(<>Edit<span className="sr-only"> {title}</span></>, "primary", undefined, () => onEdit(index))}
+    </span>)}
+  </div>;
 }
 
-export function MashScheduleView({ title = "Mash schedule", steps, createAction, ...verbs }: { title?: string; steps: readonly MashStep[]; createAction?: ReactNode } & ListRowProps) {
+/** `back` replaces the whole header: the live sheet passes its Add button (the sheet already says the title), the inventory omits it. */
+export function MashScheduleView({ title = "Mash schedule", steps, back, ...verbs }: { title?: string; steps: readonly MashStep[]; back?: ReactNode } & ListRowProps) {
   return <>
-    {E.back("Recipe", title, createAction !== undefined ? createAction : E.btn("Add step"))}
+    {back !== undefined ? back : E.back("Recipe", title, E.btn("Add step"))}
     {steps.length === 0 ? E.blank({ title: "No steps yet", description: "Add step is the only action." })
-      : steps.map((s, i) => <div key={`${i}-${s.name}`}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.minutes} min`, rowVerbs(i, steps.length, verbs))}</div>)}
+      : steps.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, mashStepDetail(s), i, steps.length, verbs)}</Fragment>)}
     {E.info(mashSummary(steps))}
   </>;
 }
