@@ -51,7 +51,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
   useEffect(() => {
     // Save edits only: re-saving the restored cart would restart its 7-day clock on every visit.
     if (!keepWorking || (fields === untouched.current.fields && qty === untouched.current.qty)) return;
-    saveWorkingCart(() => localStorage, scope, { fields, qty }, items, Date.now());
+    saveWorkingCart(() => localStorage, scope, { fields, qty }, items);
   }, [keepWorking, scope, fields, qty, items]);
   const [draftId, setDraftId] = useState<string | null>(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId ?? null : initial?.draftId ?? null);
   const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
@@ -90,17 +90,21 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
       const id = await executePortalAttempt(active, sessionStorage, command, next => {
         active = next; setAttempt(next);
         if ("orderId" in next.input) setDraftId(next.input.orderId ?? null);
+        // Retire the browser-wide cart once the request is staged, before it is
+        // sent: the exact request lives only in this tab's sessionStorage, so a
+        // cart left behind would reopen elsewhere as unsent and invite a
+        // duplicate order. `!initial`, not `keepWorking`: a request recovered
+        // after a reload came from a new cart too.
+        if (!initial) clearWorkingCart(() => localStorage, scope);
       });
       setAttempt(null);
-      // `!initial`, not `keepWorking`: a request recovered after a reload came
-      // from a new cart whose stored copy must also go once it succeeds.
-      if (!initial) clearWorkingCart(() => localStorage, scope);
       router.push(`/portal/orders/${id}`);
     } catch (err) {
       // Only a definitive first refusal can unlock edits; a later refusal
       // cannot disprove an earlier uncertain success.
       if (err instanceof CommandResponseError && canRetireCommandFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
-        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); }
+        // A definitive refusal proves no order exists, so the unlocked cart is kept again.
+        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); if (keepWorking) saveWorkingCart(() => localStorage, scope, { fields, qty }, items); }
         catch { /* Keep the exact attempt if storage cannot retire it. */ }
       }
       setError(err instanceof Error ? err.message : "Order response could not be confirmed.");

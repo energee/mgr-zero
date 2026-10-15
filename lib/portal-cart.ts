@@ -82,7 +82,7 @@ const workingCartSchema = z.object({
   // The name is kept so a package later removed from the catalog can still be named in the notice.
   lines: z.array(z.object({ skuId: z.string(), name: z.string(), qty: z.string() })),
 });
-export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string> }, items: { skuId: string; name: string }[], now: number) {
+export function saveWorkingCart(storage: CartStorage, scope: PortalScope, cart: { fields: WorkingFields; qty: Record<string, string> }, items: { skuId: string; name: string }[], now = Date.now()) {
   const { shipToId, poNumber, note, requestedShipDate } = cart.fields;
   const lines = Object.entries(cart.qty).filter(([, qty]) => qty.trim()).map(([skuId, qty]) => ({ skuId, qty, name: items.find(i => i.skuId === skuId)?.name ?? skuId }));
   try { storage().setItem(workingCartKey(scope), JSON.stringify({ savedAt: now, fields: { shipToId, poNumber, note, requestedShipDate }, lines })); }
