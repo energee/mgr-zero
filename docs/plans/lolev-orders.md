@@ -236,7 +236,10 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - a customer in `JP` with no state saves; a `US` one without a state is refused;
      - a `JP` ship-to with only a label and country saves;
      - the alias saves, clears on omit, and `''` is refused;
-     - `import_csv_row` still creates a US customer (positional call).
+     - `import_csv_row` still creates a US customer (positional call);
+     - the QuickBooks customer push sends the country and no state for a
+       `JP` customer (find the push with `grep -rn bill_state lib/qbo*.ts`
+       first; v1 sent `Country`, `sync-utils.ts:220-227`).
    - Migration `20261016100000`; types `Customer`, `ShipTo` gain `alias: string | null`, `country: string`, nullable `state`.
    - Deps: none.
 2. **Customer commands, CSV and search.** `tests/commands-customers.test.ts` (extend), `tests/import-csv.test.ts` (extend).
@@ -298,6 +301,7 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
      - refused: no books date, on/after `books_opened_on`, a ship-to of another
        customer, a SKU of another brewery, `qty <= 0`, a non-admin;
      - `return_shipment` and `create_credit_memo` refuse its invoice;
+     - no notification row (order, invoice, chat) is written;
      - a replay returns the first result.
    - Migration `20261016100400`; command `record_historical_order` (admin,
      `lib/commands/orders.ts`). Staff guide: history (orders before the books
@@ -348,6 +352,48 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
 7. **Reported, not imported:** `In House` and `Customer TOTALS` blocks, empty
    blocks, any line with no price cell (for example an Export half), the
    `Check Invo` cell.
+
+Import safety, from v1's import of the same workbook
+(`~/Repos/mgr/scripts/migration/reconcile_beer_orders.py`):
+
+- **Deterministic request ids.** Each order's request id is derived from
+  (customer, pickup day), so a rerun replays instead of duplicating
+  (v1: `XLSX-<date>-<slug>`, `:577`).
+- **Dry run by default.** The pass prints what it would write. `--apply`
+  writes.
+- **Fail closed.** An unmapped customer or beer name stops the pass. It is not
+  skipped (v1 README: "unresolved workbook names fail closed").
+- **Refuse bad blocks.** Two blocks for one customer and day stop the pass
+  (v1 `:456-461`), as does a block with mixed pickup dates (v1 `:331`).
+
+## v1 cross-check (2026-10-15)
+
+v1 imported this workbook too. Nothing conflicts with a v1 decision. The
+findings:
+
+- **Historical orders.** v1 left about 200 pre-cutover orders `packed`, then
+  moved them to `cancelled`, so that "fulfilling them would fabricate keg
+  inventory transactions" (`cancel_historical_beer_orders.py:1-10`). v1
+  rejected a historical-fulfillment bypass (issue #425). v2 keeps the goal
+  (no fabricated stock) with a different state: shipped and invoiced, no
+  movements. A cancelled order hides the sale from customer history and
+  sales, which the user wants (invoices, 2026-10-15).
+- **Notification noise.** Cancelling those orders sent one high-priority
+  broadcast per order to every user (`PROGRESS.md:401`).
+  `record_historical_order` sends no order, invoice or chat notification.
+  Task 7 tests that no notification row is written.
+- **Customer names.** v1 kept suffixes ("Sixth City - Ohio",
+  `reconcile_beer_orders.py:38-63`). v2 keeps the name and moves the place to
+  country and state, per the user. v1's alias table agrees with the user's
+  grouping ("china" → Odyssey Club, the Sarenes together).
+- **Keg pools differ.** v1 put distribution keg lines on Microstar and the
+  internal rule on KegFleet (v1 `scripts/migration/README.md:80`). The user
+  said on 2026-10-15 that returnable kegs are on Lolev kegs and no customer
+  uses Kegfleet today. This plan follows the user. See the open question
+  below.
+- **QuickBooks customer push.** v1 sends `Country` with the address
+  (`src/integrations/quickbooks/sync-utils.ts:220-227`). v2's customer
+  push must send the country and allow no state. Task 1 tests it.
 
 ## Appendix: beer names decided by the user (2026-10-15)
 
@@ -402,6 +448,9 @@ Sour.
   each week as they do today.
 - **Country list.** Default: the full ISO alpha-2 list, shown by name ("Japan"),
   stored as the code.
+- **Keg pool for history.** Default: Lolev kegs, as the user said. v1 put
+  these same orders' distribution kegs on Microstar. History writes no keg
+  events, so the pool shows only on the SKU. Confirm before import.
 - **Unverified (user, "I think"):** all seven international customers are
   untaxpaid exports. Check against export paperwork before the first live
   export order ships; history is unaffected either way.
