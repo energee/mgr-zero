@@ -60,6 +60,8 @@ Run against Preview first, then Production:
 Record the account role, route, expected result, observed result, timestamp,
 and evidence link for every check. Use synthetic brewery/customer data.
 
+Smoke does not measure latency at pilot volumes; see the [pilot latency protocol](pilot-latency-protocol.md) (#728).
+
 ## Rollback and recovery
 
 - Application-only failure: promote the previous known-good Vercel deployment
