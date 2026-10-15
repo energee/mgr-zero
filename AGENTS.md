@@ -128,7 +128,7 @@ are normal work. Run them on the throwaway `mgr_test` stack
 | Task | Read first |
 | --- | --- |
 | Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
-| Setup, ports, dev login, env vars | `README.md` |
+| Setup, ports, dev login, env vars | `README.md`; operator runbooks (Slack, order email, hosted config, retention) in `docs/operations/` |
 | Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `content/docs/index.mdx` (Fumadocs, served at `/docs`); master chooser linking `staff-guide.mdx` and `portal-guide.mdx`; update the applicable guide with the behavior |
 | Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
