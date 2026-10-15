@@ -22,7 +22,6 @@ afterwards. Never paste keys, tokens, or full request headers into the issue.
 | 2026-09-30 | That diagnosis is historical; credits, model and deployed SHA must be re-checked | #329 review |
 
 Credits alone, or an HTTP 200 stream, do not close #329.
-The journey below must pass on a named environment and SHA.
 
 ## How the model is chosen (code)
 
@@ -53,7 +52,6 @@ In the Vercel dashboard, open the team that owns the MGR project, then
 Sign in to the hosted app as an admin of the test brewery.
 Open **More → Settings → AI model**, search, and choose a model.
 Select **Save AI model**. This writes only that brewery's setting.
-The 2026-09-20 error says free-tier access excludes the default model.
 Check the model's availability on the Vercel AI Gateway models page first.
 
 **C. Change the environment default.**
@@ -116,19 +114,11 @@ On Vercel that should not happen after #412; record it as a new finding.
 If any error shows raw JSON such as `{"error":"…"}`, record it.
 The 2026-09-20 retest saw this for a 503; it has not been re-checked since.
 
-## What to record
-
-- Environment, URL, and the full deployed SHA.
-- Date and time, with timezone.
-- Access path (A, B or C) and the model name.
-- Each journey row: pass or fail, and what was observed.
-- Screenshots, with keys, tokens, emails and customer data cropped out.
-- For any failure: the drawer message, and the matching function-log line
-  with secrets removed.
-
 ## Results table
 
-Copy this into a #329 comment and fill it in.
+Copy this into a #329 comment and fill it in. Use the full deployed SHA and
+give the date with its timezone. Crop keys, tokens, emails and customer data
+out of screenshots, and remove secrets from any function-log line.
 
 ```markdown
 ## Ask MGR hosted verification — <date>
