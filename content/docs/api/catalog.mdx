@@ -184,9 +184,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Every price group × packaged format UPC: each SKU on the group scans as its format's code unless it has its own
+Every price group × packaged format UPC; brandId keeps that brand's group's: each SKU on the group scans as its format's code unless it has its own
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

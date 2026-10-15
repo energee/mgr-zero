@@ -29,8 +29,9 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
     // rows' format names and the New SKU picker.
     runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>,
     canWrite ? runCommand("list_keg_pools", {}, ctx) as Promise<KegPoolOption[]> : Promise.resolve([]),
-    // Group codes follow list_price_group_barcodes' own role gate; a role without it sees only a SKU's own UPC.
-    canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", {}, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
+    // Only this brand's group's codes, under list_price_group_barcodes' own role
+    // gate; a role without it sees only a SKU's own UPC.
+    canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", { brandId: id }, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
   ]);
   const brand = brands.find((b) => b.id === id) ?? notFound();
   const formatById = new Map(formats.map((f) => [f.id, f]));

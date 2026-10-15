@@ -290,10 +290,21 @@ defineCommand({
 // The one barcode read, gated like its RLS (#770): the pricing page and a
 // brand's SKU list both call it.
 defineQuery({
-  name: "list_price_group_barcodes", description: "Every price group × packaged format UPC: each SKU on the group scans as its format's code unless it has its own",
+  name: "list_price_group_barcodes", description: "Every price group × packaged format UPC; brandId keeps that brand's group's: each SKU on the group scans as its format's code unless it has its own",
   roles: ["admin", "sales"],
-  input: z.object({}),
-  handler: (ctx) => completeRows("Barcode list", start => ctx.db.from("price_group_barcodes").select("price_group_id, format_id, upc", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("price_group_id").order("format_id").range(start, start + PAGE_SIZE - 1)),
+  input: z.object({ brandId: z.string().uuid().optional() }),
+  handler: async (ctx, i) => {
+    const groupId = i.brandId
+      ? ((await unwrap(ctx.db.from("brands").select("price_group_id").eq("id", i.brandId).maybeSingle())) as { price_group_id: string | null } | null)?.price_group_id
+      : undefined;
+    // A brand with no price group has no group barcodes.
+    if (i.brandId && !groupId) return [];
+    return completeRows("Barcode list", start => {
+      let q = ctx.db.from("price_group_barcodes").select("price_group_id, format_id, upc", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+      if (groupId) q = q.eq("price_group_id", groupId);
+      return q.order("price_group_id").order("format_id").range(start, start + PAGE_SIZE - 1);
+    });
+  },
 });
 
 defineCommand({

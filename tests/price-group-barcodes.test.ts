@@ -69,6 +69,16 @@ describe("reading barcodes", () => {
     await expect(runCommand("list_price_group_barcodes", {}, brewer)).rejects.toThrow();
   });
 
+  it("list_price_group_barcodes narrows to one brand's group in the query, none for a group-less brand", async () => {
+    await set({ upc: "850051366040" });
+    const other = await seedPriceGroup(breweryId, "Tier 2", 2);
+    const { brandId } = await seedCatalog(breweryId, { product: "Otra", sku: "Otra case", packageType: "can", priceGroupId: other });
+    await set({ priceGroupId: other, upc: "860009737631" });
+    expect(await runCommand("list_price_group_barcodes", { brandId }, sales)).toEqual([{ price_group_id: other, format_id: can, upc: "860009737631" }]);
+    const loose = (await seedCatalog(breweryId, { product: "Suelta", sku: "Suelta case", packageType: "can" })).brandId;
+    expect(await runCommand("list_price_group_barcodes", { brandId: loose }, sales)).toEqual([]);
+  });
+
   it("list_price_groups and list_brands stay lean: codes come only from list_price_group_barcodes", async () => {
     await set({ upc: "850051366040" });
     const groups = (await runCommand("list_price_groups", {}, sales)) as Record<string, unknown>[];
