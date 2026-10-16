@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role, timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/portal", () => {
   const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
   return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { role: state.role } }) };
@@ -66,7 +66,9 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   state.calls = []; state.gates = [];
   const page = await NewOrderPage();
   expect(page.type).toBe(NewOrderClient);
-  const form = NewOrderClient();
+  const form = NewOrderClient(page.props);
+  expect(form.props.timeZone).toBe("America/Los_Angeles");
+  expect(form.props.feedback.props.timeZone).toBe("America/Los_Angeles");
   expect(state.gates).toContainEqual(["create_order", "New order"]);
   expect(form.props.skus.map((s: { id: string }) => s.id)).toEqual(["active"]);
   expect(form.props.customers[0].shipTos[0].is_default).toBe(true);

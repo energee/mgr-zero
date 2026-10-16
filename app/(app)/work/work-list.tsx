@@ -16,9 +16,9 @@ const remembered = (): "all" | WorkKind => {
   try { const v = localStorage.getItem(KEY); return v && CHIPS.includes(v as WorkKind) ? (v as WorkKind) : "all"; } catch { return "all"; }
 };
 
-export function WorkList({ rows, defaults, subtitle, createAction, chips }: { rows: WorkRow[]; defaults: WorkKind[]; subtitle: string; createAction: ReactNode; chips: string[] }) {
+export function WorkList({ rows, defaults, createAction, chips }: { rows: WorkRow[]; defaults: WorkKind[]; createAction: ReactNode; chips: string[] }) {
   // The server renders "all"; the browser's remembered chip takes over after hydration.
   const chip = useSyncExternalStore(subscribe, remembered, () => "all");
   const pick = (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* no storage */ } listeners.forEach((fn) => fn()); };
-  return <WorkView model={{ ...workFromQuery(rows, subtitle, defaults), workChips: chips }} chip={chip} onChip={pick} createAction={createAction} />;
+  return <WorkView model={{ ...workFromQuery(rows, defaults), workChips: chips }} chip={chip} onChip={pick} createAction={createAction} />;
 }
