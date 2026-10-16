@@ -1,7 +1,7 @@
 // tests/recipe-gravity.test.ts — pins the one golden example for
 // recipeGravity by hand, per lib/recipe-gravity.ts's module comment. No DB.
 import { describe, expect, it } from "vitest";
-import { recipeGravity } from "../lib/recipe-gravity";
+import { gravityBlockers, recipeGravity } from "../lib/recipe-gravity";
 
 describe("recipeGravity", () => {
   it("computes OG/FG/ABV for a single mash-stage ingredient (hand-derived golden example)", () => {
@@ -85,5 +85,42 @@ describe("recipeGravity", () => {
           { perBblQty: 1, extractPotential: 1.04, stage: "mash", unit },
         ] })).toBeNull();
     }
+  });
+});
+
+// QW3: the recipe page says why a prediction is missing, so it needs the
+// reasons, not only recipeGravity's null. Index is the line's position in the
+// input array, so the page can point at the row.
+describe("gravityBlockers", () => {
+  const boil = { perBblQty: 1, extractPotential: null, stage: "boil", unit: "gal" };
+  const malt = { perBblQty: 10, extractPotential: 1.037, stage: "mash", unit: "lb" };
+  const gravity = (ingredients: Parameters<typeof gravityBlockers>[0]) =>
+    recipeGravity({ brewhouseEfficiency: 0.75, yeastAttenuation: 0.75, ingredients });
+
+  it("names a mash line with no extract potential", () => {
+    const ingredients = [malt, boil, { ...malt, extractPotential: null }];
+    expect(gravityBlockers(ingredients)).toEqual([{ index: 2, reason: "no_extract" }]);
+    expect(gravity(ingredients)).toBeNull();
+  });
+
+  it("names a mash line stocked by volume", () => {
+    const ingredients = [{ ...malt, unit: "gal" }, malt];
+    expect(gravityBlockers(ingredients)).toEqual([{ index: 0, reason: "no_weight" }]);
+    expect(gravity(ingredients)).toBeNull();
+  });
+
+  it("names both reasons on one line", () => {
+    const ingredients = [malt, { ...malt, extractPotential: undefined, unit: "each" }];
+    expect(gravityBlockers(ingredients)).toEqual([
+      { index: 1, reason: "no_extract" },
+      { index: 1, reason: "no_weight" },
+    ]);
+    expect(gravity(ingredients)).toBeNull();
+  });
+
+  it("is empty when every mash line is predictable, and ignores other stages", () => {
+    const ingredients = [malt, boil];
+    expect(gravityBlockers(ingredients)).toEqual([]);
+    expect(gravity(ingredients)).not.toBeNull();
   });
 });

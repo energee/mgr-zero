@@ -1,5 +1,6 @@
-// components/mgr/views/recipes.tsx — Recipes list. Live slots the header
-// (no More back); inventory draws Create recipe and Review.
+// components/mgr/views/recipes.tsx — Recipes list. Each row opens its recipe;
+// live slots the header (no More back) and passes row hrefs; inventory draws
+// Create recipe and leaves the rows for the explorer to resolve.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipesViewModel } from "@/lib/mgr/recipes-view";
@@ -22,7 +23,7 @@ export function RecipesView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}
+            {E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, row.href)}
           </Fragment>
         ))}
     </>

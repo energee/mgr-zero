@@ -14,7 +14,7 @@ export function SettingsForm({ brewery }: { brewery: BrewerySettings }) {
     initial={{ name: brewery.name, timezone: brewery.timezone, ttb: brewery.ttb_registry_no ?? "", pa: brewery.pa_license_no ?? "", phone: brewery.customer_phone ?? "", hours: String(brewery.fermentation_reading_due_hours), booksOpenedOn: brewery.books_opened_on ?? "", oneWayKegFee: dollarsInput(brewery.one_way_keg_fee_cents) }}
     busy={action.busy} error={action.error}
     onSave={(v) => {
-      // The books-opened date (refused after a filed period) and the one-way keg fee
+      // The books-opened date (frozen after any filed snapshot) and the one-way keg fee
       // each have their own command, so each runs only when changed, after the basics save.
       const books = booksOpenedChange(brewery.books_opened_on ?? "", v.booksOpenedOn);
       const fee = oneWayKegFeeChange(brewery.one_way_keg_fee_cents, v.oneWayKegFee);

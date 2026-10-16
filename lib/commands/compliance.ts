@@ -174,7 +174,7 @@ defineCommand({
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock, so it waits for any packaging close in progress",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock to wait for packaging closes and books-opened changes, rechecks the date, and fixes that reporting basis after the first filing",
   roles: [...ROLES],
   // A partial TTB range would claim days of a real period and block its filing (#486).
   input: period.extend({ note: z.string().optional() }).refine(

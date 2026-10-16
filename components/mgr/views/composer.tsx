@@ -1,18 +1,11 @@
-import type { Ref } from "react";
 import { sentenceCase } from "@/lib/mgr/labels";
 import Link from "next/link";
-import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
-import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
-import { Textarea } from "@/components/ui/textarea";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
 
-export { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
-
-export type ComposerStripAction = { value: string; label: string };
 export type OfflineOutboxRow = {
   id: string;
   label: string;
@@ -21,102 +14,6 @@ export type OfflineOutboxRow = {
   fixHref?: string;
   fixTo?: string;
 };
-export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
-
-/** Enter sends; Shift+Enter is a new line, and Enter that confirms an IME
- * candidate (Japanese, Chinese…) is the IME's, not a send. */
-export const isSendKey = (event: { key: string; shiftKey: boolean; nativeEvent: { isComposing: boolean } }) =>
-  event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing;
-
-// The conversation and its restored history open from the drawer handle
-// (Open / Expand Ask MGR); the strip used to draw a History button that
-// nothing wired (#446). Listing older conversations is a separate feature.
-export function ComposerStripView({
-  actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],
-  onAction,
-  onOutbox,
-  outboxCount = 0,
-  disabled = false,
-  promptRef,
-  value,
-  onChange,
-  onSubmit,
-  streaming = false,
-  onStop,
-}: {
-  actions?: ComposerStripAction[];
-  onAction?: (value: string) => void;
-  onOutbox?: () => void;
-  outboxCount?: number;
-  disabled?: boolean;
-  promptRef?: Ref<HTMLTextAreaElement>;
-  value?: string;
-  onChange?: (value: string) => void;
-  onSubmit?: (value: string) => void;
-  streaming?: boolean;
-  onStop?: () => void;
-}) {
-  return (
-      <form className="shrink-0" onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
-        <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
-          <Textarea
-            ref={promptRef}
-            aria-label="Ask MGR"
-            placeholder="Ask MGR about inventory, orders, production…"
-            disabled={disabled}
-            value={value}
-            onChange={onChange ? (event) => onChange(event.target.value) : undefined}
-            rows={2}
-            maxLength={4000}
-            className="min-h-14 resize-none border-0 bg-transparent px-3 py-2 shadow-none focus-visible:ring-0"
-            onKeyDown={onSubmit ? (event) => {
-              if (isSendKey(event)) {
-                event.preventDefault();
-                const message = value?.trim();
-                if (message) onSubmit(message);
-              }
-            } : undefined}
-          />
-          <InputGroupAddon align="block-end" className="flex-col items-stretch gap-1 px-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="flex flex-wrap gap-1">
-              {actions.map((action) => <Button key={action.value} type="button" variant="ghost" size="sm" disabled={disabled} onClick={onAction ? () => onAction(action.value) : undefined}>{action.label}</Button>)}
-            </span>
-            <span className="flex flex-wrap items-center justify-end gap-1">
-              <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
-              <span className="text-xs text-muted-foreground">Enter to send · Shift + Enter for a new line</span>
-              {streaming
-                ? <Button type="button" size="sm" variant="outline" onClick={onStop}>Stop response</Button>
-                : <Button type="submit" size="sm" disabled={disabled || !value?.trim()}>Send</Button>}
-            </span>
-          </InputGroupAddon>
-        </InputGroup>
-      </form>
-  );
-}
-
-export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat, onSetupRetry }: {
-  messages: ComposerConversationMessage[];
-  model?: string;
-  activity?: string;
-  error?: string;
-  onRetry?: () => void;
-  onNewChat?: () => void;
-  onSetupRetry?: () => void;
-}) {
-  return (
-    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
-        <Button type="button" size="sm" variant="ghost" onClick={onSetupRetry ?? onNewChat}>{onSetupRetry ? "Retry setup" : "New chat"}</Button>
-      </header>
-      <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
-        {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown>{message.content}</Streamdown> : message.content}</div>)}
-        {activity && <p className="text-sm text-muted-foreground">{activity}</p>}
-        {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
-      </div>
-    </section>
-  );
-}
 
 export function OfflineOutboxView({ rows, busy = false, notice, onDismissNotice, onRetry, onDiscard, onRetryAll, onDiscardAll }: {
   rows: OfflineOutboxRow[];

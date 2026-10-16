@@ -89,20 +89,44 @@ export function platoToSg(plato: number): number {
   return 1 + plato / (258.6 - (plato / 258.2) * 227.1);
 }
 
+/** Why one mash line stops the prediction: no extract potential, or a unit that is not a mass. */
+export type GravityBlocker = {
+  /** The line's position in the ingredients array passed in. */
+  index: number;
+  reason: "no_extract" | "no_weight";
+};
+
+/**
+ * Lists every mash-stage line that stops recipeGravity from predicting, so a
+ * page can say why there is no prediction instead of only hiding it. A
+ * null/undefined potential means nobody typed one on the material
+ * (recipe_ingredients.extract_snapshot is nullable), which is not "contributes
+ * nothing" — skipping it would under-predict OG with no sign of it, and
+ * defaulting it would invent one. A unit that is not a mass has no honest
+ * weight (#540). A line with both problems is listed twice, once per reason.
+ * An empty list does not promise a prediction: a bill with no mash line has
+ * no blockers and still predicts nothing.
+ */
+export function gravityBlockers(ingredients: RecipeGravityIngredient[]): GravityBlocker[] {
+  const blockers: GravityBlocker[] = [];
+  ingredients.forEach((ingredient, index) => {
+    if (ingredient.stage !== "mash") return;
+    if (ingredient.extractPotential == null) blockers.push({ index, reason: "no_extract" });
+    if (!LB_PER[ingredient.unit ?? ""]) blockers.push({ index, reason: "no_weight" });
+  });
+  return blockers;
+}
+
 /**
  * Predicts OG/FG/ABV from a recipe version's mash-stage ingredients, or null
- * when there is nothing honest to predict: no mash ingredient, or any mash
- * ingredient without an extract potential. A null/undefined potential means
- * nobody typed one on the material (recipe_ingredients.extract_snapshot is
- * nullable), which is not "contributes nothing" — skipping it would
- * under-predict OG with no sign of it, and defaulting it would invent one.
- * Callers hide the prediction on null rather than print 0.0 (#430). A mash
- * ingredient that truly bears no extract (rice hulls) is given 1.000.
- * A mash ingredient whose unit is not a mass also means no prediction (#540).
+ * when there is nothing honest to predict: no mash ingredient, or any
+ * gravityBlockers entry. Callers hide the prediction on null rather than print
+ * 0.0 (#430). A mash ingredient that truly bears no extract (rice hulls) is
+ * given 1.000.
  */
 export function recipeGravity(input: RecipeGravityInput): RecipeGravityResult | null {
   const mash = input.ingredients.filter((ingredient) => ingredient.stage === "mash");
-  if (mash.length === 0 || mash.some((ingredient) => ingredient.extractPotential == null || !LB_PER[ingredient.unit ?? ""])) return null;
+  if (mash.length === 0 || gravityBlockers(input.ingredients).length > 0) return null;
   const gravityUnits =
     mash.reduce(
       (sum, ingredient) =>
