@@ -2144,9 +2144,10 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
+    to: { "Reattribute loss": "Filed period needs amendment" },
     job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
     reads: "list_compliance_reports · get_loss_review",
-    writes: "none",
+    writes: "reattribute_loss",
     states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
     spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
