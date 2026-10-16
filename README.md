@@ -120,8 +120,8 @@ migration; it resets automatically when the migrations change. The app stack (`b
 survives a test run and stale test rows (see `chat-jobs`) cannot pile up there.
 Without `.env.test.local`, local vitest refuses to run. CI keeps its separately provisioned disposable configuration.
 
-Every run takes the shared `/tmp/mgr-test-db.lock`, then checks the newest local
-migration against SQL history. Local runs also compare the existing migration/config
+Every database-project run takes the shared `/tmp/mgr-test-db.lock`, then checks
+the newest local migration against SQL history. Local runs also compare the existing migration/config
 fingerprint and a per-reset identity through SQL and REST, before and after the suite.
 Reset readiness executes the newly installed identity RPC; an old readable table is
 not proof of a fresh PostgREST cache. These harness-only functions are installed only
@@ -129,6 +129,12 @@ on the disposable local stack, never by an application migration or on hosted.
 Their reserved `mgr_test_identity_<nonce>` signatures are removed structurally by
 `types:database`, so a local readiness probe never enters the committed app types.
 The diagnostic names expected/actual identities and the pinned DB/API endpoints.
+
+The explicit pure project in `vitest.config.mts` keeps the existing screen-only
+gates and pure harness regressions independent of the running database. Vitest
+routes the actual selected files: any mixed selection or unlisted/DB file still
+initializes the database project's lock and identity guard. There is no user-set
+flag to skip that protection.
 
 For an uninterrupted reset plus proof, keep the same exclusive lock throughout:
 

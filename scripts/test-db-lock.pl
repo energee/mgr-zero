@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 # scripts/test-db-lock.pl — the one lock around the shared local test database.
-# scripts/test-db.sh holds it exclusive while it resets; every vitest run holds
-# it shared (tests/test-db-lock.setup.ts). So a reset waits for running tests,
+# scripts/test-db.sh holds it exclusive while it resets; the database Vitest
+# project holds it shared (tests/test-db-lock.setup.ts). A reset waits for tests,
 # and a test run waits for a reset. flock is released by the kernel when the
 # holder exits, so a crash never leaves it held; perl and flock exist on macOS
 # and on the Linux CI runners alike.

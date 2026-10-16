@@ -7,9 +7,9 @@
 # untouched. CI skips this: it starts one fresh stack per run.
 #
 # Parallel sessions share this database. The reset runs under
-# scripts/test-db-lock.pl held exclusive, and every vitest run holds that lock
-# shared (tests/test-db-lock.setup.ts), so a reset never lands under a running
-# suite and a suite never starts mid-reset.
+# scripts/test-db-lock.pl held exclusive, and the database Vitest project holds
+# that lock shared (tests/test-db-lock.setup.ts), so a reset never lands under
+# database-backed suites and those suites never start mid-reset.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 # Lock startup and env publication too: start can rebuild a stopped stack.
