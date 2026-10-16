@@ -22,6 +22,8 @@ import { CycleCountView } from "@/components/mgr/views/cycle-count";
 import { PackagingMaterialActuals } from "@/components/mgr/views/packaging-materials";
 import { cycleCountCans } from "@/lib/mgr/fixtures/purchasing";
 import { CellarAdditionView } from "@/components/mgr/views/cellar-addition";
+import { FormatRowsView } from "@/components/mgr/views/format-rows";
+import { ChatLinkConsentView } from "@/components/mgr/views/chat";
 
 type ExactCommand = Parameters<typeof PublicationResult>[0]["action"];
 const command = (over: Partial<Record<string, unknown>>) =>
@@ -118,6 +120,12 @@ describe("hint roles", () => {
     const preview = renderToStaticMarkup(createElement(CellarAdditionView, { model: cellarAdditionCitra }));
     expect(cards(preview, "note")).toContain("Preview:");
     expect(cards(preview, "alert")).toBe("");
+  });
+
+  it("keeps format row validation and an unusable Slack link assertive", () => {
+    const rows = renderToStaticMarkup(createElement(FormatRowsView, { kind: "components", rows: [{ id: "can", qty: "0" }], options: [{ id: "can", name: "Can" }], valid: false, onChange: noop, confirmClear: false, onConfirmClear: noop }));
+    expect(cards(rows, "alert")).toContain("Choose a different item for each row");
+    expect(cards(renderToStaticMarkup(createElement(ChatLinkConsentView, { intent: null })), "alert")).toContain("This link is missing, expired");
   });
 
   it("RecipeView renders Predicted inside a polite status region, not an alert", () => {

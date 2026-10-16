@@ -191,7 +191,7 @@ export function ChatLinkConsentView({ intent, backHref, busy = false, error, onL
       {E.info(`Slack user ${intent.slackIdentity} in ${intent.workspace} will be linked to ${intent.mgrIdentity} in ${intent.brewery}.`)}
       {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
       <Button data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={busy} onClick={onLink}>Link accounts</Button>
-    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open MGR’s App Home in Slack and choose Link MGR account for a fresh link.")}
+    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open MGR’s App Home in Slack and choose Link MGR account for a fresh link.", "alert")}
     <CommandFormMessage error={error} />
     {E.btn("Back", "g", backHref)}
   </>;
