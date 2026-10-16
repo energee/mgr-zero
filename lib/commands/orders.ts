@@ -290,17 +290,20 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
+  name: "get_order", description: "One order with lines, keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
     if (!order) throw new CommandError("Order not found", 404, "not_found");
-    const [ln, events, shipment] = await Promise.all([
+    const [ln, events, shipment, deposits] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("shipments").select().eq("order_id", i.orderId).maybeSingle()),
+      completeRows("Order deposits", start => ctx.db.from("order_deposit_lines")
+        .select("id, order_line_id, description, qty_ordered, unit_price_cents, amount_cents", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     // Both aggregate views have one row per selected key. Restrict each request
     // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
@@ -312,7 +315,7 @@ defineQuery({
       inChunks(skuIds, async batch => (await unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)
         .eq("location_id", order.from_location_id).in("sku_id", batch))) ?? []),
     ]);
-    return { order, lines, events, shipment, atp, sourceOnHand };
+    return { order, lines, events, shipment, atp, sourceOnHand, deposits };
   },
 });
 

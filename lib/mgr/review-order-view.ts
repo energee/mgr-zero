@@ -15,6 +15,9 @@ export type PortalQuote = {
   destination: { id: string; label: string; address1: string; address2?: string | null; city: string; state: string; zip: string };
   lines: { skuId: string; name: string; product: string; qty: number; unitPriceCents: number; amountCents: number }[];
   deposits: { name: string; kegSize: string; qty: number; unitPriceCents: number; amountCents: number }[];
+  /** One-way kegs carry a non-refundable fee instead of a deposit; included in amountBeforeTaxCents. */
+  oneWayFees?: { name: string; qty: number; unitPriceCents: number; amountCents: number }[];
+  oneWayFeeCents?: number;
 };
 
 export type ReviewOrderLineView = {
@@ -38,6 +41,7 @@ export type ReviewOrderViewModel = {
   info: string;
   placeVerb: string;
   deposits?: { key: string; name: string; detail: string; amount: string }[];
+  oneWayFees?: { key: string; name: string; detail: string; amount: string }[];
   estimatedTotal?: string;
   note?: string;
 };
@@ -94,6 +98,7 @@ export function toQuotedReviewOrderViewProps(quote: PortalQuote, fields: { poNum
       qty: line.qty, qtyLabel: `${line.product} quantity`,
     })),
     deposits: quote.deposits.map((deposit, index) => ({ key: String(index), name: `${deposit.name} deposit`, detail: `Quantity ${deposit.qty} at ${money(deposit.unitPriceCents)}`, amount: money(deposit.amountCents) })),
+    oneWayFees: (quote.oneWayFees ?? []).map((fee, index) => ({ key: String(index), name: "One-way keg fee", detail: `${fee.name} · quantity ${fee.qty} at ${money(fee.unitPriceCents)}`, amount: money(fee.amountCents) })),
     depositDetail: "Quoted keg deposits",
     depositAmount: money(quote.depositCents),
     subtotal: money(quote.subtotalCents),

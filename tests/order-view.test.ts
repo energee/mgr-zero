@@ -28,6 +28,20 @@ describe("Order view loop", () => {
     expect(String(model.events.at(-1)?.[0])).toMatch(/lines adjusted/);
   });
 
+  it("lists keg charges: each deposit, and the one-way fee per one-way keg line (frozen at submit)", () => {
+    const lines = orderPickedRestock.lines.map((l) => l.id === "l-stout" ? { ...l, one_way_fee_cents: 1000 } : l);
+    const deposits = [{ order_line_id: "l-hazy", description: "Lolev kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];
+    const model = toOrderViewProps({ ...orderPickedRestock, lines, deposits });
+    expect(model.kegCharges).toEqual([
+      { key: "deposit-l-hazy", name: "Lolev kegs deposit", detail: "4 × $30.00 · $120.00" },
+      { key: "fee-l-stout", name: "One-way keg fee", detail: "Stout · ⅙ bbl keg · 2 × $10.00 · $20.00" },
+    ]);
+    expect(toOrderViewProps(orderPickedRestock).kegCharges).toEqual([]);
+    const html = renderToStaticMarkup(createElement(OrderView, { model, footer: null }));
+    expect(html).toContain("Keg charges");
+    expect(html).toContain("One-way keg fee");
+  });
+
   it("shows a line's shortage reason to staff (#624)", () => {
     const lines = orderPickedRestock.lines.map((l) => l.id === "l-pils" ? { ...l, short_reason: "one case crushed" } : l);
     const model = toOrderViewProps({ ...orderPickedRestock, lines });

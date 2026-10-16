@@ -1,8 +1,9 @@
 // tests/one-way-keg-fee.test.ts — a one-way keg (a keg SKU with no container
 // source) carries the brewery's one-way keg fee on its invoice, never a
 // deposit, and the fee is never refunded (docs/plans/lolev-orders.md task 6).
-// The fee is frozen onto the order line at ship, so either invoice writer
-// (ship_order now, confirm_delivery on delivery) bills the price shipped with.
+// The fee is frozen onto the order line at submit, like a keg deposit, so the
+// staff order page and either invoice writer (ship_order now, confirm_delivery
+// on delivery) show and bill the price the order was submitted with.
 import { describe, expect, it } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx, priceSku, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -65,6 +66,26 @@ describe("one-way keg fee", () => {
     expect(frozen.data).toEqual({ one_way_fee_cents: 1000 });
   });
 
+  it("freezes the fee on the line at submit, before the order ships", async () => {
+    const f = await setup(1000);
+    const { order_id: orderId } = await runCommand("create_order", {
+      kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.wh.id,
+      lines: [{ skuId: f.oneWaySku, qty: 2 }, { skuId: f.returnableSku, qty: 1 }],
+    }, f.adminCtx) as { order_id: string };
+    const fees = async () => (await admin.from("order_lines").select("sku_id, one_way_fee_cents").eq("order_id", orderId)).data!
+      .map(l => [l.sku_id === f.oneWaySku ? "one-way" : "returnable", l.one_way_fee_cents]).sort();
+    expect(await fees()).toEqual([["one-way", null], ["returnable", null]]);
+    await runCommand("submit_order", { orderId }, f.adminCtx);
+    expect(await fees()).toEqual([["one-way", 1000], ["returnable", null]]);
+    // A fee changed after submit does not reprice the order.
+    await runCommand("set_one_way_keg_fee", { feeCents: 1500 }, f.adminCtx);
+    await runCommand("confirm_order", { orderId }, f.adminCtx);
+    const lines = (await admin.from("order_lines").select("id, qty_ordered").eq("order_id", orderId)).data!;
+    await runCommand("record_pick", { orderId, picks: lines.map(l => ({ lineId: l.id, qty: Number(l.qty_ordered) })) }, f.adminCtx);
+    const shipped = await runCommand("ship_order", { orderId, invoiceTiming: "now", ship: lines.map(l => ({ lineId: l.id, qty: Number(l.qty_ordered) })) }, f.adminCtx) as { invoice_id: string };
+    expect((await invoiceLines(shipped.invoice_id)).filter(l => l.kind === "one_way_keg_fee").map(l => [l.qty, l.unit_price_cents])).toEqual([[2, 1000]]);
+  });
+
   it("gives a returnable sixtel its deposit and no fee", async () => {
     const f = await setup(1000);
     const s = await ship(f, [{ skuId: f.returnableSku, qty: 2 }]);
@@ -93,7 +114,7 @@ describe("one-way keg fee", () => {
     expect((await invoiceLines(s.invoiceId!)).map(l => l.kind)).toEqual(["sku"]);
   });
 
-  it("bills shipped less refused on delivery, at the fee frozen at ship", async () => {
+  it("bills shipped less refused on delivery, at the fee frozen at submit", async () => {
     const f = await setup(1000);
     const s = await ship(f, [{ skuId: f.oneWaySku, qty: 3 }], "on_delivery");
     expect(s.invoiceId).toBeNull();
