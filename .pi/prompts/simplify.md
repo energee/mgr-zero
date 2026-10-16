@@ -15,4 +15,6 @@ can't explain") and simplify whatever fails it. Preserve APIs, behavior,
 error semantics, security checks, domain terms, and comments that explain why.
 Do not touch schemas, dependencies, or generated files. Ask before any change
 that needs a design or behavior decision. Then run
-`bun run test && bunx tsc --noEmit && bun run lint`.
+`bun run test && bunx tsc --noEmit && bun run lint`, and have one read-only
+agent review only your simplify diff for behavior changes (AGENTS.md
+operating loop step 5).
