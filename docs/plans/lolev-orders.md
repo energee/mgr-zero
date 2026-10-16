@@ -48,9 +48,11 @@ Kegs:
   equal to the returnable sixtel on each channel.
 - **Each one-way sixtel shipped carries a $10 fee, never refunded.** The fee
   follows the format, not the channel.
-- Returnable halves and sixtels are on **Lolev kegs** with a **$30 deposit**,
-  both sizes. No customer uses Kegfleet today. A customer that does later gets
-  separate Kegfleet formats (the pool lives on the SKU), created then.
+- Returnable halves and sixtels are primarily on **Microstar** (user,
+  2026-10-15, after first saying Lolev kegs; v1 agrees). A **$30 deposit**,
+  both sizes, every pool. A new returnable SKU goes on Microstar; an existing
+  SKU keeps the pool the packaging pass gave it. The pool lives on the SKU,
+  so a customer on another pool gets its own formats when needed.
 - In history, export sixtels were one-way and domestic sixtels returnable.
 
 Orders:
