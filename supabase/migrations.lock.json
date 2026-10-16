@@ -140,5 +140,6 @@
   "20261016101000_us_ship_to_state_only.sql": "fe26e0cc77ea66ad574b7f79b73e520550924b3fcfb70fe0f30fbf4640d935c4",
   "20261016123107_freeze_filed_books_opened_on.sql": "1500030bec561cb18f04d3592ce67968af5596c70d6e44467c1d0ecb14ed66d4",
   "20261016125525_packaging_run_lot_receipt.sql": "522c909ad0eef1096df0fceb7769427724fc4d9cea7e24f0b7f3b23d3f6df633",
-  "20261016130000_one_way_fee_at_submit.sql": "87d675bab67e853c8be32660ebddda06c5edfbe5e1bf42f38f8aff1b6269664d"
+  "20261016130000_one_way_fee_at_submit.sql": "87d675bab67e853c8be32660ebddda06c5edfbe5e1bf42f38f8aff1b6269664d",
+  "20261016140929_slack_oauth_intent_initiator_929.sql": "7999b47df94881495e041e9d185c928c43d369693811e691fe7287b3f0dfae77"
 }
