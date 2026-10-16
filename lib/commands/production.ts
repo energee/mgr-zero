@@ -193,11 +193,12 @@ defineQuery({
       i.version === undefined
         ? latestOf<{ id: string; version: number; brewhouse_efficiency: number | null; yeast_attenuation: number | null }>(versionQuery, "version")
         : unwrap(versionQuery.eq("version", i.version).maybeSingle()),
-      unwrap(ctx.db.from("recipe_versions").select("version").eq("recipe_id", i.recipeId).order("version", { ascending: false })),
+      completeRows("Recipe versions", start => ctx.db.from("recipe_versions").select("version", { count: "exact" })
+        .eq("recipe_id", i.recipeId).order("version", { ascending: false }).range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
     if (!version && i.version !== undefined) throw new CommandError("recipe version not found", 404, "not_found");
-    const versions = (versionRows ?? []).map((row) => row.version);
+    const versions = versionRows.map((row) => row.version);
     if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
 
     const [ingredients, waterAdditions] = await Promise.all([

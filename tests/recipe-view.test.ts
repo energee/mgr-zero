@@ -148,7 +148,8 @@ describe("toRecipePageModel", () => {
     expect(model.historical).toBe(true);
     const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
     expect(html).toContain('href="?v=3"');
-    expect(html).toMatch(/href="\?v=1"[^>]*aria-current="page"/);
+    const selectedLink = html.match(/<a\b[^>]*href="\?v=1"[^>]*>/)?.[0];
+    expect(selectedLink).toContain('aria-current="page"');
     expect(html).toContain("v3 (current)");
     expect(html).toContain("Older version");
     expect(html).toContain("Less crystal");

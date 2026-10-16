@@ -1999,7 +1999,7 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Style: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    to: { Style: "Recipe", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
