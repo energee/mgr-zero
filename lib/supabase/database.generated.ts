@@ -8989,6 +8989,13 @@ export type Database = {
         Args: { p_batch: string; p_brewery: string }
         Returns: Json
       }
+      get_beer_overview_aggregates: {
+        Args: { p_brewery: string }
+        Returns: {
+          kegs_out: number
+          taproom_below_par: number
+        }[]
+      }
       get_brew_day_plan: {
         Args: { p_batch: string; p_brewery: string }
         Returns: Json
