@@ -64,7 +64,8 @@ jobs:
           display_report: false
           show_full_output: false
           settings: .github/claude-ci-settings.json
-          claude_args: '--allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx)"'
+          # Bounded guide maintenance does not need the expensive reasoning tier.
+          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx)"'
 
       - name: Validate the generated guide
         id: validate
