@@ -129,6 +129,9 @@ on the disposable local stack, never by an application migration or on hosted.
 Their reserved `mgr_test_identity_<nonce>` signatures are removed structurally by
 `types:database`, so a local readiness probe never enters the committed app types.
 The diagnostic names expected/actual identities and the pinned DB/API endpoints.
+The exhaustive service-RPC RLS matrix admits only the exact verified reset probe,
+checks its signature and grants, and still exercises anonymous/authenticated denial
+plus a service-role identity positive control. Unexpected RPCs remain failures.
 
 The explicit pure project in `vitest.config.mts` keeps the existing screen-only
 gates and pure harness regressions independent of the running database. Vitest
