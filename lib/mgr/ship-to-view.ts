@@ -1,6 +1,6 @@
 // lib/mgr/ship-to-view.ts — view-model for the Ship-to form sheet. A missing
 // (null) street, city, state or zip reads as an empty field: outside the US
-// only the label is required.
+// only the label is required; a US ship-to also needs its state.
 import { countryName } from "./labels";
 
 export type ShipToViewModel = {

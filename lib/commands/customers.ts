@@ -53,8 +53,9 @@ defineCommand({
 defineCommand({
   name: "upsert_ship_to", description: "Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer",
   roles: [...roles],
-  // A US ship-to needs its street, city, state and ZIP; outside the US only the
-  // label is required, so an export customer can be entered before its address.
+  // A ship-to needs its label and country, and a US one its state: enough for the
+  // TTB destination (user, 2026-10-15). Street, city and ZIP stay optional until
+  // known; a US ZIP, when given, must be valid.
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     country,
@@ -62,7 +63,6 @@ defineCommand({
     city: z.string().min(1).optional(), state: stateCode.optional(), zip: z.string().trim().min(1).optional(),
     isDefault: z.boolean().optional(),
   }).refine(hasStateIffUs, stateByCountry)
-    .refine(i => i.country !== "US" || Boolean(i.address1 && i.city && i.zip), { path: ["address1"], message: "a US address needs a street, city and ZIP code" })
     // `when` runs the ZIP shape check even while another field is missing.
     .refine(i => i.country !== "US" || !i.zip || /^\d{5}(-\d{4})?$/.test(i.zip), {
       path: ["zip"], message: "a 5-digit ZIP code or ZIP+4", when: p => typeof (p.value as { zip?: unknown } | undefined)?.zip === "string",

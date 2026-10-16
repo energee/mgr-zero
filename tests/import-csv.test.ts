@@ -138,6 +138,8 @@ describe("country and alias columns", () => {
   it("a foreign ship-to row needs only its customer and label", () => {
     const customerId = crypto.randomUUID();
     expect(validateImportRow("ship_tos", { customerId, label: "Main", country: "JP" })).toEqual([]);
-    expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["address1 is required", "city is required", "zip is required", "state is required"]);
+    // A US ship-to needs only its state; street, city and ZIP are optional (user, 2026-10-15).
+    expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["state is required"]);
+    expect(validateImportRow("ship_tos", { customerId, label: "Main", state: "OH" })).toEqual([]);
   });
 });

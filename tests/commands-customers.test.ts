@@ -143,11 +143,15 @@ describe("country, alias and search", () => {
     expect(parse("upsert_customer", { ...customer, country: "XX" }).success).toBe(false);
     expect(parse("upsert_customer", { ...customer, country: "CN", alias: "  " }).success).toBe(false);
   });
-  it("upsert_ship_to outside the US needs only a label; a US one keeps its address and ZIP rules", () => {
+  // The user, 2026-10-15: an order needs only its country, or a US state; the
+  // street, city and ZIP stay optional until known (docs/plans/lolev-orders.md).
+  it("upsert_ship_to needs a label, plus a state in the US; street, city and ZIP are optional, a given US ZIP must be valid", () => {
     const shipTo = { customerId: crypto.randomUUID(), label: "Main" };
     expect(parse("upsert_ship_to", { ...shipTo, country: "JP" }).success).toBe(true);
     expect(parse("upsert_ship_to", { ...shipTo, country: "JP", zip: "100-0001" }).success).toBe(true);
     expect(parse("upsert_ship_to", shipTo).success).toBe(false);
+    expect(parse("upsert_ship_to", { ...shipTo, state: "OH" }).success).toBe(true);
+    expect(parse("upsert_ship_to", { ...shipTo, state: "OH", zip: "4411" }).success).toBe(false);
     expect(parse("upsert_ship_to", { ...shipTo, address1: "1 Main", city: "Phila", state: "PA", zip: "19107" }).success).toBe(true);
     expect(parse("upsert_ship_to", { ...shipTo, address1: "1 Main", city: "Phila", state: "PA", zip: "100-0001" }).success).toBe(false);
   });

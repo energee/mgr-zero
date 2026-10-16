@@ -1,6 +1,6 @@
-// Shared ship-to fields; adapters own state and command execution. A US
-// address needs street, city, state and postal code; another country has no
-// state and only the label is required.
+// Shared ship-to fields; adapters own state and command execution. A ship-to
+// needs its label, and a US one its state (the TTB destination); street, city
+// and postal code are optional until known. Another country has no state.
 import { E } from "@/components/mgr/e";
 import { COUNTRY_OPTIONS } from "@/lib/mgr/labels";
 import { Switch } from "@/components/ui/switch";
@@ -32,7 +32,7 @@ export function ShipToView({
       {E.ttl(model.title)}
       {E.pick("Country", model.country, COUNTRY_OPTIONS, { onChange: controls.country, required: true })}
       {fields.map(([key, label]) => (
-        <Fragment key={key}>{E.edit(label, model[key], "text", undefined, { onChange: controls[key] ? (nextValue: string) => controls[key]?.(key === "state" ? nextValue.toUpperCase() : nextValue) : undefined, required: key === "label" || (us && key !== "address2"), maxLength: key === "state" ? 2 : undefined, "aria-label": label })}</Fragment>
+        <Fragment key={key}>{E.edit(label, model[key], "text", undefined, { onChange: controls[key] ? (nextValue: string) => controls[key]?.(key === "state" ? nextValue.toUpperCase() : nextValue) : undefined, required: key === "label" || (us && key === "state"), maxLength: key === "state" ? 2 : undefined, "aria-label": label })}</Fragment>
       ))}
       {E.row("Default ship-to", "selected first on new orders", <Switch aria-label="Default ship-to" checked={controls.isDefault ? model.isDefault : undefined} defaultChecked={controls.isDefault ? undefined : model.isDefault} onCheckedChange={controls.isDefault} />, model.isDefault ? "ok" : "")}
       {messages}

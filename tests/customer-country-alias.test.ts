@@ -122,6 +122,14 @@ describe("import_csv_row", () => {
     expect(us).toMatchObject({ status: "blocked", error: "state is required" });
   });
 
+  it("creates a US ship-to with only a label and a state; refuses one with no state", async () => {
+    const customer = (await upsertCustomer({ p_state: "OH" })).data as Customer;
+    const [oh, none] = await importRows("ship_tos", [{ customerId: customer.id, label: "Main", state: "OH" }, { customerId: customer.id, label: "Dock" }]);
+    expect(oh.status).toBe("committed");
+    expect(oh.result).toMatchObject({ country: "US", state: "OH", address1: null, city: null, zip: null });
+    expect(none).toMatchObject({ status: "blocked", error: "state is required" });
+  });
+
   it("creates a JP ship-to with only a label and a country", async () => {
     const customer = (await upsertCustomer({ p_country: "JP" })).data as Customer;
     const [row] = await importRows("ship_tos", [{ customerId: customer.id, label: "Main", country: "JP" }]);
