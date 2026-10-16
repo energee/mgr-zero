@@ -553,6 +553,9 @@ describe("post-merge HTTP API maintainer", () => {
         mkdirSync(join(repo, "tests"), { recursive: true });
         copyFileSync(join(root, "tests", file), join(repo, "tests", file));
       }
+      for (const file of readdirSync(root).filter((file) => /^vitest\..*\.config\.mts$/.test(file))) {
+        copyFileSync(join(root, file), join(repo, file));
+      }
       symlinkSync(join(root, "node_modules"), join(repo, "node_modules"), "dir");
       put(".gitignore", "node_modules\n");
       put("vitest.config.mts", 'export default { test: { include: ["tests/*-safety.test.ts"] } };\n');
