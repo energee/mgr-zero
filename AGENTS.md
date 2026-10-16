@@ -180,7 +180,8 @@ are normal work. Run them on the throwaway `mgr_test` stack
    documentation agent, and `API: none` skips the HTTP API agent.
    `.github/pull_request_template.md` prompts for all three. Both doc agents
    also re-audit weekly, and `.github/workflows/doc-agent-watch.yml` opens an
-   issue when any doc workflow fails or no dream lands for 3 days.
+   issue when any doc workflow or `hosted jobs` fails, or no dream lands for
+   3 days.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.
@@ -196,7 +197,9 @@ from scratch — and never reaches hosted. That is what broke `/settings`, `/men
 and Ask MGR on live (#329, #330). A schema change is a new migration file, and
 `supabase/migrations.lock.json` pins every file's hash so an edit fails
 `tests/migrations-applied.test.ts`. After adding a migration, run
-`bun run migrations:lock`. (Before #285 the baseline was edited in place; that
+`bun run migrations:lock`. A new migration's timestamp must be later than
+every migration on main: `supabase db push` refuses an older one, and CI
+(`scripts/check-migration-order.ts`) rejects it. (Before #285 the baseline was edited in place; that
 window closed the day it was first pushed.)
 
 Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
