@@ -1553,6 +1553,7 @@ export type Database = {
           correction_source_id: string | null
           created_at: string
           created_by: string
+          dest_country: string | null
           dest_state: string | null
           id: string
           location_id: string
@@ -1576,6 +1577,7 @@ export type Database = {
           correction_source_id?: string | null
           created_at?: string
           created_by: string
+          dest_country?: string | null
           dest_state?: string | null
           id?: string
           location_id: string
@@ -1599,6 +1601,7 @@ export type Database = {
           correction_source_id?: string | null
           created_at?: string
           created_by?: string
+          dest_country?: string | null
           dest_state?: string | null
           id?: string
           location_id?: string
