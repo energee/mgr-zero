@@ -40,6 +40,7 @@ export default async function SettingsPage() {
         paLicense: row.pa_license_no ?? "",
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
+        daysToPackage: String(row.days_to_package),
         booksOpenedOn: row.books_opened_on ?? "",
         oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
