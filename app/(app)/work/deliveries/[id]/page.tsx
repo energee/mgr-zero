@@ -11,14 +11,14 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { shipToAddress } from "@/lib/mgr/ship-to-view";
+import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DeliveredForm } from "./delivered-form";
 
 type Stop = {
   delivery: {
     id: string; stop_no: number; delivered_at: string | null; signed_by: string | null; outcome: string | null;
     routes: { id: string; name: string | null; delivery_date: string; driver_user_id: string | null; departed_at: string | null } | null;
-    shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: { label: string; country: string; city: string | null; state: string | null } | null } } | null;
+    shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: ShipToSnapshot | null } } | null;
     stock_transfers: { transfer_no: number | null; to_location: { name: string } | null } | null;
   };
   lines: { id: string; name: string; qty: number; refused?: number }[];
@@ -43,7 +43,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
         backHref: delivery.routes ? `/routes/${delivery.routes.id}` : "/routes",
         title: `${delivery.routes?.name ?? "Route"} · Stop ${delivery.stop_no}`,
         heading,
-        shipTo: order?.ship_tos ? [order.ship_tos.label, shipToAddress(order.ship_tos)].filter(Boolean).join(" · ") : undefined,
+        shipTo: transfer ? undefined : order?.ship_tos ?? null,
         invoiceTiming: timing,
         lines: lines.map((l) => {
           const refused = transfer && delivery.outcome === "refused" ? l.qty : (l.refused ?? 0);

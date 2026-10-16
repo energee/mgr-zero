@@ -147,11 +147,15 @@ describe("Confirm delivery", () => {
     expect(html).toMatch(/On delivery · saved/);
   });
 
-  it("shows the shipment destination before delivery is confirmed", () => {
-    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
-    expect(html).toMatch(/Ship to/);
-    expect(html).toMatch(/Tap Room · Phoenixville, PA/);
-    expect(html).toContain("Not delivered · leave for a later route");
+  it("distinguishes an unrecorded customer ship-to from an internal transfer", () => {
+    const missing = htmlOf(createElement(ConfirmDeliveryView, { model: { ...confirmDeliveryStop1, shipTo: null } }));
+    expect(missing).toContain('role="alert"');
+    const transfer = htmlOf(createElement(ConfirmDeliveryView, { model: {
+      ...confirmDeliveryStop1, heading: "TRF-0004 · Storage", shipTo: undefined, invoiceTiming: "None · stock transfer",
+    } }));
+    expect(transfer).toContain("Storage");
+    expect(transfer).not.toContain('role="alert"');
+    expect(transfer).not.toContain("Fictional Lane");
   });
 
   it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {

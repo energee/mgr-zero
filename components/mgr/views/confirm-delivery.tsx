@@ -6,6 +6,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { shipToAddress } from "@/lib/mgr/ship-to-view";
 
 const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
   customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
@@ -20,11 +21,18 @@ export function ConfirmDeliveryView({
   model: ConfirmDeliveryViewModel;
   action?: ReactNode;
 }) {
+  const missingAddress: string[] = [];
+  if (model.shipTo === null) missingAddress.push("Ship-to address not recorded");
+  else if (model.shipTo) {
+    if (!model.shipTo.address1?.trim()) missingAddress.push("Street address not recorded");
+    if (!model.shipTo.zip?.trim()) missingAddress.push("Postal code not recorded");
+  }
   return (
     <>
       {E.back(model.backTo ?? "Driver route", model.title, undefined, model.backHref)}
       {E.ttl(model.heading)}
-      {model.shipTo && E.fld("Ship to", model.shipTo)}
+      {model.shipTo !== undefined && E.fld("Ship to", model.shipTo ? [model.shipTo.label, shipToAddress(model.shipTo)].filter(Boolean).join(" · ") : "Not recorded")}
+      {missingAddress.length > 0 && E.note(`${missingAddress.join(" · ")}. Confirm the destination before travelling.`)}
       {E.fld("Invoice timing", model.invoiceTiming)}
       {model.lines.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, "", row.qty)}</Fragment>
