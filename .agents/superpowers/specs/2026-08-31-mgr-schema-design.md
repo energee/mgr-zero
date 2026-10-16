@@ -95,7 +95,7 @@ money cents.
 | `order_status` | `draft, submitted, confirmed, picked, shipped, cancelled` | `invoiced`/`paid` derive from invoices (§14) |
 | `invoice_kind` | `invoice, credit_memo` | |
 | `invoice_line_kind` | `sku, keg_deposit, keg_deposit_refund, adjustment` | deposits are a line type, not SKU price |
-| `qbo_sync_status` | `pending, pushed, push_failed` | |
+| `qbo_sync_status` | `pending, pushed, push_failed, not_synced` | `not_synced`: a historical invoice (record_historical_order, before books_opened_on), never pushed |
 | `material_category` | `malt, hop, yeast, adjunct, chemical, packaging, other` | |
 | `uom` | `lb, kg, oz, g, each, l, gal, ml` | mass↔mass and vol↔vol convert by constant; each↔mass is per-material |
 | `material_movement_type` | `opening_balance, receipt, consumption, return_to_stock, loss, adjustment, count_adjustment` | |

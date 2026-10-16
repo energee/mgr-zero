@@ -8,6 +8,7 @@ import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
@@ -230,6 +231,20 @@ defineCommand({
   input: z.object({ fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_replenishment_order", {
     p_from: i.fromLocationId, p_to: i.toLocationId, p_lines: toLines(i.lines), p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks",
+  roles: ["admin"],
+  input: z.object({
+    customerId: z.string().uuid(), shipToId: z.string().uuid(), pickedUpOn: isoDate, note: z.string().optional(),
+    lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), unitPriceCents: z.number().int().min(0) })).min(1),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_order", {
+    p_brewery: ctx.breweryId, p_customer: i.customerId, p_ship_to: i.shipToId, p_picked_up_on: i.pickedUpOn,
+    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty, unit_price_cents: l.unitPriceCents })),
+    p_note: i.note ?? null, p_request_id: execution.requestId,
   })),
 });
 

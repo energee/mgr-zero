@@ -36,7 +36,7 @@ export function qboInvoicePresentation(input: {
   kind: "invoice" | "credit_memo";
   role: StaffRole;
   connected: boolean;
-  syncStatus: "pending" | "pushed" | "push_failed";
+  syncStatus: "pending" | "pushed" | "push_failed" | "not_synced";
   hasPendingPush?: boolean;
   syncError?: string | null;
   remoteState?: "live" | "voided" | "deleted";
@@ -49,6 +49,8 @@ export function qboInvoicePresentation(input: {
 }): { detail: string; actions: QboInvoiceAction[]; paidStatusShown?: true } {
   const canWriteOff = input.kind === "invoice" && input.role === "admin";
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
+  // A historical order (record_historical_order) is never sent to QuickBooks.
+  if (input.syncStatus === "not_synced") return { detail: "not in QuickBooks (before the books opened)", actions: [] };
   if (input.role === "warehouse" || input.role === "brewer" || input.role === "taproom") {
     return { detail: input.syncStatus === "pushed" ? "QuickBooks status available to Sales" : "not pushed", actions: [] };
   }
@@ -95,7 +97,7 @@ export function qboInvoicePresentation(input: {
 }
 
 export type QboStaffInvoiceLink = { href: string | null; reason: string | null };
-export type QboInvoiceIdentity = { kind: "invoice" | "credit_memo"; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_remote_state: "live" | "voided" | "deleted"; qbo_invoice_id: string | null };
+export type QboInvoiceIdentity = { kind: "invoice" | "credit_memo"; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_remote_state: "live" | "voided" | "deleted"; qbo_invoice_id: string | null };
 export type QboStaffConnection = { connected: boolean; connectionId?: string; realmId?: string };
 export type QboPushedIdentity = { connection_id: string; realm_id: string; qbo_entity_id: string | null };
 

@@ -384,6 +384,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "raise_invoice_question", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "body": "string" } }'
 ```
 
+## record_historical_order [#record_historical_order]
+
+`command` · admin
+
+Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `shipToId` | uuid | yes |
+| `pickedUpOn` | date (YYYY-MM-DD) | yes |
+| `lines` | array of object | yes |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_historical_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "shipToId": "00000000-0000-0000-0000-000000000000", "pickedUpOn": "2026-01-31", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1, "unitPriceCents": 1 } ] } }'
+```
+
 ## record_pick [#record_pick]
 
 `command` · admin, warehouse

@@ -9639,6 +9639,18 @@ export type Database = {
         }
         Returns: Json
       }
+      record_historical_order: {
+        Args: {
+          p_brewery: string
+          p_customer: string
+          p_lines: Json
+          p_note: string
+          p_picked_up_on: string
+          p_request_id: string
+          p_ship_to: string
+        }
+        Returns: Json
+      }
       record_historical_packaging_run: {
         Args: {
           p_batch: string
@@ -10716,7 +10728,7 @@ export type Database = {
         | "received"
         | "cancelled"
       qbo_remote_state: "live" | "voided" | "deleted"
-      qbo_sync_status: "pending" | "pushed" | "push_failed"
+      qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"
       staff_role: "admin" | "sales" | "warehouse" | "brewer" | "taproom"
       stock_transfer_status:
         | "draft"
@@ -10963,7 +10975,7 @@ export const Constants = {
         "cancelled",
       ],
       qbo_remote_state: ["live", "voided", "deleted"],
-      qbo_sync_status: ["pending", "pushed", "push_failed"],
+      qbo_sync_status: ["pending", "pushed", "push_failed", "not_synced"],
       staff_role: ["admin", "sales", "warehouse", "brewer", "taproom"],
       stock_transfer_status: [
         "draft",

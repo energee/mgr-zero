@@ -5,7 +5,7 @@ import { money } from "./money";
 import { invoiceCurrentState } from "./invoice-state";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "./qbo-ui";
 
-export type InvoiceListRecord = { quickbooks_link?: QboStaffInvoiceLink | null; id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; customers: { name: string } | null };
+export type InvoiceListRecord = { quickbooks_link?: QboStaffInvoiceLink | null; id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; customers: { name: string } | null };
 export type InvoiceListRow = { id: string; title: string; detail: string; tone: "" | "ok" | "w"; actions: ("Review" | "Re-push" | "Write off")[]; href?: string; remoteReview: boolean; staffLink?: QboStaffInvoiceLink | null };
 
 /** Due dates are date-only; compare them with the brewery-local day. Tests and
