@@ -4,7 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 output=$(mktemp)
 trap 'rm -f "$output"' EXIT
-bunx supabase gen types --db-url "${1:-postgresql://postgres:postgres@127.0.0.1:54352/postgres}" --schema public > "$output"
+# Supabase CLI 2.121 tries TLS by default; the local test Postgres has none, hence sslmode=disable.
+bunx supabase gen types --db-url "${1:-postgresql://postgres:postgres@127.0.0.1:54352/postgres?sslmode=disable}" --schema public > "$output"
 # Never overwrite the checked-in schema with an empty or failed CLI response.
 grep -q '^export type Database = ' "$output"
 # The CLI emits an extra blank line at EOF; keep the checked-in file clean.
