@@ -44,6 +44,8 @@ export function OrderView({
           {E.row(line.name, line.detail, adjustLines ? E.act("Adjust", "attention") : "", line.tone ?? "")}
         </Fragment>
       ))}
+      {model.kegCharges.length ? E.ttl("Keg charges") : null}
+      {model.kegCharges.map((c) => <Fragment key={c.key}>{E.fld(c.name, c.detail)}</Fragment>)}
       {showAddLine ? E.btn("Add line", "g") : null}
       {complianceNote ? E.note(complianceNote) : null}
       {model.events.length === 0 ? E.blank("No events yet") : E.tape(model.events)}

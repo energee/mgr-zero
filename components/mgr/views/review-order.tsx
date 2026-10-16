@@ -21,6 +21,7 @@ export function ReviewOrderView({ model, onQuantity, onBack, onPlace, messages, 
         </Fragment>
       ))}</fieldset>
       {model.deposits?.map(deposit => <Fragment key={deposit.key}>{E.fld(deposit.name, `${deposit.detail} · ${deposit.amount}`)}</Fragment>)}
+      {model.oneWayFees?.map(fee => <Fragment key={fee.key}>{E.fld(fee.name, `${fee.detail} · ${fee.amount}`)}</Fragment>)}
       {model.depositDetail && model.depositAmount
         ? E.row("Keg deposit", model.depositDetail, model.depositAmount)
         : null}

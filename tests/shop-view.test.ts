@@ -146,6 +146,16 @@ it("review preserves quoted amounts and identities without inventing missing tax
   expect(model.requestedDate).toBe("Not specified");
 });
 
+it("review lists the quoted one-way keg fee, and omits the row when there is none", () => {
+  const quote = { ...ridgelineReviewOrder.quote!, oneWayFeeCents: 3000,
+    oneWayFees: [{ name: "Export Pils · one-way sixtel", qty: 3, unitPriceCents: 1000, amountCents: 3000 }] };
+  const model = toQuotedReviewOrderViewProps(quote, {});
+  expect(model.oneWayFees).toEqual([{ key: "0", name: "One-way keg fee", detail: "Export Pils · one-way sixtel · quantity 3 at $10.00", amount: "$30.00" }]);
+  const html = renderToStaticMarkup(createElement(ReviewOrderView, { model, footer: null }));
+  expect(html).toContain("One-way keg fee");
+  expect(toQuotedReviewOrderViewProps(ridgelineReviewOrder.quote!, {}).oneWayFees).toEqual([]);
+});
+
 it("tells the buyer the amounts and the requested date are not final", () => {
   // A portal request is not an order: the brewery confirms both the money and
   // the date. Dropping either half of this leaves the buyer reading the
