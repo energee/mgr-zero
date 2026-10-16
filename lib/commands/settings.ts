@@ -102,9 +102,9 @@ defineQuery({
 });
 // The day compliance reports start counting. Earlier ledger rows (imported
 // history) stay visible everywhere else; null counts everything. The RPC
-// refuses a date after the start of a filed period.
+// freezes the value after any filed snapshot; an unchanged value remains a no-op.
 defineCommand({
-  name: "set_books_opened_on", description: "Set or clear the day compliance reports start counting the ledger (admin); refused after the start of a filed period",
+  name: "set_books_opened_on", description: "Set or clear the day compliance reports start counting the ledger before any report is filed (admin); after filing, only the unchanged value is allowed",
   input: z.object({ booksOpenedOn: isoDate.nullable() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
