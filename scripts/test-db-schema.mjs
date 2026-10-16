@@ -41,7 +41,7 @@ export function localEnvironment(root = process.cwd()) {
   return resolveTestEnv({}, existsSync(file) ? readFileSync(file, "utf8") : undefined);
 }
 
-/** @param {Record<string, string>} env @param {string} query */
+/** @param {Record<string, string | undefined>} env @param {string} query */
 async function sql(env, query) {
   const db = new pg.Client({ connectionString: env.DATABASE_URL, connectionTimeoutMillis: 10000 });
   await db.connect();
@@ -49,7 +49,7 @@ async function sql(env, query) {
 }
 
 /** Check SQL history first, then compare SQL and REST against the reset's nonce.
- * @param {Record<string, string>} env
+ * @param {Record<string, string | undefined>} env
  * @param {ReturnType<typeof localExpectation>} expected
  * @param {object} [pinned]
  */

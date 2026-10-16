@@ -24,7 +24,7 @@ describe("test database schema guard", () => {
     const expected = { version: "20261016125525", fingerprint: "mgr-schema branch-a", reset: "run-a" };
     expect(() => assertIdentity(expected, { ...expected })).not.toThrow();
     for (const actual of [null, { ...expected, fingerprint: "mgr-schema branch-b" }, { ...expected, reset: "run-b" }]) {
-      expect(() => assertIdentity(expected, actual)).toThrow(/expected.*run-a.*actual/s);
+      expect(() => assertIdentity(expected, actual)).toThrow(/expected[\s\S]*run-a[\s\S]*actual/);
     }
   });
 
@@ -35,12 +35,12 @@ describe("test database schema guard", () => {
     Tables: { example: { Row: { ${probe}: string } } }
     Functions: {
       real_rpc: { Args: never; Returns: string }
-      "${probe}": { Args: never; Returns: Json }
+      "${probe}": { Args: never; Returns: Json },
       mgr_test_identity_business: { Args: never; Returns: string }
     }
   }
 }`;
-    const expected = source.replace(`\n      "${probe}": { Args: never; Returns: Json }`, "");
+    const expected = source.replace(`\n      "${probe}": { Args: never; Returns: Json },`, "");
     expect(await stripIdentityTypes(source)).toBe(expected);
     expect(await stripIdentityTypes(expected)).toBe(expected);
   });
