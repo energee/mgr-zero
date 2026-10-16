@@ -22,23 +22,23 @@ it("runs pure selections with an unavailable DB but guards every mixed DB/unknow
     }
     const executed = join(temp, "unclassified-executed");
     writeFileSync(join(temp, "tests/unclassified.test.ts"), `import { it } from "vitest"; import { writeFileSync } from "node:fs"; it("must be guarded", () => { writeFileSync(${JSON.stringify(executed)}, "executed"); });`);
-    // A nonexistent database is genuinely unavailable without stopping or changing
-    // the shared stack. Even trust authentication cannot open this database.
+    // Use a refused private port, never the shared stack. Pure startup is local;
+    // mixed children use the existing fresh-CI env route to exercise SQL identity
+    // failure without relaxing local endpoint pinning or contacting port 54352.
     const env = {
       NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54351",
-      DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:54352/missing_${crypto.randomUUID().replaceAll("-", "")}`,
+      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:1/unavailable",
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "fixture-public",
       SUPABASE_SECRET_KEY: "fixture-secret",
       MGR_TEST_STACK: "1",
     };
-    writeFileSync(join(temp, ".env.test.local"), Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n"));
     const config = join(temp, "vitest.config.mts");
     writeFileSync(config, `import base from ${JSON.stringify(join(root, "vitest.config.mts"))};
 export default { ...base, root: ${JSON.stringify(temp)}, test: { ...base.test, env: { ...base.test.env, ...${JSON.stringify(env)} } } };`);
     const childEnv: NodeJS.ProcessEnv = { ...process.env, MGR_TEST_DB_LOCK: join(temp, "lock") };
     delete childEnv.MGR_TEST_DB_LOCK_FD;
-    const launch = (args: string[]) => spawnSync(join(root, "node_modules/.bin/vitest"), [...args, "--config", config], {
-      cwd: temp, env: childEnv, encoding: "utf8", timeout: 30000,
+    const launch = (args: string[], freshCI = false) => spawnSync(join(root, "node_modules/.bin/vitest"), [...args, "--config", config], {
+      cwd: temp, env: { ...childEnv, GITHUB_ACTIONS: String(freshCI) }, encoding: "utf8", timeout: 30000,
     });
     const listing = launch(["list", "--filesOnly", "--json"]);
     expect(listing.error).toBeUndefined();
@@ -54,7 +54,7 @@ export default { ...base, root: ${JSON.stringify(temp)}, test: { ...base.test, e
     expect(pure.status, pure.stdout + pure.stderr).toBe(0);
     const version = expectedMigration(readdirSync(join(root, "supabase/migrations")));
     for (const file of ["tests/schema-rules.test.ts", "tests/unclassified.test.ts"]) {
-      const mixed = launch(["run", "tests/test-db-schema-guard.test.ts", file]);
+      const mixed = launch(["run", "tests/test-db-schema-guard.test.ts", file], true);
       const output = mixed.stdout + mixed.stderr;
       expect(mixed.error).toBeUndefined();
       expect(mixed.status, output).not.toBe(0);

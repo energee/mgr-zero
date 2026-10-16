@@ -139,8 +139,13 @@ flag to skip that protection.
 For an uninterrupted reset plus proof, keep the same exclusive lock throughout:
 
 ```bash
-perl scripts/test-db-lock.pl ex bash -c 'MGR_TEST_DB_RESET=1 bash scripts/test-db.sh --locked-reset && bunx vitest run'
+perl scripts/test-db-lock.pl ex bash -c 'MGR_TEST_DB_RESET=1 bash scripts/test-db.sh --locked-reset && node_modules/.bin/vitest run'
 ```
+
+Use the direct Vitest executable inside this outer lock. Bunx drops the inherited
+descriptor on the tested local runtime; that launch is rejected, not silently
+accepted with a different lock. Normal standalone `bun run test` still takes its
+own shared lock.
 
 The child inherits and validates the actual lock descriptor; do **not** override
 `MGR_TEST_DB_LOCK` to avoid a recursive lock. An override gives up protection from
