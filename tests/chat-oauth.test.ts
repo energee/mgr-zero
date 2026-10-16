@@ -127,6 +127,117 @@ describe("Slack installation lifecycle", () => {
     expect(port.handleOAuthCallback).not.toHaveBeenCalled();
   });
 
+  it.each(["install", "reauthorize"] as const)("binds a multi-role administrator's %s intent to its initiator before activation and on replay", async (kind) => {
+    const brewery = await makeBrewery();
+    const installer = await makeStaffCtx(brewery.id, ["admin", "sales"]);
+    const otherAdmin = await makeStaffCtx(brewery.id, ["admin", "warehouse"]);
+    const { port, teamId, stored } = fakePort();
+    let started = await beginSlackInstall(installer, REDIRECT);
+    if (kind === "reauthorize") {
+      await completeSlackInstall(installer.db, callback(started.authorizeUrl), port, REDIRECT);
+      started = await beginSlackReauthorization(installer, started.installationId, REDIRECT);
+    }
+    vi.mocked(port.handleOAuthCallback).mockClear();
+
+    for (const phase of ["pending", "completed"] as const) {
+      const before = await row(started.installationId);
+      expect(before.installer_user_id).toBe(installer.userId);
+      const lookup = { p_state_hash: before.oauth_intent_hash!, p_actor: installer.userId };
+      const valid = await admin.rpc("find_chat_oauth_intent", lookup);
+      expect(valid.error).toBeNull();
+      expect(valid.data).toMatchObject({ installation_id: started.installationId, kind });
+      const found = await admin.rpc("find_chat_oauth_intent", { ...lookup, p_actor: otherAdmin.userId });
+      expect(found.error).toBeNull();
+      expect(found.data).toBeNull();
+      const activated = await admin.rpc("activate_chat_installation", {
+        p_installation: started.installationId, p_state_hash: lookup.p_state_hash, p_redirect_uri: REDIRECT,
+        p_external_installation_id: teamId, p_external_enterprise_id: null, p_display_label: "Rejected",
+        p_token_store_key: `slack:installation:${teamId}`, p_granted_capabilities: {}, p_actor: otherAdmin.userId,
+      });
+      expect(activated.error?.code).toBe("42501");
+      await expect(completeSlackInstall(otherAdmin.db, callback(started.authorizeUrl), port, REDIRECT)).rejects.toThrow(/state/i);
+      expect(port.handleOAuthCallback).toHaveBeenCalledTimes(phase === "pending" ? 0 : 1);
+      expect(port.getInstallation).not.toHaveBeenCalled();
+      expect(port.deleteInstallation).not.toHaveBeenCalled();
+      expect(await row(started.installationId)).toEqual(before);
+      expect(stored.get(teamId)).toEqual(kind === "install" && phase === "pending" ? undefined : { botToken: "xoxb-fake" });
+
+      await expect(completeSlackInstall(installer.db, callback(started.authorizeUrl), port, REDIRECT))
+        .resolves.toEqual({ installationId: started.installationId, breweryId: brewery.id, replayed: phase === "completed" });
+    }
+    const completed = await row(started.installationId);
+    const replayed = await admin.rpc("activate_chat_installation", {
+      p_installation: started.installationId, p_state_hash: completed.oauth_intent_hash!, p_redirect_uri: REDIRECT,
+      p_external_installation_id: teamId, p_external_enterprise_id: null, p_display_label: "Replay",
+      p_token_store_key: `slack:installation:${teamId}`, p_granted_capabilities: {}, p_actor: installer.userId,
+    });
+    expect(replayed.error).toBeNull();
+    expect(replayed.data).toEqual({ installation_id: started.installationId, replayed: true });
+    expect(await row(started.installationId)).toEqual(completed);
+    expect(port.handleOAuthCallback).toHaveBeenCalledTimes(1);
+    expect(port.getInstallation).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["install", "pending"], ["install", "completed"],
+    ["reauthorize", "pending"], ["reauthorize", "completed"],
+  ] as const)("rejects a revoked multi-role administrator's %s intent at both service gates when %s", async (kind, phase) => {
+    const brewery = await makeBrewery();
+    const installer = await makeStaffCtx(brewery.id, ["admin", "sales"]);
+    const otherAdmin = await makeStaffCtx(brewery.id, ["admin", "warehouse"]);
+    const { port, teamId, stored } = fakePort();
+    let started = await beginSlackInstall(installer, REDIRECT);
+    if (kind === "reauthorize") {
+      await completeSlackInstall(installer.db, callback(started.authorizeUrl), port, REDIRECT);
+      started = await beginSlackReauthorization(installer, started.installationId, REDIRECT);
+    }
+    if (phase === "completed") {
+      await completeSlackInstall(installer.db, callback(started.authorizeUrl), port, REDIRECT);
+    }
+    vi.mocked(port.handleOAuthCallback).mockClear();
+    const before = await row(started.installationId);
+    const lookup = { p_state_hash: before.oauth_intent_hash!, p_actor: installer.userId };
+    const valid = await admin.rpc("find_chat_oauth_intent", lookup);
+    expect(valid.error).toBeNull();
+    expect(valid.data).toMatchObject({ installation_id: started.installationId, kind });
+    // Retain staff membership and its sales grant, but revoke the admin grant.
+    expect((await admin.from("brewery_users").update({ roles: ["sales"] })
+      .eq("user_id", installer.userId).eq("brewery_id", brewery.id)).error).toBeNull();
+    expect((await admin.from("brewery_users").select("roles")
+      .eq("user_id", installer.userId).eq("brewery_id", brewery.id).single()).data?.roles).toEqual(["sales"]);
+
+    for (const actor of [installer, otherAdmin]) {
+      const found = await admin.rpc("find_chat_oauth_intent", { ...lookup, p_actor: actor.userId });
+      expect(found.error).toBeNull();
+      expect(found.data).toBeNull();
+      const activated = await admin.rpc("activate_chat_installation", {
+        p_installation: started.installationId, p_state_hash: lookup.p_state_hash, p_redirect_uri: REDIRECT,
+        p_external_installation_id: teamId, p_external_enterprise_id: null, p_display_label: "Rejected",
+        p_token_store_key: `slack:installation:${teamId}`, p_granted_capabilities: {}, p_actor: actor.userId,
+      });
+      expect(activated.error?.code).toBe("42501");
+      await expect(completeSlackInstall(actor.db, callback(started.authorizeUrl), port, REDIRECT)).rejects.toThrow(/state/i);
+    }
+    expect(port.handleOAuthCallback).not.toHaveBeenCalled();
+    expect(port.getInstallation).not.toHaveBeenCalled();
+    expect(port.deleteInstallation).not.toHaveBeenCalled();
+    expect(await row(started.installationId)).toEqual(before);
+    expect(stored.get(teamId)).toEqual(kind === "install" && phase === "pending" ? undefined : { botToken: "xoxb-fake" });
+
+    // A remaining admin must start a fresh intent, including for an active installation.
+    const replacement = kind === "install" && phase === "pending"
+      ? await beginSlackInstall(otherAdmin, REDIRECT)
+      : await beginSlackReauthorization(otherAdmin, started.installationId, REDIRECT);
+    expect(replacement.installationId).toBe(started.installationId);
+    expect((await row(replacement.installationId)).installer_user_id).toBe(otherAdmin.userId);
+    expect(new URL(replacement.authorizeUrl).searchParams.get("state"))
+      .not.toBe(new URL(started.authorizeUrl).searchParams.get("state"));
+    await expect(completeSlackInstall(otherAdmin.db, callback(replacement.authorizeUrl), port, REDIRECT))
+      .resolves.toEqual({ installationId: started.installationId, breweryId: brewery.id, replayed: false });
+    expect(port.handleOAuthCallback).toHaveBeenCalledTimes(1);
+    expect(stored.get(teamId)).toEqual({ botToken: "xoxb-fake" });
+  });
+
   it.each(["active", "disabled", "needs_reauthorization"])("preserves the exact credential and mapping of an existing %s workspace owner", async (state) => {
     const { port, teamId, stored } = fakePort();
     const first = await makeStaffCtx((await makeBrewery()).id);

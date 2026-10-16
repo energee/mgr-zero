@@ -101,6 +101,14 @@ roles. Trusted outer definer owners invoke it. This also replaces the scalar
 implementation introduced by #870's earlier migration without rewriting that
 committed migration. Both independently main-based branches use the same signature.
 
+`20261017144200_staff_roles_security_guards.sql` preserves the independently
+authored #929 and #640 security corrections after restating role-sensitive
+functions. Slack OAuth lookup and activation bind to the stored initiating user,
+who must still hold Admin. A tokenless old Square disconnect does not expose a
+merchant-wide revoke target while another brewery owns that connected seller.
+Standalone role-array regressions cover both guards. The role migrations never
+replace #928's finite-quantity `private.assert_order_lines` helper.
+
 The migration lock and public generated database types reflect this cutover.
 
 | Surface | Implementation |
