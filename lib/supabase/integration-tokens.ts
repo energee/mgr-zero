@@ -1,7 +1,7 @@
 // lib/supabase/integration-tokens.ts — the only server boundary for private integration credentials.
 import "server-only";
 import { toJson } from "./json";
-import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -628,7 +628,7 @@ export async function finishQboPush(ctx: Ctx, input: {
 export async function finishQboReceiptBill(ctx: Ctx, input: {
   receiptId: string; providerRequestId: string; remoteId: string | null; error: string | null; response: Record<string, unknown>; definitiveRejection?: boolean;
 }) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: receipt Bills require admin", 403);
+  if (!canRun(ctx, "post_receipt_bill")) throw new CommandError("permission denied: receipt Bills require admin", 403);
   const { data, error } = await createAdminClient().rpc("finish_qbo_receipt_bill", {
     p_brewery: ctx.breweryId, p_receipt: input.receiptId, p_actor: ctx.userId,
     p_provider_request_id: input.providerRequestId, p_remote_id: input.remoteId, p_error: input.error, p_response: toJson(input.response),

@@ -7,7 +7,7 @@ import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnap
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { breweryToday } from "@/lib/commands/registry";
+import { breweryToday, canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -51,7 +51,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   }
   if (receipt) {
     // Warehouse retains receipt access without acquiring admin-only accounting reads or actions.
-    const canPost = ctx.role === "admin";
+    const canPost = canRun(ctx, "post_receipt_bill");
     const [health, vendors]: [QboHealth | null, QboVendor[]] = canPost ? await Promise.all([
       runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth>,
       runCommand("list_vendors", {}, ctx) as Promise<QboVendor[]>,

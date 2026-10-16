@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
-import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
   beginQboInvoiceSync,
   compareAndSwapPortalInvoicePaymentTokens,
@@ -369,7 +369,7 @@ type ReceiptBillStart = {
 
 /** Query before retry; replay only the frozen payload and provider request ID. */
 export async function postReceiptBill(ctx: Ctx, receiptId: string, requestId: string, client: QboOAuthClient, newAttemptReason?: "corrected") {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: receipt Bills require admin", 403, "permission_denied");
+  if (!canRun(ctx, "post_receipt_bill")) throw new CommandError("permission denied: receipt Bills require admin", 403, "permission_denied");
   const start = await unwrap(ctx.db.rpc("start_qbo_receipt_bill", {
     p_brewery: ctx.breweryId, p_receipt: receiptId, p_request_id: requestId, p_new_attempt_reason: newAttemptReason ?? null,
   })) as ReceiptBillStart;
