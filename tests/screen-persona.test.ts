@@ -18,18 +18,18 @@ const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
   it("keeps personal Slack quiet hours unavailable to Taproom", () => {
-    const screen = asPersona(by("My notification preferences"), { role: "taproom", name: "Taproom staff", handle: "@taproom" });
+    const screen = asPersona(by("My notification preferences"), { id: "taproom", roles: ["taproom"], name: "Taproom staff", handle: "@taproom" });
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
     expect(html).not.toContain("Save my quiet hours");
     expect(html).toContain("pick due");
     expect(html).toContain("More");
   });
   it("is one demo user per staff role, each on the Team screen with that role", () => {
-    expect(PERSONAS.map((p) => p.role)).toEqual(["admin", "sales", "warehouse", "brewer"]);
+    expect(PERSONAS.map((p) => p.id)).toEqual(["admin", "sales", "warehouse", "brewer"]);
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
     for (const p of PERSONAS) {
       expect(team, `${p.name} is not on Team`).toContain(p.name);
-      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.role}`);
+      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.roles.join(", ")}`);
       if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
     }
   });
@@ -54,24 +54,24 @@ describe("persona", () => {
   });
 
   it("refuses routes the role may not open, exactly as the rail does", () => {
-    expect(deniedFor("brewer", "Customers")).toBe(true);
-    expect(deniedFor("sales", "Pick sheet")).toBe(true);
-    expect(deniedFor("brewer", "Cellar map")).toBe(false);
-    expect(deniedFor("admin", "Customers")).toBe(false);
+    expect(deniedFor(["brewer"], "Customers")).toBe(true);
+    expect(deniedFor(["sales"], "Pick sheet")).toBe(true);
+    expect(deniedFor(["brewer"], "Cellar map")).toBe(false);
+    expect(deniedFor(["admin"], "Customers")).toBe(false);
     // The movement record explicitly requires Admin or Warehouse.
-    expect(deniedFor("brewer", "Record movement")).toBe(true);
+    expect(deniedFor(["brewer"], "Record movement")).toBe(true);
     expect(needsFor("Pick sheet")).toEqual(["admin", "warehouse"]);
     expect(needsFor("Customers")).toEqual(["admin", "sales"]);
   });
 
   it("refuses commands whose record says who may run them (the permission state)", () => {
     expect(needsFor("Confirm order")).toEqual(["admin", "sales"]);
-    expect(deniedFor("brewer", "Confirm order")).toBe(true);
-    expect(deniedFor("sales", "Ship and invoice")).toBe(true);
-    expect(deniedFor("warehouse", "Order")).toBe(false); // "warehouse reads"
-    expect(deniedFor("brewer", "Order")).toBe(true);
-    expect(deniedFor("sales", "Team")).toBe(true);
-    expect(deniedFor("admin", "Team")).toBe(false);
+    expect(deniedFor(["brewer"], "Confirm order")).toBe(true);
+    expect(deniedFor(["sales"], "Ship and invoice")).toBe(true);
+    expect(deniedFor(["warehouse"], "Order")).toBe(false); // "warehouse reads"
+    expect(deniedFor(["brewer"], "Order")).toBe(true);
+    expect(deniedFor(["sales"], "Team")).toBe(true);
+    expect(deniedFor(["admin"], "Team")).toBe(false);
   });
 
   it("names the landings the persona switch swaps, and reports the role-dependent screens it cannot", () => {
@@ -110,8 +110,8 @@ describe("persona", () => {
   });
 
   it("does not let a parent tab's landing route grant its children: More lands on Invoices, warehouse may not open it", () => {
-    expect(deniedFor("warehouse", "Invoices")).toBe(true);
-    expect(deniedFor("sales", "Invoices")).toBe(false);
-    expect(deniedFor("brewer", "Orders")).toBe(true);
+    expect(deniedFor(["warehouse"], "Invoices")).toBe(true);
+    expect(deniedFor(["sales"], "Invoices")).toBe(false);
+    expect(deniedFor(["brewer"], "Orders")).toBe(true);
   });
 });

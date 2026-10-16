@@ -46,21 +46,29 @@ it("does not describe a cold cache as empty data or render skeletons", () => {
   const html = renderToStaticMarkup(NewOrderClient());
   expect(html).toContain("Loading order options");
   expect(html).not.toMatch(/animate-pulse|No customers|Go to/);
-  const orders = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const orders = renderToStaticMarkup(OrdersClient({ roles: ["sales"] }));
   expect(orders).toContain("Loading orders");
   expect(orders).not.toContain("No orders yet");
 });
 
 it("preserves customer filters and read-only Warehouse controls", () => {
-  const html = renderToStaticMarkup(OrdersClient({ role: "warehouse", status: "draft", customerId: "buyer" }));
+  const html = renderToStaticMarkup(OrdersClient({ roles: ["warehouse"], status: "draft", customerId: "buyer" }));
   expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined }]]);
   expect(html).toContain("customerId=buyer");
   expect(html).not.toContain("New order");
 });
 
+it("combines sales' create control with brewer's production navigation", () => {
+  const html = renderToStaticMarkup(OrdersClient({ roles: ["brewer", "sales"] }));
+  expect(html).toContain("New order");
+  expect(html).toContain('href="/batches"');
+  expect(html).toContain('href="/orders"');
+  expect(html).not.toContain('href="/routes"');
+});
+
 it("shows when cached orders were checked, and keeps them visible while updating", () => {
   state.fetching = true;
-  const html = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const html = renderToStaticMarkup(OrdersClient({ roles: ["sales"] }));
   expect(html).toContain("Updating");
   expect(html).toContain("Last checked");
   expect(html).toContain('dateTime="2026-09-13T12:00:00.000Z"');
@@ -70,18 +78,18 @@ it("shows when cached orders were checked, and keeps them visible while updating
 
 it("distinguishes offline cached data from a cold cache waiting for a connection", () => {
   state.paused = true;
-  const cached = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const cached = renderToStaticMarkup(OrdersClient({ roles: ["sales"] }));
   expect(cached).toContain("Waiting for connection");
   expect(cached).toContain("Showing last-known data");
   state.pending = true;
-  const cold = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const cold = renderToStaticMarkup(OrdersClient({ roles: ["sales"] }));
   expect(cold).toContain("Waiting for connection");
   expect(cold).not.toMatch(/Loading orders|Showing last-known data|No orders yet/);
 });
 
 it("labels a failed refresh as last-known data instead of presenting it as current", () => {
   state.error = new Error("Could not refresh");
-  const html = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const html = renderToStaticMarkup(OrdersClient({ roles: ["sales"] }));
   expect(html).toContain("Showing last-known data");
   expect(html).toContain("Try again");
   expect(html).toContain("Last checked");

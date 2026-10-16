@@ -4,9 +4,9 @@ import { formatDate } from "@/lib/date-format";
 const state = vi.hoisted(() => ({ kind: "invoice" as "invoice" | "credit_memo", paid: false }));
 vi.mock("@/lib/portal", () => {
   const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
-  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { role: "customer" } }) };
+  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { roles: ["customer"] } }) };
 });
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "customer" }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["customer"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: async (name: string) => {

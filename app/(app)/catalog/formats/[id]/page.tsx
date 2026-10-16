@@ -29,7 +29,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const data = await orNotFound(runCommand("get_format_composition", { formatId: id }, ctx)) as Detail;
-  const writable = ctx.role === "admin" || ctx.role === "sales";
+  const writable = ctx.roles.includes("admin") || ctx.roles.includes("sales");
   if (data.format.basis === "poured") {
     const f = data.format;
     return <>{E.back("Catalog", `${f.price_groups?.name ?? "Price group"} · ${f.name}`, writable && f.price_group_id ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} priceGroupId={f.price_group_id} groupName={f.price_groups?.name} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined, "/catalog")}{E.info(`${f.ounces} oz · poured · never held as stock`)}</>;
@@ -50,7 +50,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const composable = canComposeFormat(data.format, data.usedAsChild);
   return <>
     {E.back("Catalog", data.format.name, writable ? <FormatForm key={JSON.stringify(data.format)} format={{ ...data.format, composed: components.length > 0 } satisfies FormatSnapshot["format"]}
-      deleteAction={ctx.role === "admin" ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
+      deleteAction={ctx.roles.includes("admin") ? <DeleteCommandButton control={DeleteFormatControl} command="delete_format" input={{ formatId: id }} name={data.format.name} redirect="/catalog" /> : null}
       canCompose={components.length === 0 && composable}
       materials={<FormatRowsForm key={JSON.stringify(lines)} formatId={id} kind="bom" initial={lines} options={materialOptions} />}
       contents={composable ? <section className="pt-3"><h3 className="text-sm font-medium">Package contents</h3><div className="pt-3"><FormatRowsForm key={JSON.stringify(components)} formatId={id} kind="components" initial={components} options={children} /></div></section> : undefined}

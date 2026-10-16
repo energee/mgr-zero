@@ -55,7 +55,7 @@ describe("QuickBooks portal payment link", () => {
     const user = await makeCustomerUser(customer.customerId);
     const ctx = {
       db: await asUser(user.email), userId: user.id, breweryId: brewery.id,
-      role: "customer" as const, customerId: customer.customerId,
+      roles: ["customer" as const], customerId: customer.customerId,
     };
     const connection = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id, realm_id: `realm-${crypto.randomUUID()}`, state: "connected",
@@ -142,7 +142,7 @@ describe("QuickBooks portal payment link", () => {
     const foreignUser = await makeCustomerUser(foreignCustomer.customerId);
     const foreignCtx = {
       db: await asUser(foreignUser.email), userId: foreignUser.id, breweryId: brewery.id,
-      role: "customer" as const, customerId: foreignCustomer.customerId,
+      roles: ["customer" as const], customerId: foreignCustomer.customerId,
     };
     const noFetch = vi.fn<typeof globalThis.fetch>();
     await expect(resolvePortalInvoicePayment(
@@ -166,7 +166,7 @@ describe("QuickBooks portal payment link", () => {
     const user = await makeCustomerUser(customer.customerId);
     const ctx = {
       db: await asUser(user.email), userId: user.id, breweryId: brewery.id,
-      role: "customer" as const, customerId: customer.customerId,
+      roles: ["customer" as const], customerId: customer.customerId,
     };
     const connection = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id, realm_id: `realm-${crypto.randomUUID()}`, state: "connected",

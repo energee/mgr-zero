@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: "sales" }) }));
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "sales" }) }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"] }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
@@ -46,14 +46,14 @@ describe("Orders list view loop", () => {
   });
 
   it("names an empty filtered list without inventing rows", () => {
-    const model = toOrdersListViewProps({ role: "sales", status: "shipped", orders: [] });
+    const model = toOrdersListViewProps({ roles: ["sales"], status: "shipped", orders: [] });
     expect(model.empty?.title).toBe("No shipped orders");
     expect(model.rows).toEqual([]);
   });
 
   it("names the customer filter in the empty state (#768)", () => {
-    expect(toOrdersListViewProps({ role: "sales", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No orders for Ridgeline Tap Room");
-    expect(toOrdersListViewProps({ role: "sales", status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
+    expect(toOrdersListViewProps({ roles: ["sales"], customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No orders for Ridgeline Tap Room");
+    expect(toOrdersListViewProps({ roles: ["sales"], status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
   });
 
   it("labels the customer filter with the customer's name even when no order matches (#768)", async () => {

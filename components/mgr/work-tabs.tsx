@@ -12,8 +12,8 @@ export const WORK_CHIPS: [label: string, href: string][] = [
   ["all", "/work"], ["orders", "/orders"], ["transfers", "/transfers"], ["batches", "/batches"], ["runs", "/packaging"], ["POs", "/purchase-orders"], ["routes", "/routes"],
 ];
 
-export function workHrefsFor(role: StaffRole) {
-  const work = navFor(STAFF_NAV, role).find(item => item.href === "/work");
+export function workHrefsFor(roles: readonly StaffRole[]) {
+  const work = navFor(STAFF_NAV, roles).find(item => item.href === "/work");
   return Object.fromEntries(WORK_CHIPS.filter(([, href]) => href === work?.href || work?.children?.some(item => item.href === href)));
 }
 

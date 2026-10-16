@@ -17,7 +17,7 @@ import { getGatewayLanguageModels } from "@/lib/chat/models";
 export default async function SettingsPage() {
   const brewery = await getActiveBrewery();
   const serverEnv = getServerEnv();
-  if (brewery.role !== "admin") redirect(deniedHref("Settings", ["admin"]));
+  if (!brewery.roles.includes("admin")) redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
   const [row, locations, team, ai, aiModels] = await Promise.all([
     runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null }>,

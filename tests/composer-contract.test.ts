@@ -9,9 +9,9 @@ import {
 } from "@/lib/commands/registry";
 
 const db = null as unknown as Ctx["db"];
-const admin = { db, userId: "a", breweryId: "b", role: "admin" as const };
-const warehouse = { ...admin, role: "warehouse" as const };
-const customer = { ...admin, role: "customer" as const, customerId: "c" };
+const admin = { db, userId: "a", breweryId: "b", roles: ["admin" as const] };
+const warehouse = { ...admin, roles: ["warehouse" as const] };
+const customer = { ...admin, roles: ["customer" as const], customerId: "c" };
 
 describe("composer registry contract", () => {
   beforeEach(() => _clearRegistry());

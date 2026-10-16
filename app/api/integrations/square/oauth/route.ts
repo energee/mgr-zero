@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const actorId = data?.claims.sub;
     const picked = (await cookies()).get("brewery")?.value;
     const activeBrewery = await getActiveBrewery();
-    if (typeof actorId !== "string" || activeBrewery.role !== "admin" || (picked && picked !== activeBrewery.id)) {
+    if (typeof actorId !== "string" || !activeBrewery.roles.includes("admin") || (picked && picked !== activeBrewery.id)) {
       throw new Error("oauth state invalid");
     }
     await completeSquareOAuth({

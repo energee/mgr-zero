@@ -369,7 +369,7 @@ describe("Settings view", () => {
     expect(inventory).not.toContain('href="/catalog/water-profiles"');
     const page = src("app/(app)/settings/page.tsx");
     expect(page).toContain('water: "/catalog/water-profiles"');
-    expect(page).toContain('brewery.role !== "admin"');
+    expect(page).toContain('!brewery.roles.includes("admin")');
   });
 
   it("the Settings inventory record is SettingsView", () => {

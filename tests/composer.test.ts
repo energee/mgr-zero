@@ -132,7 +132,7 @@ describe("AI composer", () => {
   });
 
   it("keeps chat and history staff-only", () => {
-    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, role: "customer" } as Parameters<typeof canRun>[0];
+    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, roles: ["customer"] } as Parameters<typeof canRun>[0];
     for (const name of ["create_chat_conversation", "append_chat_message", "list_chat_conversations", "get_chat_history"]) expect(canRun(customer, name)).toBe(false);
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });

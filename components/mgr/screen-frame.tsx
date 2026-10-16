@@ -57,7 +57,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
   const me = (
     <MeSheet avatar={{ src: persona.avatar, name: persona.name }}>
       <MeView
-        model={{ name: persona.name, role: persona.role, email: `${persona.handle.slice(1)}@demobrewing.com`, breweries: [{ name: "Demo Brewing", current: true }] }}
+        model={{ name: persona.name, roles: persona.roles, email: `${persona.handle.slice(1)}@demobrewing.com`, breweries: [{ name: "Demo Brewing", current: true }] }}
         avatar={<UserAvatar src={persona.avatar} name={persona.name} className="size-10" />}
       />
     </MeSheet>
@@ -69,9 +69,9 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
   ) : (
     <AppShell
       brand="Demo Brewing"
-      items={navFor(STAFF_NAV, persona.role)}
+      items={navFor(STAFF_NAV, persona.roles)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={E.comp(persona.role)}
+      composer={E.comp(persona.roles)}
       active={s.tab}
     >
       {body}

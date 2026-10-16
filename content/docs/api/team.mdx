@@ -3,10 +3,19 @@ title: "Team & brewery settings"
 description: "Staff, invitations, brewery setup, operating defaults, imports and integrations."
 ---
 
-Staff roles are `admin`, `sales`, `warehouse`, `brewer` and `taproom`, and
-every operation in this reference lists the roles allowed to call it. A membership is what ties a
-user to a brewery. Revoking one ends access without deleting the history that
-member wrote.
+Staff roles are `admin`, `sales`, `warehouse`, `brewer` and `taproom`. A member
+can hold several roles and receives every permission allowed by any of them.
+Every operation in this reference lists the roles allowed to call it. Staff
+roles never grant customer-portal membership. Revoking a brewery membership
+ends its access without deleting the history that member wrote.
+
+`list_team_members` returns a `roles` array for each member.
+`update_staff_role` replaces a member's roles with the nonempty `roles` array
+in its input; duplicate values are removed and the response uses enum order.
+Removing `admin` is a demotion even when other roles remain, and is refused
+when it would leave the brewery without an admin. The old scalar `role`
+input is no longer accepted by that command. `invite_staff` still grants
+one role; an admin can add others afterward.
 
 `invite_staff` assigns one role; `invite_customer_user` links one customer. An
 email with no confirmed Auth account is sent an Auth invitation and the
@@ -448,7 +457,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff roster for the brewery: user id, email, @handle (the email's local part) and role
+Staff roster for the brewery: user id, email, @handle (the email's local part) and roles
 
 Takes no input.
 
@@ -893,18 +902,18 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Change one member's role (admin); refused when it would leave the brewery without an admin
+Change one member's roles (admin); refused when it would leave the brewery without an admin
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `userId` | uuid | yes |
-| `role` | admin or sales or warehouse or brewer or taproom | yes |
+| `roles` | array of admin or sales or warehouse or brewer or taproom | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_staff_role", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000", "role": "admin" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_staff_role", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000", "roles": [ "admin" ] } }'
 ```
 
 {/* end ops:team */}

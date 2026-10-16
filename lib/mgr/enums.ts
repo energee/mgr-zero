@@ -13,6 +13,9 @@
 // The words operators read live elsewhere (`lib/mgr/keg-labels.ts`,
 // `sentenceCase` in `lib/mgr/labels.ts`); these are the stored values.
 
+/** Every staff role, in the database enum's display order. */
+export const STAFF_ROLES = ["admin", "sales", "warehouse", "brewer", "taproom"] as const;
+
 // Kegs (lib/commands/taproom.ts).
 export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;

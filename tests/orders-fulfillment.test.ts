@@ -552,7 +552,7 @@ describe("confirm_delivery", () => {
     expect(mvAfter.data!.length).toBe(mvBefore.data!.length);
     const again = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
     expect(again.error?.message).toMatch(/already delivered/);
-    const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" }) as
+    const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, roles: ["admin"] }) as
       { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty: number }[]; invoice: { id: string } | null };
     expect(stop.delivery.signed_by).toBe("Dana");
     expect(stop.delivery.shipments.invoice_timing).toBe("on_delivery");
@@ -597,7 +597,7 @@ describe("return_shipment", () => {
 
 describe("release_allocation and get_shortfalls", () => {
   it("get_shortfalls lists negative-ATP skus; release_allocation frees the reservation", async () => {
-    const ctx = { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" as const };
+    const ctx = { db: staffDb, userId: staffId, breweryId: b.id, roles: ["admin" as const] };
     const id = await confirmedOrder(1000); // opening balance is 100
     const line = await lineOf(id);
     const { data: alloc } = await admin.from("allocations").select("id").eq("ref", line.id).single();

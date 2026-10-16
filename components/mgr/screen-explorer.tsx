@@ -35,7 +35,7 @@ const SURFACES: Surface[] = ["page", "sheet", "entry"];
 const DENIED = "Permission denied";
 // The landings the persona switch swaps for the new role's own; Driver and
 // Taproom stay put for a role that may open them.
-const HOMES = [...new Set(PERSONAS.map((p) => homeFor(p.role)))];
+const HOMES = [...new Set(PERSONAS.map((p) => homeFor(p.id)))];
 // The hash as an external store: the static page renders with no selection,
 // the client reads the hash on hydration, and every control writes it back.
 const onHash = (cb: () => void) => {
@@ -72,7 +72,7 @@ export function ScreenExplorer() {
   // The demo user the shell is drawn as (lib/mgr/demo-personas.ts). Chosen
   // outside the app, like signing in as a test account: their face and role's
   // rail, their own Today, and a refusal where their role may not go.
-  const persona = personaFor((view.p ?? PERSONAS[0].role) as StaffRole);
+  const persona = personaFor((view.p ?? PERSONAS[0].id) as StaffRole);
   // The screen the persona was last refused, for Permission denied's copy.
   const [refused, setRefused] = useState<string>();
   // Hits in area order, as the inventory page groups them, so each area heads
@@ -102,7 +102,7 @@ export function ScreenExplorer() {
   // screen as them (drawn as a refusal if their role may not open it).
   const choose = (role: StaffRole) => {
     const name = current?.[1].name;
-    if (name === DENIED && refused && !deniedFor(role, refused)) {
+    if (name === DENIED && refused && !deniedFor(personaFor(role).roles, refused)) {
       const back = screenByName(refused);
       if (back) return go(back[0], true, { p: role }, true);
     }
@@ -159,8 +159,8 @@ export function ScreenExplorer() {
     if (!name || name === current[1].name) return actInPlace(el, label, back, walk.length > 1);
     e.stopPropagation();
     if (name === BACK) return back();
-    const home = name === "Today" ? homeFor(persona.role) : name;
-    const denied = deniedFor(persona.role, home);
+    const home = name === "Today" ? homeFor(persona.id) : name;
+    const denied = deniedFor(persona.roles, home);
     if (denied) setRefused(home);
     const hit = screenByName(denied ? DENIED : home);
     if (hit) step(hit[0]);
@@ -178,7 +178,7 @@ export function ScreenExplorer() {
   // than 80svh), and tabs that open a screen this persona may not are hidden,
   // as the app would hide them.
   const boxCss = ".screen-box [data-slot=sidebar-container]{height:100%}"
-    + Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
+    + Object.values(WORK_TABS).filter((n) => deniedFor(persona.roles, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
   // The selected row stays in view when a tap or a link lands far down the list.
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
@@ -192,7 +192,7 @@ export function ScreenExplorer() {
     for (const row of box.querySelectorAll<HTMLElement>("[data-slot=item]:has([aria-label=Open])")) {
       const title = row.querySelector("[data-slot=item-title]")?.textContent ?? "";
       const name = resolveTap(current[1], title);
-      row.hidden = Boolean(name && name !== BACK && deniedFor(persona.role, name));
+      row.hidden = Boolean(name && name !== BACK && deniedFor(persona.roles, name));
     }
   }, [box, current, persona]);
 
@@ -214,11 +214,11 @@ export function ScreenExplorer() {
           {SURFACES.map((s) => <ToggleGroupItem key={s} value={s} className="capitalize">{s}</ToggleGroupItem>)}
         </ToggleGroup>
         <span className="text-sm text-fd-muted-foreground">{hits.length} {hits.length === 1 ? "screen" : "screens"}</span>
-        <Select value={persona.role} onValueChange={(v) => choose(v as StaffRole)}>
+        <Select value={persona.id} onValueChange={(v) => choose(v as StaffRole)}>
           <SelectTrigger className="w-48" aria-label="Persona"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              {PERSONAS.map((p) => <SelectItem key={p.role} value={p.role}>{p.name} · {p.role}</SelectItem>)}
+              {PERSONAS.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} · {p.id}</SelectItem>)}
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -248,7 +248,7 @@ export function ScreenExplorer() {
         {current && (() => {
           // A screen the persona may not open draws as the refusal, whether
           // reached by a tap, a switch or a link.
-          const shut = current[1].name !== DENIED && deniedFor(persona.role, current[1].name);
+          const shut = current[1].name !== DENIED && deniedFor(persona.roles, current[1].name);
           const record = shut ? (screenByName(DENIED)?.[1] ?? current[1]) : current[1];
           const s = asPersona(record, persona, shut ? current[1].name : (refused ?? (record.name === DENIED ? "Invoices" : undefined)));
           return (
@@ -264,7 +264,7 @@ export function ScreenExplorer() {
                 </nav>
               )}
               {phone ? (
-                <ScreenIframe index={current[0]} title={s.name} mode="phone" persona={persona.role} preview />
+                <ScreenIframe index={current[0]} title={s.name} mode="phone" persona={persona.id} preview />
               ) : (
                 /* The transform makes this box the containing block for the shell's
                    fixed-position rail, so it draws here and not over the docs

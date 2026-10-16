@@ -47,7 +47,7 @@ describe("command request retention (#766)", () => {
     sql(`update public.qbo_connections set state='disconnected', remote_revocation_state='unresolved' where id='${connection}'`, true);
     const invite = crypto.randomUUID();
     sql(`insert into private.invite_requests(brewery_id,actor_id,email,kind,role,state,request_id)
-      values('${brewery.id}',(select user_id from brewery_users where brewery_id='${brewery.id}' and role='admin'),'${invite}@test.local','staff','warehouse','pending_auth','${invite}')`, true);
+      values('${brewery.id}',(select user_id from brewery_users where brewery_id='${brewery.id}' and 'admin'=any(roles)),'${invite}@test.local','staff','warehouse','pending_auth','${invite}')`, true);
     close();
     close(); // a second close is a no-op
     expect(sql(`select count(*) from brewery_users where brewery_id='${brewery.id}'`, true)).toEqual(["0"]);

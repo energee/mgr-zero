@@ -14,7 +14,7 @@ export interface RequestIdentity {
 export interface StaffMembership {
   breweryId: string;
   breweryName: string;
-  role: StaffRole;
+  roles: StaffRole[];
   /** breweries.timezone (IANA): every timestamp on a staff page prints in it (#442). */
   timeZone: string;
 }
@@ -28,7 +28,7 @@ export interface CustomerMembership {
 
 type StaffMembershipRow = {
   brewery_id: string;
-  role: StaffMembership["role"];
+  roles: StaffMembership["roles"];
 };
 
 type CustomerMembershipRow = {
@@ -45,17 +45,17 @@ export interface RequestAuthContext {
   getIdentity(): Promise<RequestIdentity | null>;
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
-  /** The caller's role at one brewery, or null when not staff there: the one fact a command needs. */
-  getStaffRole(breweryId: string): Promise<StaffRole | null>;
+  /** The caller's roles at one brewery, or null when not staff there: the facts a command needs. */
+  getStaffRoles(breweryId: string): Promise<StaffRole[] | null>;
   getCustomerMembership(breweryId: string, customerId?: string): Promise<CustomerMembership | null>;
 }
 
-/** One user's role at one brewery (null when not staff there), read from the
+/** One user's roles at one brewery (null when not staff there), read from the
  *  single brewery_users row; a database failure is a 500 db_error via unwrap.
  *  Shared by the cookie and bearer command contexts. */
-export async function staffRoleAt(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<StaffRole | null> {
-  const row = await unwrap(db.from("brewery_users").select("role").eq("user_id", userId).eq("brewery_id", breweryId).maybeSingle());
-  return row?.role ?? null;
+export async function staffRolesAt(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<StaffRole[] | null> {
+  const row = await unwrap(db.from("brewery_users").select("roles").eq("user_id", userId).eq("brewery_id", breweryId).maybeSingle());
+  return row?.roles ?? null;
 }
 
 /**
@@ -84,7 +84,7 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     const db = await getSupabaseClient();
     const { data, error } = await db
       .from("brewery_users")
-      .select("brewery_id, role")
+      .select("brewery_id, roles")
       .eq("user_id", requestIdentity.userId)
       .returns<StaffMembershipRow[]>();
     if (error) throw error;
@@ -95,10 +95,10 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
       : { data: [], error: null };
     if (breweryError) throw breweryError;
     const breweryRows = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery]));
-    return (data ?? []).map(({ brewery_id, role }) => {
+    return (data ?? []).map(({ brewery_id, roles }) => {
       const brewery = breweryRows.get(brewery_id);
       if (!brewery?.name || !brewery.timezone) throw new Error("staff membership brewery is unavailable");
-      return { breweryId: brewery_id, breweryName: brewery.name, role, timeZone: brewery.timezone };
+      return { breweryId: brewery_id, breweryName: brewery.name, roles, timeZone: brewery.timezone };
     });
   })());
   const getCustomerMemberships = () => (customerMemberships ??= (async () => {
@@ -133,19 +133,19 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     getIdentity,
     getStaffMemberships,
     getCustomerMemberships,
-    // A command needs only the role, so it reads one brewery_users row rather than
+    // A command needs only roles, so it reads one brewery_users row rather than
     // every membership plus the staff_brewery name/timezone a layout prints (#759).
     // When this request already loaded the memberships (getActiveBrewery does,
-    // before buildContext), the role comes from them and keeps their contract on
+    // before buildContext), the roles come from them and keep their contract on
     // purpose: a page whose staff_brewery row is missing has already failed there.
-    async getStaffRole(breweryId) {
+    async getStaffRoles(breweryId) {
       if (staffMemberships) {
         const membership = (await staffMemberships).find((m) => m.breweryId === breweryId);
-        return membership?.role ?? null;
+        return membership?.roles ?? null;
       }
       const requestIdentity = await getIdentity();
       if (!requestIdentity) return null;
-      return staffRoleAt(await getSupabaseClient(), requestIdentity.userId, breweryId);
+      return staffRolesAt(await getSupabaseClient(), requestIdentity.userId, breweryId);
     },
     async getCustomerMembership(breweryId, customerId) {
       return (await getCustomerMemberships()).find((membership) => membership.breweryId === breweryId && (!customerId || membership.customerId === customerId)) ?? null;

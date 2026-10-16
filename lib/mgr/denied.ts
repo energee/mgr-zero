@@ -3,17 +3,17 @@
 // bookmarked URL still lands on the page, so an admin-only page checks the
 // role and sends the visitor to deniedHref() with what was refused and the
 // roles that would satisfy it. deniedCopy() is what that page then prints.
-export type Denied = { resource: string; role: string; needs: string[] };
+export type Denied = { resource: string; roles: readonly string[]; needs: readonly string[] };
 
 /** The three lines the Permission denied screen prints. */
-export function deniedCopy({ resource, role, needs }: Denied) {
+export function deniedCopy({ resource, roles, needs }: Denied) {
   const list = needs.length ? needs.join(" or ") : "another role";
   return {
     note: `You do not have access to ${resource}.`,
-    signedInAs: role,
+    signedInAs: roles.join(", "),
     needs: list,
     hint: needs.includes("admin") && needs.length === 1 ? "Ask an admin at your brewery." : "An admin can change your role in Settings, then Team.",
   };
 }
 
-export const deniedHref = (resource: string, needs: string[]) => `/denied?for=${encodeURIComponent(resource)}&needs=${encodeURIComponent(needs.join(","))}`;
+export const deniedHref = (resource: string, needs: readonly string[]) => `/denied?for=${encodeURIComponent(resource)}&needs=${encodeURIComponent(needs.join(","))}`;

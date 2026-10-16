@@ -4,6 +4,7 @@ import { toJson } from "./json";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 
 export type IntegrationProvider = "qbo" | "square";
 
@@ -98,7 +99,7 @@ type TokenRow = {
 };
 
 function requireIntegrationRole(ctx: Ctx) {
-  if (ctx.role !== "admin" && ctx.role !== "sales") {
+  if (!hasAnyRole(ctx.roles, ["admin", "sales"])) {
     throw new CommandError("integration access requires admin or sales", 403);
   }
 }
@@ -501,7 +502,7 @@ export async function finishSquarePublication(
 }
 
 export async function getSquareHealth(ctx: Ctx) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const { data, error } = await ctx.db.from("pos_connections")
     .select("id,merchant_id,merchant_label,state,remote_revocation_state,last_error,access_expires_at,sales_synced_through,catalog_sync_generation,updated_at")
     .eq("brewery_id", ctx.breweryId).eq("provider", "square").maybeSingle();
@@ -523,7 +524,7 @@ export async function getSquareHealth(ctx: Ctx) {
 export type SquareRevokeTarget = { accessToken: string } | { merchantId: string };
 
 export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (target: SquareRevokeTarget) => Promise<void>, requestId: string) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("begin_square_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId,
@@ -585,7 +586,7 @@ export async function getQboHealth(ctx: Ctx) {
 }
 
 export async function disconnectQbo(ctx: Ctx, connectionId: string, revoke: (token: string) => Promise<void>, requestId: string) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("begin_qbo_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId,
@@ -721,7 +722,7 @@ export async function finishPortalQuoteTax(ctx: Ctx, quoteId: string, connection
 }
 
 export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Promise<PortalInvoicePaymentClaim | null> {
-  if (ctx.role !== "customer" || !ctx.customerId || !isUuid(invoiceId)) {
+  if (!onlyRoles(ctx.roles, ["customer"]) || !ctx.customerId || !isUuid(invoiceId)) {
     throw new CommandError("invoice not found", 404, "not_found");
   }
   const visible = await ctx.db.from("portal_invoices").select("id").eq("id", invoiceId)

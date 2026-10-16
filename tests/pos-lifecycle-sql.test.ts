@@ -1,23 +1,137 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { beginSquareOAuth, refreshSquareCredentials, SquareClient } from "@/lib/pos";
-import { disconnectSquare, readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
-import { admin, makeBrewery, makeStaffCtx, sql } from "./helpers";
+import { beginSquareOAuth, prepareSquareCatalogPublication, refreshSquareCredentials, SquareClient } from "@/lib/pos";
+import {
+  beginSquareMenuPublication, beginSquarePublication, disconnectSquare, finishSquarePublication,
+  leaseSquarePublication, prepareSquarePublication, readVersionedIntegrationTokens,
+} from "@/lib/supabase/integration-tokens";
+import { runCommand, type StaffRole } from "@/lib/commands/registry";
+import { admin, channelId, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, seedPour, sql } from "./helpers";
+import "@/lib/commands/all";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const config = { applicationId: "sandbox-app", applicationSecret: "sandbox-secret",
   redirectUri: "https://mgr.test/api/integrations/square/oauth", environment: "sandbox" as const };
 
+async function multiRolePublicationFixture() {
+  const brewery = await makeBrewery();
+  const ctx = await makeStaffCtx(brewery.id, ["sales", "warehouse"]);
+  const location = await seedLocation(brewery.id, { name: "Multi-role Taproom", uses: ["taproom"] });
+  const connection = await admin.from("pos_connections").insert({
+    brewery_id: brewery.id, merchant_id: `multi-role-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+  }).select("id").single();
+  expect(connection.error).toBeNull();
+  sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+    values('${brewery.id}','square','${connection.data!.id}','multi-square-access','multi-square-refresh',1)`);
+  expect((await admin.from("pos_locations").insert({
+    brewery_id: brewery.id, connection_id: connection.data!.id, external_location_id: "L1",
+    external_name: "Square Taproom", external_status: "ACTIVE", location_id: location.id,
+  })).error).toBeNull();
+  const channel = await channelId(brewery.id, "Taproom");
+  const catalog = await seedCatalog(brewery.id, { product: "Multi-role beer", packageType: "keg", bblPerUnit: 0.5 });
+  const formatId = await seedPour(brewery.id, { brandId: catalog.brandId, name: "Pint", ounces: 16 });
+  await priceSku(brewery.id, { saleChannelId: channel, brandId: catalog.brandId, formatId, cents: 700 });
+  await runCommand("record_movement", {
+    skuId: catalog.skuId, locationId: location.id, binId: location.binId, qty: 1, type: "opening_balance",
+  }, ctx, { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
+  await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel },
+    ctx, { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
+  return { brewery, ctx, connectionId: connection.data!.id, brandId: catalog.brandId, formatId };
+}
+
 describe("Square durable credential lifecycle", () => {
+  it("publishes through the sales plus warehouse union without contacting Square", async () => {
+    const f = await multiRolePublicationFixture();
+    const started = await beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: f.brandId },
+      crypto.randomUUID(), "publish_pos_item");
+    const prepared = prepareSquareCatalogPublication(started.source);
+    const body = JSON.stringify({ idempotency_key: started.providerKey, object: prepared.object });
+    await prepareSquarePublication(f.ctx, started.attemptId, body, prepared.itemVersion, prepared.variationVersions);
+    expect(await leaseSquarePublication(f.ctx, started.attemptId))
+      .toMatchObject({ accessToken: "multi-square-access", credentialVersion: 1, requestBody: body });
+    const object = JSON.parse(body).object;
+    const variation = object.item_data.variations[0];
+    expect(await finishSquarePublication(f.ctx, started.attemptId, null, {
+      catalogObject: { ...object, id: "MULTI-ITEM", version: 1, item_data: {
+        ...object.item_data, variations: [{ ...variation, id: "MULTI-VAR", version: 1,
+          item_variation_data: { ...variation.item_variation_data, item_id: "MULTI-ITEM" } }],
+      } },
+      idMappings: [{ client_object_id: object.id, object_id: "MULTI-ITEM" },
+        { client_object_id: variation.id, object_id: "MULTI-VAR" }],
+    })).toMatchObject({ published: true, externalItemId: "MULTI-ITEM" });
+    expect(sql(`select status from private.square_publications where id='${started.attemptId}';
+      select external_variation_id from public.pos_catalog_ownership
+        where connection_id='${f.connectionId}' and format_id='${f.formatId}'`)).toEqual(["succeeded", "MULTI-VAR"]);
+  });
+
+  it.each([
+    { remainingRoles: ["sales"] as StaffRole[], superseded: true },
+    { remainingRoles: ["sales", "admin"] as StaffRole[], superseded: false },
+  ])("rechecks menu and item role unions after warehouse removal: $remainingRoles", async ({ remainingRoles, superseded }) => {
+    const f = await multiRolePublicationFixture();
+    const owner = await makeStaffCtx(f.brewery.id, "admin");
+    const menuRequest = crypto.randomUUID();
+    const menu = await beginSquareMenuPublication(f.ctx, { posLocationId: "L1" }, menuRequest);
+    const child = menu.manifest.find((entry) => entry.brandId === f.brandId)!;
+    const started = await beginSquarePublication(f.ctx, {
+      posLocationId: "L1", brandId: f.brandId, menuPublicationId: menu.menuAttemptId,
+    }, child.requestId, "publish_pos_menu");
+    const prepared = prepareSquareCatalogPublication(started.source);
+    await prepareSquarePublication(f.ctx, started.attemptId,
+      JSON.stringify({ idempotency_key: started.providerKey, object: prepared.object }),
+      prepared.itemVersion, prepared.variationVersions);
+    expect((await admin.from("brewery_users").update({ roles: remainingRoles })
+      .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
+    if (superseded) {
+      expect((await admin.rpc("lease_square_publication", {
+        p_brewery: f.brewery.id, p_publication: started.attemptId, p_actor: f.ctx.userId,
+      })).error?.code).toBe("42501");
+      // A current operator reconciles work whose initiating actor lost access.
+      await expect(leaseSquarePublication(owner, started.attemptId)).rejects.toMatchObject({ status: 409 });
+      expect(sql(`select status||':'||error_code from private.square_publications where id='${started.attemptId}';
+        select status||':'||(result->>'errorCode') from private.square_menu_publications where id='${menu.menuAttemptId}';
+        select result->'result'->>'errorCode' from private.command_requests
+          where actor_id='${f.ctx.userId}' and request_id='${child.requestId}'`))
+        .toEqual(["superseded:role_changed", "superseded:role_changed", "role_changed"]);
+    } else {
+      expect(await leaseSquarePublication(f.ctx, started.attemptId)).toMatchObject({ accessToken: "multi-square-access" });
+      expect(sql(`select status from private.square_publications where id='${started.attemptId}';
+        select status from private.square_menu_publications where id='${menu.menuAttemptId}'`))
+        .toEqual(["prepared", "publishing"]);
+    }
+  });
+
+  it("returns newest order versions for warehouse unions and no rows for sales-only or foreign staff", async () => {
+    const brewery = await makeBrewery();
+    const operator = await makeStaffCtx(brewery.id, ["sales", "warehouse"]);
+    const sales = await makeStaffCtx(brewery.id, "sales");
+    const foreign = await makeBrewery();
+    const outsider = await makeStaffCtx(foreign.id, ["admin", "warehouse"]);
+    const connection = await admin.from("pos_connections").insert({
+      brewery_id: brewery.id, merchant_id: `versions-${crypto.randomUUID()}`, state: "connected",
+    }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.square_order_snapshots(brewery_id,connection_id,merchant_id,external_order_id,source_version,snapshot_hash)
+      select c.brewery_id,c.id,c.merchant_id,'multi-role-order',v.version,'fixture-'||v.version::text
+      from public.pos_connections c cross join (values (1::bigint),(3::bigint)) v(version)
+      where c.id='${connection.data!.id}'`);
+    expect(await operator.db.rpc("pos_order_versions")).toMatchObject({
+      error: null, data: [{ brewery_id: brewery.id, connection_id: connection.data!.id,
+        external_order_id: "multi-role-order", source_version: 3 }],
+    });
+    expect(await sales.db.rpc("pos_order_versions")).toMatchObject({ error: null, data: [] });
+    expect(await outsider.db.rpc("pos_order_versions")).toMatchObject({ error: null, data: [] });
+  });
+
   it("binds OAuth state to its initiating Admin and current role", async () => {
     const brewery = await makeBrewery();
-    const adminCtx = await makeStaffCtx(brewery.id, "admin");
+    const adminCtx = await makeStaffCtx(brewery.id, ["sales", "admin"]);
     const other = await makeStaffCtx(brewery.id, "admin");
     const authorize = new URL((await beginSquareOAuth(adminCtx, new SquareClient(config, vi.fn()), "connect", crypto.randomUUID())).authorizeUrl);
 
     expect((await admin.rpc("claim_square_oauth", { p_state_hash: hash(authorize.searchParams.get("state")!),
       p_actor: other.userId, p_brewery: brewery.id, p_redirect_uri: config.redirectUri })).data).toEqual([]);
-    expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ roles: ["sales", "warehouse"] }).eq("brewery_id", brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
     expect((await admin.rpc("claim_square_oauth", { p_state_hash: hash(authorize.searchParams.get("state")!),
       p_actor: adminCtx.userId, p_brewery: brewery.id, p_redirect_uri: config.redirectUri })).data).toEqual([]);
   });

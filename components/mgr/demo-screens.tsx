@@ -13,20 +13,21 @@ import { MeView } from "@/components/mgr/views/me";
 import { ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 import { personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { needsFor, type Persona } from "@/lib/mgr/demo-personas";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 
 const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "disjunction" }).format(xs) : "admin");
 
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {
   if (screen.name === "Orders") {
-    const canWrite = persona.role === "admin" || persona.role === "sales";
-    const model = toOrdersListViewProps({ ...ordersWorkList, role: persona.role });
+    const canWrite = hasAnyRole(persona.roles, ["admin", "sales"]);
+    const model = toOrdersListViewProps({ ...ordersWorkList, roles: persona.roles });
     // createAction: undefined keeps OrdersView's default New order button; null hides it.
     const body = screen.body as ReactElement<ComponentProps<typeof OrdersView>>;
     return { ...screen, body: cloneElement(body, { model, createAction: canWrite ? undefined : null }) };
   }
   if (screen.name === "My notification preferences") {
-    return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={persona.role !== "taproom"} back={persona.role === "admin" ? "Chat" : "More"} /> };
+    return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={!onlyRoles(persona.roles, ["taproom"])} back={hasAnyRole(persona.roles, ["admin"]) ? "Chat" : "More"} /> };
   }
   if (screen.name === "Me") {
     return {
@@ -34,7 +35,7 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
       body: <MeView
         model={{
           name: persona.name,
-          role: persona.role,
+          roles: persona.roles,
           email: `${persona.handle.slice(1)}@demobrewing.com`,
           breweries: [{ name: "Demo Brewing", current: true }],
         }}
@@ -49,7 +50,7 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
         <>
           {E.back("Today", "No access")}
           {E.note(`You do not have access to ${refused}.`)}
-          {E.fld("Signed in as", `${persona.handle} · ${persona.role}`)}
+          {E.fld("Signed in as", `${persona.handle} · ${persona.roles.join(", ")}`)}
           {E.fld("Needs", list(needsFor(refused)))}
           {E.info("An admin can change your role in Settings, then Team.")}
           {E.btns([["Back to Today", "p"]])}

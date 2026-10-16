@@ -69,6 +69,6 @@ describe("search_entities", () => {
   it("refuses a customer role", async () => {
     const u = await makeCustomerUser(customerId);
     const db = await asUser(u.email);
-    await expect(search("Haz", { db, userId: u.id, breweryId: b.id, role: "customer", customerId })).rejects.toThrow(/permission denied/);
+    await expect(search("Haz", { db, userId: u.id, breweryId: b.id, roles: ["customer"], customerId })).rejects.toThrow(/permission denied/);
   });
 });

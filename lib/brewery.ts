@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
 import { buildContext } from "@/lib/commands/context";
 import { deniedHref } from "@/lib/mgr/denied";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 /** The brewery this request operates as, with its time zone for formatting timestamps. */
 export async function getActiveBrewery() {
@@ -14,11 +15,11 @@ export async function getActiveBrewery() {
 
   const picked = (await cookies()).get("brewery")?.value;
   const membership = memberships.find(({ breweryId }) => breweryId === picked) ?? memberships[0];
-  return { id: membership.breweryId, name: membership.breweryName, role: membership.role, timeZone: membership.timeZone };
+  return { id: membership.breweryId, name: membership.breweryName, roles: membership.roles, timeZone: membership.timeZone };
 }
 
 export async function requireAdminContext(label: string) {
   const brewery = await getActiveBrewery();
-  if (brewery.role !== "admin") redirect(deniedHref(label, ["admin"]));
+  if (!hasAnyRole(brewery.roles, ["admin"])) redirect(deniedHref(label, ["admin"]));
   return { brewery, ctx: await buildContext(brewery.id) };
 }

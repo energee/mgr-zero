@@ -1,5 +1,6 @@
 import type { StaffRole } from "@/lib/commands/registry";
 import { money } from "./money";
+import { hasAnyRole } from "./roles";
 
 export type QboInvoiceAction = "push" | "retry" | "fix_mapping" | "corrected_push" | "repush" | "write_off";
 export type QboRemoteCreateAction = Extract<QboInvoiceAction, "push" | "retry" | "corrected_push" | "repush">;
@@ -34,7 +35,7 @@ export function qboMappingVersion(currentId?: string | null) {
 /** paidStatusShown means detail already conveys full paid status; callers need not repeat it. */
 export function qboInvoicePresentation(input: {
   kind: "invoice" | "credit_memo";
-  role: StaffRole;
+  roles: readonly StaffRole[];
   connected: boolean;
   syncStatus: "pending" | "pushed" | "push_failed" | "not_synced";
   hasPendingPush?: boolean;
@@ -47,11 +48,11 @@ export function qboInvoicePresentation(input: {
   writtenOff?: boolean;
   missingMappings?: boolean;
 }): { detail: string; actions: QboInvoiceAction[]; paidStatusShown?: true } {
-  const canWriteOff = input.kind === "invoice" && input.role === "admin";
+  const canWriteOff = input.kind === "invoice" && hasAnyRole(input.roles, ["admin"]);
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
   // A historical order (record_historical_order) is never sent to QuickBooks.
   if (input.syncStatus === "not_synced") return { detail: "not in QuickBooks (before the books opened)", actions: [] };
-  if (input.role === "warehouse" || input.role === "brewer" || input.role === "taproom") {
+  if (!hasAnyRole(input.roles, ["admin", "sales"])) {
     return { detail: input.syncStatus === "pushed" ? "QuickBooks status available to Sales" : "not pushed", actions: [] };
   }
   if (input.remoteState === "deleted") return { detail: "deleted in QuickBooks", actions: [
@@ -102,8 +103,8 @@ export type QboStaffConnection = { connected: boolean; connectionId?: string; re
 export type QboPushedIdentity = { connection_id: string; realm_id: string; qbo_entity_id: string | null };
 
 /** Intuit's Projects Java sample supplies the invoice/company URL contract; see the pinned verification note. */
-export function qboStaffInvoiceLink(invoice: QboInvoiceIdentity, role: StaffRole | "customer", connection: QboStaffConnection, push?: QboPushedIdentity): QboStaffInvoiceLink | null {
-  if (role !== "admin" && role !== "sales") return null;
+export function qboStaffInvoiceLink(invoice: QboInvoiceIdentity, roles: readonly (StaffRole | "customer")[], connection: QboStaffConnection, push?: QboPushedIdentity): QboStaffInvoiceLink | null {
+  if (!hasAnyRole(roles, ["admin", "sales"])) return null;
   if (invoice.kind === "credit_memo") return { href: null, reason: "A supported staff destination for credit memos is unavailable. Find this credit memo in QuickBooks." };
   if (!connection.connected) return { href: null, reason: "Connect QuickBooks before opening this invoice in its company." };
   if (invoice.qbo_remote_state === "deleted") return { href: null, reason: "This invoice was deleted in QuickBooks." };

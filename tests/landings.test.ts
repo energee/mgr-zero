@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { channelId, ins, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
-import type { WorkRow } from "@/lib/commands/landings";
+import { defaultWorkKinds, type WorkRow } from "@/lib/commands/landings";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
@@ -23,9 +23,29 @@ describe("get_beer_overview", () => {
     for (const ctx of [adminCtx, sales, warehouse, brewer]) {
       const o = await runCommand("get_beer_overview", {}, ctx) as Record<string, number>;
       for (const k of ["fgShortages", "taproomBelowPar", "openTaps", "openOccupancies", "materialShortages", "kegsOut"]) {
-        expect(typeof o[k], `${ctx.role} ${k}`).toBe("number");
+        expect(typeof o[k], `${ctx.roles.join("+")} ${k}`).toBe("number");
       }
     }
+  });
+
+  it("uses the full overview for taproom plus brewer, but keeps taproom-only stock", async () => {
+    const taproom = await makeStaffCtx(b.id, "taproom");
+    const combined = await makeStaffCtx(b.id, ["brewer", "taproom"]);
+    expect(await runCommand("get_beer_overview", {}, taproom)).toEqual({ taproomStock: [] });
+    const overview = await runCommand("get_beer_overview", {}, combined) as Record<string, unknown>;
+    expect(overview).not.toHaveProperty("taproomStock");
+    expect(overview).toHaveProperty("openOccupancies", 0);
+  });
+});
+
+describe("defaultWorkKinds", () => {
+  it("unions all held roles without duplicate chips or role-order dependence", () => {
+    const expected = ["orders", "batches", "runs", "POs"];
+    expect(defaultWorkKinds(["sales", "brewer"])).toEqual(expected);
+    expect(defaultWorkKinds(["brewer", "sales"])).toEqual(expected);
+    expect(defaultWorkKinds(["warehouse", "brewer"])).toEqual(["orders", "transfers", "batches", "runs", "POs", "routes"]);
+    expect(defaultWorkKinds(["taproom"])).toEqual([]);
+    expect(defaultWorkKinds(["admin", "sales"])).toEqual(["orders", "transfers", "batches", "runs", "POs", "routes"]);
   });
 });
 

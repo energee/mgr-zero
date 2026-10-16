@@ -550,7 +550,7 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(deposit.ctx, deposit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, depositFetch)))
       .resolves.toMatchObject({ remoteId: "deposit-invoice" });
     expect(String(depositFetch.mock.calls[0][1]?.body)).toContain('"value": "deposit-item"');
-    expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", deposit.brewery.id).eq("user_id", deposit.ctx.userId)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", deposit.brewery.id).eq("user_id", deposit.ctx.userId)).error).toBeNull();
     await expect(pushInvoiceToQbo(deposit.ctx, deposit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
       .rejects.toMatchObject({ status: 403 });
     const foreign = await pushFixture();
@@ -627,7 +627,7 @@ describe("QuickBooks durable outbound push", () => {
       remote.set(key, entity);
       if (demote) {
         demote = false;
-        expect((await admin.from("brewery_users").update({ role: "warehouse" })
+        expect((await admin.from("brewery_users").update({ roles: ["warehouse"] })
           .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
       }
       return new Response(JSON.stringify(entity), { status: 200 });
@@ -636,7 +636,7 @@ describe("QuickBooks durable outbound push", () => {
     const requestId = crypto.randomUUID();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).rejects.toThrow("QuickBooks push reconciliation failed");
     expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
-    expect((await admin.from("brewery_users").update({ role: "admin" })
+    expect((await admin.from("brewery_users").update({ roles: ["admin"] })
       .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).resolves.toMatchObject({
       status: "pushed", remoteId: "finish-recovery-1",

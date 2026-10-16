@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }),
     userId: identity.userId,
     breweryId: membership.breweryId,
-    role: "customer",
+    roles: ["customer"],
     customerId: membership.customerId,
   };
   try {
