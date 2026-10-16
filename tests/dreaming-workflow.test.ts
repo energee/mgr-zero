@@ -8,7 +8,9 @@ import { parse as load } from "yaml";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-type Workflow = { jobs: Record<"maintain" | "publish", { steps: { name?: string; run?: string }[] }> };
+type Workflow = {
+  jobs: Record<"maintain" | "publish", { steps: { name?: string; run?: string; env?: Record<string, string> }[] }>;
+};
 const workflow = load(read(".github/workflows/dreaming.yml")) as Workflow;
 const validation = workflow.jobs.maintain.steps.find((step) => step.name === "Validate dream changes")!.run!;
 const publication = workflow.jobs.publish.steps.find((step) => step.name === "Publish dream pull request")!.run!;
@@ -75,6 +77,26 @@ describe("dreaming workflow", () => {
     for (const file of [".github/workflows/dreaming.yml", ".github/workflows/documentation-agent.yml"]) {
       expect(() => load(read(file))).not.toThrow();
     }
+  });
+
+  it("runs only from main and leaves publication to the deterministic job", () => {
+    const source = read(".github/workflows/dreaming.yml");
+
+    expect(source).not.toMatch(/^  push:/m);
+    expect(source).toContain("if: github.ref == 'refs/heads/main'");
+    const modelArgs = source.match(/claude_args: '([^']+)'/)?.[1] ?? "";
+    expect(modelArgs).not.toMatch(/git (add|commit|checkout|push)|gh pr (create|edit)/);
+    expect(modelArgs).toContain('--disallowedTools "Bash(git:*)"');
+    expect(modelArgs).toContain("--permission-mode dontAsk");
+    expect(read(".agents/agents/dreaming.md")).not.toContain("## Publish");
+  });
+
+  it("dreams on the recorded main head when no dream PR is open", () => {
+    // Checkout pins github.sha, which lags origin/main when main moves while the run queues;
+    // the publish ancestry check against the recorded head would then reject the bundle.
+    const prepare = workflow.jobs.maintain.steps.find((step) => step.name === "Prepare cumulative dream documents")!;
+    expect(prepare.env?.MAIN_HEAD).toBe("${{ steps.window.outputs.head }}");
+    expect(prepare.run).toMatch(/else\n(\s+#.*\n)*\s+git checkout -B dreaming\/main "\$MAIN_HEAD"\nfi/);
   });
 
   it("lets the validate step accept every file the mechanical TODO step writes", () => {

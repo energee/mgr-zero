@@ -71,6 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           APP_SLUG: ${{ steps.mgr-app.outputs.app-slug }}
+          MAIN_HEAD: ${{ steps.window.outputs.head }}
         run: |
           # The model runs on a checked-out dreaming/main, so its deny list is taken from main.
           git show origin/main:.github/claude-ci-settings.json > "$RUNNER_TEMP/claude-ci-settings.json"
@@ -93,6 +94,10 @@ jobs:
               git checkout -B dreaming/main origin/main
               rebuilt=true
             fi
+          else
+            # Checkout pins github.sha, which lags main if main moved while this run queued;
+            # publish requires the bundle to descend from the recorded head.
+            git checkout -B dreaming/main "$MAIN_HEAD"
           fi
           {
             echo "open_pr=$open_pr"
