@@ -1,7 +1,7 @@
 import { pickedCustomerId, selectCustomerMembership } from "@/lib/portal";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
-import { QboOAuthClient, qboConfig, resolvePortalInvoicePayment } from "@/lib/qbo";
+import { QboOAuthClient, qboConfig, resolvePortalInvoicePayment, sanitizeQboError } from "@/lib/qbo";
 
 const responseHeaders = {
   "Cache-Control": "private, no-cache, no-store, must-revalidate, max-age=0",
@@ -44,9 +44,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof CommandError && error.status === 404) {
       return new Response("Invoice not found", { status: 404, headers: responseHeaders });
     }
-    // The buyer gets the generic Payment unavailable surface; the server log
-    // keeps the cause (missing QuickBooks config, a code bug) for staff.
-    console.error("qbo_payment_failed", error);
+    // Provider errors can contain credentials or bearer links. Log only the
+    // safe classification; the buyer stays on Payment unavailable.
+    console.error("qbo_payment_failed", sanitizeQboError(error));
     return unavailable(request, id, "provider_unavailable");
   }
 }

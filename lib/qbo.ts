@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { consumeAdmission } from "@/lib/commands/admission";
 import {
   beginQboInvoiceSync,
   compareAndSwapPortalInvoicePaymentTokens,
@@ -152,7 +153,7 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
 
 export type PortalInvoicePaymentResult =
   | { kind: "redirect"; url: string }
-  | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" };
+  | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" | "rate_limited" };
 
 async function refreshPortalInvoicePayment(
   ctx: Ctx,
@@ -166,7 +167,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-    else console.error("qbo_payment_refresh_failed", error);
+    else console.error("qbo_payment_refresh_failed", sanitizeQboError(error));
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -182,6 +183,9 @@ export async function resolvePortalInvoicePayment(
 ): Promise<PortalInvoicePaymentResult> {
   let claim = await readPortalInvoicePayment(ctx, invoiceId);
   if (!claim) return { kind: "unavailable", reason: "not_configured" };
+  // Authorize the concrete invoice before spending the shared per-user budget.
+  // Admission precedes every provider read, including refresh and its retry.
+  if (!(await consumeAdmission(ctx.db)).allowed) return { kind: "unavailable", reason: "rate_limited" };
   let refreshed = false;
   if (isPast(claim.accessExpiresAt)) {
     const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
