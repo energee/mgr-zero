@@ -1,113 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useCommandContext } from "@/lib/brewery-provider";
-import { ComposerConversationView, ComposerDrawerView, ComposerProposalView, ComposerStripView, OfflineOutboxView } from "@/components/mgr/views/composer";
+import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
+import { OfflineOutboxView } from "@/components/mgr/views/composer";
+import { ComposerLoadBoundary, ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
-import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
-import { movementFormHref } from "@/lib/composer/state";
 import { discardOutbox, dismissOutboxQuarantine, flushOutbox, outboxDiscardConfirmation, outboxQuarantineNotice, readOutbox, sendOutboxAttempt, visibleOutbox, type OutboxAttempt } from "@/lib/composer/outbox";
 import type { StaffRole } from "@/lib/commands/registry";
 
-type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
+const ComposerConversation = lazy(() => import("@/components/mgr/composer-conversation"));
 
 export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
   event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
 
-const messageOf = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback;
-
 export function Composer({ role }: { role: StaffRole }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
-  const [conversationId, setConversationId] = useState<string>();
-  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [model, setModel] = useState("");
   const [open, setOpen] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  // A failure carries the recovery that fits it, so Try again re-runs what
-  // actually failed — the setup load, the new chat, or the proposal commit —
-  // instead of one handler guessing from a bare message string (#329).
-  const [failure, setFailure] = useState<{ message: string; retry: () => void }>();
-  const failed = (cause: unknown, fallback: string, retry: () => void) =>
-    setFailure({ message: cause instanceof Error ? cause.message : fallback, retry });
-  const [committing, setCommitting] = useState(false);
-  const [receipt, setReceipt] = useState<string>();
+  const [hasOpened, setHasOpened] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(0);
   const [outboxOpen, setOutboxOpen] = useState(false);
   const [outboxBusy, setOutboxBusy] = useState(false);
   const [outboxEntries, setOutboxEntries] = useState<OutboxAttempt[]>([]);
   // Why the outbox list may be incomplete: set-aside entries or a read failure.
   const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
-  const promptRef = useRef<HTMLTextAreaElement>(null);
-  // Identifies the current setup load; a superseded run drops its response.
-  const setupRun = useRef(0);
-  const setupConversationRequest = useRef<string>(undefined);
-  const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) => command(breweryId, name, input, requestId, expectedContext, provenance);
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: "/api/chat",
-    prepareSendMessagesRequest: ({ id, messages }) => ({ body: {
-      id, breweryId, expectedContext: { actorId: expectedContext.actorId, breweryId }, message: messages.findLast((message) => message.role === "user"),
-    } }),
-  }), [breweryId, expectedContext.actorId]);
-  const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
-  async function newChat(openDrawer = true, live = () => true) {
-    clearError(); setFailure(undefined); setReceipt(undefined);
-    try {
-      const requestId = openDrawer ? crypto.randomUUID() : (setupConversationRequest.current ??= crypto.randomUUID());
-      const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, requestId) as { id: string };
-      if (!live()) return;
-      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); if (openDrawer) setOpen(true);
-    } catch (cause) { if (live()) failed(cause, "Composer unavailable", openDrawer ? () => void newChat() : reloadSetup); }
-  }
-
-  // Restores the server-owned conversation for this actor/brewery scope. Named
-  // so Try again can re-run the load that failed (#329) rather than only
-  // regenerating the last AI turn; `live` drops a response the scope outlived.
-  async function loadSetup(live: () => boolean) {
-    try {
-      const [conversations, ai] = await Promise.all([
-        run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
-        run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
-      ]);
-      if (!live()) return;
-      setModel(ai.model);
-      if (!conversations[0]) { await newChat(false, live); return; }
-      const id = conversations[0].id;
-      const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
-      if (!live()) return;
-      const restored = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
-        id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
-      })) as UIMessage[];
-      setInitialMessages(restored); setConversationId(id);
-    } catch (cause) { if (live()) failed(cause, "Composer unavailable", reloadSetup); }
-  }
-
-  // A retry outlives the scope it started in, so the reload holds the scope it
-  // was issued for and a later one supersedes it.
-  function reloadSetup() {
-    const issued = ++setupRun.current;
-    setFailure(undefined);
-    void loadSetup(() => issued === setupRun.current);
-  }
-
-  function retry() {
-    if (failure) { failure.retry(); return; }
-    clearError(); void regenerate();
+  function changeOpen(nextOpen: boolean) {
+    if (nextOpen) setHasOpened(true);
+    setOpen(nextOpen);
   }
 
   useEffect(() => {
-    if (!open || setupRun.current > 0) return;
-    const issued = ++setupRun.current;
-    void loadSetup(() => issued === setupRun.current);
-    // One restore per actor/brewery scope, only when the drawer is needed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, breweryId, expectedContext.actorId]);
-
-  useEffect(() => {
-    const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
+    const focus = (event: KeyboardEvent) => {
+      if (!isComposerShortcut(event)) return;
+      event.preventDefault();
+      setHasOpened(true);
+      setOpen(true);
+      setFocusRequest((request) => request + 1);
+    };
     addEventListener("keydown", focus); return () => removeEventListener("keydown", focus);
   }, []);
 
@@ -117,29 +49,12 @@ export function Composer({ role }: { role: StaffRole }) {
     // in the staff layout, so an escape here errors every staff page (#463).
     const refresh = () => {
       try { setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope)); setOutboxNotice(outboxQuarantineNotice(localStorage)); }
-      catch (cause) { setOutboxNotice(messageOf(cause, "Offline outbox could not be read.")); }
+      catch (cause) { setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be read."); }
     };
-    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } catch (cause) { refresh(); setOutboxNotice(messageOf(cause, "Offline outbox could not be sent.")); } finally { setOutboxBusy(false); } };
+    const flush = async () => { if (!navigator.onLine) return refresh(); setOutboxBusy(true); try { await flushOutbox(localStorage, scope, command); refresh(); } catch (cause) { refresh(); setOutboxNotice(cause instanceof Error ? cause.message : "Offline outbox could not be sent."); } finally { setOutboxBusy(false); } };
     addEventListener("online", flush); addEventListener("mgr-outbox-change", refresh); refresh(); if (navigator.onLine) void flush();
     return () => { removeEventListener("online", flush); removeEventListener("mgr-outbox-change", refresh); };
   }, [breweryId, expectedContext.actorId, role]);
-
-  // A rejected proposal comes back as proposalError with nothing to commit. It
-  // gets its own alert, not the conversation's Try again, which regenerates
-  // the last AI turn rather than retrying the proposal.
-  const { proposal, error: proposalError } = latestComposerProposal(messages);
-  const transcript = messages.map((message) => ({ id: message.id, role: message.role === "user" ? "user" as const : "assistant" as const, content: composerMessageText(message) })).filter((message) => message.content);
-  const streaming = status === "submitted" || status === "streaming";
-
-  async function commitProposal() {
-    if (!proposal || committing || !conversationId) return;
-    setCommitting(true); setFailure(undefined);
-    try {
-      const result = await run(proposal.name, proposal.input, crypto.randomUUID(), { origin: "chat", conversationId, previewToken: proposal.previewToken }) as { id?: string };
-      setReceipt(result.id ? `Recorded · ${result.id}` : "Recorded");
-    } catch (cause) { failed(cause, "Could not record proposal", () => void commitProposal()); }
-    finally { setCommitting(false); }
-  }
 
   async function retryOutbox(id?: string) {
     const scope = { actorId: expectedContext.actorId, breweryId, role }; setOutboxBusy(true);
@@ -154,12 +69,14 @@ export function Composer({ role }: { role: StaffRole }) {
     discardOutbox(localStorage, scope, ids, confirmation); setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope));
   }
 
-  return <ComposerDrawerView open={open} onOpenChange={setOpen}>
-    <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
-    {proposalError && <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm">{proposalError}</p>}
-    {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
-    {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
-    {outboxOpen && <><OfflineOutboxView notice={outboxNotice ?? undefined} onDismissNotice={() => { try { dismissOutboxQuarantine(localStorage); } finally { setOutboxNotice(null); } }} rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}
-    <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || streaming || committing} streaming={streaming} onStop={stop} />
+  const outbox = outboxOpen && <><OfflineOutboxView notice={outboxNotice ?? undefined} onDismissNotice={() => { try { dismissOutboxQuarantine(localStorage); } finally { setOutboxNotice(null); } }} rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>;
+
+  return <ComposerDrawerView open={open} onOpenChange={changeOpen}>
+    {/* Keep a started conversation mounted when minimized: drafts and streams survive. */}
+    {hasOpened && <ComposerLoadBoundary fallback={<ComposerUnavailableView failed outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
+      <Suspense fallback={<ComposerUnavailableView outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
+        <ComposerConversation open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerConversation>
+      </Suspense>
+    </ComposerLoadBoundary>}
   </ComposerDrawerView>;
 }
