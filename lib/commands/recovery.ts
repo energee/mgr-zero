@@ -57,9 +57,12 @@ export const inFlightRequests = new Set<string>();
  * `resumed` says the attempt was already saved, so its first send may have
  * applied and a later rejection must not clear it.
  */
-export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, target, owner }: { requestId?: string; target?: string; owner?: RecoveryAttempt["owner"] } = {}): { attempt: RecoveryAttempt; resumed: boolean } {
+export function beginRecovery(storage: RecoveryStorage, context: CommandContextExpectation, path: string, name: string, input: unknown, { requestId, target, owner, exclusiveTarget = false }: { requestId?: string; target?: string; owner?: RecoveryAttempt["owner"]; exclusiveTarget?: boolean } = {}): { attempt: RecoveryAttempt; resumed: boolean } {
   const attempts = readRecoveries(storage, context);
   const previous = attempts.find(attempt => recoveryKey(attempt.name, attempt.target) === recoveryKey(name, target));
+  if (exclusiveTarget && target && attempts.some(attempt => attempt.target === target && (attempt !== previous || (requestId && requestId !== attempt.requestId)))) {
+    throw new Error("An earlier request for this record may have completed. Use Retry saved request or check the result before discarding it.");
+  }
   if (previous && (!requestId || requestId === previous.requestId)) {
     if (JSON.stringify(previous.input) !== JSON.stringify(input)) throw new Error("An earlier request may have completed. Use Retry saved request before submitting changes.");
     return { attempt: previous, resumed: true };

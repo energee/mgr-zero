@@ -37,13 +37,45 @@ Follow the task's scope. An audit is read-only. A fix covers the affected shared
 owner and its callers; discovering unrelated debt does not authorize a site-wide
 rewrite. Read the installed Next.js guides before changing framework code.
 
-## Required code patterns
+## Controls, entry point, and conversion
 
-Use the `AGENTS.md` **UI controls: reuse E first** rule when drawing controls.
-Inspect `components/mgr/e.tsx` before composing a form; extend its controlled
-props when needed. Native selects and standalone numeric inputs are forbidden
-in product screens and enforced by lint. Shared E controls complement the
-shared-view requirement below; they do not replace it.
+**Reuse E first.** Before creating or changing an interface, read
+`components/mgr/e.tsx` and reuse its controls inside the shared view: `E.pick`
+for selects, `E.edit` for fields (including the numeric stepper), `E.sw` for
+on/off settings, and `E.volume` for beer volume. Use existing E layouts and
+actions too. If a control needs controlled state or a missing option, extend
+the shared primitive rather than drawing a local replacement. Preserve labels,
+bounds, required/disabled state, and callbacks.
+
+Do not add native `<select>`, standalone `<input type="number">`, or
+`<Input type="number">` to product screens. Lint rejects these. Numeric inputs
+belong only inside the shared quantity implementation
+(`components/mgr/qty.tsx`), where native spinners are hidden. The Slack venue
+replica has a documented native-select exception; it is not a pattern for MGR
+interfaces. Do not suppress the rule for new forms. Shared E controls
+complement the shared-view requirement in "Required code patterns" below;
+they do not replace it.
+
+`components/mgr/screens.tsx` and the pages that render it are the entry point
+for interface work. Schema, migrations, RPCs, and database-backed tests are
+normal work; run them on the throwaway `mgr_test` stack (`scripts/test-db.sh`;
+parallel sessions share it under a lock). A screen marked `SCHEMA-GATE` in its
+`writes` waits on a named product or schema decision: say what is missing and
+leave it gated; do not decide it inline. A screen-only change is proved by the
+command in `AGENTS.md` "Current focus: screens"; a change touching schema, RPCs, or commands
+runs the full `AGENTS.md` operating-loop step 4 proof.
+
+Converting an inventory screen to a live one must not:
+
+- Invent a SKU, ATP, unit, or barrel volume the command did not return.
+- Default `backHref` (or other live paths) on fixture adapters; inventory
+  `E.back`/`E.act` stay `"#"` unless the caller passed href.
+- Drop live verbs (Pick vs Open, Reorder on detail, Question on every invoice
+  state) or suppress `question` / `footer={null}` slots.
+- Ship a customer-visible field or verb without updating
+  `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
+
+## Required code patterns
 
 1. Both paths mount the same exported presentation component. Resolve the
    symbol through aliases, barrel exports, and intermediate components: an

@@ -15,6 +15,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runNo } from "@/lib/mgr/doc-no";
+import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { MaterialCorrection } from "./material-correction";
 import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
 
@@ -31,7 +32,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
+  const { run, outputs, lot } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[]; lot: RunClosedViewModel["lot"] };
   const picking = !run.cancelled_at && !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
   const needsMaterials = closing || !!run.closed_at;
@@ -50,14 +51,8 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging runs", backHref: "/packaging", records: materialHistory.records }}
-        fields={
-          <>
-            {E.fld("Barrels drawn", run.bbl_drawn === null ? "—" : Number(run.bbl_drawn))}
-            {E.info("Closed: lot, finished goods and confirmed material usage are on the ledger.")}
-          </>
-        }
-        action={latest && correctionPlan ? <MaterialCorrection key={latest.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
+        model={{ title, backTo: "Packaging runs", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records }}
+        action={latest && correctionPlan ? <MaterialCorrection key={latest.id} runId={run.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );
   }

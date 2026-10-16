@@ -153,6 +153,18 @@ describe("dreaming workflow", () => {
     }
   });
 
+  it("feeds recurring review and watchdog friction back into the agent docs", () => {
+    const prompt = read(".agents/agents/dreaming.md");
+    const workflow = read(".github/workflows/dreaming.yml");
+
+    // gh issue is blocked for the model, so the workflow hands it the open watchdog issues.
+    expect(workflow).toContain("Collect open watchdog issues");
+    expect(workflow).toContain("WATCHDOG_ISSUES");
+    expect(prompt).toContain("## Recurring friction");
+    expect(prompt).toMatch(/gh pr view <n> --json reviews,comments/);
+    expect(prompt).toMatch(/two or more/i);
+  });
+
   it("keeps the context a dream once pruned (PR #30, restored in PR #60)", () => {
     const prompt = read(".agents/agents/dreaming.md");
     const memory = read(".agents/MEMORY.md");

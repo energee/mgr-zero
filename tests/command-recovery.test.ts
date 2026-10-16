@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { beginRecovery, finishRecovery, readRecoveries } from "@/lib/commands/recovery";
+import { beginRecovery, discardRecovery, finishRecovery, hasRecoveryForTarget, inFlightRequests, readRecoveries } from "@/lib/commands/recovery";
 const context = { actorId: "a", breweryId: "b" };
 function storage() {
   const values = new Map<string, string>();
@@ -71,4 +71,23 @@ it("lets an explicit new request id replace the saved attempt for its key: a del
   expect(readRecoveries(disk, context)).toEqual([corrected]);
   // Without an explicit id the saved attempt still wins.
   expect(beginRecovery(disk, context, "/settings/pos", "sync_square_catalog", { retryConflict: true }).attempt.requestId).toBe("new");
+});
+
+it("blocks competing packaging writes by run identity until explicit discard, without locking other runs", () => {
+  const disk = storage();
+  const saved = beginRecovery(disk, context, "/packaging/run-a", "close_packaging_run", { runId: "run-a", lotCode: "Exact lot" }, { target: "run-a", exclusiveTarget: true }).attempt;
+  expect(hasRecoveryForTarget(disk, context, "run-a")).toBe(true);
+  expect(() => beginRecovery(disk, context, "/packaging/run-a", "correct_packaging_material_record", { recordId: "record" }, { target: "run-a", exclusiveTarget: true })).toThrow("earlier request");
+  expect(() => beginRecovery(disk, context, "/packaging/run-a", saved.name, saved.input, { target: "run-a", requestId: "replacement", exclusiveTarget: true })).toThrow("earlier request");
+  expect(() => beginRecovery(disk, context, "/packaging/run-b", "close_packaging_run", { runId: "run-b" }, { target: "run-b", exclusiveTarget: true })).not.toThrow();
+  expect(readRecoveries(disk, { ...context, actorId: "other" })).toEqual([]);
+  expect(readRecoveries(disk, { ...context, breweryId: "other" })).toEqual([]);
+  inFlightRequests.add(saved.requestId);
+  try { expect(() => discardRecovery(disk, context, saved.requestId)).toThrow("still being sent"); }
+  finally { inFlightRequests.delete(saved.requestId); }
+  expect(discardRecovery(disk, context, saved.requestId)).toBe(true);
+  expect(hasRecoveryForTarget(disk, context, "run-a")).toBe(false);
+  expect(readRecoveries(disk, context)).toHaveLength(1);
+  const fresh = beginRecovery(disk, context, "/packaging/run-a", saved.name, { runId: "run-a", lotCode: "Changed" }, { target: "run-a", exclusiveTarget: true }).attempt;
+  expect(fresh.requestId).not.toBe(saved.requestId);
 });

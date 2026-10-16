@@ -5,9 +5,9 @@ export type RunClosedViewModel = {
   backHref?: string;
   backTo?: string;
   title: string;
-  lot?: string;
-  output?: string;
-  yield?: string;
+  bblDrawn?: number | null;
+  lot?: { id: string; code: string; packaged_on: string; best_by: string | null } | null;
+  outputs?: { sku_id: string; sku_name: string | null; qty_actual: number | null }[];
   records?: PackagingMaterialRecord[];
   correction?: Pick<PackagingCloseFieldsModel, "plan" | "locations" | "bins"> & { rows: PackagingActualDraft[]; reason: string };
 };

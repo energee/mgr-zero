@@ -113,6 +113,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bun scripts/pr-directives.ts todo "${{ steps.window.outputs.base }}" "${{ steps.window.outputs.head }}"
 
+      # The model may not run gh issue, so the open doc-agent-watch issues reach it here
+      # (dreaming.md "Recurring friction"). Titles and comment counts are enough to see a repeat.
+      - name: Collect open watchdog issues
+        if: steps.window.outputs.new == 'true'
+        id: watchdog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Only issues the watchdog itself filed (github.token = github-actions), so no outside text reaches the prompt.
+          issues=$(gh issue list --state open --author app/github-actions --search 'in:title "failing" OR in:title "Dreaming stale"' --limit 20 \
+            --json number,title,comments --jq '.[] | "#\(.number) \(.title) (\(.comments | length) comments)"')
+          { echo "list<<WATCHDOG_EOF"; echo "${issues:-none}"; echo "WATCHDOG_EOF"; } >> "$GITHUB_OUTPUT"
+
       - name: Run dream
         if: steps.window.outputs.new == 'true'
         uses: anthropics/claude-code-action@v1
@@ -128,7 +141,9 @@ jobs:
             You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied.
             The last accepted dream on main is ${{ steps.window.outputs.base }} and current main HEAD is
             ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
-          claude_args: '--allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(gh pr list:*),Bash(gh pr view:*)"'
+            Open watchdog issues (WATCHDOG_ISSUES): ${{ steps.watchdog.outputs.list }}
+          # Cross-document synthesis needs stronger reasoning than bounded maintenance.
+          claude_args: '--model sonnet --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(gh pr list:*),Bash(gh pr view:*)"'
 
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'

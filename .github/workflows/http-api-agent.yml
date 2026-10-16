@@ -84,7 +84,8 @@ jobs:
           display_report: false
           show_full_output: false
           settings: .github/claude-ci-settings.json
-          claude_args: '--allowedTools "Read,Grep,Glob,Edit(content/docs/api/*.mdx),Write(content/docs/api/*.mdx),Edit(components/mgr/screens.tsx),Edit(lib/mgr/api-operations.ts)"'
+          # API prose and annotations are bounded maintenance, not implementation.
+          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/api/*.mdx),Write(content/docs/api/*.mdx),Edit(components/mgr/screens.tsx),Edit(lib/mgr/api-operations.ts)"'
 
       - name: Validate the maintained reference
         id: validate

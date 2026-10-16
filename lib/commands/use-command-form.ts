@@ -6,27 +6,60 @@
 // components/mgr/command-form.tsx), and hands back its `run` so a sheet's
 // secondary verb (Remove, Delete, Clear) shares the one error slot that closing
 // clears (#447). Forms own only their fields and how to build the command input.
-// useRetainedCommand is for one irreversible write whose outcome can be unknown:
-// it keeps the exact request (id, input, context) and resends it unchanged.
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
-import { beginRecovery, finishRecovery, inFlightRequests, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
-import { classifyCommandFailure, command, CommandResponseError, type CommandFailureDetail } from "./client";
+import { beginRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
+import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 import { canRetireCommandFailure } from "./failure";
 
 /** Options for useCommandAction's run; see the comment on run. */
 export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; owner?: RecoveryAttempt["owner"]; onSent?: (requestId: string) => void };
+export type CommandAction = {
+  busy: boolean;
+  error: string | null;
+  failure: CommandFailureDetail | null;
+  setError: Dispatch<SetStateAction<string | null>>;
+  run: (name: string, input: unknown, onSuccess?: (data: unknown) => void, options?: CommandRunOptions) => Promise<boolean>;
+  pending: RecoveryAttempt | null | undefined;
+  blocked: boolean;
+};
 
-export function useCommandAction() {
+export function useCommandAction(actionTarget?: string): CommandAction {
   const breweryId = useBrewery();
   const expectedContext = useCommandContext();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<CommandFailureDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  // Targeted irreversible actions share one lock across competing commands.
+  // Undefined means storage has not been checked yet: fields stay frozen.
+  const [recovery, setRecovery] = useState<{ context: typeof expectedContext; target: string; attempt: RecoveryAttempt | null }>();
+  useEffect(() => {
+    if (actionTarget === undefined) return;
+    let hadPending = false;
+    const refresh = () => {
+      try {
+        const attempt = readRecoveries(sessionStorage, expectedContext).find(row => row.target === actionTarget) ?? null;
+        setRecovery({ context: expectedContext, target: actionTarget, attempt });
+        if (hadPending && !attempt) {
+          setError(null); setFailure(null);
+          router.refresh();
+        }
+        hadPending = attempt !== null;
+      } catch (cause) {
+        setRecovery(undefined);
+        setError(cause instanceof Error ? cause.message : "Saved requests could not be read.");
+      }
+    };
+    refresh();
+    window.addEventListener(RECOVERY_CHANGED, refresh);
+    return () => window.removeEventListener(RECOVERY_CHANGED, refresh);
+  }, [actionTarget, expectedContext, router]);
+  const pending = recovery?.context === expectedContext && recovery.target === actionTarget ? recovery.attempt : undefined;
+  const blocked = actionTarget !== undefined && pending !== null;
 
   // Resolves true on success, so a caller that navigates away can wait for it.
   // `refresh: false` skips the post-success router.refresh() for a caller that
@@ -38,13 +71,13 @@ export function useCommandAction() {
   // the id actually sent (it may be a resumed saved attempt) from `onSent`.
   // `durable: false` skips the saved request for a read or a one-time secret.
   // `owner` marks a saved request that its own screen recovers (see recovery.ts).
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, { requestId, refresh = true, target, durable = true, owner, onSent }: CommandRunOptions = {}) {
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, { requestId, refresh = true, target = actionTarget, durable = true, owner, onSent }: CommandRunOptions = {}) {
     setBusy(true);
     setError(null);
     setFailure(null);
     let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
-      if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner });
+      if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner, exclusiveTarget: actionTarget !== undefined });
       const sent = saved?.attempt ?? { name, input, requestId: requestId ?? crypto.randomUUID(), expectedContext };
       onSent?.(sent.requestId);
       inFlightRequests.add(sent.requestId);
@@ -58,7 +91,7 @@ export function useCommandAction() {
     } catch (err) {
       const detail = classifyCommandFailure(err);
       // A resumed attempt may already have applied, so only a first send's rejection clears it.
-      if (saved && !saved.resumed && detail.kind === "definitive") finishRecovery(sessionStorage, saved.attempt);
+      if (saved && canRetireCommandFailure(detail.status ?? 0, saved.resumed, detail.code)) finishRecovery(sessionStorage, saved.attempt);
       else if (saved && typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED)); // finishRecovery already notifies.
       setFailure(detail);
       setError(detail.message);
@@ -68,7 +101,7 @@ export function useCommandAction() {
     }
   }
 
-  return { busy, error, failure, setError, run };
+  return { busy, error, failure, setError, run, pending, blocked };
 }
 
 /** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them; patch sets several fields at once. */
@@ -117,34 +150,4 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
   }
 
   return { open, setOpen, error, submitting: running === name, busy: running !== null, submit, run };
-}
-
-/** One irreversible command whose exact request is kept after an uncertain
- *  failure (`phase: "unknown"`), so Retry resends it unchanged instead of
- *  creating a second write. A definitive refusal (canRetireCommandFailure, or
- *  `retire` for a caller-specific code) drops the request so edits can resume. */
-export function useRetainedCommand(name: string, { fallback, retire }: { fallback: string; retire?: (cause: CommandResponseError) => boolean }) {
-  const breweryId = useBrewery();
-  const context = useCommandContext();
-  const router = useRouter();
-  const [phase, setPhase] = useState<"idle" | "busy" | "unknown">("idle");
-  const [error, setError] = useState<string | null>(null);
-  const attempt = useRef<{ requestId: string; input: unknown; context: typeof context } | null>(null);
-
-  /** `build` runs only for a fresh attempt; a retry reuses the retained input. */
-  async function submit(build: () => unknown) {
-    if (phase === "busy") return;
-    const retrying = phase === "unknown";
-    if (!attempt.current) attempt.current = { requestId: crypto.randomUUID(), input: build(), context };
-    setPhase("busy"); setError(null);
-    try {
-      await command(breweryId, name, attempt.current.input, attempt.current.requestId, attempt.current.context);
-      attempt.current = null; setPhase("idle"); router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : fallback);
-      if (cause instanceof CommandResponseError && (retire?.(cause) || canRetireCommandFailure(cause.status, retrying, cause.code))) { attempt.current = null; setPhase("idle"); }
-      else setPhase("unknown");
-    }
-  }
-  return { phase, setPhase, error, setError, submit };
 }

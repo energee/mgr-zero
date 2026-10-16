@@ -9061,6 +9061,10 @@ export type Database = {
         Args: { p_brewery: string; p_run: string }
         Returns: Json
       }
+      get_packaging_run_lot: {
+        Args: { p_brewery: string; p_run: string }
+        Returns: Json
+      }
       get_pos_menu: {
         Args: { p_brewery: string; p_external_location: string }
         Returns: Json

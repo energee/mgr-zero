@@ -13,7 +13,7 @@ import { PackagingCloseFields } from "@/components/mgr/views/close-packaging-run
 import { emptyPackagingActual, packagingActualPayload, patchActual, removeActual, suggestedPackagingActuals, type PackagingClosePlan } from "@/lib/mgr/packaging-actuals";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
-import { useCommandAction, useRetainedCommand } from "@/lib/commands/use-command-form";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 import { packagingCloseReady } from "@/lib/mgr/close-packaging-run-view";
 
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
@@ -44,28 +44,34 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
   const [quantities, setQuantities] = useState(Object.fromEntries(outputs.map(row => [row.sku_id, String(row.qty_planned)])));
   const [plan, setPlan] = useState(initialPlan);
   const [actuals, setActuals] = useState(() => suggestedPackagingActuals(initialPlan));
-  // A stale plan is a definitive refusal even on a retry: nothing was written.
-  const { phase, setPhase, error, setError, submit } = useRetainedCommand("close_packaging_run", { fallback: "Could not close packaging run", retire: cause => cause.code === "stale_plan" });
+  const { busy, blocked, pending, error, setError, run } = useCommandAction(runId);
+  const [reviewing, setReviewing] = useState(false);
+  const retry = pending?.name === "close_packaging_run" && !busy;
   const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id] })), plan, actuals, locations, bins };
   const ready = packagingCloseReady(model);
   async function refreshPlan() {
-    if (phase !== "idle") return;
-    setPhase("busy"); setError(null);
+    if (busy || blocked || reviewing) return;
+    setReviewing(true); setError(null);
     try { setPlan(await command(breweryId, "get_packaging_close_plan", { runId }, undefined, context) as PackagingClosePlan); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not review material plan"); }
-    finally { setPhase("idle"); }
+    finally { setReviewing(false); }
   }
   return <PackagingCloseFields model={model}
-    disabled={phase !== "idle"} retry={phase === "unknown"} ready={ready || phase === "unknown"}
+    disabled={busy || blocked || reviewing} retry={retry} ready={retry || ready}
     onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) }))}
     onOutput={(id, value) => setQuantities(previous => ({ ...previous, [id]: value }))}
     onActual={(key, patch) => setActuals(previous => patchActual(previous, key, patch))}
     onAdd={() => setActuals(previous => [...previous, emptyPackagingActual()])}
     onRemove={key => setActuals(previous => removeActual(previous, key))}
-    onSubmit={() => { if (ready || phase === "unknown") void submit(() => ({
-      runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
-      outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
-      planRevision: plan.revision, actuals: packagingActualPayload(actuals),
-    })); }}
+    onSubmit={() => {
+      if (busy || reviewing) return;
+      if (retry) { void run(pending.name, pending.input, undefined, { requestId: pending.requestId }); return; }
+      if (blocked || !ready) return;
+      void run("close_packaging_run", {
+        runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
+        outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
+        planRevision: plan.revision, actuals: packagingActualPayload(actuals),
+      });
+    }}
     onRefresh={() => { void refreshPlan(); }} messages={<CommandFormMessage error={error} />} />;
 }

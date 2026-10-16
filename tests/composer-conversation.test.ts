@@ -1,9 +1,11 @@
 // Shared live/explorer conversation surface and its interaction affordances.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ComposerConversationView, ComposerStripView, isSendKey } from "@/components/mgr/views/composer";
+import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
+import { ComposerStripView, isSendKey } from "@/components/mgr/views/composer-strip";
+import { ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
+import { OfflineOutboxView } from "@/components/mgr/views/composer";
 
 describe("composer conversation surface", () => {
   it("renders a transcript, activity, recovery and conversation controls", () => {
@@ -39,6 +41,28 @@ describe("composer conversation surface", () => {
     expect(isSendKey({ key: "Enter", shiftKey: false, nativeEvent: { isComposing: true } })).toBe(false);
     expect(isSendKey({ key: "a", shiftKey: false, nativeEvent: { isComposing: false } })).toBe(false);
   });
+
+  it.each([false, true])("keeps outbox access available while chat is unavailable (failed=%s)", (failed) => {
+    const view = ComposerUnavailableView({
+      failed, outboxCount: 1, onOutbox: () => undefined,
+      children: createElement(OfflineOutboxView, {
+        rows: [{ id: "reading", label: "Tank 2 · saved reading", status: "queued", retryable: true }],
+      }),
+    });
+    const html = renderToStaticMarkup(view);
+    expect(html).toContain("Tank 2 · saved reading");
+    expect(html).toContain("Retry exact reading");
+    expect(html).toContain("Discard");
+    expect(html).toMatch(/<button(?![^>]*\sdisabled(?:\s|=|>))[^>]*>Outbox \(1\)<\/button>/);
+    expect(html).toMatch(/<textarea[^>]*\sdisabled=""/);
+    if (failed) {
+      expect(html).toContain('role="alert"');
+      expect(html).toContain("Reload page");
+    } else {
+      expect(html).toContain('role="status"');
+      expect(html).not.toContain("Reload page");
+    }
+  });
 });
 
 
@@ -48,6 +72,4 @@ it("explains pending setup and offers setup recovery before a conversation exist
   }));
   expect(html).toContain("Opening your conversation");
   expect(html).toContain("Retry setup");
-  const live = readFileSync("components/mgr/composer.tsx", "utf8");
-  expect(live).toContain('onSetupRetry={!conversationId ? reloadSetup : undefined}');
 });

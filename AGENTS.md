@@ -71,57 +71,32 @@ Each one has cost a revert or a rework here before.
     not a code change.
 16. **Don't stack PRs unasked.** Base every PR on `main`. (A PR based on
     another branch merged into that branch instead of `main`.)
+17. **Don't chain a check with a commit or push.** Never put a test, lint, or
+    grep in one command with `git commit` or `git push`; run checks as
+    separate steps and gate on their exit codes. (Failing tests were pushed
+    twice because a later grep in the chain succeeded.)
+18. **Don't act on a PR's remembered state.** Before acting on or pushing to
+    a PR, read it live: `gh pr view <n> --json state,mergedAt,headRefName`,
+    and push fixes to that PR's own head branch. (#907 was treated as open
+    after it merged.)
+19. **Don't merge `main` into a PR by hand.** Never GitHub's "Update branch"
+    or a plain merge of `main`; `scripts/land-pr.sh` does that merge and
+    regenerates `supabase/migrations.lock.json`. ("Update branch" corrupted
+    the lock.)
+20. **Don't touch an unnamed database.** Before a backup, import, or reset,
+    name the target (dev `:54342`, test `:54352`, or hosted) and confirm it
+    with `docker ps` or the URL. (A test-stack database was backed up instead
+    of dev.)
 
 ## Current focus: screens
 
-For screen, form, dialog, and entry-flow changes or parity audits, use
-`.agents/skills/screen-parity/SKILL.md`. Inventory and live application must
-share the same views, controls, and surface wrappers; fixtures versus
-database-backed data/actions are the boundary. The screen explorer is the
-interface source of truth. Validate this in code.
-
-### UI controls: reuse E first
-
-Before creating or changing an interface, read `components/mgr/e.tsx` and reuse
-its controls inside the shared view: `E.pick` for selects, `E.edit` for fields
-(including the numeric stepper), `E.sw` for on/off settings, and `E.volume`
-for beer volume. Use existing E layouts and actions too. If a control needs
-controlled state or a missing option, extend the shared primitive rather than
-drawing a local replacement. Preserve labels, bounds, required/disabled state,
-and callbacks.
-
-Do not add native `<select>`, standalone `<input type="number">`, or
-`<Input type="number">` to product screens. Lint rejects these. Numeric inputs
-belong only inside the shared quantity implementation, where native spinners
-are hidden. The Slack venue replica has a documented native-select exception;
-it is not a pattern for MGR interfaces. Do not suppress the rule for new forms.
-
-`components/mgr/screens.tsx` and the pages that render it are the entry
-point for interface work. Schema, migrations, RPCs, and database-backed tests
-are normal work. Run them on the throwaway `mgr_test` stack
-(`scripts/test-db.sh`; parallel sessions share it under a lock).
-
-- A screen marked `SCHEMA-GATE` in its `writes` waits on a named product or
-  schema decision. Say what is missing and leave it gated; do not decide it
-  inline.
-- A screen-only change (no schema, RPC, or command touched) is proved by
-  `bunx tsc --noEmit && bun run lint`, the pure inventory tests below, and a
-  look at the rendered page (step 4):
-  `bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts`.
-- A change touching schema, RPCs, or commands runs the full step 4 proof.
-- If `tests/chat-jobs.test.ts` times out locally, that is the shared dev
-  database, not your change: its `runChatScan` walks every brewery with an
-  active `chat_installations` row, and every past run left a fake one behind.
-  `update chat_installations set state = 'disconnected' where state = 'active'`
-  clears it (no seed creates installations, so every active row is a leftover).
-- Conversion must not invent a SKU, ATP, unit, or barrel volume the command
-  did not return.
-- Conversion must not default `backHref` (or other live paths) on fixture
-  adapters; inventory `E.back`/`E.act` stay `"#"` unless the caller passed href.
-- Conversion must not drop live verbs (Pick vs Open, Reorder on detail, Question
-  on every invoice state) or suppress `question` / `footer={null}` slots.
-- Conversion must not ship a customer-visible field or verb without updating
-  `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
+Screens are the current focus. Screen, form, dialog, and entry-flow work
+(and parity audits) follows `.agents/skills/screen-parity/SKILL.md`: shared views, `E` controls first,
+`SCHEMA-GATE`, and the conversion rules. Lint rejects native `<select>` and
+number inputs in product screens. A screen-only change (no schema, RPC, or
+command touched) is proved by `bunx tsc --noEmit && bun run lint`, a look at
+the rendered page (step 4), and:
+`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts`.
 
 ## Where to look
 
@@ -168,7 +143,11 @@ are normal work. Run them on the throwaway `mgr_test` stack
    code (without the variable it resets only when the migrations changed).
 5. Run `/simplify` on every code change before committing (see the tool
    table), then re-run step 4's checks: simplify passes have broken tests.
-   Then `git diff`: a stray NUL byte once made a file binary.
+   Then give only the simplify diff to one read-only agent and ask what
+   behavior it changed (identity, caching, loops, dropped data); fix any
+   answer that is not "none". (Simplify passes introduced an infinite loop, a
+   cache miss, and dropped offline data.) Then `git diff`: a stray NUL byte
+   once made a file binary.
 6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
@@ -180,7 +159,8 @@ are normal work. Run them on the throwaway `mgr_test` stack
    documentation agent, and `API: none` skips the HTTP API agent.
    `.github/pull_request_template.md` prompts for all three. Both doc agents
    also re-audit weekly, and `.github/workflows/doc-agent-watch.yml` opens an
-   issue when any doc workflow fails or no dream lands for 3 days.
+   issue when any doc workflow or `hosted jobs` fails, or no dream lands for
+   3 days.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.
@@ -196,7 +176,9 @@ from scratch — and never reaches hosted. That is what broke `/settings`, `/men
 and Ask MGR on live (#329, #330). A schema change is a new migration file, and
 `supabase/migrations.lock.json` pins every file's hash so an edit fails
 `tests/migrations-applied.test.ts`. After adding a migration, run
-`bun run migrations:lock`. (Before #285 the baseline was edited in place; that
+`bun run migrations:lock`. A new migration's timestamp must be later than
+every migration on main: `supabase db push` refuses an older one, and CI
+(`scripts/check-migration-order.ts`) rejects it. (Before #285 the baseline was edited in place; that
 window closed the day it was first pushed.)
 
 Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
@@ -209,17 +191,7 @@ approval before touching anything.
 
 ## Working files
 
-- `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
-- `.agents/PROGRESS.md` — dated Done log only. Same rule: state the change in the PR description, the dreaming PR writes it here.
-- `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
-- `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
-- `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
-- `.claude/settings.json` — shared Claude Code allowlist: the proof checks and plain `git fetch`, in exact forms. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code (`git fetch --upload-pack`, `vitest --config`).
-- `.agents/skills/` — project-local reusable workflows; `.claude/skills` is a symlink to it (Claude Code only reads `.claude/skills`); `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
-- `.agents/worktrees/<branch>/` — the only place for worktrees: `scripts/worktree.sh <branch> [base]` creates one, symlinks the gitignored `.env.local`/`.env.test.local` from the main checkout, and runs `bun install` (Turbopack rejects a node_modules symlink, so each worktree owns its own). Plain `git worktree add` leaves a checkout that cannot run `vitest` or `next dev`. Gitignored.
-- `scripts/land-pr.sh <pr> [--merge]` — lands one PR from its worktree: merges origin/main (resolving only a `migrations.lock.json` conflict), regenerates the lock and API docs, runs the local proof (tsc, lint, the PR's tests plus every test naming a SQL function its migrations define), pushes, waits for CI and reruns Docker/port infra failures, then merges. Chain calls in migration-timestamp order for a queue; one session merges at a time. Exit codes are listed in its header.
-- `.agents/agents/dreaming.md` — prompt for the dreaming workflow
-  (`.github/workflows/dreaming.yml`) that curates the agent docs via a
-  `dreaming/main` PR authored by the MGR GitHub App (`mgr[bot]`);
-  merged PRs are its input; committed `.remember/today-*.md` digests, when
-  present, are extra evidence.
+- `scripts/worktree.sh <branch> [base]` creates `.agents/worktrees/<branch>/`, the only place for worktrees; plain `git worktree add` cannot run `vitest` or `next dev`.
+- `scripts/land-pr.sh <pr> [--merge]` lands one PR: merges origin/main, regenerates the migration lock and API docs, proves, pushes, waits for CI, merges. One session merges at a time.
+- `.claude/settings.json` is the shared allowlist: exact proof commands and plain `git fetch` only. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code.
+- `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `.agents/DRIFT.md` are written by the dreaming PR (operating loop step 6). The full list of agent files is in `.agents/ARCHITECTURE.md` "Working files".

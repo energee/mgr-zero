@@ -1,15 +1,18 @@
-# .github/workflows/doc-agent-watch.yml — makes a broken doc agent visible.
+# .github/workflows/doc-agent-watch.yml — makes a broken doc agent, or a broken
+# hosted job, visible.
 #
 # Dreaming failed 13 days running (2026-09-29 to 2026-10-11) on one allowlist
-# line, and nothing told anyone. This opens one issue per problem: a run of any
-# doc workflow that did not succeed, or no `dream:` commit on main for 3 days
-# while main moved. An open issue with the same title is reused, so a daily
-# failure files once.
+# line, and nothing told anyone. `hosted jobs` failed 20 runs in a row (404 from
+# a stale production build) the same way. This opens one issue per problem: a
+# run of any watched workflow that did not succeed, or no `dream:` commit on
+# main for 3 days while main moved. An open issue with the same title is reused:
+# a doc agent failure comments on it, but a `hosted jobs` failure (cron every 5
+# minutes, up to 288 a day) does not, so the open issue stays readable.
 name: doc agent watch
 
 on:
   workflow_run:
-    workflows: ["Dreaming", "documentation agent", "http api agent"]
+    workflows: ["Dreaming", "documentation agent", "http api agent", "hosted jobs"]
     types: [completed]
   schedule:
     - cron: '0 13 * * *' # daily, after the 09:00 UTC dream has had time to run
@@ -35,10 +38,13 @@ jobs:
           URL: ${{ github.event.workflow_run.html_url }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
-          title="Doc agent failing: $NAME"
+          # Doc agent titles stay as they were so their open issues are still found.
+          if [ "$NAME" = "hosted jobs" ]; then title="Hosted jobs failing"; else title="Doc agent failing: $NAME"; fi
           body="The **$NAME** workflow ended \`$CONCLUSION\`: $URL"
           open=$(gh issue list --state open --search "in:title \"$title\"" --json number,title --jq "map(select(.title == \"$title\"))[0].number // empty")
-          if [ -n "$open" ]; then gh issue comment "$open" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
+          if [ -z "$open" ]; then gh issue create --title "$title" --body "$body"
+          elif [ "$NAME" = "hosted jobs" ]; then echo "hosted jobs issue #$open already open; not commenting"
+          else gh issue comment "$open" --body "$body"; fi
 
   stale-dream:
     if: github.event_name == 'schedule'

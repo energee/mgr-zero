@@ -13,11 +13,13 @@ pwd
 git worktree list
 git branch --show-current
 git status --short
-gh pr view --json number,baseRefName,headRefName 2>/dev/null
+gh pr view --json number,state,mergedAt,baseRefName,headRefName 2>/dev/null
 ```
 
 Report all of it verbatim. Confirm this is the intended target for the work
 about to be described, and confirm the PR base is `main` unless told otherwise.
+If the PR is merged (`state` is `MERGED` or `mergedAt` is set), stop and say
+so; do not push to its branch.
 Then wait for the user.
 
 Do not skip this because the task looks small; wrong-checkout starts have cost
