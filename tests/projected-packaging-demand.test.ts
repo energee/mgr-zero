@@ -155,6 +155,10 @@ describe("order packaging projections", () => {
     expect(await runCommand("get_material_requirements", {}, brewer)).toEqual(await runCommand("get_material_requirements", {}, f.ctx));
     const hiddenOrders = await brewer.db.from("orders").select("id").eq("brewery_id", f.brewery.id);
     expect(hiddenOrders.error).toBeNull();
+    const taproom = await makeStaffCtx(f.brewery.id, "taproom");
+    const taproomShortfall = await taproom.db.rpc("order_packaging_shortfall_rows");
+    expect(taproomShortfall.error).toBeNull();
+    expect(taproomShortfall.data).toEqual([]);
     expect(hiddenOrders.data).toEqual([]);
     const foreign = await makeStaffCtx((await makeBrewery()).id);
     expect(await requirements(f, foreign)).toEqual([]);
