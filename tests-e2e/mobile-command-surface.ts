@@ -74,65 +74,65 @@ try {
       // Device presets change viewport/UA only; ask Chromium for its native coarse-pointer sizing.
       browser("set", "viewport", "390", "844", "--args", "--blink-settings=primaryPointerType=2");
     }
-  for (const [screen, action] of [["Fermentation reading", "Save reading"], ["Cycle count", "Record count"]]) {
-    const index = SCREENS.findIndex(record => record.name === screen);
-    assert.ok(index >= 0, `Missing screen ${screen}`);
-    for (const [width, height] of [[390, 844], [390, 500], [1024, 768]]) {
-      browser("set", "viewport", String(width), String(height));
-      browser("open", `${origin}/screens/frame/${index}`);
-      browser("wait", "--text", action);
-      browser("wait", "--fn", `!!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]')`);
-      browser("wait", "--fn", `!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]').getAnimations().some(animation => animation.playState === 'running')`);
-      if (screen === "Cycle count") {
-        browser("find", "role", "combobox", "click", "--name", "Location");
-        browser("wait", "--fn", "!!document.querySelector('[role=listbox]')");
-        const popup = browser("eval", `(() => {
-          const list = document.querySelector('[role=listbox]');
-          const surface = document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]');
-          const r = list.getBoundingClientRect();
-          const item = list.querySelector('[role=option]:not([data-disabled])');
-          const i = item.getBoundingClientRect();
-          const hit = document.elementFromPoint(i.x + i.width / 2, i.y + i.height / 2);
-          const popupZ = Number(getComputedStyle(list.parentElement).zIndex);
-          const covering = [...document.querySelectorAll('nav[aria-label=Tabs],[data-mgr-composer]')].some(e => {
+    for (const [screen, action] of [["Fermentation reading", "Save reading"], ["Cycle count", "Record count"]]) {
+      const index = SCREENS.findIndex(record => record.name === screen);
+      assert.ok(index >= 0, `Missing screen ${screen}`);
+      for (const [width, height] of [[390, 844], [390, 500], [1024, 768]]) {
+        browser("set", "viewport", String(width), String(height));
+        browser("open", `${origin}/screens/frame/${index}`);
+        browser("wait", "--text", action);
+        browser("wait", "--fn", `!!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]')`);
+        browser("wait", "--fn", `!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]').getAnimations().some(animation => animation.playState === 'running')`);
+        if (screen === "Cycle count") {
+          browser("find", "role", "combobox", "click", "--name", "Location");
+          browser("wait", "--fn", "!!document.querySelector('[role=listbox]')");
+          const popup = browser("eval", `(() => {
+            const list = document.querySelector('[role=listbox]');
+            const surface = document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]');
+            const r = list.getBoundingClientRect();
+            const item = list.querySelector('[role=option]:not([data-disabled])');
+            const i = item.getBoundingClientRect();
+            const hit = document.elementFromPoint(i.x + i.width / 2, i.y + i.height / 2);
+            const popupZ = Number(getComputedStyle(list.parentElement).zIndex);
+            const covering = [...document.querySelectorAll('nav[aria-label=Tabs],[data-mgr-composer]')].some(e => {
+              const c = e.getBoundingClientRect();
+              const layer = e.hasAttribute('data-mgr-composer') ? e.parentElement : e;
+              return c.width > 0 && c.top < r.bottom && c.bottom > r.top && c.left < r.right && c.right > r.left && Number(getComputedStyle(layer).zIndex) > popupZ;
+            });
+            return popupZ >= Number(getComputedStyle(surface).zIndex) && !covering && (hit === item || item.contains(hit));
+          })()`);
+          assert.equal(popup.result, true, "Count Location Select opens above command surface");
+          if (process.argv[2]) browser("screenshot", `${process.argv[2]}/count-picker-${width}x${height}-green.png`);
+          browser("press", "Escape");
+        }
+        // A focused field in a reduced viewport exercises keyboard-space layout, not a physical OS keyboard.
+        browser("find", "label", screen === "Cycle count" ? "Counted (each)" : "Temperature (°F)", "click");
+        const { result } = browser("eval", `(() => {
+          const button = [...document.querySelectorAll('button')].find(e => e.textContent.trim() === ${JSON.stringify(action)});
+          const surface = button.closest('[data-slot=sheet-content],[data-slot=dialog-content]');
+          const body = [...surface.children].find(e => getComputedStyle(e).overflowY === 'auto');
+          if (!body) throw new Error("Command surface is missing its scroll body");
+          body.scrollTop = body.scrollHeight;
+          const r = button.getBoundingClientRect();
+          const z = Number(getComputedStyle(surface).zIndex);
+          const chrome = [...document.querySelectorAll('nav[aria-label=Tabs],[data-slot=drawer-popup]')];
+          const covering = chrome.filter(e => {
             const c = e.getBoundingClientRect();
-            const layer = e.hasAttribute('data-mgr-composer') ? e.parentElement : e;
-            return c.width > 0 && c.top < r.bottom && c.bottom > r.top && c.left < r.right && c.right > r.left && Number(getComputedStyle(layer).zIndex) > popupZ;
+            const layer = e.matches('[data-slot=drawer-popup]') ? e.parentElement : e;
+            return c.width > 0 && c.height > 0 && c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top && Number(getComputedStyle(layer).zIndex) > z;
           });
-          return popupZ >= Number(getComputedStyle(surface).zIndex) && !covering && (hit === item || item.contains(hit));
+          const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.y + r.height / 2], [r.right - 2, r.y + r.height / 2], [r.x + r.width / 2, r.top + 2], [r.x + r.width / 2, r.bottom - 2]];
+          return { coarse: matchMedia('(pointer: coarse)').matches, visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight, covering: covering.map(e => e.getAttribute('aria-label') || e.dataset.slot), reachable: points.every(([x, y]) => { const hit = document.elementFromPoint(x, y); return hit === button || button.contains(hit); }) };
         })()`);
-        assert.equal(popup.result, true, "Count Location Select opens above command surface");
-        if (process.argv[2]) browser("screenshot", `${process.argv[2]}/count-picker-${width}x${height}-green.png`);
-        browser("press", "Escape");
+        assert.equal(result.coarse, coarse, "Pointer emulation must match scenario");
+        assert.equal(result.visible, true, `${screen} ${width}x${height}: action outside viewport`);
+        assert.deepEqual(result.covering, [], `${screen} ${width}x${height}: chrome paints above action`);
+        assert.equal(result.reachable, true, `${screen} ${width}x${height}: action hit target`);
+        console.log(JSON.stringify({ screen, width, height, ...result }));
+        if (process.argv[2]) browser("screenshot", `${process.argv[2]}/${screen === "Cycle count" ? "count" : "reading"}-${width}x${height}-${coarse ? "coarse" : "fine"}-green.png`);
       }
-      // A focused field in a reduced viewport exercises keyboard-space layout, not a physical OS keyboard.
-      browser("find", "label", screen === "Cycle count" ? "Counted (each)" : "Temperature (°F)", "click");
-      const { result } = browser("eval", `(() => {
-        const button = [...document.querySelectorAll('button')].find(e => e.textContent.trim() === ${JSON.stringify(action)});
-        const surface = button.closest('[data-slot=sheet-content],[data-slot=dialog-content]');
-        const body = [...surface.children].find(e => getComputedStyle(e).overflowY === 'auto');
-        if (!body) throw new Error("Command surface is missing its scroll body");
-        body.scrollTop = body.scrollHeight;
-        const r = button.getBoundingClientRect();
-        const z = Number(getComputedStyle(surface).zIndex);
-        const chrome = [...document.querySelectorAll('nav[aria-label=Tabs],[data-slot=drawer-popup]')];
-        const covering = chrome.filter(e => {
-          const c = e.getBoundingClientRect();
-          const layer = e.matches('[data-slot=drawer-popup]') ? e.parentElement : e;
-          return c.width > 0 && c.height > 0 && c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top && Number(getComputedStyle(layer).zIndex) > z;
-        });
-        const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.y + r.height / 2], [r.right - 2, r.y + r.height / 2], [r.x + r.width / 2, r.top + 2], [r.x + r.width / 2, r.bottom - 2]];
-        return { coarse: matchMedia('(pointer: coarse)').matches, visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight, covering: covering.map(e => e.getAttribute('aria-label') || e.dataset.slot), reachable: points.every(([x, y]) => { const hit = document.elementFromPoint(x, y); return hit === button || button.contains(hit); }) };
-      })()`);
-      assert.equal(result.coarse, coarse, "Pointer emulation must match scenario");
-      assert.equal(result.visible, true, `${screen} ${width}x${height}: action outside viewport`);
-      assert.deepEqual(result.covering, [], `${screen} ${width}x${height}: chrome paints above action`);
-      assert.equal(result.reachable, true, `${screen} ${width}x${height}: action hit target`);
-      console.log(JSON.stringify({ screen, width, height, ...result }));
-      if (process.argv[2]) browser("screenshot", `${process.argv[2]}/${screen === "Cycle count" ? "count" : "reading"}-${width}x${height}-${coarse ? "coarse" : "fine"}-green.png`);
     }
-  }
-  // Inline packaging controls share the shell, not CommandForm's modal precedence.
+    // Inline packaging controls share the shell, not CommandForm's modal precedence.
     for (const [screen, selector] of [
       ["Close packaging run", '[aria-label="Finished goods bin"]'],
       ["Run closed", 'button'],
