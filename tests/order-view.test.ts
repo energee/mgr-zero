@@ -46,6 +46,11 @@ describe("Order view loop", () => {
     expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderPickedRestock) }))).not.toContain("changed after pick");
   });
 
+  it("names a foreign ship-to's country and never prints a missing part as null", () => {
+    const jp = { ...orderPickedRestock, order: { ...orderPickedRestock.order, ship_tos: { label: "Main", country: "JP", city: null, state: null } } };
+    expect(toOrderViewProps(jp).where).toBe("Al’s Bar · Japan");
+  });
+
   it("says Pickup on a pickup order and nothing otherwise", () => {
     const pickup = { ...orderPickedRestock, order: { ...orderPickedRestock.order, pickup: true } };
     expect(toOrderViewProps(pickup).pickup).toBe(true);

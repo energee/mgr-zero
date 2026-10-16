@@ -33,6 +33,11 @@ describe("Account view", () => {
     expect(model.info).toBe("Contact the brewery to change account details.");
   });
 
+  it("names a foreign ship-to's country and never prints a missing part as null", () => {
+    const model = toPortalAccountViewProps({ ...portalAccountRidgeline, shipTos: [{ id: "jp", label: "Main", country: "JP", city: null, state: null }] });
+    expect(model.shipTos[0]?.detail).toBe("Japan");
+  });
+
   it("omits keg-deposit rows when the snapshot has none", () => {
     const model = toPortalAccountViewProps({ ...portalAccountRidgeline, deposits: [] });
     expect(model.deposits).toEqual([]);

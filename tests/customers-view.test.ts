@@ -198,4 +198,7 @@ it("a ship-to reads as one address line; missing parts drop out and a foreign on
   expect(shipToAddress({ country: "US", address1: "1 Main St", address2: "Dock 2", city: "Phila", state: "PA", zip: "19107" })).toBe("1 Main St, Dock 2 · Phila, PA 19107");
   expect(shipToAddress({ country: "JP", address1: null, address2: null, city: null, state: null, zip: null })).toBe("Japan");
   expect(shipToAddress({ country: "NL", address1: null, address2: null, city: "Amsterdam", state: null, zip: "1011" })).toBe("Amsterdam 1011 · Netherlands");
+  // The short form (city and state only) the order, portal and delivery screens use.
+  expect(shipToAddress({ country: "US", city: "Columbus", state: "OH" })).toBe("Columbus, OH");
+  expect(shipToAddress({ country: "JP", city: null, state: null })).toBe("Japan");
 });

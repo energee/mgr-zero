@@ -294,7 +294,7 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, city, state)")
+    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
     if (!order) throw new CommandError("Order not found", 404, "not_found");
     const [ln, events, shipment] = await Promise.all([

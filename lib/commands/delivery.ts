@@ -95,7 +95,7 @@ defineQuery({
   input: z.object({ deliveryId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
-      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
+      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, country, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
     const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string } } | null; stock_transfers: { id: string } | null };

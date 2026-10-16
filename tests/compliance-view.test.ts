@@ -22,7 +22,7 @@ import { toLicensesViewProps } from "../lib/mgr/licenses-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import { colaChoice, colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
-import { toLotTraceViewProps } from "../lib/mgr/lot-trace-view";
+import { toLotTraceViewProps, type LotTraceSnapshot } from "../lib/mgr/lot-trace-view";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
@@ -246,6 +246,13 @@ describe("Lot trace", () => {
     expect(html).not.toMatch(/href="\/(orders|customers|invoices)/);
     expect(html).not.toMatch(/Recorded balances by SKU and bin[\s\S]*118 units/);
     expect(html).not.toMatch(/Order 7|production in/i);
+  });
+
+  it("names a recipient ship-to's country and never prints a missing part as null", () => {
+    const recipient = (ship_tos: LotTraceSnapshot["recipients"][number]["ship_tos"]) => ({ id: "order", order_no: 7, customers: null, ship_tos, shipments: [] });
+    const shipTo = (s: LotTraceSnapshot["recipients"][number]["ship_tos"]) => toLotTraceViewProps({ ...lotTraceHazy, recipients: [recipient(s)] }).recipients?.[0]?.shipTo;
+    expect(shipTo({ label: "main", country: "JP", address1: null, city: null, state: null, zip: null })).toBe("main · Japan");
+    expect(shipTo({ label: "main", country: "US", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" })).toBe("main · 1 Sample St · Sample, PA 19100");
   });
 
   it("preserves live movement provenance and links", () => {

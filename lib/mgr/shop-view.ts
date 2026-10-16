@@ -17,6 +17,7 @@ export type ShopCatalogItem = {
 export type ShopShipTo = {
   id: string;
   label: string;
+  country: string;
   address1?: string;
   city?: string;
   state?: string;

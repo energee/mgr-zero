@@ -29,7 +29,7 @@ const ridgeline = {
   order_no: 231,
   from_location_id: LOC_WAREHOUSE.id,
   customers: { name: RIDGELINE.name },
-  ship_tos: { label: "Main", city: "Phoenixville", state: "PA" },
+  ship_tos: { label: "Main", country: "US", city: "Phoenixville", state: "PA" },
 };
 
 const line = (

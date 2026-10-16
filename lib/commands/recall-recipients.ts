@@ -11,7 +11,7 @@ export async function recipientsFor(ctx: Ctx, orderIds: string[]) {
   // Shipments filter on the same order ids, so both reads start together.
   const [orders, shipments] = await Promise.all([
     inChunks(ids, async chunk => completeRows("Recall recipients", start => ctx.db.from("orders")
-      .select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip)", { count: "exact" })
+      .select("id,order_no,customers(id,name),ship_tos(id,label,country,address1,address2,city,state,zip)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).in("id", chunk).order("id").range(start, start + PAGE_SIZE - 1))),
     inChunks(ids, async chunk => completeRows("Recall shipments", start => ctx.db.from("shipments")
       .select("id,order_id,carrier,tracking", { count: "exact" }).eq("brewery_id", ctx.breweryId)

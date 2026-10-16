@@ -14,8 +14,8 @@ const USER = "00000000-0000-4000-8000-0000000000u1";
 export const portalAccountRidgeline: PortalAccountSnapshot = {
   customer: { id: CUSTOMER, name: RIDGELINE.name },
   shipTos: [
-    { id: SHIP_MAIN, label: "Main", city: "Phoenixville", state: "PA" },
-    { id: SHIP_DOCK, label: "Dock", city: "Royersford", state: "PA" },
+    { id: SHIP_MAIN, label: "Main", country: "US", city: "Phoenixville", state: "PA" },
+    { id: SHIP_DOCK, label: "Dock", country: "US", city: "Royersford", state: "PA" },
   ],
   membership: { userId: USER },
   deposits: [{ kegSize: "½ bbl", kegsOnDeposit: 38, depositCents: 114000 }],

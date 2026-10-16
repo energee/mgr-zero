@@ -101,6 +101,11 @@ describe("Order detail view", () => {
     expect(model.adjusted).toBeUndefined();
   });
 
+  it("names a foreign ship-to's country and never prints a missing part as null", () => {
+    const model = toPortalOrderViewProps({ ...portalOrderShipped, order: { ...portalOrderShipped.order, ship_tos: { label: "Main", country: "JP", city: null, state: null } } });
+    expect(model.shipTo).toBe("Main · Japan");
+  });
+
   it("puts PO, note, and adjusted copy on the model when present, and hides invoice/Reorder otherwise", () => {
     const model = toPortalOrderViewProps({
       order: {

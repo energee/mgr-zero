@@ -1,5 +1,6 @@
 // Review uses authoritative quote amounts when available; unquoted amounts stay pending.
 import { money } from "./money";
+import { shipToAddress } from "./ship-to-view";
 import { packageName, shopCartTotals, type ShopSnapshot } from "./shop-view";
 
 export type ReviewOrderSnapshot = ShopSnapshot & {
@@ -61,7 +62,7 @@ export function toReviewOrderViewProps({
   const { merchandiseCents } = shopCartTotals(catalog, depositCentsPerKeg);
   const shipTo = shipTos.find((s) => s.id === shipToId);
   const shipToLabel = shipTo
-    ? `${shipTo.label} · ${shipTo.city}, ${shipTo.state}`
+    ? [shipTo.label, shipToAddress(shipTo)].filter(Boolean).join(" · ")
     : "—";
   return {
     lines: catalog.filter((i) => i.qty > 0).map((i) => ({

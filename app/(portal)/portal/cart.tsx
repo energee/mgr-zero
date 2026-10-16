@@ -17,7 +17,7 @@ import { cartActionsDisabled, cartLines, cartMissingInput, planDraftSync, portal
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
-export type ShipToOption = { id: string; label: string; is_default?: boolean };
+export type ShipToOption = { id: string; label: string; country: string; is_default?: boolean };
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.` : message;
 }

@@ -105,6 +105,11 @@ describe("portal customers cannot read internal order and SKU columns", () => {
     expect(catalog).toEqual([expect.objectContaining({ skuId, unitPriceCents: 1000 })]);
   });
 
+  it("the portal order's ship-to names its country, so a foreign one reads without null parts", async () => {
+    const detail = await runCommand("portal_order", { orderId }, custCtx) as { order: { ship_tos: Record<string, unknown> } };
+    expect(detail.order.ship_tos).toEqual({ label: "main", country: "US", city: "Town", state: "PA" });
+  });
+
   it("portal_order_rows(p_order) returns just that order, and only the caller's", async () => {
     const own = await customerDb.rpc("portal_order_rows", { p_order: orderId }).select("id");
     expect(own.data).toEqual([{ id: orderId }]);

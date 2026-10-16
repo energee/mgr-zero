@@ -41,9 +41,13 @@ export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
   };
 }
 
-/** A ship-to as one line on Customer detail: street, then the city, state and
- *  zip, then the country outside the US. Missing parts drop out. */
-export function shipToAddress(s: Pick<ShipToSnapshot, "country" | "address1" | "address2" | "city" | "state" | "zip">): string {
+/** A ship-to as one line: street, then the city, state and zip, then the
+ *  country outside the US. Missing parts drop out, so a foreign ship-to with
+ *  no address reads as its country. Screens that show only the place (order,
+ *  portal, delivery) pass no street or zip. */
+export type ShipToAddressParts = { country: string } & Partial<Record<"address1" | "address2" | "city" | "state" | "zip", string | null>>;
+
+export function shipToAddress(s: ShipToAddressParts): string {
   const street = [s.address1, s.address2].filter(Boolean).join(", ");
   const place = [[s.city, s.state].filter(Boolean).join(", "), s.zip].filter(Boolean).join(" ");
   return [street, place, s.country === "US" ? "" : countryName(s.country)].filter(Boolean).join(" · ");

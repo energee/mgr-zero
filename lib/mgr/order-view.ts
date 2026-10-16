@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { shipToAddress } from "./ship-to-view";
 import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
@@ -60,7 +61,7 @@ export type OrderSnapshot = {
     repick_since?: string | null;
     from_location_id?: string;
     customers: { name: string } | null;
-    ship_tos: { label: string; city: string; state: string } | null;
+    ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   locations?: { id: string; name: string }[];
   lines: {
@@ -142,7 +143,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
-    ? `${order.customers.name}${order.ship_tos ? ` · ${order.ship_tos.city}, ${order.ship_tos.state}` : ""}`
+    ? [order.customers.name, order.ship_tos && shipToAddress(order.ship_tos)].filter(Boolean).join(" · ")
     : "Taproom transfer";
   return {
     backHref,
