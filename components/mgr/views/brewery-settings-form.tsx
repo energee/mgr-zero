@@ -51,7 +51,10 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
     {field("ttb", "TTB registry number")}
     {field("pa", "PA license")}
     {field("phone", "Customer-facing phone", "tel")}
-    {field("booksOpenedOn", "Books opened on · optional", "date")}
+    <div className="flex min-w-0 flex-col gap-2">
+      {field("booksOpenedOn", "Books opened on · optional", "date")}
+      <p className="text-xs text-muted-foreground">Set or clear before your first filed snapshot. After any report is filed, this value is fixed.</p>
+    </div>
     {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01 })}
     <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
       <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>

@@ -9,6 +9,9 @@ import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
+import { fermentationSummary, mashRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { plural } from "@/lib/mgr/plural";
+import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
@@ -127,14 +130,38 @@ export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils
 
 export const recipesList: RecipesSnapshot = {
   rows: [
-    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28", verb: "Review", tone: "primary" },
-    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21", verb: "Review", tone: "primary" },
-    { key: "stout", title: "Stout v2", detail: "Stout · draft version", verb: "Finish", tone: "primary", warning: true },
+    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28" },
+    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21" },
   ],
+};
+
+/** The drawn mash schedule, in the shape create_recipe_version stores. The
+ *  Recipe row, the Mash schedule frame and its footer all read it, so the total
+ *  and the conversion rest never disagree. */
+export const MASH_STEPS: MashStep[] = [
+  { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
+  { name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 },
+  { name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 },
+];
+
+/** The drawn fermentation schedule. Same rule as MASH_STEPS. */
+export const FERM_STAGES: FermentationStage[] = [
+  { name: "Primary", kind: "primary", tempF: 68, days: 4 },
+  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, days: 2 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, days: 2 },
+  { name: "Conditioning", kind: "conditioning", tempF: 34, days: 10 },
+];
+
+/** The drawn water: Denver source, Hazy target, a suggestion the brewer trimmed by hand so Calcium and Chloride warn; Bicarbonate warns too, since salts only add ions and Denver starts 70 ppm over the target. */
+export const WATER_HAZY: WaterDraft = {
+  targetProfileId: "hazy", sourceProfileId: "denver", mashGal: "9.5", spargeGal: "12.0", targetMashPh: "5.35",
+  additions: [{ materialId: "gypsum", qty: 4, unit: "g", stage: "mash" }, { materialId: "cacl", qty: 6, unit: "g", stage: "mash" }, { materialId: "lactic", qty: 3, unit: "mL", stage: "sparge" }],
 };
 
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
+  saved: "Aug 28, 2026",
+  recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   ingredients: [
@@ -150,9 +177,11 @@ export const recipeHazyV4: RecipeViewModel = {
   knockoutTemp: "65",
   efficiency: "72",
   attenuation: "78",
-  mash: { title: "Mash schedule · 3 steps", detail: "152 °F saccharification rest" },
-  fermentation: { title: "Fermentation schedule · 4 stages", detail: "18 days · dry hop day 4 in Primary" },
-  water: { title: "Water · Municipal Denver to Hazy target", detail: "3 salts and acids" },
+  mash: { title: `Mash schedule · ${plural(MASH_STEPS.length, "step")}`, detail: mashRowSummary(MASH_STEPS) },
+  // PR D drops the dry-hop day argument with the dry-hop row.
+  fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES, 4) },
+  // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
+  water: { title: "Water", detail: `target ${waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name} · ${plural(WATER_HAZY.additions.length, "addition")}` },
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%",
   tape: [

@@ -16,6 +16,9 @@ export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies 
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
+/** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
+ *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
+export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
 /** "dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
   `${stage.replace("_", " ")}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
@@ -56,6 +59,18 @@ export function mashSummary(steps: readonly MashStep[]): string {
   return `Total ${totalMinutes(steps)} min · ${rest ? `the ${rest.tempF} °F rest is the recorded mash temperature; the gravity prediction does not use it.` : "no rest between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
+/** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
+export function mashRowSummary(steps: readonly MashStep[]): string {
+  const rest = saccharificationRest(steps);
+  return `Total ${totalMinutes(steps)} min · ${rest ? `${rest.tempF} °F saccharification rest` : "no saccharification rest"}`;
+}
+
+/** A mash step's row detail; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
+export function mashStepDetail(step: MashStep): string {
+  const kind = step.kind.toLowerCase() === step.name.trim().toLowerCase() ? "" : `${step.kind} · `;
+  return `${kind}${step.tempF} °F · ${step.minutes} min`;
+}
+
 /** Total days, and where a dry hop on day N lands: day 4 is the last day of a 4-day Primary. */
 export function fermentationSummary(stages: readonly FermentationStage[], dryHopDay?: number): string {
   const total = stages.reduce((n, s) => n + s.days, 0);
@@ -79,7 +94,7 @@ export function processReadout(v: ProcessColumns, profileName: (id: string | nul
     ["Pre-boil volume", v.pre_boil_bbl === null ? null : `${v.pre_boil_bbl} bbl`],
     ["Whirlpool", whirlpool],
     ["Knockout temp", v.knockout_temp_f === null ? null : `${v.knockout_temp_f} °F`],
-    ["Source profile", profileName(v.source_water_profile_id) ?? "Brewery default"],
+    ["Source profile", profileName(v.source_water_profile_id) ?? "No source"],
     ["Target profile", profileName(v.target_water_profile_id) ?? "No target"],
     ["Mash water", v.mash_water_gal === null ? null : `${v.mash_water_gal} gal`],
     ["Sparge water", v.sparge_water_gal === null ? null : `${v.sparge_water_gal} gal`],

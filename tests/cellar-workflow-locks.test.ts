@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { DB, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import { DB, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -186,5 +186,83 @@ describe.sequential("cellar workflow serialization", () => {
     await waitForLock(a, pid);
     await a.query("commit");
     await expect(pending).resolves.toMatchObject({ rows: [expect.objectContaining({ result: expect.objectContaining({ batchId: f.batchId }) })] });
+  });
+
+  it("makes a books-opened clear wait for filing, then refuse without changing its basis", async () => {
+    const ctx = await makeStaffCtx((await makeBrewery()).id);
+    await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, ctx);
+    const a = await client(ctx.userId, true);
+    const b = await client(ctx.userId, false);
+    const filingRequest = crypto.randomUUID();
+    const filed = (await a.query(
+      "select public.file_compliance_report($1,'TTB','2026-02-01','2026-02-28',null,$2) result",
+      [ctx.breweryId, filingRequest],
+    )).rows[0].result;
+    await a.query("reset role");
+    const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+    const clearRequest = crypto.randomUUID();
+    const pending = b.query("select public.set_brewery_books_opened_on($1,null,$2)", [ctx.breweryId, clearRequest]);
+    pending.catch(() => {});
+    await waitForLock(a, pid);
+    await a.query("commit");
+    await expect(pending).rejects.toThrow(/cannot change or be cleared.*filed/);
+    expect((await b.query("select books_opened_on::text from public.breweries where id=$1", [ctx.breweryId])).rows[0].books_opened_on).toBe("2026-02-01");
+    expect((await b.query("select figures from public.report_filings where id=$1", [filed.id])).rows[0].figures).toEqual(filed.figures);
+    expect((await a.query("select count(*)::int n from private.command_requests where request_id=$1", [clearRequest])).rows[0].n).toBe(0);
+    const replay = (await b.query(
+      "select public.file_compliance_report($1,'TTB','2026-02-01','2026-02-28',null,$2) result",
+      [ctx.breweryId, filingRequest],
+    )).rows[0].result;
+    expect(replay).toEqual(filed);
+  });
+
+  it("makes filing wait for a prefiling clear and calculate from that committed basis", async () => {
+    const ctx = await makeStaffCtx((await makeBrewery()).id);
+    const { skuId } = await seedCatalog(ctx.breweryId, { packageType: "can", bblPerUnit: 0.5 });
+    const loc = await seedLocation(ctx.breweryId);
+    insertFixture("inventory_movements", {
+      brewery_id: ctx.breweryId, sku_id: skuId, location_id: loc.id, bin_id: loc.binId,
+      created_by: ctx.userId, qty: 10, type: "opening_balance", occurred_on: "2026-01-01",
+    });
+    await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, ctx);
+    const a = await client(ctx.userId, true);
+    const b = await client(ctx.userId, false);
+    await a.query("select public.set_brewery_books_opened_on($1,null,$2)", [ctx.breweryId, crypto.randomUUID()]);
+    await a.query("reset role");
+    const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+    const pending = b.query(
+      "select public.file_compliance_report($1,'TTB','2026-02-01','2026-02-28',null,$2) result",
+      [ctx.breweryId, crypto.randomUUID()],
+    );
+    pending.catch(() => {});
+    await waitForLock(a, pid);
+    await a.query("commit");
+    const filed = (await pending).rows[0].result;
+    expect(filed.figures.lines.find((line: { class: string }) => line.class === "can")).toMatchObject({ begin: 5, end: 5 });
+    const generated = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: "2026-02-01", periodEnd: "2026-02-28",
+    }, ctx) as { figures: unknown };
+    expect(generated.figures).toEqual(filed.figures);
+    await expect(runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, ctx)).rejects.toThrow(/filed/);
+  });
+
+  it("rechecks the period after a waiting filing sees the books-opened date move past its start", async () => {
+    const ctx = await makeStaffCtx((await makeBrewery()).id);
+    const a = await client(ctx.userId, true);
+    const b = await client(ctx.userId, false);
+    await a.query("select public.set_brewery_books_opened_on($1,'2026-03-01',$2)", [ctx.breweryId, crypto.randomUUID()]);
+    await a.query("reset role");
+    const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+    const requestId = crypto.randomUUID();
+    const pending = b.query(
+      "select public.file_compliance_report($1,'TTB','2026-02-01','2026-02-28',null,$2)",
+      [ctx.breweryId, requestId],
+    );
+    pending.catch(() => {});
+    await waitForLock(a, pid);
+    await a.query("commit");
+    await expect(pending).rejects.toThrow(/period starts before the books opened on 2026-03-01/);
+    expect((await b.query("select count(*)::int n from public.report_filings where brewery_id=$1", [ctx.breweryId])).rows[0].n).toBe(0);
+    expect((await a.query("select count(*)::int n from private.command_requests where request_id=$1", [requestId])).rows[0].n).toBe(0);
   });
 });

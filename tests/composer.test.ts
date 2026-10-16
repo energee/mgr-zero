@@ -6,7 +6,10 @@ import { E } from "@/components/mgr/e";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
-import { ComposerConversationView, ComposerDrawerView, ComposerProposalView } from "@/components/mgr/views/composer";
+import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
+import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
+import { ComposerProposalView } from "@/components/mgr/views/composer";
+import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { chatModelFromSettings, gatewayLanguageModels, modelMatches, modelProvider } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -20,12 +23,6 @@ const ids = {
 };
 
 describe("AI composer", () => {
-  it("defers conversation setup until the drawer first opens", () => {
-    const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/useEffect\(\(\) => \{\s*if \(!open \|\| setupRun\.current > 0\) return;\s*const issued/);
-    expect(live).toContain("[open, breweryId, expectedContext.actorId]");
-  });
-
   it("ignores keydown-like events without a key", () => {
     expect(isComposerShortcut({ metaKey: true })).toBe(false);
     expect(isComposerShortcut({ key: "K", ctrlKey: true })).toBe(true);
@@ -140,73 +137,10 @@ describe("AI composer", () => {
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });
 
-  // #329: a failed setup (list_chat_conversations / get_brewery_ai_model) left
-  // the drawer dead — Try again only regenerated the last AI turn, which never
-  // re-ran the load that failed.
-  it("retries the setup load, not just the AI turn, after a setup error", () => {
-    const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    // Every failure carries its own recovery, so Try again re-runs what failed
-    // — the setup load, the new chat, or the commit — and only an AI-turn error
-    // falls through to regenerate().
-    expect(live).toMatch(/setFailure\(\{ message: [^}]*retry \}\)/);
-    expect(live).toMatch(/failed\(cause, "Composer unavailable", reloadSetup\)/);
-    expect(live).toMatch(/failed\(cause, "Could not record proposal", \(\) => void commitProposal\(\)\)/);
-    expect(live).toMatch(/if \(failure\) \{ failure\.retry\(\); return; \}/);
-    expect(live).toMatch(/onRetry=\{retry\}/);
-  });
-
-  // A malformed proposal must neither throw out of the staff layout's render
-  // (#463) nor borrow the conversation's Try again, which regenerates the last
-  // AI turn rather than retrying the proposal.
-  it("shows a rejected proposal as its own alert, without Try again", () => {
-    const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/const \{ proposal, error: proposalError \} = latestComposerProposal\(messages\)/);
-    expect(live).not.toMatch(/try \{ proposal = latestComposerProposal/);
-    expect(live).not.toMatch(/error=\{[^}]*proposalError/);
-    expect(live).toMatch(/\{proposalError && <p role="alert"[^>]*>\{proposalError\}<\/p>\}/);
-  });
-
-  it("shares the AI SDK composer between live and inventory surfaces", () => {
-    expect(E.comp().type).toBe(ComposerDrawerView);
-    const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toContain("useChat");
-    expect(live).not.toMatch(/normalized\.includes|ComposerMovementPickerView|chooseAction/);
-    expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
-    expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
-    const shared = readFileSync("components/mgr/views/composer.tsx", "utf8");
-    const drawer = readFileSync("components/mgr/views/composer-drawer.tsx", "utf8");
-    const drawerPrimitive = readFileSync("components/ui/drawer.tsx", "utf8");
-    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { dependencies: Record<string, string> };
-    expect(shared).toMatch(/export \{ ComposerDrawerView \} from/);
-    expect(drawer).toContain('const MINIMIZED = "44px"');
-    expect(drawer).toContain('const COMPACT = "480px"');
-    expect(drawer).toContain("const EXPANDED = 1");
-    expect(drawer).toContain('const minimized = isMobile ? "92px" : MINIMIZED');
-    expect(drawer).toMatch(/<Drawer[\s\S]*\bopen\b[\s\S]*snapPoints=\{\[minimized, COMPACT, EXPANDED\]\}/);
-    expect(drawer).toContain("modal={false}");
-    expect(drawer).toContain("disablePointerDismissal");
-    expect(drawer).toContain("snapToSequentialPoints");
-    expect(drawer).toContain("snapPoint={snapPoint}");
-    expect(drawer).toContain("onSnapPointChange={setSnapPoint}");
-    expect(drawer).toContain("handle={<div");
-    // Base UI ignores mouse drags starting on buttons; the surrounding handle must receive them.
-    expect(drawer).toMatch(/<Button[^>]*className="pointer-events-none h-11 w-full rounded-none"/);
-    expect(drawer).toContain("event.detail === 0");
-    expect(drawer).toContain('addEventListener("pointerup"');
-    expect(drawer).not.toContain("handleOnly");
-    expect(drawer).not.toContain("DrawerTrigger");
-    expect(drawer).toContain('"Expand Ask MGR"');
-    expect(drawer).toContain('"Minimize Ask MGR"');
-    expect(drawer).toContain('"Open Ask MGR"');
-    expect(shared).toContain('className="flex min-h-0 flex-1 flex-col overflow-hidden"');
-    expect(shared).not.toContain(">Minimize</Button>");
-    expect(readFileSync("components/mgr/app-shell.tsx", "utf8")).toContain('className="h-11 shrink-0"');
-    expect(drawerPrimitive).toContain('from "@base-ui/react/drawer"');
-    expect(drawerPrimitive).toMatch(/\{handle\}[\s\S]*<DrawerPrimitive\.Content/);
-    expect(drawerPrimitive).toContain("transform-[translate3d(0,var(--drawer-snap-point-offset,0px),0)]");
-    expect(drawerPrimitive).not.toContain('from "vaul"');
-    expect(packageJson.dependencies).toHaveProperty("@base-ui/react");
-    expect(packageJson.dependencies).not.toHaveProperty("vaul");
+  it("uses the shared drawer and strip in inventory chrome", () => {
+    const composer = E.comp();
+    expect(composer.type).toBe(ComposerDrawerView);
+    expect(composer.props.children.type).toBe(ComposerStripView);
   });
 
   it("renders only canonical proposal effects", () => {

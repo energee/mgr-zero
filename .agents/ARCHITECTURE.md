@@ -74,7 +74,7 @@ never copy it into a second place.
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge, weekly, and manual customer-documentation contract and automation. Claude may edit only the three guide MDX files in a read-only GitHub job whose sandbox deny list is `.github/claude-ci-settings.json` (shared with dreaming); a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
 | `content/docs/api/` (index plus one page per area), `lib/mgr/api-operations.ts`, `lib/mgr/api-schema.ts`, `lib/mgr/api-errors.ts` | The HTTP API reference, served at `/docs/api`. Generated blocks (envelope, role matrix, per-area operations with field tables and self-validating curl examples) are written between markers by `bun run docs:api`, deriving available operations from the command registry and designed operations from each screen's declared `reads`/`writes`; `tests/api-docs.test.ts` fails on drift in either direction. |
-| `.github/workflows/doc-agent-watch.yml` | Opens one GitHub issue per problem when Dreaming, the documentation agent or the HTTP API agent fails, or when no `dream:` commit lands on main for 3 days. |
+| `.github/workflows/doc-agent-watch.yml` | Opens one GitHub issue per problem when Dreaming, the documentation agent, the HTTP API agent or `hosted jobs` fails, or when no `dream:` commit lands on main for 3 days. |
 | `.agents/agents/http-api.md`, `.github/workflows/http-api-agent.yml` | Post-merge and weekly HTTP API reference maintenance, mirroring the documentation agent; a PR body with `API: none` skips it. Claude may edit the `content/docs/api/*.mdx` prose and a screen's `reads:`/`writes:` annotations only — never hand-write the generated tables (`Bash` is absent from its allowlist; the workflow runs `bun run docs:api`) — and opens the reviewable `docs/http-api` pull request via the MGR App token. |
 | `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
 | `.agents/agents/dreaming.md`, `.agents/DRIFT.md`, `.github/workflows/dreaming.yml`, `.github/claude-ci-settings.json` | Daily/manual agent-doc curation and its unresolved read-only drift ledger. Claude edits documents with read-only GitHub access under the shared CI deny list (read from main, not the checked-out dream branch); the workflow validates and publishes through the MGR GitHub App (`mgr[bot]`). |
@@ -351,3 +351,23 @@ remain for pages vacuum has not yet marked all-visible. The cost: on
 function's body and expects both index-only scans, and rejects two indexes on
 one table with the same keys whatever their `include` (#794). So widen an
 existing index with `include` rather than adding a second one on the same keys.
+
+## Working files
+
+Agent-facing files and where each harness reads them. `AGENTS.md` keeps a
+short version of this list.
+
+- `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
+- `.agents/PROGRESS.md` — dated Done log only. Same rule: state the change in the PR description, the dreaming PR writes it here.
+- `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
+- `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
+- `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
+- `.claude/settings.json` — shared Claude Code allowlist: the proof checks and plain `git fetch`, in exact forms. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code (`git fetch --upload-pack`, `vitest --config`).
+- `.agents/skills/` — project-local reusable workflows; `.claude/skills` is a symlink to it (Claude Code only reads `.claude/skills`); `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
+- `.agents/worktrees/<branch>/` — the only place for worktrees: `scripts/worktree.sh <branch> [base]` creates one, symlinks the gitignored `.env.local`/`.env.test.local` from the main checkout, and runs `bun install` (Turbopack rejects a node_modules symlink, so each worktree owns its own). Plain `git worktree add` leaves a checkout that cannot run `vitest` or `next dev`. Gitignored.
+- `scripts/land-pr.sh <pr> [--merge]` — lands one PR from its worktree: merges origin/main (resolving only a `migrations.lock.json` conflict), regenerates the lock and API docs, runs the local proof (tsc, lint, the PR's tests plus every test naming a SQL function its migrations define), pushes, waits for CI and reruns Docker/port infra failures, then merges. Chain calls in migration-timestamp order for a queue; one session merges at a time. Exit codes are listed in its header.
+- `.agents/agents/dreaming.md` — prompt for the dreaming workflow
+  (`.github/workflows/dreaming.yml`) that curates the agent docs via a
+  `dreaming/main` PR authored by the MGR GitHub App (`mgr[bot]`);
+  merged PRs are its input; committed `.remember/today-*.md` digests, when
+  present, are extra evidence.

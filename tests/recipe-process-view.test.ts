@@ -1,6 +1,6 @@
 // tests/recipe-process-view.test.ts — draft helpers for the schedule sheets (issue #278).
 import { describe, expect, it } from "vitest";
-import { fermentationSummary, ionReadout, mashSummary, moveItem, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -25,7 +25,7 @@ describe("schedule drafts", () => {
   it("reads a cut version's process facts out, skipping what it does not carry", () => {
     const names = (id: string | null) => (id === "hazy" ? "Hazy target" : null);
     expect(processReadout({ pre_boil_bbl: 12.5, whirlpool_minutes: 20, whirlpool_temp_f: 180, whirlpool_rest_minutes: null, knockout_temp_f: null, target_water_profile_id: "hazy", source_water_profile_id: null, mash_water_gal: 9.5, sparge_water_gal: null, target_mash_ph: 5.35 }, names)).toEqual([
-      ["Pre-boil volume", "12.5 bbl"], ["Whirlpool", "20 min at 180 °F"], ["Source profile", "Brewery default"], ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
+      ["Pre-boil volume", "12.5 bbl"], ["Whirlpool", "20 min at 180 °F"], ["Source profile", "No source"], ["Target profile", "Hazy target"], ["Mash water", "9.5 gal"], ["Target mash pH", "5.35"],
     ]);
   });
   it("summaries name the recorded mash-temperature rest and the total days", () => {
@@ -34,6 +34,20 @@ describe("schedule drafts", () => {
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
     expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");
+  });
+  it("prints a per-bbl quantity to three significant digits, never two fraction digits", () => {
+    expect(perBblDisplay(40.909091)).toBe("40.9");
+    expect(perBblDisplay(0.045455)).toBe("0.0455");
+    expect(perBblDisplay(0.011364)).toBe("0.0114");
+  });
+  it("the mash row summary gives the total and the saccharification rest", () => {
+    expect(mashRowSummary([{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }])).toBe("Total 60 min · 152 °F saccharification rest");
+    expect(mashRowSummary([{ name: "Mash-in", kind: "infusion", tempF: 152, minutes: 60 }, { name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 70 min · 152 °F saccharification rest");
+    expect(mashRowSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no saccharification rest");
+  });
+  it("a mash step's detail hides the kind when it repeats the name", () => {
+    expect(mashStepDetail({ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 })).toBe("infusion · 152 °F · 60 min");
+    expect(mashStepDetail({ name: "Rest", kind: "rest", tempF: 145, minutes: 20 })).toBe("145 °F · 20 min");
   });
 });
 
