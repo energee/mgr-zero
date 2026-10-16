@@ -18,10 +18,29 @@ use warnings;
 use Fcntl qw(:flock);
 BEGIN { $^F = 255 }    # keep the locks' descriptors open across exec
 
-my $mode = shift // die "usage: test-db-lock.pl ex CMD... | sh\n";
+my $mode = shift // die "usage: test-db-lock.pl ex CMD... | sh | check\n";
+die "test-db lock: invalid mode $mode\n" unless $mode =~ /^(ex|sh|check)$/;
 my $path = $ENV{MGR_TEST_DB_LOCK} // '/tmp/mgr-test-db.lock';
-open(my $gate, '>>', "$path.gate") or die "test-db lock: $path.gate: $!\n";
-open(my $lock, '>>', $path) or die "test-db lock: $path: $!\n";
+my $inherited;
+if (defined $ENV{MGR_TEST_DB_LOCK_FD}) {
+  my $fd = $ENV{MGR_TEST_DB_LOCK_FD};
+  die "test-db lock: invalid inherited descriptor\n" unless $fd =~ /^\d+$/ && $fd >= 3 && $fd <= 255;
+  open($inherited, '+<&=', $fd) or die "test-db lock: inherited descriptor $fd is closed\n";
+  my @held = stat($inherited);
+  my @target = stat($path);
+  die "test-db lock: inherited descriptor does not protect $path (do not override MGR_TEST_DB_LOCK)\n"
+    unless @held && @target && $held[0] == $target[0] && $held[1] == $target[1];
+  flock($inherited, LOCK_EX | LOCK_NB) or die "test-db lock: inherited exclusive lock was lost\n";
+}
+if ($mode eq 'check') {
+  die "test-db lock: --locked-reset requires an inherited exclusive lock; run scripts/test-db.sh\n" unless $inherited;
+  exit 0;
+}
+my ($gate, $lock);
+unless ($inherited) {
+  open($gate, '>>', "$path.gate") or die "test-db lock: $path.gate: $!\n";
+  open($lock, '>>', $path) or die "test-db lock: $path: $!\n";
+}
 
 sub take {
   my ($fh, $op, $what) = @_;
@@ -31,10 +50,11 @@ sub take {
 }
 local $SIG{ALRM} = sub { die "test-db lock: still held after 10 minutes (a vitest in watch mode?)\n" };
 alarm 600;
-if ($mode eq 'ex') {
+if (!$inherited && $mode eq 'ex') {
   take($gate, LOCK_EX, 'another reset');
   take($lock, LOCK_EX, 'running tests');
-} else {
+  $ENV{MGR_TEST_DB_LOCK_FD} = fileno($lock);
+} elsif (!$inherited) {
   take($gate, LOCK_SH, 'a reset');
   take($lock, LOCK_SH, 'a reset');
   flock($gate, LOCK_UN);

@@ -6,7 +6,7 @@ import { parseEnv } from "node:util";
  * @returns {Record<string, string>}
  */
 export function resolveTestEnv(loaded, localText) {
-  if (loaded.CI === "true") return loaded;
+  if (loaded.CI === "true" && localText === undefined) return loaded;
   if (localText === undefined) throw new Error("Run scripts/test-db.sh before local tests");
   const local = parseEnv(localText);
   try {
