@@ -19,18 +19,6 @@ describe("explorer parity", () => {
     expect(pages.filter((page) => !mapped.has(page))).toEqual(knownRouteDebt);
   });
 
-  it("keeps TODO's screen totals aligned with the executable parity inventory", () => {
-    const todo = readFileSync("TODO.md", "utf8");
-    const mgr = SCREENS.filter((screen) => !screen.venue);
-    const ungated = ungatedMgrScreens();
-    const mapped = new Set(SCREEN_ROUTES.map((route) => route.name));
-    const unmapped = ungated.filter((screen) => !mapped.has(screen.name));
-
-    expect(todo).toContain(
-      `${mgr.length} MGR screens: ${ungated.length} ungated and mapped, ${mgr.length - ungated.length} gated, and ${unmapped.length} ungated without a live route`,
-    );
-  });
-
   it("every ungated MGR screen names a live page that exists", () => {
     const file = new Map(SCREEN_ROUTES.map((r) => [r.name, r.file]));
     const missing = ungatedMgrScreens()

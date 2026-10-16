@@ -190,8 +190,8 @@ defineQuery({
   name: "list_reporting_basis_corrections",
   description: "Immutable reporting-basis correction history, newest first, including old/new values, actor, time and reason",
   roles: [...ROLES], input: z.object({}),
-  handler: (ctx) => rows<ReportingBasisCorrection>(ctx.db.from("reporting_basis_corrections")
-    .select("*").eq("brewery_id", ctx.breweryId).order("corrected_at", { ascending: false })),
+  handler: (ctx) => completeRows<ReportingBasisCorrection>("Reporting basis history", start => ctx.db.from("reporting_basis_corrections")
+    .select("*", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("corrected_at", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
 });
 
 defineCommand({

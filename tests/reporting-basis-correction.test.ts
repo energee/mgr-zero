@@ -123,4 +123,15 @@ describe("recorded reporting-basis correction", () => {
     expect(filings[0].figures).toEqual(filed.figures);
     expect(filings[0].basis_amendments?.[0].new_figures).toEqual(regenerated.figures);
   });
+
+  it("reads the complete immutable history beyond the database's 1000-row response cap", async () => {
+    const breweryId = (await makeBrewery()).id;
+    const ctx = await makeStaffCtx(breweryId);
+    sql(`insert into public.reporting_basis_corrections(brewery_id,old_basis,new_basis,corrected_by,reason)
+      select '${breweryId}','2025-01-01','2025-02-01','${ctx.userId}','History fixture ' || n
+      from generate_series(1,1001) n`, true);
+    const history = await runCommand("list_reporting_basis_corrections", {}, ctx) as { id: string }[];
+    expect(history).toHaveLength(1001);
+    expect(new Set(history.map(row => row.id)).size).toBe(1001);
+  });
 });

@@ -42,7 +42,7 @@ export function ReportingBasisView({ basis, history, timeZone, busy = false, err
     </form>
     {E.ttl("Reporting basis history")}
     {history.length ? history.map(row => <div key={row.id} className="mt-3 rounded-lg border p-3 text-sm">
-      <p className="font-medium">{row.old_basis ? formatDate(row.old_basis) : "Not set"} → {row.new_basis ? formatDate(row.new_basis) : "Not set"}</p>
+      <p className="font-medium">{row.old_basis ? formatDate(row.old_basis) : "Not set"} to {row.new_basis ? formatDate(row.new_basis) : "Not set"}</p>
       <p>{row.reason}</p>
       <p className="break-words text-muted-foreground"><time dateTime={row.corrected_at}>{formatDateTime(row.corrected_at, timeZone)}</time> · Actor {row.corrected_by}</p>
     </div>) : E.info("No reporting basis corrections recorded.")}

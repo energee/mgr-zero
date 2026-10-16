@@ -39,7 +39,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
       {E.info("An admin corrected the reporting basis. The original filed snapshot below remains unchanged. Review the recorded corrected figures and file any amended report outside MGR; MGR does not transmit it or clear this history flag.")}
       {model.amendments.map((amendment, index) => <div key={amendment.id} className="grid gap-2">
         {E.ttl(index === 0 ? "Latest recorded correction" : "Earlier recorded correction")}
-        <p>{amendment.oldBasis} → {amendment.newBasis} · {amendment.reason}</p>
+        <p>{amendment.oldBasis} to {amendment.newBasis} · {amendment.reason}</p>
         <p className="break-words text-sm text-muted-foreground"><time dateTime={amendment.at}>{formatDateTime(amendment.at, model.timeZone)}</time> · Actor {amendment.actor}</p>
         {amendment.invalidPeriod ? E.note("This period starts before the corrected books-opened date. Resolve its external filing with your compliance owner; it cannot be generated under this basis.") : null}
         {!amendment.figures.balances ? E.note("The corrected figures do not balance. Resolve the source records before preparing an amended filing.") : null}
