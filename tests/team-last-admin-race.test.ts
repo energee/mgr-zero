@@ -72,7 +72,7 @@ async function race(first: Write, second: Write) {
   if (!outcome.ok) expect(outcome.error.message).toMatch(/keep at least one admin/);
 }
 
-describe.sequential("last admin under concurrency (#458)", () => {
+describe("last admin under concurrency (#458)", { concurrent: false }, () => {
   it("two admins demoting each other leave one admin", async () => {
     await race(demote, demote);
   });
