@@ -527,10 +527,12 @@ describe("post-merge HTTP API maintainer", () => {
     const validate = parse(workflow).jobs.maintain.steps.find((step: { id?: string }) => step.id === "validate").run as string;
     const render = validate.indexOf("bun run docs:api");
     expect(validate.indexOf("unexpected=")).toBeLessThan(render);
-    expect(validate.indexOf('if [ -n "$screens" ]')).toBeLessThan(render);
+    expect(validate.indexOf("bun scripts/validate-api-agent-screens.ts")).toBeLessThan(render);
     expect(validate).toContain("content/docs/api/[a-z-]+\\.mdx");
     expect(validate).not.toContain("lib/mgr/api-operations");
   });
+
+  const fixtureScreen = '/** Existing block comment\n * Preserve its context. */\nexport const SCREENS = [{\n    reads: "get_order", writes: "none",\n}];\nexport const screen = SCREENS[0];\n';
 
   // Execute the real validation shell, including Bun imports, in an isolated
   // repository. No model, provider, credentials or application database involved.
@@ -559,7 +561,8 @@ describe("post-merge HTTP API maintainer", () => {
       symlinkSync(join(root, "node_modules"), join(repo, "node_modules"), "dir");
       put(".gitignore", "node_modules\n");
       put("vitest.config.mts", 'export default { test: { include: ["tests/*-safety.test.ts"] } };\n');
-      put("components/mgr/screens.tsx", 'export const screen = {\n    reads: "get_order", writes: "none",\n};\n');
+      put("components/mgr/screens.tsx", fixtureScreen);
+      put("scripts/validate-api-agent-screens.ts", read("scripts/validate-api-agent-screens.ts"));
       put("lib/mgr/api-operations.ts", 'export { screen } from "../../components/mgr/screens";\n');
       put("content/docs/api/orders.mdx", "# Orders\n");
       put("scripts/write-api-docs.ts", [
@@ -586,14 +589,23 @@ describe("post-merge HTTP API maintainer", () => {
   }
 
   it.each([
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: (globalThis.x = 1, "a"), writes: "none",\n};\n'],
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: "get_order", writes: "none",\n};\nawait Bun.write("payload-executed", "yes");\n'],
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: "get_order", writes: "none",\n};\n++globalThis.x; await Bun.write("payload-executed", "yes");\n'],
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: "a", writes: "none", body: await Bun.write("payload-executed", "yes"),\n};\n'],
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: `get_${await Bun.write("payload-executed", "yes")}`, writes: "none",\n};\n'],
-    ['components/mgr/screens.tsx', 'export const screen = {\n    reads: "a", writes: "none",\n};\n// \u0000\nawait Bun.write("payload-executed", "yes");\n'],
-    ['lib/mgr/api-operations.ts', 'await Bun.write("payload-executed", "yes");\nexport { screen } from "../../components/mgr/screens";\n'],
-  ])("rejects executable source changes before generation (%s)", (path, source) => {
+    ["expression initializer", "components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', '(globalThis.x = 1, "a")')],
+    ["top-level sentinel", "components/mgr/screens.tsx", `${fixtureScreen}await Bun.write("payload-executed", "yes");\n`],
+    ["increment prefix", "components/mgr/screens.tsx", `${fixtureScreen}++globalThis.x; await Bun.write("payload-executed", "yes");\n`],
+    ["diff header impersonation", "components/mgr/screens.tsx", `${fixtureScreen}++ b/1; var b; await Bun.write("payload-executed", "yes");\n`],
+    ["trailing property code", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", body: await Bun.write("payload-executed", "yes"),')],
+    ["template interpolation", "components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', '`get_${await Bun.write("payload-executed", "yes")}`')],
+    ["binary/NUL payload", "components/mgr/screens.tsx", `${fixtureScreen}// \u0000\nawait Bun.write("payload-executed", "yes");\n`],
+    ["existing block-comment escape", "components/mgr/screens.tsx", fixtureScreen.replace("/** Existing block comment\n", '/** Existing block comment\n  reads: "*/ await Bun.write(String.fromCharCode(112,97,121,108,111,97,100,45,101,120,101,99,117,116,101,100), String.fromCharCode(121)) /*",\n')],
+    ["new screen property", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", extra: "product change",')],
+    ["removed annotation property", "components/mgr/screens.tsx", fixtureScreen.replace(' writes: "none",', "")],
+    ["added annotation property", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", reads: "get_atp",')],
+    ["new screen record", "components/mgr/screens.tsx", fixtureScreen.replace("}];", '}, { reads: "get_atp", writes: "none" }];')],
+    ["non-screen reads property", "components/mgr/screens.tsx", `${fixtureScreen}export const other = { reads: "not an annotation" };\n`],
+    ["changed comment", "components/mgr/screens.tsx", fixtureScreen.replace("Preserve its context.", "Changed comment.")],
+    ["validator replacement", "scripts/validate-api-agent-screens.ts", 'await Bun.write("payload-executed", "yes");\n'],
+    ["registry execution", "lib/mgr/api-operations.ts", 'await Bun.write("payload-executed", "yes");\nexport { screen } from "../../components/mgr/screens";\n'],
+  ])("rejects source changes before generation: %s", (_label, path, source) => {
     validateEdit((put) => put(path, source), (repo, result) => {
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
       expect(existsSync(join(repo, "generator-ran"))).toBe(false);
@@ -603,17 +615,17 @@ describe("post-merge HTTP API maintainer", () => {
   });
 
   it.each([
-    '    reads: "get_order · get_atp [view]", writes: "submit_order",',
-    '    reads: "get_order · get_atp [view]",\n    writes: "submit_order",',
-  ])("accepts literal reads/writes edits and stages deterministic output: %s", (annotations) => {
-    validateEdit((put) => put("components/mgr/screens.tsx", `export const screen = {\n${annotations}\n};\n`), (repo, result) => {
+    ["get_order · get_atp [view]", "submit_order"],
+    ["", "none"],
+    ["get_order [*/ literal /*]", "none"],
+  ])("accepts literal annotation changes and stages deterministic output: %s", (reads, writes) => {
+    validateEdit((put) => put("components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', JSON.stringify(reads)).replace('"none"', JSON.stringify(writes))), (repo, result) => {
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(existsSync(join(repo, "generator-ran"))).toBe(true);
       const patch = readFileSync(join(repo, "api-reference.patch"), "utf8");
-      for (const line of annotations.split("\n")) expect(patch).toContain(`+${line}`);
-      expect(patch).toContain("+get_order · get_atp [view]");
-      expect(patch).toContain("+submit_order");
+      expect(patch).toContain(`+    reads: ${JSON.stringify(reads)}, writes: ${JSON.stringify(writes)},`);
       expect(patch).toContain("+Generated backlog");
+      expect(readFileSync(join(repo, "content/docs/api/orders.mdx"), "utf8")).toBe(`# Orders\n${reads}\n${writes}\n`);
     });
   });
 

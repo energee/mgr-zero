@@ -121,9 +121,11 @@ only `content/docs/api/*.mdx` and literal `reads`/`writes` annotations in
 `components/mgr/screens.tsx`, and you have no shell. So:
 
 - **Do not run `bun run docs:api`** — the workflow runs it for you, after you
-  stop and after validating your diff without importing it. Change a screen's
-  literal `reads`/`writes` strings or the prose and leave the generated blocks
-  alone; they will be correct.
+  stop and after validating your diff without importing it. Change literal
+  `reads`/`writes` values in existing `SCREENS` records or the prose and
+  leave the generated blocks alone; they will be correct. Screen comments,
+  property names, record structure and formatting must remain byte-for-byte
+  unchanged: the workflow parses both sources and masks only those literal values.
 - **`lib/commands/` is read-only to you there.** A registry `description` or
   `roles` that reads badly as documentation (step 2) is still worth finding —
   name it and the fix you would make in your closing summary, so it reaches the

@@ -104,19 +104,10 @@ jobs:
             echo "$changed"
             exit 1
           fi
-          # Validate without importing either TypeScript module. A whole changed
-          # line may contain only literal reads/writes properties, with no escapes,
-          # expressions or trailing code (both properties often share one line).
-          # --text also exposes NUL-containing payloads; exclude only diff headers,
-          # not executable lines starting with ++ or --.
-          screens=$(git diff --cached --no-ext-diff --no-textconv --text -U0 -- components/mgr/screens.tsx \
-            | grep -a '^[+-]' | grep -avE '^(--- a/|\+\+\+ b/)' \
-            | grep -avE '^[+-]([[:space:]]*(reads|writes): "[^"`$\\{}]*",)+[[:space:]]*$' || true)
-          if [ -n "$screens" ]; then
-            echo "HTTP API agent edited screens.tsx outside literal reads/writes annotations:"
-            echo "$screens"
-            exit 1
-          fi
+          # Parse the staged source without importing it. Only existing SCREENS
+          # reads/writes literal values may change; all other bytes, including
+          # comments and context, must match the trusted checkout.
+          bun scripts/validate-api-agent-screens.ts
           # Only validated literal annotations can now reach the generator's
           # imports. Rendering remains ours, never a model tool.
           bun run docs:api
