@@ -776,7 +776,7 @@ Implementation updates all affected owners in the same logical changes:
 - schema design and schema decisions;
 - UI layout plan and screen inventory;
 - `content/docs/index.mdx` and the applicable staff or portal guide;
-- `README.md` environment, setup, OAuth, and local Slack testing;
+- `docs/operations/slack-setup.md` environment, setup, OAuth, and local Slack testing;
 - Slack app manifest and scope rationale;
 - HTTP/command documentation for every registered integration operation;
 - the pull request description, from which the documentation workflow updates progress;
