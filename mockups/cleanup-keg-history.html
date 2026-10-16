@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keg event history — scoped controls proposal</title>
+  <link rel="stylesheet" href="cleanup.css">
+  <style>
+    button{font:inherit;color:inherit;text-align:left}.toolbar .control{width:100%}.event-detail{font-size:12px;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}.event-row{padding:16px 0;border-bottom:1px solid var(--border)}.event-row:last-child{border-bottom:0}.event-heading{display:flex;align-items:start;justify-content:space-between;gap:14px}.event-name{font-size:14px;font-weight:650}.empty-example{margin-top:24px;padding:16px;border:1px dashed var(--border);border-radius:8px;background:var(--bg)}.empty-example .scope-strip{background:var(--surface)}.empty-title{font-size:14px;font-weight:650;margin-bottom:5px}.phone .toolbar{grid-template-columns:1fr}.phone .event-name{font-size:13px}.phone .scope-strip{align-items:start}.phone .scope-strip .link{flex-shrink:0;font-size:11px}.phone .event-row{padding:15px 0}.clear-control{border:0;background:none;padding:0;cursor:default}.scope-value{overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+<main class="board">
+  <div class="eyebrow">Cleanup proposal · keg event history</div>
+  <h1>Keep the history visible, not every customer.</h1>
+  <p class="intro">Two labeled controls replace wrapping entity chips. The customer opens the existing searchable picker; both selections stay visible and combine on the same immutable event history.</p>
+  <div class="columns">
+    <section class="desktop" aria-label="Desktop history proposal">
+      <div class="chrome"><span class="brand">MGR</span><span>Beer · Keg fleet</span><span>Desktop · 962 px</span></div>
+      <div class="content">
+        <div class="nav-links"><span class="link">← Keg fleet</span></div>
+        <div class="page-head"><div><h2>Keg event history</h2><p class="subtitle">Newest first · read-only event records</p></div></div>
+        <div class="toolbar">
+          <div class="field"><label class="field-label" for="desktop-pool">Keg pool</label><button type="button" id="desktop-pool" class="control" aria-describedby="static-note"><span>Owned</span><span class="chevron" aria-hidden="true">⌄</span></button></div>
+          <div class="field"><label class="field-label" for="desktop-customer">Customer</label><button type="button" id="desktop-customer" class="control" aria-describedby="desktop-customer-help static-note"><span>Juniper Taproom</span><span class="chevron" aria-hidden="true">⌕</span></button><p id="desktop-customer-help" class="inline-help">Opens customer search · not a search of event records</p></div>
+        </div>
+        <div class="scope-strip"><span class="scope-value"><span class="muted">Showing:</span> <span class="scope-name">Owned · Juniper Taproom</span></span><button type="button" class="link clear-control" aria-describedby="static-note">Clear pool &amp; customer</button></div>
+        <div aria-label="Illustrative matching event records">
+          <article class="event-row"><div class="event-heading"><span class="event-name">Returned · Juniper Taproom</span><span class="badge ok">Returned</span></div><p class="event-detail">Event date: Sep 3, 2026 · 4 × Owned ½ bbl</p><p class="event-detail">Note: Empty shells collected at delivery.</p></article>
+          <article class="event-row"><div class="event-heading"><span class="event-name">Lost · Juniper Taproom</span><span class="badge warn">Lost</span></div><p class="event-detail">Event date: Sep 1, 2026 · 1 × Owned ½ bbl</p><p class="event-detail">Note: Customer confirmed missing shell.</p></article>
+          <article class="event-row"><div class="event-heading"><span class="event-name">Shipped · Juniper Taproom</span></div><p class="event-detail">Event date: Aug 28, 2026 · 6 × Owned ½ bbl</p></article>
+        </div>
+        <div class="empty-example">
+          <div class="caption">Alternate filtered state · illustration only</div>
+          <div class="scope-strip"><span class="scope-value"><span class="muted">Showing:</span> <span class="scope-name">Leased · Orchard Kitchen</span></span><span class="link">Clear pool &amp; customer</span></div>
+          <p class="empty-title">No matching events</p><p class="small muted">No events match this pool and customer. Choose All pools, choose All customers, or clear both filters.</p>
+          <p class="inline-help">Keep the explicitly selected customer available even if this combination has no events. This does not mean the entire ledger is empty.</p>
+        </div>
+        <p class="disclaimer">Event date = the event’s recorded <code>at</code>, shown with the current brewery-zone date formatter. No actor or event-source field is implied.</p>
+      </div>
+    </section>
+    <section class="phone" aria-label="Phone history proposal">
+      <div class="chrome"><span class="brand">MGR</span><span>Beer</span><span>390 px</span></div>
+      <div class="content">
+        <div class="nav-links"><span class="link">← Keg fleet</span></div>
+        <div class="page-head"><div><h2>Keg event history</h2><p class="subtitle">Newest first · read-only event records</p></div></div>
+        <div class="toolbar">
+          <div class="field"><label class="field-label" for="phone-pool">Keg pool</label><button type="button" id="phone-pool" class="control" aria-describedby="static-note"><span>Owned</span><span class="chevron" aria-hidden="true">⌄</span></button></div>
+          <div class="field"><label class="field-label" for="phone-customer">Customer</label><button type="button" id="phone-customer" class="control" aria-describedby="phone-customer-help static-note"><span>Juniper Taproom</span><span class="chevron" aria-hidden="true">⌕</span></button><p id="phone-customer-help" class="inline-help">Opens searchable customer sheet</p></div>
+        </div>
+        <div class="scope-strip"><span class="scope-value"><span class="muted">Showing:</span><br><span class="scope-name">Owned · Juniper Taproom</span></span><button type="button" class="link clear-control" aria-describedby="static-note">Clear pool<br>&amp; customer</button></div>
+        <div aria-label="Same illustrative matching event records">
+          <article class="event-row"><div class="event-heading"><span class="event-name">Returned · Juniper Taproom</span><span class="badge ok">Returned</span></div><p class="event-detail">Event date: Sep 3, 2026<br>4 × Owned ½ bbl</p><p class="event-detail">Note: Empty shells collected at delivery.</p></article>
+          <article class="event-row"><div class="event-heading"><span class="event-name">Lost · Juniper Taproom</span><span class="badge warn">Lost</span></div><p class="event-detail">Event date: Sep 1, 2026<br>1 × Owned ½ bbl</p><p class="event-detail">Note: Customer confirmed missing shell.</p></article>
+          <article class="event-row"><div class="event-heading"><span class="event-name">Shipped · Juniper Taproom</span></div><p class="event-detail">Event date: Aug 28, 2026<br>6 × Owned ½ bbl</p></article>
+        </div>
+        <p class="disclaimer">Select a customer in the existing sheet; do not display the whole customer list on this page.</p>
+      </div>
+    </section>
+  </div>
+  <section class="notes" aria-label="Design decisions">
+    <div class="note"><b>One controlled toolbar</b>Inventory and the public history route use the same Keg pool and Customer presentation. Remove the live-only chip slot instead of restyling it separately.</div>
+    <div class="note"><b>Scope survives each change</b>Changing pool keeps <code>?customer</code>; changing customer keeps <code>?pool</code>. All pools / All customers clear only their dimension. The visible Clear removes both.</div>
+    <div class="note"><b>A picker, not another ledger filter</b>Customer search only narrows existing eligible picker options. Keep observed-event customers plus the explicitly selected customer; do not add record search, date/reason filters, or pagination.</div>
+  </section>
+  <p class="footnote" id="static-note">Proposed layout · fictional data · not a live-page screenshot</p>
+</main>
+</body>
+</html>

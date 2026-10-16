@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keg event — labeled reason and visible consequences</title>
+<link rel="stylesheet" href="cleanup.css">
+<style>
+.event-head{display:flex;justify-content:space-between;align-items:start;gap:16px;padding:18px 20px;border-bottom:1px solid var(--border)}.event-head h3{margin:0;font-size:16px}.close-mark{display:inline-flex;align-items:center;justify-content:center;background:var(--danger);color:white;width:30px;height:30px;border-radius:5px;font-size:20px}.event-fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}.event-fields .full{grid-column:1/-1}.event-footer{padding:14px 20px;border-top:1px solid var(--border);background:var(--surface)}.event-footer .notice{margin:10px 0 12px;font-size:11px}.consequence{font-size:12px}.event-footer .button{width:100%}.dialog-stage{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1px 18px}.reason-map{margin-top:18px}.reason-map .table td{padding:8px 6px;font-size:11px}.reason-map .table th{padding:8px 6px}.reason-map .table th:first-child,.reason-map .table td:first-child{padding-left:0}.phone .content{padding:16px 0 0;background:var(--bg)}.phone .page-head{padding:0 16px;margin-bottom:12px}.phone .mock-dialog{border-top:1px solid var(--border);border-radius:12px 12px 0 0;display:flex;flex-direction:column;height:814px}.phone .event-head{padding:16px}.phone .dialog-body{padding:16px;overflow-y:auto;flex:1;min-height:0}.phone .event-fields{gap:12px}.phone .event-footer{flex-shrink:0;padding:12px 16px 20px}.phone .event-footer .button{min-height:44px}.phone .event-footer .notice{font-size:11px;line-height:1.45}.phone .close-mark{width:40px;height:40px}.phone .event-head h3{padding-top:5px}.field-label strong{font-weight:550;color:var(--fg)}.desktop .mock-dialog{margin:20px auto}.desktop .content{padding:20px}.desktop .event-footer .button{width:auto;display:flex;margin-left:auto}.scroll-hint{font-size:10px;color:var(--muted);margin-top:12px}.reason-map h3{margin-bottom:5px}.reason-map p{margin-bottom:8px}
+</style>
+</head>
+<body>
+<main class="board">
+<div class="eyebrow">Cleanup proposal · Keg fleet / Record keg event</div>
+<h1>Choose the reason once. See exactly what will be recorded.</h1>
+<p class="intro">A labeled Reason select replaces six wrapping chips. The existing dialog / phone sheet keeps the customer and destination rules, with the empty-shell warning and selected consequence next to the action.</p>
+<div class="columns">
+<section aria-label="Desktop proposal">
+<div class="caption">Desktop · existing CommandForm dialog · 448px wide</div>
+<div class="desktop">
+<div class="chrome"><span class="brand">MGR</span><span>Beer · Kegs</span><span>Warehouse</span></div>
+<div class="content">
+<div class="page-head"><div><h2>Keg fleet</h2><p class="subtitle">Pools, physical shells and customer holdings</p></div><span class="button quiet">Record keg event</span></div>
+<div class="nav-links"><span class="link">Keg report</span><span class="link">Keg event history</span><span class="link">Customer keg balance</span></div>
+<div class="dialog-stage">
+<div class="mock-dialog" aria-label="Illustrated Record keg event dialog">
+<div class="event-head"><div><h3>Record keg event</h3><p class="subtitle">Empty physical shells only</p></div><span class="close-mark" aria-label="Close and discard edits">×</span></div>
+<div class="dialog-body">
+<div class="event-fields">
+<div class="field full"><span class="field-label" id="d-pool">Keg pool</span><div class="control" aria-labelledby="d-pool">Owned <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="d-size">Size</span><div class="control" aria-labelledby="d-size">½ bbl <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="d-reason">Reason</span><div class="control" aria-labelledby="d-reason"><strong>Returned</strong> <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="d-location">Returned to</span><div class="control" aria-labelledby="d-location">Warehouse <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="d-bin">Bin</span><div class="control" aria-labelledby="d-bin">Walk-in <span class="chevron">⌄</span></div></div>
+<div class="field full"><span class="field-label" id="d-customer">Customer <strong>· required for Returned</strong></span><div class="control" aria-labelledby="d-customer">Ridgeline Tap Room <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="d-qty">Kegs · empty shells</span><div class="control input" aria-labelledby="d-qty"><span class="muted">−</span><strong>4</strong><span class="muted">+</span></div></div>
+<div class="field"><span class="field-label" id="d-note">Note · optional</span><div class="control input" aria-labelledby="d-note"><span class="muted">Add a note</span></div></div>
+</div>
+<p class="inline-help">Bins belong to the selected location; its first bin is preselected.</p>
+</div>
+<div class="event-footer">
+<p class="consequence"><strong>Returned · 4 empty shells</strong><br>Ridgeline Tap Room → Warehouse / Walk-in</p>
+<div class="notice warn"><strong>Empty kegs only.</strong> Beer coming back with a keg, and its credit, is <strong>Return shipment</strong>. A deposit refund is a separate credit memo.</div>
+<span class="button">Record keg event</span>
+</div>
+</div>
+</div>
+<div class="reason-map">
+<h3>The reason sets the direction — not a new status</h3>
+<p class="tiny muted">All six existing manual reasons remain available. No balances or capacity estimates are shown.</p>
+<table class="table" aria-label="Existing reason behavior"><colgroup><col style="width:16%"><col style="width:21%"><col style="width:63%"></colgroup><thead><tr><th>Reason</th><th>Customer</th><th>Physical-shell consequence</th></tr></thead><tbody>
+<tr><td><strong>Acquired</strong></td><td>Absent</td><td>Add to the chosen bin and fleet.</td></tr>
+<tr><td><strong>Retired</strong></td><td>Absent</td><td>Remove from the chosen bin and fleet.</td></tr>
+<tr><td><strong>Shipped</strong></td><td>Required</td><td>Shipped from bin → customer; fleet total unchanged.</td></tr>
+<tr><td><strong>Returned</strong></td><td>Required</td><td>Customer → returned-to bin; fleet total unchanged.</td></tr>
+<tr><td><strong>Lost</strong></td><td>Optional</td><td>Remove from customer when named; otherwise from bin. Fleet decreases.</td></tr>
+<tr><td><strong>Found</strong></td><td>Absent</td><td>Add to the bin and fleet; never a customer recovery.</td></tr>
+</tbody></table>
+</div>
+</div>
+</div>
+</section>
+<section aria-label="Phone proposal">
+<div class="caption">Phone · existing bottom sheet · fixed action footer</div>
+<div class="phone">
+<div class="chrome"><span class="brand">MGR</span><span>Beer · Kegs</span></div>
+<div class="content">
+<div class="page-head"><div><h2>Keg fleet</h2><p class="subtitle">Record an empty-shell movement</p></div></div>
+<div class="mock-dialog" aria-label="Illustrated Record keg event sheet">
+<div class="event-head"><div><h3>Record keg event</h3><p class="subtitle">Empty physical shells only</p></div><span class="close-mark" aria-label="Close and discard edits">×</span></div>
+<div class="dialog-body">
+<div class="event-fields">
+<div class="field full"><span class="field-label" id="p-pool">Keg pool</span><div class="control" aria-labelledby="p-pool">Owned <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="p-size">Size</span><div class="control" aria-labelledby="p-size">½ bbl <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="p-reason">Reason</span><div class="control" aria-labelledby="p-reason"><strong>Returned</strong><span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="p-location">Returned to</span><div class="control" aria-labelledby="p-location">Warehouse <span class="chevron">⌄</span></div></div>
+<div class="field"><span class="field-label" id="p-bin">Bin</span><div class="control" aria-labelledby="p-bin">Walk-in <span class="chevron">⌄</span></div></div>
+<div class="field full"><span class="field-label" id="p-customer">Customer <strong>· required for Returned</strong></span><div class="control" aria-labelledby="p-customer">Ridgeline Tap Room <span class="chevron">⌄</span></div></div>
+<div class="field full"><span class="field-label" id="p-qty">Kegs · empty shells</span><div class="control input" aria-labelledby="p-qty"><span class="muted">−</span><strong>4</strong><span class="muted">+</span></div></div>
+<div class="field full"><span class="field-label" id="p-note">Note · optional</span><div class="control input" aria-labelledby="p-note"><span class="muted">Add a note</span></div></div>
+</div>
+<p class="inline-help">Bins belong to the selected location; its first bin is preselected.</p>
+</div>
+<div class="event-footer">
+<p class="consequence"><strong>Returned · 4 empty shells</strong><br>Ridgeline Tap Room → Warehouse / Walk-in</p>
+<div class="notice warn"><strong>Empty kegs only.</strong> Beer coming back with a keg, and its credit, is <strong>Return shipment</strong>. A deposit refund is a separate credit memo.</div>
+<span class="button">Record keg event</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<div class="notes">
+<div class="note"><b>1 · One labeled choice</b>Reason uses existing E.pick with enum-backed values. Acquired, Retired, Shipped, Returned, Lost and Found stay distinct. The selected reason remains visible.</div>
+<div class="note"><b>2 · Same action, reachable</b>Keep CommandForm: desktop dialog, phone sheet. The fields scroll; the consequence, safety warning and existing record action stay in its footer. Closing still discards unsubmitted edits.</div>
+<div class="note"><b>3 · Never record the shell twice</b>Beer shipping and full-beer returns already post shell events automatically (#815). Later empty pickups are manual; deposit refunds remain separate (#577). No balance preview, money split or new confirmation.</div>
+</div>
+<p class="footnote">Proposed layout · fictional data · not a live-page screenshot. Controls are static illustrations, not query or mutation evidence. The reason mapping is an explanatory design annotation, not an additional live dashboard. Quantity counts empty physical shells; ½ bbl identifies shell size, not a volume of returned beer.</p>
+</main>
+</body>
+</html>

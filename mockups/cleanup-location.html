@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Location scope · proposed cleanup</title>
+<link rel="stylesheet" href="cleanup.css">
+<style>
+.location-toolbar{grid-template-columns:300px minmax(0,1fr)}.count-line{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:18px;align-items:center;padding:16px 0;border-bottom:1px solid var(--border)}.count-line:last-child{border-bottom:0}.count-section{border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:18px}.count-section h3{margin-bottom:4px}.quantity{color:var(--muted);font-weight:400}.history-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:10px}.phone .location-toolbar{grid-template-columns:minmax(0,1fr)}.phone .count-line{grid-template-columns:minmax(0,1fr);gap:10px;padding:14px 0}.phone .count-section{padding:13px}.phone .nav-links{gap:14px}.phone .count-line .field{max-width:100%}.phone .save-row .button{align-self:stretch}.phone .history-row{align-items:start}.count-section .notice{margin:12px 0 0}.desktop .count-section .field-label{font-size:10px}
+</style>
+</head>
+<body>
+<main class="board">
+<div class="eyebrow">Proposed cleanup · location scope</div>
+<h1>Choose a location. Keep page navigation separate.</h1>
+<p class="intro">One labeled Location select replaces the growing row of taproom names. Weekly count, Tap board, and Variance remain distinct pages, not a combined dashboard.</p>
+<div class="columns">
+<section>
+<p class="caption">Desktop · weekly count · proposed layout</p>
+<div class="desktop">
+<div class="chrome"><span class="brand">MGR</span><span>Beer / Taproom</span><span>Admin</span></div>
+<div class="content">
+<div class="page-head"><div><div class="tiny muted">← Beer</div><h2>Weekly count</h2></div></div>
+<div class="nav-links" aria-label="Taproom pages, illustrated"><span class="current">Weekly count</span><span class="link">Tap board</span><span class="link">Variance by brand</span></div>
+<div class="toolbar location-toolbar"><div class="field"><span class="field-label">Location</span><div class="control"><span>Ridgeline Tap Room</span><span class="chevron">⌄</span></div></div></div>
+<section class="sync-strip">
+<div class="sync-main"><div><div class="sync-title">Expected consumption</div><div class="sync-detail">Captured prior · Sep 1, 2026 · reopen saved count</div></div><span class="button quiet">Refresh expected</span></div>
+<div class="sync-extra">Expected consumption unavailable · no usable POS observation</div>
+</section>
+<section class="count-section">
+<div class="subhead"><h3>Count every stock bucket</h3><span class="button quiet small">Print current stock labels</span></div>
+<p class="small muted">Server date Sep 8, 2026 · whole remaining packages only · enter zero explicitly. A partly full keg is one.</p>
+<div class="count-line"><div><div class="strong">Pils · 16 oz case</div><div class="subline">Cold · Untracked stock · worksheet row 1 · recorded 6</div></div><div class="field"><span class="field-label">Remaining units · row 1</span><div class="control quantity">Enter units</div></div></div>
+<div class="count-line"><div><div class="strong">Hazy IPA · ½ bbl keg</div><div class="subline">Cold · Lot L-260901-HZ · worksheet row 2 · recorded 3</div></div><div class="field"><span class="field-label">Remaining units · row 2</span><div class="control quantity">Enter units</div></div></div>
+<div class="save-row"><span class="tiny muted">Print includes only current positive stock and keeps captured worksheet row numbers.</span><span class="button">Record count</span></div>
+</section>
+<div class="section-label">Recent saved counts</div>
+<p class="tiny muted">Newest 50 at this taproom.</p>
+<div class="history-row"><div><div class="small strong">Weekly count · Sep 1, 2026</div><div class="subline">2 observations · 0 movements · 0 units depleted · 0 units destroyed</div></div><span class="link small">Open count</span></div>
+<p class="disclaimer">Proposed layout · fictional data · not a live-page screenshot</p>
+</div>
+</div>
+</section>
+<section>
+<p class="caption">Phone · same page and scope</p>
+<div class="phone">
+<div class="chrome"><span class="brand">MGR</span><span>Beer / Taproom</span><span>Admin</span></div>
+<div class="content">
+<div class="page-head"><div><div class="tiny muted">← Beer</div><h2>Weekly count</h2></div></div>
+<div class="nav-links" aria-label="Taproom pages, illustrated"><span class="current">Weekly count</span><span class="link">Tap board</span><span class="link">Variance by brand</span></div>
+<div class="toolbar location-toolbar"><div class="field"><span class="field-label">Location</span><div class="control"><span>Ridgeline Tap Room</span><span class="chevron">⌄</span></div></div></div>
+<section class="sync-strip"><div class="sync-main"><div><div class="sync-title">Expected consumption</div><div class="sync-detail">Captured prior · Sep 1, 2026 · reopen saved count</div></div><span class="button quiet">Refresh expected</span></div><div class="sync-extra">Expected consumption unavailable · no usable POS observation</div></section>
+<section class="count-section">
+<h3>Count every stock bucket</h3>
+<p class="small muted">Server date Sep 8, 2026 · whole remaining packages only · enter zero explicitly. A partly full keg is one.</p>
+<div style="margin-top:12px"><span class="button quiet">Print current stock labels</span></div>
+<div class="count-line"><div><div class="strong">Pils · 16 oz case</div><div class="subline">Cold · Untracked stock · worksheet row 1 · recorded 6</div></div><div class="field"><span class="field-label">Remaining units · row 1</span><div class="control quantity">Enter units</div></div></div>
+<div class="count-line"><div><div class="strong">Hazy IPA · ½ bbl keg</div><div class="subline">Cold · Lot L-260901-HZ · worksheet row 2 · recorded 3</div></div><div class="field"><span class="field-label">Remaining units · row 2</span><div class="control quantity">Enter units</div></div></div>
+<div class="save-row"><span class="tiny muted">Print includes only current positive stock and keeps captured worksheet row numbers.</span><span class="button">Record count</span></div>
+</section>
+<div class="section-label">Recent saved counts</div><p class="tiny muted">Newest 50 at this taproom.</p>
+<div class="history-row"><div><div class="small strong">Weekly count · Sep 1, 2026</div><div class="subline">2 observations · 0 movements</div></div><span class="link small">Open count</span></div>
+<p class="disclaimer">Proposed layout · fictional data · not a live-page screenshot</p>
+</div>
+</div>
+</section>
+</div>
+<div class="notes">
+<div class="note"><b>Location is entity scope</b>Keep a persistent label and the selected location name. Options come from the existing taproom-location read; there is no invented “All locations” option.</div>
+<div class="note"><b>Pages remain pages</b>Keep Count / Tap board / Variance navigation independent of scope. Keep Variance’s 4 weeks / 12 weeks choice visible. Replenishment stays its own work page.</div>
+<div class="note"><b>Draft safety is a prerequisite</b>The drawing shows an untouched count, not saved draft protection. Existing count state is local; changing scope must not silently lose entered quantities or a frozen exact request. Resolve that separately before enabling unsafe transitions.</div>
+</div>
+<p class="footnote">Proposed layout · fictional data · not a live-page screenshot. Controls are static illustrations, not live reads or mutations. This is a location-selector proposal only; count, tap, variance, replenishment, permissions, and shell behavior remain with their existing owners.</p>
+</main>
+</body>
+</html>

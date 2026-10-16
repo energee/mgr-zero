@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · separate scopes, specific saves</title>
+<link rel="stylesheet" href="cleanup.css">
+<style>
+.settings-layout{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start}.settings-layout .form-section{margin:0}.settings-side{display:grid;gap:16px}.settings-lower{display:grid;grid-template-columns:1fr 1fr;gap:22px 20px;border-top:1px solid var(--border);padding-top:22px;margin-top:22px}.settings-lower h3{font-size:16px;margin-bottom:9px}.settings-link{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);font-size:13px}.settings-link:last-child{border-bottom:0}.settings-link .link{font-size:15px}.settings-link .subline{font-size:11px}.section-help{font-size:11px;color:var(--muted);margin-top:6px}.step-control{gap:6px;padding:0;overflow:hidden}.step-control span{padding:9px 12px}.step-control .step-value{border-left:1px solid var(--border);border-right:1px solid var(--border);flex:1;text-align:center}.form-section h3{font-size:17px;margin-bottom:0}.save-row .tiny{max-width:210px}.phone .settings-layout,.phone .settings-lower{grid-template-columns:1fr}.phone .settings-lower{gap:20px}.phone .save-row .button{width:100%;min-height:44px}.phone .settings-link{min-height:52px}.phone .settings-side{gap:15px}.phone .form-section{margin:0}.phone .settings-layout{gap:15px}.phone .form-grid{gap:12px}.phone .save-row .tiny{max-width:none}.phone .section-summary{margin-bottom:13px}.deployment-line{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding-top:10px}.phone .deployment-line{flex-direction:column;gap:4px}.mock-state{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="board">
+<div class="eyebrow">Admin setup · proposed cleanup</div>
+<h1>Settings: one page, three clear save scopes</h1>
+<p class="intro">Separate brewery details, Ask MGR, and wholesale fulfillment. Keep service connections distinct from CSV setup. No save-all action, new routes, or hidden form fields.</p>
+<div class="columns">
+<div>
+<div class="caption">Desktop · full Settings content</div>
+<section class="desktop">
+<div class="chrome"><span class="brand">MGR</span><span>Today &nbsp; Beer &nbsp; Work &nbsp; More</span><span>Admin</span></div>
+<div class="content">
+<div class="nav-links"><span class="link">← More</span></div>
+<div class="page-head"><div><h2>Settings</h2><p class="subtitle">Your brewery, your team, and the services that keep work moving.</p></div><span class="badge neutral">Admin only</span></div>
+<div class="settings-layout">
+<section class="form-section">
+<h3>Brewery details</h3>
+<p class="section-summary">Identity, compliance details, and daily operating defaults.</p>
+<div class="form-grid">
+<div class="field"><span class="field-label">Brewery name · required</span><div class="control input">Sample Brewing</div></div>
+<div class="field"><span class="field-label">Timezone · required</span><div class="control">America / New York <span class="chevron">⌄</span></div><p class="inline-help">Search supported IANA timezones.</p></div>
+<div class="field"><span class="field-label">TTB registry number</span><div class="control input">BR-PA-00000</div></div>
+<div class="field"><span class="field-label">PA license</span><div class="control input">G-0000</div></div>
+<div class="field"><span class="field-label">Customer-facing phone</span><div class="control input">(202) 555-0147</div><p class="inline-help">Printed when portal online payment is unavailable.</p></div>
+<div class="field"><span class="field-label">Books opened on · optional</span><div class="control input muted">Not set <span class="chevron">▦</span></div><p class="inline-help">Calendar date (YYYY-MM-DD). Unset counts all ledger history. Fixed after any report is filed.</p></div>
+<div class="field"><span class="field-label">One-way keg fee ($)</span><div class="control input">10.00</div><p class="inline-help">USD per one-way keg shipped; $0 bills none. Applies to later shipments.</p></div>
+<div class="field"><span class="field-label">Reading overdue after (hours)</span><div class="control step-control"><span>−</span><span class="step-value">24</span><span>+</span></div><p class="inline-help">Whole hours · 1–168.</p></div>
+</div>
+<div class="save-row"><span class="tiny muted">Saves these brewery fields only.</span><span class="button">Save brewery</span></div>
+</section>
+<div class="settings-side">
+<section class="form-section">
+<h3>Ask MGR</h3>
+<p class="section-summary">The AI model used by everyone at this brewery.</p>
+<div class="field"><span class="field-label">AI model</span><div class="control">Current model <span class="chevron">⌄</span></div><p class="inline-help">Illustrative choice. Live names, provider, and available pricing come from the existing Gateway catalog.</p></div>
+<p class="section-help"><span class="link">View models and promotions ↗</span></p>
+<div class="save-row"><span class="tiny muted">Saves the brewery AI model only.</span><span class="button">Save AI model</span></div>
+</section>
+<section class="form-section">
+<h3>Wholesale fulfillment</h3>
+<p class="section-summary">Choose the source warehouse for new portal orders.</p>
+<div class="field"><span class="field-label">Portal fulfillment warehouse</span><div class="control">Example Warehouse <span class="chevron">⌄</span></div><p class="inline-help">Warehouse locations only.</p></div>
+<div class="save-row"><span class="tiny muted">Saves the fulfillment source only.</span><span class="button quiet">Save warehouse</span></div>
+</section>
+</div>
+</div>
+<div class="settings-lower">
+<section><h3>People and places</h3>
+<div class="settings-link"><div>Team<div class="subline">3 members</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Locations<div class="subline">Example Warehouse · Sample Taproom</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Source water<div class="subline">Manage source and target water profiles</div></div><span class="link">→</span></div>
+</section>
+<section><h3>Connections</h3>
+<div class="settings-link"><div>Accounting<div class="subline">QuickBooks connection, mappings and payment defaults</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Point of sale<div class="subline">Square connection, location mappings, sync and menu</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Chat<div class="subline">Slack notifications and preferences</div></div><span class="link">→</span></div>
+</section>
+<section><h3>Appearance</h3><p class="section-summary">Choose how MGR looks on this device.</p><span class="button quiet">Switch to dark mode</span></section>
+<section><h3>Import and data setup</h3><div class="settings-link"><div>Import<div class="subline">Upload, map and commit CSV rows</div></div><span class="link">→</span></div></section>
+</div>
+<div class="rule"></div>
+<div class="deployment-line"><span class="muted">Deployment</span><span>dedicated · read-only</span></div>
+<p class="disclaimer">Proposed layout · fictional data · not a live-page screenshot</p>
+</div>
+</section>
+</div>
+<div>
+<div class="caption">Phone · full vertical page, no collapsed fields</div>
+<section class="phone">
+<div class="chrome"><span class="brand">MGR</span><span>More · Admin</span></div>
+<div class="content">
+<div class="nav-links"><span class="link">← More</span></div>
+<div class="page-head"><div><h2>Settings</h2><p class="subtitle">Your brewery, your team, and the services that keep work moving.</p></div></div>
+<div class="settings-layout">
+<section class="form-section">
+<h3>Brewery details</h3><p class="section-summary">Identity, compliance details, and daily operating defaults.</p>
+<div class="form-grid">
+<div class="field"><span class="field-label">Brewery name · required</span><div class="control input">Sample Brewing</div></div>
+<div class="field"><span class="field-label">Timezone · required</span><div class="control">America / New York <span class="chevron">⌄</span></div><p class="inline-help">Search supported IANA timezones.</p></div>
+<div class="field"><span class="field-label">TTB registry number</span><div class="control input">BR-PA-00000</div></div>
+<div class="field"><span class="field-label">PA license</span><div class="control input">G-0000</div></div>
+<div class="field"><span class="field-label">Customer-facing phone</span><div class="control input">(202) 555-0147</div><p class="inline-help">Printed when portal online payment is unavailable.</p></div>
+<div class="field"><span class="field-label">Books opened on · optional</span><div class="control input muted">Not set <span class="chevron">▦</span></div><p class="inline-help">Calendar date (YYYY-MM-DD). Unset counts all ledger history. Fixed after any report is filed.</p></div>
+<div class="field"><span class="field-label">One-way keg fee ($)</span><div class="control input">10.00</div><p class="inline-help">USD per one-way keg shipped; $0 bills none. Applies to later shipments.</p></div>
+<div class="field"><span class="field-label">Reading overdue after (hours)</span><div class="control step-control"><span>−</span><span class="step-value">24</span><span>+</span></div><p class="inline-help">Whole hours · 1–168.</p></div>
+</div>
+<div class="save-row"><span class="tiny muted">Saves these brewery fields only.</span><span class="button">Save brewery</span></div>
+</section>
+<div class="settings-side">
+<section class="form-section">
+<h3>Ask MGR</h3><p class="section-summary">The AI model used by everyone at this brewery.</p>
+<div class="field"><span class="field-label">AI model</span><div class="control">Current model <span class="chevron">⌄</span></div><p class="inline-help">Illustrative choice. Live names, provider, and available pricing come from the existing Gateway catalog.</p></div>
+<p class="section-help"><span class="link">View models and promotions ↗</span></p>
+<div class="save-row"><span class="tiny muted">Saves the brewery AI model only.</span><span class="button">Save AI model</span></div>
+</section>
+<section class="form-section">
+<h3>Wholesale fulfillment</h3><p class="section-summary">Choose the source warehouse for new portal orders.</p>
+<div class="field"><span class="field-label">Portal fulfillment warehouse</span><div class="control">Example Warehouse <span class="chevron">⌄</span></div><p class="inline-help">Warehouse locations only.</p></div>
+<div class="save-row"><span class="tiny muted">Saves the fulfillment source only.</span><span class="button quiet">Save warehouse</span></div>
+</section>
+</div>
+</div>
+<div class="settings-lower">
+<section><h3>People and places</h3>
+<div class="settings-link"><div>Team<div class="subline">3 members</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Locations<div class="subline">Example Warehouse · Sample Taproom</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Source water<div class="subline">Manage source and target water profiles</div></div><span class="link">→</span></div>
+</section>
+<section><h3>Connections</h3>
+<div class="settings-link"><div>Accounting<div class="subline">QuickBooks connection, mappings and payment defaults</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Point of sale<div class="subline">Square connection, location mappings, sync and menu</div></div><span class="link">→</span></div>
+<div class="settings-link"><div>Chat<div class="subline">Slack notifications and preferences</div></div><span class="link">→</span></div>
+</section>
+<section><h3>Appearance</h3><p class="section-summary">Choose how MGR looks on this device.</p><span class="button quiet">Switch to dark mode</span></section>
+<section><h3>Import and data setup</h3><div class="settings-link"><div>Import<div class="subline">Upload, map and commit CSV rows</div></div><span class="link">→</span></div></section>
+</div>
+<div class="rule"></div><div class="deployment-line"><span class="muted">Deployment</span><span>dedicated · read-only</span></div>
+<p class="disclaimer">Proposed layout · fictional data · not a live-page screenshot</p>
+</div>
+</section>
+</div>
+</div>
+<div class="notes">
+<div class="note"><b>Three specific saves</b>Brewery, AI model, and warehouse keep their existing commands, errors, and busy state. No global saved or unsaved badge is implied.</div>
+<div class="note"><b>Same page, clearer grouping</b>People and places, water profiles, and appearance remain. Service connections are separate from CSV import; Deployment stays read-only.</div>
+<div class="note"><b>Full fields, explicit limits</b>Both panels include all eight brewery fields and both other forms. Model choice is illustrative, not an approved model or a live catalog result.</div>
+</div>
+<p class="footnote">Proposed layout · fictional data · not a live-page screenshot. Static controls illustrate placement only. No live reads or writes occurred. Inventory and live implementation must reuse the same Settings surface and shared form bodies; this board is a planning artifact, not evidence of application parity.</p>
+</main>
+</body>
+</html>
