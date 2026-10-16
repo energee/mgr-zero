@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orders — proposed register and mobile records</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .order-link{text-decoration:underline;text-underline-offset:3px}.date{font-variant-numeric:tabular-nums}.phone .record-head{display:block}.phone .record-id a{font-size:12px}.status-stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px}.phone .facts{grid-template-columns:1.25fr 1fr}.phone .filters{gap:5px}.phone .filter{padding:5px 7px}.table .exception{margin-top:8px}.action-warn{background:var(--attention-bg);color:var(--attention)}.action-success{background:var(--success-bg);color:var(--success)}
+  </style>
+</head>
+<body>
+<main class="board">
+  <header>
+    <div class="eyebrow">Work / Orders · proposed information hierarchy</div>
+    <h1>Compare orders. Keep the next step clear.</h1>
+    <p class="intro">Desktop aligns order facts in a register. Phone records make the customer readable, then label the date and status. The order link and next action remain separate targets.</p>
+  </header>
+  <div class="columns">
+    <section aria-label="Desktop layout concept">
+      <p class="caption">Desktop · 962 px frame · admin example · all controls illustrative</p>
+      <div class="desktop">
+        <div class="chrome"><span class="brand">MGR</span><span>Work → Orders · existing shell retained</span></div>
+        <div class="content">
+          <div class="page-head"><div><h2>Orders</h2><p class="subtitle">admin default</p></div><a class="button" href="/orders/new" title="Illustrative control — not a live page">New order</a></div>
+          <div class="filters" aria-label="Illustrative existing Work navigation"><span class="filter">all</span><span class="filter selected">orders</span><span class="filter">transfers</span><span class="filter">batches</span><span class="filter">runs</span><span class="filter">POs</span><span class="filter">routes</span></div>
+          <div class="filters" aria-label="Illustrative existing status filters"><span class="filter selected">all</span><span class="filter">draft</span><span class="filter">submitted</span><span class="filter">confirmed</span><span class="filter">picked</span><span class="filter">shipped</span><span class="filter">cancelled</span></div>
+          <table class="table" aria-label="Illustrative orders register">
+            <colgroup><col style="width:15%"><col style="width:29%"><col style="width:20%"><col style="width:22%"><col style="width:14%"></colgroup>
+            <thead><tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Requested ship date</th><th scope="col">Status / exception</th><th scope="col">Next action</th></tr></thead>
+            <tbody>
+              <tr><td><a class="link order-link" href="/orders/fictional-241" title="Illustrative order link">ORD-0241</a></td><td class="strong">Juniper Corner</td><td class="date"><time datetime="2026-10-19">Oct 19, 2026</time></td><td><span class="badge info">Confirmed</span></td><td><a class="button info small" href="/orders/fictional-241" title="Illustrative next action for admin">Pick</a></td></tr>
+              <tr><td><a class="link order-link" href="/orders/fictional-242" title="Illustrative order link">ORD-0242</a></td><td class="strong">North Orchard Neighborhood Market and Gathering Hall</td><td class="muted">Not scheduled</td><td><span class="badge neutral">Submitted</span></td><td><a class="button action-success small" href="/orders/fictional-242/confirm" title="Illustrative next action for admin">Confirm</a></td></tr>
+              <tr><td><a class="link order-link" href="/orders/fictional-239" title="Illustrative order link">ORD-0239</a></td><td class="strong">Willow Lantern</td><td class="date"><time datetime="2026-10-20">Oct 20, 2026</time></td><td><span class="badge info">Confirmed</span><div class="exception">Restock staged<br>Put back before re-pick.</div></td><td><a class="button action-warn small" href="/orders/fictional-239/restock" title="Illustrative next action for admin">Put back</a></td></tr>
+              <tr><td><a class="link order-link" href="/orders/fictional-236" title="Illustrative order link">ORD-0236</a></td><td class="muted">transfer</td><td class="muted">Not scheduled</td><td><span class="badge neutral">Draft</span></td><td><a class="button small" href="/orders/fictional-236" title="Illustrative next action for admin">Finish</a></td></tr>
+            </tbody>
+          </table>
+          <p class="tiny muted" style="margin-top:20px">Illustrative links and filters only. No working query, command, or pagination is demonstrated here.</p>
+        </div>
+      </div>
+    </section>
+    <section aria-label="Phone layout concept">
+      <p class="caption">Phone · 390 px frame · same records</p>
+      <div class="phone">
+        <div class="chrome"><span class="brand">MGR</span><span>Work → Orders</span></div>
+        <div class="content">
+          <div class="page-head"><div><h2>Orders</h2><p class="subtitle">admin default</p></div><a class="button" href="/orders/new" title="Illustrative control">New order</a></div>
+          <div class="filters" aria-label="Illustrative existing Work navigation"><span class="filter">all</span><span class="filter selected">orders</span><span class="filter">transfers</span><span class="filter">batches</span><span class="filter">runs</span><span class="filter">POs</span><span class="filter">routes</span></div>
+          <div class="filters" aria-label="Illustrative existing status filters"><span class="filter selected">all</span><span class="filter">draft</span><span class="filter">submitted</span><span class="filter">confirmed</span><span class="filter">picked</span><span class="filter">shipped</span><span class="filter">cancelled</span></div>
+          <article class="record">
+            <div class="record-head"><h3 class="record-title">Juniper Corner</h3><p class="record-id"><a class="link order-link" href="/orders/fictional-241" title="Illustrative order link">ORD-0241</a></p></div>
+            <div class="facts"><div class="fact"><div class="label">Requested ship date</div><div class="value date"><time datetime="2026-10-19">Oct 19, 2026</time></div></div><div class="fact"><div class="label">Status</div><div class="value"><span class="badge info">Confirmed</span></div></div></div>
+            <div class="record-footer"><span class="small muted">Next action</span><a class="button info" href="/orders/fictional-241" title="Illustrative next action for admin">Pick</a></div>
+          </article>
+          <article class="record">
+            <div class="record-head"><h3 class="record-title">North Orchard Neighborhood Market and Gathering Hall</h3><p class="record-id"><a class="link order-link" href="/orders/fictional-242" title="Illustrative order link">ORD-0242</a></p></div>
+            <div class="facts"><div class="fact"><div class="label">Requested ship date</div><div class="value muted">Not scheduled</div></div><div class="fact"><div class="label">Status</div><div class="value"><span class="badge neutral">Submitted</span></div></div></div>
+            <div class="record-footer"><span class="small muted">Next action</span><a class="button action-success" href="/orders/fictional-242/confirm" title="Illustrative next action for admin">Confirm</a></div>
+          </article>
+          <article class="record">
+            <div class="record-head"><h3 class="record-title">Willow Lantern</h3><p class="record-id"><a class="link order-link" href="/orders/fictional-239" title="Illustrative order link">ORD-0239</a></p></div>
+            <div class="facts"><div class="fact"><div class="label">Requested ship date</div><div class="value date"><time datetime="2026-10-20">Oct 20, 2026</time></div></div><div class="fact"><div class="label">Status</div><div class="value"><span class="badge info">Confirmed</span></div></div></div>
+            <div class="exception">Restock staged · Put back before re-pick.</div>
+            <div class="record-footer"><span class="small muted">Next action</span><a class="button action-warn" href="/orders/fictional-239/restock" title="Illustrative next action for admin">Put back</a></div>
+          </article>
+          <article class="record">
+            <div class="record-head"><h3 class="record-title muted">transfer</h3><p class="record-id"><a class="link order-link" href="/orders/fictional-236" title="Illustrative order link">ORD-0236</a></p></div>
+            <div class="facts"><div class="fact"><div class="label">Requested ship date</div><div class="value muted">Not scheduled</div></div><div class="fact"><div class="label">Status</div><div class="value"><span class="badge neutral">Draft</span></div></div></div>
+            <div class="record-footer"><span class="small muted">Next action</span><a class="button" href="/orders/fictional-236" title="Illustrative next action for admin">Finish</a></div>
+          </article>
+          <p class="tiny muted">All controls illustrative; fictional links are not a working application.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+  <aside class="notes" aria-label="Design callouts">
+    <div class="note"><b>1 · Facts get their own places</b>Order, customer, requested date, status, and next action have stable columns. Phone records retain these labels without forcing a table.</div>
+    <div class="note"><b>2 · Missing is not an alert</b>An absent requested date reads “Not scheduled.” Long customer names wrap. “transfer” preserves the current missing-customer fallback without inventing a destination.</div>
+    <div class="note"><b>3 · State is not a command</b>Confirmed stays visible while Pick or Put back names the valid next step. These admin examples do not grant other roles those verbs.</div>
+  </aside>
+  <p class="footnote">Proposed layout · fictional data · not a live-page screenshot<br>System font is a deliberate conceptual substitute, not pixel parity. Existing navigation and status-filter scope are retained; these static controls are illustrative. No amounts, line counts, destinations, overdue claims, or new order states are implied.</p>
+</main>
+</body>
+</html>

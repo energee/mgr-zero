@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff invoices — proposed register and mobile records</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.sync-strip{display:flex;gap:12px;align-items:center;justify-content:space-between}.sync-copy{min-width:0}.table td{padding-top:14px;padding-bottom:14px}.table .button{width:100%}.money{font-weight:650;white-space:nowrap}.state-copy{margin-top:5px;font-size:11px;color:var(--muted)}.account-link{display:block;margin-top:7px;color:var(--primary);font-weight:600;font-size:11px}.phone .record-footer .button{min-width:100px}.phone .record .facts .value.money{font-size:17px}.phone .record-footer{align-items:center}.phone .record .record-title{font-size:14px}.phone .record .record-head{margin-bottom:10px}.phone .notice{font-size:11px}.control-note{font-size:10px;color:var(--muted);margin-bottom:12px}.table .badge{white-space:normal}.customer-name{font-weight:550}.phone .record-id{font-size:12px}.table th{letter-spacing:.025em}.balance-unknown{color:var(--muted);font-weight:500}.phone .record .exception{margin-top:10px}.phone .button{min-height:44px}.phone .account-link{font-size:12px;max-width:180px}.control{cursor:default}
+</style>
+</head>
+<body>
+<main class="board">
+<div class="eyebrow">More / Staff invoices · Design proposal</div>
+<h1>Read the money. Understand the state. Open one record.</h1>
+<p class="intro">A comparable desktop register and labeled mobile records separate invoice identity, customer, amount, payment and accounting. A zero balance never silently means paid.</p>
+<div class="columns">
+<section>
+<p class="caption">Desktop · 962 px frame · staff /invoices</p>
+<div class="desktop">
+<div class="chrome"><span class="brand">MGR</span><span>More / Invoices · Admin example</span></div>
+<div class="content">
+<div class="page-head"><div><h2>Invoices</h2><p class="subtitle">Invoices and credit memos · newest first</p></div><span class="tiny muted">Illustrative state set · Oct 16, 2026</span></div>
+<div class="notice sync-strip"><div class="sync-copy"><strong>QuickBooks connected</strong> · Juniper Demo Brewing<br>Last successful manual sync: Oct 16, 2026, 9:10 AM · Morgan Ellis<br><span class="tiny">Payment status may be stale until you complete a manual sync. No automatic reconciliation runs.</span></div><span class="button quiet control">Sync QuickBooks</span></div>
+<p class="control-note">All controls on this sheet are illustrative and inactive; no provider or accounting actions run. Dates use the brewery’s local day.</p>
+<table class="table">
+<caption style="text-align:left;font-size:12px;font-weight:650;padding-bottom:8px">Invoice register</caption>
+<colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:13%"><col style="width:18%"><col style="width:21%"><col style="width:10%"></colgroup>
+<thead><tr><th scope="col">Document</th><th scope="col">Customer</th><th scope="col" class="num">Invoice total</th><th scope="col" class="num">QuickBooks balance</th><th scope="col">Due / payment</th><th scope="col">Accounting</th><th scope="col">Details</th></tr></thead>
+<tbody>
+<tr><td><strong>INV-2186</strong></td><td class="customer-name">Cedar Wharf Market</td><td class="num money">$1,240.00</td><td class="num money">$1,240.00</td><td><span class="badge warn">Overdue</span><div class="state-copy">Due Oct 12, 2026<br>Balance due</div></td><td>In QuickBooks<div class="state-copy">Last manually read balance</div><span class="account-link control">Open in QuickBooks ↗</span></td><td><span class="button small control">Open</span></td></tr>
+<tr><td><strong>INV-2185</strong></td><td class="customer-name">Moss Lane Kitchen</td><td class="num money">$680.00</td><td class="num money">$0.00</td><td><span class="badge ok">Paid</span><div class="state-copy">Paid in QuickBooks<br>No payment date supplied</div></td><td>In QuickBooks<span class="account-link control">Open in QuickBooks ↗</span></td><td><span class="button small control">Open</span></td></tr>
+<tr><td><strong>INV-2184</strong></td><td class="customer-name">Harbor Lantern</td><td class="num money">$0.00</td><td class="num money">$0.00</td><td><span class="badge warn">Voided · not paid</span><div class="state-copy">No overdue marker</div></td><td>Voided in QuickBooks<span class="account-link control">Open in QuickBooks ↗</span></td><td><span class="button small control">Open</span></td></tr>
+<tr><td><strong>INV-2183</strong></td><td class="customer-name muted">Customer unavailable</td><td class="num money">$540.00</td><td class="num balance-unknown">Unknown</td><td><span class="badge neutral">Payment unverified</span><div class="state-copy">Due date unavailable</div></td><td><span class="badge warn">Push failed</span><div class="state-copy">Item unmapped<br>Not successfully pushed; QuickBooks link unavailable</div></td><td><span class="button small control">Review</span></td></tr>
+<tr><td><strong>CM-0048</strong><div class="subline">Credit memo</div></td><td class="customer-name">Cedar Wharf Market</td><td class="num money">−$180.00<div class="subline">Credit total</div></td><td class="num balance-unknown">Unavailable</td><td><span class="badge info">Credit memo</span><div class="state-copy">Not a payment due</div></td><td>In QuickBooks<div class="state-copy">Verified staff credit-memo link unavailable</div></td><td><span class="button small control">Open</span></td></tr>
+<tr><td><strong>INV-2182</strong></td><td class="customer-name">Willow Tap House</td><td class="num money">$870.00</td><td class="num balance-unknown">Unknown</td><td><span class="badge warn">Deleted · not paid</span><div class="state-copy">No overdue marker</div></td><td>Deleted in QuickBooks<div class="state-copy">QuickBooks link unavailable</div></td><td><span class="button small control">Review</span></td></tr>
+<tr><td><strong>INV-2181</strong></td><td class="customer-name">Fern &amp; Field</td><td class="num money">$320.00</td><td class="num balance-unknown">Unknown</td><td><span class="badge neutral">Written off</span><div class="state-copy">In MGR · not a payment</div></td><td>Written off in MGR<div class="state-copy">No new provider action</div></td><td><span class="button small control">Open</span></td></tr>
+<tr><td><strong>INV-2180</strong></td><td class="customer-name">Moss Lane Kitchen</td><td class="num money">$960.00</td><td class="num money">$960.00</td><td><span class="badge neutral">Balance due</span><div class="state-copy">Due Oct 20, 2026</div></td><td><span class="badge warn">Edited in QuickBooks</span><div class="state-copy">Local subtotal $900.00<br>Invoice total is current</div><span class="account-link control">Open in QuickBooks ↗</span></td><td><span class="button small control">Review</span></td></tr>
+<tr><td><strong>INV-2179</strong></td><td class="customer-name">Juniper Corner Store</td><td class="num money">$240.00</td><td class="num money">$0.00</td><td><span class="badge neutral">Settled</span><div class="state-copy">No cash payment recorded<br>Not labeled Paid</div></td><td>In QuickBooks<span class="account-link control">Open in QuickBooks ↗</span></td><td><span class="button small control">Open</span></td></tr>
+</tbody>
+</table>
+<div class="rule"></div><p class="small muted">Corrections belong in QuickBooks, or as a credit memo here. Authorized operations remain on invoice detail; opening a row never writes to the books.</p>
+<div class="notice" style="margin-top:14px;margin-bottom:0"><strong>Email delivery status unavailable.</strong> The current invoice query does not report whether QuickBooks emailed an invoice.</div>
+</div>
+</div>
+</section>
+<section>
+<p class="caption">Mobile · 390 px frame · same record contract</p>
+<div class="phone">
+<div class="chrome"><span class="brand">MGR</span><span>More / Invoices</span></div>
+<div class="content">
+<div class="page-head"><div><h2>Invoices</h2><p class="subtitle">Invoices and credit memos · newest first</p></div></div>
+<div class="notice"><strong>QuickBooks connected</strong> · Juniper Demo Brewing<br>Last successful manual sync:<br>Oct 16, 2026, 9:10 AM · Morgan Ellis<br><span class="tiny">Payment status may be stale. No automatic reconciliation runs.</span><div style="margin-top:10px"><span class="button quiet control">Sync QuickBooks</span></div></div>
+<p class="control-note">Illustrative, inactive controls · selected examples</p>
+<article class="record"><div class="record-head"><div><div class="record-title">INV-2186</div><div class="record-id">Customer · Cedar Wharf Market</div></div><span class="badge warn">Overdue</span></div><div class="facts"><div class="fact"><div class="label">Invoice total</div><div class="value money">$1,240.00</div></div><div class="fact"><div class="label">QuickBooks balance</div><div class="value money">$1,240.00</div></div><div class="fact"><div class="label">Due / payment</div><div class="value">Oct 12, 2026<br>Balance due</div></div><div class="fact"><div class="label">Accounting</div><div class="value">In QuickBooks</div></div></div><div class="record-footer"><span class="account-link control">Open in QuickBooks ↗</span><span class="button control">Open</span></div></article>
+<article class="record"><div class="record-head"><div><div class="record-title">INV-2185</div><div class="record-id">Customer · Moss Lane Kitchen</div></div><span class="badge ok">Paid</span></div><div class="facts"><div class="fact"><div class="label">Invoice total</div><div class="value money">$680.00</div></div><div class="fact"><div class="label">QuickBooks balance</div><div class="value money">$0.00</div></div><div class="fact"><div class="label">Payment</div><div class="value">Paid in QuickBooks</div></div><div class="fact"><div class="label">Accounting</div><div class="value">In QuickBooks</div></div></div><div class="record-footer"><span class="account-link control">Open in QuickBooks ↗</span><span class="button control">Open</span></div></article>
+<article class="record"><div class="record-head"><div><div class="record-title">INV-2184</div><div class="record-id">Customer · Harbor Lantern</div></div><span class="badge warn">Voided</span></div><div class="facts"><div class="fact"><div class="label">Invoice total</div><div class="value money">$0.00</div></div><div class="fact"><div class="label">QuickBooks balance</div><div class="value money">$0.00</div></div><div class="fact"><div class="label">Payment</div><div class="value">Not paid</div></div><div class="fact"><div class="label">Accounting</div><div class="value">Voided in QuickBooks</div></div></div><div class="record-footer"><span class="account-link control">Open in QuickBooks ↗</span><span class="button control">Open</span></div></article>
+<article class="record"><div class="record-head"><div><div class="record-title">INV-2183</div><div class="record-id">Customer unavailable</div></div><span class="badge warn">Push failed</span></div><div class="facts"><div class="fact"><div class="label">Invoice total</div><div class="value money">$540.00</div></div><div class="fact"><div class="label">QuickBooks balance</div><div class="value">Unknown</div></div><div class="fact"><div class="label">Due / payment</div><div class="value">Due date unavailable<br>Payment unverified</div></div><div class="fact"><div class="label">Accounting</div><div class="value">Item unmapped</div></div></div><div class="exception">QuickBooks link unavailable: this invoice has not been successfully pushed.</div><div class="record-footer"><span class="tiny muted">Resolve on invoice detail</span><span class="button control">Review</span></div></article>
+<article class="record"><div class="record-head"><div><div class="record-title">CM-0048 · Credit memo</div><div class="record-id">Customer · Cedar Wharf Market</div></div></div><div class="facts"><div class="fact"><div class="label">Credit total</div><div class="value money">−$180.00</div></div><div class="fact"><div class="label">QuickBooks balance</div><div class="value">Unavailable</div></div><div class="fact"><div class="label">Due / payment</div><div class="value">Not a payment due</div></div><div class="fact"><div class="label">Accounting</div><div class="value">In QuickBooks</div></div></div><div class="record-footer"><span class="tiny muted">Staff credit-memo link unavailable</span><span class="button control">Open</span></div></article>
+<p class="tiny muted">Operations stay on invoice detail. Email delivery status is not supplied by the current query.</p>
+</div>
+</div>
+</section>
+</div>
+<div class="notes">
+<div class="note"><b>1 · Amounts keep their meaning</b>Invoice total and last-read QuickBooks balance are different facts. Known zero is visible; missing stays unknown. Credits stay negative, never invented payable balances.</div>
+<div class="note"><b>2 · Payment ≠ accounting</b>Due, Paid and Settled are distinct from push failure, review, void and deletion. Date-only due days use the brewery’s local calendar; voiding is not payment.</div>
+<div class="note"><b>3 · One list destination</b>Open or Review leads to the invoice. A verified QuickBooks link remains secondary. Mobile reserves full-width facts above navigation, not beside three competing buttons.</div>
+</div>
+<p class="footnote">Proposed layout · fictional data · not a live-page screenshot<br>System font is a deliberate conceptual substitute, not pixel parity. This proposal covers staff /invoices only. Portal invoice/payment follow-on belongs to the parent plan; no portal payment contract is inferred. All provider destinations shown here are illustrative, inactive labels, not verification of these fictional records.</p>
+</main>
+</body>
+</html>
