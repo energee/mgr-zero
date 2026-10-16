@@ -423,15 +423,15 @@ describe("SCREENS", () => {
     expect(history).toContain("Pay");
   });
 
-  it("gives Save screens a real input or select", () => {
-    // Issue 95: a Save button that would write a value must sit next to a
-    // typed Input or a Select, not a read-only key/value row.
+  it("gives Save screens an editable input, select or toggle choice", () => {
+    // A Save button that writes a value must sit next to a real editable
+    // control, including the multi-select toggle group used for staff roles.
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
       if (!/<button[^>]*>Save/.test(html)) continue;
       expect.soft(
-        /<input\b/.test(html) || html.includes('role="combobox"'),
-        `${screen.name}: Save without an input or select`,
+        /<input\b/.test(html) || html.includes('role="combobox"') || /<button\b[^>]*aria-pressed=/.test(html),
+        `${screen.name}: Save without an editable control`,
       ).toBe(true);
     }
   });
@@ -526,7 +526,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 

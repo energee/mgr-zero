@@ -100,7 +100,7 @@ export function apiOperations(): ApiOperation[] {
       name: tool.name,
       kind: tool.kind,
       status: "available",
-      roles: definition?.scope === "pretenant" ? "authenticated pre-tenant" : Array.isArray(roles) ? roles.join(", ") : roles,
+      roles: definition?.scope === "pretenant" ? "authenticated pre-tenant" : typeof roles === "string" ? roles : roles?.join(", "),
       scope: definition?.scope,
       description: tool.description,
       screens: fromScreens.get(tool.name)?.screens ?? [],

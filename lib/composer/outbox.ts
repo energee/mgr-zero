@@ -20,7 +20,7 @@ export const OUTBOX_RETIREMENT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const OUTBOX_QUARANTINE_KEY = "mgr-offline-outbox:quarantine";
 
 const staffRole = z.enum(["admin", "sales", "warehouse", "brewer", "taproom"]);
-const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), roles: z.array(staffRole).min(1) }).strict();
+const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), roles: z.array(staffRole).min(1).readonly() }).strict();
 const retirementSchema = z.object({ retiredAt: z.number().int().nonnegative() }).strict();
 const attemptSchema = z.object({
   version: z.literal(1),

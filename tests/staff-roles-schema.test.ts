@@ -18,7 +18,10 @@ function readsScalarMembershipRole(fn: FunctionBody) {
   for (const match of source.matchAll(/\b([a-z_][a-z_0-9]*)\s+(?:(?:private|public)\s*\.\s*)?(?:invite_requests|chat_messages)(?:\s*%rowtype)?\b/gi)) scalarRecords.add(match[1]);
   // SQL range variables of the two intentionally scalar relations.
   for (const match of source.matchAll(/\b(?:from|join)\s+(?:(?:private|public)\s*\.\s*)?(?:invite_requests|chat_messages)\s+(?:as\s+)?([a-z_][a-z_0-9]*)/gi)) scalarRecords.add(match[1]);
-  let membershipSource = source.replace(/\bauth\s*\.\s*role\s*\(\s*\)/gi, " ");
+  let membershipSource = source.replace(/\bauth\s*\.\s*role\s*\(\s*\)/gi, " ")
+    // Invite INSERT column names are deliberately scalar; do not exempt any
+    // other part of a function that also queries brewery staff membership.
+    .replace(/\binsert\s+into\s+(?:private\s*\.\s*)?invite_requests\s*\([^)]*\)/gi, " ");
   for (const record of scalarRecords) membershipSource = membershipSource.replace(new RegExp(`\\b${record}\\s*\\.\\s*role\\b`, "gi"), " ");
   return /\brole\b/i.test(membershipSource);
 }
@@ -61,5 +64,6 @@ describe("staff role array clean cutover (#797)", () => {
     expect(functions.length, "nonempty live function catalog").toBeGreaterThan(0);
     expect(functions.filter(readsScalarMembershipRole).map(fn => fn.signature)).toEqual([]);
     expect(functions.filter(fn => /\b(?:public\s*\.\s*)?staff_role\s*\(/i.test(fn.body)).map(fn => fn.signature)).toEqual([]);
+    expect(functions.filter(fn => /\b(?:actor|v_actor)\s*->>\s*'role'/i.test(fn.body)).map(fn => fn.signature)).toEqual([]);
   });
 });

@@ -87,13 +87,21 @@ not the original "brewer-only" shortcut. Taproom does not grant either destinati
 The general Beer landing also retains the Taproom and Tap board destinations
 when a Taproom member gains Sales or Brewer.
 
-## Implemented migration
+## Implemented migrations
 
-All SQL changes are consolidated in
-`supabase/migrations/20261017144000_staff_roles.sql`. The original six-file
-sequence was replaced by this one migration so the schema, callers and scalar
-drop form one cutover. Committed historical migrations remain unchanged.
-The migration lock and generated database types are updated with this migration.
+The core cutover is `supabase/migrations/20261017144000_staff_roles.sql`.
+The original six-file sequence was consolidated so the schema, callers and
+scalar drop form one cutover. Committed migrations remain unchanged.
+
+`20261017144100_staff_actor_roles.sql` adds the canonical private
+`actor_has_staff_roles(brewery, actor, allowed)` predicate and migrates repeated
+trusted service-actor checks. It is `SECURITY INVOKER`, stable, has an empty search
+path, and is not directly executable by public, anon, authenticated or service
+roles. Trusted outer definer owners invoke it. This also replaces the scalar
+implementation introduced by #870's earlier migration without rewriting that
+committed migration. Both independently main-based branches use the same signature.
+
+The migration lock and public generated database types reflect this cutover.
 
 | Surface | Implementation |
 |---|---|
@@ -129,7 +137,9 @@ The inventory and live roster render `TeamView`. Their member forms render
 disabled state, selection ordering, nonempty validation, unchanged-set detection
 and existing command-error presentation. The live `MemberForm` supplies
 database-backed member data and sends `update_staff_role` with `roles`.
-The inventory supplies a Sales + Brewer fixture and no live mutations.
+The inventory keeps each demo identity's saved roles consistent with its
+persona and lets the shared picker choose combinations such as Sales + Brewer,
+without live mutations.
 `InviteView` keeps its single-role `E.pick` selector.
 
 ## Tasks

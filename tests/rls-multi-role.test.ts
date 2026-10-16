@@ -185,6 +185,39 @@ describe("all staff-dependent RLS policies preserve multi-role union (#797)", { 
     } finally { await connection.query("reset role"); }
   });
 
+  it("trusted-actor role checks use union membership, deny missing scope, and are not directly executable", async () => {
+    await connection.query("update public.brewery_users set roles=array['sales','brewer']::public.staff_role[] where brewery_id=$1 and user_id=$2", [own.brewery.id, own.taproom.id]);
+    expect((await connection.query(`select
+      private.actor_has_staff_roles($1,$2,array['sales']::public.staff_role[]) sales,
+      private.actor_has_staff_roles($1,$2,array['warehouse','brewer']::public.staff_role[]) brewer,
+      private.actor_has_staff_roles($1,$2,array['admin','warehouse']::public.staff_role[]) denied,
+      private.actor_has_staff_roles($3,$2,array['sales']::public.staff_role[]) foreign_tenant,
+      private.actor_has_staff_roles($1,$4,array['sales']::public.staff_role[]) nonmember,
+      private.actor_has_staff_roles($1,null,array['sales']::public.staff_role[]) missing_actor,
+      private.actor_has_staff_roles($1,$2,array[]::public.staff_role[]) empty_roles,
+      private.actor_has_staff_roles($1,$2,null::public.staff_role[]) missing_roles`,
+    [own.brewery.id, own.taproom.id, foreign.brewery.id, buyerId])).rows)
+      .toEqual([{ sales: true, brewer: true, denied: false, foreign_tenant: false, nonmember: false, missing_actor: false, empty_roles: false, missing_roles: false }]);
+    expect(sql(`select r.name||':'||has_function_privilege(r.name,
+      'private.actor_has_staff_roles(uuid,uuid,public.staff_role[])','execute')
+      from (values('anon'),('authenticated'),('service_role')) r(name) order by r.name`))
+      .toEqual(["anon:false", "authenticated:false", "service_role:false"]);
+    expect(sql(`select prosecdef||':'||(provolatile='s') from pg_proc
+      where oid='private.actor_has_staff_roles(uuid,uuid,public.staff_role[])'::regprocedure`))
+      .toEqual(["false:true"]);
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      await connection.query("savepoint direct_actor_helper");
+      try {
+        await connection.query(`set local role ${role}`);
+        await expect(connection.query("select private.actor_has_staff_roles($1,$2,array['sales']::public.staff_role[])", [own.brewery.id, own.taproom.id]))
+          .rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await connection.query("rollback to savepoint direct_actor_helper");
+        await connection.query("release savepoint direct_actor_helper");
+      }
+    }
+  });
+
   it("rejects empty, multidimensional and null-containing membership arrays at the table boundary", async () => {
     for (const [expression, code] of [
       ["array[]::public.staff_role[]", "23514"],

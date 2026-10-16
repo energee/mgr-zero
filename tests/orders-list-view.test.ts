@@ -29,7 +29,7 @@ describe("Orders list view loop", () => {
     ["admin", ["Finish", "Confirm", "Pick", "Ship", "Put back", "Open", "Open"]],
   ])("offers only authorized actions for %s", (role, verbs) => {
     const states = ["draft", "submitted", "confirmed", "picked", "picked", "shipped", "cancelled"] as const;
-    const rows = toOrdersListViewProps({ role, orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
+    const rows = toOrdersListViewProps({ roles: [role], orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
     expect(rows.map(r => r.verb)).toEqual(verbs);
     for (const [i, row] of rows.entries()) {
       expect(row.href).toBe(`/orders/${i}${row.verb === "Confirm" ? "/confirm" : row.verb === "Put back" ? "/restock" : ""}`);

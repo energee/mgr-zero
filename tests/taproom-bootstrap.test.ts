@@ -139,6 +139,23 @@ it("rejects quiet-hour changes through a verified Slack callback as well as the 
   expect((await admin.from("notification_preferences").select("id").eq("brewery_id", b.id)).data).toEqual([]);
 });
 
+it("allows quiet-hour callback consent for Taproom + Brewer and rechecks the union on consumption", async () => {
+  const b = await makeBrewery();
+  const staff = await makeStaffCtx(b.id, ["brewer", "taproom"]);
+  const installation = (await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Multi-role callback", state: "active", installer_user_id: staff.userId, token_store_key: crypto.randomUUID() })).id;
+  await ins("chat_user_links", { brewery_id: b.id, installation_id: installation, provider: "slack", external_user_id: "U-MIXED-CALLBACK", user_id: staff.userId, state: "active" });
+  const intent = await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-MIXED-CALLBACK", p_action: "mgr_save_preferences" });
+  expect(intent.error).toBeNull();
+  expect(intent.data).toMatch(/^[0-9a-f-]{36}$/);
+  const receipt = await ins("chat_callback_receipts", { brewery_id: b.id, installation_id: installation, provider: "slack", callback_id: crypto.randomUUID(), callback_kind: "mgr_save_preferences", external_user_id: "U-MIXED-CALLBACK", disposition: "pending", payload_hash: "fixture", received_at: new Date().toISOString() });
+  const saved = await admin.rpc("consume_chat_action_intent", { p_receipt: receipt.id, p_intent: intent.data, p_action: "mgr_save_preferences", p_input: { reason: "operations_digest", enabled: true, start: "22:00", end: "08:00", timezone: "UTC" } });
+  expect(saved.error).toBeNull();
+  expect(saved.data).toEqual({ disposition: "processed" });
+  const preference = await admin.from("notification_preferences").select("quiet_hours_start,quiet_hours_end").eq("brewery_id", b.id).eq("user_id", staff.userId).eq("reason", "operations_digest").single();
+  expect(preference.error).toBeNull();
+  expect(preference.data).toEqual({ quiet_hours_start: "22:00:00", quiet_hours_end: "08:00:00" });
+});
+
 it("Beer reads only allowed taproom stock and never queries forbidden aggregates", async () => {
   const cat = await seedCatalog(ctx.breweryId);
   const taproom = await seedLocation(ctx.breweryId, { name: "Taproom", uses: ["taproom"] });

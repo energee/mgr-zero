@@ -13,6 +13,7 @@ import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, PORTAL_BU
 import { writeFileSync } from "node:fs";
 import { asPersona } from "../components/mgr/demo-screens";
 import { initialsOf } from "../components/mgr/user-avatar";
+import { sentenceCase } from "../lib/mgr/labels";
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
@@ -29,7 +30,7 @@ describe("persona", () => {
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
     for (const p of PERSONAS) {
       expect(team, `${p.name} is not on Team`).toContain(p.name);
-      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.roles.join(", ")}`);
+      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.roles.map(sentenceCase).join(", ")}`);
       if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
     }
   });

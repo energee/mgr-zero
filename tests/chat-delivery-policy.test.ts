@@ -213,6 +213,7 @@ describe("delivery leasing", () => {
 });
 
 describe("multi-role notification union", () => {
+  type TodaySubjectRow = { subject_id: string; reason: string };
   it("unions sales and warehouse Today, App Home, and deliveries once per destination, retaining live assignment checks", async () => {
     const mixed = await makeStaffCtx(b.id, ["sales", "warehouse"]);
     const other = await makeStaffCtx(b.id, ["sales", "warehouse"]);
@@ -232,11 +233,11 @@ describe("multi-role notification union", () => {
     const today = await mixed.db.rpc("get_today_items", { p_brewery: b.id, p_now: "2036-09-05T14:00:00Z" });
     expect(today.error).toBeNull();
     for (const [subject, reason] of [[submitted, "submitted_order"], [pick, "pick_due"], [stop.id, "delivery_next"]]) {
-      expect(today.data?.filter((row) => row.subject_id === subject && row.reason === reason)).toHaveLength(1);
+      expect((today.data as TodaySubjectRow[] | null)?.filter((row) => row.subject_id === subject && row.reason === reason)).toHaveLength(1);
     }
     const otherToday = await other.db.rpc("get_today_items", { p_brewery: b.id, p_now: "2036-09-05T14:00:00Z" });
     expect(otherToday.error).toBeNull();
-    expect(otherToday.data?.some((row) => row.subject_id === stop.id)).toBe(false);
+    expect((otherToday.data as TodaySubjectRow[] | null)?.some((row) => row.subject_id === stop.id)).toBe(false);
     const home = await admin.rpc("get_chat_home_items", {
       p_installation: inst.id, p_external_user_id: `U-${mixed.userId.slice(0, 8)}`,
     });
