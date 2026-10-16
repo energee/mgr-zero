@@ -24,7 +24,6 @@ export default async function holdTestDbLock(project: TestProject) {
     stdio.push(fd);
   }
   const holder = spawn("perl", [script, "sh"], { stdio });
-  const release = () => { holder.stdin!.end(); };
   try {
     await Promise.race([
       once(holder.stdout!, "data"),
@@ -42,10 +41,10 @@ export default async function holdTestDbLock(project: TestProject) {
     const revision = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     console.log(`test-db: locked ${JSON.stringify({ revision, expected, actual: identity, database: env.DATABASE_URL?.replace(/:[^:@/]+@/, ":***@"), api: env.NEXT_PUBLIC_SUPABASE_URL })}`);
     return async () => {
-      try { await checkSchema(env, expected, identity); } finally { release(); }
+      try { await checkSchema(env, expected, identity); } finally { holder.stdin!.end(); }
     };
   } catch (error) {
-    release();
+    holder.stdin!.end();
     throw error;
   }
 }

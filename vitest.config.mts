@@ -32,13 +32,13 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.ts"],
     projects: [
       { extends: true, test: { name: "pure", include: pureTests } },
       {
         extends: true,
         test: {
           name: "database",
+          include: ["tests/**/*.test.ts"],
           exclude: [...configDefaults.exclude, ...pureTests],
           globalSetup: ["tests/test-db-lock.setup.ts"],
         },

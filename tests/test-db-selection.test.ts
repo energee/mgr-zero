@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { expectedMigration } from "../scripts/test-db-schema.mjs";
@@ -37,15 +37,24 @@ it("runs pure selections with an unavailable DB but guards every mixed DB/unknow
 export default { ...base, root: ${JSON.stringify(temp)}, test: { ...base.test, env: { ...base.test.env, ...${JSON.stringify(env)} } } };`);
     const childEnv: NodeJS.ProcessEnv = { ...process.env, MGR_TEST_DB_LOCK: join(temp, "lock") };
     delete childEnv.MGR_TEST_DB_LOCK_FD;
-    const run = (files: string[]) => spawnSync(join(root, "node_modules/.bin/vitest"), ["run", "--config", config, ...files], {
+    const launch = (args: string[]) => spawnSync(join(root, "node_modules/.bin/vitest"), [...args, "--config", config], {
       cwd: temp, env: childEnv, encoding: "utf8", timeout: 30000,
     });
-    const pure = run(["tests/test-db-schema-guard.test.ts"]);
+    const listing = launch(["list", "--filesOnly", "--json"]);
+    expect(listing.error).toBeUndefined();
+    expect(listing.status, listing.stdout + listing.stderr).toBe(0);
+    const specs = JSON.parse(listing.stdout) as { file: string; projectName: string }[];
+    expect(specs.map(spec => `${spec.projectName}:${basename(spec.file)}`).sort()).toEqual([
+      "database:schema-rules.test.ts",
+      "database:unclassified.test.ts",
+      "pure:test-db-schema-guard.test.ts",
+    ]);
+    const pure = launch(["run", "tests/test-db-schema-guard.test.ts"]);
     expect(pure.error).toBeUndefined();
     expect(pure.status, pure.stdout + pure.stderr).toBe(0);
     const version = expectedMigration(readdirSync(join(root, "supabase/migrations")));
     for (const file of ["tests/schema-rules.test.ts", "tests/unclassified.test.ts"]) {
-      const mixed = run(["tests/test-db-schema-guard.test.ts", file]);
+      const mixed = launch(["run", "tests/test-db-schema-guard.test.ts", file]);
       const output = mixed.stdout + mixed.stderr;
       expect(mixed.error).toBeUndefined();
       expect(mixed.status, output).not.toBe(0);
@@ -56,4 +65,4 @@ export default { ...base, root: ${JSON.stringify(temp)}, test: { ...base.test, e
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
-}, 60000);
+}, 150000);
