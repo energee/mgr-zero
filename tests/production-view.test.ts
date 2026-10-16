@@ -225,10 +225,19 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(toRecipesViewProps(recipesList));
   });
 
-  it("maps live list_recipes onto Open rows without inventing a style", () => {
-    const model = toRecipesViewProps({ recipes: [{ id: "r1", name: "Hazy IPA", brand: null }] });
-    expect(model.rows[0]).toMatchObject({ title: "Hazy IPA", detail: "no brand yet", verb: "Open", href: "/recipes/r1" });
-    expect(htmlOf(createElement(RecipesView, { model }))).toContain('href="/recipes/r1"');
+  it("maps live list_recipes onto rows titled with the current version, without inventing a style", () => {
+    const model = toRecipesViewProps({
+      recipes: [
+        { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1 },
+        { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
+      ],
+    });
+    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "no brand yet", href: "/recipes/r1" });
+    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "no version yet", warning: true, href: "/recipes/r2" });
+    const html = htmlOf(createElement(RecipesView, { model }));
+    expect(html).toContain('href="/recipes/r1"');
+    expect(html).toContain('href="/recipes/r2"');
+    expect(html).not.toContain(">Open<");
   });
 
   it("the live Recipes page mounts RecipesView and links Create recipe to New recipe", () => {

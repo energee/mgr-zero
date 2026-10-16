@@ -61,10 +61,12 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Boil time");
     expect(recipe).toContain("Whirlpool rest");
     expect(recipe).toContain("Knockout temp");
-    expect(recipe).toContain("Notes");
+    expect(recipe).toContain("Version note");
+    expect(recipe).toContain("Ingredients");
+    expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water · /);
+    expect(recipe).toMatch(/Water\s+target /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -75,6 +77,25 @@ describe("SCREENS", () => {
     expect(gate).toMatch(/schedules/);
   });
 
+  it("draws the Recipe frame from the shared schedule helpers, with its saved date and no gate", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    const drawn = text("Recipe");
+    // The water row is titled Water, as on the live draft; the Water frame names the source.
+    expect(drawn).not.toContain("Water · Municipal Denver");
+    expect(drawn).toContain("target Hazy target · 3 additions");
+    expect(recipe.to?.Water).toBe("Water");
+    expect(text("Water")).toContain("Municipal · Denver");
+    expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
+    expect(drawn).toContain("Saved");
+    expect(drawn).toContain("Aug 28, 2026");
+    const spec = String(recipe.spec);
+    expect(spec).not.toMatch(/schema gate/i);
+    expect(spec).toContain("each batch's Brew day keeps the plan it was brewed from");
+    const states = (recipe.states ?? []).map(([name]) => name);
+    expect(states).toEqual(expect.arrayContaining(["no version", "draft", "frozen"]));
+    expect(states).not.toContain("no price group");
+  });
+
   it("keeps water profiles in the catalog, with their ion values", () => {
     const list = text("Water profiles");
     expect(list).toContain("Burton");
@@ -83,10 +104,11 @@ describe("SCREENS", () => {
     expect(catalogText).toContain("Water profiles");
   });
 
-  it("gives water one stage axis and a brewery-default source", () => {
+  it("gives water one stage axis and a source picked from Water profiles", () => {
     const water = text("Water");
     expect(water).toContain("Gypsum");
-    expect(water).toMatch(/brewery default/);
+    expect(water).toContain("Municipal · Denver");
+    expect(water).not.toMatch(/brewery default/);
     expect(water).toContain("Target mash pH");
     // Spec D7: one stage axis. The addition sheet asks where a salt goes once,
     // never a timing and a target that can contradict each other.

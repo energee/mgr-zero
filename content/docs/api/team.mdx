@@ -555,7 +555,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Set or clear the day compliance reports start counting the ledger (admin); refused after the start of a filed period
+Set or clear the day compliance reports start counting the ledger before any report is filed (admin); after filing, only the unchanged value is allowed
 
 | Field | Type | Required |
 | --- | --- | --- |

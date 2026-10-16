@@ -11,8 +11,10 @@
 # was already applied ("already exists") counts as applied.
 #
 # Exit codes: 2 merge conflict (resolve by hand, commit, rerun), 3 local proof
-# failed, 4 CI failed for a real reason, 5 push did not land, 6 main gained a
-# migration since the sync (rerun to resync).
+# failed (including an added migration that sorts before main's newest, which
+# `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
+# reason, 5 push did not land, 6 main gained a migration since the sync (rerun
+# to resync).
 # Env: TEST_DATABASE_URL (default: the local test stack), CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
@@ -50,6 +52,7 @@ if [ -n "$(git status --porcelain)" ]; then
 Claude-Session: $CLAUDE_SESSION_URL}"
 fi
 
+bun scripts/check-migration-order.ts origin/main || exit 3
 migs=$(git diff --name-only origin/main...HEAD -- 'supabase/migrations/*.sql')
 tests=$(git diff --name-only --diff-filter=d origin/main...HEAD -- 'tests/*.test.ts')
 for m in $migs; do

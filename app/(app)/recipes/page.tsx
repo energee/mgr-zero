@@ -1,6 +1,6 @@
 // app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
-// (list_recipes), each opening its own version-editing page; Create recipe
-// links to /recipes/new.
+// (list_recipes), each titled with its current version and opening its own
+// recipe page; Create recipe links to /recipes/new.
 import { E } from "@/components/mgr/e";
 import { RecipesView } from "@/components/mgr/views/recipes";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -9,7 +9,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import "@/lib/commands/all";
 
-type Recipe = { id: string; name: string; brand_id: string | null; note: string | null };
+type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null };
 type Brand = { id: string; name: string };
 
 export default async function RecipesPage() {
@@ -23,7 +23,7 @@ export default async function RecipesPage() {
   return (
     <RecipesView
       model={toRecipesViewProps({
-        recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id) })),
+        recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
       })}
       header={E.hd("Recipes", "brewing process specs", E.btn("Create recipe", "p", "/recipes/new"))}
     />
