@@ -28,9 +28,10 @@ for (const file of changed) {
 // Use the shared history for existing pins: main may contain newer migrations
 // that this branch has not merged yet. Ordering still uses all of current main.
 const base = git("merge-base", main, "HEAD")[0];
-const lockPath = "supabase/migrations.lock.json";
-const trustedLock = JSON.parse(execFileSync("git", ["show", `${base}:${lockPath}`], { encoding: "utf8" })) as Record<string, string>;
-const branchLock = JSON.parse(execFileSync("git", ["show", `HEAD:${lockPath}`], { encoding: "utf8" })) as Record<string, string>;
+const lockAt = (ref: string) =>
+  JSON.parse(execFileSync("git", ["show", `${ref}:supabase/migrations.lock.json`], { encoding: "utf8" })) as Record<string, string>;
+const trustedLock = lockAt(base);
+const branchLock = lockAt("HEAD");
 const changedPins = Object.keys(trustedLock).filter((file) => branchLock[file] !== trustedLock[file]);
 for (const file of changedPins) {
   console.error(`::error::${file} has an immutable lock entry that differs from trusted history; restore the original pin.`);
