@@ -7,20 +7,21 @@
 # Local proof: tsc, lint, the PR's own test files, every test file that names a
 # SQL function the PR's migrations define (CI runs the whole suite, so an old
 # test pinned to the old behavior fails there otherwise), and the docs checks.
-# The PR's migrations are applied to the shared test database first; DDL that
-# was already applied ("already exists") counts as applied.
+# The database tests run against the shared test database as scripts/test-db.sh
+# builds it (reset when the migrations changed), under one exclusive lock held
+# from the reset through the vitest run, so the identity guard in
+# tests/test-db-lock.setup.ts sees this PR's migrations and no reset intervenes.
 #
 # Exit codes: 2 merge conflict (resolve by hand, commit, rerun), 3 local proof
 # failed (including an added migration that sorts before main's newest, which
 # `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
 # reason, 5 push did not land, 6 main gained a migration since the sync (rerun
 # to resync).
-# Env: TEST_DATABASE_URL (default: the local test stack), CLAUDE_SESSION_URL
+# Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
 n=${1:?usage: scripts/land-pr.sh <pr> [--merge]}; do_merge=${2:-}
 ROOT=$(cd "$(dirname "$0")/.." && git rev-parse --path-format=absolute --git-common-dir | xargs dirname)
-DB=${TEST_DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54352/postgres}
 b=$(gh pr view "$n" --json headRefName --jq .headRefName) || exit 1
 wt=$(git -C "$ROOT" worktree list --porcelain | awk -v b="refs/heads/$b" '/^worktree/{w=$2} $0=="branch "b{print w}')
 if [ -z "$wt" ]; then
@@ -55,18 +56,15 @@ fi
 bun scripts/check-migration-order.ts origin/main || exit 3
 migs=$(git diff --name-only origin/main...HEAD -- 'supabase/migrations/*.sql')
 tests=$(git diff --name-only --diff-filter=d origin/main...HEAD -- 'tests/*.test.ts')
-for m in $migs; do
-  out=$(psql "$DB" -v ON_ERROR_STOP=1 -q -f "$m" 2>&1 >/dev/null) && continue
-  echo "$out" | grep -q "already exists" && { echo "already applied: $m"; continue; }
-  echo "$out"; echo "migration failed: $m"; exit 3
-done
 for fn in $(cat $migs /dev/null | grep -oiE "create (or replace )?function [a-z_.]+" | awk '{print $NF}' | sed 's/.*\.//' | sort -u); do
   tests="$tests $(git grep -l -w "$fn" -- 'tests/*.test.ts')"
 done
 tests=$(echo $tests | tr ' ' '\n' | sort -u | tr '\n' ' ')
 log=$(mktemp)
+# bunx drops the inherited lock descriptor; the direct vitest binary keeps it.
 bunx tsc --noEmit && bun run lint >/dev/null 2>&1 \
-  && bunx vitest run $tests tests/migrations-applied.test.ts tests/docs.test.ts tests/api-docs.test.ts >"$log" 2>&1
+  && perl scripts/test-db-lock.pl ex bash -c 'bash scripts/test-db.sh --locked-reset && node_modules/.bin/vitest run "$@"' \
+    land-pr $tests tests/migrations-applied.test.ts tests/docs.test.ts tests/api-docs.test.ts >"$log" 2>&1
 status=$?
 grep -E "Test Files|Tests |FAIL|×" "$log"
 [ $status = 0 ] || { echo "local proof failed (full log: $log)"; exit 3; }

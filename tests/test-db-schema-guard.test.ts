@@ -1,4 +1,5 @@
 // Gates branch identity diagnostics without querying or resetting a database.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { expectedMigration, assertMigration, assertIdentity, localEnvironment, stripIdentityTypes } from "../scripts/test-db-schema.mjs";
 
@@ -43,5 +44,15 @@ describe("test database schema guard", () => {
     const expected = source.replace(`\n      "${probe}": { Args: never; Returns: Json },`, "");
     expect(await stripIdentityTypes(source)).toBe(expected);
     expect(await stripIdentityTypes(expected)).toBe(expected);
+  });
+
+  // A plain psql apply records neither migration history nor the identity this
+  // guard checks, so land-pr's database tests would always fail the guard.
+  it("lands PRs against a test-db.sh build held under the exclusive lock", () => {
+    const landPr = readFileSync("scripts/land-pr.sh", "utf8");
+    expect(landPr).not.toMatch(/\bpsql\b/);
+    const proof = landPr.indexOf("perl scripts/test-db-lock.pl ex bash -c 'bash scripts/test-db.sh --locked-reset");
+    expect(proof).toBeGreaterThan(-1);
+    expect(landPr.indexOf("node_modules/.bin/vitest run", proof)).toBeGreaterThan(proof);
   });
 });
