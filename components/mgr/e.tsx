@@ -8,6 +8,7 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
+import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { ComposerDrawerView, ComposerStripView } from "@/components/mgr/views/composer";
@@ -363,6 +364,16 @@ export const E = {
       </Select>
     </Field>
   ),
+  /** A picked value from a list too long for a Select (materials): the trigger opens a
+   *  searchable sheet (phone) or dialog (desk). `placeholder` is the trigger text when
+   *  nothing is picked; `selectedLabel` names a retained value missing from `options`. */
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string }) => (
+    <Field data-disabled={controls?.disabled}>
+      {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={controls?.["aria-describedby"]} selectedLabel={controls?.selectedLabel}
+        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} />
+    </Field>
+  ),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
@@ -382,6 +393,10 @@ export const E = {
       <AlertDescription className="text-pretty text-info-foreground">{t}</AlertDescription>
     </Alert>
   ),
+  /** Plain muted text, or nothing, for the caller's always-mounted role="status"
+   *  region, so a screen reader hears the change politely. E.info and E.note are
+   *  alerts and would interrupt the screen reader on every change. */
+  polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
   /** Annotation chips; the gallery renders this under the frame, never inside it. */
   states: (arr: [string, string, (0 | 1)?][]) => (
     <dl className="flex flex-wrap gap-1.5">

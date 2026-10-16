@@ -1,11 +1,11 @@
-// lib/mgr/recipes-view.ts — view-model for the Recipes list.
+// lib/mgr/recipes-view.ts — view-model for the Recipes list. Each row is a
+// recipe titled with its current version ("Hazy IPA v4"); a recipe with no
+// version yet says so and carries the warning class.
 import type { EmptyState } from "./empty-state";
 export type RecipesRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
   warning?: boolean;
   href?: string;
 };
@@ -19,7 +19,7 @@ export type RecipesViewModel = {
 export type RecipesSnapshot = {
   backHref?: string;
   rows?: RecipesRowView[];
-  recipes?: { id: string; name: string; brand?: string | null }[];
+  recipes?: { id: string; name: string; brand?: string | null; latest_version: number | null }[];
 };
 
 const NO_RECIPES: EmptyState = { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." };
@@ -32,13 +32,12 @@ export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
   return {
     backHref: s.backHref,
     empty: recipes.length === 0 ? NO_RECIPES : undefined,
-    rows: recipes.map((r) => ({
-      key: r.id,
-      title: r.name,
-      detail: r.brand ?? "no brand yet",
-      verb: "Open",
-      tone: "primary",
-      href: `/recipes/${r.id}`,
-    })),
+    rows: recipes.map((r) => {
+      const href = `/recipes/${r.id}`;
+      if (r.latest_version === null) {
+        return { key: r.id, title: r.name, detail: "no version yet", warning: true, href };
+      }
+      return { key: r.id, title: `${r.name} v${r.latest_version}`, detail: r.brand ?? "no brand yet", href };
+    }),
   };
 }
