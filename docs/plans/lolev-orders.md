@@ -58,7 +58,14 @@ Kegs:
 Orders:
 - An order has a **pickup** flag. A pickup order is never routed. It still
   names a destination, for TTB.
-- One sheet block (customer × week) is one order.
+- **One order per customer per pickup date** (user, 2026-10-15). Every block a
+  customer picks up that day merges into it, and lines of the same brand and
+  format add up. A block with no pickup date takes its tab's can date.
+- Sarene's tabs from 2-12-25 to 3-11-26 hold East, West and Totals blocks;
+  Totals equals East + West in all 23 such tabs, so Totals is the order and
+  East and West are skipped.
+- Some tabs have no `price tier` column, which shifts the quantity columns
+  left. The export reads each block's columns by header name.
 - `books_opened_on` moves to **2026-10-15**. Orders picked up before it are
   **historical**: an order and an invoice at the grid price, with no stock,
   no finished goods, no TTB month, and never pushed to QuickBooks. Orders on
@@ -80,10 +87,11 @@ map is the import's input (Import, below).
 - **From 2-12-25 (61 tabs):** one block per customer, headed `can date |
   pickup date | <customer> | type | price tier | half | sixtel | case`. The
   `In House` and `Customer TOTALS` blocks are not orders.
-- **Result:** about 261 historical and 34 live orders, 1,521 lines. 118 blocks
-  have no pickup date; they take the tab's can date. One cell reads
-  `Check Invo` (Sixth City, 2-11-26); the import reports it and uses the can
-  date.
+- **Result (dry run, 2026-10-15):** 217 orders, 190 historical and 27 live,
+  1,276 lines, every beer and customer mapped. Units: 989 halves, 1,844
+  returnable sixtels, 1,065 one-way sixtels (all export), 15,858 cases; 422
+  brand × format SKUs. One cell reads `Check Invoice` (Sixth City, 2-11-26);
+  the import reports it and uses the can date.
 
 | Customer | Destination | Channel | History | Live |
 | --- | --- | --- | --- | --- |
