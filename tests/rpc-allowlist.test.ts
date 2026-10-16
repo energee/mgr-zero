@@ -72,6 +72,7 @@ const AUTHENTICATED_RPCS = [
   "get_packaging_material_plan(uuid,jsonb)",
   "get_packaging_close_plan(uuid,uuid)",
   "get_packaging_material_record(uuid,uuid)",
+  "get_packaging_run_lot(uuid,uuid)",
   "correct_packaging_material_record(uuid,uuid,text,jsonb,uuid)",
   "complete_batch(uuid,uuid,uuid,numeric)",
   "confirm_delivery(uuid,text,uuid,jsonb,text,text,boolean)",
