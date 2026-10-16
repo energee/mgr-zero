@@ -687,7 +687,7 @@ export class QboOAuthClient {
     if (!payload?.QueryResponse || typeof payload.QueryResponse !== "object" || Array.isArray(payload.QueryResponse)) {
       throw new Error("Bill reconciliation response was invalid");
     }
-    const rows = payload?.QueryResponse?.Bill ?? [];
+    const rows = payload.QueryResponse.Bill ?? [];
     if (!Array.isArray(rows)) throw new Error("Bill reconciliation response was invalid");
     const matches = rows.filter((value: unknown): value is Record<string, unknown> => {
       if (!value || typeof value !== "object") return false;
