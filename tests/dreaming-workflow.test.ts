@@ -1,9 +1,74 @@
-import { readFileSync } from "node:fs";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 // ponytail: yaml is already installed transitively (fumadocs); a real parser without a new dependency.
 import { parse as load } from "yaml";
 
 const read = (path: string) => readFileSync(path, "utf8");
+
+type Workflow = { jobs: Record<"maintain" | "publish", { steps: { name?: string; run?: string }[] }> };
+const workflow = load(read(".github/workflows/dreaming.yml")) as Workflow;
+const validation = workflow.jobs.maintain.steps.find((step) => step.name === "Validate dream changes")!.run!;
+const publication = workflow.jobs.publish.steps.find((step) => step.name === "Publish dream pull request")!.run!;
+// Exercise the real trust boundary, stopping before authenticated remote publication.
+const publishShell = publication.slice(publication.indexOf("git fetch"), publication.indexOf('body="'));
+const env = { ...process.env };
+for (const key of Object.keys(env)) {
+  if (key.startsWith("GIT_")) delete env[key];
+}
+
+function git(cwd: string, ...args: string[]) {
+  const result = spawnSync("git", args, { cwd, env, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout.trim();
+}
+
+function checkBundle(
+  edit: (repo: string) => void,
+  check: (result: { published: SpawnSyncReturns<string>; publisher: string; base: string }) => void,
+  advanceMain = false,
+) {
+  const root = mkdtempSync(join(tmpdir(), "dream-bundle-"));
+  const producer = join(root, "producer");
+  const publisher = join(root, "publisher");
+  try {
+    mkdirSync(join(producer, ".agents/agents"), { recursive: true });
+    git(producer, "init", "-b", "main");
+    git(producer, "config", "user.name", "Fixture");
+    git(producer, "config", "user.email", "fixture@example.invalid");
+    git(producer, "config", "core.hooksPath", "/dev/null");
+    writeFileSync(join(producer, "AGENTS.md"), "original\n");
+    git(producer, "add", ".");
+    git(producer, "commit", "-m", "trusted main");
+    const base = git(producer, "rev-parse", "HEAD");
+    git(producer, "update-ref", "refs/remotes/origin/main", base);
+    git(root, "clone", producer, publisher);
+    edit(producer);
+    const validated = spawnSync("bash", ["-e", "-o", "pipefail", "-c", validation], {
+      cwd: producer,
+      env: { ...env, GITHUB_OUTPUT: join(root, "output"), DREAM_SHA: "", DREAM_LOGIN: "Fixture", DREAM_EMAIL: "fixture@example.invalid" },
+      encoding: "utf8",
+    });
+    expect(validated.status, validated.stderr).toBe(0);
+    expect(read(join(root, "output"))).toContain("changed=true");
+    if (advanceMain) {
+      writeFileSync(join(publisher, "application.ts"), "new main code\n");
+      git(publisher, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "add", ".");
+      git(publisher, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "intervening main");
+      git(publisher, "update-ref", "refs/remotes/origin/main", "HEAD");
+    }
+    const published = spawnSync("bash", ["-e", "-o", "pipefail", "-c", publishShell], {
+      cwd: publisher,
+      env: { ...env, RUNNER_TEMP: producer, TRUSTED_BASE: base },
+      encoding: "utf8",
+    });
+    check({ published, publisher, base });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 
 describe("dreaming workflow", () => {
   it("is valid YAML (a column-0 line inside a `run: |` block once broke the file)", () => {
@@ -37,12 +102,14 @@ describe("dreaming workflow", () => {
     expect(workflow).toContain('[ "$current_pr" = "$EXPECTED_PR" ]');
     expect(workflow).toContain("git add -A");
     expect(workflow).toContain("git diff --cached --name-only");
-    // The editable-path check runs once, in maintain; publish ships that exact commit.
-    expect(workflow.split("Dream changed forbidden path")).toHaveLength(2);
+    // Maintain gives early staged feedback; publish independently checks the full tree.
+    expect(workflow).toContain("Dream changed forbidden path");
+    expect(workflow).toContain("Dream bundle changed forbidden path");
     expect(workflow).toContain("refs/dreaming/last-checked");
 
     const modelArgs = workflow.match(/claude_args: '([^']+)'/)?.[1] ?? "";
-    expect(modelArgs).not.toMatch(/git (add|commit|checkout|push)|gh pr (create|edit)/);
+    expect(modelArgs).not.toContain("Bash(git ");
+    expect(modelArgs).not.toMatch(/gh pr (create|edit)/);
     expect(prompt).not.toContain("## Publish");
   });
 
@@ -161,6 +228,83 @@ describe("dreaming workflow", () => {
     expect(prompt).toContain("## Recurring friction");
     expect(prompt).toMatch(/gh pr view <n> --json reviews,comments/);
     expect(prompt).toMatch(/two or more/i);
+  });
+
+  it("captures Git evidence before the model without staging it", () => {
+    const capture = workflow.jobs.maintain.steps.findIndex((step) => step.name === "Capture trusted Git evidence");
+    const dream = workflow.jobs.maintain.steps.findIndex((step) => step.name === "Run dream");
+    expect(capture).toBeGreaterThan(-1);
+    expect(capture).toBeLessThan(dream);
+    expect(workflow.jobs.maintain.steps[capture].run).toContain('git --no-pager log --no-ext-diff --stat "$ACCEPTED_BASE..$MAIN_HEAD" > .git/dream-evidence.log');
+    expect(read(".agents/agents/dreaming.md")).toContain("Read `.git/dream-evidence.log`");
+  });
+
+  it("rejects a forbidden precommitted file hidden behind an allowed staged document", () => {
+    checkBundle((repo) => {
+      writeFileSync(join(repo, "application.ts"), "forbidden\n");
+      git(repo, "add", ".");
+      git(repo, "commit", "-m", "hidden forbidden change");
+      writeFileSync(join(repo, "AGENTS.md"), "allowed staged doc\n");
+    }, ({ published, publisher, base }) => {
+      expect(published.status).toBe(1);
+      expect(published.stdout?.toString()).toContain("Dream bundle changed forbidden path: application.ts");
+      expect(git(publisher, "rev-parse", "HEAD")).toBe(base);
+      expect(existsSync(join(publisher, "application.ts"))).toBe(false);
+    });
+  });
+
+  it.each([false, true])("accepts the exact allowed tree with intervening main=%s", (advanceMain) => {
+    checkBundle((repo) => {
+      writeFileSync(join(repo, ".agents/agents/example.md"), "allowed agent instructions\n");
+      writeFileSync(join(repo, "AGENTS.md"), "curated\n");
+    }, ({ published, publisher, base }) => {
+      expect(published.status, published.stderr?.toString()).toBe(0);
+      expect(read(join(publisher, "AGENTS.md"))).toBe("curated\n");
+      expect(git(publisher, "diff", "--name-only", base, "HEAD")).toBe(".agents/agents/example.md\nAGENTS.md");
+    }, advanceMain);
+  });
+
+  it("rejects a bundle without the recorded trusted ancestor", () => {
+    checkBundle((repo) => {
+      git(repo, "checkout", "--orphan", "unrelated");
+      git(repo, "commit", "-m", "unrelated root");
+      writeFileSync(join(repo, "AGENTS.md"), "allowed staged doc\n");
+    }, ({ published, publisher, base }) => {
+      expect(published.status).toBe(1);
+      expect(published.stdout?.toString()).toContain("does not descend from the recorded main head");
+      expect(git(publisher, "rev-parse", "HEAD")).toBe(base);
+    });
+  });
+
+  it("rejects a symlink masquerading as allowed Markdown", () => {
+    checkBundle((repo) => {
+      rmSync(join(repo, "AGENTS.md"));
+      symlinkSync("/synthetic/forbidden-target", join(repo, "AGENTS.md"));
+    }, ({ published }) => {
+      expect(published.status).toBe(1);
+      expect(published.stdout?.toString()).toContain("Dream bundle changed document type: AGENTS.md (120000)");
+    });
+  });
+
+  it.each([".agents/agents/nested/forbidden.md", "forbidden\nAGENTS.md"])("rejects non-allowlisted path %j", (path) => {
+    checkBundle((repo) => {
+      mkdirSync(join(repo, ".agents/agents/nested"), { recursive: true });
+      writeFileSync(join(repo, path), "forbidden\n");
+      git(repo, "add", ".");
+      git(repo, "commit", "-m", "hidden forbidden path");
+      writeFileSync(join(repo, "AGENTS.md"), "allowed staged doc\n");
+    }, ({ published, publisher, base }) => {
+      expect(published.status).toBe(1);
+      expect(published.stdout?.toString()).toContain("Dream bundle changed forbidden path:");
+      expect(git(publisher, "rev-parse", "HEAD")).toBe(base);
+    });
+  });
+
+  it("accepts deletion of an allowed document", () => {
+    checkBundle((repo) => rmSync(join(repo, "AGENTS.md")), ({ published, publisher }) => {
+      expect(published.status, published.stderr?.toString()).toBe(0);
+      expect(existsSync(join(publisher, "AGENTS.md"))).toBe(false);
+    });
   });
 
   it("keeps the context a dream once pruned (PR #30, restored in PR #60)", () => {

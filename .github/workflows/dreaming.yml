@@ -126,6 +126,15 @@ jobs:
             --json number,title,comments --jq '.[] | "#\(.number) \(.title) (\(.comments | length) comments)"')
           { echo "list<<WATCHDOG_EOF"; echo "${issues:-none}"; echo "WATCHDOG_EOF"; } >> "$GITHUB_OUTPUT"
 
+      - name: Capture trusted Git evidence
+        if: steps.window.outputs.new == 'true'
+        env:
+          ACCEPTED_BASE: ${{ steps.window.outputs.base }}
+          MAIN_HEAD: ${{ steps.window.outputs.head }}
+        run: |
+          # Inside .git so Read can see it without git add including it in the bundle.
+          git --no-pager log --no-ext-diff --stat "$ACCEPTED_BASE..$MAIN_HEAD" > .git/dream-evidence.log
+
       - name: Run dream
         if: steps.window.outputs.new == 'true'
         uses: anthropics/claude-code-action@v1
@@ -143,7 +152,7 @@ jobs:
             ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
             Open watchdog issues (WATCHDOG_ISSUES): ${{ steps.watchdog.outputs.list }}
           # Cross-document synthesis needs stronger reasoning than bounded maintenance.
-          claude_args: '--model sonnet --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(gh pr list:*),Bash(gh pr view:*)"'
+          claude_args: '--model sonnet --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(gh pr list:*),Bash(gh pr view:*)"'
 
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'
@@ -172,8 +181,8 @@ jobs:
           EOF
           git -c "user.name=$DREAM_LOGIN" -c "user.email=$DREAM_EMAIL" \
             commit -q -m "dream: agent doc maintenance"
-          # A bundle of the validated commit, not a patch: publish pushes exactly this
-          # tree, so it never re-merges main or needs preimage blobs for a 3-way apply.
+          # Publish independently checks this entire tree against the recorded main
+          # head; this staged-path check is only early feedback, not a trust boundary.
           # Edits that land on main during the model run leave the PR one merge behind,
           # which GitHub shows as usual and the next dream's merge absorbs. Only commits
           # publish cannot already reach (main, the observed dreaming/main) are packed.
@@ -227,10 +236,31 @@ jobs:
           EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}
           EXPECTED_SHA: ${{ needs.maintain.outputs.dream_sha }}
           REBUILT: ${{ needs.maintain.outputs.rebuilt }}
+          TRUSTED_BASE: ${{ needs.maintain.outputs.head }}
         run: |
           current_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
           [ "$current_pr" = "$EXPECTED_PR" ] || { echo "Dream PR changed during curation; retry without advancing the marker."; exit 1; }
           git fetch "$RUNNER_TEMP/dream.bundle" HEAD
+          # Never trust the producer's HEAD, staged delta, or path validation. The
+          # recorded main head predates the model; fresh origin/main may have advanced.
+          git merge-base --is-ancestor "$TRUSTED_BASE" FETCH_HEAD || {
+            echo "Dream bundle does not descend from the recorded main head."; exit 1;
+          }
+          git diff --no-renames --name-only -z "$TRUSTED_BASE" FETCH_HEAD > "$RUNNER_TEMP/dream-paths"
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              .agents/agents/*/*) echo "Dream bundle changed forbidden path: $path"; exit 1 ;;
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md|TODO.md) ;;
+              *) echo "Dream bundle changed forbidden path: $path"; exit 1 ;;
+            esac
+            # Documents may be deleted or regular text blobs, never symlinks,
+            # executable files, or submodules masquerading as allowed Markdown.
+            mode=$(git ls-tree --format='%(objectmode)' FETCH_HEAD -- "$path")
+            case "$mode" in
+              ''|100644) ;;
+              *) echo "Dream bundle changed document type: $path ($mode)"; exit 1 ;;
+            esac
+          done < "$RUNNER_TEMP/dream-paths"
           git checkout -B dreaming/main FETCH_HEAD
           body="Curates the living agent documents from merged evidence. Outstanding read-only drift is tracked in .agents/DRIFT.md; the diff is the authoritative change summary."
           if [ "$REBUILT" = "true" ]; then
