@@ -60,6 +60,7 @@ function fixture() {
   git(root, "config", "user.email", "fixture@example.invalid");
   git(root, "config", "core.hooksPath", "/dev/null");
   commit(root);
+  git(root, "update-ref", "refs/remotes/origin/main", "main");
   git(root, "checkout", "-b", "feature");
   return root;
 }
@@ -124,6 +125,7 @@ describe("migration CLI against trusted history", () => {
     writeFileSync(join(root, "supabase/migrations", nextMigration), "select 2;\n");
     expect(run(root, "lock-migrations.ts", []).status).toBe(0);
     commit(root);
+    git(root, "update-ref", "refs/remotes/origin/main", "main");
     git(root, "checkout", "feature");
     writeFileSync(join(root, "supabase/migrations", forward), "select 3;\n");
     expect(run(root, "lock-migrations.ts", []).status).toBe(0);
@@ -149,6 +151,7 @@ describe("migration CLI against trusted history", () => {
     writeFileSync(join(root, "supabase/migrations/20261020000000_main.sql"), "select 3;\n");
     expect(run(root, "lock-migrations.ts", []).status).toBe(0);
     commit(root);
+    git(root, "update-ref", "refs/remotes/origin/main", "main");
     git(root, "checkout", "feature");
     // A branch behind main remains valid when it has no new migrations.
     expect(run(root).status).toBe(0);
@@ -161,10 +164,11 @@ describe("migration CLI against trusted history", () => {
   });
 });
 
-describe("append-only migration lock generator", () => {
+describe("migration lock generation from trusted history", () => {
   it("preserves existing hashes instead of blessing edited SQL", () => {
     const root = fixture();
     writeFileSync(join(root, "supabase/migrations", migration), "select 2;\n");
+    writeLock(root, { [migration]: hash("select 2;\n") });
     expect(run(root, "lock-migrations.ts", []).status).toBe(0);
     expect(readLock(root)[migration]).toBe(hash("select 1;\n"));
     commit(root);
@@ -176,5 +180,43 @@ describe("append-only migration lock generator", () => {
     rmSync(join(root, "supabase/migrations", migration));
     expect(run(root, "lock-migrations.ts", []).status).toBe(0);
     expect(readLock(root)).toEqual({ [migration]: hash("select 1;\n") });
+  });
+
+  it.each(["edit", "rename"])("regenerates a committed branch-only migration after %s", (change) => {
+    const root = fixture();
+    const file = join(root, "supabase/migrations", nextMigration);
+    writeFileSync(file, "select 2;\n");
+    expect(run(root, "lock-migrations.ts", []).status).toBe(0);
+    commit(root);
+    const revised = change === "rename" ? "20261016101002_revised.sql" : nextMigration;
+    if (change === "rename") renameSync(file, join(root, "supabase/migrations", revised));
+    writeFileSync(join(root, "supabase/migrations", revised), "select 3;\n");
+    expect(run(root, "lock-migrations.ts", []).status).toBe(0);
+    expect(readLock(root)).toEqual({ [migration]: hash("select 1;\n"), [revised]: hash("select 3;\n") });
+    commit(root);
+    expect(run(root).status).toBe(0);
+  });
+
+  it("drops a removed branch-only pin without dropping trusted main pins", () => {
+    const root = fixture();
+    const file = join(root, "supabase/migrations", nextMigration);
+    writeFileSync(file, "select 2;\n");
+    expect(run(root, "lock-migrations.ts", []).status).toBe(0);
+    commit(root);
+    rmSync(file);
+    expect(run(root, "lock-migrations.ts", []).status).toBe(0);
+    expect(readLock(root)).toEqual({ [migration]: hash("select 1;\n") });
+    commit(root);
+    expect(run(root).status).toBe(0);
+  });
+
+  it("fails without trusted main history and leaves the checkout lock untouched", () => {
+    const root = fixture();
+    git(root, "update-ref", "-d", "refs/remotes/origin/main");
+    const before = readFileSync(join(root, lockPath), "utf8");
+    const result = run(root, "lock-migrations.ts", []);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Cannot load trusted migration history");
+    expect(readFileSync(join(root, lockPath), "utf8")).toBe(before);
   });
 });

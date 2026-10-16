@@ -176,7 +176,9 @@ from scratch — and never reaches hosted. That is what broke `/settings`, `/men
 and Ask MGR on live (#329, #330). A schema change is a new migration file.
 `supabase/migrations.lock.json` pins every file's hash for
 `tests/migrations-applied.test.ts`. After adding a migration, run
-`bun run migrations:lock`; it only adds missing pins, never rewrites old ones.
+`bun run migrations:lock`; it preserves pins from trusted `origin/main`
+merge-base history, re-hashes branch-only files, and drops removed branch-only
+pins. Fetch main's history first; generation fails if that history is unavailable.
 CI and `scripts/land-pr.sh` run `scripts/check-migration-order.ts` against a
 trusted main ref. That guard rejects edits, renames, deletions, and changed or
 missing existing lock entries independently of the checkout's hashes. A new

@@ -1,11 +1,19 @@
-// scripts/lock-migrations.ts — adds missing hashes to supabase/migrations.lock.json.
-// Existing pins are never rewritten or dropped: `supabase db push` will never
-// apply an existing version again (see #329, #330). Run after ADDING a migration.
+// scripts/lock-migrations.ts — pins main's migrations and hashes branch-only work.
+// Only trusted history is immutable: unmerged migrations can still be revised
+// or renamed before `supabase db push` ever applies them.
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 const DIR = "supabase/migrations";
-const lock = JSON.parse(readFileSync(`${DIR}.lock.json`, "utf8")) as Record<string, string>;
+let lock: Record<string, string>;
+try {
+  const base = execFileSync("git", ["merge-base", "origin/main", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  lock = JSON.parse(execFileSync("git", ["show", `${base}:${DIR}.lock.json`], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })) as Record<string, string>;
+} catch (error) {
+  console.error(`Cannot load trusted migration history from origin/main; fetch main with its history before regenerating the lock. ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
 for (const file of readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort()) {
   if (!Object.hasOwn(lock, file)) {
     lock[file] = createHash("sha256").update(readFileSync(`${DIR}/${file}`)).digest("hex");
