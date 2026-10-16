@@ -113,7 +113,7 @@ jobs:
           for attempt in 1 2 3; do
             supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta && exit 0
             [ "$attempt" = 3 ] && exit 1
-            echo "supabase start failed (attempt $attempt); retrying in 60s"
+            echo "stack start failed (attempt $attempt); retrying in 60s"
             supabase stop --workdir tests/supabase --no-backup || true
             sleep 60
           done

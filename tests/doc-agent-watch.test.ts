@@ -12,10 +12,13 @@ describe("doc agent watch", () => {
   const source = read(".github/workflows/doc-agent-watch.yml");
   const watch = load(source) as Workflow;
 
-  it("watches every doc workflow by its exact name", () => {
-    const names = ["dreaming", "documentation-agent", "http-api-agent"].map((f) => (load(read(`.github/workflows/${f}.yml`)) as { name: string }).name);
+  it("watches every doc workflow, and hosted jobs, by its exact name", () => {
+    // hosted-jobs failed 20 runs in a row (404 on a stale production build) unnoticed.
+    const names = ["dreaming", "documentation-agent", "http-api-agent", "hosted-jobs"].map((f) => (load(read(`.github/workflows/${f}.yml`)) as { name: string }).name);
     expect(watch.on.workflow_run?.workflows).toEqual(names);
     expect(watch.on.workflow_run?.types).toEqual(["completed"]);
+    // Doc agent titles are unchanged so their already-open issues still match.
+    expect(source).toContain('if [ "$NAME" = "hosted jobs" ]; then title="Hosted jobs failing"; else title="Doc agent failing: $NAME"; fi');
   });
 
   it("opens an issue on a run that did not succeed, and when dreaming goes stale", () => {

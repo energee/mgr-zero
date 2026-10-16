@@ -134,9 +134,21 @@ describe("production-readiness workflow contract", () => {
   });
 
   it("reclaims stale test stacks before startup and always stops its own stack", () => {
-    expect(ci.match(/supabase stop --workdir tests\/supabase --no-backup/g)).toHaveLength(2);
-    expect(ci).toMatch(/supabase stop --workdir tests\/supabase --no-backup[^\n]*\n\s*- run: supabase start/);
+    // Three stops: reclaim before startup, between start retries, and always at the end.
+    expect(ci.match(/supabase stop --workdir tests\/supabase --no-backup/g)).toHaveLength(3);
+    expect(ci).toMatch(/- run: supabase stop --workdir tests\/supabase --no-backup[^\n]*\n(?:\s*#[^\n]*\n)*\s*- name: Start the test stack/);
     expect(ci).toMatch(/if: always\(\)\s+run: supabase stop --workdir tests\/supabase --no-backup/);
+  });
+
+  // Every CI failure in Sept–Oct 2026 was an image pull throttled with toomanyrequests.
+  it("retries the stack start, stopping the half-started stack between attempts", () => {
+    expect(ci).toMatch(/for attempt in 1 2 3; do\s+supabase start --workdir tests\/supabase [^\n]*&& exit 0\s+\[ "\$attempt" = 3 \] && exit 1/);
+  });
+
+  // supabase db push refuses a migration older than hosted's newest (vercel-build.sh).
+  it("rejects a pull request that adds a migration older than main's newest", () => {
+    expect(ci).toContain("bun scripts/check-migration-order.ts FETCH_HEAD");
+    expect(ci).toMatch(/git fetch --no-tags origin "\$BASE_REF"\n\s*bun scripts\/check-migration-order\.ts/);
   });
 
   it("installs and runs with bun, not npm", () => {
