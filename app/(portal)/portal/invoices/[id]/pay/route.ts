@@ -1,7 +1,7 @@
 import { pickedCustomerId, selectCustomerMembership } from "@/lib/portal";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
-import { QboOAuthClient, qboConfig, resolvePortalInvoicePayment, sanitizeQboError } from "@/lib/qbo";
+import { QboOAuthClient, qboConfig, qboPaymentFailureCause, resolvePortalInvoicePayment } from "@/lib/qbo";
 
 const responseHeaders = {
   "Cache-Control": "private, no-cache, no-store, must-revalidate, max-age=0",
@@ -44,9 +44,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof CommandError && error.status === 404) {
       return new Response("Invoice not found", { status: 404, headers: responseHeaders });
     }
-    // Provider errors can contain credentials or bearer links. Log only the
-    // safe classification; the buyer stays on Payment unavailable.
-    console.error("qbo_payment_failed", sanitizeQboError(error));
+    // The buyer stays on Payment unavailable; staff get the cause (missing
+    // setup, a CommandError code, an error name) but never a provider body,
+    // which can contain credentials or bearer links.
+    console.error("qbo_payment_failed", qboPaymentFailureCause(error));
     return unavailable(request, id, "provider_unavailable");
   }
 }

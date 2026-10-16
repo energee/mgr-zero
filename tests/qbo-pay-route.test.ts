@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   customerId: "customer-1",
   seenCustomer: "",
   configured: true,
+  setupMissing: false,
   confirmed: true,
   expired: false,
   requests: 0,
@@ -54,7 +55,10 @@ vi.mock("@/lib/qbo", async (importOriginal) => {
   };
   return {
     ...qbo,
-    qboConfig: () => config,
+    qboConfig: () => {
+      if (state.setupMissing) throw new Error("QuickBooks setup is unavailable");
+      return config;
+    },
     QboOAuthClient: class extends qbo.QboOAuthClient {
       constructor() { super(config, state.transport); }
     },
@@ -74,6 +78,7 @@ function setup() {
   state.customerId = "customer-1";
   state.seenCustomer = "";
   state.configured = true;
+  state.setupMissing = false;
   state.confirmed = true;
   state.expired = false;
   state.requests = 0;
@@ -126,8 +131,25 @@ describe("portal invoice Pay route", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://mgr.test/portal/invoices/invoice-1?payment=unavailable");
     expect(await response.text()).toBe("");
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", "QuickBooks is unavailable");
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error" });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it("logs a code bug's error name so staff can tell it from a provider outage", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    state.transport.mockRejectedValue(new TypeError("bearer-secret is not a function"));
+    expect((await pay()).status).toBe(303);
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "TypeError" });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it("logs missing QuickBooks setup as its own cause", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    state.setupMissing = true;
+    expect((await pay()).status).toBe(303);
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error", message: "QuickBooks setup is unavailable" });
   });
 
   it("bounds repeated authorized requests before any additional provider read or refresh", async () => {
@@ -154,6 +176,9 @@ describe("portal invoice Pay route", () => {
     state.admissionError = true;
     expect((await pay()).status).toBe(303);
     expect(state.transport).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", {
+      name: "CommandError", status: 503, code: "admission_unavailable", message: "command admission unavailable",
+    });
   });
 
   it("spends one admission for the bounded unauthorized-read refresh and retry", async () => {
@@ -175,7 +200,7 @@ describe("portal invoice Pay route", () => {
     state.transport.mockRejectedValue(new Error("refresh-secret private-provider-detail"));
     expect((await pay()).status).toBe(303);
     expect(state.transport).toHaveBeenCalledOnce();
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_refresh_failed", "QuickBooks is unavailable");
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_refresh_failed", { name: "Error" });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 

@@ -141,6 +141,21 @@ export function sanitizeQboError(error: unknown) {
   return "QuickBooks is unavailable";
 }
 
+const QBO_SETUP_UNAVAILABLE = "QuickBooks setup is unavailable";
+
+/**
+ * The payment-failure log fields: enough cause for staff, never a provider body.
+ * Only messages MGR writes itself (a CommandError, the missing-setup error) are
+ * kept; any other error, which may carry tokens or a bearer link, logs its name.
+ */
+export function qboPaymentFailureCause(error: unknown) {
+  if (error instanceof CommandError) {
+    return { name: error.name, status: error.status, code: error.code, message: error.message };
+  }
+  if (!(error instanceof Error)) return { name: typeof error };
+  return error.message === QBO_SETUP_UNAVAILABLE ? { name: error.name, message: error.message } : { name: error.name };
+}
+
 export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<string>) {
   try {
     const url = new URL(value);
@@ -167,7 +182,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-    else console.error("qbo_payment_refresh_failed", sanitizeQboError(error));
+    else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -933,7 +948,7 @@ function meaningfulInvoiceContentMatches(expectedInvoice: unknown, actual: Recor
 }
 
 export function qboConfig(env: Record<string, string | undefined> = process.env): QboConfig {
-  try { return readQboEnv(env); } catch { throw new Error("QuickBooks setup is unavailable"); }
+  try { return readQboEnv(env); } catch { throw new Error(QBO_SETUP_UNAVAILABLE); }
 }
 
 export function isQboConfigured(env: Record<string, string | undefined> = process.env) {
