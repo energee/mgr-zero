@@ -6,6 +6,9 @@
 // The last block reads the page and brand picker sources: the page draws
 // toRecipePageModel, and the picker never disables itself while it saves.
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
 import { draftBlocker, gravityBlockerText, noMashText, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
@@ -21,6 +24,7 @@ const version: NonNullable<RecipeSnapshot["version"]> = {
 const snapshot: RecipeSnapshot = {
   recipe: { id: "r1", name: "Pale", brand_id: null, note: null },
   version,
+  versions: [3, 2, 1],
   ingredients: [
     { id: "i1", material_id: "m-malt", per_bbl_qty: 40.9, stage: "mash", timing_minutes: null, sort: 0, extract_snapshot: 37, materials: { base_uom: "lb" } },
     { id: "i2", material_id: "m-hop", per_bbl_qty: 0.5, stage: "boil", timing_minutes: 60, sort: 1, extract_snapshot: null, materials: { base_uom: "lb" } },
@@ -131,6 +135,29 @@ describe("toRecipePageModel", () => {
     const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
     expect(model.saved).toBe("Sep 30, 2026");
     expect(model.recipeNote).toBe("House pale");
+  });
+  it("links every version and distinguishes the current version from the one being viewed", () => {
+    const current = toRecipePageModel(predicted, ctx);
+    expect(current.historical).toBe(false);
+    expect(current.versions).toEqual([
+      { number: 3, href: "?v=3", selected: true, latest: true },
+      { number: 2, href: "?v=2", selected: false, latest: false },
+      { number: 1, href: "?v=1", selected: false, latest: false },
+    ]);
+    const model = toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx);
+    expect(model.historical).toBe(true);
+    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true, parentForm: "Editable brand" }));
+    expect(html).toContain('href="?v=3"');
+    expect(html).toMatch(/href="\?v=1"[^>]*aria-current="page"/);
+    expect(html).toContain("v3 (current)");
+    expect(html).toContain("Older version");
+    expect(html).toContain("Less crystal");
+    expect(html).not.toContain("Create recipe version");
+    expect(html).not.toContain("Editable brand");
+    expect(html).not.toMatch(/<input|<select|<form/);
+    const currentHtml = renderToStaticMarkup(createElement(RecipeView, { model: current, readOnly: true }));
+    expect(currentHtml).toContain('href="/recipes/r1/new"');
+    expect(currentHtml).toContain("Create recipe version");
   });
   it("says which saved line had no extract potential instead of a prediction", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);
