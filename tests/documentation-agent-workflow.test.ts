@@ -1,14 +1,14 @@
 // Exercises the documentation workflow's real publication shell across an intervening main update.
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+// yaml is installed through fumadocs, as in dreaming-workflow.test.ts; no new dependency.
+import { parse } from "yaml";
 
-// js-yaml is installed through eslint, as in dreaming-workflow.test.ts; no new dependency.
-const { load } = createRequire(import.meta.url)("js-yaml") as { load: (source: string) => Workflow };
+const load = (source: string) => parse(source) as Workflow;
 type Step = { name?: string; uses?: string; run?: string; with?: { path?: string; "fetch-depth"?: number } };
 type Workflow = { jobs: { maintain: { steps: Step[] }; publish: { steps: Step[] } } };
 const source = readFileSync(".github/workflows/documentation-agent.yml", "utf8");
