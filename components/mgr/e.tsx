@@ -428,12 +428,12 @@ export const E = {
       ))}
     </ItemGroup>
   ),
-  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][]) => (
+  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[]) => (
     <Table className="min-w-max">
       <TableHeader>
         <TableRow>
           {hd.map((h, i) => (
-            <TableHead key={i} className={cn(i && "text-right")}>{h}</TableHead>
+            <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
           ))}
         </TableRow>
       </TableHeader>
@@ -441,7 +441,7 @@ export const E = {
         {rows.map((r, i) => (
           <TableRow key={i}>
             {r.map((c, j) => (
-              <TableCell key={j} className={cn(j && "text-right")}>{c}</TableCell>
+              <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
             ))}
           </TableRow>
         ))}
