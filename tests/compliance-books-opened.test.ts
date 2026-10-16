@@ -60,4 +60,40 @@ describe("compliance report and books_opened_on", () => {
     await setBooks(null);
     expect(can(await october())).toMatchObject({ begin: 1.5, in: 7, end: 8.5 });
   });
+
+  it.each([
+    { opened: "2026-02-01", movement: "2026-01-01", start: "2026-02-01", end: "2026-02-28", begin: 0, nextStart: "2026-03-01", nextEnd: "2026-03-31", refused: [null, "2026-01-01"] },
+    { opened: "2026-01-01", movement: "2026-02-01", start: "2026-03-01", end: "2026-03-31", begin: 5, nextStart: "2026-04-01", nextEnd: "2026-04-30", refused: ["2026-02-15", "2026-03-01", "2026-04-01"] },
+  ])("preserves filed, regenerated and next-opening balances with books opened $opened", async (scenario) => {
+    const breweryId = (await makeBrewery()).id;
+    const ctx = await makeStaffCtx(breweryId);
+    const { skuId } = await seedCatalog(breweryId, { packageType: "can", bblPerUnit: 0.5 });
+    const loc = await seedLocation(breweryId);
+    insertFixture("inventory_movements", {
+      brewery_id: breweryId, sku_id: skuId, location_id: loc.id, bin_id: loc.binId,
+      created_by: ctx.userId, qty: 10, type: "opening_balance", occurred_on: scenario.movement,
+    });
+    await runCommand("set_books_opened_on", { booksOpenedOn: scenario.opened }, ctx);
+    const period = { jurisdiction: "TTB", periodStart: scenario.start, periodEnd: scenario.end };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const filed = await runCommand("file_compliance_report", period, ctx, execution) as { id: string; figures: Report["figures"] };
+    expect(can({ figures: filed.figures, warnings: [] })).toMatchObject({ begin: scenario.begin, end: scenario.begin });
+
+    for (const date of scenario.refused) {
+      await expect(runCommand("set_books_opened_on", { booksOpenedOn: date }, ctx)).rejects.toThrow(/filed/);
+    }
+    const generated = await runCommand("generate_compliance_report", period, ctx) as Report;
+    expect(generated.figures).toEqual(filed.figures);
+    const listed = await runCommand("list_compliance_reports", period, ctx) as { filings: { id: string; figures: Report["figures"] }[]; booksOpenedOn: string };
+    expect(listed.booksOpenedOn).toBe(scenario.opened);
+    expect(listed.filings).toHaveLength(1);
+    expect(listed.filings[0]).toMatchObject({ id: filed.id, figures: filed.figures });
+    expect(await runCommand("file_compliance_report", period, ctx, execution)).toEqual(filed);
+    const next = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: scenario.nextStart, periodEnd: scenario.nextEnd,
+    }, ctx) as Report;
+    expect(can(next)).toMatchObject({ begin: scenario.begin, end: scenario.begin });
+    expect(generated.warnings).toEqual([]);
+    expect(next.warnings).toEqual([]);
+  });
 });
