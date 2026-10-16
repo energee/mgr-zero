@@ -62,4 +62,28 @@ describe("scripts/claude-guard.sh", () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("migrations.lock.json");
   });
+
+  it.each([
+    'git commit -m "chore: bump vitest to 3"',
+    "git commit -m 'fix tsconfig paths'",
+    "git commit -F - <<'EOF'\nfix: x\n\nProof: bun run test && bunx tsc --noEmit (exit 0)\nEOF",
+  ])("allows a commit whose message names a check: %s", (command) => {
+    expect(runGuard(command, tree()).status).toBe(0);
+  });
+
+  it("blocks a git -C commit chained to a test run", () => {
+    const result = runGuard("bun run test && git -C /x commit -m y", tree());
+    expect(result.status).toBe(2);
+  });
+
+  it("checks the lock in the git -C tree, not the hook's cwd", () => {
+    const bad = tree("not json");
+    expect(runGuard(`git -C ${bad} commit -m y`, tree()).status).toBe(2);
+    expect(runGuard(`git -C ${tree()} push`, bad).status).toBe(0);
+  });
+
+  it("checks the lock in the cd tree, not the hook's cwd", () => {
+    const bad = tree("not json");
+    expect(runGuard(`cd ${bad} && git commit -m y`, tree()).status).toBe(2);
+  });
 });
