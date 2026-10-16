@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
@@ -37,7 +37,8 @@ export function localExpectation(root = process.cwd()) {
 }
 
 export function localEnvironment(root = process.cwd()) {
-  return resolveTestEnv({}, readFileSync(join(root, ".env.test.local"), "utf8"));
+  const file = join(root, ".env.test.local");
+  return resolveTestEnv({}, existsSync(file) ? readFileSync(file, "utf8") : undefined);
 }
 
 /** @param {Record<string, string>} env @param {string} query */

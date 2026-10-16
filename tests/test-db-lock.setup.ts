@@ -31,10 +31,11 @@ export default async function holdTestDbLock(project: TestProject) {
       once(holder, "error").then(([error]) => { throw error; }),
     ]);
     const root = fileURLToPath(new URL("../", import.meta.url));
-    // Local automation can inherit CI=true. The pinned local file still wins.
-    const env = existsSync(`${root}.env.test.local`) ? localEnvironment(root) : project.config.env;
-    // The dedicated CI pure-test job deliberately has no database.
-    if (env.CI === "true" && !env.DATABASE_URL) return release;
+    // CI=true can be inherited locally; only the actual GitHub runner may
+    // intentionally omit the pinned local file (including its pure-test job).
+    const freshCI = process.env.GITHUB_ACTIONS === "true" && !existsSync(`${root}.env.test.local`);
+    const env = freshCI ? project.config.env : localEnvironment(root);
+    if (freshCI && !env.DATABASE_URL) return release;
     const expected = localExpectation(root);
     const identity = await checkSchema(env, expected);
     const revision = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();

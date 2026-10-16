@@ -1,8 +1,12 @@
 // Gates branch identity diagnostics without querying or resetting a database.
 import { describe, expect, it } from "vitest";
-import { expectedMigration, assertMigration, assertIdentity, stripIdentityTypes } from "../scripts/test-db-schema.mjs";
+import { expectedMigration, assertMigration, assertIdentity, localEnvironment, stripIdentityTypes } from "../scripts/test-db-schema.mjs";
 
 describe("test database schema guard", () => {
+  it("refuses missing local configuration instead of inherited app settings", () => {
+    expect(() => localEnvironment(`missing-test-env-${crypto.randomUUID()}`)).toThrow("Run scripts/test-db.sh before local tests");
+  });
+
   it("chooses the newest migration prefix, not directory order or unrelated files", () => {
     expect(expectedMigration(["20261016125525_new_rpc.sql", "README", "00001_baseline.sql", "20261015120000_old.sql"])).toBe("20261016125525");
     expect(() => expectedMigration([])).toThrow("no local migrations");
