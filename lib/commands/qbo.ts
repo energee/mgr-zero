@@ -59,6 +59,14 @@ defineCommand({
 });
 
 defineCommand({
+  name: "set_qbo_one_way_fee_mapping", description: "Set the QuickBooks item used for one-way keg fee charges",
+  input: z.object({ qboItemId: z.string().trim().min(1) }), roles: ["admin"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_one_way_fee_mapping", {
+    p_brewery: ctx.breweryId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "set_qbo_push_defaults", description: "Set the ACH and card options copied onto future QuickBooks invoices",
   input: z.object({ allowAch: z.boolean(), allowCard: z.boolean() }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_push_defaults", {

@@ -30,14 +30,14 @@ export function QboDisconnectAction({ connectionId }: { connectionId: string }) 
     onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), { refresh: false })} />;
 }
 
-type MappingProps = { kind: "customer" | "item" | "deposit"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
+type MappingProps = { kind: "customer" | "item" | "deposit" | "one_way_fee"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
 export function QboMappingForm(props: MappingProps) {
   return <QboMappingFields key={qboMappingVersion(props.currentId)} {...props} />;
 }
 
 function QboMappingFields({ kind, localId, label, currentId, context = "accounting" }: MappingProps) {
   const [remoteId, setRemoteId] = useState(currentId ?? "");
-  const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping" : "set_qbo_deposit_mapping";
+  const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping" : kind === "deposit" ? "set_qbo_deposit_mapping" : "set_qbo_one_way_fee_mapping";
   const build = () => kind === "customer" ? { customerId: localId, qboCustomerId: remoteId }
     : kind === "item" ? { skuId: localId, qboItemId: remoteId } : { qboItemId: remoteId };
   const form = useCommandForm(name, { build, reset: () => setRemoteId(currentId ?? "") });

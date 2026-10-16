@@ -1,5 +1,6 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
 import type { GatewayModelOption } from "@/lib/chat/models";
+import { toCents } from "@/lib/mgr/money";
 
 export type SettingsViewModel = {
   backHref?: string;
@@ -12,6 +13,8 @@ export type SettingsViewModel = {
   overdueHours: string;
   /** The day compliance reports start counting (YYYY-MM-DD), or "" when unset. */
   booksOpenedOn: string;
+  /** The one-way keg fee in dollars ("10.00"); "0.00" bills none. */
+  oneWayKegFee: string;
   aiModel: string;
   aiModels: GatewayModelOption[];
   deployment: string;
@@ -30,4 +33,13 @@ export type SettingsViewModel = {
 export function booksOpenedChange(before: string, after: string): { booksOpenedOn: string | null } | undefined {
   if (before === after) return undefined;
   return { booksOpenedOn: after || null };
+}
+
+/**
+ * The set_one_way_keg_fee input for a form save, or undefined when the fee did
+ * not change. A cleared field reads as no fee (0 cents).
+ */
+export function oneWayKegFeeChange(beforeCents: number, after: string): { feeCents: number } | undefined {
+  const feeCents = toCents(after) ?? 0;
+  return feeCents === beforeCents ? undefined : { feeCents };
 }

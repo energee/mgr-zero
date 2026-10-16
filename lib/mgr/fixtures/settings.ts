@@ -13,6 +13,7 @@ export const settingsDemo: SettingsViewModel = {
   phone: "(610) 555-0142",
   overdueHours: "24",
   booksOpenedOn: "",
+  oneWayKegFee: "10.00",
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [
     { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", pricing: { input: "0.000003", output: "0.000015" } },

@@ -52,11 +52,11 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id, books_opened_on";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse and the books-opened date",
+  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
@@ -108,6 +108,16 @@ defineCommand({
   input: z.object({ booksOpenedOn: isoDate.nullable() }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_books_opened_on", {
     p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_request_id: execution.requestId,
+  })),
+});
+
+// The flat fee each one-way keg shipped carries instead of a deposit; 0 bills none.
+// Frozen on the order line at ship, so a change reaches only later shipments.
+defineCommand({
+  name: "set_one_way_keg_fee", description: "Set the non-refundable fee, in cents, invoiced for each one-way keg shipped (admin); 0 bills none",
+  input: z.object({ feeCents: z.number().int().min(0) }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_one_way_keg_fee", {
+    p_brewery: ctx.breweryId, p_fee_cents: i.feeCents, p_request_id: execution.requestId,
   })),
 });
 

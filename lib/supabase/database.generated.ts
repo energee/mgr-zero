@@ -554,6 +554,7 @@ export type Database = {
           gravity_unit: string
           id: string
           name: string
+          one_way_keg_fee_cents: number
           pa_license_no: string | null
           portal_fulfillment_location_id: string | null
           settings: Json
@@ -569,6 +570,7 @@ export type Database = {
           gravity_unit?: string
           id?: string
           name: string
+          one_way_keg_fee_cents?: number
           pa_license_no?: string | null
           portal_fulfillment_location_id?: string | null
           settings?: Json
@@ -584,6 +586,7 @@ export type Database = {
           gravity_unit?: string
           id?: string
           name?: string
+          one_way_keg_fee_cents?: number
           pa_license_no?: string | null
           portal_fulfillment_location_id?: string | null
           settings?: Json
@@ -3061,6 +3064,7 @@ export type Database = {
         Row: {
           brewery_id: string
           id: string
+          one_way_fee_cents: number | null
           order_id: string
           qty_ordered: number
           qty_picked: number | null
@@ -3073,6 +3077,7 @@ export type Database = {
         Insert: {
           brewery_id: string
           id?: string
+          one_way_fee_cents?: number | null
           order_id: string
           qty_ordered: number
           qty_picked?: number | null
@@ -3085,6 +3090,7 @@ export type Database = {
         Update: {
           brewery_id?: string
           id?: string
+          one_way_fee_cents?: number | null
           order_id?: string
           qty_ordered?: number
           qty_picked?: number | null
@@ -4738,6 +4744,7 @@ export type Database = {
           id: string
           last_error: string | null
           qbo_deposit_item_id: string | null
+          qbo_one_way_fee_item_id: string | null
           realm_id: string
           realm_label: string | null
           refresh_expires_at: string | null
@@ -4757,6 +4764,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           qbo_deposit_item_id?: string | null
+          qbo_one_way_fee_item_id?: string | null
           realm_id: string
           realm_label?: string | null
           refresh_expires_at?: string | null
@@ -4776,6 +4784,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           qbo_deposit_item_id?: string | null
+          qbo_one_way_fee_item_id?: string | null
           realm_id?: string
           realm_label?: string | null
           refresh_expires_at?: string | null
@@ -10025,6 +10034,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_one_way_keg_fee: {
+        Args: { p_brewery: string; p_fee_cents: number; p_request_id: string }
+        Returns: Json
+      }
       set_personal_notification_destination: {
         Args: {
           p_brewery: string
@@ -10121,6 +10134,10 @@ export type Database = {
           p_request_id: string
           p_sku: string
         }
+        Returns: Json
+      }
+      set_qbo_one_way_fee_mapping: {
+        Args: { p_brewery: string; p_qbo_item_id: string; p_request_id: string }
         Returns: Json
       }
       set_qbo_push_defaults: {
@@ -10628,6 +10645,7 @@ export type Database = {
         | "keg_deposit"
         | "keg_deposit_refund"
         | "adjustment"
+        | "one_way_keg_fee"
       keg_container_source:
         | "owned_fleet"
         | "per_fill_rental"
@@ -10865,6 +10883,7 @@ export const Constants = {
         "keg_deposit",
         "keg_deposit_refund",
         "adjustment",
+        "one_way_keg_fee",
       ],
       keg_container_source: [
         "owned_fleet",

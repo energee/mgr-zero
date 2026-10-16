@@ -29,6 +29,7 @@ const AUTHENTICATED_RPCS = [
   "list_chat_user_links(uuid)",
   "set_brewery_operating_defaults(uuid,integer,uuid)",
   "set_brewery_books_opened_on(uuid,date,uuid)",
+  "set_one_way_keg_fee(uuid,integer,uuid)",
   "set_brewery_ai_model(uuid,text,uuid)",
 
   "begin_csv_import(uuid,text,jsonb,uuid)",
@@ -60,6 +61,7 @@ const AUTHENTICATED_RPCS = [
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
   "set_qbo_deposit_mapping(uuid,text,uuid)",
+  "set_qbo_one_way_fee_mapping(uuid,text,uuid)",
   "set_qbo_push_defaults(uuid,boolean,boolean,uuid)",
   "write_off_invoice(uuid,uuid,text,uuid)",
   "start_qbo_push(uuid,uuid,text,uuid)",

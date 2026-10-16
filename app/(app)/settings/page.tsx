@@ -7,6 +7,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
 import { plural } from "@/lib/mgr/plural";
+import { dollarsInput } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
         booksOpenedOn: row.books_opened_on ?? "",
+        oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
         aiModels,
         deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,

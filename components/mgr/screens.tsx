@@ -1324,7 +1324,7 @@ export const SCREENS: Screen[] = [
     to: { "Save mapping": "Accounting" },
     job: "Resolve an ambiguous QuickBooks customer or item without guessing",
     reads: "list_customers · list_skus · get_qbo_connection",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
     spec: "A person verifies and enters the exact QuickBooks record ID. MGR never chooses automatically from a matching name. A company already claimed by another brewery cannot be overridden here.",
     body: <QboMappingView kind="customer" defaultValue="184" companyConflict />,
@@ -1332,15 +1332,16 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict" },
-    job: "Review verified customer, SKU and deposit mappings for the connected company",
+    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
+    job: "Review verified customer, SKU, deposit and one-way keg fee mappings for the connected company",
     reads: "get_qbo_connection · list_customers · list_skus",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
     states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers or SKUs"]],
     body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={[
       { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
       { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
       { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
+      { title: "One-way kegs", rows: [{ id: "one_way_fee", label: "One-way keg fee item", kind: "one_way_fee", detail: "One verified QuickBooks item for the non-refundable one-way keg fee" }] },
     ]} />,
   },
   {

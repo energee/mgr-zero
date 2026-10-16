@@ -394,6 +394,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replenishment_suggestions", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## set_one_way_keg_fee [#set_one_way_keg_fee]
+
+`command` · admin
+
+Set the non-refundable fee, in cents, invoiced for each one-way keg shipped (admin); 0 bills none
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `feeCents` | integer | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_one_way_keg_fee", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "feeCents": 1 } }'
+```
+
 ## set_taproom_par [#set_taproom_par]
 
 `command` · admin, sales

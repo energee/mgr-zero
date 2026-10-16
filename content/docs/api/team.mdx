@@ -179,7 +179,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse and the books-opened date
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee
 
 Takes no input.
 
@@ -785,6 +785,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "qboItemId": "string" } }'
+```
+
+## set_qbo_one_way_fee_mapping [#set_qbo_one_way_fee_mapping]
+
+`command` · admin
+
+Set the QuickBooks item used for one-way keg fee charges
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_one_way_fee_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qboItemId": "string" } }'
 ```
 
 ## set_qbo_push_defaults [#set_qbo_push_defaults]
