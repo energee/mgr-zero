@@ -270,7 +270,7 @@ export function ScreenExplorer() {
                    with it, so the scrolling is an inner box and this one holds
                    still. Keyed by screen: a drawing never inherits another's
                    filtered rows or added lines. */
-                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-hidden rounded-lg border outline-none [transform:translateZ(0)]">
+                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-clip rounded-lg border outline-none [transform:translateZ(0)]">
                   <style>{boxCss}</style>
                   <div className="h-full overflow-auto">
                     {s.surface === "sheet" ? (

@@ -203,6 +203,8 @@ try {
         return {
           contained: box.contains(composer),
           coarse: matchMedia('(pointer: coarse)').matches,
+          frameScroll: box.scrollTop,
+          frameBottom: box.getBoundingClientRect().bottom,
           pageBottom: page.getBoundingClientRect().bottom,
           composerTop: composer.getBoundingClientRect().top,
           rect: r.toJSON(),
@@ -211,6 +213,8 @@ try {
       })()`).result;
       assert.equal(embedded.coarse, coarse);
       assert.equal(embedded.contained, true, `${screen}: composer belongs to explorer container`);
+      assert.equal(embedded.frameScroll, 0, `${screen}: fixed explorer frame must not scroll with its page`);
+      assert.ok(embedded.frameBottom - embedded.composerTop <= 46, `${screen}: minimized composer remains a handle`);
       assert.ok(embedded.pageBottom <= embedded.composerTop + 1, `${screen}: embedded page stops above composer`);
       assert.equal(embedded.reachable, true, `${screen}: embedded control center and edges`);
       console.log(JSON.stringify({ explorer: screen, ...embedded }));
