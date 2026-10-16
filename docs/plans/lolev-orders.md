@@ -411,8 +411,8 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
 `lib/import/lolev.ts`, through `runCommand` as the other passes do:
 
 1. **Setup.** `set_books_opened_on` 2026-10-15 (refused if a period before it
-   is filed). The `$30` deposit on Lolev kegs (`update_keg_pool`; the pool
-   exists from the catalog pass). The `$10`
+   is filed). The `$30` deposit on each keg pool (`update_keg_pool`; the
+   pools exist from the catalog pass). The `$10`
    one-way fee. The one-way sixtel format and shell material. The Export
    cells (Wholesale sixtel and case per tier) and the one-way sixtel cells
    (= the returnable sixtel cell, per channel and tier).
@@ -424,7 +424,8 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
    ship-to each, label `Main`, country and state only (no street) unless
    known.
 4. **SKUs.** For each brand × format a line needs: `create_sku` with defaults
-   (Half and Sixtel on Lolev kegs; one-way Sixtel and Case with no pool).
+   (Half and Sixtel on Microstar unless the SKU exists; one-way Sixtel and
+   Case with no pool).
 5. **History.** One `record_historical_order` per block picked up before
    2026-10-15, lines at the grid price for the customer's channel, the
    brand's price group and the format. The 13 pre-2-12-25 tabs are one
@@ -472,9 +473,7 @@ findings:
   grouping ("china" → Odyssey Club, the Sarenes together).
 - **Keg pools differ.** v1 put distribution keg lines on Microstar and the
   internal rule on KegFleet (v1 `scripts/migration/README.md:80`). The user
-  said on 2026-10-15 that returnable kegs are on Lolev kegs and no customer
-  uses Kegfleet today. This plan follows the user. See the open question
-  below.
+  confirmed Microstar on 2026-10-15.
 - **QuickBooks customer push.** v1 sends `Country` with the address
   (`src/integrations/quickbooks/sync-utils.ts:220-227`). v2's customer
   push must send the country and allow no state. Task 1 tests it.
@@ -532,9 +531,6 @@ Sour.
   each week as they do today.
 - **Country list.** Default: the full ISO alpha-2 list, shown by name ("Japan"),
   stored as the code.
-- **Keg pool for history.** Default: Lolev kegs, as the user said. v1 put
-  these same orders' distribution kegs on Microstar. History writes no keg
-  events, so the pool shows only on the SKU. Confirm before import.
 - **Unverified (user, "I think"):** all seven international customers are
   untaxpaid exports. Check against export paperwork before the first live
   export order ships; history is unaffected either way.
