@@ -335,25 +335,27 @@ defineQuery({
 
 defineQuery({
   name: "get_packaging_run",
-  description: "One packaging run with the packages it plans to fill",
+  description: "One packaging run with planned and recorded actual outputs and its committed lot identity and packaging dates",
   input: z.object({ runId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx, i) => {
     const run = (await unwrap(ctx.db.from("packaging_runs").select(RUN_COLUMNS)
       .eq("brewery_id", ctx.breweryId).eq("id", i.runId).maybeSingle())) as RunRow | null;
     if (!run) throw new CommandError("packaging run not found", 404, "not_found");
 
-    const [brands, vessels, rows] = await Promise.all([
+    const [brands, vessels, rows, lot] = await Promise.all([
       brandNames(ctx, [run.brand_id]),
       vesselNames(ctx, [run.occupancy_id]),
       unwrap(ctx.db.from("packaging_run_outputs")
         .select("id, sku_id, qty_planned, qty_actual")
         .eq("brewery_id", ctx.breweryId).eq("run_id", i.runId).order("id")).then((r) => r ?? []),
+      unwrap(ctx.db.rpc("get_packaging_run_lot", { p_brewery: ctx.breweryId, p_run: i.runId })),
     ]);
     const skus = (await unwrap(ctx.db.from("skus").select("id, name")
       .eq("brewery_id", ctx.breweryId).in("id", [...new Set(rows.map((o) => o.sku_id as string))]))) ?? [];
     const skuNames = new Map(skus.map((s) => [s.id as string, s.name as string]));
 
     return {
+      lot,
       run: {
         ...run,
         brand_name: brands.get(run.brand_id) ?? null,

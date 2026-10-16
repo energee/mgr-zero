@@ -117,9 +117,9 @@ export const runClosedHazy: RunClosedViewModel = {
   title: "RUN-0031 · closed",
   records: [{ id: "material-record", created_at: "2026-09-05", corrects_id: null, correction_reason: null, planned: packagingPlan.planned, actuals: [{ material_id: "cans", material_name: "Cans", unit: "each", location_id: "warehouse", location_name: "Warehouse", bin_id: "dry", bin_name: "Dry", lot_id: null, lot_code: null, qty_used: 2832, qty_loss: 6, qty_unused: 12 }] }],
   correction: { plan: packagingPlan, locations: closePackagingRunHazy.closeFields!.locations, bins: closePackagingRunHazy.closeFields!.bins, rows: closePackagingRunHazy.closeFields!.actuals, reason: "" },
-  lot: "L-240905-HZ",
-  output: "118 cases · Warehouse",
-  yield: "97.9% · 0.30 bbl loss",
+  bblDrawn: 40,
+  lot: { id: "lot-hazy", code: "L-260905-HZ", packaged_on: "2026-09-05", best_by: null },
+  outputs: [{ sku_id: "cases", sku_name: "Hazy cases", qty_actual: 118 }],
 };
 
 /** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
