@@ -79,7 +79,7 @@ export function RecipeView({
         <nav aria-label="Recipe versions" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
           <span className="text-muted-foreground">Versions</span>
           {model.versions.map((version) => (
-            <Link key={version.number} href={version.href ?? "#"} aria-current={version.selected ? "page" : undefined} className="underline underline-offset-4 aria-[current=page]:font-semibold">
+            <Link key={version.number} href={version.href ?? "#"} data-to="Recipe" aria-current={version.selected ? "page" : undefined} className="underline underline-offset-4 aria-[current=page]:font-semibold">
               v{version.number}{version.latest ? " (current)" : ""}
             </Link>
           ))}
