@@ -37,7 +37,7 @@ Follow the task's scope. An audit is read-only. A fix covers the affected shared
 owner and its callers; discovering unrelated debt does not authorize a site-wide
 rewrite. Read the installed Next.js guides before changing framework code.
 
-## Required code patterns
+## Controls, entry point, and conversion
 
 **Reuse E first.** Before creating or changing an interface, read
 `components/mgr/e.tsx` and reuse its controls inside the shared view: `E.pick`
@@ -53,7 +53,8 @@ belong only inside the shared quantity implementation
 (`components/mgr/qty.tsx`), where native spinners are hidden. The Slack venue
 replica has a documented native-select exception; it is not a pattern for MGR
 interfaces. Do not suppress the rule for new forms. Shared E controls
-complement the shared-view requirement below; they do not replace it.
+complement the shared-view requirement in "Required code patterns" below;
+they do not replace it.
 
 `components/mgr/screens.tsx` and the pages that render it are the entry point
 for interface work. Schema, migrations, RPCs, and database-backed tests are
@@ -61,7 +62,7 @@ normal work; run them on the throwaway `mgr_test` stack (`scripts/test-db.sh`;
 parallel sessions share it under a lock). A screen marked `SCHEMA-GATE` in its
 `writes` waits on a named product or schema decision: say what is missing and
 leave it gated; do not decide it inline. A screen-only change is proved by the
-command in `AGENTS.md` "Screens"; a change touching schema, RPCs, or commands
+command in `AGENTS.md` "Current focus: screens"; a change touching schema, RPCs, or commands
 runs the full `AGENTS.md` operating-loop step 4 proof.
 
 Converting an inventory screen to a live one must not:
@@ -73,6 +74,8 @@ Converting an inventory screen to a live one must not:
   state) or suppress `question` / `footer={null}` slots.
 - Ship a customer-visible field or verb without updating
   `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
+
+## Required code patterns
 
 1. Both paths mount the same exported presentation component. Resolve the
    symbol through aliases, barrel exports, and intermediate components: an

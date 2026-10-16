@@ -51,7 +51,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   `tests/data-api-boundary.test.ts` / `tests/rls-command-boundary.test.ts`.
 - Integration credentials never sit in a public table:
   `private.integration_tokens`, behind `lib/supabase/integration-tokens.ts`
-  (iron rule 4). Connection delete or identity change purges the token row.
+  (iron rule 4). That boundary is server-only (`import "server-only"`) and
+  admits Admin or Sales for token access; a few operations are Admin-only.
+  Connection delete or identity change purges the token row.
 - `import_csv` (`begin_csv_import` plus per-row `import_csv_row`) and
   `invite_staff` / `invite_customer_user` (the durable invitation workflow)
   are live; see the CSV and Auth invitation sections of

@@ -88,10 +88,10 @@ Each one has cost a revert or a rework here before.
     with `docker ps` or the URL. (A test-stack database was backed up instead
     of dev.)
 
-## Screens
+## Current focus: screens
 
-Screen, form, dialog, and entry-flow work (and parity audits) follows
-`.agents/skills/screen-parity/SKILL.md`: shared views, `E` controls first,
+Screens are the current focus. Screen, form, dialog, and entry-flow work
+(and parity audits) follows `.agents/skills/screen-parity/SKILL.md`: shared views, `E` controls first,
 `SCHEMA-GATE`, and the conversion rules. Lint rejects native `<select>` and
 number inputs in product screens. A screen-only change (no schema, RPC, or
 command touched) is proved by `bunx tsc --noEmit && bun run lint`, a look at
