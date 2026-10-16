@@ -34,6 +34,7 @@ directives. Keep the generator's block-comment markers. The existing
 `Card` icon prop may use only `<DocIcon name="literal" />`.
 `tests/mdx-safety.test.ts` parses every docs page without evaluating it,
 before either agent writes a publication patch and before the production build.
+Keep docs as regular files and directories, never symlinks to other content.
 
 ## When to run
 

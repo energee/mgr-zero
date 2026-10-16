@@ -113,6 +113,7 @@ name); this is the only expression-valued prop allowed. Do not add include
 elements or directives. `tests/mdx-safety.test.ts` parses every docs page
 without evaluating it, before the workflow writes a publication patch and
 before `bun run build` starts Next.js.
+Keep docs as regular files and directories, never symlinks to other content.
 
 Never expose source paths, command/query names, database terminology, access
 policy terminology, development phases, future plans, or implementation gates.

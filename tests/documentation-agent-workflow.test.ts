@@ -162,6 +162,23 @@ describe("documentation agent workflow", () => {
     );
   });
 
+  it("rejects an allowlisted guide symlink to outside content before patch creation", () => {
+    checkPublication(
+      repo => {
+        const sentinel = join(repo, "..", "outside.mdx");
+        writeFileSync(sentinel, "MGR_MDX_SYNTHETIC_OUTSIDE_CONTENT");
+        rmSync(join(repo, guides[1]));
+        symlinkSync(sentinel, join(repo, guides[1]));
+      },
+      ({ repo, validated, published }) => {
+        expect(validated.status).not.toBe(0);
+        expect(validated.stderr).toContain("Docs symlinks are not allowed");
+        expect(published).toBeUndefined();
+        expect(existsSync(join(repo, "customer-guide.patch"))).toBe(false);
+      },
+    );
+  });
+
   it.each([
     ["safe prose", '<Card title="Orders"><Callout type="info">Read on.</Callout></Card>\n\n<Screen name="Orders" />', true],
     ["expression", "{process.env.X}", false],

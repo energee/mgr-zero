@@ -1,5 +1,5 @@
 // Parse only: never compile, run, import app code, or enable file-inclusion plugins.
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { createProcessor } from "@mdx-js/mdx";
@@ -36,7 +36,7 @@ function assertSafeMdx(source: string) {
         if (attribute.type !== "mdxJsxAttribute") {
           throw new Error("MDX spread attributes are not allowed");
         }
-        if (attribute.value !== null && typeof attribute.value !== "string") {
+        if (typeof attribute.value === "object" && attribute.value !== null) {
           // The chooser's existing icon prop is the sole expression exception.
           // Parse it as MDX too: exactly one empty DocIcon with one literal name.
           const icon = processor.parse(attribute.value.value).children;
@@ -62,10 +62,19 @@ function assertSafeMdx(source: string) {
 const root = resolve(__dirname, "..");
 const docs = resolve(root, "content/docs");
 function mdxFiles(directory: string): string[] {
+  // Check the parent too: content/ itself must not redirect the docs root.
+  for (const path of [resolve(directory, ".."), directory]) {
+    if (!lstatSync(path).isDirectory()) {
+      throw new Error(`Docs content must be a regular directory: ${path}`);
+    }
+  }
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name);
+    if (entry.isSymbolicLink()) throw new Error(`Docs symlinks are not allowed: ${path}`);
     if (entry.isDirectory()) return mdxFiles(path);
-    return entry.name.endsWith(".mdx") ? [path] : [];
+    if (!entry.name.endsWith(".mdx")) return [];
+    if (!entry.isFile()) throw new Error(`Docs MDX must be a regular file: ${path}`);
+    return [path];
   }).sort();
 }
 
@@ -120,10 +129,34 @@ describe("non-evaluating MDX publication boundary", () => {
     }
   });
 
+  it.each(["file", "directory", "content root", "content parent"])("rejects an outside-content %s symlink before reading it", kind => {
+    const outside = mkdtempSync(join(tmpdir(), "mgr-mdx-symlink-"));
+    const content = join(outside, "docs");
+    const sentinel = join(outside, "outside.mdx");
+    mkdirSync(content);
+    writeFileSync(sentinel, "MGR_MDX_SYNTHETIC_OUTSIDE_CONTENT");
+    try {
+      if (kind === "content root") {
+        const link = join(outside, "linked-docs");
+        symlinkSync(content, link, "dir");
+        expect(() => mdxFiles(link)).toThrow("Docs content must be a regular directory");
+      } else if (kind === "content parent") {
+        const link = join(outside, "linked-parent");
+        symlinkSync(outside, link, "dir");
+        expect(() => mdxFiles(join(link, "docs"))).toThrow("Docs content must be a regular directory");
+      } else {
+        symlinkSync(kind === "file" ? sentinel : outside, join(content, kind === "file" ? "guide.mdx" : "nested"));
+        expect(() => mdxFiles(content)).toThrow("Docs symlinks are not allowed");
+      }
+    } finally {
+      rmSync(outside, { recursive: true });
+    }
+  });
+
   it("accepts approved literal components, icon props, comments and inert code examples", () => {
     expect(() => assertSafeMdx(`
 <Cards>
-  <Card title="Orders" href="/docs/staff-guide" icon={<DocIcon name="staff" />}>
+  <Card title="Orders" href="/docs/staff-guide" external icon={<DocIcon name="staff" />}>
     <Callout type="info">Read the guide.</Callout>
   </Card>
 </Cards>
