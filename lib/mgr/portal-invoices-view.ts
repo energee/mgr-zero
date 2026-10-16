@@ -57,13 +57,13 @@ export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvo
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);
-      const unpaid = !credit && state === "unpaid" && !invoiceIsSettledWithoutPayment(inv);
       const total = invoiceCurrentTotalCents(inv, inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0));
       const status: PortalInvoiceViewModel["status"] = credit ? "Credit"
         : invoiceIsSettledWithoutPayment(inv) ? "Settled"
         : state === "written_off" ? "Written off"
         : state === "voided" ? "Voided" : state === "deleted" ? "Deleted"
         : state === "paid" ? "Paid" : "Unpaid";
+      const unpaid = status === "Unpaid";
       return {
         key: inv.id,
         title: docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),
