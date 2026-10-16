@@ -5,9 +5,12 @@ import { join, relative, resolve } from "node:path";
 import { createProcessor } from "@mdx-js/mdx";
 import type { Nodes } from "mdast";
 import { frontmatter } from "fumadocs-core/content/md/frontmatter";
+import { remarkGfm } from "fumadocs-core/mdx-plugins/remark-gfm";
 import { describe, expect, it } from "vitest";
 
-const processor = createProcessor();
+// Parse with the GFM syntax the Fumadocs build always applies; without it a
+// footnote definition hides a live expression as an inert `definition`.
+const processor = createProcessor({ remarkPlugins: [remarkGfm] });
 // Explicit JSX only. Markdown headings, links, tables and fenced examples remain prose.
 // Keep this deliberately narrower than Fumadocs' complete component registry.
 const components: Record<string, true> = {
@@ -17,6 +20,7 @@ const markdown: Record<string, true> = {
   root: true, paragraph: true, text: true, heading: true, thematicBreak: true, blockquote: true,
   list: true, listItem: true, break: true, emphasis: true, strong: true, link: true, image: true,
   linkReference: true, imageReference: true, definition: true, inlineCode: true, code: true,
+  table: true, tableRow: true, tableCell: true, delete: true, footnoteReference: true, footnoteDefinition: true,
 };
 
 function assertSafeMdx(source: string) {
@@ -116,6 +120,9 @@ describe("non-evaluating MDX publication boundary", () => {
     '<Card.Other />',
     '<>fragment</>',
     '<Cards><Card>Nested {process.env.X}</Card></Cards>',
+    "Note[^1]\n\n[^1]: {globalThis.X=process.env.HOME}",
+    "Note[^1]\n\n[^1]: <Unknown />",
+    "| a |\n| - |\n| {process.env.X} |",
   ])("rejects active or unapproved source: %s", source => {
     expect(() => assertSafeMdx(source)).toThrow();
   });
