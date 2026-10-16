@@ -41,6 +41,22 @@ export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
   };
 }
 
+/** A ship-to row as get_customer returns it. */
+export type ShipToRecord = {
+  label: string; country: string; address1: string | null; address2: string | null;
+  city: string | null; state: string | null; zip: string | null; is_default: boolean;
+};
+
+/** The ship-to form's starting fields. Editing keeps the ship-to's own
+ *  values; a new ship-to is blank and starts in the customer's country, so a
+ *  ship-to for a Japanese customer does not default to the United States. */
+export function shipToFormFields(shipTo: ShipToRecord | undefined, customerCountry: string) {
+  return {
+    label: shipTo?.label ?? "", country: shipTo?.country ?? customerCountry, address1: shipTo?.address1 ?? "", address2: shipTo?.address2 ?? "",
+    city: shipTo?.city ?? "", state: shipTo?.state ?? "", zip: shipTo?.zip ?? "", isDefault: shipTo?.is_default ?? false,
+  };
+}
+
 /** A ship-to as one line: street, then the city, state and zip, then the
  *  country outside the US. Missing parts drop out, so a foreign ship-to with
  *  no address reads as its country. Screens that show only the place (order,

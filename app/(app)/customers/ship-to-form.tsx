@@ -4,19 +4,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { ShipToView } from "@/components/mgr/views/ship-to";
-import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
+import { shipToFormFields, toShipToViewProps, type ShipToRecord } from "@/lib/mgr/ship-to-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-export type ShipToEditData = {
-  id: string; label: string; country: string; address1: string | null; address2: string | null;
-  city: string | null; state: string | null; zip: string | null; is_default: boolean;
-};
+export type ShipToEditData = ShipToRecord & { id: string };
 
-export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?: ShipToEditData }) {
-  const initial = {
-    label: shipTo?.label ?? "", country: shipTo?.country ?? "US", address1: shipTo?.address1 ?? "", address2: shipTo?.address2 ?? "",
-    city: shipTo?.city ?? "", state: shipTo?.state ?? "", zip: shipTo?.zip ?? "", isDefault: shipTo?.is_default ?? false,
-  };
+/** customerCountry seeds a new ship-to's country; an edit keeps its own. */
+export function ShipToForm({ customerId, customerCountry, shipTo }: { customerId: string; customerCountry: string; shipTo?: ShipToEditData }) {
+  const initial = shipToFormFields(shipTo, customerCountry);
   const [fields, setFields] = useState(initial);
   const set = <K extends keyof typeof initial>(key: K) => (value: typeof initial[K]) => setFields(prev => ({ ...prev, [key]: value }));
   const form = useCommandForm("upsert_ship_to", {

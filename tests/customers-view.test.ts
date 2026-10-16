@@ -12,7 +12,7 @@ import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixture
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { toCustomerViewProps } from "../lib/mgr/customer-view";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
-import { shipToAddress, toShipToViewProps } from "../lib/mgr/ship-to-view";
+import { shipToAddress, shipToFormFields, toShipToViewProps } from "../lib/mgr/ship-to-view";
 
 const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -192,6 +192,13 @@ describe("country and alias", () => {
     expect(markup).toContain(">Japan<");
     expect(markup).not.toContain(">State<");
   });
+});
+
+it("a new ship-to starts in the customer's country; an edited one keeps its own", () => {
+  expect(shipToFormFields(undefined, "JP")).toEqual({ label: "", country: "JP", address1: "", address2: "", city: "", state: "", zip: "", isDefault: false });
+  expect(shipToFormFields(undefined, "US").country).toBe("US");
+  const edited = { label: "Dock", country: "US", address1: "1 Main St", address2: null, city: "Phila", state: "PA", zip: "19107", is_default: true };
+  expect(shipToFormFields(edited, "JP")).toEqual({ label: "Dock", country: "US", address1: "1 Main St", address2: "", city: "Phila", state: "PA", zip: "19107", isDefault: true });
 });
 
 it("a ship-to reads as one address line; missing parts drop out and a foreign one names its country", () => {
