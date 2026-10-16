@@ -58,7 +58,7 @@ async function waitForLock(observer: Client, pid: number) {
 // The fourth argument acknowledges the exact barrels the completion writes off from open tanks.
 const completionSql = "select public.complete_batch($1,$2,$3,$4) result";
 
-describe.sequential("cellar workflow serialization", () => {
+describe("cellar workflow serialization", { concurrent: false }, () => {
   it("locks the observed occupancy through a first reading while completed retries bypass closure", async () => {
     const f = await brew(1);
     const requestId = crypto.randomUUID();

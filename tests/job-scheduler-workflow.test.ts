@@ -2,10 +2,9 @@
 // Vercel Hobby cron runs at most daily, so GitHub Actions POSTs the existing
 // bearer-authenticated routes: order email every 5 minutes, retention daily.
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
+import { parse as load } from "yaml";
 
-const { load } = createRequire(import.meta.url)("js-yaml") as { load: (source: string) => unknown };
 type Step = { run?: string; env?: Record<string, string> };
 type Job = { if?: string; steps: Step[] };
 type Workflow = { on: { schedule: { cron: string }[]; workflow_dispatch?: unknown }; permissions: unknown; jobs: Record<string, Job> };

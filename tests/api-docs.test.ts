@@ -41,6 +41,22 @@ describe("HTTP API reference", () => {
     expect(isNullable(z.string().catch("fallback"))).toBe(true);
   });
 
+  it("generates validator-accepted numeric examples from lower and upper bounds", () => {
+    const schema = z.object({
+      tempF: z.number().min(25).max(212),
+      negative: z.number().max(-5),
+      integer: z.number().int().min(4.2).max(7),
+      exclusive: z.number().gt(25).max(26),
+      repeated: z.number().min(20).min(30).max(40),
+    });
+    expect(schema.safeParse(sampleInput(schema)).success).toBe(true);
+  });
+
+  it("refuses numeric examples with contradictory bounds", () => {
+    expect(() => sampleInput(z.object({ value: z.number().min(30).max(25) })))
+      .toThrow("api-schema: no sample number satisfies this field's checks");
+  });
+
   it("renders taproom descriptions with literal braces in MDX", async () => {
     const source = renderArea("taproom");
     expect(source).toContain("keg is &#123;skuId&#125;");

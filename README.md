@@ -27,6 +27,15 @@ Requires Node.js 24.x and Bun 1.3.x. The repository pins Node in `.node-version`
 and `package.json`, and Bun in `.bun-version` / `packageManager`; use Bun for
 installs and scripts, and Node 24 as the Next.js runtime.
 
+`bunx tsc --noEmit` uses TypeScript 7 through the `@typescript/native` alias.
+ESLint, Next.js tooling, and screen-composition tests still need the TypeScript
+6 compiler API, supplied by Microsoft's `@typescript/typescript6` compatibility
+package under the `typescript` name. It uses the official npm tarball because
+Bun 1.3.10 resolves the nested npm alias back to the compatibility package
+when the compatibility package itself is installed through an npm alias.
+See [Microsoft's side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0).
+Node type definitions stay on the latest 24.x release to match the runtime.
+
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
 developer and in CI — they were chosen to avoid colliding with a
@@ -94,6 +103,12 @@ bun tests-e2e/mobile-command-surface.ts # fixture-only overlay regression; no se
 ```
 
 Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` cover staged import rows and staff/buyer invitations. The docs path check recognizes tracked repository roots, not generated build directories, so it does not require a dev-server run after a production build.
+
+When upgrading Zod, run `bun run docs:api` and the API-reference tests: numeric
+examples derive bounds from core check definitions and must pass their schemas.
+Slack OAuth tests intercept the Chat SDK adapter's own Web API client, not a
+separately installed version, while exercising real credential persistence and
+database locking.
 
 Tests run against a real local Supabase stack (not a mock), but **their own
 throwaway one**: `bash scripts/test-db.sh` starts a second stack (project
