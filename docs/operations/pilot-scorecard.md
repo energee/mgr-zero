@@ -1,7 +1,7 @@
 <!-- Manual business-success scorecard for the pilot (#729): defined before launch, filled during the pilot. -->
 # Pilot scorecard
 
-Status: **draft, awaiting owner values**. Owner: Ted. Tracks
+Status: **evaluation period agreed 2026-10-16; other values awaiting owner**. Owner: Ted. Tracks
 [#729](https://github.com/energee/mgr-zero/issues/729); evidence belongs to the
 release index [#311](https://github.com/energee/mgr-zero/issues/311).
 
@@ -11,8 +11,7 @@ Technical sign-off lives in [`release-checklist.md`](release-checklist.md).
 Pilot scope (J01 ordering, J02 picked-order adjustment, J06 recovery) is Decision 1 in
 [`release-readiness-2026-09-18.md`](release-readiness-2026-09-18.md).
 
-No scorecard or runbook exists in this repository.
-If one exists outside it, link it here and cut the duplicate parts.
+No scorecard or runbook exists in this repository or outside it (owner, 2026-10-16).
 
 The document has two parts.
 Part A is defined and signed off before any pilot user starts; #311 lists that as a pilot blocker.
@@ -51,8 +50,8 @@ The pilot ends at the first agreed limit reached.
 
 | Rule | Proposal | Agreed value |
 | --- | --- | --- |
-| Calendar period | 4 weeks from the first real order | |
-| Order count | 50 completed orders | |
+| Calendar period | 4 weeks from the first real order | 4 weeks from the first real order (owner, 2026-10-16) |
+| Order count | 50 completed orders | Not used: the calendar period alone ends the pilot |
 
 ### Outcome measures
 
