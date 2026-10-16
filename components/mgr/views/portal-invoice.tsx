@@ -34,7 +34,6 @@ export function PortalInvoiceView({
   const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid, model.payable);
   const questionNav = E.nav("Question this invoice", `sends a note to ${model.breweryName}`);
   const questionSlot = question !== undefined ? question : questionNav;
-  const payFooter = footer !== undefined ? footer : E.btn("Pay invoice", "p");
   return (
     <>
       {E.back("Invoices", model.title, undefined, model.backHref)}
@@ -57,7 +56,7 @@ export function PortalInvoiceView({
       {kind === "pay" ? (
         <>
           {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
-          {payFooter}
+          {footer !== undefined ? footer : E.btn("Pay invoice", "p")}
           {E.info("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
         </>
       ) : null}
