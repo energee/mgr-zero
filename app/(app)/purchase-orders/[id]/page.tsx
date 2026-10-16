@@ -17,7 +17,7 @@ import { ReceiveForm, ReceiptBillAdapter, type PoLine } from "./po-actions";
 
 type Po = {
   id: string; po_no: number; vendor_id: string; status: string; ordered_on: string | null; expected_on: string | null;
-  sent_via: string | null; note: string | null; vendor: { name: string; email: string | null } | null;
+  sent_via: string | null; note: string | null; vendor: { name: string; email: string | null; qbo_vendor_id: string | null; qbo_realm_id: string | null } | null;
   closed_at: string | null; close_reason: string | null;
   lines: PoLine[];
   receipts: ReceiptSnapshot[];
@@ -26,7 +26,6 @@ type Po = {
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type QboHealth = { connected: boolean; realmId?: string; purchaseAccountId: string | null };
-type QboVendor = { id: string; qbo_vendor_id: string | null; qbo_realm_id: string | null };
 
 const VIA: Record<string, string> = { mailto: "from a mail client", external: "outside MGR" };
 
@@ -52,14 +51,10 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   if (receipt) {
     // Warehouse retains receipt access without acquiring admin-only accounting reads or actions.
     const canPost = canRun(ctx, "post_receipt_bill");
-    const [health, vendors]: [QboHealth | null, QboVendor[]] = canPost ? await Promise.all([
-      runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth>,
-      runCommand("list_vendors", {}, ctx) as Promise<QboVendor[]>,
-    ]) : [null, []];
-    const vendor = vendors.find(row => row.id === po.vendor_id);
+    const health = canPost ? await runCommand("get_qbo_connection", {}, ctx) as QboHealth : null;
     const model = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`, {
       canPost, connected: health?.connected ?? false,
-      mappingsReady: Boolean(health?.purchaseAccountId && health.realmId && vendor?.qbo_vendor_id && vendor.qbo_realm_id === health.realmId),
+      mappingsReady: Boolean(health?.purchaseAccountId && health.realmId && po.vendor?.qbo_vendor_id && po.vendor.qbo_realm_id === health.realmId),
       mappingHref: "/settings/accounting/mappings",
     });
     if (!model) notFound();

@@ -41,11 +41,14 @@ new attempt. A pending uncertain request cannot use that option.
 Mapping changes cannot rewrite a reserved request.
 `get_purchase_order` includes each receipt's `qbo_bill_id`, `qbo_bill_request_id`,
 `qbo_bill_status`, `qbo_bill_error`, and canonical `qbo_bill_receipt_id`.
+Its `vendor` carries `qbo_vendor_id` and `qbo_realm_id`, so a caller can check
+the vendor mapping without listing every vendor.
 
 Correcting a receipt after an attempt preserves that payable identity and
 payload. Posted corrections must be adjusted in QuickBooks, not by another Bill
 or vendor credit. Bill payments are QuickBooks-only and are not included in
-`sync_qbo_payments`. Reconnecting another company cannot retarget a pending Bill.
+`sync_qbo_payments`. Reconnecting another company cannot retarget a pending Bill; after a definitive
+rejection, `newAttemptReason: "corrected"` posts to the currently connected company.
 
 {/* ops:purchasing */}
 

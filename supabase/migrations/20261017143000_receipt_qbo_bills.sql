@@ -107,9 +107,13 @@ begin
       if v_replay is null then perform private.complete_command_request(p_request_id,jsonb_build_object('billAttemptId',v_bill.id)); end if;
       return jsonb_build_object('receiptId',v_bill.receipt_id,'status','pushed','remoteId',v_bill.response->>'Id');
     end if;
-    select * into v_conn from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
-    if not found or v_conn.id<>v_bill.connection_id or v_conn.realm_id<>v_bill.realm_id then
-      raise exception 'QuickBooks connection changed; frozen Bill must be reconciled in its original company' using errcode='MG409';
+    -- A pending attempt may have posted, so it stays bound to its company. A
+    -- definitive rejection never posted; its corrected attempt uses the current one.
+    if v_bill.status='pending' then
+      select * into v_conn from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
+      if not found or v_conn.id<>v_bill.connection_id or v_conn.realm_id<>v_bill.realm_id then
+        raise exception 'QuickBooks connection changed; frozen Bill must be reconciled in its original company' using errcode='MG409';
+      end if;
     end if;
     if p_new_attempt_reason='corrected' and v_replay is null then
       if v_bill.status<>'push_failed' then raise exception 'Only a definitive rejected Bill allows a corrected attempt; reconcile the pending Bill' using errcode='MG409'; end if;

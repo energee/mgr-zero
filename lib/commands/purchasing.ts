@@ -269,7 +269,7 @@ defineQuery({
   input: z.object({ poId: z.string().uuid(), correctionReceiptId: z.string().uuid().optional() }), roles: [...PO_ROLES],
   handler: async (ctx, i) => {
     const [po, lines, balances, receipts] = await Promise.all([
-      unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
+      unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email, qbo_vendor_id, qbo_realm_id)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
       unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("brewery_id", ctx.breweryId).eq("po_id", i.poId)),
       unwrap(ctx.db.from("po_open_balances").select("po_line_id, qty_received, qty_open").eq("po_id", i.poId)),
       unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, qbo_bill_id, qbo_bill_request_id, qbo_bill_status, qbo_bill_error, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
@@ -297,7 +297,7 @@ defineQuery({
     const correction = i.correctionReceiptId ? receipts?.find(receipt => receipt.id === i.correctionReceiptId) : null;
     if (i.correctionReceiptId && !correction) throw new CommandError("receipt not found", 404, "not_found");
     return {
-      ...header, vendor: vendors as unknown as { name: string; email: string | null } | null,
+      ...header, vendor: vendors as unknown as { name: string; email: string | null; qbo_vendor_id: string | null; qbo_realm_id: string | null } | null,
       lines: (lines ?? []).map(({ materials, ...l }) => ({
         ...l, qty_ordered: Number(l.qty_ordered), material: materials as unknown as { name: string; purchase_uom: string; purchase_uom_factor: number; base_uom: string; lot_tracked: boolean } | null,
         qty_received: Number(balance.get(l.id as string)?.qty_received ?? 0), qty_open: Number(balance.get(l.id as string)?.qty_open ?? l.qty_ordered),

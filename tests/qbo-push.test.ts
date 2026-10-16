@@ -816,7 +816,10 @@ describe("QuickBooks receipt Bills", () => {
     expect(remote.queries).toEqual([`select * from Bill where DocNumber = '${body.DocNumber}'`]);
     expect(remote.bills.size).toBe(1);
     expect(receiptBillAttempts(f.brewery.id)).toEqual([frozen]);
-    const detail = await runCommand("get_purchase_order", { poId: f.po.id }, f.ctx) as { receipts: Record<string, unknown>[] };
+    const detail = await runCommand("get_purchase_order", { poId: f.po.id }, f.ctx) as {
+      vendor: Record<string, unknown>; receipts: Record<string, unknown>[];
+    };
+    expect(detail.vendor).toMatchObject({ qbo_vendor_id: "vendor-exact-42", qbo_realm_id: f.realm });
     expect(detail.receipts.find(receipt => receipt.id === f.receiptId)).toMatchObject({
       qbo_bill_status: "pushed", qbo_bill_id: "bill-1", qbo_bill_request_id: frozen.providerRequestId,
       qbo_bill_error: null, qbo_bill_receipt_id: f.receiptId,
@@ -1134,6 +1137,28 @@ describe("QuickBooks receipt Bills", () => {
     expect(rejectedFetch).toHaveBeenCalledTimes(1);
     expect(sql(`select status from private.qbo_receipt_bills where brewery_id='${f.brewery.id}' order by created_at,id`))
       .toEqual(["push_failed", "pushed"]);
+  });
+
+  it("allows a corrected attempt in a reconnected company after a definite rejection", async () => {
+    const f = await receiptBillFixture();
+    const rejectedFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ Fault: { Error: [{ Message: "Vendor is inactive" }] } }), { status: 400 }));
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, rejectedFetch)))
+      .rejects.toThrow(/QuickBooks rejected/i);
+    const newConnectionId = crypto.randomUUID();
+    expect((await admin.from("qbo_connections").update({ id: newConnectionId, realm_id: `replacement-${f.realm}` })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+      values('${f.brewery.id}','qbo','${newConnectionId}','new-access','new-refresh')
+      on conflict (brewery_id,provider) do update set connection_id=excluded.connection_id`);
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "new-company-vendor" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "new-company-account" }, f.ctx);
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch), "corrected"))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(JSON.parse(remote.posts[0].body)).toMatchObject({ VendorRef: { value: "new-company-vendor" } });
+    expect(sql(`select realm_id || '|' || status from private.qbo_receipt_bills where brewery_id='${f.brewery.id}' order by created_at,id`))
+      .toEqual([`${f.realm}|push_failed`, `replacement-${f.realm}|pushed`]);
   });
 
   it("refuses a corrected attempt while the original provider outcome is unknown", async () => {
