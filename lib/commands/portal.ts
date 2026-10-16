@@ -200,7 +200,7 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     const [customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
       unwrap(ctx.db.from("portal_customers").select("id, name").eq("id", customerId).single()),
-      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
+      unwrap(ctx.db.from("ship_tos").select("id, label, country, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("portal_keg_deposits").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
       // Only this brewery's explicitly configured warehouse, never an
       // arbitrary/default one. Filter by the configured id rather than leaning

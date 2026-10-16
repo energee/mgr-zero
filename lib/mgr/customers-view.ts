@@ -1,6 +1,6 @@
 // lib/mgr/customers-view.ts — view-model for the Customers list.
 import type { EmptyState } from "./empty-state";
-import { paymentTermLabel } from "./labels";
+import { countryName, nameWithAlias, paymentTermLabel } from "./labels";
 export type CustomersRowView = {
   key: string;
   title: string;
@@ -20,8 +20,12 @@ export type CustomersSnapshot = {
   customers: {
     id: string;
     name: string;
+    /** Staff-only; the title reads "name · alias". */
+    alias?: string | null;
     type: string;
-    state: string;
+    /** ISO code. Only a US customer has a state. */
+    country: string;
+    state: string | null;
     payment_terms: string | null;
     sale_channels: { name: string } | null;
     /** Inventory: portal membership count. Live omits this. */
@@ -32,7 +36,8 @@ export type CustomersSnapshot = {
 };
 
 function detail(c: CustomersSnapshot["customers"][number]): string {
-  const head = `${c.type} · ${c.state}`;
+  // A US customer reads its state; any other its country.
+  const head = `${c.type} · ${c.country === "US" ? c.state : countryName(c.country)}`;
   if (c.portal_user_count != null) return `${head} · ${c.portal_user_count} portal users`;
   if (c.remit) return `${head} · ${c.remit}`;
   const channel = c.sale_channels?.name;
@@ -49,7 +54,7 @@ export function toCustomersViewProps({ customers, missingPortalEmail }: Customer
       : { title: "No customers yet", description: "Add the accounts you sell to so orders have somewhere to go." } : undefined,
     rows: customers.map((c) => ({
       key: c.id,
-      title: c.name,
+      title: nameWithAlias(c),
       detail: detail(c),
       href: `/customers/${c.id}`,
       warning: Boolean(c.remit),

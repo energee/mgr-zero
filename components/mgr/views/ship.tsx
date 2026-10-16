@@ -19,7 +19,7 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   onInvoiceTiming?: (timing: "now" | "on_delivery") => void;
   messages?: ReactNode; submitting?: boolean; disabled?: boolean;
 }) {
-  const timing = invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
+  const timing = model.pickup ? 0 : invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.pick("Fulfillment source", model.fulfillmentSource, ((fulfillmentOptions ?? [model.fulfillmentSource]).map(source => ({ value: source, label: source }))), { disabled: true })}
@@ -34,8 +34,9 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
     {E.edit("Tracking", tracking, "text", undefined, { onChange: onTracking, placeholder: "optional" })}
     <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" value={onInvoiceTiming ? String(timing) : undefined} defaultValue={onInvoiceTiming ? undefined : String(timing)}
       onValueChange={value => { if (value !== "") onInvoiceTiming?.(value === "1" ? "on_delivery" : "now"); }}>
-      <ToggleGroupItem value="0">Invoice now</ToggleGroupItem><ToggleGroupItem value="1">On delivery</ToggleGroupItem>
+      <ToggleGroupItem value="0">Invoice now</ToggleGroupItem>{!model.pickup && <ToggleGroupItem value="1">On delivery</ToggleGroupItem>}
     </ToggleGroup>
+    {model.pickup && E.info("A pickup order is invoiced when it ships.")}
     {E.tape(tape ?? model.tape)}
     {sources}
     {messages}

@@ -1,6 +1,7 @@
 // lib/mgr/portal-account-view.ts — view-model for portal Account.
 // Maps get_portal_account onto PortalAccountView. Empty deposits omit rows.
 import { money } from "./money";
+import { shipToAddress } from "./ship-to-view";
 
 export type PortalAccountShipToView = {
   key: string;
@@ -32,7 +33,7 @@ export type PortalAccountViewModel = {
 /** get_portal_account payload. */
 export type PortalAccountSnapshot = {
   customer: { id: string; name: string };
-  shipTos: { id: string; label: string; city: string; state: string; is_default?: boolean }[];
+  shipTos: { id: string; label: string; country: string; city: string | null; state: string | null; is_default?: boolean }[];
   membership: { userId: string };
   deposits: { kegSize: string | null; kegsOnDeposit: number; depositCents: number }[];
 };
@@ -48,7 +49,7 @@ export function toPortalAccountViewProps({
     shipTos: shipTos.map((s) => ({
       key: s.id,
       title: `${s.label} ship-to${s.is_default ? " · default" : ""}`,
-      detail: `${s.city}, ${s.state}`,
+      detail: shipToAddress(s),
     })),
     membership: { title: "You · buyer", detail: "this login", trailing: "active" },
     deposits: deposits.filter((d) => d.kegsOnDeposit !== 0).map((d) => ({

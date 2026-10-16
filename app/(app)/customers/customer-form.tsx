@@ -14,18 +14,21 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { CUSTOMER_TYPES, PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
 import type { CustomerEditValues } from "@/lib/mgr/customer-view";
-import { PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
+import { COUNTRY_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
 
 /** upsert_customer input from form values, shared by this dialog and the
- *  inline Customer detail form: blanks become undefined, state is uppercased. */
+ *  inline Customer detail form: blanks become undefined, state is uppercased
+ *  and sent for a US customer only (another country has none). */
 export const upsertCustomerInput = (values: CustomerEditValues, id?: string) => ({
   ...(id ? { id } : {}),
   name: values.name,
+  alias: values.alias.trim() ? values.alias : undefined,
   type: values.type as CustomerType,
-  state: values.state.toUpperCase(),
+  country: values.country,
+  state: values.country === "US" ? values.state.toUpperCase() : undefined,
   saleChannelId: values.saleChannelId,
   licenseNumber: values.licenseNumber || undefined,
   paymentTerms: values.paymentTerms as PaymentTerm,
@@ -40,8 +43,10 @@ const defaultChannel = (channels: { id: string; name: string }[]) =>
 export type CustomerEditData = {
   id: string;
   name: string;
+  alias: string | null;
   type: CustomerType;
-  state: string;
+  country: string;
+  state: string | null;
   saleChannelId: string;
   licenseNumber: string | null;
   paymentTerms: string;
@@ -58,17 +63,21 @@ export function CustomerForm({
   const initialChannel = customer?.saleChannelId ?? defaultChannel(channels);
   const isEdit = !!customer;
   const [name, setName] = useState(customer?.name ?? "");
+  const [alias, setAlias] = useState(customer?.alias ?? "");
   const [type, setType] = useState<CustomerType>(customer?.type ?? "retailer");
+  const [country, setCountry] = useState(customer?.country ?? "US");
   const [state, setState] = useState(customer?.state ?? "");
   const [saleChannelId, setSaleChannelId] = useState(initialChannel);
   const [licenseNumber, setLicenseNumber] = useState(customer?.licenseNumber ?? "");
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "net30");
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const form = useCommandForm("upsert_customer", {
-    build: () => upsertCustomerInput({ name, type, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
+    build: () => upsertCustomerInput({ name, alias, type, country, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
     reset: () => {
       setName(customer?.name ?? "");
+      setAlias(customer?.alias ?? "");
       setType(customer?.type ?? "retailer");
+      setCountry(customer?.country ?? "US");
       setState(customer?.state ?? "");
       setSaleChannelId(initialChannel);
       setLicenseNumber(customer?.licenseNumber ?? "");
@@ -86,6 +95,7 @@ export function CustomerForm({
             <Label htmlFor="customer-name">Name</Label>
             <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
+          {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, placeholder: "Staff only" })}
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-type">Type</Label>
             <Select value={type} onValueChange={(v) => setType(v as CustomerType)}>
@@ -103,7 +113,8 @@ export function CustomerForm({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-2">
+          {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true })}
+          {country === "US" && <div className="flex flex-col gap-2">
             <Label htmlFor="customer-state">State</Label>
             <Input
               id="customer-state"
@@ -113,7 +124,7 @@ export function CustomerForm({
               placeholder="NY"
               required
             />
-          </div>
+          </div>}
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-sale-channel">Sale channel</Label>
             <Select value={saleChannelId} onValueChange={setSaleChannelId} required>

@@ -80,7 +80,7 @@ export type InvoiceSnapshot = {
 
 export function invoiceMappingRows(customer: { name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null,
   lines: { id: string; kind: string; sku_id: string | null; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null }[],
-  realm: string, depositItemId: string | null | undefined, mappingHref: string, depositHref?: string): InvoiceMappingView[] {
+  realm: string, depositItemId: string | null | undefined, mappingHref: string, depositHref?: string, oneWayFeeItemId?: string | null): InvoiceMappingView[] {
   const customerMapped = Boolean(customer?.qbo_customer_id && customer.qbo_realm_id === realm);
   const rows: InvoiceMappingView[] = [{ key: "customer", title: "Customer mapping", detail: customerMapped ? `${customer!.name} · customer ${customer!.qbo_customer_id}` : "QuickBooks customer is missing", tone: customerMapped ? "ok" : "w", href: customer ? mappingHref : undefined, unavailable: !customer }];
   const seen = new Set<string>();
@@ -92,6 +92,8 @@ export function invoiceMappingRows(customer: { name: string; qbo_customer_id: st
     rows.push({ key, title: line.skus?.name ?? line.description, detail: "QuickBooks item is missing", tone: "w", href: line.sku_id ? mappingHref : undefined, unavailable: !line.sku_id });
   }
   if (!depositItemId && lines.some(line => /keg_deposit/.test(line.kind))) rows.push({ key: "deposit", title: "Keg deposit mapping", detail: "QuickBooks deposit item is missing", tone: "w", href: depositHref, unavailable: !depositHref });
+  // The fee item is set beside the deposit item, in Accounting mappings.
+  if (!oneWayFeeItemId && lines.some(line => line.kind === "one_way_keg_fee")) rows.push({ key: "one_way_fee", title: "One-way keg fee mapping", detail: "QuickBooks one-way keg fee item is missing", tone: "w", href: depositHref, unavailable: !depositHref });
   return rows;
 }
 

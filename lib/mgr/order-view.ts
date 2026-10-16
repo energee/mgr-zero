@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { shipToAddress } from "./ship-to-view";
 import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
 import { formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
@@ -24,6 +25,8 @@ export type OrderViewModel = {
   next: string;
   fulfillmentSource?: string;
   shipTo?: string;
+  /** Collected at the brewery: never routed (orders.pickup). */
+  pickup: boolean;
   customerPo?: string;
   requested?: string;
   note?: string;
@@ -53,11 +56,12 @@ export type OrderSnapshot = {
     requested_ship_date: string | null;
     note: string | null;
     needs_restock: boolean;
+    pickup?: boolean;
     /** orders.repick_since: when an adjustment sent a picked order back to confirmed (#811). */
     repick_since?: string | null;
     from_location_id?: string;
     customers: { name: string } | null;
-    ship_tos: { label: string; city: string; state: string } | null;
+    ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   locations?: { id: string; name: string }[];
   lines: {
@@ -139,7 +143,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
-    ? `${order.customers.name}${order.ship_tos ? ` · ${order.ship_tos.city}, ${order.ship_tos.state}` : ""}`
+    ? [order.customers.name, order.ship_tos && shipToAddress(order.ship_tos)].filter(Boolean).join(" · ")
     : "Taproom transfer";
   return {
     backHref,
@@ -151,6 +155,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       ? locations?.find((l) => l.id === order.from_location_id)?.name
       : undefined,
     shipTo: order.ship_tos?.label,
+    pickup: Boolean(order.pickup),
     customerPo: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,

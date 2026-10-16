@@ -7,7 +7,9 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
-export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string; booksOpenedOn: string };
+export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string; booksOpenedOn: string;
+  /** The one-way keg fee in dollars ("10.00"), billed per one-way keg shipped. */
+  oneWayKegFee: string };
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
@@ -50,6 +52,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
     {field("pa", "PA license")}
     {field("phone", "Customer-facing phone", "tel")}
     {field("booksOpenedOn", "Books opened on · optional", "date")}
+    {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01 })}
     <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
       <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
       {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168 })}

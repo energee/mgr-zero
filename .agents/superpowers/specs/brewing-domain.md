@@ -53,6 +53,7 @@ removals = ending. Rules that v1 got wrong at least once:
   removals; if one is shown, label the scope per line rather than dropping real removals.
 - Cross-state wholesale: destination-state registration; OH and WI require the shipping
   brewery to remit excise. Every removal therefore records channel + destination state.
+  An export removal outside the US records its destination country instead of a state.
 
 ## Yeast & water chemistry assumptions
 

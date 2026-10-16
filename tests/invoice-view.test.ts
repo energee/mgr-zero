@@ -26,6 +26,13 @@ describe("Invoice view", () => {
     expect(invoiceMappingRows(customer, [{ ...line, skus: { ...line.skus, qbo_realm_id: "current" } }], "current", null, "/mapping")).toHaveLength(1);
     expect(invoiceMappingRows(null, [], "current", null, "/mapping")[0].unavailable).toBe(true);
   });
+  it("asks for the one-way keg fee item only when a fee line has none", () => {
+    const customer = { name: "Export buyer", qbo_customer_id: "1", qbo_realm_id: "current" };
+    const fee = { id: "fee", kind: "one_way_keg_fee", sku_id: null, description: "One-way keg fee", skus: null };
+    expect(invoiceMappingRows(customer, [fee], "current", null, "/mapping", "/settings/accounting/mappings").map(row => row.title))
+      .toEqual(["Customer mapping", "One-way keg fee mapping"]);
+    expect(invoiceMappingRows(customer, [fee], "current", null, "/mapping", undefined, "fee-item")).toHaveLength(1);
+  });
   it("keeps mappings and questions beside shared QuickBooks status and authorized actions", () => {
     const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail: "Push failed", balanceCents: 12000, healthy: false }, accountingActions: "Retry exact push" }));
     expect(html).toContain("Customer mapping");

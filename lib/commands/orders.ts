@@ -8,6 +8,7 @@ import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
@@ -22,13 +23,15 @@ defineCommand({
     customerId: z.string().uuid().optional(), shipToId: z.string().uuid().optional(),
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid().optional(),
     requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    // A pickup is collected at the brewery: never put on a route, invoiced when it ships.
+    pickup: z.boolean().optional(),
     lines,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_order", {
     p_brewery: ctx.breweryId, p_kind: i.kind, p_customer: i.customerId ?? null, p_ship_to: i.shipToId ?? null,
     p_from_location: i.fromLocationId, p_to_location: i.toLocationId ?? null,
     p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: toLines(i.lines), p_request_id: execution.requestId,
+    p_lines: toLines(i.lines), p_request_id: execution.requestId, p_pickup: i.pickup ?? false,
   })),
 });
 
@@ -39,12 +42,14 @@ defineCommand({
     orderId: z.string().uuid(), shipToId: z.string().uuid().optional(),
     // Omitted preserves the saved date; explicit null clears it via the existing RPC.
     requestedShipDate: z.string().date().nullable().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    // Omitted keeps the saved pickup flag.
+    pickup: z.boolean().optional(),
     lines,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
     p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null,
     p_po: i.poNumber ?? null, p_note: i.note ?? null, p_lines: toLines(i.lines), p_request_id: execution.requestId,
-    p_clear_requested: i.requestedShipDate === null,
+    p_clear_requested: i.requestedShipDate === null, p_pickup: i.pickup ?? null,
   })),
 });
 
@@ -229,6 +234,20 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "record_historical_order", description: "Admin only: record an order picked up before the books opened as shipped, picked up and paid at the given prices; writes no stock, deposits or fees, and its invoice is never sent to QuickBooks",
+  roles: ["admin"],
+  input: z.object({
+    customerId: z.string().uuid(), shipToId: z.string().uuid(), pickedUpOn: isoDate, note: z.string().optional(),
+    lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), unitPriceCents: z.number().int().min(0) })).min(1),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_historical_order", {
+    p_brewery: ctx.breweryId, p_customer: i.customerId, p_ship_to: i.shipToId, p_picked_up_on: i.pickedUpOn,
+    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty, unit_price_cents: l.unitPriceCents })),
+    p_note: i.note ?? null, p_request_id: execution.requestId,
+  })),
+});
+
 // ---- queries ----
 
 defineQuery({
@@ -275,7 +294,7 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, city, state)")
+    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
     if (!order) throw new CommandError("Order not found", 404, "not_found");
     const [ln, events, shipment] = await Promise.all([

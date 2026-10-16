@@ -5,7 +5,7 @@ import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
-import { OrderSkuPicker, OrderQuantity } from "./new-order";
+import { OrderSkuPicker, OrderQuantity, PickupSwitch } from "./new-order";
 import { isCompleteLine } from "@/lib/order-form-rules";
 
 export type EditDraftOrderModel = {
@@ -16,6 +16,7 @@ export type EditDraftOrderModel = {
   shipTos: { id: string; label: string }[];
   requestedShipDate: string;
   poNumber: string;
+  pickup: boolean;
   lines: { skuId: string; qty: string }[];
   skus: { id: string; label: string }[];
   backHref?: string;
@@ -24,6 +25,7 @@ export type DraftOrderChanges = {
   shipToId?: string;
   requestedShipDate: string | null;
   poNumber: string;
+  pickup?: boolean;
   lines: { skuId: string; qty: number }[];
 };
 
@@ -36,6 +38,7 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
   const [shipToId, setShipToId] = useState(model.shipToId);
   const [requestedShipDate, setRequestedShipDate] = useState(model.requestedShipDate);
   const [poNumber, setPoNumber] = useState(model.poNumber);
+  const [pickup, setPickup] = useState(model.pickup);
   const [lines, setLines] = useState(model.lines);
   const lineErrors = lines.map((line, index) => {
     if (!model.skus.some(sku => sku.id === line.skuId)) return `Line ${index + 1}: choose an available SKU.`;
@@ -51,7 +54,7 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     if (!ready || busy) return;
-    onSave?.({ shipToId: model.kind === "wholesale" ? shipToId : undefined, requestedShipDate: requestedShipDate || null, poNumber, lines: lines.map(line => ({ skuId: line.skuId, qty: Number(line.qty) })) });
+    onSave?.({ shipToId: model.kind === "wholesale" ? shipToId : undefined, requestedShipDate: requestedShipDate || null, poNumber, pickup: model.kind === "wholesale" ? pickup : undefined, lines: lines.map(line => ({ skuId: line.skuId, qty: Number(line.qty) })) });
   }}>
     {E.back("Order", "Edit draft", undefined, model.backHref)}
     {E.fld("Order", model.title)}
@@ -59,6 +62,7 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
     {model.kind === "wholesale" && E.pick("Ship-to", shipToId, model.shipTos.map(option => ({ value: option.id, label: option.label })), { onChange: setShipToId, disabled: busy, required: true })}
     {E.edit("Requested ship", requestedShipDate, "date", undefined, { onChange: setRequestedShipDate, disabled: busy })}
     {E.edit("Customer PO", poNumber, "text", undefined, { onChange: setPoNumber, disabled: busy })}
+    {model.kind === "wholesale" && <PickupSwitch on={pickup} onChange={setPickup} disabled={busy} />}
     {lines.map((line, index) => <div key={index}>
       {E.row(<OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId} options={model.skus} onChange={value => updateLine(index, { skuId: value })} />,
         "", <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={qty => updateLine(index, { qty })} required invalid={Boolean(lineErrors[index])} />)}

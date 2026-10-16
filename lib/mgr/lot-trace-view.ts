@@ -1,6 +1,7 @@
 // lib/mgr/lot-trace-view.ts — view-model for Lot trace.
 import { calendarDay } from "./calendar-day";
 import { sentenceCase } from "./labels";
+import { shipToAddress } from "./ship-to-view";
 import { bblFixed } from "@/lib/volume";
 
 export type LotTraceRowView = { key: string; title: string; detail?: string; trailing?: string };
@@ -60,7 +61,7 @@ export type LotTraceSnapshot = LotTraceSources & {
   on_hand_bbl: number;
   warning: string;
   balances: { sku_id: string; bin_id: string; sku: string; bin: string; location: string; qty: number; bbl: number }[];
-  recipients: { id: string; order_no: number; customers: { id: string; name: string } | null; ship_tos: { label: string; address1: string; city: string; state: string; zip: string } | null; shipments: { id: string; carrier: string | null; tracking: string | null; invoices: { id: string; invoice_no: number }[] }[] }[];
+  recipients: { id: string; order_no: number; customers: { id: string; name: string } | null; ship_tos: { label: string; country: string; address1: string | null; address2?: string | null; city: string | null; state: string | null; zip: string | null } | null; shipments: { id: string; carrier: string | null; tracking: string | null; invoices: { id: string; invoice_no: number }[] }[] }[];
 };
 
 const ownedSku = (brand: string, sku: string) =>
@@ -71,7 +72,7 @@ export function toRecipientViews(recipients: LotTraceSnapshot["recipients"], bac
   return recipients.map(recipient => ({
     id: recipient.id, orderNo: recipient.order_no, orderHref: backHref ? `/orders/${recipient.id}` : undefined,
     customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
-    shipTo: recipient.ship_tos ? `${recipient.ship_tos.label} · ${recipient.ship_tos.address1}, ${recipient.ship_tos.city}, ${recipient.ship_tos.state} ${recipient.ship_tos.zip}` : undefined,
+    shipTo: recipient.ship_tos ? [recipient.ship_tos.label, shipToAddress(recipient.ship_tos)].filter(Boolean).join(" · ") : undefined,
     shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: `${shipment.carrier ?? "Shipment"} ${shipment.tracking ?? ""}`, invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: invoice.invoice_no, href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
   }));
 }

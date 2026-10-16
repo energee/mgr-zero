@@ -48,15 +48,24 @@ Kegs:
   equal to the returnable sixtel on each channel.
 - **Each one-way sixtel shipped carries a $10 fee, never refunded.** The fee
   follows the format, not the channel.
-- Returnable halves and sixtels are on **Lolev kegs** with a **$30 deposit**,
-  both sizes. No customer uses Kegfleet today. A customer that does later gets
-  separate Kegfleet formats (the pool lives on the SKU), created then.
+- Returnable halves and sixtels are primarily on **Microstar** (user,
+  2026-10-15, after first saying Lolev kegs; v1 agrees). A **$30 deposit**,
+  both sizes, every pool. A new returnable SKU goes on Microstar; an existing
+  SKU keeps the pool the packaging pass gave it. The pool lives on the SKU,
+  so a customer on another pool gets its own formats when needed.
 - In history, export sixtels were one-way and domestic sixtels returnable.
 
 Orders:
 - An order has a **pickup** flag. A pickup order is never routed. It still
   names a destination, for TTB.
-- One sheet block (customer × week) is one order.
+- **One order per customer per pickup date** (user, 2026-10-15). Every block a
+  customer picks up that day merges into it, and lines of the same brand and
+  format add up. A block with no pickup date takes its tab's can date.
+- Sarene's tabs from 2-12-25 to 3-11-26 hold East, West and Totals blocks;
+  Totals equals East + West in all 23 such tabs, so Totals is the order and
+  East and West are skipped.
+- Some tabs have no `price tier` column, which shifts the quantity columns
+  left. The export reads each block's columns by header name.
 - `books_opened_on` moves to **2026-10-15**. Orders picked up before it are
   **historical**: an order and an invoice at the grid price, with no stock,
   no finished goods, no TTB month, and never pushed to QuickBooks. Orders on
@@ -78,10 +87,11 @@ map is the import's input (Import, below).
 - **From 2-12-25 (61 tabs):** one block per customer, headed `can date |
   pickup date | <customer> | type | price tier | half | sixtel | case`. The
   `In House` and `Customer TOTALS` blocks are not orders.
-- **Result:** about 261 historical and 34 live orders, 1,521 lines. 118 blocks
-  have no pickup date; they take the tab's can date. One cell reads
-  `Check Invo` (Sixth City, 2-11-26); the import reports it and uses the can
-  date.
+- **Result (dry run, 2026-10-15):** 217 orders, 190 historical and 27 live,
+  1,276 lines, every beer and customer mapped. Units: 989 halves, 1,844
+  returnable sixtels, 1,065 one-way sixtels (all export), 15,858 cases; 422
+  brand × format SKUs. One cell reads `Check Invoice` (Sixth City, 2-11-26);
+  the import reports it and uses the can date.
 
 | Customer | Destination | Channel | History | Live |
 | --- | --- | --- | --- | --- |
@@ -411,8 +421,8 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
 `lib/import/lolev.ts`, through `runCommand` as the other passes do:
 
 1. **Setup.** `set_books_opened_on` 2026-10-15 (refused if a period before it
-   is filed). The `$30` deposit on Lolev kegs (`update_keg_pool`; the pool
-   exists from the catalog pass). The `$10`
+   is filed). The `$30` deposit on each keg pool (`update_keg_pool`; the
+   pools exist from the catalog pass). The `$10`
    one-way fee. The one-way sixtel format and shell material. The Export
    cells (Wholesale sixtel and case per tier) and the one-way sixtel cells
    (= the returnable sixtel cell, per channel and tier).
@@ -424,7 +434,8 @@ A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
    ship-to each, label `Main`, country and state only (no street) unless
    known.
 4. **SKUs.** For each brand × format a line needs: `create_sku` with defaults
-   (Half and Sixtel on Lolev kegs; one-way Sixtel and Case with no pool).
+   (Half and Sixtel on Microstar unless the SKU exists; one-way Sixtel and
+   Case with no pool).
 5. **History.** One `record_historical_order` per block picked up before
    2026-10-15, lines at the grid price for the customer's channel, the
    brand's price group and the format. The 13 pre-2-12-25 tabs are one
@@ -472,9 +483,7 @@ findings:
   grouping ("china" → Odyssey Club, the Sarenes together).
 - **Keg pools differ.** v1 put distribution keg lines on Microstar and the
   internal rule on KegFleet (v1 `scripts/migration/README.md:80`). The user
-  said on 2026-10-15 that returnable kegs are on Lolev kegs and no customer
-  uses Kegfleet today. This plan follows the user. See the open question
-  below.
+  confirmed Microstar on 2026-10-15.
 - **QuickBooks customer push.** v1 sends `Country` with the address
   (`src/integrations/quickbooks/sync-utils.ts:220-227`). v2's customer
   push must send the country and allow no state. Task 1 tests it.
@@ -532,9 +541,6 @@ Sour.
   each week as they do today.
 - **Country list.** Default: the full ISO alpha-2 list, shown by name ("Japan"),
   stored as the code.
-- **Keg pool for history.** Default: Lolev kegs, as the user said. v1 put
-  these same orders' distribution kegs on Microstar. History writes no keg
-  events, so the pool shows only on the SKU. Confirm before import.
 - **Unverified (user, "I think"):** all seven international customers are
   untaxpaid exports. Check against export paperwork before the first live
   export order ships; history is unaffected either way.

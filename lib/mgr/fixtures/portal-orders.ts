@@ -9,7 +9,7 @@ const ORDER_225 = "00000000-0000-4000-8000-000000000225";
 const ORDER_221 = "00000000-0000-4000-8000-000000000221";
 const INVOICE_1037 = "00000000-0000-4000-8000-000000001037";
 
-const ridgelineShipTo = { label: "Main", city: "Phoenixville", state: "PA" } as const;
+const ridgelineShipTo = { label: "Main", country: "US", city: "Phoenixville", state: "PA" } as const;
 
 const line = (
   id: string,

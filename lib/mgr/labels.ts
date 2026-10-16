@@ -2,7 +2,7 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import type { BrandSort, PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
@@ -28,3 +28,14 @@ export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as Pay
 
 /** Catalog's sort tabs, in BRAND_SORTS order (lib/mgr/enums.ts). */
 export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };
+
+/** A record as staff see it: its name, then its staff-only alias when it has one
+ *  ("Appaloosa · Animal #14", "Tavour · Nano Wine 'N Beer"). Brands and customers. */
+export const nameWithAlias = (r: { name: string; alias?: string | null }) => (r.alias ? `${r.name} · ${r.alias}` : r.name);
+
+/** A stored country code as staff read it ("JP" → "Japan"); an unknown code prints as stored. */
+export const countryName = (code: string) => COUNTRY_NAMES[code as CountryCode] ?? code;
+
+/** The country picker's options, by name; the stored value is the code (COUNTRY_CODES). */
+export const COUNTRY_OPTIONS = COUNTRY_CODES.map((value) => ({ value, label: COUNTRY_NAMES[value] }))
+  .sort((a, b) => a.label.localeCompare(b.label, "en"));

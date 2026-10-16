@@ -11,6 +11,8 @@ export type NewOrderViewModel = {
   source: string;
   requestedShip: string;
   po: string;
+  /** Collected at the brewery, so never put on a route. */
+  pickup?: boolean;
   lines: NewOrderLineView[];
   skus?: { id: string; label: string }[];
   kind?: "wholesale" | "taproom_transfer";

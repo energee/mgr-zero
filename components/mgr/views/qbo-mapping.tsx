@@ -9,7 +9,7 @@ export function QboMappingSheetView({ context = "accounting", currentId, open, o
   return <CommandForm open={open ?? localOpen} onOpenChange={onOpenChange ?? setLocalOpen} title={context === "invoice" ? "Fix mapping" : "Mapping conflict"} trigger={<Button variant="outline" size="sm">{currentId ? "Change" : "Map"}</Button>}>{children}</CommandForm>;
 }
 
-export type MappingRow = { id: string; label: string; kind: "customer" | "item" | "deposit"; currentId?: string | null; detail?: string; action?: ReactNode };
+export type MappingRow = { id: string; label: string; kind: "customer" | "item" | "deposit" | "one_way_fee"; currentId?: string | null; detail?: string; action?: ReactNode };
 export function QboMappingsView({ title, backLabel, backHref, context = "accounting", connected = true, company, sections, depositHref }: {
   title: string; backLabel: string; backHref?: string; context?: "accounting" | "invoice"; connected?: boolean; company?: string | null;
   sections: { title?: string; empty?: string; rows: MappingRow[] }[]; depositHref?: string;
@@ -27,7 +27,7 @@ export function QboMappingsView({ title, backLabel, backHref, context = "account
 }
 
 export function QboMappingView({ kind, label, value, defaultValue = "", onChange, onSubmit, busy = false, error, companyConflict = false }: {
-  kind: "customer" | "item" | "deposit"; label?: string; value?: string; defaultValue?: string;
+  kind: "customer" | "item" | "deposit" | "one_way_fee"; label?: string; value?: string; defaultValue?: string;
   onChange?: (value: string) => void; onSubmit?: FormEventHandler<HTMLFormElement>;
   busy?: boolean; error?: string | null; companyConflict?: boolean;
 }) {

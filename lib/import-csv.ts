@@ -1,13 +1,15 @@
 // The CSV map and its preview/command validation use the same field contract.
 import { z } from "zod";
-import { CUSTOMER_TYPES, PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, CUSTOMER_TYPES, PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
 export const IMPORT_ROW_CAP = 5000;
 export const IMPORT_KINDS = ["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"] as const;
 export type ImportKind = typeof IMPORT_KINDS[number];
-type Field = { name: string; required?: boolean; type?: "positive" | "cents" | "number" | "state"; lookup?: string; values?: readonly string[] };
+// usOnly: required only when the row's country is US (the default), as in
+// import_csv_row. A state outside the US is refused (customers_state_by_country).
+type Field = { name: string; required?: boolean; usOnly?: boolean; type?: "positive" | "cents" | "number" | "state" | "country"; lookup?: string; values?: readonly string[] };
 export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
-  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", required: true, type: "state" }, { name: "saleChannelId", required: true, lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }],
-  ship_tos: [{ name: "customerId", required: true, lookup: "customers" }, ...["label", "address1", "city", "zip"].map(name => ({ name, required: true })), { name: "state", required: true, type: "state" }, { name: "address2" }],
+  customers: [{ name: "name", required: true }, { name: "type", required: true, values: CUSTOMER_TYPES }, { name: "state", usOnly: true, type: "state" }, { name: "saleChannelId", required: true, lookup: "channels" }, { name: "licenseNumber" }, { name: "paymentTerms", values: PAYMENT_TERMS }, { name: "country", type: "country" }, { name: "alias" }],
+  ship_tos: [{ name: "customerId", required: true, lookup: "customers" }, { name: "label", required: true }, { name: "address1" }, { name: "city" }, { name: "zip" }, { name: "state", usOnly: true, type: "state" }, { name: "address2" }, { name: "country", type: "country" }],
   products_skus: [{ name: "product", required: true }, { name: "formatId", required: true, lookup: "formats" }, { name: "sku_name" }, { name: "style" }, { name: "abv", type: "number" }, { name: "upc" }],
   channel_prices: [{ name: "saleChannelId", required: true, lookup: "channels" }, { name: "priceGroupId", required: true, lookup: "groups" }, { name: "formatId", required: true, lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
   opening_balances: [{ name: "skuId", required: true, lookup: "skus" }, { name: "locationId", required: true, lookup: "locations" }, { name: "binId", required: true, lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
@@ -58,9 +60,11 @@ export const isImportUuid = (value?: string) =>
 export function validateImportRow(kind: ImportKind, row: Record<string, string>, lookups?: ImportLookups): string[] {
   const errors: string[] = Object.keys(row).filter(key => !IMPORT_FIELDS[kind].some(f => f.name === key)).map(key => `unknown CSV field ${key}`);
   const references: Record<string, ImportLookups[string][number]> = {};
+  const us = (row.country?.trim() || "US") === "US";
   for (const f of IMPORT_FIELDS[kind]) {
     const value = row[f.name]?.trim() ?? "";
-    if (!value) { if (f.required) errors.push(`${f.name} is required`); continue; }
+    if (!value) { if (f.required || (f.usOnly && us)) errors.push(`${f.name} is required`); continue; }
+    if (f.name === "state" && !us) { errors.push("state is for a US address only; leave it blank for another country"); continue; }
     if (f.values && !f.values.includes(value)) errors.push(`${f.name}: choose ${f.values.join(", ")}`);
     // Preview resolves identities only for validation; the RPC receives the original cells.
     if (f.lookup && lookups) {
@@ -76,6 +80,7 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
       else references[f.name] = matches[0];
     }
     if (f.type === "state" && !(US_STATE_CODES as readonly string[]).includes(value)) errors.push(`${f.name} must be a US state code, such as PA`);
+    if (f.type === "country" && !(COUNTRY_CODES as readonly string[]).includes(value)) errors.push(`${f.name} must be a two-letter country code, such as JP`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
       if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
     }

@@ -36,7 +36,8 @@ export type StopDoc = { id: string; label: string; kind: "shipment" | "transfer"
 
 /** A stop with the document it delivers embedded, so its label never depends on a brewery-wide read. */
 type StopRow = DeliveryRow & { shipments: ShipmentRow | null; stock_transfers: TransferRow | null };
-const SHIPMENT_LABEL = "orders(order_no, customers(name), ship_tos(label))";
+// Inner-joined (every shipment has one order) so the unrouted read can filter on orders.pickup.
+const SHIPMENT_LABEL = "orders!inner(order_no, customers(name), ship_tos(label))";
 const TRANSFER_LABEL = "transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)";
 
 const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", label: [docNo("ORD", s.orders?.order_no ?? null, "Order"), s.orders?.customers?.name, s.orders?.ship_tos?.label].filter(Boolean).join(" · ") });
@@ -52,11 +53,12 @@ defineQuery({
     // Read only what the page shows: the listed routes' stops, and the documents on no route (an
     // anti-join on deliveries), each read whole by completeRows however many pages it spans (#473).
     // ponytail: a carrier-shipped order still waits in "unassigned" until someone routes it; a
-    // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen
+    // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen.
+    // A pickup order (orders.pickup) is the customer collecting it, so it never waits here.
     const [routes, shipments, transfers, drivers, today] = await Promise.all([
       rows<RouteRow>(q),
       completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
+        .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
       completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
       unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
@@ -93,7 +95,7 @@ defineQuery({
   input: z.object({ deliveryId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
-      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
+      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, country, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
     const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string } } | null; stock_transfers: { id: string } | null };

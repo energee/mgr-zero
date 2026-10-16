@@ -20,6 +20,8 @@ export type ShipViewModel = {
   fulfillmentSource: string;
   lines: ShipLineView[];
   shortNote?: string;
+  /** A pickup order is invoiced when it ships: ship_order refuses on_delivery for it. */
+  pickup: boolean;
   invoiceTiming: "now" | "on_delivery";
   tape: [string, string][];
 };
@@ -30,6 +32,7 @@ export type ShipSnapshot = {
     id: string;
     order_no: number | null;
     from_location_id: string;
+    pickup?: boolean;
     ship_tos?: { state: string } | null;
   };
   lines: {
@@ -50,7 +53,9 @@ const pickedOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_picked ?? 0)
 const shipOf = (l: ShipSnapshot["lines"][number]) => Number(l.qty_shipped ?? pickedOf(l));
 
 /** Map get_order plus proposed ship qtys (qty_shipped, else qty_picked). */
-export function toShipViewProps({ order, lines, locations, invoiceTiming = "now", backHref }: ShipSnapshot): ShipViewModel {
+export function toShipViewProps({ order, lines, locations, invoiceTiming: asked = "now", backHref }: ShipSnapshot): ShipViewModel {
+  const pickup = Boolean(order.pickup);
+  const invoiceTiming = pickup ? "now" : asked;
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   const dest = order.ship_tos?.state ?? "";
   const anyShort = lines.some((l) => shipOf(l) < pickedOf(l));
@@ -92,6 +97,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming = "now"
     shortNote: short
       ? `Shipping ${shipOf(short)} of ${pickedOf(short)} ${shortNameWord}: the remaining ${pickedOf(short) - shipOf(short)} is cancelled and its allocation released. There is no backorder.`
       : undefined,
+    pickup,
     invoiceTiming,
     tape,
   };

@@ -82,7 +82,7 @@ export const materialLotTraceCitra: MaterialLotTraceSnapshot = {
   used: [{ id: "use40", qty: 4, at: "2026-08-09T12:00:00Z", stage: "boil", batch_id: "batch40", run_id: null }, { id: "use41", qty: 4, at: "2026-08-10T12:00:00Z", stage: "boil", batch_id: "batch41", run_id: null }],
   batches: [{ id: "batch40", batch_no: 40, brewed_on: "2026-08-09", closed_at: null }, { id: "batch41", batch_no: 41, brewed_on: "2026-08-10", closed_at: null }],
   runs: [], lots: [{ id: "finished", code: "L-240831-HZ", packaged_on: "2026-08-31" }],
-  recipients: [{ id: "order1", order_no: 101, customers: { id: "customer1", name: "Fictional Corner Bar" }, ship_tos: { label: "main", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" }, shipments: [{ id: "shipment1", carrier: null, tracking: null, invoices: [{ id: "invoice1", invoice_no: 101 }] }] }],
+  recipients: [{ id: "order1", order_no: 101, customers: { id: "customer1", name: "Fictional Corner Bar" }, ship_tos: { label: "main", country: "US", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" }, shipments: [{ id: "shipment1", carrier: null, tracking: null, invoices: [{ id: "invoice1", invoice_no: 101 }] }] }],
   unlinked_qty: 0,
   warning: "Only recorded material identities and effective consumption are traced. Historical untracked stock cannot be assigned to a lot; recorded blend membership is not a proportional share.",
 };

@@ -171,6 +171,22 @@ describe("Ship view", () => {
     expect(html(createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery) }))).not.toMatch(/shortage reason/);
   });
 
+  it("a pickup order is invoiced now: no On delivery choice, even if one was asked for", () => {
+    const pickup = { ...orderShipOnDelivery, order: { ...orderShipOnDelivery.order, pickup: true } };
+    const model = toShipViewProps(pickup);
+    expect(model.pickup).toBe(true);
+    expect(model.invoiceTiming).toBe("now");
+    expect(model.tape.at(-1)).toEqual(["invoice number", "assigned on commit"]);
+    const markup = html(createElement(ShipView, { model }));
+    expect(markup).toMatch(/Invoice now/);
+    expect(markup).not.toMatch(/On delivery/);
+    expect(markup).toContain("A pickup order is invoiced when it ships.");
+    const delivered = html(createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery) }));
+    expect(toShipViewProps(orderShipOnDelivery).pickup).toBe(false);
+    expect(delivered).toMatch(/On delivery/);
+    expect(delivered).not.toContain("pickup order");
+  });
+
   it("maps all-as-picked onto deferred invoice tape", () => {
     const model = toShipViewProps(orderShipOnDelivery);
     expect(model.invoiceTiming).toBe("on_delivery");

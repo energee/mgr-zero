@@ -27,8 +27,8 @@ const item = (
 export const ridgelineShop: ShopSnapshot = {
   customer: { id: CUSTOMER_RIDGELINE, name: RIDGELINE.name },
   shipTos: [
-    { id: SHIP_MAIN, label: "Main", address1: "", city: "Phoenixville", state: "PA", zip: "" },
-    { id: SHIP_DOCK, label: "Dock", address1: "", city: "Royersford", state: "PA", zip: "" },
+    { id: SHIP_MAIN, label: "Main", country: "US", address1: "", city: "Phoenixville", state: "PA", zip: "" },
+    { id: SHIP_DOCK, label: "Dock", country: "US", address1: "", city: "Royersford", state: "PA", zip: "" },
   ],
   shipToId: SHIP_MAIN,
   requestedDate: "2026-09-09",

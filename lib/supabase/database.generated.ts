@@ -554,6 +554,7 @@ export type Database = {
           gravity_unit: string
           id: string
           name: string
+          one_way_keg_fee_cents: number
           pa_license_no: string | null
           portal_fulfillment_location_id: string | null
           settings: Json
@@ -569,6 +570,7 @@ export type Database = {
           gravity_unit?: string
           id?: string
           name: string
+          one_way_keg_fee_cents?: number
           pa_license_no?: string | null
           portal_fulfillment_location_id?: string | null
           settings?: Json
@@ -584,6 +586,7 @@ export type Database = {
           gravity_unit?: string
           id?: string
           name?: string
+          one_way_keg_fee_cents?: number
           pa_license_no?: string | null
           portal_fulfillment_location_id?: string | null
           settings?: Json
@@ -1127,6 +1130,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          alias: string | null
           bill_address1: string | null
           bill_address2: string | null
           bill_city: string | null
@@ -1134,6 +1138,7 @@ export type Database = {
           bill_zip: string | null
           billing_email: string | null
           brewery_id: string
+          country: string
           created_at: string
           id: string
           license_no: string | null
@@ -1145,11 +1150,12 @@ export type Database = {
           qbo_sync_state: string | null
           qbo_sync_token: string | null
           sale_channel_id: string
-          state: string
+          state: string | null
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
           type: Database["public"]["Enums"]["customer_type"]
         }
         Insert: {
+          alias?: string | null
           bill_address1?: string | null
           bill_address2?: string | null
           bill_city?: string | null
@@ -1157,6 +1163,7 @@ export type Database = {
           bill_zip?: string | null
           billing_email?: string | null
           brewery_id: string
+          country?: string
           created_at?: string
           id?: string
           license_no?: string | null
@@ -1168,11 +1175,12 @@ export type Database = {
           qbo_sync_state?: string | null
           qbo_sync_token?: string | null
           sale_channel_id: string
-          state: string
+          state?: string | null
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
           type?: Database["public"]["Enums"]["customer_type"]
         }
         Update: {
+          alias?: string | null
           bill_address1?: string | null
           bill_address2?: string | null
           bill_city?: string | null
@@ -1180,6 +1188,7 @@ export type Database = {
           bill_zip?: string | null
           billing_email?: string | null
           brewery_id?: string
+          country?: string
           created_at?: string
           id?: string
           license_no?: string | null
@@ -1191,7 +1200,7 @@ export type Database = {
           qbo_sync_state?: string | null
           qbo_sync_token?: string | null
           sale_channel_id?: string
-          state?: string
+          state?: string | null
           tax_treatment?: Database["public"]["Enums"]["tax_treatment"] | null
           type?: Database["public"]["Enums"]["customer_type"]
         }
@@ -1547,6 +1556,7 @@ export type Database = {
           correction_source_id: string | null
           created_at: string
           created_by: string
+          dest_country: string | null
           dest_state: string | null
           id: string
           location_id: string
@@ -1570,6 +1580,7 @@ export type Database = {
           correction_source_id?: string | null
           created_at?: string
           created_by: string
+          dest_country?: string | null
           dest_state?: string | null
           id?: string
           location_id: string
@@ -1593,6 +1604,7 @@ export type Database = {
           correction_source_id?: string | null
           created_at?: string
           created_by?: string
+          dest_country?: string | null
           dest_state?: string | null
           id?: string
           location_id?: string
@@ -3052,6 +3064,7 @@ export type Database = {
         Row: {
           brewery_id: string
           id: string
+          one_way_fee_cents: number | null
           order_id: string
           qty_ordered: number
           qty_picked: number | null
@@ -3064,6 +3077,7 @@ export type Database = {
         Insert: {
           brewery_id: string
           id?: string
+          one_way_fee_cents?: number | null
           order_id: string
           qty_ordered: number
           qty_picked?: number | null
@@ -3076,6 +3090,7 @@ export type Database = {
         Update: {
           brewery_id?: string
           id?: string
+          one_way_fee_cents?: number | null
           order_id?: string
           qty_ordered?: number
           qty_picked?: number | null
@@ -3135,6 +3150,7 @@ export type Database = {
           needs_restock: boolean
           note: string | null
           order_no: number | null
+          pickup: boolean
           po_number: string | null
           repick_since: string | null
           requested_ship_date: string | null
@@ -3155,6 +3171,7 @@ export type Database = {
           needs_restock?: boolean
           note?: string | null
           order_no?: number | null
+          pickup?: boolean
           po_number?: string | null
           repick_since?: string | null
           requested_ship_date?: string | null
@@ -3175,6 +3192,7 @@ export type Database = {
           needs_restock?: boolean
           note?: string | null
           order_no?: number | null
+          pickup?: boolean
           po_number?: string | null
           repick_since?: string | null
           requested_ship_date?: string | null
@@ -4726,6 +4744,7 @@ export type Database = {
           id: string
           last_error: string | null
           qbo_deposit_item_id: string | null
+          qbo_one_way_fee_item_id: string | null
           realm_id: string
           realm_label: string | null
           refresh_expires_at: string | null
@@ -4745,6 +4764,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           qbo_deposit_item_id?: string | null
+          qbo_one_way_fee_item_id?: string | null
           realm_id: string
           realm_label?: string | null
           refresh_expires_at?: string | null
@@ -4764,6 +4784,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           qbo_deposit_item_id?: string | null
+          qbo_one_way_fee_item_id?: string | null
           realm_id?: string
           realm_label?: string | null
           refresh_expires_at?: string | null
@@ -5608,43 +5629,46 @@ export type Database = {
       }
       ship_tos: {
         Row: {
-          address1: string
+          address1: string | null
           address2: string | null
           brewery_id: string
-          city: string
+          city: string | null
+          country: string
           created_at: string
           customer_id: string
           id: string
           is_default: boolean
           label: string
-          state: string
-          zip: string
+          state: string | null
+          zip: string | null
         }
         Insert: {
-          address1: string
+          address1?: string | null
           address2?: string | null
           brewery_id: string
-          city: string
+          city?: string | null
+          country?: string
           created_at?: string
           customer_id: string
           id?: string
           is_default?: boolean
           label: string
-          state: string
-          zip: string
+          state?: string | null
+          zip?: string | null
         }
         Update: {
-          address1?: string
+          address1?: string | null
           address2?: string | null
           brewery_id?: string
-          city?: string
+          city?: string | null
+          country?: string
           created_at?: string
           customer_id?: string
           id?: string
           is_default?: boolean
           label?: string
-          state?: string
-          zip?: string
+          state?: string | null
+          zip?: string | null
         }
         Relationships: [
           {
@@ -8695,6 +8719,7 @@ export type Database = {
           p_kind: Database["public"]["Enums"]["order_kind"]
           p_lines: Json
           p_note: string
+          p_pickup?: boolean
           p_po: string
           p_request_id: string
           p_requested: string
@@ -8777,6 +8802,7 @@ export type Database = {
       customers_missing_portal_email: {
         Args: { p_brewery: string }
         Returns: {
+          alias: string | null
           bill_address1: string | null
           bill_address2: string | null
           bill_city: string | null
@@ -8784,6 +8810,7 @@ export type Database = {
           bill_zip: string | null
           billing_email: string | null
           brewery_id: string
+          country: string
           created_at: string
           id: string
           license_no: string | null
@@ -8795,7 +8822,7 @@ export type Database = {
           qbo_sync_state: string | null
           qbo_sync_token: string | null
           sale_channel_id: string
-          state: string
+          state: string | null
           tax_treatment: Database["public"]["Enums"]["tax_treatment"] | null
           type: Database["public"]["Enums"]["customer_type"]
         }[]
@@ -9612,6 +9639,18 @@ export type Database = {
         }
         Returns: Json
       }
+      record_historical_order: {
+        Args: {
+          p_brewery: string
+          p_customer: string
+          p_lines: Json
+          p_note: string
+          p_picked_up_on: string
+          p_request_id: string
+          p_ship_to: string
+        }
+        Returns: Json
+      }
       record_historical_packaging_run: {
         Args: {
           p_batch: string
@@ -10007,6 +10046,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_one_way_keg_fee: {
+        Args: { p_brewery: string; p_fee_cents: number; p_request_id: string }
+        Returns: Json
+      }
       set_personal_notification_destination: {
         Args: {
           p_brewery: string
@@ -10103,6 +10146,10 @@ export type Database = {
           p_request_id: string
           p_sku: string
         }
+        Returns: Json
+      }
+      set_qbo_one_way_fee_mapping: {
+        Args: { p_brewery: string; p_qbo_item_id: string; p_request_id: string }
         Returns: Json
       }
       set_qbo_push_defaults: {
@@ -10313,6 +10360,7 @@ export type Database = {
           p_lines: Json
           p_note: string
           p_order: string
+          p_pickup?: boolean
           p_po: string
           p_request_id: string
           p_requested: string
@@ -10422,7 +10470,9 @@ export type Database = {
       }
       upsert_customer: {
         Args: {
+          p_alias?: string
           p_brewery: string
+          p_country?: string
           p_id: string
           p_license_no: string
           p_name: string
@@ -10511,6 +10561,7 @@ export type Database = {
           p_address2: string
           p_brewery: string
           p_city: string
+          p_country?: string
           p_customer: string
           p_id: string
           p_is_default?: boolean
@@ -10606,6 +10657,7 @@ export type Database = {
         | "keg_deposit"
         | "keg_deposit_refund"
         | "adjustment"
+        | "one_way_keg_fee"
       keg_container_source:
         | "owned_fleet"
         | "per_fill_rental"
@@ -10676,7 +10728,7 @@ export type Database = {
         | "received"
         | "cancelled"
       qbo_remote_state: "live" | "voided" | "deleted"
-      qbo_sync_status: "pending" | "pushed" | "push_failed"
+      qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"
       staff_role: "admin" | "sales" | "warehouse" | "brewer" | "taproom"
       stock_transfer_status:
         | "draft"
@@ -10843,6 +10895,7 @@ export const Constants = {
         "keg_deposit",
         "keg_deposit_refund",
         "adjustment",
+        "one_way_keg_fee",
       ],
       keg_container_source: [
         "owned_fleet",
@@ -10922,7 +10975,7 @@ export const Constants = {
         "cancelled",
       ],
       qbo_remote_state: ["live", "voided", "deleted"],
-      qbo_sync_status: ["pending", "pushed", "push_failed"],
+      qbo_sync_status: ["pending", "pushed", "push_failed", "not_synced"],
       staff_role: ["admin", "sales", "warehouse", "brewer", "taproom"],
       stock_transfer_status: [
         "draft",

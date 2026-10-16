@@ -2,7 +2,7 @@ import type { Database } from "@/lib/supabase/database";
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
-import { US_STATE_CODES } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
 
@@ -162,6 +162,9 @@ export const cents = z.number().int().nonnegative().max(PG_INT_MAX);
 
 /** A real two-letter US state code (US_STATE_CODES), for customers.state, ship_tos.state and the registry tables. */
 export const stateCode = z.string().refine((s) => (US_STATE_CODES as readonly string[]).includes(s), "a US state code, such as PA");
+
+/** An ISO 3166-1 alpha-2 country code (COUNTRY_CODES), for customers.country and ship_tos.country. */
+export const countryCode = z.string().refine((s) => (COUNTRY_CODES as readonly string[]).includes(s), "a two-letter country code, such as JP");
 
 /** A phone number: 7 to 15 digits once spaces, dots, dashes and parentheses are dropped, with an optional leading +. "" means none. */
 export const phone = z.string().trim().refine(

@@ -7,7 +7,7 @@ export const LOCATIONS = [LOC_WAREHOUSE, LOC_TAPROOM];
 
 export const ALS = {
   name: "Al’s Bar",
-  shipTo: { label: "Main", city: "Columbus", state: "OH" },
+  shipTo: { label: "Main", country: "US", city: "Columbus", state: "OH" },
 } as const;
 
 export const RIDGELINE = {

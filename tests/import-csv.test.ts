@@ -122,3 +122,24 @@ describe("importRowKey", () => {
     expect(key("opening_balances", { skuId: "s" })).not.toBe(key("opening_balances", { skuId: "s" }, 1));
   });
 });
+
+// docs/plans/lolev-orders.md task 2: country and alias are optional CSV columns;
+// state, and a ship-to's street, city and ZIP, are required only for US rows.
+describe("country and alias columns", () => {
+  const channel = crypto.randomUUID();
+  it("a customer row takes country and alias; state is required only for US", () => {
+    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", alias: "china", saleChannelId: channel })).toEqual([]);
+    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", saleChannelId: channel })).toEqual(["state is required"]);
+    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", country: "US", saleChannelId: channel })).toEqual(["state is required"]);
+    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", state: "PA", saleChannelId: channel })).toEqual([]);
+    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "XX", saleChannelId: channel }).join(" ")).toMatch(/country/);
+    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", state: "PA", saleChannelId: channel }).join(" ")).toMatch(/state/);
+  });
+  it("a foreign ship-to row needs only its customer and label", () => {
+    const customerId = crypto.randomUUID();
+    expect(validateImportRow("ship_tos", { customerId, label: "Main", country: "JP" })).toEqual([]);
+    // A US ship-to needs only its state; street, city and ZIP are optional (user, 2026-10-15).
+    expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["state is required"]);
+    expect(validateImportRow("ship_tos", { customerId, label: "Main", state: "OH" })).toEqual([]);
+  });
+});

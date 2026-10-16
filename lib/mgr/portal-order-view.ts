@@ -2,6 +2,7 @@
 // portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { shipToAddress } from "./ship-to-view";
 import { buyerStatus } from "./order-status";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
@@ -45,7 +46,7 @@ export type PortalOrderSnapshot = {
     po_number: string | null;
     requested_ship_date: string | null;
     note: string | null;
-    ship_tos: { label: string; city: string; state: string } | null;
+    ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   lines: {
     id: string;
@@ -91,7 +92,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
     status: buyerStatus(order.status, order.requested_ship_date),
-    shipTo: ship ? `${ship.label} · ${ship.city}, ${ship.state}` : undefined,
+    shipTo: ship ? [ship.label, shipToAddress(ship)].filter(Boolean).join(" · ") : undefined,
     po: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,

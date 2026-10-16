@@ -47,6 +47,8 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   const [invoiceTiming, setInvoiceTiming] = useState<"now" | "on_delivery">("now");
   const [result, setResult] = useState<ShipmentDoneViewModel | null>(null);
   const proposed = { ...snapshot, invoiceTiming, lines: snapshot.lines.map(line => ({ ...line, qty_shipped: Number(qtys[line.id]) })) };
+  // A pickup order ships invoiced now (ship_order refuses on_delivery for it); the model says which.
+  const model = toShipViewProps(proposed);
   const sources = <ShipmentSourcesView lines={snapshot.lines.map(line => ({
     key: line.id, name: line.skus?.name ?? "Line", qty: Number(qtys[line.id]),
     options: available.stock.filter(stock => stock.stock_id === line.sku_id).map(stock => ({
@@ -63,7 +65,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
     if (busy || disabled) return;
     const ship = buildShipLines(snapshot.lines, qtys, allocations, available, reasons);
     void run("ship_order", {
-      orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming, ship,
+      orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming: model.invoiceTiming, ship,
     }, data => {
       if (transfer) { router.push(`/orders/${snapshot.order.id}`); return; }
       const { invoice_id: invoiceId, warnings } = data as { invoice_id: string | null; warnings?: KegShortage[] };
@@ -72,7 +74,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
   }}>
     {transfer
       ? <CompleteTransferView model={toCompleteTransferViewProps(proposed)} quantities={qtys} onQuantity={onQuantity} sources={sources} messages={messages} submitting={busy} disabled={disabled} />
-      : <ShipView model={toShipViewProps(proposed)} quantities={qtys} onQuantity={onQuantity}
+      : <ShipView model={model} quantities={qtys} onQuantity={onQuantity}
           reasons={reasons} onReason={(id, value) => setReasons(prev => ({ ...prev, [id]: value }))} carrier={carrier} tracking={tracking}
           onCarrier={setCarrier} onTracking={setTracking} onInvoiceTiming={setInvoiceTiming} sources={sources} messages={messages} submitting={busy} disabled={disabled} />}
   </form>;

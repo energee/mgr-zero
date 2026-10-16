@@ -94,7 +94,7 @@ describe("shared order-entry controls", () => {
 
   it("shares all address controls, normalizes state, and keeps the second line optional", () => {
     const state = vi.fn(), address2 = vi.fn(), isDefault = vi.fn();
-    const node = ShipToView({ model: toShipToViewProps({ label: "Dock", address1: "1 Main", address2: "Suite 2", city: "Town", state: "PA", zip: "12345", isDefault: true }),
+    const node = ShipToView({ model: toShipToViewProps({ label: "Dock", country: "US", address1: "1 Main", address2: "Suite 2", city: "Town", state: "PA", zip: "12345", isDefault: true }),
       controls: { state, address2, isDefault }, footer: null });
     const nodes = elements(node);
     const field = (label: string) => nodes.find(element => element.props["aria-label"] === label)!;

@@ -46,6 +46,19 @@ describe("Order view loop", () => {
     expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderPickedRestock) }))).not.toContain("changed after pick");
   });
 
+  it("names a foreign ship-to's country and never prints a missing part as null", () => {
+    const jp = { ...orderPickedRestock, order: { ...orderPickedRestock.order, ship_tos: { label: "Main", country: "JP", city: null, state: null } } };
+    expect(toOrderViewProps(jp).where).toBe("Al’s Bar · Japan");
+  });
+
+  it("says Pickup on a pickup order and nothing otherwise", () => {
+    const pickup = { ...orderPickedRestock, order: { ...orderPickedRestock.order, pickup: true } };
+    expect(toOrderViewProps(pickup).pickup).toBe(true);
+    expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(pickup) }))).toContain("Pickup");
+    expect(toOrderViewProps(orderPickedRestock).pickup).toBe(false);
+    expect(renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderPickedRestock) }))).not.toContain("Pickup");
+  });
+
   it("a cancelled order that was changed after pick carries no re-pick note (#811)", () => {
     const cancelled = { ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "cancelled" as const, repick_since: "2026-09-02T14:00:00.000Z" } };
     expect(toOrderViewProps(cancelled).repickNote).toBeUndefined();

@@ -92,6 +92,11 @@ describe("Review order view", () => {
     expect(model.po).toBe("optional");
   });
 
+  it("names a foreign ship-to's country and never prints a missing part as null", () => {
+    const model = toReviewOrderViewProps({ ...ridgelineShop, shipTos: [{ id: ridgelineShop.shipToId, label: "Main", country: "JP" }] });
+    expect(model.shipTo).toBe("Main · Japan");
+  });
+
   it("renders Place order and Hazy IPA from the adapter", () => {
     const html = htmlOf(createElement(ReviewOrderView, { model: toReviewOrderViewProps(ridgelineReviewOrder) }));
     expect(html).toMatch(/Hazy IPA/);

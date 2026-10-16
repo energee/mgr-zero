@@ -53,3 +53,13 @@ it("marks outstanding invoices overdue only after the brewery-local due day", ()
     expect(toInvoiceListRow({ ...owed, ...change }, "admin", true, "UTC", now).detail).not.toContain("overdue");
   }
 });
+
+it("reads a historical not_synced invoice as paid and not in QuickBooks, with no actions", () => {
+  const historical = { ...invoice, qbo_sync_status: "not_synced" as const, paid_at: "2025-08-14T16:00:00Z", due_on: "2025-08-14", qbo_balance_cents: null };
+  const row = toInvoiceListRow(historical, "admin", true, "America/New_York", new Date("2026-10-15T12:00:00Z"));
+  expect(row.detail).toContain("not in QuickBooks (before the books opened)");
+  expect(row.detail).toContain("paid");
+  expect(row.detail).not.toMatch(/overdue|pushed to QuickBooks/);
+  expect(row.tone).toBe("ok");
+  expect(row.actions).toEqual([]);
+});

@@ -6,7 +6,7 @@ import { useState, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
-import { PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
+import { COUNTRY_OPTIONS, PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E } from "@/components/mgr/e";
 import type { CustomerEditValues, CustomerViewModel } from "@/lib/mgr/customer-view";
@@ -64,8 +64,12 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
               {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true })}
+              {/* Staff-only, like a brand alias; never shown to the customer. */}
+              {E.edit("Alias", values.alias, "text", undefined, { ...controls("alias"), placeholder: "Staff only" })}
               {E.pick("Type", values.type, TYPE_OPTIONS, controls("type"))}
-              {E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
+              {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls("country"), required: true })}
+              {/* Only a US customer has a state; another country has none. */}
+              {values.country === "US" && E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
               {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
             </div>
           </section>

@@ -32,6 +32,7 @@ export function OrderView({
       {model.completeHref ? E.act("Complete transfer", "success", model.completeHref) : null}
       {model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
+      {model.pickup ? E.fld("Delivery", "Pickup") : null}
       {model.customerPo ? E.fld("Customer PO", model.customerPo) : null}
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.note ? E.fld("Note", model.note) : null}

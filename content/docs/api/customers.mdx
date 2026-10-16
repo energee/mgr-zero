@@ -120,12 +120,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Customers alphabetical with sale channel name
+Customers alphabetical with sale channel name; optionally only those whose name or alias contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeShipTos` | boolean | no |
 | `missingPortalEmail` | boolean | no |
+| `q` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -179,9 +180,11 @@ Create or update a customer account: its sale channel decides its prices and whe
 | --- | --- | --- |
 | `name` | string | yes |
 | `type` | distributor or retailer or brewery or other | yes |
-| `state` | string | yes |
 | `saleChannelId` | uuid | yes |
 | `id` | uuid | no |
+| `alias` | string | no |
+| `country` | string | no |
+| `state` | string | no |
 | `licenseNumber` | string | no |
 | `paymentTerms` | due_on_receipt or net15 or net30 | no |
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | no |
@@ -190,7 +193,7 @@ Create or update a customer account: its sale channel decides its prices and whe
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "CA", "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "saleChannelId": "00000000-0000-0000-0000-000000000000", "id": "00000000-0000-0000-0000-000000000000", "alias": "string", "country": "CA" } }'
 ```
 
 ## upsert_ship_to [#upsert_ship_to]
@@ -203,19 +206,20 @@ Create or update a ship-to address; isDefault switches the customer default, omi
 | --- | --- | --- |
 | `customerId` | uuid | yes |
 | `label` | string | yes |
-| `address1` | string | yes |
-| `city` | string | yes |
-| `state` | string | yes |
-| `zip` | string | yes |
 | `id` | uuid | no |
+| `country` | string | no |
+| `address1` | string | no |
 | `address2` | string | no |
+| `city` | string | no |
+| `state` | string | no |
+| `zip` | string | no |
 | `isDefault` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "CA", "zip": "19107" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "id": "00000000-0000-0000-0000-000000000000", "country": "CA" } }'
 ```
 
 {/* end ops:customers */}
