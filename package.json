@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
-    "build": "vitest run tests/mdx-safety.test.ts && next build",
+    "build": "vitest run --config vitest.mdx.config.mts tests/mdx-safety.test.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

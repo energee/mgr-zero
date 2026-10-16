@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { createProcessor } from "@mdx-js/mdx";
 import type { Nodes } from "mdast";
+import { frontmatter } from "fumadocs-core/content/md/frontmatter";
 import { describe, expect, it } from "vitest";
 
 const processor = createProcessor();
@@ -56,7 +57,9 @@ function assertSafeMdx(source: string) {
     }
     if ("children" in node) node.children.forEach(visit);
   }
-  visit(processor.parse(source));
+  // Match the build's exact YAML/body boundary. A YAML block scalar containing
+  // a Markdown fence must not hide executable body nodes from this parser.
+  visit(processor.parse(frontmatter(source).content));
 }
 
 const root = resolve(__dirname, "..");
@@ -90,6 +93,9 @@ describe("non-evaluating MDX publication boundary", () => {
     "{/* marker */ process.env.X}",
     "{/**/ + process.env.X}",
     "{}",
+    "---\ntitle: x\ndescription: |\n  ~~~\n---\n\n{process.env.X}",
+    '---\ntitle: x\ndescription: |\n  ~~~\n---\n\n<Card title={x} />',
+    "---\r\ntitle: x\r\ndescription: |\r\n  ```\r\n---\r\n\n<include>../../.env</include>",
     "import value from './outside.js'",
     "export const value = 1",
     '<Card title={x} />',
@@ -154,7 +160,12 @@ describe("non-evaluating MDX publication boundary", () => {
   });
 
   it("accepts approved literal components, icon props, comments and inert code examples", () => {
-    expect(() => assertSafeMdx(`
+    expect(() => assertSafeMdx(`---
+title: Safe guide
+description: |
+  ~~~ is inert frontmatter text, not a body fence.
+---
+
 <Cards>
   <Card title="Orders" href="/docs/staff-guide" external icon={<DocIcon name="staff" />}>
     <Callout type="info">Read the guide.</Callout>

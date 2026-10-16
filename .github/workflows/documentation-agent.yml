@@ -92,7 +92,7 @@ jobs:
           fi
           # Parse untrusted prose without app imports, evaluation or includes.
           # Reject active content before it can reach the App-authenticated job.
-          bunx vitest run tests/mdx-safety.test.ts
+          bunx vitest run --config vitest.mdx.config.mts tests/mdx-safety.test.ts
           git diff --cached --check
           # Transfer only validated changes, never an old guide snapshot that
           # could revert unrelated prose merged while the audit was running.

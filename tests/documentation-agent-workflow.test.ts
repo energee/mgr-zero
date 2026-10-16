@@ -34,8 +34,9 @@ function installMdxValidation(repo: string) {
   cpSync(resolve("tests/mdx-safety.test.ts"), join(repo, "tests/mdx-safety.test.ts"));
   symlinkSync(resolve("node_modules"), join(repo, "node_modules"), "dir");
   writeFileSync(join(repo, ".gitignore"), "node_modules/\n");
-  // The synthetic repository has no application or database configuration.
-  writeFileSync(join(repo, "vitest.config.mts"), 'export default { test: { include: ["tests/mdx-safety.test.ts"] } };\n');
+  cpSync(resolve("vitest.mdx.config.mts"), join(repo, "vitest.mdx.config.mts"));
+  // A safe audit must work even when the app's DB-backed test config cannot.
+  writeFileSync(join(repo, "vitest.config.mts"), 'throw new Error("Default database test config must not load");\n');
 }
 
 function publication(root: string, edit: (repo: string) => void, intervene?: (repo: string) => void) {
@@ -151,6 +152,7 @@ describe("documentation agent workflow", () => {
     "{process.env.X}",
     '<Card title={x} />',
     "<include>../../synthetic-outside.txt</include>",
+    "---\ntitle: x\ndescription: |\n  ~~~\n---\n\n{process.env.X}",
   ])("rejects generated active content before producing a patch: %s", (mdx) => {
     checkPublication(
       (repo) => writeFileSync(join(repo, guides[1]), mdx),
@@ -184,6 +186,7 @@ describe("documentation agent workflow", () => {
     ["expression", "{process.env.X}", false],
     ["prop expression", "<Card title={x} />", false],
     ["include", "<include>../../synthetic-outside.txt</include>", false],
+    ["frontmatter fence", "---\ntitle: x\ndescription: |\n  ~~~\n---\n\n{process.env.X}", false],
   ])("gates API publication patch creation for %s", (_name, mdx, accepted) => {
     const root = mkdtempSync(join(tmpdir(), "api-mdx-publication-"));
     try {
