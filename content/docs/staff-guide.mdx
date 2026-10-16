@@ -541,7 +541,9 @@ excluded from beer sales. Movement dates and invoice dates remain separate.
 **Export state transactions** downloads the exact supporting facts, source IDs,
 BBL, and cents behind those totals. Returns retain the original shipment state;
 later address edits do not reassign sales. Facts without a recorded destination
-appear under **Unassigned** for review. MGR does not infer their state.
+appear under **Unassigned** for review. MGR does not infer their state. Export
+sales, and returns or credits against them, are not flagged Unassigned just
+because they have no US destination.
 Saved snapshots retain their own export. Older snapshots without supporting
 facts say so. State tax calculations and filing forms remain external.
 
