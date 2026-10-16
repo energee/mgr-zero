@@ -229,7 +229,7 @@ explicit `permissions` mapping is present):
 | `actions/checkout` in review / doc / dream maintenance | Contents read; persisted credentials disabled | Read source only; marketplace checkout also disables persistence. |
 | `actions/checkout` in publication | Repository-scoped MGR App token: contents and pull requests write (dream also issues read) | Deterministic publication after validation, separate from the model. |
 | `actions/checkout` in `@claude` | Job token: contents, pull requests and issues write | User-requested code changes; intentionally not a read-only reviewer. |
-| `actions/setup-node`, `oven-sh/setup-bun`, `supabase/setup-cli` | Runner job context; no explicit application/provider secret input | Install pinned runtime versions; same job scopes, never elevated independently. |
+| `actions/setup-node`, `oven-sh/setup-bun`, [Supabase CLI setup](https://github.com/supabase/setup-cli) | Runner job context; no explicit application/provider secret input | Install pinned runtime versions; same job scopes, never elevated independently. |
 | `anthropics/claude-code-action` review | `CLAUDE_CODE_OAUTH_TOKEN`; contents / pull requests / issues read, id-token write | OIDC obtains the Claude GitHub App identity for review comments; model tool allowlist remains narrow. |
 | `anthropics/claude-code-action` doc / API maintenance | OAuth secret; explicit read-only `github.token`, id-token write | Model does not receive the publication App token. |
 | `anthropics/claude-code-action` dream maintenance | OAuth secret; explicit `github.token`, contents / pull requests / issues read | No publication permissions in the model job. |
