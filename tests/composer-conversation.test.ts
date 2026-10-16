@@ -23,6 +23,19 @@ describe("composer conversation surface", () => {
     expect(html).toContain('role="log"');
   });
 
+  it.each([
+    "![stock](https://images.example.invalid/pixel?brewery=private)",
+    '<img src="https://images.example.invalid/pixel?brewery=private" alt="stock" />',
+    "[stock]: https://images.example.invalid/pixel?brewery=private\n\n![stock]",
+  ])("does not load images supplied by an assistant reply: %s", (image) => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, {
+      messages: [{ id: "assistant", role: "assistant", content: `**Stock remains private.**\n\n${image}` }],
+    }));
+    expect(html).not.toMatch(/<img\b|rel="preload"[^>]*as="image"/);
+    expect(html).not.toContain("https://images.example.invalid");
+    expect(html).toContain("Stock remains private.");
+  });
+
   it("supports stopping a stream and documents the input keyboard behavior", () => {
     const html = renderToStaticMarkup(createElement(ComposerStripView, { value: "hello", onChange: () => undefined, streaming: true, onStop: () => undefined }));
     expect(html).toContain("Stop response");
