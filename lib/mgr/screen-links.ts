@@ -303,6 +303,8 @@ export const INERT: (string | RegExp)[] = [
   "Rice hulls \u00b7 50 lb",
   "Role",
   "Save brewery",
+  "Record correction and flag amendments",
+  "Clear date · count all history",
   "Save AI model",
   "Load private channels",
   "Save operations channel",

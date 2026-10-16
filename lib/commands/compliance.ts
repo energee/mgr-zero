@@ -171,7 +171,28 @@ defineCommand({
   })),
 });
 
-export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
+export type ReportingBasisCorrection = { id: string; old_basis: string | null; new_basis: string | null; corrected_by: string; corrected_at: string; reason: string };
+export type BasisAmendment = { filing_id: string; correction_id: string; old_figures: Report["figures"]; new_figures: Report["figures"]; correction: ReportingBasisCorrection };
+export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string; needs_amendment?: boolean; basis_amendments?: BasisAmendment[] };
+
+defineCommand({
+  name: "correct_reporting_basis",
+  description: "Admin correction after filing: record immutable old/new books-opened basis, actor, time and reason, and flag every affected filed period as needing amendment; original snapshots stay unchanged",
+  roles: ["admin"],
+  input: z.object({ booksOpenedOn: isoDate.nullable(), expectedBooksOpenedOn: isoDate.nullable(), reason: z.string().trim().min(1) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_reporting_basis", {
+    p_brewery: ctx.breweryId, p_books_opened_on: i.booksOpenedOn, p_expected_books_opened_on: i.expectedBooksOpenedOn,
+    p_reason: i.reason, p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "list_reporting_basis_corrections",
+  description: "Immutable reporting-basis correction history, newest first, including old/new values, actor, time and reason",
+  roles: [...ROLES], input: z.object({}),
+  handler: (ctx) => rows<ReportingBasisCorrection>(ctx.db.from("reporting_basis_corrections")
+    .select("*").eq("brewery_id", ctx.breweryId).order("corrected_at", { ascending: false })),
+});
 
 defineCommand({
   name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, a period not yet over, a period that starts before the books opened, a TTB period that is not exactly one calendar month, quarter, or year. MGR does not transmit the filing; filing takes the cellar workflow lock to wait for packaging closes and books-opened changes, rechecks the date, and fixes that reporting basis after the first filing",
@@ -190,13 +211,20 @@ defineQuery({
   name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today and books-opened date for the month list",
   roles: [...ROLES], input: period.partial(),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction");
+    let q = ctx.db.from("report_filings").select("*, basis_amendments:report_basis_amendments(*, correction:reporting_basis_corrections(*))")
+      .eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction");
     if (i.jurisdiction) q = q.eq("jurisdiction", i.jurisdiction);
     if (i.periodStart) q = q.eq("period_start", i.periodStart);
     if (i.periodEnd) q = q.eq("period_end", i.periodEnd);
     const [filings, today, brewery] = await Promise.all([rows<Filing>(q), breweryToday(ctx),
       unwrap(ctx.db.from("breweries").select("books_opened_on").eq("id", ctx.breweryId).single())]);
-    return { filings, today, booksOpenedOn: brewery?.books_opened_on ?? null };
+    return {
+      filings: filings.map(filing => {
+        const affected = (filing.basis_amendments ?? []).sort((a, b) => b.correction.corrected_at.localeCompare(a.correction.corrected_at));
+        return { ...filing, needs_amendment: affected.length > 0, basis_amendments: affected };
+      }),
+      today, booksOpenedOn: brewery?.books_opened_on ?? null,
+    };
   },
 });
 

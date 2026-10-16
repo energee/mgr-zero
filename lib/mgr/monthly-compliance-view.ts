@@ -3,22 +3,29 @@ import { destinationStateTotals } from "./destination-state-export";
 import { money } from "./money";
 import { sentenceCase } from "./labels";
 import { bblExact, bblFixed } from "@/lib/volume";
+import { formatDate } from "@/lib/date-format";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
+  timeZone: string;
   report: Report;
   filing?: Filing;
   losses: LossReview[];
   backHref?: string;
 };
 
-export type MonthlyComplianceViewModel = {
+export type MonthlyComplianceViewModel = ComplianceFiguresViewModel & {
   title: string;
+  timeZone: string;
   backHref?: string;
   filingDate?: string;
-  balances: boolean;
+  amendments?: { id: string; oldBasis: string; newBasis: string; actor: string; at: string; reason: string; invalidPeriod: boolean; figures: ComplianceFiguresViewModel }[];
   warnings: string[];
   losses: { source: LossReview; key: string; title: string; detail: string; allocations: { key: string; title: string; detail: string; bbl: string }[] }[];
+};
+
+export type ComplianceFiguresViewModel = {
+  balances: boolean;
   lines: string[][];
   inProcess: string;
   packaged: string;
@@ -37,13 +44,38 @@ const CLASS_LABEL = { keg: "kegs", can: "cans", bottle: "bottles" } as const;
 const removalBbl = (key: string, value: number) => key === "loss" ? bblExact(value, 8) : bblFixed(value);
 const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
 
+function toComplianceFigures(figures: Report["figures"]): ComplianceFiguresViewModel {
+  return {
+    balances: figures.balances,
+    lines: figures.lines.map((line) => [CLASS_LABEL[line.class], line.begin.toFixed(2), line.in.toFixed(2), line.out.toFixed(2), line.end.toFixed(2)]),
+    inProcess: bblFixed(figures.inProcess),
+    packaged: bblFixed(figures.packaged),
+    removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
+    cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: bblExact(value, 8) })),
+    stateRows: destinationStateTotals(figures.stateTransactions ?? []).map(row => [row.state, bblExact(row.outwardBbl, 8), bblExact(row.returnedBbl, 8), bblExact(row.adjustmentBbl, 8), bblExact(row.volumeBbl, 8), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
+    stateExport: figures.stateTransactions ? { periodStart: figures.periodStart, periodEnd: figures.periodEnd, facts: figures.stateTransactions } : undefined,
+    byState: Object.entries(figures.byState).map(([key, value]) => ({ key, title: `Taxpaid to ${key}`, bbl: bblFixed(value) })),
+  };
+}
+
 export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot): MonthlyComplianceViewModel {
   const figures = snapshot.report.figures;
   return {
+    ...toComplianceFigures(figures),
     title: snapshot.monthLabel,
+    timeZone: snapshot.timeZone,
     backHref: snapshot.backHref,
     filingDate: snapshot.filing?.filed_at?.slice(0, 10),
-    balances: figures.balances,
+    amendments: snapshot.filing?.basis_amendments?.map(row => ({
+      id: row.correction_id,
+      oldBasis: row.correction.old_basis ? formatDate(row.correction.old_basis) : "Not set",
+      newBasis: row.correction.new_basis ? formatDate(row.correction.new_basis) : "Not set",
+      actor: row.correction.corrected_by,
+      at: row.correction.corrected_at,
+      reason: row.correction.reason,
+      invalidPeriod: row.correction.new_basis !== null && snapshot.report.figures.periodStart < row.correction.new_basis,
+      figures: toComplianceFigures(row.new_figures),
+    })),
     warnings: snapshot.report.warnings,
     losses: snapshot.losses.map((loss) => ({
       source: loss,
@@ -57,13 +89,5 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
         bbl: `${allocation.bbl} bbl`,
       })),
     })),
-    lines: figures.lines.map((line) => [CLASS_LABEL[line.class], line.begin.toFixed(2), line.in.toFixed(2), line.out.toFixed(2), line.end.toFixed(2)]),
-    inProcess: bblFixed(figures.inProcess),
-    packaged: bblFixed(figures.packaged),
-    removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
-    cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: bblExact(value, 8) })),
-    stateRows: destinationStateTotals(figures.stateTransactions ?? []).map(row => [row.state, bblExact(row.outwardBbl, 8), bblExact(row.returnedBbl, 8), bblExact(row.adjustmentBbl, 8), bblExact(row.volumeBbl, 8), money(row.invoicedCents), money(row.creditedCents), money(row.salesCents)]),
-    stateExport: figures.stateTransactions ? { periodStart: figures.periodStart, periodEnd: figures.periodEnd, facts: figures.stateTransactions } : undefined,
-    byState: Object.entries(figures.byState).map(([key, value]) => ({ key, title: `Taxpaid to ${key}`, bbl: bblFixed(value) })),
   };
 }
