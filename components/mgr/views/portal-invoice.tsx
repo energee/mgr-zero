@@ -28,14 +28,13 @@ export function PortalInvoiceView({
   variant?: PortalInvoiceVariant;
   /** Live: QuestionForm. Inventory default is the Question this invoice nav. */
   question?: ReactNode;
-  /** Live/inventory: Pay and Download PDF. Unavailable has none by default. */
+  /** Live payment action. Pay inventory defaults to its simulated payment button. */
   footer?: ReactNode;
 }) {
   const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid, model.payable);
   const questionNav = E.nav("Question this invoice", `sends a note to ${model.breweryName}`);
   const questionSlot = question !== undefined ? question : questionNav;
-  const payFooter = footer !== undefined ? footer : E.btns([["Pay invoice", "p"], ["Download PDF", "g"]]);
-  const paidFooter = footer !== undefined ? footer : E.btn("Download PDF", "g");
+  const payFooter = footer !== undefined ? footer : E.btn("Pay invoice", "p");
   return (
     <>
       {E.back("Invoices", model.title, undefined, model.backHref)}
@@ -69,7 +68,7 @@ export function PortalInvoiceView({
           {footer}
         </>
       ) : null}
-      {kind === "paid" ? paidFooter : kind === "credit" ? footer : null}
+      {kind === "paid" || kind === "credit" ? footer : null}
       {questionSlot}
     </>
   );
