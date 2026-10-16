@@ -94,7 +94,7 @@ money cents.
 | `order_kind` | `wholesale, taproom_transfer` | |
 | `order_status` | `draft, submitted, confirmed, picked, shipped, cancelled` | `invoiced`/`paid` derive from invoices (§14) |
 | `invoice_kind` | `invoice, credit_memo` | |
-| `invoice_line_kind` | `sku, keg_deposit, keg_deposit_refund, adjustment` | deposits are a line type, not SKU price |
+| `invoice_line_kind` | `sku, keg_deposit, keg_deposit_refund, adjustment, one_way_keg_fee` | deposits are a line type, not SKU price; `one_way_keg_fee`: the never-refunded fee per one-way keg shipped |
 | `qbo_sync_status` | `pending, pushed, push_failed, not_synced` | `not_synced`: a historical invoice (record_historical_order, before books_opened_on), never pushed |
 | `material_category` | `malt, hop, yeast, adjunct, chemical, packaging, other` | |
 | `uom` | `lb, kg, oz, g, each, l, gal, ml` | mass↔mass and vol↔vol convert by constant; each↔mass is per-material |
@@ -113,6 +113,9 @@ money cents.
 `name, ttb_registry_no, pa_license_no, timezone default 'America/New_York', settings jsonb
 default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
 `admin_update` update `staff_role(id)='admin'`. No `unique(id, brewery_id)` (it is the root).
+`one_way_keg_fee_cents int not null default 0 check (>= 0)`: the flat fee each
+one-way keg shipped carries instead of a deposit, set by admin-only
+`set_one_way_keg_fee`; 0 adds no fee line (`20261016100700_one_way_keg_fee.sql`).
 
 ### `brewery_users` — roles become an array (decided 2026-09-07, not built)
 **Decided, not built — tracking issue #797.** The shipped table has one scalar
@@ -139,10 +142,21 @@ Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (
 `price_lists`). `unique (brewery_id, name)`. Staff-only base-table reads;
 buyers read `portal_customers` identity (`id`, `brewery_id`, `name`,
 `sale_channel_id`) through a function scoped to `my_customer_ids()` (#793).
+`country text not null default 'US'`: an ISO 3166-1 alpha-2 code, validated
+against `COUNTRY_CODES` (`lib/mgr/enums.ts`) by zod and by shape in SQL.
+`state` is nullable: `customers_state_by_country` requires a two-letter state
+for a US customer and none for any other country. `alias text` (optional,
+non-blank): a staff-only informal name, like `brands.alias`; staff search
+matches it and the customer list shows "Name · Alias"; buyers never read it
+(`portal_customers` carries no alias) (`20261016100500_customer_country_alias.sql`).
 
 ### `customer_users` — unchanged
 ### `ship_tos` — unchanged, but `customer_id` becomes composite → `customers`
-`state` check 2-letter. Adds `unique (id, customer_id, brewery_id)` so orders can pin a
+`country text not null default 'US'` (ISO alpha-2, as on `customers`).
+`ship_tos_state_by_country`: a US ship-to has a two-letter `state`, any other
+country has none. `address1`, `city` and `zip` are nullable; zod requires them
+only for a US address, so outside the US only the label is required
+(`20261016100500_customer_country_alias.sql`). Adds `unique (id, customer_id, brewery_id)` so orders can pin a
 ship-to to its customer. idx `(customer_id)`. RLS: `staff_all`, `customer_own` select.
 `is_default boolean not null default false`; a partial unique index on
 `(brewery_id, customer_id) where is_default` permits at most one default.
@@ -191,6 +205,12 @@ All existing columns, `removal_shape` check, `bbl` trigger, revoke, indexes, and
 policies carried forward verbatim. `lot_id → lots` composite FK added after `lots` exists
 (nullable). `ref uuid` stays (order id / pos sale id / run id; typed context lives on the
 domain row's `movement_id`).
+`dest_country text` (ISO alpha-2, nullable): the destination of an export sale
+removal outside the US. `removal_shape` makes a `sale_removal` name exactly one
+of `dest_state` and `dest_country`, a country only when `tax_treatment =
+'export'`, and no other movement type a country. `ship_order_impl` writes it
+from the ship-to's country and refuses a non-export order to a foreign ship-to
+(`20261016100600_export_destination.sql`).
 `occurred_on date not null` is the frozen brewery-local effective date. A before-insert
 trigger defaults it to the local date of `created_at`; `close_packaging_run` sets it
 to Packaged on and reports bucket by it. Existing rows retain their insert-time local
@@ -242,7 +262,11 @@ default 'draft'`, `customer_id → customers`, `ship_to_id` (FK `(ship_to_id, cu
 brewery_id) → ship_tos (id, customer_id, brewery_id)` so a ship-to always belongs to the
 order's customer), `from_location_id → locations not null` (where removals post),
 `to_location_id → locations`, `price_list_id → price_lists` (snapshot of the list used),
-`requested_ship_date date`, `po_number text`, `note text`, `created_by`, `shipped_at`.
+`requested_ship_date date`, `po_number text`, `note text`, `created_by`, `shipped_at`,
+`pickup boolean not null default false` (wholesale only, `orders_pickup_wholesale`):
+the customer collects it, so its shipment is never routed and `ship_order`
+refuses `on_delivery` invoicing for it; it still names a ship-to for TTB
+(`20261016100200_pickup_orders.sql`).
 - check: `kind='wholesale'` ⇒ `customer_id, ship_to_id not null and to_location_id is null`;
   `kind='taproom_transfer'` ⇒ `to_location_id not null and customer_id, ship_to_id null`.
 - unique `(brewery_id, order_no)`. idx `(brewery_id, status, requested_ship_date)`,
@@ -264,7 +288,10 @@ definer RPC resolves it server-side.
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
-`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: no
+`short_reason text`, `one_way_fee_cents int check (null or > 0)`: the brewery's
+one-way keg fee frozen at ship for a one-way keg line, null otherwise; both
+invoice writers read it, so a later fee change does not move the invoice.
+unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: no
 customer policy; buyers read lines inlined in `portal_orders` (#788); customer
 line replacement happens only through the definer portal/draft RPCs on a draft
 order. Remainder after ship is
@@ -319,7 +346,9 @@ not null <> 0, unit_price_cents int not null, amount_cents int generated always 
 
 ### `qbo_connections`
 connection `id`, pk `brewery_id`, `realm_id text not null`,
-`access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`; no
+`access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`,
+`qbo_one_way_fee_item_id text` (the QuickBooks item one-way keg fee lines push
+to; a push with a fee line and no mapping is refused); no
 credential columns. RLS: integration operators (`admin`/`sales`) may read their
 brewery's non-secret metadata. `connect_qbo` owns OAuth completion/upsert through
 the narrow integration-client exception; `get_qbo_connection` returns
