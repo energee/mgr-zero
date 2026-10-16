@@ -4,8 +4,11 @@
 //
 // Fails when a migration this branch ADDS (vs its merge base with <main-ref>)
 // is not newer than every migration on <main-ref>; `supabase db push` would
-// refuse it on hosted. Run by ci.yml on pull requests and by land-pr.sh after
-// it merges origin/main. The caller fetches <main-ref> first.
+// refuse it on hosted. Run by ci.yml (pull requests against origin/<base>,
+// pushes to main against the pre-push commit) and by land-pr.sh after it
+// merges origin/main. The caller makes sure <main-ref> is present locally.
+// Renamed or edited migrations are out of scope here: migrations.lock.json and
+// tests/migrations-applied.test.ts reject an edit to a committed migration.
 import { execFileSync } from "node:child_process";
 import { outOfOrder } from "@/lib/migration-order";
 

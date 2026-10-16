@@ -146,9 +146,11 @@ describe("production-readiness workflow contract", () => {
   });
 
   // supabase db push refuses a migration older than hosted's newest (vercel-build.sh).
-  it("rejects a pull request that adds a migration older than main's newest", () => {
-    expect(ci).toContain("bun scripts/check-migration-order.ts FETCH_HEAD");
-    expect(ci).toMatch(/git fetch --no-tags origin "\$BASE_REF"\n\s*bun scripts\/check-migration-order\.ts/);
+  it("rejects a pull request, or a push to main, that adds a migration older than the base's newest", () => {
+    // Runs on push too: two green PRs can merge out of order without re-running CI.
+    expect(ci).toContain("BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}");
+    expect(ci).toMatch(/- name: Added migrations sort after the base's newest\n\s+env:/);
+    expect(ci).toContain('run: bun scripts/check-migration-order.ts "$BASE"');
   });
 
   it("installs and runs with bun, not npm", () => {

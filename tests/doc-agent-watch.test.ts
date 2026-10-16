@@ -19,6 +19,8 @@ describe("doc agent watch", () => {
     expect(watch.on.workflow_run?.types).toEqual(["completed"]);
     // Doc agent titles are unchanged so their already-open issues still match.
     expect(source).toContain('if [ "$NAME" = "hosted jobs" ]; then title="Hosted jobs failing"; else title="Doc agent failing: $NAME"; fi');
+    // hosted jobs runs every 5 minutes: an open issue gets no comment per failure.
+    expect(source).toMatch(/elif \[ "\$NAME" = "hosted jobs" \]; then echo [^\n]*\n\s*else gh issue comment/);
   });
 
   it("opens an issue on a run that did not succeed, and when dreaming goes stale", () => {

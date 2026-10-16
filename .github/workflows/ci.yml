@@ -54,13 +54,14 @@ jobs:
       - run: bun install --frozen-lockfile
       # `supabase db push` refuses a migration older than the newest one hosted
       # applied; sixteen late 20260928* files blocked production deploys.
-      - name: Added migrations sort after main's newest
-        if: github.event_name == 'pull_request'
+      # A pull request compares against its base (fetched by the full-depth
+      # checkout above). A push to main compares against the commit before the
+      # push: two open PRs can each pass, then merge in the wrong order through
+      # the GitHub UI without re-running CI, and this turns main red.
+      - name: Added migrations sort after the base's newest
         env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          git fetch --no-tags origin "$BASE_REF"
-          bun scripts/check-migration-order.ts FETCH_HEAD
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: bun scripts/check-migration-order.ts "$BASE"
       - run: bun run lint
       - run: bunx tsc --noEmit
       - run: bun run build
