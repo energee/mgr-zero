@@ -13,10 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 WD=tests/supabase
-# The CLI rejects template paths (including symlinks) outside its project root.
-# Copy the canonical app template into the disposable project's ignored scratch.
-mkdir -p "$WD/supabase/.temp/templates"
-cp supabase/templates/invite.html "$WD/supabase/.temp/templates/invite.html"
+scripts/test-stack-templates.sh
 psql_test() { PGPASSWORD=postgres psql -h 127.0.0.1 -p 54352 -U postgres -d postgres -qtAc "$1"; }
 # Hash of everything a reset builds from: the migrations (names and contents)
 # and the stack config; seed is off. It is stored as the database's comment,
