@@ -4,7 +4,7 @@
 // themselves are generated (lib/mgr/api-operations.ts), so this covers the
 // derivation and the page set rather than the prose.
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { compile, run } from "@mdx-js/mdx";
@@ -547,6 +547,15 @@ describe("post-merge HTTP API maintainer", () => {
     };
     try {
       put("package.json", JSON.stringify({ scripts: { "docs:api": "bun scripts/write-api-docs.ts" } }));
+      // Keep trusted validation tests available when the workflow invokes them,
+      // without copying app modules or replacing a real gate with a shell stub.
+      for (const file of readdirSync(join(root, "tests")).filter((file) => file.endsWith("-safety.test.ts"))) {
+        mkdirSync(join(repo, "tests"), { recursive: true });
+        copyFileSync(join(root, "tests", file), join(repo, "tests", file));
+      }
+      symlinkSync(join(root, "node_modules"), join(repo, "node_modules"), "dir");
+      put(".gitignore", "node_modules\n");
+      put("vitest.config.mts", 'export default { test: { include: ["tests/*-safety.test.ts"] } };\n');
       put("components/mgr/screens.tsx", 'export const screen = {\n    reads: "get_order", writes: "none",\n};\n');
       put("lib/mgr/api-operations.ts", 'export { screen } from "../../components/mgr/screens";\n');
       put("content/docs/api/orders.mdx", "# Orders\n");
