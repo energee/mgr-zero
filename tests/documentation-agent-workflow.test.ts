@@ -1,8 +1,8 @@
 // Exercises the documentation workflow's real publication shell across an intervening main update.
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 // yaml is installed through fumadocs, as in dreaming-workflow.test.ts; no new dependency.
@@ -29,6 +29,15 @@ function git(cwd: string, ...args: string[]) {
   return result.stdout.trim();
 }
 
+function installMdxValidation(repo: string) {
+  mkdirSync(join(repo, "tests"), { recursive: true });
+  cpSync(resolve("tests/mdx-safety.test.ts"), join(repo, "tests/mdx-safety.test.ts"));
+  symlinkSync(resolve("node_modules"), join(repo, "node_modules"), "dir");
+  writeFileSync(join(repo, ".gitignore"), "node_modules/\n");
+  // The synthetic repository has no application or database configuration.
+  writeFileSync(join(repo, "vitest.config.mts"), 'export default { test: { include: ["tests/mdx-safety.test.ts"] } };\n');
+}
+
 function publication(root: string, edit: (repo: string) => void, intervene?: (repo: string) => void) {
   const repo = join(root, "repo");
   mkdirSync(join(repo, "content/docs"), { recursive: true });
@@ -37,6 +46,7 @@ function publication(root: string, edit: (repo: string) => void, intervene?: (re
   git(repo, "config", "user.email", "fixture@example.invalid");
   git(repo, "config", "core.hooksPath", "/dev/null");
   for (const guide of guides) writeFileSync(join(repo, guide), "original\n");
+  installMdxValidation(repo);
   git(repo, "add", ".");
   git(repo, "commit", "-m", "A audited revision");
   edit(repo);
@@ -135,6 +145,52 @@ describe("documentation agent workflow", () => {
       expect(validated.stdout).toContain("outside the guide suite");
       expect(published).toBeUndefined();
     });
+  });
+
+  it.each([
+    "{process.env.X}",
+    '<Card title={x} />',
+    "<include>../../synthetic-outside.txt</include>",
+  ])("rejects generated active content before producing a patch: %s", (mdx) => {
+    checkPublication(
+      (repo) => writeFileSync(join(repo, guides[1]), mdx),
+      ({ repo, validated, published }) => {
+        expect(validated.status).not.toBe(0);
+        expect(published).toBeUndefined();
+        expect(existsSync(join(repo, "customer-guide.patch"))).toBe(false);
+      },
+    );
+  });
+
+  it.each([
+    ["safe prose", '<Card title="Orders"><Callout type="info">Read on.</Callout></Card>\n\n<Screen name="Orders" />', true],
+    ["expression", "{process.env.X}", false],
+    ["prop expression", "<Card title={x} />", false],
+    ["include", "<include>../../synthetic-outside.txt</include>", false],
+  ])("gates API publication patch creation for %s", (_name, mdx, accepted) => {
+    const root = mkdtempSync(join(tmpdir(), "api-mdx-publication-"));
+    try {
+      mkdirSync(join(root, "content/docs/api"), { recursive: true });
+      installMdxValidation(root);
+      git(root, "init", "-b", "main");
+      git(root, "config", "user.name", "Fixture");
+      git(root, "config", "user.email", "fixture@example.invalid");
+      writeFileSync(join(root, "content/docs/api/index.mdx"), "original\n");
+      git(root, "add", ".");
+      git(root, "-c", "core.hooksPath=/dev/null", "commit", "-m", "baseline");
+      writeFileSync(join(root, "content/docs/api/index.mdx"), mdx);
+      git(root, "add", ".");
+      const api = load(readFileSync(".github/workflows/http-api-agent.yml", "utf8"));
+      const run = api.jobs.maintain.steps.find(step => step.name === "Validate the maintained reference")!.run!;
+      // Exercise the real non-evaluating gate through patch creation, without
+      // importing the API generator's unrelated command/screen application code.
+      const gate = run.slice(run.indexOf("# Parse untrusted"), run.indexOf("# Everything else"));
+      const result = command(root, "bash", ["-e", "-o", "pipefail", "-c", gate]);
+      expect(result.status === 0, result.stderr).toBe(accepted);
+      expect(existsSync(join(root, "api-reference.patch"))).toBe(accepted);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   // #864: GitHub transiently rejected the force push ("cannot lock ref"); one failure must not fail the run.

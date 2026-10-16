@@ -28,6 +28,13 @@ between its `ops:<slug>` and `end ops:<slug>` MDX comment markers. Never
 hand-edit between those markers — `tests/api-docs.test.ts` re-renders them and
 fails on drift.
 
+MDX is prose, not executable code. Use only approved components with literal
+attributes; never add imports, exports, expressions, spreads, includes or
+directives. Keep the generator's block-comment markers. The existing
+`Card` icon prop may use only `<DocIcon name="literal" />`.
+`tests/mdx-safety.test.ts` parses every docs page without evaluating it,
+before either agent writes a publication patch and before the production build.
+
 ## When to run
 
 After command modules change, after `/api/command` auth/envelope changes, or

@@ -107,6 +107,13 @@ name fails the build). Keep existing embeds, move them with their section, and
 add one when a new section describes a screen the inventory draws. Cross-link guides as `/docs/staff-guide` and
 `/docs/portal-guide`; `content/docs/meta.json` fixes the sidebar order.
 
+Use literal component attributes, never JavaScript expressions or spreads.
+The chooser may keep `icon={<DocIcon name="staff" />}` (with a literal icon
+name); this is the only expression-valued prop allowed. Do not add include
+elements or directives. `tests/mdx-safety.test.ts` parses every docs page
+without evaluating it, before the workflow writes a publication patch and
+before `bun run build` starts Next.js.
+
 Never expose source paths, command/query names, database terminology, access
 policy terminology, development phases, future plans, or implementation gates.
 Describe only behavior available now. It is acceptable, and required, to say
