@@ -207,7 +207,6 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Ask about this invoice/);
     expect(html).not.toMatch(/Question this invoice/);
   });
-
 });
 
 describe("Question invoice view", () => {
