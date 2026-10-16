@@ -1,7 +1,7 @@
 <!-- Manual business-success scorecard for the pilot (#729): defined before launch, filled during the pilot. -->
 # Pilot scorecard
 
-Status: **evaluation period agreed 2026-10-16; other values awaiting owner**. Owner: Ted. Tracks
+Status: **period, targets and scorecard ownership agreed 2026-10-16; pilot participants awaiting assignment**. Owner: Ted. Tracks
 [#729](https://github.com/energee/mgr-zero/issues/729); evidence belongs to the
 release index [#311](https://github.com/energee/mgr-zero/issues/311).
 
@@ -23,9 +23,9 @@ Part B is filled in during and after the pilot.
 
 | Role | Responsibility | Person |
 | --- | --- | --- |
-| Scorecard owner | Keeps this record and makes the proceed/adjust decision | Proposal: Ted |
+| Scorecard owner | Keeps this record and makes the proceed/adjust decision | Ted (owner, 2026-10-16) |
 | Brewery lead | Pilot brewery's day-to-day contact; reports blockers | |
-| Operator | Fills the operator log | Proposal: same as scorecard owner |
+| Operator | Fills the operator log | Ted (owner, 2026-10-16) |
 | Staff users | Use MGR for orders, picking, and invoices | |
 | Buyers | Place orders through the portal | |
 
@@ -57,18 +57,22 @@ The pilot ends at the first agreed limit reached.
 
 Record every measure by hand in the operator log below.
 No analytics package is needed.
-The owner accepts or changes each proposed target.
+The owner approved M1–M6 on 2026-10-16.
 
 | # | Measure | How it is counted | Proposed target | Agreed target |
 | --- | --- | --- | --- | --- |
-| M1 | Setup to first completed order | Days from the first staff sign-in to the first order invoiced | 7 days or fewer | |
-| M2 | Independent orders | Share of orders placed and completed with no help from the operator | 80% by the final week | |
-| M3 | Assisted orders | Orders where the operator stepped in; note why | Falls week over week | |
-| M4 | Stock reconciliation exceptions | Weekly count where MGR stock differs from a physical count | 0 unexplained at period end | |
-| M5 | Invoice reconciliation exceptions | Invoices whose MGR amount differs from QuickBooks or the customer's record | 0 unexplained at period end | |
-| M6 | Remaining spreadsheet work | Tasks staff still do in the old spreadsheet; list each one | None for pilot-scope journeys | |
+| M1 | Setup to first completed order | Days from the first staff sign-in to the first order invoiced | 7 days or fewer | 7 days or fewer |
+| M2 | Independent orders | Share of orders placed and completed with no help from the operator | 80% by the final week | At least 80% by the final week |
+| M3 | Assisted orders | Orders where the operator stepped in; note why | Falls week over week | Falls week over week |
+| M4 | Stock reconciliation exceptions | Weekly count where MGR stock differs from a physical count | 0 unexplained at period end | 0 unexplained at period end |
+| M5 | Invoice reconciliation exceptions | Invoices whose MGR amount differs from QuickBooks or the customer's record | 0 unexplained at period end | 0 unexplained at period end |
+| M6 | Remaining spreadsheet work | Tasks staff still do in the old spreadsheet; list each one | None for pilot-scope journeys | None for pilot-scope journeys |
 
 Definition signed off by: ____________ Date: ____________
+
+The targets and scorecard owner/operator are agreed.
+Before signing off Part A, assign the brewery lead, staff users and buyers, and confirm the starting conditions.
+No pilot outcomes or release sign-off are implied by this agreement.
 
 ## Part B: evaluation (during and after the pilot)
 
