@@ -11,10 +11,11 @@ import { listRow, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
 
-export function WaterView({ title = "Water", water, profiles, materials, back, chemistryKnown = false, profilesHref, onChange, onAdd, ...verbs }: {
+export function WaterView({ title = "Water", water, profiles, materials, header, chemistryKnown = false, profilesHref, onChange, onAdd, ...verbs }: {
   title?: string; water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[];
-  /** Replaces the whole header; the live sheet passes null because the sheet already says Water. */
-  back?: ReactNode;
+  /** Replaces the whole header row: undefined keeps the default E.back, null draws none
+   *  (the live sheet passes null because the sheet already says Water). */
+  header?: ReactNode;
   /** Live: the Water profiles page, opened in a new tab so the unsaved version draft survives. Brewer has no Catalog, so this row is Brewer's way in; inventory leaves it unlinked. */
   profilesHref?: string;
   /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
@@ -31,7 +32,7 @@ export function WaterView({ title = "Water", water, profiles, materials, back, c
   const chemistry = !chemistryKnown ? "gated" : target && source && volumesOk ? "ready" : "waiting";
   const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
-    {back !== undefined ? back : E.back("Recipe", title)}
+    {header !== undefined ? header : E.back("Recipe", title)}
     {E.pick("Source profile", water.sourceProfileId, [{ value: "", label: "No source" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ sourceProfileId: nextValue }) : undefined })}
     {E.pick("Target profile", water.targetProfileId, [{ value: "", label: "No target" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ targetProfileId: nextValue }) : undefined })}
     {/* A new tab: this sheet edits an unsaved version draft, and leaving the page would drop it. */}

@@ -3,7 +3,7 @@
 // get_recipe result shape (RecipeSnapshot), the copy of a saved version a new
 // draft starts from (versionToDraft), why a draft cannot be saved yet
 // (draftBlocker), the read page's model of a saved version (toRecipePageModel)
-// and why a prediction is missing (gravityBlockerText).
+// and why a prediction is missing (gravityBlockerText, noMashText).
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
@@ -43,8 +43,8 @@ export type RecipeViewModel = {
   title: string;
   /** When the shown version was saved, as a date in the brewery's zone. */
   saved?: string;
-  /** The recipe's own note (not the version note). */
-  note?: string;
+  /** The recipe's own note (not the version note, which is `notes`). */
+  recipeNote?: string;
   priceGroup?: string;
   priceGroupOptions?: string[];
   ingredients?: RecipeIngredientView[];
@@ -147,6 +147,12 @@ export function gravityBlockerText(blockers: GravityBlocker[], nameOf: (index: n
     : `${name} has no extract potential; set it under Materials.`;
 }
 
+/** Why there is no prediction when no line is a mash line: gravityBlockers lists nothing then,
+ * yet recipeGravity predicts nothing. Null with no lines, since draftBlocker already asks for one. */
+export function noMashText(stages: string[]): string | null {
+  return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
+}
+
 /** The read page's model of a recipe: its latest saved version read out as text, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
@@ -155,7 +161,7 @@ export function toRecipePageModel(
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
   const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
-  const base = { title: recipe.name, backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, note: recipe.note ?? undefined };
+  const base = { title: recipe.name, backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note ?? undefined };
   if (!v) return { ...base, empty: "No version yet: create the first one" };
 
   // The water rows leave out the process scalars processReadout also returns; the numbers grid shows those.
@@ -164,7 +170,8 @@ export function toRecipePageModel(
   const blockers = gravityBlockers(ingredients.map((i) => ({ perBblQty: Number(i.per_bbl_qty), extractPotential: i.extract_snapshot, stage: i.stage, unit: i.materials?.base_uom })));
   const predicted = s.ogPlato !== null && s.fgPlato !== null && s.abv !== null
     ? `Predicted: OG ${formatGravity(s.ogPlato, ctx.unit)} · FG ${formatGravity(s.fgPlato, ctx.unit)} · ABV ${s.abv.toFixed(1)}%`
-    : gravityBlockerText(blockers, (n) => material.name(ingredients[n].material_id), (n) => ingredients[n].materials?.base_uom, { saved: true }) ?? undefined;
+    : gravityBlockerText(blockers, (n) => material.name(ingredients[n].material_id), (n) => ingredients[n].materials?.base_uom, { saved: true })
+      ?? noMashText(ingredients.map((i) => i.stage)) ?? undefined;
   return {
     ...base,
     title: `${recipe.name} v${v.version}`,

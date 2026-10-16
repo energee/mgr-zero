@@ -393,6 +393,10 @@ export const E = {
       <AlertDescription className="text-pretty text-info-foreground">{t}</AlertDescription>
     </Alert>
   ),
+  /** Plain muted text, or nothing, for the caller's always-mounted role="status"
+   *  region, so a screen reader hears the change politely. E.info and E.note are
+   *  alerts and would interrupt the screen reader on every change. */
+  polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
   /** Annotation chips; the gallery renders this under the frame, never inside it. */
   states: (arr: [string, string, (0 | 1)?][]) => (
     <dl className="flex flex-wrap gap-1.5">

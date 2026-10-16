@@ -27,10 +27,11 @@ export function listRow(title: string, detail: string, index: number, count: num
   </div>;
 }
 
-/** `back` replaces the whole header: the live sheet passes its Add button (the sheet already says the title), the inventory omits it. */
-export function MashScheduleView({ title = "Mash schedule", steps, back, ...verbs }: { title?: string; steps: readonly MashStep[]; back?: ReactNode } & ListRowProps) {
+/** `header` replaces the whole header row: undefined keeps the default E.back with Add step, null draws none,
+ *  and the live sheet passes its Add button (the sheet already says the title). */
+export function MashScheduleView({ title = "Mash schedule", steps, header, ...verbs }: { title?: string; steps: readonly MashStep[]; header?: ReactNode } & ListRowProps) {
   return <>
-    {back !== undefined ? back : E.back("Recipe", title, E.btn("Add step"))}
+    {header !== undefined ? header : E.back("Recipe", title, E.btn("Add step"))}
     {steps.length === 0 ? E.blank({ title: "No steps yet", description: "Add step is the only action." })
       : steps.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, mashStepDetail(s), i, steps.length, verbs)}</Fragment>)}
     {E.info(mashSummary(steps))}

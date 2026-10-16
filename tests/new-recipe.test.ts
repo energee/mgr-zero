@@ -105,7 +105,7 @@ describe("Recipe creation", () => {
     const versioned = { title: "Hazy v1", createHref: "/recipes/x/new", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "mash · 40.9 lb / bbl", qty: "" }] };
     const empty = { title: "Hazy", createHref: "/recipes/x/new", empty: "No version yet: create the first one" };
     const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
-    const draft = (blocked?: string) => draw({ model: { title: "Hazy v2", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, blocked } });
+    const draft = (blockedReason?: string) => draw({ model: { title: "Hazy v2", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, blockedReason } });
 
     it("a cut version reads its numbers as text, with no input", () => {
       const cut = draw({ readOnly: true, model: versioned });
@@ -148,7 +148,7 @@ describe("Recipe creation", () => {
     });
 
     it("shows the recipe note, the saved date and a version note under headings", () => {
-      const html = draw({ readOnly: true, model: { ...versioned, note: "House IPA", saved: "Aug 28, 2026", notes: "Knock out cold." } });
+      const html = draw({ readOnly: true, model: { ...versioned, recipeNote: "House IPA", saved: "Aug 28, 2026", notes: "Knock out cold." } });
       expect(html).toMatch(/Recipe note[^]*House IPA/);
       expect(html).toMatch(/<dt[^>]*>Saved<\/dt><dd[^>]*>Aug 28, 2026<\/dd>/);
       expect(html).toMatch(/<dt[^>]*>Version note<\/dt><dd[^>]*>Knock out cold\.<\/dd>/);

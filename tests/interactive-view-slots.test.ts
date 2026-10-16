@@ -33,7 +33,7 @@ it("explicit null invoice question and QBO slots suppress their fixture actions"
   expect(html).not.toMatch(/>Fix</);
 });
 
-// Task 11 (QW18-21): the schedule views take a whole-header `back` slot and draw tappable rows.
+// Task 11 (QW18-21): the schedule views take a whole-header `header` slot and draw tappable rows.
 const STEPS = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
   { name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 },
@@ -43,12 +43,12 @@ const STAGES = [{ name: "Primary", kind: "primary", tempF: 68, days: 4 }, { name
 const WATER = { targetProfileId: "", sourceProfileId: "", mashGal: "", spargeGal: "", targetMashPh: "", additions: [] };
 const verbs = { onEdit: () => {}, onMove: () => {} };
 const headerOf = {
-  "Mash schedule": (back?: ReactNode) => createElement(MashScheduleView, { steps: STEPS, back }),
-  "Fermentation schedule": (back?: ReactNode) => createElement(FermentationScheduleView, { stages: STAGES, back }),
-  Water: (back?: ReactNode) => createElement(WaterView, { water: WATER, profiles: [], materials: [], back }),
+  "Mash schedule": (header?: ReactNode) => createElement(MashScheduleView, { steps: STEPS, header }),
+  "Fermentation schedule": (header?: ReactNode) => createElement(FermentationScheduleView, { stages: STAGES, header }),
+  Water: (header?: ReactNode) => createElement(WaterView, { water: WATER, profiles: [], materials: [], header }),
 };
 
-it.each(Object.entries(headerOf))("%s draws its own header, none for back={null}, and a passed node in its place", (title, view) => {
+it.each(Object.entries(headerOf))("%s draws its own header, none for header={null}, and a passed node in its place", (title, view) => {
   expect(renderToStaticMarkup(view())).toContain(`<h1 class="text-lg font-semibold">${title}</h1>`);
   const suppressed = renderToStaticMarkup(view(null));
   expect(suppressed).not.toContain("<h1");

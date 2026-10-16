@@ -4,7 +4,7 @@
 // schedules as rows under their headings. The live draft
 // (recipes/[id]/recipe-version-form.tsx) passes `controls`: the fields become
 // controlled, the schedule and ingredient rows open their sheets through
-// `slots`, the bottom button submits, and `controls.blocked` says what the
+// `slots`, the bottom button submits, and `controls.blockedReason` says what the
 // draft still lacks. Without `controls`, Create recipe version sits in the
 // title row. parentForm draws the recipe's parent fields (name, style, brand,
 // note) at the top.
@@ -23,14 +23,11 @@ export type RecipeControls = {
   submitLabel?: string;
   busy?: boolean;
   /** What the draft still needs before it can be saved (draftBlocker); set means the submit is disabled. */
-  blocked?: string | null;
+  blockedReason?: string | null;
   error?: string | null;
 };
 /** Rows that open a sheet on the live draft; each replaces the fixture's static row with the same row as trigger. */
 export type RecipeSlots = { addIngredient?: ReactNode; mash?: ReactNode; fermentation?: ReactNode; water?: ReactNode };
-
-/** Plain muted text for a polite status region; E.info is an alert and would interrupt the screen reader. */
-const statusText = (t: ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null);
 
 export function RecipeView({
   model,
@@ -75,11 +72,11 @@ export function RecipeView({
           {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
         </>
         : null}
-      {model.note ? E.row("Recipe note", model.note) : null}
+      {model.recipeNote ? E.row("Recipe note", model.recipeNote) : null}
       {model.saved ? E.fld("Saved", model.saved) : null}
       {/* Always mounted and polite: the prediction changes as the draft is typed,
           and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
-      <div role="status">{statusText(model.predicted)}</div>
+      <div role="status">{E.polite(model.predicted)}</div>
     </>
   );
   const body = model.empty ? (
@@ -105,9 +102,9 @@ export function RecipeView({
       {model.actualsNote ? E.note(model.actualsNote) : null}
       {controls ? (
         <>
-          <div role="status">{statusText(controls.blocked)}</div>
+          <div role="status">{E.polite(controls.blockedReason)}</div>
           <CommandFormMessage error={controls.error} />
-          <Button type="submit" className="w-full md:w-fit md:self-end" disabled={controls.busy || Boolean(controls.blocked)}>{controls.busy ? "Saving…" : controls.submitLabel ?? "Create recipe version"}</Button>
+          <Button type="submit" className="w-full md:w-fit md:self-end" disabled={controls.busy || Boolean(controls.blockedReason)}>{controls.busy ? "Saving…" : controls.submitLabel ?? "Create recipe version"}</Button>
         </>
       ) : null}
     </>
@@ -118,7 +115,7 @@ export function RecipeView({
     <>
       {E.back(model.backLabel ?? "Recipes", model.title, verb, model.backHref)}
       {controls
-        ? <form className="contents" onSubmit={(event) => { event.preventDefault(); if (!controls.busy && !controls.blocked) controls.onSubmit(); }}>{body}</form>
+        ? <form className="contents" onSubmit={(event) => { event.preventDefault(); if (!controls.busy && !controls.blockedReason) controls.onSubmit(); }}>{body}</form>
         : body}
     </>
   );

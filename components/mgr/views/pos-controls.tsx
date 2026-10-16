@@ -55,12 +55,6 @@ export function SquareDisconnectControl({ connectionId, status }: { connectionId
 
 type ExactCommand = ReturnType<typeof useExactCommand>;
 
-/** A result a screen reader should hear without being interrupted: plain text in a
- *  polite region that stays mounted, so the announcement fires when text appears. */
-function StatusText({ text }: { text: string | null }) {
-  return <div role="status">{text && <p className="text-sm text-muted-foreground">{text}</p>}</div>;
-}
-
 /** Each sync's outcome: a completed sync reads out in the status region; a
  *  superseded or failed sync stays an E.note alert, since it asks for action. */
 export function SyncFeedback({ runs }: { runs: [kind: string, action: ExactCommand][] }) {
@@ -75,7 +69,7 @@ export function SyncFeedback({ runs }: { runs: [kind: string, action: ExactComma
     }
   }
   return <>
-    <StatusText text={done.join(" · ") || null} />
+    <div role="status">{E.polite(done.join(" · ") || null)}</div>
     {problems.map(problem => <Fragment key={problem}>{E.note(problem)}</Fragment>)}
   </>;
 }
@@ -122,7 +116,7 @@ export function PublicationResult({ action, onRetry, onCorrected }: { action: Ex
     : null;
   const text = notice && `${notice.label} · ${notice.detail}`;
   return <div className="flex flex-col gap-2">
-    <StatusText text={notice?.tone === "success" ? text : null} />
+    <div role="status">{E.polite(notice?.tone === "success" ? text : null)}</div>
     {notice && notice.tone !== "success" && E.note(text)}
     {notice?.retry && <Button variant="outline" disabled={action.busy} onClick={onRetry}>Retry exact attempt</Button>}
     {notice && (status === "rejected" || status === "superseded") && <Button variant="outline" disabled={action.busy} onClick={onCorrected}>Start corrected attempt</Button>}

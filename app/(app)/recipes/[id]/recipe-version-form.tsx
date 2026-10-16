@@ -5,9 +5,10 @@
 // sessionStorage per actor, brewery and recipe (lib/mgr/recipe-draft.ts),
 // written as each change is made, restored with a notice and Start over on
 // return, and cleared when the version saves; /recipes/new keeps none, since
-// there is no recipe to key it by yet. The the ingredient, mash, fermentation and water rows opening
-// their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview from the same
-// pure recipeGravity the server uses (lib/recipe-gravity.ts). With a recipeId
+// there is no recipe to key it by yet. The ingredient, mash, fermentation and
+// water rows open their sheets (schedule-sheets.tsx), and the OG/FG/ABV preview
+// comes from the same pure recipeGravity the server uses (lib/recipe-gravity.ts),
+// or names why there is none (gravityBlockerText, noMashText). With a recipeId
 // the bottom button runs create_recipe_version, disabled with draftBlocker's
 // reason until the draft is complete; without one (recipes/new) the
 // shared parent fields sit on top and one save runs create_recipe then
@@ -26,7 +27,7 @@ import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { draftBlocker, gravityBlockerText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { draftBlocker, gravityBlockerText, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
@@ -54,7 +55,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   const start = initial ?? BLANK_DRAFT;
   const [parent, setParent] = useState(BLANK_RECIPE);
   const [draft, setDraft] = useState(start);
-  const [restored, setRestored] = useState<string | null>(null);
+  const [restoredNotice, setRestoredNotice] = useState<string | null>(null);
   const { numbers, notes, lines, mashSchedule, fermentationSchedule, water } = draft;
 
   const { setError } = action;
@@ -72,7 +73,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       }
       if (!kept) return;
       setDraft(kept.draft);
-      setRestored(kept.stale ? `Restored your unsaved draft, based on an earlier version; the recipe is now on v${baseVersion}.` : "Restored your unsaved draft");
+      setRestoredNotice(kept.stale ? `Restored your unsaved draft, based on an earlier version; the recipe is now on v${baseVersion}.` : "Restored your unsaved draft");
     };
     restore();
   }, [key, baseVersionId, baseVersion, setError]);
@@ -91,7 +92,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   function startOver() {
     if (key !== null) sessionStorage.removeItem(key);
     setDraft(start);
-    setRestored(null);
+    setRestoredNotice(null);
   }
 
   // Declared before the preview reads it during render (#440).
@@ -108,13 +109,15 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   });
 
   // Recomputed every render: a handful of numbers. Null (no "Predicted:"
-  // line) until every mash ingredient's material has an extract_potential and
-  // a weight unit; until then the preview names the first line that blocks it.
+  // line) until there is a mash ingredient and every mash ingredient's material
+  // has an extract_potential and a weight unit; until then the preview names the
+  // first line that blocks it, or says there is no mash ingredient.
   const gravityLines = validLines.map((l) => ({ perBblQty: Number(l.perBblQty), extractPotential: material.get(l.materialId)?.extract_potential ?? null, stage: l.stage, unit: material.unit(l.materialId) }));
   const preview = eff > 0 && eff <= 1 && att > 0 && att <= 1 && validLines.length > 0
     ? recipeGravity({ brewhouseEfficiency: eff, yeastAttenuation: att, ingredients: gravityLines })
     : null;
-  const gravityWhy = gravityBlockerText(gravityBlockers(gravityLines), (n) => material.name(validLines[n].materialId), (n) => material.unit(validLines[n].materialId), { saved: false });
+  const gravityWhy = gravityBlockerText(gravityBlockers(gravityLines), (n) => material.name(validLines[n].materialId), (n) => material.unit(validLines[n].materialId), { saved: false })
+    ?? noMashText(validLines.map((l) => l.stage));
 
   const creating = recipeId === undefined;
   // A parent that saved before the version failed is kept, so a retry writes
@@ -137,7 +140,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
     });
   }
   // What the draft still lacks, named for the brewer; the submit stays disabled until it is null.
-  const blocked = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
+  const blockedReason = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   const parentLocked = creating && createdId !== "";
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
@@ -159,13 +162,13 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
       parentForm={creating ? <>
         <NewRecipeFieldsView brands={brands} values={parent} onChange={setParent} busy={action.busy || parentLocked} />
         {parentLocked ? E.info("The recipe is saved under this name; only the version is still to write.") : null}
-      </> : restored ? <>
-        {E.info(restored)}
+      </> : restoredNotice ? <>
+        {E.info(restoredNotice)}
         {E.btn("Start over", "g", undefined, startOver)}
       </> : undefined}
       controls={{
         set: (field, value) => change(field === "notes" ? { notes: value } : { numbers: { ...draft.numbers, [field]: value } }),
-        onSubmit: () => void submit(), busy: action.busy, blocked, error: action.error,
+        onSubmit: () => void submit(), busy: action.busy, blockedReason, error: action.error,
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{

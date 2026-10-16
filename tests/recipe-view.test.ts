@@ -1,12 +1,13 @@
 // tests/recipe-view.test.ts — the recipe page's pure view-model: a saved
 // version copied into a draft (versionToDraft, versionNumbers), the first
 // reason a draft cannot be saved (draftBlocker), the read page's model
-// (toRecipePageModel) and why a prediction is missing (gravityBlockerText). No DB.
+// (toRecipePageModel) and why a prediction is missing (gravityBlockerText,
+// noMashText). No DB.
 // The last block reads the page and brand picker sources: the page draws
 // toRecipePageModel, and the picker never disables itself while it saves.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { draftBlocker, gravityBlockerText, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { draftBlocker, gravityBlockerText, noMashText, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
@@ -129,7 +130,7 @@ describe("toRecipePageModel", () => {
   it("dates the version in the brewery's zone and carries the recipe note", () => {
     const model = toRecipePageModel({ ...predicted, recipe: { ...snapshot.recipe, note: "House pale" }, version: { ...version, created_at: "2026-10-01T03:00:00Z" } }, ctx);
     expect(model.saved).toBe("Sep 30, 2026");
-    expect(model.note).toBe("House pale");
+    expect(model.recipeNote).toBe("House pale");
   });
   it("says which saved line had no extract potential instead of a prediction", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);
@@ -139,12 +140,28 @@ describe("toRecipePageModel", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], materials: { base_uom: "gal" } }] }, ctx);
     expect(model.predicted).toBe("CMG White Wheat is stocked in gal, which has no weight, so nothing is predicted.");
   });
+  it("says nothing is predicted when the version has no mash ingredient", () => {
+    const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);
+    expect(model.predicted).toBe("No mash ingredient, so nothing is predicted.");
+  });
   it("draws the empty recipe with no invented numbers", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
     expect(model.title).toBe("Pale");
     expect(model.empty).toBeTruthy();
     expect(model.mash).toBeUndefined();
     expect(model.saved).toBeUndefined();
+  });
+});
+
+describe("noMashText", () => {
+  it("names a missing mash ingredient when there are lines but none is mash", () => {
+    expect(noMashText(["boil", "dry_hop"])).toBe("No mash ingredient, so nothing is predicted.");
+  });
+  it("is null on an empty draft, where draftBlocker already asks for an ingredient", () => {
+    expect(noMashText([])).toBeNull();
+  });
+  it("is null when a mash line is present", () => {
+    expect(noMashText(["mash", "boil"])).toBeNull();
   });
 });
 

@@ -161,7 +161,7 @@ export const WATER_HAZY: WaterDraft = {
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
   saved: "Aug 28, 2026",
-  note: "The flagship. Keep it soft and juicy.",
+  recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   ingredients: [

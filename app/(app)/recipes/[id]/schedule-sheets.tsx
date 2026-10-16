@@ -55,7 +55,7 @@ export function MashScheduleSheet({ steps, onChange, trigger }: { steps: MashSte
   return <ListSheet sheetTitle="Mash schedule" trigger={trigger ?? `Mash schedule · ${steps.length} steps`} addLabel="Add step" saveLabel="Save step"
     items={steps} onChange={onChange} toFields={toMashStepFields} ready={mashStepReady}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), minutes: Number(f.minutes) })}
-    list={(p) => <MashScheduleView steps={p.items} onEdit={p.onEdit} onMove={p.onMove} back={p.add} />}
+    list={(p) => <MashScheduleView steps={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
     item={(p) => <MashStepView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
 }
 
@@ -63,7 +63,7 @@ export function FermentationScheduleSheet({ stages, onChange, trigger }: { stage
   return <ListSheet sheetTitle="Fermentation schedule" trigger={trigger ?? `Fermentation schedule · ${stages.length} stages`} addLabel="Add stage" saveLabel="Save stage"
     items={stages} onChange={onChange} toFields={toStageFields} ready={stageReady}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), days: Number(f.days) })}
-    list={(p) => <FermentationScheduleView stages={p.items} onEdit={p.onEdit} onMove={p.onMove} back={p.add} />}
+    list={(p) => <FermentationScheduleView stages={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
     item={(p) => <FermentationStageView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
 }
 
@@ -72,7 +72,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
   return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
-    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} back={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
+    list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} header={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
 }
 

@@ -9,11 +9,11 @@ import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { INGREDIENT_STAGES } from "./recipe-process-view";
 import type { RecipeDraft } from "./recipe-view";
 
-const numberText = z.string();
 const draftShape = z.object({
+  // Numeric fields are held as typed text; draftBlocker checks them when saving.
   numbers: z.object({
-    preBoil: numberText, boilMin: numberText, whirlpoolMin: numberText, whirlpoolTemp: numberText,
-    whirlpoolRest: numberText, knockoutTemp: numberText, efficiency: numberText, attenuation: numberText,
+    preBoil: z.string(), boilMin: z.string(), whirlpoolMin: z.string(), whirlpoolTemp: z.string(),
+    whirlpoolRest: z.string(), knockoutTemp: z.string(), efficiency: z.string(), attenuation: z.string(),
   }),
   notes: z.string(),
   lines: z.array(z.object({ materialId: z.string(), perBblQty: z.string(), stage: z.enum(INGREDIENT_STAGES), timingMinutes: z.string() })),

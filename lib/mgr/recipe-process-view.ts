@@ -16,10 +16,10 @@ export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies 
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
-/** "dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+/** "dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
   `${stage.replace("_", " ")}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
 /** Name and base unit by material id, for rows that name a material the command returned. */
