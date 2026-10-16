@@ -9,11 +9,11 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 
 ## Decisions
 - **2026-09-02 — Bun is the package manager.** Installs and scripts go through Bun (`bun install`, `bun run`, `bunx`); Node 22 remains the Next.js runtime. The committed lockfile is `bun.lock` only.
-- **`components/mgr/screens.tsx` is the source of truth for MGR screens** (2026-09-02; built from UI plan rev 4). `2026-08-31-mgr-wireframes.html` was ported into typed records by 2026-09-03 (PR #69, last 17 Slack/QuickBooks/Square venue frames into `components/mgr/venue.tsx`); the file itself, and the dev-only `/design` gallery it fed, were deleted 2026-09-04 (PR #133) — `/docs/screens` is now the sole design-review surface. Change navigation/flows and the `SCREENS` array together — the record count is not sacred, a real operator job gets a real body, never an annotation chip. The records publish read-only at `/docs/screens` (MGR frames, long linkable index), `/docs/screens-explore` (filterable, tappable walkthrough over the same records — a role-scoped persona switch, sheets portal inline, browser back retraces taps; `tests/tap-coverage.test.ts` fails if any tap in any screen resolves nowhere; PR #136, refactored PR #139) and `/docs/integrations` (the venue frames, grouped by product); all embed the one public `app/(frames)/screens/frame/[s]` route (the explorer draws screens inline in their own shell instead) — a generated page, deliberately outside the documentation agent's allowlist (`tests/design-docs.test.ts`). Staff uses Today/Beer/Work/More; the wholesale portal has its own Order/Orders/Invoices/Account shell. Frames draw only user-visible UI — the annotation, gate-copy, and Today-exemplar rules live in the plan preamble and §5, not here. Edit the typed records directly, never regenerate.
-- **MGR screen controls, established across the design pass (2026-09-03, PRs #89–#127):** one primary (filled) action per screen, other verbs outline/ghost; quantities and dates use native inputs (`E.qty`, native date) rather than an on-screen keypad; a field a user can change renders a real shadcn `Input`/`Select`/`Switch`, never a chip standing in for a field; `E.tabs` is for view switchers, chips stay for filters and single-choice fields; the shell and its grids use the real desktop width (`md:max-w-5xl`, responsive `E.btns`/`E.tiles`) rather than a phone-width column stretched wide.
+- **`components/mgr/screens.tsx` is the source of truth for MGR screens** (2026-09-02; the wireframe HTML and `/design` gallery are deleted, PR #133). Change navigation/flows and the `SCREENS` array together — the record count is not sacred, a real operator job gets a real body, never an annotation chip. The records publish read-only at `/docs/screens`, `/docs/screens-explore` (role-scoped persona switch, sheets portal inline, browser back retraces taps; `tests/tap-coverage.test.ts` fails if any tap resolves nowhere) and `/docs/integrations` (venue frames); all embed the one public `app/(frames)/screens/frame/[s]` route (the explorer draws screens inline in their own shell instead) — a generated page, deliberately outside the documentation agent's allowlist (`tests/design-docs.test.ts`). Staff uses Today/Beer/Work/More; the wholesale portal has its own Order/Orders/Invoices/Account shell. Frames draw only user-visible UI — the annotation, gate-copy, and Today-exemplar rules live in the plan preamble and §5, not here. Edit the typed records directly, never regenerate.
+- **MGR screen controls, established across the design pass (2026-09-03, PRs #89–#127):** one primary (filled) action per screen, other verbs outline/ghost; quantities use the shared stepper (`E.qty`, `components/mgr/qty.tsx`) and dates the shared `DatePicker` (`E.edit` with `type="date"`), never an on-screen keypad — a native number input is lint-banned anywhere outside `qty.tsx`; a field a user can change renders a real shadcn `Input`/`Select`/`Switch`, never a chip standing in for a field; `E.tabs` is for view switchers, chips stay for filters and single-choice fields; the shell and its grids use the real desktop width (`md:max-w-5xl`, responsive `E.btns`/`E.tiles`) rather than a phone-width column stretched wide.
 - **Accent colors carry semantic status/action roles (2026-09-06, PR #156):** the six-accent palette is fixed to meanings, not chosen per screen — confirm green, put-back/assign orange, pick/count/resume cyan, general actions purple, destructive red/pink — with AA-checked light/dark tokens; color supplements the label/icon, it never stands alone. Sign out is classed destructive (red), not the teal accent for "irreversible actions that still write a record" (PR #155); `app/globals.css`'s token comment is the single statement of which accent means what — update it in the same change that reclassifies a control.
-- **Migrations accumulate; a committed one is never edited again (2026-09-13, PRs #285, #337 — supersedes the earlier "baseline edited in place" practice).** `supabase db push` applies a migration version once and never rereads that file, so two migrations kept being hand-edited after hosted had already applied them (`00001_baseline.sql` through #320/#326, then a second file through #303–#319) and the edits never reached hosted — `/settings`, `/menu`, and Ask MGR broke on live (#329, #330). Fix: both applied files were restored to exactly what hosted ran, everything edited into them since became one catch-up migration, and `supabase/migrations.lock.json` + `tests/migrations-applied.test.ts` now fail the build the moment a committed migration's hash changes. A schema change is always a new migration file, then `bun run migrations:lock`. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md` (pre-#285 baseline design).
-- **The backend push landed 2026-09-08 (Programs 0–10, PRs #185–#209), then continued hardening through an adversarial-walkthrough remediation wave (PRs #480–#600).** Schema, RPCs, and the full command surface exist for all ten programs (ordering, locations/bins/stock-transfers, catalog identity, sale channels, production/packaging/cellar, purchasing, taproom kegs, delivery routes, compliance/lot-trace, explorer-parity landings). `components/mgr/screens.tsx` is no longer screens-only work — database/RPC work is normal, gated per-screen only where `writes` still says `SCHEMA-GATE` (`TODO.md` keeps the current count). Durable rulings from those programs: gravity is stored in °Plato only with a per-user/brewery display-unit preference, resolved server-side, never stored computed (Program 5); a hop contract's lead time is an observed vendor view, never stored, and PO transport (`sent_via`) is a property, not a `po_status` fork (Program 6, confirms the PR #173 design); a keg event naming a customer only ever means shipped/lost-at-customer, never `found` (Program 7); a departed delivery route is frozen — no stop can change and the route can't return with one open (Program 8); a movement's tax treatment is resolved and frozen at insert, never recomputed at report time, so editing a channel or customer later never restates a filed month (Program 9); global search is parallel per-entity RLS-bound reads, not a definer SQL function, because RLS already decides the rows (Program 10). `ship_order` records the bin and lot of each source the caller names (migration `20260927080000`); the ship form always names its sources, so lot trace reaches the customer for lot-tracked stock. A legacy call that omits `sources` consumes untracked first-bin stock and records no lot.
+- **Migrations accumulate; a committed one is never edited again (2026-09-13, PRs #285, #337).** The rule and its lock test are in `AGENTS.md` Authority. The two hand-edited files were restored to exactly what hosted ran, and everything edited into them became one catch-up migration. Pre-#285 baseline design: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
+- **Backend program rulings (Programs 0–10).** Gravity is stored in °Plato only with a per-user/brewery display-unit preference, resolved server-side, never stored computed (Program 5). A keg event naming a customer only ever means shipped/lost-at-customer, never `found` (Program 7). A movement's tax treatment is resolved and frozen at insert, never recomputed at report time, so editing a channel or customer later never restates a filed month (Program 9). (Lead time, `sent_via`, departed routes, and global search: `.agents/ARCHITECTURE.md` ownership table.) `ship_order` records the bin and lot of each source the caller names (migration `20260927080000`); the ship form always names its sources, so lot trace reaches the customer for lot-tracked stock. A legacy call that omits `sources` consumes untracked first-bin stock and records no lot.
 - **Order confirmation is review-only (2026-10-13 owner ruling, #713, PR #887).** No surface confirms an order without the Confirm order review (`/orders/[id]/confirm`); the order detail footer has no direct Confirm. ATP stays a soft warning: warn, don't block.
 - **A role guard must be NULL-safe (2026-10-15, #895, PR #897).** `public.staff_role(b)` returns NULL for a non-member, so `staff_role(b) <> 'admin'` or `not in (...)` is NULL and never raises. Use `is distinct from 'admin'` or `coalesce(staff_role(b)::text, '') not in (...)` (as `private.assert_chat_admin` does). Six QuickBooks RPCs let an outsider write before this fix.
 - **A SKU's own `skus.upc` wins over its price group's barcode (2026-10-14, #879, PR #879 D2 amended).** `price_group_barcodes` holds one nullable UPC per price group × packaged format; `list_formats` and `get_format_composition` name `formats_price_group_fk` because the table adds a second PostgREST path.
@@ -39,28 +39,21 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   fulfillment source (`set_portal_fulfillment_source`, PR #29). See
   `.agents/ARCHITECTURE.md`. A registry name or client-held ID does not prove
   a gate is met.
-- The public HTTP API is `POST /api/command` (the command registry). Auth is
-  the existing Supabase user session: browser cookies, or
-  `Authorization: Bearer <access_token>` from password grant against the
-  Supabase Auth URL. No resource REST routes, no API keys, until a non-user
+- Public HTTP API: `POST /api/command` only (`.agents/ARCHITECTURE.md` iron
+  rule 1). A script gets its Bearer access token by password grant against the
+  Supabase Auth URL. No resource REST routes and no API keys until a non-user
   machine client exists.
-- Public-schema table DML is revoked from `anon` and `authenticated`; local
-  Supabase also disables automatic Data API grants so the baseline ACL is
-  self-contained. Staff writes are authorized in SQL, not only in the
-  registry: each mutation RPC is `security definer`, calls
-  `private.assert_staff(brewery, roles)` (or `private.assert_customer`)
-  first, then claims `(actor, requestId)` against brewery, command, canonical
-  payload, and result in `private.command_requests`. Raw Data API writes fail
-  42501 for every browser JWT. (2026-09-01 merge decision: PR #27's
-  `security invoker` + `require_authorized_staff_rpc` + `request.path`
-  policies were superseded by this model; only its additive work was kept.)
-  New writers must be granted explicitly in the baseline's Data API grants
-  section and pinned in `tests/data-api-boundary.test.ts` /
-  `tests/rls-command-boundary.test.ts` (nothing is auto-exposed).
-- Integration credentials never sit in a public table. `private.integration_tokens`
-  is reachable only through `lib/supabase/integration-tokens.ts` (server-only,
-  admin/sales, visible-connection check, then service-only RPC that rechecks
-  membership); connection delete/identity change purges the token row.
+- Writes are authorized in SQL (`.agents/ARCHITECTURE.md` iron rule 5): each
+  mutation RPC calls `private.assert_staff(brewery, roles)` (or
+  `private.assert_customer`) first, and raw Data API writes fail 42501 for every
+  browser JWT. Nothing is auto-exposed (`auto_expose_new_tables = false`): a new
+  writer is granted in its migration and pinned in
+  `tests/data-api-boundary.test.ts` / `tests/rls-command-boundary.test.ts`.
+- Integration credentials never sit in a public table:
+  `private.integration_tokens`, behind `lib/supabase/integration-tokens.ts`
+  (iron rule 4). That boundary is server-only (`import "server-only"`) and
+  admits Admin or Sales for token access; a few operations are Admin-only.
+  Connection delete or identity change purges the token row.
 - `import_csv` (`begin_csv_import` plus per-row `import_csv_row`) and
   `invite_staff` / `invite_customer_user` (the durable invitation workflow)
   are live; see the CSV and Auth invitation sections of
@@ -103,19 +96,14 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   third `orders.kind` (orders stay a priced customer document); bin-to-bin
   moves inside one location are structurally barred from becoming
   deliveries (`check (to_location_id <> from_location_id)`).
-- **The HTTP API reference lives at `/docs/api`, not README (2026-09-07, PRs
-  #165–#167; split from one generated page into `content/docs/api/` — an
-  index plus one page per area — 2026-09-25, PR #492):** generated by
-  `bun run docs:api` from the command registry (available operations) and
-  each screen's declared `reads`/`writes` (designed operations);
-  `tests/api-docs.test.ts` fails on drift, including round-tripping every
-  generated curl example through its own command's Zod schema. The
-  `http-api` agent (`.agents/agents/http-api.md`) now runs post-merge via
-  `.github/workflows/http-api-agent.yml`, mirroring the documentation agent:
-  it may edit prose and screen `reads:`/`writes:` annotations only, never
-  the generated tables (`Bash` is absent from its allowlist — the workflow
-  regenerates), and every PR it opens states whether the designed-operation
-  count shrank or held.
+- **The HTTP API reference lives at `/docs/api` (`content/docs/api/`, one page
+  per area), not README.** `bun run docs:api` generates it from the command
+  registry (available operations) and each screen's `reads`/`writes`
+  (designed operations); `tests/api-docs.test.ts` fails on drift, including
+  round-tripping every curl example through its command's Zod schema. Every
+  PR the post-merge `http-api` agent opens states whether the
+  designed-operation count shrank or held; its edit limits are in
+  `.agents/agents/http-api.md` "In CI".
 - **Keg deposit and Keg fleet Returned event stay separate records (2026-09-26
   owner decision, issue #577, PR #605).** Reconciliation, not a merged write:
   `kegDepositRows` (`lib/keg-deposits.ts`, pure) flags a customer × pool × size
@@ -149,7 +137,12 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `git diff --name-only` never reports a file an agent created rather than edited, so a job that gates on that diff being empty will silently discard untracked output as "no changes". Stage first (`git add -A`) and diff the index instead (PR #49, documentation-agent.yml).
 - `claude-code-action` rewrites the repository's git identity to `claude[bot]` while the model runs, overriding any identity configured before it (e.g. dreaming's own prepare step). A commit made in a later job step inherits that rewritten config unless it names the author explicitly; `dreaming.yml`'s validate step now commits with `git -c user.name=$DREAM_LOGIN -c user.email=$DREAM_EMAIL` so the dream commit is attributed to `mgr-bot`, not `claude[bot]` (PR #131).
 - A test that freezes the worker clock to a fixed timestamp while the code under test queues rows keyed off the real `now()` (e.g. `next_attempt_at`) goes red with no code change once wall-clock time passes that fixed point. Pin a frozen-clock test a decade or more ahead of wall time, not to a plausible recent date (`tests/chat-jobs.test.ts`, `tests/chat-delivery-policy.test.ts`, PR #151).
-- Claude Code Review now skips any PR by checking `github.event.pull_request.user.type != 'Bot'` (`claude-code-review.yml`), not the two hardcoded branch names (`dreaming/main`, `documentation/user-guide`) it used before — the old check missed `docs/http-api` and any future bot-maintained branch and once failed CI outright on a `mgr-bot`-authored PR ("Workflow initiated by non-human actor"). `tests/workflow-contract.test.ts` asserts the `user.type` condition, not branch names (PR #169, #170).
+- Claude Code Review skips bot PRs by checking `github.event.pull_request.user.type != 'Bot'` (`claude-code-review.yml`), never a list of branch names: a name list misses the next bot-maintained branch and fails CI on it ("Workflow initiated by non-human actor"). `tests/workflow-contract.test.ts` asserts the `user.type` condition (PRs #169, #170).
+- If `tests/chat-jobs.test.ts` times out locally, that is the shared dev
+  database, not your change: its `runChatScan` walks every brewery with an
+  active `chat_installations` row, and every past run left a fake one behind.
+  `update chat_installations set state = 'disconnected' where state = 'active'`
+  clears it (no seed creates installations, so every active row is a leftover).
 - A parallel `.agents/worktrees/<branch>` session holding port 3000 pushes your own `next dev` to 3001 silently; browsing 3000 then renders the other worktree's tree, so a real change reads as "not applied." The `browse` skill's step 4 eyeball check must target the port `next dev` actually printed (`lsof` finds whose checkout owns 3000) (PR #176).
 
 ## Process
