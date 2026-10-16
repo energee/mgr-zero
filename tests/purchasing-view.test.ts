@@ -175,7 +175,7 @@ describe("receipt Bill presentation", () => {
     expect(html).toContain("Posting result unknown");
     expect(html).toContain("Retry exact Bill");
     expect(html).toContain("original provider request ID");
-    expect(html).toContain('class="contents" data-preview-action=""');
+    expect(html).toContain('data-preview-action="true"');
   });
 
   it("makes a rejected Bill an explicit corrected attempt against the latest receipt, not an unknown retry", () => {

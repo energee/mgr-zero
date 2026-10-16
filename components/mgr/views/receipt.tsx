@@ -37,9 +37,9 @@ export function ReceiptView({ model, onPostBill, busy = false, error }: {
         {E.info("Bill payments are managed only in QuickBooks. MGR does not record or sync Bill payments.")}
         <CommandFormMessage error={bill.error} />
         <CommandFormMessage error={error} />
-        {bill.action && <div className="contents" data-preview-action><CommandForm open={confirming} onOpenChange={open => { if (!busy) setConfirming(open); }}
+        {bill.action && <CommandForm open={confirming} onOpenChange={open => { if (!busy) setConfirming(open); }}
           title={retry ? "Reconcile receipt Bill in QuickBooks?" : corrected ? "Post corrected Bill to QuickBooks?" : "Post receipt Bill to QuickBooks?"}
-          trigger={E.btn(retry ? "Retry exact Bill" : corrected ? "Post corrected Bill" : "Post Bill to QuickBooks", busy || !onPostBill ? "p disabled" : "p")}>
+          trigger={E.btn(retry ? "Retry exact Bill" : corrected ? "Post corrected Bill" : "Post Bill to QuickBooks", busy || !onPostBill ? "p disabled" : "p", undefined, undefined, { "data-preview-action": true })}>
           <form className="flex flex-col gap-3" data-preview-action onSubmit={event => event.preventDefault()}>
             {E.note(retry
               ? "Check QuickBooks for the original frozen Bill first. If it is absent, resend that exact saved snapshot with the same provider request ID. Do not create a new attempt, change its vendor or account, or include later receipt corrections."
@@ -51,7 +51,7 @@ export function ReceiptView({ model, onPostBill, busy = false, error }: {
               if (!busy && await onPostBill?.()) setConfirming(false);
             }}>{busy ? "Checking…" : retry ? "Confirm exact Bill retry" : corrected ? "Confirm corrected Bill" : "Confirm post Bill"}</Button></CommandFormFooter>
           </form>
-        </CommandForm></div>}
+        </CommandForm>}
       </>}
       {model.revisions?.map(revision => <div key={revision.label}>{E.nav(revision.label, "Receipt history", "", undefined, revision.href)}</div>)}
       {model.correction && E.act("Correct receipt", "attention", model.correction.href)}

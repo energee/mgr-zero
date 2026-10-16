@@ -689,9 +689,12 @@ export class QboOAuthClient {
     }
     const rows = payload?.QueryResponse?.Bill ?? [];
     if (!Array.isArray(rows)) throw new Error("Bill reconciliation response was invalid");
-    const matches = rows.filter((row): row is Record<string, unknown> => !!row && typeof row === "object"
-      && row.DocNumber === frozen.DocNumber && row.PrivateNote === `MGR receipt bill ${requestId}`
-      && typeof row.Id === "string" && row.Id.length > 0);
+    const matches = rows.filter((value: unknown): value is Record<string, unknown> => {
+      if (!value || typeof value !== "object") return false;
+      const row = value as Record<string, unknown>;
+      return row.DocNumber === frozen.DocNumber && row.PrivateNote === `MGR receipt bill ${requestId}`
+        && typeof row.Id === "string" && row.Id.length > 0;
+    });
     if (rows.length !== 0 && (matches.length !== 1 || rows.length !== 1)) throw new Error("Bill reconciliation identity was ambiguous");
     return { ok: true as const, remoteId: matches.length === 1 ? matches[0].Id as string : null };
   }

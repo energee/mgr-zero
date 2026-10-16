@@ -1054,6 +1054,44 @@ describe("QuickBooks receipt Bills", () => {
     expect(receiptBillAttempts(foreign.brewery.id)).toEqual([]);
   });
 
+  it("keeps the central explicit-actor role check private and false for absent membership or allowed roles", async () => {
+    const f = await receiptBillFixture();
+    const foreign = await makeBrewery();
+    const results = sql(`select jsonb_build_array(
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}',null,array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${foreign.id}','${f.ctx.userId}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${crypto.randomUUID()}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',array[]::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',null))::text`);
+    expect(JSON.parse(results[0])).toEqual([true, false, false, false, false, false]);
+    expect(sql(`select r.role from (values ('anon'),('authenticated'),('service_role')) r(role)
+      where has_function_privilege(r.role,'private.actor_has_staff_roles(uuid,uuid,public.staff_role[])','execute')`)).toEqual([]);
+  });
+
+  it("rechecks the current actor role at completion and recovers the same Bill after permission returns", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const response = await remote.fetch(input, init);
+      if (init?.method === "POST") {
+        expect((await admin.from("brewery_users").update({ role: "warehouse" })
+          .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
+      }
+      return response;
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).rejects.toThrow(/reconciliation failed/i);
+    expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id").eq("id", f.receiptId).single()).data)
+      .toEqual({ qbo_bill_status: "pending", qbo_bill_id: null });
+    expect((await admin.from("brewery_users").update({ role: "admin" })
+      .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toHaveLength(1);
+    expect(remote.bills.size).toBe(1);
+  });
+
   it("only permits an explicitly corrected fresh attempt after a definite rejection and preserves the rejected snapshot", async () => {
     const f = await receiptBillFixture();
     const rejectedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
