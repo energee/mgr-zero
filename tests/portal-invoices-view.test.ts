@@ -6,12 +6,13 @@ import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
+import { E } from "../components/mgr/e";
 import { PortalInvoiceView } from "../components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "../components/mgr/views/portal-invoices";
 import { QuestionInvoiceView } from "../components/mgr/views/question-invoice";
 import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "../lib/mgr/fixtures/portal-invoices";
-import { toPortalInvoiceViewProps } from "../lib/mgr/portal-invoice-view";
+import { toPortalInvoiceViewProps, type PortalInvoiceSnapshot } from "../lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "../lib/mgr/portal-invoices-view";
 import { toQuestionInvoiceViewProps } from "../lib/mgr/question-invoice-view";
 
@@ -50,7 +51,7 @@ describe("Invoice history view", () => {
       detail: "due Oct 3, 2026",
       total: "$948.00",
       unpaid: true,
-      tone: "",
+      tone: "w",
       href: "/portal/invoices/00000000-0000-4000-8000-000000001042",
     });
     expect(model.rows[1]).toMatchObject({
@@ -68,7 +69,7 @@ describe("Invoice history view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("treats a credit memo as settled money, not Pay", () => {
+  it("treats a credit memo as neutral money, not Pay or paid", () => {
     const model = toPortalInvoicesViewProps({
       customerName: RIDGELINE.name,
       invoices: [{
@@ -85,7 +86,7 @@ describe("Invoice history view", () => {
       detail: "credit",
       total: "−$106.00",
       unpaid: false,
-      tone: "ok",
+      tone: "",
     });
   });
 
@@ -140,6 +141,57 @@ describe("Invoice history view", () => {
 });
 
 describe("Portal invoice view", () => {
+  const states: {
+    status: string;
+    tone: "" | "ok" | "w";
+    invoice: Partial<PortalInvoiceSnapshot["invoice"]>;
+  }[] = [
+    { status: "Paid", tone: "ok", invoice: { paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 } },
+    { status: "Settled", tone: "ok", invoice: { qbo_remote_state: "live", qbo_balance_cents: 0 } },
+    { status: "Unpaid", tone: "w", invoice: { qbo_balance_cents: 94800 } },
+    { status: "Review", tone: "w", invoice: { qbo_accountant_drift: true, qbo_balance_cents: 94800 } },
+    { status: "Voided", tone: "", invoice: { qbo_remote_state: "voided", paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 } },
+    { status: "Deleted", tone: "", invoice: { qbo_remote_state: "deleted", paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 } },
+    { status: "Written off", tone: "", invoice: { written_off_at: "2026-09-10T12:00:00Z", paid_at: "2026-09-09T12:00:00Z", qbo_balance_cents: 0 } },
+    { status: "Credit", tone: "", invoice: { kind: "credit_memo" } },
+  ];
+
+  it.each(states)("renders $status with its financial tone and visible words", ({ status, tone, invoice }) => {
+    const snapshot = { ...portalInvoiceUnpaid, invoice: { ...portalInvoiceUnpaid.invoice, ...invoice } };
+    const model = toPortalInvoiceViewProps(snapshot);
+    expect(model.status).toBe(status);
+    const html = htmlOf(createElement(PortalInvoiceView, { model, footer: null }));
+    expect(html).toContain(renderToStaticMarkup(E.row("Status", status, "", tone)));
+    expect(html).toContain("Question this invoice");
+    expect(html).not.toContain(">Pay invoice<");
+    if (status !== "Review") {
+      const list = toPortalInvoicesViewProps({
+        customerName: RIDGELINE.name,
+        invoices: [{ ...snapshot.invoice, invoice_lines: snapshot.lines }],
+      });
+      const row = list.rows[0];
+      expect(row.tone).toBe(tone);
+      const expectedRow = E.row(
+        row.title,
+        row.unpaid ? `${row.detail} · ${row.total}` : row.detail,
+        row.unpaid ? E.act("Pay", "info") : row.total,
+        tone,
+      );
+      expect(htmlOf(createElement(PortalInvoicesView, { model: list })))
+        .toContain(renderToStaticMarkup(expectedRow));
+    }
+  });
+
+  it.each([undefined, "/invoices"])("uses warning tokens on status badges without losing words or links (%s)", (href) => {
+    const warning = htmlOf(E.status("Needs review", "w", href));
+    expect(warning).toContain("bg-warning");
+    expect(warning).toContain("text-warning-foreground");
+    expect(warning).toContain(">Needs review<");
+    if (href) expect(warning).toContain(`href="${href}"`);
+    expect(htmlOf(E.status("Paid", "ok"))).not.toContain("bg-warning");
+    expect(htmlOf(E.status("Credit"))).not.toContain("bg-warning");
+  });
+
   it("maps portal_invoice onto number, total, due, lines, and brewery phone", () => {
     const model = toPortalInvoiceViewProps(portalInvoiceUnpaid);
     expect(model.title).toBe("INV-1042");

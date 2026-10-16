@@ -4,7 +4,7 @@
 // (QBO Payments parked) and passes QuestionForm in question.
 import { type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
+import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
 
 export type { PortalInvoiceViewModel };
 
@@ -41,7 +41,7 @@ export function PortalInvoiceView({
       {E.back("Invoices", model.title, undefined, model.backHref)}
       {E.ttl(model.total)}
       {E.fld("Issued", model.issued)}
-      {E.row("Status", model.status, "", model.status === "Unpaid" ? "w" : "ok")}
+      {E.row("Status", model.status, "", portalInvoiceStatusTone[model.status])}
       {kind === "unavailable"
         ? E.info("Online payment isn’t available for this invoice right now.")
         : null}
