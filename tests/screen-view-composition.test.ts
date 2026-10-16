@@ -85,6 +85,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
     visited.add(key);
     const file = sourceFile(path);
     const imports = new Map<string, { imported: string; path?: string }>();
+    let lazyImportName: string | undefined;
 
     for (const statement of file.statements) {
       if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
@@ -94,8 +95,29 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
       const bindings = clause?.namedBindings;
       if (bindings && ts.isNamedImports(bindings)) {
         for (const element of bindings.elements) {
+          if (statement.moduleSpecifier.text === "react" && (element.propertyName?.text ?? element.name.text) === "lazy") lazyImportName = element.name.text;
           imports.set(element.name.text, { imported: element.propertyName?.text ?? element.name.text, path: target });
         }
+      }
+    }
+
+    // Follow mounted React.lazy default imports, not every component exported
+    // by the deferred module.
+    for (const statement of file.statements) {
+      if (!lazyImportName || !ts.isVariableStatement(statement)) continue;
+      for (const declaration of statement.declarationList.declarations) {
+        const initializer = declaration.initializer;
+        if (!ts.isIdentifier(declaration.name) || !initializer || !ts.isCallExpression(initializer)
+          || !ts.isIdentifier(initializer.expression) || initializer.expression.text !== lazyImportName) continue;
+        const loader = initializer.arguments[0];
+        if (!loader || !ts.isArrowFunction(loader) || !ts.isCallExpression(loader.body)) continue;
+        const importCall = loader.body;
+        if (importCall.expression.kind !== ts.SyntaxKind.ImportKeyword
+          || !importCall.arguments[0] || !ts.isStringLiteral(importCall.arguments[0])) continue;
+        imports.set(declaration.name.text, {
+          imported: "default",
+          path: localModule(path, importCall.arguments[0].text),
+        });
       }
     }
 
@@ -185,6 +207,8 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/unused.tsx")).not.toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/lazy-delegated.tsx")).toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/lazy-unused.tsx")).not.toContain("ExampleView");
   });
 
   it("records audited whole-body slots even when the expected view is mounted", () => {
