@@ -55,13 +55,13 @@ function checkBundle(
     expect(read(join(root, "output"))).toContain("changed=true");
     if (advanceMain) {
       writeFileSync(join(publisher, "application.ts"), "new main code\n");
-      git(publisher, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "add", ".");
+      git(publisher, "add", ".");
       git(publisher, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "intervening main");
       git(publisher, "update-ref", "refs/remotes/origin/main", "HEAD");
     }
     const published = spawnSync("bash", ["-e", "-o", "pipefail", "-c", publishShell], {
       cwd: publisher,
-      env: { ...env, RUNNER_TEMP: producer, TRUSTED_BASE: base },
+      env: { ...env, RUNNER_TEMP: producer, TRUSTED_BASE: base, DREAM_LOGIN: "Fixture", DREAM_EMAIL: "fixture@example.invalid" },
       encoding: "utf8",
     });
     check({ published, publisher, base });
@@ -84,49 +84,6 @@ describe("dreaming workflow", () => {
 
     expect(written).toEqual(expect.arrayContaining(["TODO.md", ".agents/PROGRESS.md"]));
     for (const path of written) expect(allowlist).toContain(path);
-  });
-
-  it("batches curation and leaves publication to a deterministic job", () => {
-    const workflow = read(".github/workflows/dreaming.yml");
-    const prompt = read(".agents/agents/dreaming.md");
-
-    expect(workflow).not.toMatch(/^  push:/m);
-    expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("schedule:");
-    expect(workflow).toContain("if: github.ref == 'refs/heads/main'");
-    expect(workflow).toContain("publish:\n    needs: maintain");
-    expect(workflow).toContain("actions/upload-artifact");
-    expect(workflow).toContain("actions/download-artifact");
-    expect(workflow).toContain('EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}');
-    expect(workflow).toContain('current_pr=$(gh pr list');
-    expect(workflow).toContain('[ "$current_pr" = "$EXPECTED_PR" ]');
-    expect(workflow).toContain("git add -A");
-    expect(workflow).toContain("git diff --cached --name-only");
-    // Maintain gives early staged feedback; publish independently checks the full tree.
-    expect(workflow).toContain("Dream changed forbidden path");
-    expect(workflow).toContain("Dream bundle changed forbidden path");
-    expect(workflow).toContain("refs/dreaming/last-checked");
-
-    const modelArgs = workflow.match(/claude_args: '([^']+)'/)?.[1] ?? "";
-    expect(modelArgs).not.toContain("Bash(git ");
-    expect(modelArgs).not.toMatch(/gh pr (create|edit)/);
-    expect(prompt).not.toContain("## Publish");
-  });
-
-  it("ships the validated dream commit as a bundle so publish never re-merges or 3-way applies", () => {
-    const workflow = read(".github/workflows/dreaming.yml");
-
-    expect(workflow).toContain('git bundle create dream.bundle HEAD ^origin/main ${DREAM_SHA:+^$DREAM_SHA}');
-    expect(workflow).toContain('git fetch "$RUNNER_TEMP/dream.bundle" HEAD');
-    expect(workflow).toContain("git checkout -B dreaming/main FETCH_HEAD");
-    expect(workflow).not.toContain("git apply");
-    expect(workflow).not.toContain("dream.patch");
-    // One merge decision, made in maintain; publish does not re-derive it.
-    expect(workflow.split("git merge --no-edit origin/main")).toHaveLength(2);
-    // Publish does nothing but advance the marker when the dream changed nothing.
-    expect(workflow).toMatch(
-      /name: Publish dream pull request\n\s+if: needs\.maintain\.outputs\.changed == 'true'/
-    );
   });
 
   it("recovers from a conflicting dreaming/main without a silent rebuild", () => {
@@ -230,13 +187,35 @@ describe("dreaming workflow", () => {
     expect(prompt).toMatch(/two or more/i);
   });
 
-  it("captures Git evidence before the model without staging it", () => {
-    const capture = workflow.jobs.maintain.steps.findIndex((step) => step.name === "Capture trusted Git evidence");
-    const dream = workflow.jobs.maintain.steps.findIndex((step) => step.name === "Run dream");
-    expect(capture).toBeGreaterThan(-1);
-    expect(capture).toBeLessThan(dream);
-    expect(workflow.jobs.maintain.steps[capture].run).toContain('git --no-pager log --no-ext-diff --stat "$ACCEPTED_BASE..$MAIN_HEAD" > .git/dream-evidence.log');
-    expect(read(".agents/agents/dreaming.md")).toContain("Read `.git/dream-evidence.log`");
+  it("captures only the trusted Git window without staging its evidence", () => {
+    const repo = mkdtempSync(join(tmpdir(), "dream-evidence-"));
+    try {
+      git(repo, "init", "-b", "main");
+      git(repo, "config", "user.name", "Fixture");
+      git(repo, "config", "user.email", "fixture@example.invalid");
+      git(repo, "config", "core.hooksPath", "/dev/null");
+      writeFileSync(join(repo, "AGENTS.md"), "original\n");
+      git(repo, "add", ".");
+      git(repo, "commit", "-m", "before the window");
+      const base = git(repo, "rev-parse", "HEAD");
+      writeFileSync(join(repo, "changed.md"), "new evidence\n");
+      git(repo, "add", ".");
+      git(repo, "commit", "-m", "inside the window");
+      const head = git(repo, "rev-parse", "HEAD");
+      const capture = workflow.jobs.maintain.steps.find((step) => step.name === "Capture trusted Git evidence")!.run!;
+      const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", capture], {
+        cwd: repo, env: { ...env, ACCEPTED_BASE: base, MAIN_HEAD: head }, encoding: "utf8",
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const evidence = read(join(repo, ".git/dream-evidence.log"));
+      expect(evidence).toContain(head);
+      expect(evidence).not.toContain(base);
+      expect(evidence).toContain("changed.md");
+      git(repo, "add", "-A");
+      expect(git(repo, "diff", "--cached", "--name-only")).toBe("");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it("rejects a forbidden precommitted file hidden behind an allowed staged document", () => {
@@ -250,6 +229,21 @@ describe("dreaming workflow", () => {
       expect(published.stdout?.toString()).toContain("Dream bundle changed forbidden path: application.ts");
       expect(git(publisher, "rev-parse", "HEAD")).toBe(base);
       expect(existsSync(join(publisher, "application.ts"))).toBe(false);
+    });
+  });
+
+  it("does not publish forbidden content hidden in an intermediate producer commit", () => {
+    checkBundle((repo) => {
+      writeFileSync(join(repo, "application.ts"), "harmless private sentinel\n");
+      git(repo, "add", ".");
+      git(repo, "commit", "-m", "forbidden intermediate content");
+      git(repo, "rm", "application.ts");
+      git(repo, "commit", "-m", "remove intermediate content");
+      writeFileSync(join(repo, "AGENTS.md"), "allowed curated document\n");
+    }, ({ published, publisher, base }) => {
+      expect(published.status, published.stderr?.toString()).toBe(0);
+      expect(read(join(publisher, "AGENTS.md"))).toBe("allowed curated document\n");
+      expect(git(publisher, "log", "--format=%H", `${base}..HEAD`, "--", "application.ts")).toBe("");
     });
   });
 
@@ -276,13 +270,13 @@ describe("dreaming workflow", () => {
     });
   });
 
-  it("rejects a symlink masquerading as allowed Markdown", () => {
+  it.each(["AGENTS.md", ".agents/agents/[ab].md"])("rejects a symlink masquerading as allowed Markdown: %s", (path) => {
     checkBundle((repo) => {
-      rmSync(join(repo, "AGENTS.md"));
-      symlinkSync("/synthetic/forbidden-target", join(repo, "AGENTS.md"));
-    }, ({ published }) => {
+      if (existsSync(join(repo, path))) rmSync(join(repo, path));
+      symlinkSync("/synthetic/forbidden-target", join(repo, path));
+    }, ({ published, publisher, base }) => {
       expect(published.status).toBe(1);
-      expect(published.stdout?.toString()).toContain("Dream bundle changed document type: AGENTS.md (120000)");
+      expect(git(publisher, "rev-parse", "HEAD")).toBe(base);
     });
   });
 

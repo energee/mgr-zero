@@ -24,6 +24,8 @@ jobs:
       open_pr: ${{ steps.prepare.outputs.open_pr }}
       dream_sha: ${{ steps.prepare.outputs.dream_sha }}
       rebuilt: ${{ steps.prepare.outputs.rebuilt }}
+      login: ${{ steps.prepare.outputs.login }}
+      email: ${{ steps.prepare.outputs.email }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -76,7 +78,7 @@ jobs:
           # The dreaming/main head this run builds on; publish's push lease is pinned to it.
           dream_sha=$(git rev-parse -q --verify origin/dreaming/main || true)
           rebuilt=false
-          # Merge and dream commits alike are the MGR GitHub App, so nothing needs re-authoring later.
+          # Trusted bot identity is also passed to the independent publisher.
           login="${APP_SLUG}[bot]"
           git config user.name "$login"
           id="$(gh api "users/${login}" --jq .id)"
@@ -152,7 +154,7 @@ jobs:
             ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
             Open watchdog issues (WATCHDOG_ISSUES): ${{ steps.watchdog.outputs.list }}
           # Cross-document synthesis needs stronger reasoning than bounded maintenance.
-          claude_args: '--model sonnet --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(gh pr list:*),Bash(gh pr view:*)"'
+          claude_args: '--model sonnet --permission-mode dontAsk --disallowedTools "Bash(git:*)" --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(gh pr list:*),Bash(gh pr view:*)"'
 
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'
@@ -237,6 +239,8 @@ jobs:
           EXPECTED_SHA: ${{ needs.maintain.outputs.dream_sha }}
           REBUILT: ${{ needs.maintain.outputs.rebuilt }}
           TRUSTED_BASE: ${{ needs.maintain.outputs.head }}
+          DREAM_LOGIN: ${{ needs.maintain.outputs.login }}
+          DREAM_EMAIL: ${{ needs.maintain.outputs.email }}
         run: |
           current_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
           [ "$current_pr" = "$EXPECTED_PR" ] || { echo "Dream PR changed during curation; retry without advancing the marker."; exit 1; }
@@ -261,7 +265,12 @@ jobs:
               *) echo "Dream bundle changed document type: $path ($mode)"; exit 1 ;;
             esac
           done < "$RUNNER_TEMP/dream-paths"
-          git checkout -B dreaming/main FETCH_HEAD
+          # Publish only this validated snapshot, never the producer's commit
+          # history: an intermediate commit could contain a later-deleted secret.
+          git checkout -B dreaming/main "$TRUSTED_BASE"
+          git read-tree --reset -u FETCH_HEAD
+          git -c "user.name=$DREAM_LOGIN" -c "user.email=$DREAM_EMAIL" \
+            commit --allow-empty -q -m "dream: agent doc maintenance"
           body="Curates the living agent documents from merged evidence. Outstanding read-only drift is tracked in .agents/DRIFT.md; the diff is the authoritative change summary."
           if [ "$REBUILT" = "true" ]; then
             body=$(printf '%s\n\n%s' "$body" "dreaming/main no longer merged with main, so it was rebuilt from main. Edits from the previous dream PR that main had not merged were dropped.")
