@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerPortal, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -10,10 +10,11 @@ const MINIMIZED = "44px";
 const COMPACT = "480px";
 const EXPANDED = 1;
 
-export function ComposerDrawerView({ children, open, onOpenChange }: {
+export function ComposerDrawerView({ children, open, onOpenChange, container }: {
   children: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  container?: HTMLElement | null;
 }) {
   const isMobile = useIsMobile();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -41,11 +42,13 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
       snapPoint={snapPoint}
       onSnapPointChange={setSnapPoint}
     >
+      {/* Nested portals inherit this container, preserving DrawerContent's shared viewport and popup. */}
+      <DrawerPortal container={container}>
       <DrawerContent
         // app/globals.css uses this marker to layer the owning viewport below Tabs.
         data-mgr-composer=""
         // Keep the initial peek stationary while Base UI measures its portal.
-        className={cn("h-dvh! max-h-none! border-t [--composer-peek:44px] max-md:[--composer-peek:92px]", !interacted && !chatOpen && "transform-[translate3d(0,calc(100%-var(--composer-peek)),0)]! transition-none!")}
+        className={cn("max-h-none! border-t [--composer-peek:44px] max-md:[--composer-peek:92px]", container ? "h-full!" : "h-dvh!", !interacted && !chatOpen && "transform-[translate3d(0,calc(100%-var(--composer-peek)),0)]! transition-none!")}
         initialFocus={false}
         handle={<div
           className="group h-11 w-full shrink-0 cursor-grab touch-pan-x active:cursor-grabbing"
@@ -69,6 +72,7 @@ export function ComposerDrawerView({ children, open, onOpenChange }: {
         </DrawerHeader>
         <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${snapPoint === minimized ? "h-0 overflow-hidden p-0" : snapPoint === EXPANDED ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>{children}</div>
       </DrawerContent>
+      </DrawerPortal>
     </Drawer>
   );
 }

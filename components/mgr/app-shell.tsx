@@ -47,7 +47,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
   );
   return (
     <TooltipProvider>
-    <SidebarProvider defaultOpen={sidebarOpen}>
+    <SidebarProvider defaultOpen={sidebarOpen} className="h-dvh min-h-0 print:h-auto">
       <Sidebar collapsible="icon">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
@@ -84,7 +84,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="h-dvh min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
+      <SidebarInset className="h-full min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
         <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-2">
           <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
             <SidebarTrigger className="hidden md:inline-flex" />

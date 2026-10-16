@@ -8,7 +8,7 @@ import { SCREENS } from "../components/mgr/screens";
 
 const readingIndex = SCREENS.findIndex(record => record.name === "Fermentation reading");
 assert.ok(readingIndex >= 0, "Missing Fermentation reading fixture");
-const session = `mobile-surface-${createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12)}-${process.pid}`;
+let session = `mobile-surface-${createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12)}-${process.pid}`;
 const socket = createServer();
 await new Promise<void>(resolve => socket.listen(0, "127.0.0.1", resolve));
 const port = (socket.address() as { port: number }).port;
@@ -70,6 +70,7 @@ try {
   for (const coarse of [false, true]) {
     if (coarse) {
       browser("close");
+      session += "-coarse";
       // Device presets change viewport/UA only; ask Chromium for its native coarse-pointer sizing.
       browser("set", "viewport", "390", "844", "--args", "--blink-settings=primaryPointerType=2");
     }
@@ -81,6 +82,7 @@ try {
       browser("open", `${origin}/screens/frame/${index}`);
       browser("wait", "--text", action);
       browser("wait", "--fn", `!!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]')`);
+      browser("wait", "--fn", `!document.querySelector('[data-slot=sheet-content],[data-slot=dialog-content]').getAnimations().some(animation => animation.playState === 'running')`);
       if (screen === "Cycle count") {
         browser("find", "role", "combobox", "click", "--name", "Location");
         browser("wait", "--fn", "!!document.querySelector('[role=listbox]')");
@@ -104,7 +106,7 @@ try {
         browser("press", "Escape");
       }
       // A focused field in a reduced viewport exercises keyboard-space layout, not a physical OS keyboard.
-      browser("find", "label", screen === "Cycle count" ? "Counted (each)" : "Temperature (°F)", "focus");
+      browser("find", "label", screen === "Cycle count" ? "Counted (each)" : "Temperature (°F)", "click");
       const { result } = browser("eval", `(() => {
         const button = [...document.querySelectorAll('button')].find(e => e.textContent.trim() === ${JSON.stringify(action)});
         const surface = button.closest('[data-slot=sheet-content],[data-slot=dialog-content]');
@@ -119,7 +121,7 @@ try {
           const layer = e.matches('[data-slot=drawer-popup]') ? e.parentElement : e;
           return c.width > 0 && c.height > 0 && c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top && Number(getComputedStyle(layer).zIndex) > z;
         });
-        const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.top + 2], [r.right - 2, r.bottom - 2]];
+        const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.y + r.height / 2], [r.right - 2, r.y + r.height / 2], [r.x + r.width / 2, r.top + 2], [r.x + r.width / 2, r.bottom - 2]];
         return { coarse: matchMedia('(pointer: coarse)').matches, visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight, covering: covering.map(e => e.getAttribute('aria-label') || e.dataset.slot), reachable: points.every(([x, y]) => { const hit = document.elementFromPoint(x, y); return hit === button || button.contains(hit); }) };
       })()`);
       assert.equal(result.coarse, coarse, "Pointer emulation must match scenario");
@@ -149,7 +151,7 @@ try {
         const bounds = scroller.getBoundingClientRect();
         const r = control.getBoundingClientRect();
         const composer = document.querySelector('[data-mgr-composer]').getBoundingClientRect();
-        const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.top + 2], [r.right - 2, r.bottom - 2]];
+        const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.y + r.height / 2], [r.right - 2, r.y + r.height / 2], [r.x + r.width / 2, r.top + 2], [r.x + r.width / 2, r.bottom - 2]];
         return {
           coarse: matchMedia('(pointer: coarse)').matches,
           disabled: control.disabled,
@@ -177,6 +179,47 @@ try {
       }
       console.log(JSON.stringify({ screen, width: 1280, height: 577, ...measurement }));
       if (process.argv[2]) browser("screenshot", `${process.argv[2]}/packaging-${index}-${coarse ? "coarse" : "fine"}-green.png`);
+    }
+    for (const [screen, action] of [
+      ["Close packaging run", "Finished goods bin"],
+      ["Run closed", "Correct material actuals"],
+      ["Fermentation reading", "Save reading"],
+      ["Cycle count", "Record count"],
+    ]) {
+      const index = SCREENS.findIndex(record => record.name === screen);
+      browser("open", `${origin}/docs/screens-explore#s=${index}`);
+      browser("wait", "--fn", "document.querySelector('.screen-box')?.contains(document.querySelector('[data-mgr-composer]'))");
+      if (screen === "Run closed") browser("find", "label", "Correction reason", "fill", "Review observed material loss");
+      const embedded = browser("eval", `(() => {
+        document.documentElement.classList.toggle('dark', ${coarse});
+        const box = document.querySelector('.screen-box');
+        const page = box.querySelector('[data-mgr-page-scroll]');
+        const composer = box.querySelector('[data-mgr-composer]');
+        const control = ${screen === "Close packaging run" ? "box.querySelector('[aria-label=\"Finished goods bin\"]')" : `[...box.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(action)})`};
+        box.scrollIntoView({ block: 'center' });
+        control.scrollIntoView({ block: 'center' });
+        const r = control.getBoundingClientRect();
+        const points = [[r.x+r.width/2,r.y+r.height/2],[r.left+2,r.y+r.height/2],[r.right-2,r.y+r.height/2],[r.x+r.width/2,r.top+2],[r.x+r.width/2,r.bottom-2]];
+        return {
+          contained: box.contains(composer),
+          coarse: matchMedia('(pointer: coarse)').matches,
+          pageBottom: page.getBoundingClientRect().bottom,
+          composerTop: composer.getBoundingClientRect().top,
+          rect: r.toJSON(),
+          reachable: points.every(([x,y]) => { const hit = document.elementFromPoint(x,y); return hit === control || control.contains(hit); }),
+        };
+      })()`).result;
+      assert.equal(embedded.coarse, coarse);
+      assert.equal(embedded.contained, true, `${screen}: composer belongs to explorer container`);
+      assert.ok(embedded.pageBottom <= embedded.composerTop + 1, `${screen}: embedded page stops above composer`);
+      assert.equal(embedded.reachable, true, `${screen}: embedded control center and edges`);
+      console.log(JSON.stringify({ explorer: screen, ...embedded }));
+      if (process.argv[2]) browser("screenshot", `${process.argv[2]}/explorer-${index}-${coarse ? "coarse-dark" : "fine-light"}.png`);
+      if (screen === "Fermentation reading" || screen === "Cycle count") {
+        browser("find", "role", "button", "click", "--name", "Close", "--exact");
+        browser("wait", "--fn", "!document.querySelector('.screen-box [data-slot=dialog-content]')");
+        assert.equal(browser("eval", "document.querySelector('.screen-box').contains(document.querySelector('[data-mgr-composer]'))").result, true);
+      }
     }
   }
   browser("set", "viewport", "390", "844");
