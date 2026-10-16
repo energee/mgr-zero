@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
-import { QboMappingView, QboMappingSheetView } from "@/components/mgr/views/qbo-mapping";
+import { QboMappingView, QboMappingSheetView, type QboMappingKind } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
@@ -30,16 +30,20 @@ export function QboDisconnectAction({ connectionId }: { connectionId: string }) 
     onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), { refresh: false })} />;
 }
 
-type MappingProps = { kind: "customer" | "item" | "deposit" | "one_way_fee"; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
+type MappingProps = { kind: QboMappingKind; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
 export function QboMappingForm(props: MappingProps) {
   return <QboMappingFields key={qboMappingVersion(props.currentId)} {...props} />;
 }
 
 function QboMappingFields({ kind, localId, label, currentId, context = "accounting" }: MappingProps) {
   const [remoteId, setRemoteId] = useState(currentId ?? "");
-  const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping" : kind === "deposit" ? "set_qbo_deposit_mapping" : "set_qbo_one_way_fee_mapping";
-  const build = () => kind === "customer" ? { customerId: localId, qboCustomerId: remoteId }
-    : kind === "item" ? { skuId: localId, qboItemId: remoteId } : { qboItemId: remoteId };
+  const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping"
+    : kind === "vendor" ? "set_qbo_vendor_mapping" : kind === "purchase_account" ? "set_qbo_purchase_account"
+      : kind === "deposit" ? "set_qbo_deposit_mapping" : "set_qbo_one_way_fee_mapping";
+  const build = () => kind === "customer" ? { customerId: localId, qboCustomerId: remoteId.trim() }
+    : kind === "item" ? { skuId: localId, qboItemId: remoteId.trim() }
+      : kind === "vendor" ? { vendorId: localId, qboVendorId: remoteId.trim() }
+        : kind === "purchase_account" ? { qboAccountId: remoteId.trim() } : { qboItemId: remoteId.trim() };
   const form = useCommandForm(name, { build, reset: () => setRemoteId(currentId ?? "") });
   return <QboMappingSheetView open={form.open} onOpenChange={form.setOpen} context={context} currentId={currentId}>
     <QboMappingView kind={kind} label={label} value={remoteId} onChange={setRemoteId} onSubmit={form.submit} busy={form.submitting} error={form.error} companyConflict={context === "accounting"} />

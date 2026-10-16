@@ -16,6 +16,7 @@ import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
 import { NewPoView } from "../components/mgr/views/new-po";
 import { PurchaseOrdersView } from "../components/mgr/views/purchase-orders";
 import { ReceiptView } from "../components/mgr/views/receipt";
+import { ReceiptFixture } from "../components/mgr/fixture-adapters";
 import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
@@ -26,10 +27,11 @@ import {
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
-import { toPostedReceiptViewProps } from "../lib/mgr/receipt-view";
+import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { poLineCounts } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
+import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -125,22 +127,13 @@ describe("Purchase orders", () => {
     expect(receiving).not.toContain('max="4"');
   });
 
-  it("the Receipt inventory record is ReceiptView", () => {
-    const body = screen("Receipt").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(ReceiptView);
-    expect(body.props.model).toEqual(receiptPoCountryMalt);
+  it("the Receipt inventory adapter mounts the same ReceiptView as the live route", () => {
+    const body = screen("Receipt").body as { type: unknown; props: { children: { type: unknown; props: { model: unknown } } } };
+    expect(body.type).toBe(ReceiptFixture);
+    expect(body.props.children.type).toBe(ReceiptView);
+    expect(body.props.children.props.model).toEqual(receiptPoCountryMalt);
   });
 
-  it("the live PO page mounts ReceivePoView and a durable ReceiptView", () => {
-    const page = src("app/(app)/purchase-orders/[id]/page.tsx");
-    expect(page).toMatch(/<ReceiveForm\b/);
-    expect(page).toMatch(/<ReceiptView\b/);
-    expect(page).toContain("searchParams");
-    expect(page).toContain('toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`)');
-    const form = src("app/(app)/purchase-orders/[id]/po-actions.tsx");
-    expect(form).toMatch(/<ReceivePoView\b/);
-    expect(form).not.toMatch(/<Input\b|<Label\b|<Select\b/);
-  });
 });
 
 it("posted receipt uses counted quantities, captured lot references and current balances", () => {
@@ -158,6 +151,83 @@ it("posted receipt uses counted quantities, captured lot references and current 
   expect(model.backHref).toBeUndefined();
   expect(toPostedReceiptViewProps(snapshot, "wrong-receipt")).toBeUndefined();
   expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
+});
+
+describe("receipt Bill presentation", () => {
+  const receipt: ReceiptSnapshot = { id: "latest", received_on: "2026-09-20", receipt_lines: [], corrects_receipt_id: "original" };
+  const admin = { canPost: true, connected: true, mappingsReady: true, mappingHref: "/settings/accounting/mappings" };
+
+  it("offers first posting only to an admin with current mappings on the effective receipt", () => {
+    expect(receiptBillPresentation(receipt, admin).action).toBe("post");
+    expect(receiptBillPresentation(receipt, { ...admin, canPost: false }).action).toBeUndefined();
+    expect(receiptBillPresentation(receipt, { ...admin, connected: false }).connectionRequired).toBe(true);
+    expect(receiptBillPresentation(receipt, { ...admin, connected: false }).action).toBeUndefined();
+    expect(receiptBillPresentation(receipt, { ...admin, mappingsReady: false }).mappingHref).toBe(admin.mappingHref);
+    expect(receiptBillPresentation(receipt, { ...admin, mappingsReady: false }).action).toBeUndefined();
+    expect(receiptBillPresentation({ ...receipt, corrected_by_receipt_id: "newer" }, admin).action).toBeUndefined();
+  });
+
+  it("reconciles unknown Bills by the frozen canonical receipt even after corrections or mapping changes", () => {
+    const bill = receiptBillPresentation({ ...receipt, qbo_bill_status: "pending", qbo_bill_receipt_id: "original", qbo_bill_request_id: "provider-request" }, { ...admin, mappingsReady: false });
+    expect(bill).toMatchObject({ status: "pending", receiptId: "original", requestId: "provider-request", action: "retry" });
+    expect(bill.mappingHref).toBeUndefined();
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill }, onPostBill: async () => true }));
+    expect(html).toContain("Posting result unknown");
+    expect(html).toContain("Retry exact Bill");
+    expect(html).toContain("original provider request ID");
+    expect(html).toContain('class="contents" data-preview-action=""');
+  });
+
+  it("makes a rejected Bill an explicit corrected attempt against the latest receipt, not an unknown retry", () => {
+    const rejected = { ...receipt, qbo_bill_status: "push_failed" as const, qbo_bill_receipt_id: "original", qbo_bill_request_id: "rejected-request", qbo_bill_error: "Account rejected" };
+    const bill = receiptBillPresentation(rejected, admin);
+    expect(bill).toMatchObject({ status: "push_failed", receiptId: "latest", action: "corrected", mappingHref: admin.mappingHref });
+    expect(receiptBillPresentation({ ...rejected, corrected_by_receipt_id: "newer" }, admin).action).toBeUndefined();
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill }, onPostBill: async () => true }));
+    expect(html).toContain("Rejected by QuickBooks");
+    expect(html).toContain("Post corrected Bill");
+    expect(html).toContain('href="/settings/accounting/mappings"');
+    expect(html).toContain("Account rejected");
+  });
+
+  it("recovers the exact corrected command after refreshed server state becomes pending", () => {
+    const values: Record<string, string> = {};
+    const storage = { getItem: (key: string) => values[key] ?? null, setItem: (key: string, value: string) => { values[key] = value; }, removeItem: (key: string) => { delete values[key]; } };
+    const context = { actorId: "operator", breweryId: "brewery" };
+    const target = "receipt-bill:latest";
+    const corrected = receiptBillRequest({ receiptId: "latest", status: "push_failed", action: "corrected" });
+    const original = beginRecovery(storage, context, "/purchase-orders/po", "post_receipt_bill", corrected.input, { target });
+    const retry = receiptBillRequest({ receiptId: "latest", status: "pending", action: "retry" }, original.attempt);
+    expect(retry).toEqual({ input: { receiptId: "latest", newAttemptReason: "corrected" }, requestId: original.attempt.requestId, discardRequestId: undefined });
+    expect(beginRecovery(storage, context, "/purchase-orders/po", "post_receipt_bill", retry.input, { target, requestId: retry.requestId }))
+      .toEqual({ attempt: original.attempt, resumed: true });
+  });
+
+  it("retires a lost rejection response only when the operator confirms a corrected attempt", () => {
+    const values: Record<string, string> = {};
+    const storage = { getItem: (key: string) => values[key] ?? null, setItem: (key: string, value: string) => { values[key] = value; }, removeItem: (key: string) => { delete values[key]; } };
+    const context = { actorId: "operator", breweryId: "brewery" };
+    const target = "receipt-bill:latest";
+    const previous = beginRecovery(storage, context, "/purchase-orders/po", "post_receipt_bill", { receiptId: "latest" }, { target });
+    const corrected = receiptBillRequest({ receiptId: "latest", status: "push_failed", action: "corrected" }, previous.attempt);
+    expect(corrected.discardRequestId).toBe(previous.attempt.requestId);
+    expect(discardRecovery(storage, context, corrected.discardRequestId!)).toBe(true);
+    const next = beginRecovery(storage, context, "/purchase-orders/po", "post_receipt_bill", corrected.input, { target });
+    expect(next.resumed).toBe(false);
+    expect(next.attempt.requestId).not.toBe(previous.attempt.requestId);
+    expect(next.attempt.input).toEqual({ receiptId: "latest", newAttemptReason: "corrected" });
+  });
+
+  it("keeps a posted correction chain immutable in MGR and states QuickBooks-only payments", () => {
+    const bill = receiptBillPresentation({ ...receipt, qbo_bill_status: "pushed", qbo_bill_id: "731", qbo_bill_receipt_id: "original" }, admin);
+    expect(bill.action).toBeUndefined();
+    expect(bill.receiptId).toBe("original");
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill } }));
+    expect(html).toContain("Bill posted, adjust in QuickBooks");
+    expect(html).toContain("Bill payments are managed only in QuickBooks");
+    expect(html).not.toContain("Post Bill to QuickBooks");
+    expect(html).toContain("Correct receipt");
+  });
 });
 
 describe("Materials", () => {

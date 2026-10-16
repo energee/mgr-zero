@@ -2497,14 +2497,14 @@ isOneToOne: false
                   ]
                 },"qbo_connections": {
                   Row: {
-                    "access_expires_at": string | null,"allow_online_ach_payment": boolean,"allow_online_credit_card_payment": boolean,"brewery_id": string,"connected_by": string | null,"credential_version": number,"granted_scopes": (string)[],"id": string,"last_error": string | null,"qbo_deposit_item_id": string | null,"qbo_one_way_fee_item_id": string | null,"realm_id": string,"realm_label": string | null,"refresh_expires_at": string | null,"refresh_hard_expires_at": string | null,"remote_revocation_state": string,"state": string,"updated_at": string
+                    "access_expires_at": string | null,"allow_online_ach_payment": boolean,"allow_online_credit_card_payment": boolean,"brewery_id": string,"connected_by": string | null,"credential_version": number,"granted_scopes": (string)[],"id": string,"last_error": string | null,"qbo_deposit_item_id": string | null,"qbo_one_way_fee_item_id": string | null,"qbo_purchase_account_id": string | null,"realm_id": string,"realm_label": string | null,"refresh_expires_at": string | null,"refresh_hard_expires_at": string | null,"remote_revocation_state": string,"state": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "access_expires_at"?: string | null,"allow_online_ach_payment"?: boolean,"allow_online_credit_card_payment"?: boolean,"brewery_id": string,"connected_by"?: string | null,"credential_version"?: number,"granted_scopes"?: (string)[],"id"?: string,"last_error"?: string | null,"qbo_deposit_item_id"?: string | null,"qbo_one_way_fee_item_id"?: string | null,"realm_id": string,"realm_label"?: string | null,"refresh_expires_at"?: string | null,"refresh_hard_expires_at"?: string | null,"remote_revocation_state"?: string,"state"?: string,"updated_at"?: string
+                    "access_expires_at"?: string | null,"allow_online_ach_payment"?: boolean,"allow_online_credit_card_payment"?: boolean,"brewery_id": string,"connected_by"?: string | null,"credential_version"?: number,"granted_scopes"?: (string)[],"id"?: string,"last_error"?: string | null,"qbo_deposit_item_id"?: string | null,"qbo_one_way_fee_item_id"?: string | null,"qbo_purchase_account_id"?: string | null,"realm_id": string,"realm_label"?: string | null,"refresh_expires_at"?: string | null,"refresh_hard_expires_at"?: string | null,"remote_revocation_state"?: string,"state"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "access_expires_at"?: string | null,"allow_online_ach_payment"?: boolean,"allow_online_credit_card_payment"?: boolean,"brewery_id"?: string,"connected_by"?: string | null,"credential_version"?: number,"granted_scopes"?: (string)[],"id"?: string,"last_error"?: string | null,"qbo_deposit_item_id"?: string | null,"qbo_one_way_fee_item_id"?: string | null,"realm_id"?: string,"realm_label"?: string | null,"refresh_expires_at"?: string | null,"refresh_hard_expires_at"?: string | null,"remote_revocation_state"?: string,"state"?: string,"updated_at"?: string
+                    "access_expires_at"?: string | null,"allow_online_ach_payment"?: boolean,"allow_online_credit_card_payment"?: boolean,"brewery_id"?: string,"connected_by"?: string | null,"credential_version"?: number,"granted_scopes"?: (string)[],"id"?: string,"last_error"?: string | null,"qbo_deposit_item_id"?: string | null,"qbo_one_way_fee_item_id"?: string | null,"qbo_purchase_account_id"?: string | null,"realm_id"?: string,"realm_label"?: string | null,"refresh_expires_at"?: string | null,"refresh_hard_expires_at"?: string | null,"remote_revocation_state"?: string,"state"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -2669,14 +2669,14 @@ isOneToOne: false
                   ]
                 },"receipts": {
                   Row: {
-                    "bin_id": string | null,"brewery_id": string,"correction_reason": string | null,"corrects_receipt_id": string | null,"created_at": string,"id": string,"location_id": string | null,"note": string | null,"po_id": string,"received_by": string,"received_on": string
+                    "bin_id": string | null,"brewery_id": string,"correction_reason": string | null,"corrects_receipt_id": string | null,"created_at": string,"id": string,"location_id": string | null,"note": string | null,"po_id": string,"qbo_bill_error": string | null,"qbo_bill_id": string | null,"qbo_bill_request_id": string | null,"qbo_bill_status": string | null,"received_by": string,"received_on": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"received_by": string,"received_on"?: string
+                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by": string,"received_on"?: string
                   }
                   Update: {
-                    "bin_id"?: string | null,"brewery_id"?: string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id"?: string,"received_by"?: string,"received_on"?: string
+                    "bin_id"?: string | null,"brewery_id"?: string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id"?: string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by"?: string,"received_on"?: string
                   }
                   Relationships: [
                     {
@@ -3405,14 +3405,14 @@ isOneToOne: false
                   ]
                 },"vendors": {
                   Row: {
-                    "active": boolean,"address": string | null,"brewery_id": string,"contact_name": string | null,"created_at": string,"email": string | null,"id": string,"lead_time_days": number | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_vendor_id": string | null
+                    "active": boolean,"address": string | null,"brewery_id": string,"contact_name": string | null,"created_at": string,"email": string | null,"id": string,"lead_time_days": number | null,"name": string,"payment_terms": string,"phone": string | null,"qbo_realm_id": string | null,"qbo_vendor_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"address"?: string | null,"brewery_id": string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_time_days"?: number | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_vendor_id"?: string | null
+                    "active"?: boolean,"address"?: string | null,"brewery_id": string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_time_days"?: number | null,"name": string,"payment_terms"?: string,"phone"?: string | null,"qbo_realm_id"?: string | null,"qbo_vendor_id"?: string | null
                   }
                   Update: {
-                    "active"?: boolean,"address"?: string | null,"brewery_id"?: string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_time_days"?: number | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_vendor_id"?: string | null
+                    "active"?: boolean,"address"?: string | null,"brewery_id"?: string,"contact_name"?: string | null,"created_at"?: string,"email"?: string | null,"id"?: string,"lead_time_days"?: number | null,"name"?: string,"payment_terms"?: string,"phone"?: string | null,"qbo_realm_id"?: string | null,"qbo_vendor_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -4874,6 +4874,9 @@ isOneToOne: false
 "finish_qbo_push":
 { Args: { "p_actor": string,"p_brewery": string,"p_error": string,"p_push": string,"p_qbo_entity_id": string,"p_request_id": string,"p_response": Json,"p_status": string }; Returns: Json
                            },
+"finish_qbo_receipt_bill":
+{ Args: { "p_actor": string,"p_brewery": string,"p_definitive_rejection"?: boolean,"p_error": string,"p_provider_request_id": string,"p_receipt": string,"p_remote_id": string,"p_response": Json }; Returns: Json
+                           },
 "finish_square_disconnect":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_request_id": string,"p_revoked": boolean }; Returns: Json
                            },
@@ -5383,8 +5386,14 @@ isOneToOne: false
 "set_qbo_one_way_fee_mapping":
 { Args: { "p_brewery": string,"p_qbo_item_id": string,"p_request_id": string }; Returns: Json
                            },
+"set_qbo_purchase_account":
+{ Args: { "p_brewery": string,"p_qbo_account_id": string,"p_request_id": string }; Returns: Json
+                           },
 "set_qbo_push_defaults":
 { Args: { "p_allow_ach": boolean,"p_allow_card": boolean,"p_brewery": string,"p_request_id": string }; Returns: Json
+                           },
+"set_qbo_vendor_mapping":
+{ Args: { "p_brewery": string,"p_qbo_vendor_id": string,"p_request_id": string,"p_vendor": string }; Returns: Json
                            },
 "set_recipe_brand":
 { Args: { "p_brand": string,"p_brewery": string,"p_recipe": string,"p_request_id": string }; Returns: Json
@@ -5411,6 +5420,9 @@ isOneToOne: false
                            },
 "start_qbo_push":
 { Args: { "p_brewery": string,"p_invoice": string,"p_new_attempt_reason": string,"p_request_id": string }; Returns: Json
+                           },
+"start_qbo_receipt_bill":
+{ Args: { "p_brewery": string,"p_new_attempt_reason"?: string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
 "store_integration_tokens":
 { Args: { "p_access_token": string,"p_actor": string,"p_brewery": string,"p_connection": string,"p_provider": string,"p_refresh_token": string }; Returns: boolean
