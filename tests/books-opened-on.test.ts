@@ -1,10 +1,9 @@
 // tests/books-opened-on.test.ts — the brewery's books-opened date
 // (docs/plans/lolev-history.md, tasks 1–2): the day the ledger starts counting
-// for compliance. Admin-only; null by default; and it cannot move past the
-// start of a period already filed, because that filing's beginning balance
-// was computed from rows the new date would hide.
+// for compliance. Admin-only; null by default; fixed after any filed snapshot
+// so changing or clearing it cannot change that snapshot's reporting basis.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { makeBrewery, makeStaffCtx, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -39,14 +38,41 @@ describe("books opened on", () => {
     await expect(runCommand("set_books_opened_on", { booksOpenedOn: "2026-10-01" }, brewerCtx)).rejects.toThrow(/permission denied/);
   });
 
-  it("refuses a date after the start of a filed period, and allows one on or before it", async () => {
-    const { error } = await admin.from("report_filings").insert({
-      brewery_id: breweryId, jurisdiction: "TTB", period_start: "2026-09-01", period_end: "2026-09-30",
-      figures: {}, filed_at: new Date().toISOString(),
-    });
-    if (error) throw error;
-    await expect(runCommand("set_books_opened_on", { booksOpenedOn: "2026-09-15" }, adminCtx)).rejects.toThrow(/filed/);
-    await runCommand("set_books_opened_on", { booksOpenedOn: "2026-09-01" }, adminCtx);
-    expect(await booksOpenedOn()).toBe("2026-09-01");
+  it("freezes every change after filing, but permits the same value and exact request replay", async () => {
+    const requestId = crypto.randomUUID();
+    const execution = { requestId, correlationId: crypto.randomUUID() };
+    const original = await runCommand("set_books_opened_on", { booksOpenedOn: "2026-01-01" }, adminCtx, execution);
+    await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, adminCtx);
+    await runCommand("file_compliance_report", {
+      jurisdiction: "TTB", periodStart: "2026-03-01", periodEnd: "2026-03-31",
+    }, adminCtx);
+    for (const date of [null, "2026-01-01", "2026-02-15", "2026-03-01", "2026-04-01"]) {
+      await expect(runCommand("set_books_opened_on", { booksOpenedOn: date }, adminCtx)).rejects.toThrow(/cannot change or be cleared.*filed.*compliance owner/);
+      expect(await booksOpenedOn()).toBe("2026-02-01");
+    }
+    expect(await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, adminCtx))
+      .toEqual({ books_opened_on: "2026-02-01" });
+    // The old request returns its original receipt, never overwrites the later saved basis.
+    expect(await runCommand("set_books_opened_on", { booksOpenedOn: "2026-01-01" }, adminCtx, execution)).toEqual(original);
+    expect(await booksOpenedOn()).toBe("2026-02-01");
+    await expect(runCommand("set_books_opened_on", { booksOpenedOn: null }, adminCtx, execution)).rejects.toThrow(/different payload/);
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`, true)).toEqual(["1"]);
+  });
+
+  it("also freezes an unset basis and allows an unchanged null", async () => {
+    const fresh = await makeStaffCtx((await makeBrewery()).id);
+    await runCommand("file_compliance_report", {
+      jurisdiction: "TTB", periodStart: "2026-02-01", periodEnd: "2026-02-28",
+    }, fresh);
+    await expect(runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, fresh)).rejects.toThrow(/filed/);
+    expect(await runCommand("set_books_opened_on", { booksOpenedOn: null }, fresh)).toEqual({ books_opened_on: null });
+  });
+
+  it("keeps database admin and tenant authority on direct RPC calls", async () => {
+    const input = { p_brewery: breweryId, p_books_opened_on: "2026-02-01", p_request_id: crypto.randomUUID() };
+    expect((await brewerCtx.db.rpc("set_brewery_books_opened_on", input)).error).not.toBeNull();
+    const outsider = await makeStaffCtx((await makeBrewery()).id);
+    expect((await outsider.db.rpc("set_brewery_books_opened_on", { ...input, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+    expect(await booksOpenedOn()).toBe("2026-02-01");
   });
 });

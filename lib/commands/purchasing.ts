@@ -4,7 +4,7 @@
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
-import { defineCommand, defineQuery, cents, phone, unwrap, CommandError } from "./registry";
+import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
@@ -151,11 +151,11 @@ defineQuery({
 defineQuery({
   name: "get_material_on_hand", description: "Material on hand by location and bin, in base units; optionally one location",
   input: z.object({ locationId: z.string().uuid().optional() }), roles: [...PURCHASING],
-  handler: (ctx, i) => {
-    let q = ctx.db.from("material_bin_on_hand").select("material_id, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId);
+  handler: (ctx, i) => completeRows("Material stock", start => {
+    let q = ctx.db.from("material_bin_on_hand").select("material_id, location_id, bin_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
     if (i.locationId) q = q.eq("location_id", i.locationId);
-    return unwrap(q);
-  },
+    return q.order("material_id").order("location_id").order("bin_id").range(start, start + PAGE_SIZE - 1);
+  }),
 });
 
 const poLine = z.object({

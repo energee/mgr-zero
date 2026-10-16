@@ -52,6 +52,16 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bun scripts/pr-directives.ts check
       - run: bun install --frozen-lockfile
+      # `supabase db push` refuses a migration older than the newest one hosted
+      # applied; sixteen late 20260928* files blocked production deploys.
+      # A pull request compares against its base (fetched by the full-depth
+      # checkout above). A push to main compares against the commit before the
+      # push: two open PRs can each pass, then merge in the wrong order through
+      # the GitHub UI without re-running CI, and this turns main red.
+      - name: Added migrations sort after the base's newest
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: bun scripts/check-migration-order.ts "$BASE"
       - run: bun run lint
       - run: bunx tsc --noEmit
       - run: bun run build
@@ -96,7 +106,18 @@ jobs:
       # `start` on a fresh stack already applies supabase/migrations/*, so
       # there is no separate `db reset` step here.
       - run: supabase stop --workdir tests/supabase --no-backup || true
-      - run: supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
+      # Every CI failure in September–October was an image pull throttled with
+      # "toomanyrequests"; a later attempt usually gets through. Three tries,
+      # stopping the half-started stack between them.
+      - name: Start the test stack (retries registry rate limits)
+        run: |
+          for attempt in 1 2 3; do
+            supabase start --workdir tests/supabase -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta && exit 0
+            [ "$attempt" = 3 ] && exit 1
+            echo "stack start failed (attempt $attempt); retrying in 60s"
+            supabase stop --workdir tests/supabase --no-backup || true
+            sleep 60
+          done
       - name: Generated database types match migrations
         if: matrix.shard == '1/3'
         # gen types pulls postgres-meta with no fallback when ECR Public

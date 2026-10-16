@@ -40,6 +40,8 @@ export type OrderViewModel = {
   editHref?: string;
   completeHref?: string;
   lines: OrderLineView[];
+  /** Keg deposits and one-way keg fees, frozen on the order at submit. */
+  kegCharges: { key: string; name: string; detail: string }[];
   events: [ReactNode, ReactNode?][];
 };
 
@@ -72,8 +74,12 @@ export type OrderSnapshot = {
     qty_shipped: number | null;
     unit_price_cents: number;
     short_reason?: string | null;
+    /** Set at submit on a one-way keg line (order_lines.one_way_fee_cents). */
+    one_way_fee_cents?: number | null;
     skus: { name: string } | null;
   }[];
+  /** order_deposit_lines, one per returnable keg line. */
+  deposits?: { order_line_id: string; description: string; qty_ordered: number; unit_price_cents: number; amount_cents: number }[];
   events: {
     id: string;
     event: string;
@@ -139,7 +145,7 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits = [] }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
@@ -178,6 +184,12 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
         tone: lineTone(picked, ordered, qtyAtp),
       };
     }),
+    kegCharges: [
+      ...deposits.map((d) => ({ key: `deposit-${d.order_line_id}`, name: d.description,
+        detail: `${Number(d.qty_ordered)} × ${money(d.unit_price_cents)} · ${money(d.amount_cents)}` })),
+      ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: "One-way keg fee",
+        detail: `${l.skus?.name ?? "Line"} · ${Number(l.qty_ordered)} × ${money(l.one_way_fee_cents!)} · ${money(Number(l.qty_ordered) * l.one_way_fee_cents!)}` })),
+    ],
     events: events.map((e) => [
       `${formatDateTime(e.created_at, timeZone)} · ${e.event.replace(/_/g, " ")}`,
       e.event === "lines_adjusted"

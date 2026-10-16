@@ -71,6 +71,63 @@ The `/api/command` Server view contained 358 modules totaling an estimated 716.0
 
 **Expected improvement** → Stable, documented defaults with no expected CWV regression from an unnecessary experimental configuration.
 
+### Composer bundle isolation
+
+The focused October 2026 audit used `origin/main` at
+`dcc7e2cf09bf343b2166ba67b64360c0065117ff`. Its Client analyzer baseline was
+**1788.1 KiB for `/orders`** and **1606.1 KiB for `/portal`**. These are estimated
+compressed totals of reachable modules, not browser transfers or initial
+JavaScript sizes. They are a separate snapshot from the older route table above.
+
+The local production-browser comparison used `next build` / `next start`,
+isolated Chrome sessions, and the same fictional staff and buyer accounts.
+Each route was opened directly after login, with the staff drawer still closed.
+The table sums JavaScript resource-timing body sizes; cache hits can still report
+body sizes, so these are not wire-transfer totals or field metrics.
+
+| Route | Before encoded bytes | After encoded bytes | Before decoded bytes | After decoded bytes |
+| --- | ---: | ---: | ---: | ---: |
+| `/orders` | 623,446 | 418,551 | 2,157,304 | 1,457,034 |
+| `/portal` | 550,431 | 396,379 | 1,886,158 | 1,382,398 |
+
+The shared `E` controls imported the Composer drawer and strip through
+`views/composer.tsx`, which also imported Streamdown and `E`. That made markdown
+reachable through ordinary controls, including portal controls that never mount
+a staff conversation. The drawer and strip now have direct, lightweight imports
+in `E`; the markdown conversation view has its own module. No re-export through
+the old mixed view restores that dependency path.
+
+The staff layout still mounts `Composer`, but that client component now owns only
+the existing drawer handle, keyboard shortcut, and actor/brewery/role-scoped
+outbox lifecycle. Its `React.lazy` conversation import mounts on the first
+open and stays mounted when minimized so drafts, transcript, and streaming state
+survive. The deferred module owns the AI SDK, markdown conversation view, setup,
+proposal, and commit recovery. A keyboard focus request waits for both the module
+and conversation setup before focusing the enabled prompt.
+
+The eager loading/error view keeps the same Outbox control and scoped outbox
+panel available while chat input is disabled. A local error boundary contains a
+failed conversation chunk; it asks the operator to reconnect and reload without
+replacing the staff page or removing outbox access.
+
+Conversation setup was already open-gated before this change. This split defers
+code loading and initialization; it does not remove eager conversation network
+reads, because there were none. Outbox startup/online flushing remains active
+without opening Ask MGR. The shared drawer, strip, conversation, proposal, and
+outbox views retain the same controls and layout in live and inventory adapters.
+
+The post-change Client analyzer reports 1790.1 KiB for `/orders`, including its
+deferred conversation, and 1159.7 KiB for `/portal`. No Streamdown or AI SDK
+modules remain in the portal Client graph. The staff graph still contains them;
+the browser comparison above establishes deferred initial delivery instead.
+
+The production-browser smoke also opened Ask MGR for the first time while
+offline, observed the locally contained chunk failure, and opened a saved
+reading in the eager outbox without replacing Orders. Reconnecting and reloading
+restored conversation setup and shortcut focus. Desktop and 390-pixel mobile
+checks preserved an unsent draft through expand, minimize, and reopen.
+No model request or field Core Web Vitals improvement is claimed.
+
 ## Follow-up production measurement
 
 A production deployment exists, but no field Web Vitals sample has been collected, so LCP, INP, CLS, FCP, and TTFB remain unmeasured. Establish field baselines in Vercel Speed Insights against LCP < 2.5 s, INP < 200 ms, CLS < 0.1, FCP < 1.8 s, and TTFB < 800 ms. Configure any observability drains through the Vercel Dashboard or REST API rather than application bundle code.

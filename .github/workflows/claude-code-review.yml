@@ -2,16 +2,24 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: add a paths filter or PR-author filter; see
+    # Not on synchronize: an Opus review on every push re-reviewed the same PR
+    # many times (land-pr.sh alone pushes a main-sync commit). A PR is reviewed
+    # once when it opens or leaves draft; add the `review` label to review the
+    # current head again. The label must exist in the repo first (once:
+    # `gh label create review`). Paths or PR-author filters are also possible; see
     # https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+    types: [opened, ready_for_review, reopened, labeled]
 
 jobs:
   claude-review:
     # Skip drafts (ready_for_review retriggers) and every bot-authored PR:
     # the action hard-fails on non-human actors, and reviewing its own output
     # adds no value. Covers dreaming/main, documentation/user-guide, mgr[bot].
-    if: github.event.pull_request.draft == false && github.event.pull_request.user.type != 'Bot'
+    # A `labeled` event runs only for the `review` label.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'review')
     runs-on: ubuntu-latest
     permissions:
       contents: read
