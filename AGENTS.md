@@ -143,7 +143,11 @@ the rendered page (step 4), and:
    code (without the variable it resets only when the migrations changed).
 5. Run `/simplify` on every code change before committing (see the tool
    table), then re-run step 4's checks: simplify passes have broken tests.
-   Then `git diff`: a stray NUL byte once made a file binary.
+   Then give only the simplify diff to one read-only agent and ask what
+   behavior it changed (identity, caching, loops, dropped data); fix any
+   answer that is not "none". (Simplify passes introduced an infinite loop, a
+   cache miss, and dropped offline data.) Then `git diff`: a stray NUL byte
+   once made a file binary.
 6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
