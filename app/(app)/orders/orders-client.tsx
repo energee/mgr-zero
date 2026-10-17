@@ -14,7 +14,7 @@ import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/histor
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
-export function OrdersClient({ role, status, customerId, customerName, cursor }: { role: StaffRole; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
+export function OrdersClient({ role, timeZone, status, customerId, customerName, cursor }: { role: StaffRole; timeZone: string; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
@@ -30,8 +30,8 @@ export function OrdersClient({ role, status, customerId, customerName, cursor }:
     <OrdersView
       model={toOrdersListViewProps({ role, status, customer, orders: page.rows })}
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
-      listStatus={!result.data ? <QueryFeedback error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
-      feedback={result.data ? <QueryFeedback error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
+      listStatus={!result.data ? <QueryFeedback timeZone={timeZone} error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
+      feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       pagination={page.pagination}
       linkRows
       filters={(
