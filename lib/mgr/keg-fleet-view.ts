@@ -36,7 +36,7 @@ export type KegFleetViewModel = {
   /** Inventory only: the pool form drawn inline, and its vendor options. */
   poolForm?: KegPoolValue;
   vendors?: KegOption[];
-  /** Inventory only: the event form drawn inline. */
+  /** Inventory only: initial values for the shared event dialog/sheet. */
   eventForm?: KegEventValue;
   eventOptions?: KegEventOptions;
   /** Why Record keg event is not offered; the view draws it in place of the form. */

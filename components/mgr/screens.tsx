@@ -2239,7 +2239,6 @@ export const SCREENS: Screen[] = [
     slice: 9,
     tab: "Beer",
     name: "Keg fleet",
-    to: { "Record keg event": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
     reads: "get_keg_fleet · list_customers · list_locations · list_bins · list_vendors",
     writes: "create_keg_pool · update_keg_pool · record_keg_event",

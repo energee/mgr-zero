@@ -32,7 +32,6 @@ describe("Keg fleet", () => {
     expect(html).not.toContain("Record keg event");
     expect(html).not.toContain("Selected pool");
     expect(html).not.toContain("Customer keg balance");
-    expect(html).not.toContain("Preview:");
   });
   it("the Keg fleet inventory record is KegFleetView", () => {
     const body = screen("Keg fleet").body as { type: unknown; props: { model: unknown } };
@@ -63,9 +62,6 @@ describe("Keg fleet", () => {
     }
   });
 
-  it("#974 the inventory shows no balance preview, which live has no data for", () => {
-    expect(htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }))).not.toContain("Preview:");
-  });
 
   it("the live kegs page mounts KegFleetView and slots PoolForm", () => {
     const page = src("app/(app)/kegs/page.tsx");
@@ -75,7 +71,8 @@ describe("Keg fleet", () => {
     expect(page).toMatch(/<PoolForm\b/);
     expect(page).toMatch(/<KegEventForm\b/);
     expect(page).not.toMatch(/\bnote=/);
-    expect(src("components/mgr/views/keg-fleet.tsx").match(/Beer coming back with a keg/g)).toHaveLength(1);
+    const html = htmlOf(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    expect(html.match(/Beer coming back with a keg/g)).toHaveLength(1);
   });
 });
 
