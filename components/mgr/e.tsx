@@ -3,7 +3,10 @@
 // deleted in #133 once ported) but styled as shadcn defaults: quiet surfaces, one accent,
 // color only where it carries meaning (a status dot, not a filled row).
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
-// here sets heights. Screen authors use only these and never components/ui.
+// here sets heights. Views import shadcn parts from @/components/ui directly.
+// E holds only MGR vocabulary that adds behavior or domain meaning to them:
+// status tones, quantity and volume fields, searchPick, the irr/del button
+// kinds. Never add an E helper that only wraps a single shadcn part.
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
@@ -21,6 +24,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -66,7 +70,9 @@ const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode
   <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
   <span className="text-muted-foreground text-sm leading-normal">{s}</span>
   {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
-  {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
+  {/* The bar tops out at full: a tank recorded over capacity (before #488)
+      still says its real bbl in the line above. */}
+  {f != null && <Progress value={Math.min(f, 100)} aria-label="Fill" className="mt-1" />}
 </>);
 
 /** shadcn pins ItemMedia to the title line whenever a row has a description. That
@@ -149,13 +155,19 @@ export const E = {
   ttl: (t: React.ReactNode, id?: string) => <h2 id={id} className={cn("mt-2 text-sm font-medium text-muted-foreground", id && "scroll-m-20")}>{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
-  /** foot: fields that belong to this row, drawn inside its card on their own
+  /** No box (#909 §2E): the row's text sits flush with the column's headings
+   *  and fields. A row draws one row and cannot see its neighbour, so the
+   *  hairline between consecutive rows is CSS in app/globals.css, keyed on
+   *  `data-row` on the row's outer element (E.nav's link, when it has one).
+   *  foot: fields that belong to this row, drawn inside it on their own
    *  line. A lot code and a best-by are facts about the line being received,
-   *  so they sit in it; listing them under the card made the reader match
+   *  so they sit in it; listing them after the row made the reader match
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
-   *  takes a full line without any layout of its own. */
+   *  takes a full line without any layout of its own. It draws no rule of
+   *  its own: one would read as the hairline between rows and cut the line's
+   *  fields away from it. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
+    <Item data-row data-gated={cls === "dis" || undefined} className={cn("relative rounded-none border-0 px-0", cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -166,7 +178,7 @@ export const E = {
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
-      {foot ? <ItemFooter className="mt-3 flex-col items-stretch gap-2 border-t pt-3">{foot}</ItemFooter> : null}
+      {foot ? <ItemFooter className="flex-col items-stretch gap-2">{foot}</ItemFooter> : null}
     </Item>
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status.
@@ -482,7 +494,7 @@ export const E = {
    *  label instead. */
   nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string) => {
     const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
-    return href ? <Link href={href} className="block">{row}</Link> : row;
+    return href ? <Link href={href} data-row className="relative block">{row}</Link> : row;
   },
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than
