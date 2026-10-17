@@ -6,7 +6,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, canRecordBrewDay, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
-import { INGREDIENT_STAGES, type IngredientStage } from "@/lib/mgr/recipe-process-view";
+import { INGREDIENT_STAGES, perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
 
 const processFields = [["preBoilBbl", "Pre-boil barrels"], ["boilMinutes", "Boil minutes"], ["whirlpoolMinutes", "Whirlpool minutes"], ["whirlpoolTempF", "Whirlpool °F"], ["whirlpoolRestMinutes", "Whirlpool rest minutes"], ["knockoutTempF", "Knockout °F"], ["mashWaterGal", "Mash water gallons"], ["spargeWaterGal", "Sparge water gallons"], ["targetMashPh", "Mash pH"]] as const;
 
@@ -83,7 +83,7 @@ function BrewPlanSheet({ plan, frozen }: { plan?: BrewPlan; frozen: boolean }) {
   return <>
       <details open><summary className="font-medium">{frozen ? "Frozen recipe plan" : "Pinned recipe plan"}</summary>
         {E.fld("Recipe", plan?.recipe ?? "No recipe")}
-        {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${row.per_bbl_qty} ${row.unit} per bbl · ${row.stage}`)}</Fragment>)}
+        {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${row.stage}`)}</Fragment>)}
         {(plan?.version?.mash_schedule ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.name, `${row.temp_f ?? row.tempF ?? "—"} °F · ${row.minutes} min`)}</Fragment>)}
         {(plan?.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned; confirm actual use in ${row.baseUnit}`)}</Fragment>)}
       </details>
