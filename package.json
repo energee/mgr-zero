@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "vitest run --config vitest.mdx.config.mts tests/mdx-safety.test.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -66,6 +66,9 @@
     "typescript": "https://registry.npmjs.org/@typescript/typescript6/-/typescript6-6.0.2.tgz",
     "vite": "8.3.4",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "katex": "0.19.0"
   },
   "engines": {
     "node": "24.x"
