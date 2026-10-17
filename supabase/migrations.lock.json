@@ -141,5 +141,6 @@
   "20261016123107_freeze_filed_books_opened_on.sql": "1500030bec561cb18f04d3592ce67968af5596c70d6e44467c1d0ecb14ed66d4",
   "20261016125525_packaging_run_lot_receipt.sql": "522c909ad0eef1096df0fceb7769427724fc4d9cea7e24f0b7f3b23d3f6df633",
   "20261016130000_one_way_fee_at_submit.sql": "87d675bab67e853c8be32660ebddda06c5edfbe5e1bf42f38f8aff1b6269664d",
+  "20261016230500_beer_overview_aggregates.sql": "753dd5085fd6d12506733554dce44f5dbdd8efa27141124488b283bd9d5906fd",
   "20261017143500_projected_packaging_demand.sql": "760932eba155064fd8f2034ce2cbd7569add5d49ca763e52c3321a6102cbe18a"
 }

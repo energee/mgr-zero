@@ -18,16 +18,14 @@ const GUIDES: string[] = JSON.parse(read("content/docs/meta.json")).pages;
 const CUSTOMER_GUIDES = GUIDES.filter((g) => g !== "api");
 
 describe("customer guides (MDX)", () => {
-  it("has exactly the pages meta.json lists, each with frontmatter and no code", () => {
+  it("has exactly the pages meta.json lists, each with frontmatter and customer language", () => {
     const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
     // The API reference is a folder of pages (content/docs/api/), not one file.
     expect(files).toEqual(CUSTOMER_GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of CUSTOMER_GUIDES) {
       const mdx = read(`content/docs/${guide}.mdx`);
       expect(mdx).toMatch(/^---\n(?:\w+: .+\n)*title: .+\ndescription: .+\n(?:\w+: .+\n)*---\n/);
-      // Prose only: no imports/exports, scripts, raw HTML or styling hooks.
-      expect(mdx).not.toMatch(/^(import|export)\s/m);
-      expect(mdx).not.toMatch(/<(?:script|style|link|iframe|img|div|span|p|a)\b/i);
+      // Active-content safety for every guide is owned by mdx-safety.test.ts.
       expect(mdx).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
     }
   });

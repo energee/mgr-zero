@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+# bun.lock is the deployment lockfile; do not commit an incidental npm lock.
+package-lock.json
 /.pnp
 .pnp.*
 .yarn/*

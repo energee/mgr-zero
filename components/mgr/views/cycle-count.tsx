@@ -30,7 +30,7 @@ export function CycleCountView({ model, footer, onQuantity, onLocation, onBin, m
       {model.adjustments?.map(adjustment => <div key={adjustment.key}>{E.fld(adjustment.lot, `before ${adjustment.expected.toLocaleString("en-US", { maximumFractionDigits: 4 })} · after ${adjustment.counted.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${adjustment.unit} · adjustment ${adjustment.delta > 0 ? "+" : ""}${adjustment.delta.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${adjustment.unit}`)}</div>)}
       {model.adjustments?.length === 0 && E.info("No adjustment movements. This count will still be recorded.")}
     </fieldset>
-    {frozen && E.note("No trustworthy response arrived. The quantity, allocation and request are frozen. Retry this unchanged count to recover its original result.")}
+    {frozen && E.note("No trustworthy response arrived. The quantity, allocation and request are frozen. Retry this unchanged count to recover its original result.", "alert")}
     {messages}
     {footer !== undefined ? footer : E.pin(<CycleCountFooter submitting={submitting} disabled={disabled} />)}
   </>;

@@ -10,6 +10,7 @@ export type EntryViewModel = {
   link?: { label: string; to: string };
   info?: string;
   note?: string;
+  error?: string;
   extraPrimary?: string;
 };
 
@@ -45,8 +46,8 @@ const SET_PASSWORD_ERRORS: Record<string, string> = {
   weak_password: "Choose a stronger password.",
 };
 
-/** `error` is the `?error=` code; any other value (a crafted link) shows the generic note, never its own text. */
+/** `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text. */
 export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
-  const note = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
-  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", note };
+  const message = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
+  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
 }

@@ -1,12 +1,26 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolveTestEnv } from "./scripts/test-env.mjs";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
+// The existing screen-only proof contract, plus this harness's pure regressions.
+// Every unlisted file stays in the guarded database project.
+const pureTests = [
+  "tests/mgr-screens.test.ts",
+  "tests/tap-coverage.test.ts",
+  "tests/screen-links.test.ts",
+  "tests/theme-contrast.test.ts",
+  "tests/screen-persona.test.ts",
+  "tests/design-docs.test.ts",
+  "tests/docs.test.ts",
+  "tests/migrations-applied.test.ts",
+  "tests/test-db-schema-guard.test.ts",
+  "tests/test-db-selection.test.ts",
+];
 
 export default defineConfig({
   resolve: {
@@ -18,9 +32,18 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.ts"],
-    // Holds the shared test-database lock for the run (scripts/test-db-lock.pl).
-    globalSetup: ["tests/test-db-lock.setup.ts"],
+    projects: [
+      { extends: true, test: { name: "pure", include: pureTests } },
+      {
+        extends: true,
+        test: {
+          name: "database",
+          include: ["tests/**/*.test.ts"],
+          exclude: [...configDefaults.exclude, ...pureTests],
+          globalSetup: ["tests/test-db-lock.setup.ts"],
+        },
+      },
+    ],
     testTimeout: 20000,
     fileParallelism: false,
     // Mode "test" layers .env.test.local (written by scripts/test-db.sh: the
