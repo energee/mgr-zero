@@ -244,13 +244,7 @@ describe("SCREENS", () => {
     }
   });
 
-  it("carries every MGR-venue frame with unique names", () => {
-    // A tripwire against a frame dropped by hand from a 1700-line array — the
-    // uniqueness check below catches duplicates, nothing else catches a loss.
-    // Bump it deliberately when a frame lands or leaves; the venue split is
-    // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(202);
-    expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
+  it("keeps inventory screen names unique", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 

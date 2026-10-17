@@ -11,6 +11,7 @@ import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { FieldSeparator } from "@/components/ui/field";
+import { ReportingBasisView } from "@/components/mgr/views/reporting-basis";
 
 export type { SettingsViewModel };
 
@@ -19,12 +20,14 @@ export function SettingsView({
   breweryForm,
   fulfillmentForm,
   aiModelForm,
+  reportingBasisForm,
   hrefs = {},
 }: {
   model: SettingsViewModel;
   breweryForm?: ReactNode;
   fulfillmentForm?: ReactNode;
   aiModelForm?: ReactNode;
+  reportingBasisForm?: ReactNode;
   hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water", string>>;
 }) {
   return (
@@ -32,7 +35,7 @@ export function SettingsView({
       {E.back("More", "Settings", undefined, model.backHref)}
       <div className="grid gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[48rem]:items-start @min-[48rem]:gap-10">
         <div className="@container min-w-0">
-          {breweryForm ?? <BrewerySettingsFormView initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}
+          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}
         </div>
         {/* Side by side on desk, the column gap parts Brewery details from the other two. */}
         <FieldSeparator className="@min-[48rem]:hidden" />
@@ -42,6 +45,7 @@ export function SettingsView({
           {fulfillmentForm ?? <PortalFulfillmentView locations={model.warehouseOptions} currentId={model.warehouseId} />}
         </div>
       </div>
+      {model.hasFiledReports ? reportingBasisForm ?? <ReportingBasisView basis={model.booksOpenedOn || null} history={model.basisCorrections ?? []} timeZone={model.timezone} /> : null}
       <div className="mt-2 grid gap-8 border-t pt-6 @min-[48rem]:grid-cols-2">
         <section aria-labelledby="settings-people" className="flex min-w-0 flex-col gap-2">
           <h2 id="settings-people" className="mb-2 font-heading text-xl font-semibold">People and places</h2>

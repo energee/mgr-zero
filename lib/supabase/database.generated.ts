@@ -2851,6 +2851,38 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
+                },"report_basis_amendments": {
+                  Row: {
+                    "brewery_id": string,"correction_id": string,"filing_id": string,"new_figures": NonNullable<Json>,"old_figures": NonNullable<Json>
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"correction_id": string,"filing_id": string,"new_figures": NonNullable<Json>,"old_figures": NonNullable<Json>
+                  }
+                  Update: {
+                    "brewery_id"?: string,"correction_id"?: string,"filing_id"?: string,"new_figures"?: NonNullable<Json>,"old_figures"?: NonNullable<Json>
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "report_basis_amendments_brewery_id_correction_id_fkey"
+      columns: ["brewery_id","correction_id"]
+isOneToOne: false
+      referencedRelation: "reporting_basis_corrections"
+      referencedColumns: ["brewery_id","id"]
+    },{
+      foreignKeyName: "report_basis_amendments_brewery_id_filing_id_fkey"
+      columns: ["brewery_id","filing_id"]
+isOneToOne: false
+      referencedRelation: "report_filings"
+      referencedColumns: ["brewery_id","id"]
+    },{
+      foreignKeyName: "report_basis_amendments_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"report_filings": {
                   Row: {
                     "brewery_id": string,"created_at": string,"figures": NonNullable<Json>,"filed_at": string | null,"filed_by": string | null,"id": string,"jurisdiction": string,"note": string | null,"period_end": string,"period_start": string
@@ -2865,6 +2897,26 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "report_filings_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"reporting_basis_corrections": {
+                  Row: {
+                    "brewery_id": string,"corrected_at": string,"corrected_by": string,"id": string,"new_basis": string | null,"old_basis": string | null,"reason": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"corrected_at"?: string,"corrected_by": string,"id"?: string,"new_basis"?: string | null,"old_basis"?: string | null,"reason": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"corrected_at"?: string,"corrected_by"?: string,"id"?: string,"new_basis"?: string | null,"old_basis"?: string | null,"reason"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "reporting_basis_corrections_brewery_id_fkey"
       columns: ["brewery_id"]
 isOneToOne: false
       referencedRelation: "breweries"
@@ -4745,6 +4797,9 @@ isOneToOne: false
                            },
 "correct_purchase_receipt":
 { Args: { "p_brewery": string,"p_lines": Json,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
+                           },
+"correct_reporting_basis":
+{ Args: { "p_books_opened_on": string,"p_brewery": string,"p_expected_books_opened_on": string,"p_reason": string,"p_request_id": string }; Returns: Json
                            },
 "correct_taproom_count":
 { Args: { "p_brewery": string,"p_corrections": Json,"p_count": string,"p_reason": string,"p_request_id": string }; Returns: Json

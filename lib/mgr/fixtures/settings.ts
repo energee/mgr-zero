@@ -3,6 +3,11 @@ import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 
 /** The demo brewery's zone: inventory frames print fixture timestamps in it, as live pages print in breweries.timezone (#442). */
 export const DEMO_TIME_ZONE = "America/New_York";
+export const basisCorrectionDemo = {
+  id: "00000000-0000-4000-8000-000000000939", old_basis: "2026-01-01", new_basis: null,
+  corrected_by: "00000000-0000-4000-8000-000000000001", corrected_at: "2026-09-03T14:30:00Z",
+  reason: "Include verified opening inventory from the prior year",
+};
 
 export const settingsDemo: SettingsViewModel = {
   name: "Demo Brewing",
@@ -13,6 +18,8 @@ export const settingsDemo: SettingsViewModel = {
   phone: "(610) 555-0142",
   overdueHours: "24",
   booksOpenedOn: "",
+  hasFiledReports: true,
+  basisCorrections: [basisCorrectionDemo],
   oneWayKegFee: "10.00",
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [

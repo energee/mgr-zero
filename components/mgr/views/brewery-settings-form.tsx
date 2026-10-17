@@ -16,11 +16,12 @@ const TIMEZONES = Intl.supportedValuesOf("timeZone");
 const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
-export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null }: {
+export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false }: {
   initial: BrewerySettingsValues;
   onSave?: (values: BrewerySettingsValues) => void;
   busy?: boolean;
   error?: string | null;
+  basisLocked?: boolean;
 }) {
   const [values, setValues] = useState(initial);
   const { anchor: timezoneAnchor, props: timezoneSearch } = useComboboxSearch(timezoneLabel(values.timezone));
@@ -57,8 +58,8 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         {field("pa", "PA license")}
         {field("phone", "Customer-facing phone", "tel")}
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("Books opened on · optional", values.booksOpenedOn, "date", undefined, { onChange: (nextValue: string) => change("booksOpenedOn", nextValue), "aria-describedby": `${id}-booksOpenedOn-help` })}
-          <FieldDescription id={`${id}-booksOpenedOn-help`}>Set or clear before your first filed snapshot. After any report is filed, this value is fixed.</FieldDescription>
+          {E.edit("Books opened on · optional", values.booksOpenedOn, "date", undefined, { onChange: (nextValue: string) => change("booksOpenedOn", nextValue), id: `${id}-booksOpenedOn`, disabled: basisLocked, "aria-describedby": `${id}-booksOpenedOn-help` })}
+          <FieldDescription id={`${id}-booksOpenedOn-help`}>{basisLocked ? "Filed reporting basis. Use Correct reporting basis below to record a correction and flag affected periods." : "Set or clear before your first filed snapshot. Later changes require a recorded admin correction."}</FieldDescription>
         </div>
         {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01 })}
         <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
