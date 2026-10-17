@@ -41,9 +41,11 @@ describe("Keg fleet shared fields", () => {
     expect(out).toContain("Add a keg pool in service first.");
   });
 
-  it("the inventory draws the same fields as the live forms", () => {
-    const out = html(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
-    for (const label of ["Pool name", "Kind", "Vendor", "Per-fill cost ($)", "Deposit per keg ($)", "Keg pool", "Size", "Bin", "Customer", "Kegs", "Note"]) expect(out).toContain(label);
+  it("the inventory pool controls and shared event fields use the same labels as live", () => {
+    const inventory = html(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
+    const event = html(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    for (const label of ["Pool name", "Kind", "Vendor", "Per-fill cost ($)", "Deposit per keg ($)"]) expect(inventory).toContain(label);
+    for (const label of ["Keg pool", "Size", "Bin", "Customer", "Kegs", "Note"]) expect(event).toContain(label);
   });
 
   it("Location bins shows why Move stock is unavailable instead of the form", () => {
@@ -59,17 +61,19 @@ describe("Keg fleet shared fields", () => {
     // Radix's Switch carries its own aria-hidden checkbox; a raw one would not be hidden.
     expect(pool).not.toMatch(/<input type="checkbox"(?![^>]*aria-hidden)/);
     const event = html(createElement(KegEventFields, { value: { poolId: "p", kegSize: "half_bbl", reason: "acquired", locationId: "", binId: "", customerId: "", qty: "", note: "" }, options: { pools: [{ value: "p", label: "Owned" }], locations: [], bins: [], customers: [] }, onChange: () => {} }));
-    expect(event).toContain("toggle-group-item");
+    expect(event).toContain('id="keg-reason"');
     expect(event).not.toContain("Customer");
   });
 
-  it("live forms mount the shared fields instead of ui/select, ui/input or a raw checkbox", () => {
-    for (const [file, view] of [["app/(app)/kegs/pool-form.tsx", "KegPoolFields"], ["app/(app)/kegs/event-form.tsx", "KegEventFields"]]) {
-      const source = src(file);
-      expect(source, file).toMatch(new RegExp(`<${view}\\b`));
-      expect(source, file).not.toMatch(/components\/ui\/(select|input|label)"/);
-      expect(source, file).not.toMatch(/<input\b/);
-    }
+  it("live forms delegate to shared controls rather than drawing raw controls", () => {
+    const pool = src("app/(app)/kegs/pool-form.tsx");
+    expect(pool).toMatch(/<KegPoolFields\b/);
+    expect(pool).not.toMatch(/components\/ui\/(select|input|label)"/);
+    expect(pool).not.toMatch(/<input\b/);
+    const event = src("app/(app)/kegs/event-form.tsx");
+    expect(event).toMatch(/<KegEventPresentation\b/);
+    expect(event).not.toMatch(/components\/ui\/(select|input|label)"/);
+    expect(event).not.toMatch(/<input\b/);
     expect(src("app/(app)/locations/move-stock-form.tsx")).not.toMatch(/components\/ui\/(select|input|label)"/);
     expect(src("app/(app)/locations/move-stock-form.tsx")).toMatch(/<MoveStockFields\b/);
     expect(src("app/(app)/locations/[id]/bins/page.tsx")).toMatch(/moveStockUnavailable/);

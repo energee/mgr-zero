@@ -204,6 +204,8 @@ export const INERT: (string | RegExp)[] = [
   "+ add ingredient",
   // The Recipe frame's note is a read-out row; the parent form above it edits the note.
   "Recipe note",
+  // The QuickBooks sync row's title is a read-out; its Sync button acts in place.
+  "Last successful sync",
   "1 \u00b7 Add locations",
   "1 \u00b7 Review auto-reconciled losses",
   "2 \u00b7 Review generated figures",
