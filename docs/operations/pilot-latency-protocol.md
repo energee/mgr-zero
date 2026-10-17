@@ -93,6 +93,11 @@ Fill one row per task per run set.
 Attach the completed table to #311 with the release SHA.
 Triage each measured failure as its own issue.
 
+[Supplemental local measurements, 2026-10-16](pilot-latency-local-2026-10-16.md)
+record all 32 production-runtime repetitions at the agreed synthetic volumes,
+including the 1.046-second warm report observation. They do not fill this
+protocol's real-pilot authorization table or replace pilot-time real-data evidence.
+
 | Date | Release SHA | Task | Condition | Runs | Median (s) | Max (s) | Failures | Within agreed limit | Operator |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
 | | | T1 | cold | | | | | | |
