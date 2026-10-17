@@ -73,7 +73,7 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
       actor: row.correction.corrected_by,
       at: row.correction.corrected_at,
       reason: row.correction.reason,
-      invalidPeriod: row.correction.new_basis !== null && snapshot.report.figures.periodStart < row.correction.new_basis,
+      invalidPeriod: row.correction.new_basis !== null && figures.periodStart < row.correction.new_basis,
       figures: toComplianceFigures(row.new_figures),
     })),
     warnings: snapshot.report.warnings,

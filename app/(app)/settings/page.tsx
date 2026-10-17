@@ -33,6 +33,7 @@ export default async function SettingsPage() {
   // Every location is already in hand for the summary line, so the portal's
   // fulfillment sources come out of that list rather than a second read.
   const warehouses = locations.filter((l) => l.uses.includes("warehouse"));
+  const hasFiledReports = reports.filings.length > 0;
   return (
     <SettingsView
       model={{
@@ -45,7 +46,7 @@ export default async function SettingsPage() {
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
         booksOpenedOn: row.books_opened_on ?? "",
-        hasFiledReports: reports.filings.length > 0,
+        hasFiledReports,
         basisCorrections,
         oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
@@ -56,7 +57,7 @@ export default async function SettingsPage() {
         locations: locations.map((l) => l.name).join(" · ") || "none yet",
         team: plural(team.length, "member"),
       }}
-      breweryForm={<SettingsForm key={row.books_opened_on ?? "unset"} brewery={row} hasFiledReports={reports.filings.length > 0} />}
+      breweryForm={<SettingsForm key={row.books_opened_on ?? "unset"} brewery={row} hasFiledReports={hasFiledReports} />}
       reportingBasisForm={<ReportingBasisForm key={row.books_opened_on ?? "unset"} basis={row.books_opened_on} history={basisCorrections} timeZone={row.timezone} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
