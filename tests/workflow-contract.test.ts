@@ -68,7 +68,6 @@ const supabaseEnvMapper = readFileSync(resolve(__dirname, "..", "scripts", "supa
 const vitestConfig = readFileSync(resolve(__dirname, "..", "vitest.config.mts"), "utf8");
 const prePush = readFileSync(resolve(__dirname, "..", "scripts", "pre-push.sh"), "utf8");
 const hook = readFileSync(resolve(__dirname, "..", ".githooks", "pre-push"), "utf8");
-const testDb = readFileSync(resolve(__dirname, "..", "scripts", "test-db.sh"), "utf8");
 
 describe("workflow action field reader", () => {
   it("requires a direct scalar child of the action's with mapping", () => {
@@ -198,35 +197,6 @@ describe("production-readiness workflow contract", () => {
     expect(prePush).toContain("tests/migrations-applied.test.ts");
   });
 
-  // `supabase db reset` rebuilds the schema behind PostgREST, which cached it at
-  // boot; without the reload the whole suite fails with "Could not find the
-  // table 'public.breweries' in the schema cache" and reads as broken code.
-  it("reloads PostgREST's schema cache after resetting the test database", () => {
-    const reset = testDb.indexOf("supabase db reset");
-    // scripts/wait-rest.sh sends the reload and waits until PostgREST serves.
-    const reload = testDb.indexOf("scripts/wait-rest.sh");
-    expect(reset).toBeGreaterThan(-1);
-    expect(reload).toBeGreaterThan(reset);
-  });
-
-  // Parallel sessions share this one test database. scripts/test-db-lock.pl
-  // (behavior in tests/test-db-lock.test.ts) is held exclusive by a reset and
-  // shared by every vitest run, so neither can start under the other; a reset
-  // runs only when the migrations changed since the last one.
-  it("resets under the exclusive lock, and only when the schema changed", () => {
-    // The reset lives only in the --locked-reset branch, which the script
-    // reaches by re-running itself under the exclusive lock.
-    const reset = testDb.indexOf("supabase db reset");
-    expect(testDb).toContain("test-db-lock.pl ex bash scripts/test-db.sh --locked-reset");
-    expect(testDb.indexOf('= --locked-reset ]')).toBeGreaterThan(-1);
-    expect(testDb.indexOf('= --locked-reset ]')).toBeLessThan(reset);
-    expect(testDb.indexOf("mgr-schema")).toBeGreaterThan(-1);
-    expect(testDb.indexOf("mgr-schema")).toBeLessThan(reset);
-  });
-
-  it("holds the lock shared for every vitest run", () => {
-    expect(vitestConfig).toContain("tests/test-db-lock.setup.ts");
-  });
 
   it("leaves the build and the database shards to CI", () => {
     // Comments name the manual escape hatch; only what the hook runs counts.

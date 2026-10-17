@@ -3,12 +3,13 @@ import { rawDatabase } from "./raw-database";
 import { assert } from "vitest";
 // Live, independently specified authorization matrix. Run only on tests/supabase.
 import { sampleInput } from "@/lib/mgr/api-schema";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { runCommand, listTools, getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { admin, asUser, ins, makeBrewery, makeStaff, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
+import { checkSchema, localEnvironment, localExpectation } from "../scripts/test-db-schema.mjs";
 
 // Adding an RLS table requires an explicit decision AND a nonempty fixture below.
 // This is the approved read matrix, deliberately independent of taproom_can.
@@ -486,6 +487,33 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
     close_brewery: [B], prune_command_requests: [],
   };
+  if (existsSync(".env.test.local")) {
+    // Admit only this reset's verified probe; every other service RPC still
+    // needs an explicit case, and this one stays in the denial loop below.
+    const env = localEnvironment();
+    const identity = await checkSchema(env, localExpectation());
+    expect(identity.rpc).toMatch(/^mgr_test_identity_[a-f0-9]{32}$/);
+    expect(sql(`select json_build_object(
+        'arity',p.pronargs,'returns',p.prorettype::regtype::text,'invoker',not p.prosecdef,
+        'pinned',coalesce(p.proconfig @> array['search_path=""'],false),
+        'public',exists(select 1 from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE'),
+        'anon',has_function_privilege('anon',p.oid,'execute'),
+        'authenticated',has_function_privilege('authenticated',p.oid,'execute'),
+        'service',has_function_privilege('service_role',p.oid,'execute'))
+      from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='${identity.rpc}'`)
+      .map(row => JSON.parse(row))).toEqual([{
+        arity: 0, returns: "jsonb", invoker: true, pinned: true,
+        public: false, anon: false, authenticated: false, service: true,
+      }]);
+    const anonymous = createClient<Database>(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    expect((await rawDatabase(anonymous).rpc(identity.rpc, {})).error?.code).toBe("42501");
+    const service = await rawDatabase(admin).rpc(identity.rpc, {});
+    expect(service.error).toBeNull();
+    expect(service.data).toEqual(identity);
+    serviceCases[identity.rpc] = [];
+  }
   const serviceCatalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
       and has_function_privilege('service_role',p.oid,'execute') and not has_function_privilege('authenticated',p.oid,'execute')

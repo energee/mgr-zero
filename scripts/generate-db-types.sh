@@ -6,6 +6,8 @@ output=$(mktemp)
 trap 'rm -f "$output"' EXIT
 # Supabase CLI 2.121 tries TLS by default; the local test Postgres has none, hence sslmode=disable.
 bunx supabase gen types --db-url "${1:-postgresql://postgres:postgres@127.0.0.1:54352/postgres?sslmode=disable}" --schema public > "$output"
+# The local reset's service-only readiness RPC is not application schema.
+node scripts/test-db-schema.mjs clean-types "$output"
 # Never overwrite the checked-in schema with an empty or failed CLI response.
 grep -q '^export type Database = ' "$output"
 # The CLI emits an extra blank line at EOF; keep the checked-in file clean.
