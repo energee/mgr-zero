@@ -1,16 +1,13 @@
-// components/mgr/scope-pick.tsx — a labeled pick that scopes a page through
+// components/mgr/scope-pick.tsx — a labeled E pick that scopes a page through
 // its URL (#972): each option carries the href that selects it, and picking
-// one opens that href, so links, refresh and Back keep the scope. A Select for
-// a short fixed list; `search` opens SearchPick for a long one. "All" is an
+// one opens that href, so links, refresh and Back keep the scope. "All" is an
 // option like any other, not a Clear button. A client component because it
-// navigates, and E helpers run in server pages.
+// navigates, while the shared E controls own the product control surface.
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useId } from "react";
-import { SearchPick } from "@/components/mgr/search-pick";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { E } from "@/components/mgr/e";
 
 /** One choice. Radix Select rejects an empty value, so an All row uses "all".
  *  The screen inventory leaves `href` out, and its pick stays inert. */
@@ -42,20 +39,7 @@ function Pick({ label, value, options, search, open }: ScopePickProps & { open?:
     const href = options.find((option) => option.value === next)?.href;
     if (href) open?.(href);
   };
-  const noun = label.toLowerCase();
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      {search ? (
-        <SearchPick id={id} label={label} value={value} options={options} onChange={pick} title={label}
-          placeholder={`Select ${noun}`} searchPlaceholder={`Search ${noun}`} noMatchMessage={`No matching ${noun}`} />
-      ) : (
-        <Select value={value} onValueChange={pick}>
-          {/* The label is passed so server markup names the choice before the list mounts. */}
-          <SelectTrigger id={id}><SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue></SelectTrigger>
-          <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-        </Select>
-      )}
-    </Field>
-  );
+  return search
+    ? E.searchPick(label, value, options, { id, onChange: pick, previewAction: !options.some((option) => option.href) })
+    : E.pick(label, value, options, { id, onChange: pick });
 }

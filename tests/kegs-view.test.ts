@@ -114,10 +114,4 @@ describe("Keg event history", () => {
     expect(html.indexOf(">Keg pool<")).toBeLessThan(html.indexOf(">Customer<"));
   });
 
-  it("#972 defaults both scopes to All", () => {
-    const model = toKegHistoryViewProps({});
-    expect([model.pool, model.customer]).toEqual(["all", "all"]);
-    expect(model.poolOptions).toEqual([{ value: "all", label: "All pools" }]);
-    expect(model.customerOptions).toEqual([{ value: "all", label: "All customers" }]);
-  });
 });

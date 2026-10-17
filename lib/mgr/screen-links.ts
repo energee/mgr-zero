@@ -415,9 +415,7 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
   // The Ingredient sheet's material picker opens its own search; elsewhere "Material" walks to the Material screen.
   const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
-  // Keg event history's Customer scope opens its own search too (ScopePick).
-  const kegHistoryCustomer = screen.name === "Keg event history" && l === "Customer";
-  return !authored(screen, l, to) && (localMapping || draftSku || ingredientMaterial || kegHistoryCustomer || INERT.some((k) => matches(k, l)));
+  return !authored(screen, l, to) && (localMapping || draftSku || ingredientMaterial || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];
