@@ -487,7 +487,7 @@ export const SCREENS: Screen[] = [
     to: { "Source water": "Water profiles" },
     reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
     states: permitted("admin only"),
-    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {

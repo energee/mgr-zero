@@ -1,5 +1,4 @@
 import { getServerEnv } from "@/lib/env/server";
-import { E } from "@/components/mgr/e";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -44,7 +43,7 @@ export default async function SettingsPage() {
         oneWayKegFee: dollarsInput(row.one_way_keg_fee_cents),
         aiModel: ai.model,
         aiModels,
-        deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,
+        deployment: serverEnv.dedicated ? "dedicated" : "hosted",
         warehouseId: row.portal_fulfillment_location_id,
         warehouseOptions: warehouses.map(({ id, name }) => ({ id, name })),
         locations: locations.map((l) => l.name).join(" · ") || "none yet",
@@ -53,7 +52,6 @@ export default async function SettingsPage() {
       breweryForm={<SettingsForm brewery={row} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
-      deployment={E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
       hrefs={{ water: "/catalog/water-profiles", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
     />
   );

@@ -508,6 +508,12 @@ describe("SCREENS", () => {
     expect(html).toContain("August 31, 2027");
   });
 
+  it("points a date field at its description, as the other fields do", () => {
+    const html = renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date", undefined, { "aria-describedby": "best-by-help" })));
+    expect(html).toMatch(/<button[^>]*aria-describedby="best-by-help"/);
+  });
+
+
   it("falls back to initials when a person has no fixture photo", () => {
     const render = (node: ReturnType<typeof E.face>) => renderToStaticMarkup(createElement("div", null, node));
     // Initials sit under the photo, so the markup a static export ships keeps
@@ -943,7 +949,9 @@ describe("SCREENS", () => {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const html = renderToStaticMarkup(createElement("div", null, s!.hd, s!.body));
-      expect(filled(html).length, name).toBeLessThanOrEqual(1);
+      // Settings has three independent forms. Its equal-weight Save buttons
+      // intentionally remain filled rather than implying one page-wide action.
+      expect(filled(html).length, name).toBeLessThanOrEqual(name === "Settings" ? 3 : 1);
     }
   });
 

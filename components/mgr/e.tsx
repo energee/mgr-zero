@@ -305,7 +305,7 @@ export const E = {
    *  (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     const { onChange, hideLabel, contextualLabels, ...attributes } = controls ?? {};
-    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} />;
+    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={controls?.["aria-describedby"]} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
