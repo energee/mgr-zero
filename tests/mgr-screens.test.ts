@@ -1039,3 +1039,20 @@ describe("vessel tile fill (#909)", () => {
     expect(tile()).not.toContain("progressbar");
   });
 });
+
+describe("Work kind strip (#992)", () => {
+  const WORK_VIEWS = ["orders-list", "transfers", "batches", "packaging-runs", "purchase-orders", "routes"];
+  it("every Work page draws the kind strip through WorkKindTabs, not its own TabBar", () => {
+    for (const view of WORK_VIEWS) {
+      const source = readFileSync(`components/mgr/views/${view}.tsx`, "utf8");
+      expect(source, view).toMatch(/<WorkKindTabs\b/);
+      expect(source, view).not.toMatch(/E\.tabs\(WORK_CHIPS|<TabBar[^>]*workTabs/);
+    }
+  });
+  it("Orders draws the kind strip full width with the state filter on its own row", () => {
+    const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Orders")!.body));
+    const lists = [...html.matchAll(/<div[^>]*role="tablist"[^>]*class="([^"]*)"/g)].map((m) => m[1]);
+    expect(lists[0]).toContain("w-full overflow-x-auto");
+    expect(lists[0]).not.toContain("md:w-fit");
+  });
+});
