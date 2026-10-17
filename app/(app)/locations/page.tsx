@@ -9,6 +9,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { LocationForm } from "./location-form";
+import { canRun } from "@/lib/commands/registry";
 
 type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 
@@ -17,11 +18,11 @@ export default async function LocationsPage() {
   const ctx = await buildContext(brewery.id);
   const locations = (await runCommand("list_locations", {}, ctx)) as LocationRow[];
   return <LocationsView
-    model={toLocationsViewProps({ locations, backHref: brewery.role === "admin" ? "/settings" : "/beer" })}
-    backLabel={brewery.role === "admin" ? "Settings" : "Beer"}
-    rowActionLabel={brewery.role === "admin" ? "Edit" : "Review"}
-    createAction={brewery.role === "admin" ? <LocationForm /> : null}
+    model={toLocationsViewProps({ locations, backHref: brewery.roles.includes("admin") ? "/settings" : "/beer" })}
+    backLabel={brewery.roles.includes("admin") ? "Settings" : "Beer"}
+    rowActionLabel={brewery.roles.includes("admin") ? "Edit" : "Review"}
+    createAction={brewery.roles.includes("admin") ? <LocationForm /> : null}
     linkRows
-    footer={brewery.role !== "brewer" ? <Link href="/inventory" className="text-xs text-muted-foreground underline underline-offset-2">All finished goods inventory</Link> : null}
+    footer={canRun(ctx, "get_atp") ? <Link href="/inventory" className="text-xs text-muted-foreground underline underline-offset-2">All finished goods inventory</Link> : null}
   />;
 }

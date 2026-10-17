@@ -1,6 +1,38 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
 import type { GatewayModelOption } from "@/lib/chat/models";
-import { toCents } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
+import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
+
+export type BrewerySettings = {
+  name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null;
+  customer_phone: string | null; fermentation_reading_due_hours: number; days_to_package: number;
+  books_opened_on: string | null; one_way_keg_fee_cents: number;
+};
+
+export type BrewerySettingsValues = {
+  name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string;
+  daysToPackage: string; booksOpenedOn: string; oneWayKegFee: string;
+};
+
+export function toBrewerySettingsValues(brewery: BrewerySettings): BrewerySettingsValues {
+  return {
+    name: brewery.name, timezone: brewery.timezone, ttb: brewery.ttb_registry_no ?? "",
+    pa: brewery.pa_license_no ?? "", phone: brewery.customer_phone ?? "",
+    hours: String(brewery.fermentation_reading_due_hours), daysToPackage: String(brewery.days_to_package),
+    booksOpenedOn: brewery.books_opened_on ?? "", oneWayKegFee: dollarsInput(brewery.one_way_keg_fee_cents),
+  };
+}
+
+export function breweryOperatingDefaultsCommand(values: Pick<BrewerySettingsValues, "hours" | "daysToPackage">) {
+  const readingDueHours = Number(values.hours);
+  const daysToPackage = Number(values.daysToPackage);
+  return {
+    name: "set_brewery_operating_defaults",
+    input: { readingDueHours, daysToPackage },
+    valid: Number.isInteger(readingDueHours) && readingDueHours >= 1 && readingDueHours <= 168
+      && Number.isInteger(daysToPackage) && daysToPackage >= 1 && daysToPackage <= 120,
+  };
+}
 
 export type SettingsViewModel = {
   backHref?: string;
@@ -11,8 +43,11 @@ export type SettingsViewModel = {
   paLicense: string;
   phone: string;
   overdueHours: string;
+  daysToPackage: string;
   /** The day compliance reports start counting (YYYY-MM-DD), or "" when unset. */
   booksOpenedOn: string;
+  hasFiledReports?: boolean;
+  basisCorrections?: ReportingBasisCorrection[];
   /** The one-way keg fee in dollars ("10.00"); "0.00" bills none. */
   oneWayKegFee: string;
   aiModel: string;

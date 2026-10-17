@@ -8,7 +8,7 @@ import { toPortalOrderViewProps, type PortalOrderSnapshot } from "@/lib/mgr/port
 import "@/lib/commands/all";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
+let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
 let customerId: string, shipToId: string, whId: string, skuId: string;
 
 beforeAll(async () => {
@@ -22,7 +22,7 @@ beforeAll(async () => {
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: wh.binId, qty: 100, type: "opening_balance", created_by: ctx.userId });
   const user = await makeCustomerUser(customerId);
-  custCtx = { db: await asUser(user.email), userId: user.id, breweryId: b.id, role: "customer", customerId };
+  custCtx = { db: await asUser(user.email), userId: user.id, breweryId: b.id, roles: ["customer"], customerId };
 });
 
 /** A confirmed wholesale order of `qty`, picked at `picked`; returns ids. */

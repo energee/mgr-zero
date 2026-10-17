@@ -4,6 +4,7 @@ export type MaterialRequirementSnapshot = {
   base_uom: string | null;
   purchase_uom: string | null;
   required: number;
+  projected: number;
   on_hand: number;
   on_order: number;
   short: number;
@@ -41,6 +42,7 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
       title: row.material_name ?? row.material_id,
       detail: [
         `need ${fmt(row.required)} · on hand ${fmt(row.on_hand)} · on order ${fmt(row.on_order)} ${row.base_uom ?? ""}`,
+        row.projected > 0 ? `includes ${fmt(row.projected)} projected` : undefined,
         row.needed_by ? `needed by ${row.needed_by}` : undefined,
         row.vendor_name ? `${row.vendor_name}${row.lead_time_days === null ? " · no lead time typed" : ` · ${row.lead_time_days} day lead · buy by ${row.buy_by}`}` : "no contract and no default vendor",
         row.out_of_reach ? "past the buy-by date · left out of the draft" : undefined,

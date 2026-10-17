@@ -48,7 +48,7 @@ describe("staff draft editing", () => {
   });
   it("keeps editing restricted to Admin and Sales", () => {
     for (const role of ["admin", "sales", "warehouse", "brewer", "customer"] as const) {
-      expect(canRun({ role } as Ctx, "update_draft_order")).toBe(role === "admin" || role === "sales");
+      expect(canRun({ roles: [role] } as Ctx, "update_draft_order")).toBe(role === "admin" || role === "sales");
     }
   });
   it("offers edit only for draft and keeps fixture destinations inert", () => {

@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   createRequestAuthContext,
   getRequestAuthContext,
-  staffRoleAt,
+  staffRolesAt,
   type RequestAuthContext,
 } from "@/lib/auth/request-context";
 import { z } from "zod";
@@ -29,8 +29,8 @@ const notMember = () => new CommandError("not a member of this brewery", 403, "n
 // tests/api-command.test.ts and tests/route-context-reads.test.ts pin.
 export async function ctxForBearer(db: SupabaseClient<Database>, userId: string, breweryId: string, customerId?: string): Promise<Ctx> {
   if (!isUuid(breweryId)) throw notMember();
-  const role = await staffRoleAt(db, userId, breweryId);
-  if (role && !customerId) return { db, userId, breweryId, role };
+  const roles = customerId ? null : await staffRolesAt(db, userId, breweryId);
+  if (roles) return { db, userId, breweryId, roles };
 
   let customerQuery = db
     .from("portal_customers")
@@ -40,7 +40,7 @@ export async function ctxForBearer(db: SupabaseClient<Database>, userId: string,
   if (customerId) customerQuery = customerQuery.eq("id", customerId);
   const customer = await unwrap(customerQuery);
   if (customer?.[0]?.id) {
-    return { db, userId, breweryId, role: "customer", customerId: customer[0].id };
+    return { db, userId, breweryId, roles: ["customer"], customerId: customer[0].id };
   }
 
   throw notMember();
@@ -52,14 +52,14 @@ function assertExpectedContext(ctx: OperationCtx, expected?: CommandContextExpec
   if (!expected) return;
   if (expected.actorId !== ctx.userId
     || expected.breweryId !== (ctx.breweryId ?? undefined)
-    || expected.customerId !== (ctx.role === "customer" ? ctx.customerId : undefined)) throw contextChanged();
+    || expected.customerId !== (ctx.breweryId !== null && ctx.roles.includes("customer") ? ctx.customerId : undefined)) throw contextChanged();
 }
 
 function scopeHeaders(ctx: OperationCtx): Record<string, string> {
   return {
     "x-mgr-actor-id": ctx.userId,
     ...(ctx.breweryId ? { "x-mgr-brewery-id": ctx.breweryId } : {}),
-    ...(ctx.role === "customer" && ctx.customerId ? { "x-mgr-customer-id": ctx.customerId } : {}),
+    ...(ctx.breweryId !== null && ctx.roles.includes("customer") && ctx.customerId ? { "x-mgr-customer-id": ctx.customerId } : {}),
   };
 }
 
@@ -69,14 +69,14 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
 
   const discoveryDb = await request.getSupabaseClient();
   if (breweryId === undefined) {
-    const discovered = { db: discoveryDb, userId: identity.userId, breweryId: null, role: null } satisfies PreTenantCtx;
+    const discovered = { db: discoveryDb, userId: identity.userId, breweryId: null, roles: [] } satisfies PreTenantCtx;
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
   if (!isUuid(breweryId)) throw notMember();
-  const role = customerId ? null : await request.getStaffRole(breweryId);
-  if (role) {
-    const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role } satisfies Ctx;
+  const roles = customerId ? null : await request.getStaffRoles(breweryId);
+  if (roles) {
+    const discovered = { db: discoveryDb, userId: identity.userId, breweryId, roles } satisfies Ctx;
     assertExpectedContext(discovered, expected);
     return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
@@ -87,7 +87,7 @@ async function buildCookieContext(breweryId: string | undefined, request: Reques
       db: discoveryDb,
       userId: identity.userId,
       breweryId,
-      role: "customer",
+      roles: ["customer"],
       customerId: customer.customerId,
     } satisfies Ctx;
     assertExpectedContext(discovered, expected);
@@ -132,7 +132,7 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     accessToken: async () => accessToken,
   });
   const discovered = breweryId === undefined
-    ? ({ db: discoveryDb, userId, breweryId: null, role: null } satisfies PreTenantCtx)
+    ? ({ db: discoveryDb, userId, breweryId: null, roles: [] } satisfies PreTenantCtx)
     : await ctxForBearer(discoveryDb, userId, breweryId, expected?.customerId);
   assertExpectedContext(discovered, expected);
   const db = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {

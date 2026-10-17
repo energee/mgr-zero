@@ -151,7 +151,7 @@ async function setup() {
   const buyer = await makeCustomerUser(customer.customerId);
   const db = await asUser(buyer.email);
   return { brewery, adminCtx, source, first, second, zeroDeposit, missingFormat, customer, poolId: pool.data!.id as string,
-    portalCtx: { db, userId: buyer.id, breweryId: brewery.id, role: "customer" as const, customerId: customer.customerId } };
+    portalCtx: { db, userId: buyer.id, breweryId: brewery.id, roles: ["customer" as const], customerId: customer.customerId } };
 }
 
 async function submitted(f: Awaited<ReturnType<typeof setup>>) {

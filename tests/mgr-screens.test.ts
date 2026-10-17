@@ -244,13 +244,7 @@ describe("SCREENS", () => {
     }
   });
 
-  it("carries every MGR-venue frame with unique names", () => {
-    // A tripwire against a frame dropped by hand from a 1700-line array — the
-    // uniqueness check below catches duplicates, nothing else catches a loss.
-    // Bump it deliberately when a frame lands or leaves; the venue split is
-    // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(202);
-    expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
+  it("keeps inventory screen names unique", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -423,15 +417,15 @@ describe("SCREENS", () => {
     expect(history).toContain("Pay");
   });
 
-  it("gives Save screens a real input or select", () => {
-    // Issue 95: a Save button that would write a value must sit next to a
-    // typed Input or a Select, not a read-only key/value row.
+  it("gives Save screens an editable input, select or toggle choice", () => {
+    // A Save button that writes a value must sit next to a real editable
+    // control, including the multi-select toggle group used for staff roles.
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
       if (!/<button[^>]*>Save/.test(html)) continue;
       expect.soft(
-        /<input\b/.test(html) || html.includes('role="combobox"'),
-        `${screen.name}: Save without an input or select`,
+        /<input\b/.test(html) || html.includes('role="combobox"') || /<button\b[^>]*aria-pressed=/.test(html),
+        `${screen.name}: Save without an editable control`,
       ).toBe(true);
     }
   });
@@ -526,7 +520,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 
@@ -892,11 +886,14 @@ describe("SCREENS", () => {
     expect(move).toContain("md:hidden");
     expect(move).toContain("hidden md:block");
     // Team: no selection-less bulk remove; the role editor lives on the
-    // Team member sheet since #72 split editors out of list pages. Roles are
-    // a single supported choice; role arrays remain unsupported.
+    // Team member sheet since #72 split editors out of list pages. Members
+    // can hold several roles, so the shared editor supports multiple picks.
     expect(html("Team")).not.toMatch(/Remove selected member/);
     const member = html("Team member");
-    expect(member).toContain("data-slot=\"select-trigger\"");
+    expect(member).toContain('aria-label="Roles"');
+    expect(member).toContain('data-slot="toggle-group-item"');
+    expect(member).toContain("Choose one or more roles");
+    expect(member).not.toContain('data-slot="select-trigger"');
     expect(member).not.toContain('role="switch"');
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);

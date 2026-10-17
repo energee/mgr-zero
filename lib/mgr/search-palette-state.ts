@@ -19,10 +19,10 @@ export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
 }
 
 
-export function searchDestinations(role: StaffRole, term: string) {
+export function searchDestinations(roles: readonly StaffRole[], term: string) {
   const query = term.trim().toLowerCase();
   if (!query) return [];
-  return navFor(shippedNav(STAFF_NAV), role)
+  return navFor(shippedNav(STAFF_NAV), roles)
     .flatMap(item => [item, ...(item.children ?? [])])
     .filter(item => item.label.toLowerCase().includes(query));
 }

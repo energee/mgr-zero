@@ -46,7 +46,7 @@ async function createDraft(qty: Json = 2) {
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
-  staff = await makeStaffCtx(breweryId, "admin");
+  staff = await makeStaffCtx(breweryId, ["warehouse", "admin"]);
   fromLocationId = (await seedLocation(breweryId)).id;
   toLocationId = (await seedLocation(breweryId, { name: "Taproom", uses: ["taproom"] })).id;
   const catalog = await seedCatalog(breweryId);

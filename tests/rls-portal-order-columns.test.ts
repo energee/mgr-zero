@@ -14,7 +14,7 @@ const HIDDEN_ORDER_COLUMNS = ["created_by", "from_location_id", "to_location_id"
 let customerDb: Awaited<ReturnType<typeof asUser>>;
 let staffDb: Awaited<ReturnType<typeof asUser>>;
 let orderId: string, skuId: string, retiredSkuId: string, otherChannelSkuId: string, staffId: string, foreignOrderId: string, depositLineId: string;
-let custCtx: { db: typeof customerDb; userId: string; breweryId: string; role: "customer"; customerId: string };
+let custCtx: { db: typeof customerDb; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
 
 beforeAll(async () => {
   const b = await makeBrewery();
@@ -56,7 +56,7 @@ beforeAll(async () => {
   })).id;
   const user = await makeCustomerUser(mine.customerId);
   customerDb = await asUser(user.email);
-  custCtx = { db: customerDb, userId: user.id, breweryId: b.id, role: "customer", customerId: mine.customerId };
+  custCtx = { db: customerDb, userId: user.id, breweryId: b.id, roles: ["customer"], customerId: mine.customerId };
 });
 
 describe("portal customers cannot read internal order and SKU columns", () => {

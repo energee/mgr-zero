@@ -11,7 +11,7 @@ import { AppShell, type AppShellProps } from "@/components/mgr/app-shell";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
 const shell = (sidebarOpen: boolean) => {
-  const props: AppShellProps = { brand: "Demo Brewing", items: navFor(STAFF_NAV, "admin"), sidebarOpen, children: "body" };
+  const props: AppShellProps = { brand: "Demo Brewing", items: navFor(STAFF_NAV, ["admin"]), sidebarOpen, children: "body" };
   return renderToStaticMarkup(createElement(AppShell, props));
 };
 
@@ -24,7 +24,7 @@ describe("desktop rail", () => {
 
   it("keeps every tab in the collapsed rail and names it in a tooltip", () => {
     const html = shell(false);
-    for (const tab of navFor(STAFF_NAV, "admin")) {
+    for (const tab of navFor(STAFF_NAV, ["admin"])) {
       // Once as the menu button's own label, once as its tooltip content.
       expect(html.split(`>${tab.label}<`).length - 1).toBeGreaterThanOrEqual(2);
     }

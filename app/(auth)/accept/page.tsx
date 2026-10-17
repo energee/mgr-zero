@@ -20,7 +20,7 @@ export default async function AcceptPage({ searchParams }: { searchParams: Promi
 
   return <EntrySurface>
     {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
-    <EntryView model={{ ...toAcceptInviteViewProps(landing.name, landing.role), error: error ? "Enter your name and a password of at least 8 characters." : undefined }}
+    <EntryView model={{ ...toAcceptInviteViewProps(landing.name, landing.roles.join(", ")), error: error ? "Enter your name and a password of at least 8 characters." : undefined }}
       action={acceptInvite} defaults={{ name }} hidden={<input type="hidden" name="audience" value={audience} />} />
   </EntrySurface>;
 }

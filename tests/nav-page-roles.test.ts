@@ -8,8 +8,8 @@
 // come back here.
 import { describe, expect, it } from "vitest";
 import "../lib/commands/all";
-import { getCommandDefinition, type StaffRole } from "../lib/commands/registry";
-import { STAFF_NAV, type NavItem } from "../lib/mgr/nav";
+import { canRun, getCommandDefinition, type Ctx, type StaffRole, STAFF_ROLES } from "../lib/commands/registry";
+import { STAFF_NAV, navFor, shippedNav, type NavItem } from "../lib/mgr/nav";
 
 /** href → every registry operation the page (and its detail page) calls. */
 const PAGE_QUERIES: Record<string, readonly string[]> = {
@@ -52,6 +52,21 @@ describe("production pages open for every role the rail offers them to", () => {
           expect(def, `${name} is not registered`).toBeDefined();
           expect.soft(def!.roles, `${href} as ${role}: ${name}`).toContain(role);
         }
+      }
+    });
+  }
+});
+
+describe("multi-role page authorization", () => {
+  for (const first of STAFF_ROLES) for (const second of STAFF_ROLES) {
+    it(`opens each offered page as ${first}+${second}`, () => {
+      const roles = [first, second];
+      // canRun never reads db: this test exercises the real registry gate only.
+      const ctx = { roles, breweryId: "brewery" } as Ctx;
+      const paths = new Set(flatten(navFor(shippedNav(STAFF_NAV), roles)).map(item => item.href));
+      for (const [href, queries] of Object.entries(PAGE_QUERIES)) {
+        if (!paths.has(href)) continue;
+        for (const name of queries) expect.soft(canRun(ctx, name), `${href}: ${name}`).toBe(true);
       }
     });
   }
