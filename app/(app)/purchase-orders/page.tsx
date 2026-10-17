@@ -16,11 +16,12 @@ import { poNo } from "@/lib/mgr/doc-no";
 
 type Po = { id: string; po_no: number; status: string; expected_on: string | null; ordered_on: string | null; vendor_name: string | null; lines_open: number };
 
-function verb(po: Po): [string, "info" | "attention" | "success"] {
-  if (po.status === "draft") return ["Mark sent", "info"];
-  if (po.status === "received") return ["Open", "success"];
-  if (po.status === "cancelled") return ["Open", "info"];
-  return ["Receive", po.status === "partially_received" ? "attention" : "info"];
+/** The row's next action. A received or cancelled order has none: its row is
+ *  a plain link, because "Open" on a closed order reads as reopen (#996). */
+function next(po: Po): { verb: string; tone: "info" | "attention" } | undefined {
+  if (po.status === "draft") return { verb: "Mark sent", tone: "info" };
+  if (po.status === "received" || po.status === "cancelled") return undefined;
+  return { verb: "Receive", tone: po.status === "partially_received" ? "attention" : "info" };
 }
 const status = (po: Po) => {
   if (po.status === "partially_received") return `partially received · ${po.lines_open} ${po.lines_open === 1 ? "line" : "lines"} still due`;
@@ -40,10 +41,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
         title: "Work",
         subtitle: all === "1" ? "every order" : "open orders",
         includeClosed: all === "1",
-        rows: pos.map(po => {
-          const [label, tone] = verb(po);
-          return { key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), verb: label, tone, href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" };
-        }),
+        rows: pos.map(po => ({ key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), ...next(po), href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" })),
       })}
       createAction={<Button size="sm" asChild><Link href="/purchase-orders/new">New PO</Link></Button>}
       linkRows

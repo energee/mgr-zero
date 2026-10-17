@@ -6,8 +6,9 @@ export type PurchaseOrdersRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
+  /** The next action; a closed order has none and its row is a plain link (#996). */
+  verb?: string;
+  tone?: "info" | "attention";
   warning?: boolean;
   href?: string;
 };

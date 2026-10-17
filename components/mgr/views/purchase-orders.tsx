@@ -29,7 +29,9 @@ export function PurchaseOrdersView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
+            {row.verb
+              ? E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")
+              : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
       {footer}
