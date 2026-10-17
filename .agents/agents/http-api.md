@@ -125,16 +125,22 @@ command, run this before calling the work done.
 
 `.github/workflows/http-api-agent.yml` runs this prompt after every merge to
 `main` (skipped when the PR body says `API: none`) and weekly, with a narrower reach than you have interactively. There you may edit
-only `content/docs/api/*.mdx`, `components/mgr/screens.tsx` and
-`lib/mgr/api-operations.ts`, and you have no shell. So:
+only `content/docs/api/*.mdx` and literal `reads`/`writes` annotations in
+`components/mgr/screens.tsx`, and you have no shell. So:
 
 - **Do not run `bun run docs:api`** — the workflow runs it for you, after you
-  stop, on exactly the sources you changed. Change a screen's `reads`/`writes`
-  or the prose and leave the generated blocks alone; they will be correct.
+  stop and after validating your diff without importing it. Change literal
+  `reads`/`writes` values in existing `SCREENS` records or the prose and
+  leave the generated blocks alone; they will be correct. Screen comments,
+  property names, record structure and formatting must remain byte-for-byte
+  unchanged: the workflow parses both sources and masks only those literal values.
 - **`lib/commands/` is read-only to you there.** A registry `description` or
   `roles` that reads badly as documentation (step 2) is still worth finding —
   name it and the fix you would make in your closing summary, so it reaches the
   pull request description rather than being silently dropped.
+- **`lib/mgr/api-operations.ts` is read-only too.** If a new name needs an area
+  assignment (step 5), report the name and proposed area in your closing summary
+  instead of editing the module. That implementation needs its own reviewed PR.
 - **`tests/api-command.test.ts` is out of reach too.** If the envelope or auth
   changed under you, say so plainly instead of editing around it; that is a
   code change wearing a docs change's clothes, and it needs its own PR.
