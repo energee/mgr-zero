@@ -22,7 +22,7 @@ function form() {
     .mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()])
     .mockReturnValueOnce([false, vi.fn()])
     .mockReturnValueOnce([[{ skuId: "sku", qty: "3" }], vi.fn()]);
-  const rendered = OrderForm({ customers, locations: [{ id: "source", name: "Source", kind: "warehouse" }], skus });
+  const rendered = OrderForm({ timeZone: "America/Los_Angeles", customers, locations: [{ id: "source", name: "Source", kind: "warehouse" }], skus });
   expect(state.useState).toHaveBeenCalledTimes(9);
   return rendered;
 }
@@ -48,6 +48,7 @@ it("keeps cached eligible choices on failed refetch with recovery feedback", () 
   expect(props.disabled).toBe(false);
   expect(props.model.skus).toHaveLength(1);
   expect(renderToStaticMarkup(props.skuFeedback)).toContain("Showing last-known data");
+  expect(renderToStaticMarkup(props.skuFeedback)).toContain("Dec 31, 1969, 4:00 PM");
   if (!isValidElement<{ retry: () => void }>(props.skuFeedback)) throw new Error("Missing pricing feedback");
   props.skuFeedback.props.retry(); expect(state.retry).toHaveBeenCalledOnce();
 });

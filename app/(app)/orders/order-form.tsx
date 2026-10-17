@@ -28,11 +28,13 @@ export function OrderForm({
   customers,
   locations,
   skus,
+  timeZone,
   feedback,
 }: {
   customers: CustomerOption[];
   locations: LocationOption[];
   skus: SkuOption[];
+  timeZone: string;
   feedback?: ReactNode;
 }) {
   const router = useRouter();
@@ -56,7 +58,7 @@ export function OrderForm({
   // A cold channel read is not an empty list; retain inputs but block submission until it resolves.
   const skuOptionsReady = channel === undefined || priced.data !== undefined;
   const availableSkuIds = skuOptions.map(sku => sku.id);
-  const skuFeedback = channel === undefined ? undefined : <QueryFeedback
+  const skuFeedback = channel === undefined ? undefined : <QueryFeedback timeZone={timeZone}
     error={priced.error} loading={!priced.data ? "Loading customer-priced SKUs" : undefined}
     paused={priced.isPaused} fetching={priced.isFetching} updatedAt={priced.dataUpdatedAt}
     retry={() => void priced.refetch()} />;
