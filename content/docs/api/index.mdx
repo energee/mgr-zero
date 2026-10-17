@@ -61,7 +61,7 @@ transaction, and returns `409 conflict` if anything changed. A stale refusal
 leaves no movement, completed request, or conversation result.
 
 The current staff browser composer is a structured client of this same endpoint. It
-loads only the registered reads allowed for the current staff role, asks for every
+loads only the registered reads allowed for the current staff roles, asks for every
 required movement field, calls `preview_command`, and sends `record_movement`
 only after the person selects **Commit movement**. Editing or dismissing a
 proposal sends no movement command. Staff ATP answers use `get_atp`; portal
@@ -229,9 +229,9 @@ other operation uses the following membership checks.
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
 in. Being signed in is not enough. The caller must be a member of that brewery:
-staff (`brewery_users` with role `admin`, `sales`, `warehouse`, `brewer` or
-`taproom`) or a portal user (`customer_users` linked to one of the brewery's
-customers, role `customer`).
+staff (`brewery_users` with one or more of the roles `admin`, `sales`,
+`warehouse`, `brewer` or `taproom`) or a portal user (`customer_users` linked
+to one of the brewery's customers, role `customer`).
 
 The two failures are different, and that difference is worth handling.
 `401 unauthenticated` means the token is missing or expired: sign in again.
@@ -241,15 +241,16 @@ return to that original account and workspace to retry an uncertain write.
 
 ### Roles are enforced twice [#enforcement]
 
-An operation lists the roles that may call it. The endpoint refuses the rest
-with `403 permission_denied` before the handler runs. Below that, Postgres
-row-level security scopes every query to the caller's brewery. Customers,
-orders, invoices, shipments, deliveries, routes, transfers, lots, sale
-channels, prices, compliance filings and POS sales also admit only the roles of
-the operations that read them. A role the endpoint should have refused still
-reads nothing from those records. Other records admit admin, sales, warehouse
-and brewer. Taproom staff read the catalog and, beyond it, only records of
-taproom locations.
+An operation lists the roles that may call it. A member holding several roles
+gets every permission any of them allows. The endpoint refuses a member whose
+roles include none of those roles with `403 permission_denied` before the
+handler runs. Below that, Postgres row-level security scopes every query to the
+caller's brewery. Customers, orders, invoices, shipments, deliveries, routes,
+transfers, lots, sale channels, prices, compliance filings and POS sales also
+admit only the roles of the operations that read them. A role the endpoint
+should have refused still reads nothing from those records. Other records
+admit admin, sales, warehouse and brewer. A member whose only role is taproom reads the catalog and, beyond
+it, only records of taproom locations.
 
 An empty list and a forbidden read look the same from outside, on purpose.
 Keep that in mind when you debug an empty result. A caller cannot probe another
@@ -596,7 +597,7 @@ duplicate orders, because each attempt then looks like a fresh intention.
 
 Offline eligibility is narrower than idempotency. The browser currently queues
 only `record_fermentation_reading`, after persisting its exact input,
-observation time, request ID, actor, brewery, and role before transport. A
+observation time, request ID, actor, brewery, and roles before transport. A
 reload or reconnect retries that same envelope. `record_movement`,
 `record_pick`, and stock transfers require current server state and are never
 queued; a stable request ID alone does not make an operation safe offline.
