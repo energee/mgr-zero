@@ -10,7 +10,7 @@ import "../lib/commands/all";
 let b: { id: string }, adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let customerId: string, shipToId: string, saleChannelId: string, skuId: string, warehouseId: string, warehouseBinId: string;
 let customerEmail: string;
-let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
+let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
 
 beforeAll(async () => {
   b = await makeBrewery();
@@ -29,7 +29,7 @@ beforeAll(async () => {
   const custUser = await makeCustomerUser(customerId);
   customerEmail = custUser.email;
   const db = await asUser(custUser.email);
-  custCtx = { db, userId: custUser.id, breweryId: b.id, role: "customer", customerId };
+  custCtx = { db, userId: custUser.id, breweryId: b.id, roles: ["customer"], customerId };
 });
 
 describe("portal commands", () => {
@@ -298,7 +298,7 @@ describe("portal commands", () => {
     // Staff RLS sees every location and every SKU, so the portal cannot lean on RLS to narrow either.
     const staff = await makeStaffCtx(b.id, "admin");
     await admin.from("customer_users").insert({ customer_id: customerId, user_id: staff.userId });
-    const dual = { ...staff, role: "customer" as const, customerId };
+    const dual = { ...staff, roles: ["customer" as const], customerId };
     const source = await seedLocation(b.id, { name: "Dual source WH" });
     await runCommand("set_portal_fulfillment_source", { locationId: source.id }, adminCtx);
     const account = await runCommand("get_portal_account", {}, dual) as { fulfillmentSource: { id: string } | null };

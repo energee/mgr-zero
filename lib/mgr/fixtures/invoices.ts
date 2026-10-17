@@ -15,12 +15,14 @@ export const invoiceList = [
   { ...invoice, id: "paid", invoice_no: 1036, paid_at: "2026-08-29T12:00:00Z", qbo_balance_cents: 0, qbo_cash_collected_cents: 98000 },
   { ...invoice, id: "deleted", invoice_no: 1035, customers: { name: "Teresa’s" }, qbo_remote_state: "deleted" as const },
   { ...invoice, id: "settled", invoice_no: 1034, qbo_balance_cents: 0 },
+  { ...invoice, id: "settled-with-cash", invoice_no: 1031, paid_at: "2026-09-30T12:00:00Z", qbo_balance_cents: 0, qbo_cash_collected_cents: 48000 },
+  { ...invoice, id: "unknown-push", invoice_no: 1030, qbo_sync_status: "pending" as const, has_pending_qbo_push: true, qbo_balance_cents: null },
   { ...invoice, id: "partial", invoice_no: 1033, customers: null, due_on: "2026-10-20", qbo_balance_cents: 50000, qbo_cash_collected_cents: 48000 },
   { ...invoice, id: "written-off", invoice_no: 1032, customers: { name: "Teresa’s" }, qbo_remote_state: "deleted" as const, written_off_at: "2026-09-30T15:00:00Z" },
   { ...invoice, id: "historical", invoice_no: 1001, qbo_sync_status: "not_synced" as const, paid_at: "2025-08-14T16:00:00Z", due_on: "2025-08-14", qbo_balance_cents: null },
   { ...invoice, id: "number-unavailable", invoice_no: null, qbo_sync_status: "pending" as const, due_on: null, qbo_balance_cents: null },
   { ...invoice, id: "credit", invoice_no: 12, kind: "credit_memo" as const, total_cents: -18000, subtotal_cents: -18000, due_on: null, qbo_balance_cents: null },
-].map(row => toInvoiceListRow(row, "admin", true, DEMO_TIME_ZONE, new Date("2026-10-04T12:00:00Z")));
+].map(row => toInvoiceListRow(row, ["admin"], true, DEMO_TIME_ZONE, new Date("2026-10-04T12:00:00Z")));
 
 /** The ordinary sync: the latest attempt completed, so only last success shows. */
 export const invoicesSync: QboSyncStatus = {

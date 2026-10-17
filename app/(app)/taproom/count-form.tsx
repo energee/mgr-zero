@@ -7,6 +7,7 @@ import { WeeklyCountDraftView, WeeklyCountPrintAction, WeeklyCountCorrectionView
 import { useRouter } from "next/navigation";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { useCommandContext } from "@/lib/brewery-provider";
+import type { StaffRole } from "@/lib/commands/registry";
 import {
   beginCorrectionAttempt,
   beginCountAttempt,
@@ -111,14 +112,14 @@ export function TaproomPrintWorksheet({ breweryId, locationId, locationName, rev
   </>;
 }
 
-export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, role, timeZone, print }: {
+export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, roles, timeZone, print }: {
   breweryId: string;
   /** breweries.timezone, from the server page: SSR and hydration format the same times (#442). */
   timeZone: string;
   snapshot: TaproomCountSnapshot;
   projection: DraftProjection;
   lotLabels: Record<string, string>;
-  role: "admin" | "warehouse" | "taproom";
+  roles: readonly StaffRole[];
   print?: ReactNode;
 }) {
   const expectedContext = useRef(useCommandContext());
@@ -163,7 +164,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
     }
   }
 
-  return <WeeklyCountDraftView state={state} role={role} lotLabels={lotLabels} timeZone={timeZone} print={print}
+  return <WeeklyCountDraftView state={state} roles={roles} lotLabels={lotLabels} timeZone={timeZone} print={print}
     priorHref={state.draft.priorCount ? `/taproom?location=${state.draft.locationId}&count=${state.draft.priorCount.id}` : undefined}
     projectionBusy={projectionBusy} projectionError={projectionError} onRefreshExpected={refreshProjection} onRefreshSnapshot={refreshSnapshot}
     onDisposition={(key, value) => setState(current => updateCountDisposition(current, key, value))}

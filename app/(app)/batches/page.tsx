@@ -23,7 +23,7 @@ export default async function BatchesPage() {
     recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version }] : []);
   return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading` }, { unit: gravity.effective, timeZone: brewery.timeZone }))}
     createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} />}
-    workHrefs={workHrefsFor(brewery.role)}
+    workHrefs={workHrefsFor(brewery.roles)}
     newVesselHref="/cellar/vessels/new"
   />;
 }

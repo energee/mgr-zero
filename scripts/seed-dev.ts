@@ -77,7 +77,7 @@ async function seed() {
       console.log(`Creating membership ${email} -> ${breweryId}...`);
       const { error: insertErr } = await admin
         .from("brewery_users")
-        .insert({ brewery_id: breweryId, user_id: userId, role: "admin" });
+        .insert({ brewery_id: breweryId, user_id: userId, roles: ["admin"] });
       if (insertErr) throw insertErr;
       console.log(`  Created membership`);
     }

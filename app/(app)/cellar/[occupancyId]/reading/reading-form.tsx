@@ -28,24 +28,27 @@ import {
   type OutboxAttempt,
 } from "@/lib/composer/outbox";
 import { formatGravity, INVALID_GRAVITY, parseGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import type { StaffRole } from "@/lib/commands/registry";
 
 function localObservationValue(iso = new Date().toISOString()) {
   const date = new Date(iso);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export function ReadingForm({ occupancyId, identity, unit, role, prior, openByDefault = false, returnHref }: {
+export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByDefault = false, returnHref }: {
   occupancyId: string;
   identity: FermentationReadingIdentity;
   unit: GravityUnit;
-  role: "admin" | "brewer";
+  roles: readonly StaffRole[];
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
   openByDefault?: boolean;
   returnHref?: string;
 }) {
   const router = useRouter();
   const expectedContext = useCommandContext();
-  const scope = { actorId: expectedContext.actorId, breweryId: expectedContext.breweryId ?? "", role } as const;
+  const scope = { actorId: expectedContext.actorId, breweryId: expectedContext.breweryId ?? "", roles } as const;
+  // Effects key on the role members, not the array a server refresh recreates.
+  const rolesKey = roles.toSorted().join(",");
   const [open, setOpenState] = useState(openByDefault);
   const [tempF, setTempF] = useState("");
   const [gravity, setGravity] = useState("");
@@ -86,7 +89,7 @@ export function ReadingForm({ occupancyId, identity, unit, role, prior, openByDe
     }
   // The page is keyed to this signed-in scope; role changes remount it through the server layout.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [occupancyId, expectedContext.actorId, expectedContext.breweryId, role]);
+  }, [occupancyId, expectedContext.actorId, expectedContext.breweryId, rolesKey]);
 
   const reset = useCallback(() => {
     setTempF(""); setGravity(""); setPh(""); setNote(""); setObservedAt("");

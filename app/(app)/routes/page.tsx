@@ -25,5 +25,5 @@ export default async function RoutesPage() {
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),
     ...unassigned.map(document => ({ key: document.id, title: document.label, detail: "shipped · no route", verb: "Add to route", tone: "attention" as const, href: "/routes/new", warning: true })),
-  ] })} createAction={E.btn("New route", "p", "/routes/new")} workHrefs={workHrefsFor(brewery.role)} />;
+  ] })} createAction={E.btn("New route", "p", "/routes/new")} workHrefs={workHrefsFor(brewery.roles)} />;
 }

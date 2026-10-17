@@ -7,7 +7,7 @@ import type { Ctx, StaffRole } from "../lib/commands/registry";
 import { openableKinds, SEARCH_KINDS } from "../lib/commands/search";
 import "../lib/commands/all";
 
-const ctxFor = (role: StaffRole) => ({ breweryId: "11111111-1111-4111-8111-111111111111", role, userId: "22222222-2222-4222-8222-222222222222" } as unknown as Ctx);
+const ctxFor = (role: StaffRole) => ({ breweryId: "11111111-1111-4111-8111-111111111111", roles: [role], userId: "22222222-2222-4222-8222-222222222222" } as unknown as Ctx);
 
 describe("openableKinds", () => {
   it("admin searches every kind", () => {

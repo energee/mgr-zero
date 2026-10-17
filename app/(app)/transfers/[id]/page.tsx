@@ -23,7 +23,7 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { transfer, lines, bins } = await orNotFound(runCommand("get_stock_transfer", { transferId: id }, ctx) as Promise<Detail>);
-  const stock = brewery.role === "admin" || brewery.role === "warehouse" ? await runCommand("get_bin_move_stock", { locationId: transfer.from_location_id }, ctx) as BinMoveStock[] : [];
+  const stock = brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? await runCommand("get_bin_move_stock", { locationId: transfer.from_location_id }, ctx) as BinMoveStock[] : [];
   const binById = new Map(bins.map((b) => [b.id, b.name]));
   const bin = (id: string) => binById.get(id) ?? "—";
   const what = (l: Detail["lines"][number]) => l.skus?.name ?? l.materials?.name ?? (l.keg_pools ? `${l.keg_pools.name} · ${l.keg_size?.replace("_", " ")}` : "Line");

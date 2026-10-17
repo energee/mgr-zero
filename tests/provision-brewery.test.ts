@@ -39,13 +39,13 @@ it("provisions without membership via Bearer and replays concurrently without du
   const results = await Promise.all(responses.map(r => r.json()));
   expect(results[0].data).toEqual(results[1].data);
   breweryId = results[0].data;
-  expect((await admin.from("brewery_users").select("role").eq("brewery_id", breweryId).eq("user_id", userId)).data).toEqual([{ role: "admin" }]);
+  expect((await admin.from("brewery_users").select("roles").eq("brewery_id", breweryId).eq("user_id", userId)).data).toEqual([{ roles: ["admin"] }]);
   expect((await admin.from("breweries").select("id").eq("name", input.name)).data).toEqual([{ id: breweryId }]);
   expect((await post({ ...body, input: { ...input, name: "different" } })).status).toBe(409);
 });
 it("cookie identity builds a typed pre-tenant context and can provision through the cookie route", async () => {
   const ctx = await buildContext();
-  expect(ctx).toMatchObject({ userId, breweryId: null, role: null });
+  expect(ctx).toMatchObject({ userId, breweryId: null, roles: [] });
   const response = await POST(new Request("http://localhost/api/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "provision_brewery", input, requestId }) }));
   expect(response.status).toBe(200);
   expect((await response.json()).data).toBe(breweryId);
@@ -89,7 +89,7 @@ it("keeps existing and anonymous roles from using bootstrap as an elevation path
   expect(independent).not.toBe(breweryId);
   await admin.from("brewery_users").delete().eq("brewery_id", breweryId).eq("user_id", userId);
   expect((await post({ name: "provision_brewery", input, requestId })).status).toBe(200);
-  expect((await admin.from("brewery_users").select("role").eq("brewery_id", breweryId).eq("user_id", userId)).data).toEqual([]);
+  expect((await admin.from("brewery_users").select("roles").eq("brewery_id", breweryId).eq("user_id", userId)).data).toEqual([]);
 });
 
 it("rolls back brewery and request when the dependent admin insert fails", async () => {

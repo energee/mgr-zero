@@ -73,9 +73,9 @@ describe("integration token isolation", () => {
       asUser(brewerUser.email),
       asUser(customerUser.email),
     ]);
-    adminCtx = { db: adminDb, userId: adminUser.id, breweryId: brewery.id, role: "admin" };
-    salesCtx = { db: salesDb, userId: salesUser.id, breweryId: brewery.id, role: "sales" };
-    warehouseCtx = { db: warehouseDb, userId: warehouseUser.id, breweryId: brewery.id, role: "warehouse" };
+    adminCtx = { db: adminDb, userId: adminUser.id, breweryId: brewery.id, roles: ["admin"] };
+    salesCtx = { db: salesDb, userId: salesUser.id, breweryId: brewery.id, roles: ["sales"] };
+    warehouseCtx = { db: warehouseDb, userId: warehouseUser.id, breweryId: brewery.id, roles: ["warehouse"] };
     browsers = [
       { name: "admin", db: adminDb },
       { name: "sales", db: salesDb },
@@ -169,7 +169,7 @@ describe("integration token isolation", () => {
   it("rechecks current actor membership inside the service-only token statements", async () => {
     const { error: demoteError } = await admin
       .from("brewery_users")
-      .update({ role: "brewer" })
+      .update({ roles: ["brewer"] })
       .eq("brewery_id", brewery.id)
       .eq("user_id", adminCtx.userId);
     expect(demoteError).toBeNull();
@@ -198,7 +198,7 @@ describe("integration token isolation", () => {
     } finally {
       const { error: restoreError } = await admin
         .from("brewery_users")
-        .update({ role: "admin" })
+        .update({ roles: ["admin"] })
         .eq("brewery_id", brewery.id)
         .eq("user_id", adminCtx.userId);
       expect(restoreError).toBeNull();
@@ -210,7 +210,7 @@ describe("integration token isolation", () => {
     const otherBrewery = await makeBrewery();
     const otherAdmin = await makeStaff(otherBrewery.id, "admin");
     const otherDb = await asUser(otherAdmin.email);
-    const otherCtx: Ctx = { db: otherDb, userId: otherAdmin.id, breweryId: otherBrewery.id, role: "admin" };
+    const otherCtx: Ctx = { db: otherDb, userId: otherAdmin.id, breweryId: otherBrewery.id, roles: ["admin"] };
     const { error: connectionError } = await admin.from("qbo_connections").insert({
       brewery_id: otherBrewery.id,
       realm_id: `realm-${crypto.randomUUID()}`,
@@ -241,7 +241,7 @@ describe("integration token isolation", () => {
       db: lifecycleDb,
       userId: lifecycleAdmin.id,
       breweryId: lifecycleBrewery.id,
-      role: "admin",
+      roles: ["admin"],
     };
     const firstRealm = `realm-${crypto.randomUUID()}`;
     const { data: firstConnection, error: firstConnectionError } = await admin
@@ -296,7 +296,7 @@ describe("integration token isolation", () => {
       db: await asUser(movedAdmin.email),
       userId: movedAdmin.id,
       breweryId: movedBrewery.id,
-      role: "admin",
+      roles: ["admin"],
     };
     await storeTokens(movedCtx, "qbo", "moved-access-token", "moved-refresh-token");
     const moveTarget = await makeBrewery();
@@ -315,7 +315,7 @@ describe("integration token isolation", () => {
       db: await asUser(posAdmin.email),
       userId: posAdmin.id,
       breweryId: posBrewery.id,
-      role: "admin",
+      roles: ["admin"],
     };
     const { data: posConnection, error: posConnectionError } = await admin
       .from("pos_connections")

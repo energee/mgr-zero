@@ -7,7 +7,7 @@ import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, priceSku, seed
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
+let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
 let hazy: string, saison: string;
 
 // Dates relative to today so the "upcoming" cut never time-bombs. Weeks start Monday.
@@ -43,7 +43,7 @@ beforeAll(async () => {
   const other = await makeBrewery();
   await planBatches(other.id, [{ brand: (await seedCatalog(other.id, { product: "Elsewhere" })).brandId, plannedOn: iso(nextWeek) }]);
   const user = await makeCustomerUser(customerId);
-  custCtx = { db: await asUser(user.email), userId: user.id, breweryId: b.id, role: "customer", customerId };
+  custCtx = { db: await asUser(user.email), userId: user.id, breweryId: b.id, roles: ["customer"], customerId };
 });
 
 describe("portal_schedule", () => {

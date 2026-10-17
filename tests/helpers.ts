@@ -25,9 +25,10 @@ async function makeAuthUser() {
   return { id: data.user.id, email };
 }
 
-export async function makeStaff(breweryId: string, role: StaffRole = "admin") {
+export async function makeStaff(breweryId: string, role: StaffRole | StaffRole[] = "admin") {
   const u = await makeAuthUser();
-  const { error } = await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: u.id, role });
+  const roles = Array.isArray(role) ? role : [role];
+  const { error } = await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: u.id, roles });
   if (error) throw error;
   return u;
 }
@@ -49,10 +50,10 @@ export async function asUser(email: string): Promise<SupabaseClient<Database>> {
 }
 
 // A ready-to-use command Ctx for a fresh staff member of `breweryId`.
-export async function makeStaffCtx(breweryId: string, role: StaffRole = "admin") {
+export async function makeStaffCtx(breweryId: string, role: StaffRole | StaffRole[] = "admin") {
   const staff = await makeStaff(breweryId, role);
   const db = await asUser(staff.email);
-  return { db, userId: staff.id, breweryId, role };
+  return { db, userId: staff.id, breweryId, roles: Array.isArray(role) ? role : [role] };
 }
 
 // psql against the test database for pg_catalog assertions (schema-* tests):

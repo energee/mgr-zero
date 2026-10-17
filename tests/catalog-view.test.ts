@@ -30,7 +30,7 @@ import { toFormatsViewProps } from "../lib/mgr/formats-view";
 import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
 import { toSkuListViewProps } from "../lib/mgr/sku-list-view";
 import { barcodeOf } from "../lib/mgr/price-groups-view";
-import { toSkuViewProps } from "../lib/mgr/sku-view";
+import { toSkuViewProps, skuUpdateCommand, skuCreateCommand } from "../lib/mgr/sku-view";
 import { formatVolume } from "../lib/volume";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -316,6 +316,33 @@ describe("SKU view", () => {
     expect(model.active).toBe(true);
     expect(model.upc).toBe("00810123450127");
     expect(model.volumeInfo).toMatch(/from the Format/);
+  });
+
+  it("reads a saved fractional batch share as a percentage, with blank meaning unset", () => {
+    expect(toSkuViewProps({ ...skuHazyHalf, sku: { ...skuHazyHalf.sku!, batch_share: 0.375 } }).batchSharePercent).toBe("37.5");
+    expect(toSkuViewProps({ ...skuHazyHalf, sku: { ...skuHazyHalf.sku!, batch_share: null } }).batchSharePercent).toBe("");
+    expect(toSkuViewProps({ formats: skuHazyHalf.formats }).batchSharePercent).toBeUndefined();
+  });
+
+  it("converts edit percentages to update_sku fractions and blank to null without changing create_sku", () => {
+    const fields = { skuId: "sku", active: true, upc: "", batchSharePercent: "37.5" };
+    expect(skuUpdateCommand(fields)).toEqual({ name: "update_sku", input: { skuId: "sku", active: true, upc: "", batchShare: 0.375 }, valid: true });
+    expect(skuUpdateCommand({ ...fields, batchSharePercent: "" }).input.batchShare).toBeNull();
+    for (const batchSharePercent of ["0", "-1", "100.1", "invalid"]) {
+      expect(skuUpdateCommand({ ...fields, batchSharePercent }).valid).toBe(false);
+    }
+    expect(skuUpdateCommand({ ...fields, batchSharePercent: "100" }).valid).toBe(true);
+    expect(skuCreateCommand({ brandId: "brand", formatId: "format", name: "", upc: "" }).input).not.toHaveProperty("batchShare");
+  });
+
+  it("owns the optional numeric share control only for existing packaged SKUs", () => {
+    const saved = htmlOf(createElement(SkuView, { model: toSkuViewProps(skuHazyHalf) }));
+    expect(saved).toContain('aria-label="Batch package share (%)"');
+    expect(saved).toContain('max="100"');
+    expect(saved).toContain("Clear to stop projecting");
+    const creation = htmlOf(createElement(SkuView, { model: toSkuViewProps({ formats: skuHazyHalf.formats }) }));
+    expect(creation).not.toContain('aria-label="Batch package share (%)"');
+    expect(creation).toContain("Edit the SKU after creation");
   });
 
   it("renders Save SKU, Active, and the UPC", () => {

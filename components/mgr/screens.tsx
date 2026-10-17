@@ -70,7 +70,7 @@ import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
 import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
-import { accountingExpired } from "@/lib/mgr/fixtures/accounting";
+import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
@@ -80,7 +80,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture } from "@/components/mgr/fixture-adapters";
+import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -212,7 +212,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
@@ -485,9 +485,9 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water": "Water profiles" },
-    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
-    states: permitted("admin only"),
-    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
+    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
+    states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
+    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
@@ -673,11 +673,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Team",
-    job: "Roster, single staff role, invitations and membership removal",
+    job: "Roster, staff roles, invitations and membership removal",
     reads: "list_team_members",
     writes: "invite_staff [existing] · update_staff_role · revoke_staff",
-    states: [["last admin", "role change refused · keep one admin", 1], ["permission", "admin only", 1]],
-    spec: "A person shows as @handle, derived from their email. Admin invites one staff role and changes or removes other memberships. The roster does not distinguish pending acceptance. Existing accounts cannot be attached or reinvited; removing membership leaves the Auth account.",
+    states: [["last admin", "removing Admin refused · keep one admin", 1], ["permission", "admin only", 1]],
+    spec: "A person shows as @handle, derived from their email. Roles are listed in enum order: Admin, Sales, Warehouse, Brewer, Taproom. Admin invites one staff role and can assign several roles to another member; permissions are the union of the held roles. The roster does not distinguish pending acceptance. Removing membership leaves the sign-in account.",
     body: <TeamView model={teamRoster} />,
   },
   {
@@ -694,13 +694,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team" },
-    job: "Change one member's role or remove that membership",
+    to: { "Save roles": "Team" },
+    job: "Change one member's roles or remove that membership",
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff",
-    states: [["permission", "admin only", 1], ["last admin", "keep at least one admin", 1], ["self", "remove refused", 1]],
-    spec: "Membership holds one role. Multiple simultaneous staff roles are unsupported. The live form opens only for another member; removing membership leaves their sign-in account.",
-    body: <TeamMemberView name="Dave Chen" email="dave@demobrewing.com" avatar="/mock/dave.jpg" savedRole="brewer" />,
+    states: [["permission", "admin only", 1], ["last admin", "keep at least one member with Admin", 1], ["no roles", "choose at least one role", 1], ["self", "remove refused", 1]],
+    spec: "Choose one or more roles. Each adds its permissions; Admin already includes every staff permission. Removing Admin is a demotion even when another role remains and is refused for the last admin. Invitations still grant one role. The live form opens only for another member; removing membership leaves their sign-in account.",
+    body: <TeamMemberView name="Dave Chen" email="dave@demobrewing.com" avatar="/mock/dave.jpg" savedRoles={["brewer"]} />,
   },
   {
     step: 2,
@@ -1311,17 +1311,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
-    job: "Review verified customer, SKU, deposit and one-way keg fee mappings for the connected company",
-    reads: "get_qbo_connection · list_customers · list_skus",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
-    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers or SKUs"]],
-    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={[
-      { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
-      { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
-      { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
-      { title: "One-way kegs", rows: [{ id: "one_way_fee", label: "One-way keg fee item", kind: "one_way_fee", detail: "One verified QuickBooks item for the non-refundable one-way keg fee" }] },
-    ]} />,
+    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Country Malt": "Mapping conflict", "Purchase account": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
+    job: "Review verified customer, SKU, vendor, purchase account, deposit and one-way keg fee mappings for the connected company",
+    reads: "get_qbo_connection · list_customers · list_skus · list_vendors",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_vendor_mapping · set_qbo_purchase_account · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} />,
   },
   {
     step: 5, slice: 1, tab: "More",
@@ -1438,8 +1433,8 @@ export const SCREENS: Screen[] = [
     job: "Add a packaged SKU to a brand, or edit a pour its price group owns",
     reads: "list_formats · list_keg_pools",
     writes: "create_sku · update_sku · upsert_format",
-    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1]],
-    spec: "A SKU is one brand in a packaged or poured format. New SKU picks a packaged format; a pour is added on its price group and opens here locked. Packaged SKUs hold stock; poured SKUs draw from keg stock. It owns active state, optional UPC, and provider mappings. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
+    states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
+    spec: "A SKU is one brand in a packaged or poured format. New SKU picks a packaged format; a pour is added on its price group and opens here locked. Packaged SKUs hold stock; poured SKUs draw from keg stock. It owns active state, optional UPC, and provider mappings. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
   },
   {
@@ -1855,13 +1850,13 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt" },
-    job: "What posted after a receive, including over, short and what is still owed",
-    reads: "get_purchase_order [ordered less counted per line]",
-    writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
+    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
+    job: "What posted after a receive, including over, short, what is still owed, and its QuickBooks Bill",
+    reads: "get_purchase_order [ordered less counted per line; correction-chain Bill identity and status] · get_qbo_connection [admin only; purchase account] · list_vendors [admin Bill mapping readiness]",
+    writes: "post_receipt_bill [admin only; confirmation; one frozen Bill per receipt correction chain; pending retries query then replay the exact snapshot and provider request ID; definite rejection requires explicit newAttemptReason corrected]",
+    states: [["permission", "warehouse or admin required; only admin can post Bills", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"], ["unmapped", "fix exact vendor and purchase account IDs in Accounting mappings", 1], ["unknown", "retry checks for the Bill first then resends the same snapshot and provider request ID if absent", 1], ["rejected", "fix mappings then explicitly Post corrected Bill", 1], ["posted", "Bill posted, adjust in QuickBooks; payments are QuickBooks-only"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
-    body: <ReceiptView model={receiptPoCountryMalt} />,
+    body: <ReceiptFixture><ReceiptView model={receiptPoCountryMalt} /></ReceiptFixture>,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "Correct receipt",
@@ -2121,7 +2116,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Compliance months",
-    to: { "September 2026": "Period in progress" },
+    to: { "September 2026": "Period in progress", "August 2026": "Filed period needs amendment" },
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
@@ -2141,6 +2136,16 @@ export const SCREENS: Screen[] = [
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
+    to: { "Reattribute loss": "Filed period needs amendment" },
+    job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
+    reads: "list_compliance_reports · get_loss_review",
+    writes: "reattribute_loss",
+    states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
+    spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
   },
   {
     step: 7,
@@ -2405,12 +2410,12 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
+    to: { "Can labels": "Material", "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
     job: "See demand gaps and draft one purchase order per vendor, without priority state",
     reads: "get_material_requirements",
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
-    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["projected", "includes N projected · uncovered orders and batch package shares"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
+    spec: "Material demand combines unbrewed recipe ingredients, open packaging runs, and projected packaging from uncovered orders and active batches with SKU package shares. Batch units are rounded down from planned barrels times the SKU share divided by format volume; needed-by is brew date (planned until brewed) plus Days to package. Any non-cancelled run linked directly or through its source tank replaces the whole batch projection, including after it closes. An unlinked tankless run does not identify a batch and cannot replace that batch's projection. Order projection is the smaller of negative ATP and open order allocations, less open runs and projected batch units of that SKU, so stock and planned supply are never counted twice. Standing allocations hold stock ahead of orders but never project alone. Order needed-by is the earliest requested ship date, or today without one. Packaging units flow through the format's material quantities once, rounding each-count materials up. One row per material includes the projected portion and reads includes N projected. On-hand material and unreceived purchase orders reduce the gap. Resolution is an active contract, then the material's default vendor; missing vendor and past buy-by rows cannot draft. Buy-by is needed-by less vendor lead time. Projected and firm shortfalls draft identically, one purchase order per vendor, rounded to whole purchase units. Nothing here ranks or prioritises.",
     body: <PlanningView model={toPlanningViewProps(planningDemo)} />,
   },
   {
