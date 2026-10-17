@@ -31,6 +31,7 @@ import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
 import { toSkuListViewProps } from "../lib/mgr/sku-list-view";
 import { barcodeOf } from "../lib/mgr/price-groups-view";
 import { toSkuViewProps, skuUpdateCommand, skuCreateCommand } from "../lib/mgr/sku-view";
+import { resolveTap } from "../lib/mgr/screen-links";
 import { formatVolume } from "../lib/volume";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -38,30 +39,70 @@ const brandOf = (sku: { name: string }) => sku.name.split(" · ")[0];
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Catalog view", () => {
-  it("maps list_brands through style · ABV · SKU copy", () => {
+  it("maps list_brands onto separate style, ABV and SKU count fields", () => {
     const model = toCatalogViewProps(catalogBrands);
-    expect(model.brands.map((r) => r.title)).toEqual([
-      brandOf(SKU_HAZY),
-      brandOf(SKU_PILS),
-      brandOf(SKU_STOUT),
+    expect(model.brands.map(({ name, style, abv, skus }) => [name, style, abv, skus])).toEqual([
+      [brandOf(SKU_HAZY), "IPA", "6.8%", "4"],
+      [brandOf(SKU_PILS), "Lager", "4.9%", "2"],
+      [brandOf(SKU_STOUT), "Stout", "7.2%", "1"],
     ]);
-    expect(model.brands[0]?.detail).toBe("IPA · 6.8% · 4 SKUs");
-    // The row is the link to that brand's page; Catalog draws no Edit brand button.
+    // The name is the link to that brand's page; Catalog draws no Edit brand button.
     expect(model.brands[0]?.href).toBe(`/catalog/brands/${model.brands[0]!.key}`);
-    expect(model.brands[1]?.detail).toBe("Lager · 4.9% · 2 SKUs");
-    expect(model.brands[2]?.detail).toBe("Stout · 7.2% · 1 SKU");
     expect(model.priceGroups).toBe("3 channels · 8 groups");
     expect(model.waterProfiles).toBe("3 profiles");
     expect(model.backHref).toBeUndefined();
   });
 
-  it("a brand's staff-only alias follows its name (brand-alias.md)", () => {
+  it("says Not set for a missing style or ABV, and keeps a real zero ABV and zero SKUs", () => {
+    const model = toCatalogViewProps({ priceGroups: [], brands: [
+      { id: "unset", name: "Unset", abv: null, styles: null, skus: [] },
+      { id: "blank", name: "Blank", abv: "", styles: null, skus: [] },
+      { id: "zero", name: "Zero", abv: "0.00", styles: { name: "Non-alcoholic" }, skus: [] },
+    ] });
+    expect(model.brands.map(({ style, abv, skus }) => [style, abv, skus])).toEqual([
+      ["Not set", "Not set", "0"],
+      ["Not set", "Not set", "0"],
+      ["Non-alcoholic", "0%", "0"],
+    ]);
+  });
+
+  it("keeps a brand's staff-only alias apart from its name (brand-alias.md)", () => {
+    // Pickers and the brand page title still join the two.
     expect(brandLabel({ name: "Appaloosa", alias: "Animal #14" })).toBe("Appaloosa · Animal #14");
     expect(brandLabel({ name: "Lupula", alias: null })).toBe("Lupula");
     expect(brandLabel({ name: "Lupula" })).toBe("Lupula");
+    const [first, second, third] = catalogBrands.brands;
+    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, { ...second!, alias: null }, { ...third!, alias: "" }] });
+    expect(model.brands.map(({ name, alias }) => [name, alias])).toEqual([
+      [first!.name, "Animal #14"],
+      [second!.name, undefined],
+      [third!.name, undefined],
+    ]);
+  });
+
+  it("draws brands as whole-linked table rows with the alias under Brand", () => {
     const [first, ...rest] = catalogBrands.brands;
     const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, ...rest] });
-    expect(model.brands[0]?.title).toBe(`${first!.name} · Animal #14`);
+    // Inventory brand rows are taps, never Catalog links (tests/mgr-screens.test.ts
+    // resolves the tap), and the table preserves horizontal containment.
+    const inert = htmlOf(createElement(CatalogView, { model }));
+    expect(inert).not.toMatch(/href="\/catalog\/brands\//);
+    expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
+    const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
+    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs"]);
+    // One link per brand in the desktop table, then one in the phone list; the
+    // positioned link covers the record without adding another focus target.
+    const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
+      .map((m) => [m[1].match(/href="([^"]+)"/)?.[1], m[2]])
+      .filter(([href]) => href?.startsWith("/catalog/brands/"));
+    expect(links).toEqual([...model.brands, ...model.brands].map((b) => [b.href, b.name]));
+    expect(html.match(/Animal #14/g)).toHaveLength(2);
+    // The phone list labels every fact under its header and draws no box per record.
+    const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
+    expect(records).toHaveLength(model.brands.length);
+    for (const record of records) {
+      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs"]);
+    }
   });
 
   it("the brand page carries and draws the alias field", () => {
@@ -102,7 +143,7 @@ describe("Catalog view", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
     expect(html).toMatch(/>Add brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
-    expect(html).toMatch(/IPA · 6\.8% · 4 SKUs/);
+    for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
     expect(html).toMatch(/3 channels · 8 groups/);
     expect(html).toMatch(/Water profiles/);
@@ -133,7 +174,7 @@ describe("Catalog view", () => {
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).toContain(brandOf(SKU_PILS));
-    expect(html).toMatch(/IPA · 6\.8% · 4 SKUs/);
+    expect(html).toContain(">4<");
     expect(html).not.toMatch(/New pour|never a SKU/);
     expect(html).toMatch(/href="\/catalog\/brands\//);
   });
@@ -153,10 +194,13 @@ describe("Catalog view", () => {
     expect(isValidElement(screen("Catalog").body)).toBe(true);
     expect(body.type).toBe(CatalogView);
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
-    const html = htmlOf(screen("Catalog").body);
-    expect(html).toContain("Shared sizes and packaging for every brand");
-    expect(html).toContain("Open format");
-    expect(html).toContain("½ bbl keg");
+  });
+
+  it("a brand or format name opens its screen in the explorer", () => {
+    const packaged = formatsInventory.formats.filter((format) => format.basis === "packaged");
+    for (const row of toFormatsViewProps({ ...formatsInventory, formats: packaged }).rows) expect(resolveTap(screen("Catalog"), row.cells[0]!), row.cells[0]).toBe("Format");
+    for (const row of toFormatsViewProps(formatsInventory).rows) expect(resolveTap(screen("Formats"), row.cells[0]!), row.cells[0]).toBe("Format");
+    for (const brand of toCatalogViewProps(catalogBrands).brands) expect(resolveTap(screen("Catalog"), brand.name), brand.name).toBe("Brand");
   });
 
   it("the live Catalog page mounts CatalogView and the shared FormatsView", () => {
@@ -509,8 +553,7 @@ describe("Formats view", () => {
     expect(html).toMatch(/½ bbl keg/);
     expect(html).toMatch(/Pint/);
     expect(html).toContain(formatVolume("0.50000000"));
-    expect(html).not.toMatch(/→/);
-    expect(html).toMatch(/Open format/);
+    expect(html).not.toMatch(/→|Open format/);
   });
 
   it("the Formats inventory record is FormatsView", () => {

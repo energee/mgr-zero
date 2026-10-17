@@ -228,6 +228,22 @@
   }
 }
 
+/* Unboxed rows (E.row in components/mgr/e.tsx, #909 §2E). A row that follows
+   another row draws a hairline 6px above itself, the middle of the page
+   column's 12px gap; a lone row, or the first of a run, draws none. Lists
+   often wrap each row in a keyed element (a <div>, an E.nav link, or a receipt
+   revision's keyed div and link), so those exact row boundaries draw the rule. */
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + [data-row]::before,
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + * > [data-row]:first-child::before,
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + * > a > [data-row]:first-child::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: -0.375rem;
+  height: 1px;
+  background: var(--color-border);
+}
+
 /* Print the pick sheet (and any other page) without the shell chrome: the
    header, the phone tab bar, and the desktop rail (shadcn's Sidebar renders
    divs, so it is addressed by its data-slot; that hides its gap column too). */

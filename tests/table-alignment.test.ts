@@ -10,7 +10,9 @@ import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { ImportView } from "@/components/mgr/views/import";
 import { importPreview } from "@/lib/mgr/fixtures/import";
 import { FormatsView } from "@/components/mgr/views/formats";
-import { formatsInventory } from "@/lib/mgr/fixtures/catalog";
+import { CatalogView } from "@/components/mgr/views/catalog";
+import { catalogBrands, formatsInventory } from "@/lib/mgr/fixtures/catalog";
+import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 
 function cells(html: string, tag: "th" | "td") {
@@ -45,26 +47,32 @@ describe("E.tbl column alignment", () => {
   });
 
   it.each([
-    ["Formats", ["l", "l", "r", "l", "l"]],
+    ["Formats", ["l", "l", "r", "l"]],
     ["Import", ["r", "l", "l", "l"]],
   ] as const)("renders %s inventory through the shared view with semantic alignment", (name, alignment) => {
     const screen = SCREENS.find(screen => screen.name === name)!;
     expectAlignment(renderToStaticMarkup(createElement("div", null, screen.body)), [...alignment]);
   });
 
-  it("keeps every format value and action in labeled phone cards and desktop columns", () => {
+  it("keeps every format value in labeled phone records and desktop columns, the name linking the format", () => {
     const model = toFormatsViewProps({ ...formatsInventory, formatHref: row => `/catalog/formats/${row.id}` });
     const html = renderToStaticMarkup(createElement(FormatsView, { model }));
-    const cards = html.match(/<li\b[\s\S]*?<\/li>/g) ?? [];
-    expect(cards.length).toBe(model.rows.length);
-    expect(cells(html, "td").length).toBe(model.rows.length * 5);
-    cards.forEach((card, index) => {
+    const records = html.split(/data-slot="item"(?=[\s>])/).slice(1);
+    expect(records.length).toBe(model.rows.length);
+    expect(cells(html, "td").length).toBe(model.rows.length * 4);
+    expect(cells(html, "td").filter((_, index) => index % 4 === 0).map(cell => cell.content)).toEqual(model.rows.map(row => row.cells[0]));
+    expect(html).not.toContain("Open format");
+    records.forEach((record, index) => {
       const row = model.rows[index];
-      for (const value of row.cells) expect(card).toContain(value);
-      expect([...card.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map(match => match[1])).toEqual(model.headers.slice(1));
-      expect(card).toContain(`href="${row.href}"`);
-      expect(card).toContain("Open format");
+      for (const value of row.cells) expect(record).toContain(value);
+      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map(match => match[1])).toEqual(model.headers.slice(1));
+      expect(record).toMatch(new RegExp(`<a\\b[^>]*href="${row.href}"[^>]*>${row.cells[0]}</a>`));
     });
+  });
+
+  it("renders the Catalog brand table with text left and counts right", () => {
+    const html = renderToStaticMarkup(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
+    expectAlignment(html, ["l", "l", "r", "r"]);
   });
 
   it("keeps import results and original preview row numbers with text results left", () => {

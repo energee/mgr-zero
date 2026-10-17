@@ -73,6 +73,8 @@ export const catalogBrands: CatalogSnapshot = {
     {
       id: BRAND_STOUT,
       name: STOUT,
+      // A staff-only alias, so the frame shows the line under the name.
+      alias: "Winter #2",
       abv: 7.2,
       styles: { name: "Stout" },
       skus: [{ id: SKU_STOUT.sku_id }],
