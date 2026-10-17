@@ -39,8 +39,6 @@ export type KegFleetViewModel = {
   /** Inventory only: the event form drawn inline. */
   eventForm?: KegEventValue;
   eventOptions?: KegEventOptions;
-  /** A balance preview the fixture can state; the live form has no per-customer, per-size balance to show. */
-  eventPreview?: { qty: number; name: string; from: string; to: string };
   /** Why Record keg event is not offered; the view draws it in place of the form. */
   eventUnavailable?: string | null;
 };

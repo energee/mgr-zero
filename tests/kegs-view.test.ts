@@ -7,11 +7,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { KegBalanceView } from "../components/mgr/views/keg-balance";
-import { KegFleetView } from "../components/mgr/views/keg-fleet";
+import { KegEventFields, KegFleetView } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
+import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
 import { kegShortageText, toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
+import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
 import { toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -45,6 +47,24 @@ describe("Keg fleet", () => {
     expect(html).toMatch(/Microstar/);
     expect(html).not.toMatch(/href="\/kegs/);
     expect(html).not.toMatch(/href="\/inventory"/);
+  });
+
+  it("#974 Reason is a labeled select stating the chosen reason's effect, for each of the six manual reasons", () => {
+    expect(Object.keys(REASON_EFFECT)).toEqual([...KEG_EVENT_REASONS]);
+    for (const reason of KEG_EVENT_REASONS) {
+      const html = htmlOf(createElement(KegEventFields, { value: { ...kegFleetMicrostar.eventForm!, reason }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} }));
+      expect(html, reason).toMatch(/<label[^>]*for="keg-reason"[^>]*>Reason<\/label>/);
+      const trigger = html.match(/<button[^>]*id="keg-reason"[^>]*>/)?.[0] ?? "";
+      expect(trigger, reason).toContain('role="combobox"');
+      expect(trigger, reason).toContain('aria-describedby="keg-reason-effect"');
+      expect(html, reason).toContain(`>${REASON_LABEL[reason]}</span>`);
+      expect(html.match(/<p[^>]*id="keg-reason-effect"[^>]*>(.*?)<\/p>/)?.[1], reason).toBe(REASON_EFFECT[reason]);
+      expect(html, reason).not.toContain("toggle-group-item");
+    }
+  });
+
+  it("#974 the inventory shows no balance preview, which live has no data for", () => {
+    expect(htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }))).not.toContain("Preview:");
   });
 
   it("the live kegs page mounts KegFleetView and slots PoolForm", () => {

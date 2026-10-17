@@ -59,7 +59,7 @@ describe("Keg fleet shared fields", () => {
     // Radix's Switch carries its own aria-hidden checkbox; a raw one would not be hidden.
     expect(pool).not.toMatch(/<input type="checkbox"(?![^>]*aria-hidden)/);
     const event = html(createElement(KegEventFields, { value: { poolId: "p", kegSize: "half_bbl", reason: "acquired", locationId: "", binId: "", customerId: "", qty: "", note: "" }, options: { pools: [{ value: "p", label: "Owned" }], locations: [], bins: [], customers: [] }, onChange: () => {} }));
-    expect(event).toContain("toggle-group-item");
+    expect(event).toContain('id="keg-reason"');
     expect(event).not.toContain("Customer");
   });
 
