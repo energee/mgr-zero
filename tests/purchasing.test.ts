@@ -61,6 +61,22 @@ describe("vendors, materials, contracts", () => {
     expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: ych.id, name: "YCH Hops", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
   });
 
+  it("list_vendors_and_contracts and list_materials q match the name in the query, with % and _ literal (#994)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    for (const name of ["Hops 100% Direct", "Malt_Co", "MaltyCo"]) await runCommand("upsert_vendor", { name }, own);
+    const vendors = async (q: string) => ((await runCommand("list_vendors_and_contracts", { q }, own)) as { name: string }[]).map((v) => v.name);
+    expect(await vendors("malt")).toEqual(["Malt_Co", "MaltyCo"]);
+    expect(await vendors("100%")).toEqual(["Hops 100% Direct"]);
+    expect(await vendors("t_c")).toEqual(["Malt_Co"]);
+    for (const name of ["Citra 50% Pellets", "Pale_Malt", "PaleXMalt"]) {
+      await runCommand("upsert_material", { name, category: "other", baseUom: "lb", purchaseUom: "lb", purchaseUomFactor: 1 }, own);
+    }
+    const materials = async (q: string) => ((await runCommand("list_materials", { q }, own)) as { name: string }[]).map((m) => m.name);
+    expect(await materials("pale")).toEqual(["Pale_Malt", "PaleXMalt"]);
+    expect(await materials("50%")).toEqual(["Citra 50% Pellets"]);
+    expect(await materials("e_m")).toEqual(["Pale_Malt"]);
+  });
+
   it("a sales user may not edit vendors", async () => {
     const sales = await makeStaffCtx(b.id, "sales");
     await expect(runCommand("upsert_vendor", { name: "Nope" }, sales)).rejects.toThrow(/permission/i);

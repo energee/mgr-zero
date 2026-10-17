@@ -6,7 +6,7 @@ import { BreweryProvider } from "@/lib/brewery-provider";
 // tests render the page subtree on its own, so they supply it here.
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
-const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown>, inputs: {} as Record<string, unknown> }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: state.roles }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
@@ -34,6 +34,9 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
     case "get_bin_move_stock": return [{ skuId: "sku", qty: 4 }];
+    // #994: the searched lists record their input and find nothing, so the no-match copy shows.
+    case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
+    case "list_vendors": case "get_material_on_hand": return [];
     default: throw new Error(name);
   }
 }
@@ -44,6 +47,9 @@ import CustomerPage from "@/app/(app)/customers/[id]/page";
 import BinsPage from "@/app/(app)/locations/[id]/bins/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
+import RecipesPage from "@/app/(app)/recipes/page";
+import VendorsPage from "@/app/(app)/vendors/page";
+import MaterialsPage from "@/app/(app)/materials/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
@@ -132,9 +138,27 @@ it("converted inventory frames never navigate into the live catalog/customer/loc
 
 it("asks the registered customer query for the missing-email subset", async () => {
   const page = await CustomersPage({ searchParams: Promise.resolve({ missingEmail: "1" }) });
-  expect(state.customerInput).toEqual({ missingPortalEmail: true });
+  expect(state.customerInput).toEqual({ missingPortalEmail: true, q: "" });
   expect(page.type).toBe(CustomersView);
   expect(page.props.model.missingPortalEmail).toBe(true);
+});
+
+// #994: Customers, Recipes, Vendors and Materials on hand pass ?q= to their list query, as Catalog does.
+it("passes the Customers search to list_customers and keeps ?missingEmail in the form", async () => {
+  const html = render(await CustomersPage({ searchParams: Promise.resolve({ q: " buy ", missingEmail: "1" }) }));
+  expect(state.customerInput).toEqual({ missingPortalEmail: true, q: "buy" });
+  expect(html).toContain('value="buy"');
+  expect(html).toContain('name="missingEmail" value="1"');
+});
+it.each([
+  ["list_recipes", RecipesPage, { q: "west" }, "No recipes match"],
+  ["list_vendors_and_contracts", VendorsPage, { q: "west" }, "No vendors match"],
+  ["list_materials", MaterialsPage, { includeInactive: true, q: "west" }, "No materials match"],
+] as const)("passes the search to %s and says nothing matches", async (name, Page, input, empty) => {
+  const html = render(await Page({ searchParams: Promise.resolve({ q: " west " }) }));
+  expect(state.inputs[name]).toEqual(input);
+  expect(html).toContain('value="west"');
+  expect(html).toContain(empty);
 });
 
 // docs/plans/list-filters.md: the URL's search, sort and category reach list_brands; a bad sort falls back.

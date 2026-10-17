@@ -168,5 +168,6 @@ describe("country, alias and search", () => {
     expect(await ids(`Tavour ${tag}`)).toEqual([c.id]);
     expect(await ids(tag)).toEqual([c.id, jp.id]);
     expect(await ids(`${tag}%`)).toEqual([]);
+    expect(await ids(`Tavour_${tag}`)).toEqual([]);
   });
 });

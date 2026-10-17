@@ -359,6 +359,16 @@ describe("Vendors", () => {
   });
 });
 
+// #994: an empty search is not an empty list.
+describe("Vendors and Materials on hand search", () => {
+  it("say nothing matches, not nothing yet, when a search is on", () => {
+    expect(toVendorsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No vendors match", description: "Clear the search to see every vendor." });
+    expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
+    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
+  });
+});
+
 describe("New PO lines", () => {
   // One check decides which rows count: the view flags a row that falls short
   // and the form saves only when every row counts, so the two cannot disagree.
