@@ -190,6 +190,6 @@ it("rechecks current membership before replaying a completed request", async () 
   const row = await movement(-1, "loss");
   const requestId = crypto.randomUUID();
   await reverse(ctx, row.id, "Wrong entry", requestId);
-  expect((await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)).error).toBeNull();
+  expect((await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)).error).toBeNull();
   await expect(reverse(ctx, row.id, "Wrong entry", requestId)).rejects.toThrow(/permission/);
 });

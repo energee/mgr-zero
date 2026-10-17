@@ -4,16 +4,21 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ConfirmDeleteControl } from "./confirm-delete";
+import type { StaffRole } from "@/lib/commands/registry";
+import { STAFF_ROLES } from "@/lib/mgr/enums";
+import { sentenceCase } from "@/lib/mgr/labels";
 
-const ROLES = [
-  ["warehouse", "Warehouse", "pick, receive, count, transfer"], ["sales", "Sales", "orders, customers, price groups"],
-  ["brewer", "Brewer", "batches, cellar, packaging"], ["taproom", "Taproom", "taproom stock and personal preferences"],
-  ["admin", "Admin", "everything, including team and settings"],
-];
+const ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
+  admin: "everything, including team and settings",
+  sales: "orders, customers, price groups",
+  warehouse: "pick, receive, count, transfer",
+  brewer: "batches, cellar, packaging",
+  taproom: "taproom stock and personal preferences",
+};
+const ROLE_OPTIONS = STAFF_ROLES.map(value => ({ value, label: sentenceCase(value) }));
 
 function StaffRoleField({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
-  const selected = ROLES.find(([role]) => role === value);
-  return <div className="flex flex-col gap-2">{E.pick("Role", value, (ROLES.map(([role, label]) => ({ value: role, label }))), { onChange, disabled, displayValue: selected?.[1] ?? value })}<p className="text-sm text-muted-foreground">{selected?.[2]}</p></div>;
+  return <div className="flex flex-col gap-2">{E.pick("Role", value, ROLE_OPTIONS, { onChange, disabled })}<p className="text-sm text-muted-foreground">{ROLE_DESCRIPTIONS[value as StaffRole]}</p></div>;
 }
 
 export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChange, onRoleChange, onSubmit, busy = false, error }: {
@@ -30,18 +35,25 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
   </form>;
 }
 
-export function TeamMemberView({ name, email, avatar, savedRole, role, onRoleChange, onSubmit, onRemove, saving = false, removing = false, error }: {
-  name: string; email: string; avatar?: string; savedRole: string; role?: string; onRoleChange?: (value: string) => void;
+export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRolesChange, onSubmit, onRemove, saving = false, removing = false, error }: {
+  name: string; email: string; avatar?: string; savedRoles: StaffRole[]; roles?: StaffRole[]; onRolesChange?: (value: StaffRole[]) => void;
   onSubmit?: FormEventHandler<HTMLFormElement>; onRemove?: () => Promise<boolean>; saving?: boolean; removing?: boolean; error?: string | null;
 }) {
-  const [draftRole, setRole] = useState(savedRole), busy = saving || removing, value = role ?? draftRole;
+  const [draftRoles, setRoles] = useState(savedRoles), busy = saving || removing, value = roles ?? draftRoles;
+  const unchanged = value.length === savedRoles.length && value.every(role => savedRoles.includes(role));
+  const empty = value.length === 0;
   const removeName = name.replace(/^@/, "");
   return <>
     {E.row(name, email, "", "", E.face({ src: avatar, name: removeName }))}
-    <form onSubmit={event => { event.preventDefault(); if (!busy && value !== savedRole) onSubmit?.(event); }} className="flex flex-col gap-4">
-      <StaffRoleField value={value} onChange={next => { setRole(next); onRoleChange?.(next); }} disabled={busy} />
-      <CommandFormMessage error={error} />
-      <CommandFormFooter><Button type="submit" disabled={busy || value === savedRole}>{saving ? "Saving…" : "Save role"}</Button></CommandFormFooter>
+    <form onSubmit={event => { event.preventDefault(); if (!busy && !empty && !unchanged) onSubmit?.(event); }} className="flex flex-col gap-4">
+      {E.picks("Roles", STAFF_ROLES.filter(role => value.includes(role)), ROLE_OPTIONS, {
+        onChange: next => { const selected = STAFF_ROLES.filter(role => next.includes(role)); setRoles(selected); onRolesChange?.(selected); },
+        disabled: busy,
+        "aria-invalid": empty,
+      })}
+      <p className="text-sm text-muted-foreground">Choose one or more roles. Each role adds its permissions. Admin includes every staff permission.</p>
+      <CommandFormMessage error={error ?? (empty ? "Choose at least one role." : null)} />
+      <CommandFormFooter><Button type="submit" disabled={busy || empty || unchanged}>{saving ? "Saving…" : "Save roles"}</Button></CommandFormFooter>
     </form>
     {E.note(`Removing ${removeName} ends this brewery membership.`)}
     <ConfirmDeleteControl title={`Remove ${removeName}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"

@@ -14,6 +14,15 @@ must be in service and the format a keg with a keg size, or the request fails;
 the pool's kind sets the SKU's container source, so you never send one. A SKU
 already linked to a pool that is later taken out of service keeps the link.
 
+`update_sku.batchShare` is the default fraction of a batch's planned beer
+volume packaged into that SKU, greater than 0 and at most 1. Omit it to keep
+the share; send `null` to clear it. All SKU shares for a brand, including
+inactive SKUs, total at most 1. Only active SKUs with a share project batch
+packaging demand. New SKUs start without a share; configure one with
+`update_sku` after creation. The brewery's `days_to_package` starts at 14;
+`set_brewery_operating_defaults.daysToPackage` accepts whole days from 1 to
+120 and omission preserves the existing estimate.
+
 Prices live on a grid, not on SKUs. A price group is a row of that grid and a
 brand sits on one; it also owns the poured formats that become columns on the
 grid, shared by every brand on it. A sale channel is the column and a
@@ -311,7 +320,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clear); brand, format, provider mappings and history stay unchanged
+Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -319,6 +328,7 @@ Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clea
 | `active` | boolean | yes |
 | `upc` | string | no |
 | `kegPoolId` | uuid or null | no |
+| `batchShare` | number or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

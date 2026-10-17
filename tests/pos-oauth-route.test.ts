@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({ claim: vi.fn(), complete: vi.fn(), fail: vi.fn() }));
-const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, role: "admin" }));
+const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, roles: ["admin"] }));
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: vi.fn(() => session.breweryCookie ? { value: session.breweryCookie } : undefined) })),
 }));
 vi.mock("@/lib/brewery", () => ({
-  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture", role: session.role })),
+  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture", roles: session.roles })),
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createServerClient: vi.fn(async () => ({ auth: { getClaims: vi.fn(async () => ({ data: { claims: { sub: "actor-1" } } })) } })),
@@ -21,7 +21,7 @@ import { GET } from "@/app/api/integrations/square/oauth/route";
 describe("Square OAuth callback", () => {
   beforeEach(() => {
     session.breweryCookie = "brewery-1";
-    session.role = "admin";
+    session.roles = ["admin"];
     vi.stubEnv("SQUARE_APPLICATION_ID", "sandbox-app");
     vi.stubEnv("SQUARE_APPLICATION_SECRET", "sandbox-secret");
     vi.stubEnv("SQUARE_REDIRECT_URI", "https://mgr.test/api/integrations/square/oauth");
@@ -36,7 +36,7 @@ describe("Square OAuth callback", () => {
     ["wrong current role", "brewery-1", "warehouse"],
   ])("rejects %s before state claim or provider fetch", async (_label, breweryCookie, role) => {
     session.breweryCookie = breweryCookie;
-    session.role = role;
+    session.roles = [role];
     const fetch = vi.fn<typeof globalThis.fetch>();
     vi.stubGlobal("fetch", fetch);
 

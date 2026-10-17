@@ -35,15 +35,15 @@ export async function inviteLanding(auth: RequestAuthContext, audience: InviteAu
 
   if (audience === "staff") {
     const [membership] = await auth.getStaffMemberships();
-    return membership && { audience, name: membership.breweryName, role: membership.role, email: identity.email };
+    return membership && { audience, name: membership.breweryName, roles: membership.roles, email: identity.email };
   }
 
   const [membership] = await auth.getCustomerMemberships();
-  return membership && { audience, name: membership.breweryName, role: "customer", email: identity.email };
+  return membership && { audience, name: membership.breweryName, roles: ["customer"], email: identity.email };
 }
 
 /** Sign-in landings send an account with consent invitations waiting to /invitations first. */
 export async function hasPendingInvitations(db: SupabaseClient<Database>, userId: string) {
-  const pending = await runCommand("list_my_invitations", {}, { db, userId, breweryId: null, role: null }) as unknown[];
+  const pending = await runCommand("list_my_invitations", {}, { db, userId, breweryId: null, roles: [] }) as unknown[];
   return pending.length > 0;
 }

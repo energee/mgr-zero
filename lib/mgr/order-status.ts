@@ -4,6 +4,8 @@
 // lifecycle step, and the portal says it in buyer words. Staged beer outranks
 // the lifecycle everywhere, so the restock override lives here too rather than
 // in each caller.
+import { hasAnyRole } from "@/lib/mgr/roles";
+
 export type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 export type ActionTone = "primary" | "success" | "info" | "attention";
 
@@ -20,9 +22,6 @@ const ACTION: Record<OrderStatus, [string, ActionTone, string]> = {
 export const salesRoles = ["admin", "sales"] as const;
 export const warehouseRoles = ["admin", "warehouse"] as const;
 
-/** Whether `role` is in a command's role list. */
-export const hasRole = (roles: readonly string[], role: string) => roles.includes(role);
-
 /** Staged beer waits for Put back on a picked order, and on a confirmed one a
  * mixed adjust sent back for a re-pick (#811): put back first, then count. */
 export const stagedOnOpenOrder = (status: OrderStatus, needsRestock: boolean) =>
@@ -30,9 +29,9 @@ export const stagedOnOpenOrder = (status: OrderStatus, needsRestock: boolean) =>
 
 /** The verb a staff list offers on this order, and where it goes. Only a role
  * the next step's command allows gets the verb; anyone else gets Open. */
-export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, role: string): { verb: string; tone: ActionTone; href: string } {
+export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, heldRoles: readonly string[]): { verb: string; tone: ActionTone; href: string } {
   const roles = status === "draft" || status === "submitted" ? salesRoles : warehouseRoles;
-  if (!hasRole(roles, role)) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
+  if (!hasAnyRole(heldRoles, roles)) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
   if (stagedOnOpenOrder(status, needsRestock)) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
   const [verb, tone, path] = ACTION[status];
   return { verb, tone, href: `/orders/${id}${path}` };

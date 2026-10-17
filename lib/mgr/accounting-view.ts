@@ -1,7 +1,12 @@
 import { formatDateTime } from "@/lib/date-format";
 import { disconnectStatus } from "@/lib/mgr/integration-disconnect";
-export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean };
+export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean; purchaseAccountId?: string | null };
 export type QboEnvironment = "sandbox" | "production";
+export type QboMappingKind = "customer" | "item" | "deposit" | "one_way_fee" | "vendor" | "purchase_account";
+export type QboMappingSection = {
+  title?: string; empty?: string;
+  rows: { id: string; label: string; kind: QboMappingKind; currentId?: string | null; detail?: string }[];
+};
 export type AccountingViewModel = {
   connected: boolean; canDisconnect: boolean; company: string; status: string; reconnect: boolean; error?: string | null; access?: string;
   /** QuickBooks realm id, shown as its own fact. */

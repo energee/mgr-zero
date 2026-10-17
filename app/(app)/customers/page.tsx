@@ -17,7 +17,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: P
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [customers, channels] = (await Promise.all([runCommand("list_customers", { missingPortalEmail }, ctx), runCommand("list_sale_channels", {}, ctx)])) as [Customer[], SaleChannel[]];
-  const canWrite = brewery.role === "admin" || brewery.role === "sales";
+  const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   return <CustomersView
     model={toCustomersViewProps({ customers, missingPortalEmail })}
     createAction={canWrite ? <CustomerForm channels={channels} /> : null}

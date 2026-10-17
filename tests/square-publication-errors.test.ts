@@ -6,7 +6,7 @@ import type { Ctx } from "@/lib/commands/registry";
 import { beginSquareMenuPublication, beginSquarePublication } from "@/lib/supabase/integration-tokens";
 
 const ctxFailing = (error: { message: string; code?: string }) => ({
-  breweryId: "brewery-1", userId: "user-1", role: "admin",
+  breweryId: "brewery-1", userId: "user-1", roles: ["admin"],
   db: { rpc: vi.fn().mockResolvedValue({ data: null, error }) },
 }) as unknown as Ctx;
 

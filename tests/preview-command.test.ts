@@ -193,7 +193,7 @@ describe("atomic inventory movement previews", () => {
       expect(denied.error?.code).toBe("42501");
       expect(sql(`select count(*) from private.command_requests where actor_id='${ctx.userId}' and request_id='${requestId}'`)).toEqual(["0"]);
     } finally {
-      await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: ctx.userId, role: "admin" });
+      await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: ctx.userId, roles: ["admin"] });
     }
   });
 });

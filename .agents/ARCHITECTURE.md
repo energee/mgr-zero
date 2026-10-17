@@ -46,7 +46,7 @@ never copy it into a second place.
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
 | `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
-| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads only its role (`staffRoleAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRole` reuses them. |
+| `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. A command reads its role array (`staffRolesAt`: one `brewery_users` row, shared by the cookie and bearer paths, each rejecting a non-UUID brewery as not_member first); pages read full memberships with the `staff_brewery` name and timezone (`getActiveBrewery`), and a later `getStaffRoles` reuses them. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`, and `readAppUrl` — the public origin for links and OAuth redirects, never taken from a request Host) shared by server code, scripts, and tests. |
 | `lib/commands/movement-input.ts` | `movementInput`, the `record_movement` command's input schema. It registers no command, so the client-side Composer can import it; `lib/commands/inventory.ts`, `lib/commands/preview.ts`, and the inventory page share it. |
 | `lib/composer/state.ts` | The Composer drawer's `record_movement` proposal: the `composerProposal` schema that `lib/chat/messages.ts` parses the newest assistant message's proposal against. A malformed or non-movement proposal returns an operator error instead of reaching the commit button. |
@@ -56,6 +56,7 @@ never copy it into a second place.
 | `lib/hash.ts` | `sha256` hex digests and `oauthState`, the request-id-bound-to-actor OAuth state the QBO, Square, and Slack starts share. Only the hash of a secret is stored, so every caller hashes the same way. |
 | `lib/mgr/money.ts` | Cents as text: `money` for anything an operator reads (thousands separators, a true minus sign on a credit) and `dollarsInput` for the text of a dollars field; `toCents` turns that field back into integer cents (empty is undefined). An eslint `no-restricted-syntax` rule rejects a local `(cents / 100).toFixed(2)` everywhere else; `lib/qbo.ts` is exempt because its decimal string is a wire value, not a display. |
 | `lib/mgr/labels.ts`, `lib/mgr/tax-treatments.ts`, `lib/mgr/enums.ts` | How stored enum values read (`sentenceCase`, import kinds) and which values exist: the sale-channel tax treatments, and the keg and production option arrays the pickers draw. `enums.ts` imports nothing, so a `"use client"` form or a shared view under `components/mgr/views/` can read an option list without importing a `lib/commands/<area>.ts` module and registering every command in it; those modules re-export from here so the zod schemas and the pickers stay one list (`tests/boundary.test.ts`). |
+| `lib/mgr/roles.ts` | Shared role-set predicates: `hasAnyRole` tests overlap against an explicit allowed list, including Admin where permitted; `onlyRoles` is true only for a nonempty set held entirely within the excluded roles. Staff permissions and navigation are the union of the held roles. Portal customer membership remains separate. Canonical staff role order is `STAFF_ROLES` in `lib/mgr/enums.ts`. |
 | `lib/mgr/doc-icons.ts` | The one name → icon map the docs may use (page frontmatter via `lib/source.ts`, landing cards via `<DocIcon />`). |
 | `hooks/use-mobile.ts` | shadcn's Sidebar breakpoint hook on `useSyncExternalStore` (one shared MediaQueryList, 768px = Tailwind md). |
 | `components/mgr/{frame-persona,screen-width}.tsx` | Design-inventory chrome: the stand-alone frame drawn as the persona in the URL hash; the published inventory's sticky viewport control and the iframe embed it drives. |
@@ -148,8 +149,10 @@ a gap to close, not a convention to trust.
    proven by `tests/rls-ledger.test.ts`.
 3. **Every tenant table carries `brewery_id` with RLS.** Access derives from
    `brewery_users` / `customer_users` via `my_brewery_ids()`, `is_staff_of()`,
-   `staff_role()`, `my_customer_ids()` (defined in the baseline) and
-   `my_staff_brewery_ids(roles)` (migration `20261008170000`). Cross-tenant FKs are composite so a row can't reference
+   `staff_roles()` / `has_staff_role()` (the role-array helpers from #797),
+   `my_customer_ids()` and `my_staff_brewery_ids(roles)`. Staff membership stores a
+   nonempty canonical array; authorization uses overlap with explicitly allowed
+   roles, not a primary role. Cross-tenant FKs are composite so a row can't reference
    another brewery's data. Portal customers never `SELECT` the `breweries` base
    table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).

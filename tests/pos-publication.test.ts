@@ -337,7 +337,7 @@ describe("Square durable catalog publication", () => {
     const { brewery, ctx, connectionId } = await publicationFixture();
     const next = await makeStaffCtx(brewery.id, "admin");
     const old = await beginSquareMenuPublication(ctx, { posLocationId: "L1" }, crypto.randomUUID());
-    expect((await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", brewery.id)
+    expect((await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", brewery.id)
       .eq("user_id", ctx.userId)).error).toBeNull();
     const current = await beginSquareMenuPublication(next, { posLocationId: "L1" }, crypto.randomUUID());
     expect(current.status).toBe("publishing");
@@ -372,7 +372,7 @@ describe("Square durable catalog publication", () => {
   it.each(["role", "connection", "token"] as const)("denies the publication lease after a stale %s", async (stale) => {
     const { brewery, ctx, connectionId, brandId } = await publicationFixture();
     const start = await beginSquarePublication(ctx, { posLocationId: "L1", brandId }, crypto.randomUUID(), "publish_pos_item");
-    if (stale === "role") expect((await admin.from("brewery_users").update({ role: "sales" })
+    if (stale === "role") expect((await admin.from("brewery_users").update({ roles: ["sales"] })
       .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     if (stale === "connection") expect((await admin.from("pos_connections").update({ state: "disconnected" })
       .eq("id", connectionId)).error).toBeNull();

@@ -143,7 +143,7 @@ it("rechecks role before successful replay and canonicalizes UUIDs and trimmed i
   const f = await fixture(), i = input(f);
   const first = await f.ctx.db.rpc("tap_keg",i); expect(first.error).toBeNull();
   expect((await f.ctx.db.rpc("tap_keg", { ...i, p_sku: i.p_sku.toUpperCase(), p_location: i.p_location.toUpperCase() })).data).toEqual(first.data);
-  expect((await admin.from("brewery_users").update({ role: "sales" }).eq("user_id",f.ctx.userId).eq("brewery_id",f.brewery.id)).error).toBeNull();
+  expect((await admin.from("brewery_users").update({ roles: ["sales"] }).eq("user_id",f.ctx.userId).eq("brewery_id",f.brewery.id)).error).toBeNull();
   expect((await f.ctx.db.rpc("tap_keg",i)).error?.code).toBe("42501");
   expect(state(f)).toEqual(["1:0:1"]);
 });
