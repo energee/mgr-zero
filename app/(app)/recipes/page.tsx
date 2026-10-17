@@ -1,7 +1,6 @@
 // app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
 // (list_recipes), each titled with its current version and opening its own
-// recipe page; Create recipe links to /recipes/new.
-import { E } from "@/components/mgr/e";
+// recipe page; the back goes to More and New recipe links to /recipes/new.
 import { RecipesView } from "@/components/mgr/views/recipes";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -23,9 +22,10 @@ export default async function RecipesPage() {
   return (
     <RecipesView
       model={toRecipesViewProps({
+        backHref: "/more",
+        createHref: "/recipes/new",
         recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
       })}
-      header={E.hd("Recipes", "brewing process specs", E.btn("Create recipe", "p", "/recipes/new"))}
     />
   );
 }

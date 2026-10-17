@@ -55,7 +55,7 @@ export default async function VendorsPage() {
           disabled: !v.active,
         })),
       })}
-      header={E.hd("Vendors", "who you buy from", <VendorForm />)}
+      header={E.hd("Vendors", "", <VendorForm />)}
       rowTrailing={(row) => {
         const v = vendors.find((x) => x.id === row.key)!;
         return <VendorForm vendor={v} />;
@@ -72,7 +72,7 @@ export default async function VendorsPage() {
               warning: c.qty_available <= 0,
             })),
           })}
-          header={E.hd("Contracts", "committed quantities", <ContractForm vendors={options} materials={materials} />)}
+          header={E.hd("Contracts", "", <ContractForm vendors={options} materials={materials} />)}
           rowTrailing={(row) => {
             const contract = contracts.find((c) => c.id === row.key)!;
             return <ContractForm contract={contract} vendors={options} materials={materials} />;
