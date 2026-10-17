@@ -5,6 +5,7 @@
 // an overlap, so every vessel is offered here.
 import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -38,7 +39,7 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   const model = {
     plan: plan.plan, sources: plan.sources, records: history.records, actuals: brewPlanActuals(plan.plan, Number(batch.planned_bbl), plan.sources), process: {}, confirmEmpty: false,
     title: batNo(batch.batch_no), backHref: "/batches",
-    planned: Number(batch.planned_bbl) + " bbl · " + batch.planned_on, note: batch.note ?? undefined,
+    planned: Number(batch.planned_bbl) + " bbl · " + formatDate(batch.planned_on), note: batch.note ?? undefined,
     today, plannedBbl: Number(batch.planned_bbl), recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),

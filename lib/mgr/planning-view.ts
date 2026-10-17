@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/date-format";
 export type MaterialRequirementSnapshot = {
   material_id: string;
   material_name: string | null;
@@ -43,8 +44,8 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
       detail: [
         `need ${fmt(row.required)} · on hand ${fmt(row.on_hand)} · on order ${fmt(row.on_order)} ${row.base_uom ?? ""}`,
         row.projected > 0 ? `includes ${fmt(row.projected)} projected` : undefined,
-        row.needed_by ? `needed by ${row.needed_by}` : undefined,
-        row.vendor_name ? `${row.vendor_name}${row.lead_time_days === null ? " · no lead time typed" : ` · ${row.lead_time_days} day lead · buy by ${row.buy_by}`}` : "no contract and no default vendor",
+        row.needed_by ? `needed by ${formatDate(row.needed_by)}` : undefined,
+        row.vendor_name ? `${row.vendor_name}${row.lead_time_days === null ? " · no lead time typed" : ` · ${row.lead_time_days} day lead${row.buy_by ? ` · buy by ${formatDate(row.buy_by)}` : ""}`}` : "no contract and no default vendor",
         row.out_of_reach ? "past the buy-by date · left out of the draft" : undefined,
       ].filter(Boolean).join(" · "),
       quantity: `${fmt(row.purchase_units_short)} ${row.purchase_uom ?? ""}`.trim(),

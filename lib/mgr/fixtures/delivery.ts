@@ -9,15 +9,15 @@ export const routesDriver: RoutesSnapshot = {
   title: "Work",
   subtitle: "driver default",
   rows: [
-    { key: "a", title: "Route A · 2026-09-10", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
-    { key: "b", title: "Route B · 2026-09-11", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },
+    { key: "a", title: "Route A · Sep 10, 2026", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
+    { key: "b", title: "Route B · Sep 11, 2026", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },
     { key: "ord", title: "ORD-0236 · Ridgeline · Dock", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
     { key: "trf", title: "TRF-0004 · Storage", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
   ],
 };
 
 export const routeAPlan: RouteViewModel = {
-  title: "Route A · 2026-09-10",
+  title: "Route A · Sep 10, 2026",
   date: "2026-09-10",
   driverId: "7f3a21c0",
   driverOptions: [{ id: "7f3a21c0", label: "driver 7f3a21c0 · warehouse" }, { id: "2b9e44d1", label: "driver 2b9e44d1 · admin" }],
@@ -35,7 +35,7 @@ export const routeAPlan: RouteViewModel = {
 };
 
 export const returnRouteA: ReturnRouteViewModel = {
-  title: "Route A · 2026-09-10",
+  title: "Route A · Sep 10, 2026",
   driverVehicle: "driver 7f3a21c0 · Box truck 2",
   departed: "8:10 AM",
   stops: [
@@ -46,7 +46,7 @@ export const returnRouteA: ReturnRouteViewModel = {
 };
 
 export const driverRouteA: DriverRouteViewModel = {
-  title: "Route A · 2026-09-10",
+  title: "Route A · Sep 10, 2026",
   driverVehicle: "driver 7f3a21c0 · Box truck 2",
   departed: "8:10 AM",
   stops: [

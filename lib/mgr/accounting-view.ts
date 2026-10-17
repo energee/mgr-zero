@@ -1,4 +1,4 @@
-import { formatDateTime } from "@/lib/date-format";
+import { formatDate, formatDateTime } from "@/lib/date-format";
 import { disconnectStatus } from "@/lib/mgr/integration-disconnect";
 export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean; purchaseAccountId?: string | null };
 export type QboEnvironment = "sandbox" | "production";
@@ -25,15 +25,15 @@ export function qboCompanyName(health: { realmLabel: string | null; realmId?: st
   return health.realmLabel && health.realmLabel !== health.realmId ? health.realmLabel : null;
 }
 
-/** missingEmails: count_customers_missing_portal_email, when the caller read it. environment: qboEnvironment(QBO_API_BASE), when configured. */
-export function toAccountingViewProps(health: QboHealth, missingEmails?: number, environment?: QboEnvironment): AccountingViewModel {
+/** timeZone: breweries.timezone, the day the token expires in. missingEmails: count_customers_missing_portal_email, when the caller read it. environment: qboEnvironment(QBO_API_BASE), when configured. */
+export function toAccountingViewProps(health: QboHealth, timeZone: string, missingEmails?: number, environment?: QboEnvironment): AccountingViewModel {
   const name = qboCompanyName(health);
   return {
     connected: health.connected && health.state === "connected", canDisconnect: disconnectStatus(health) === "available",
     company: name ?? "QuickBooks Online", status: `${health.state.replaceAll("_", " ")}${health.realmId && environment ? ` · ${environment}` : ""}`,
     companyId: health.realmId,
     reconnect: Boolean(health.connectionId), error: health.lastError,
-    access: health.accessExpiresAt ? `renews automatically · current token expires ${health.accessExpiresAt.slice(0, 10)}` : undefined,
+    access: health.accessExpiresAt ? `renews automatically · current token expires ${formatDate(health.accessExpiresAt, timeZone)}` : undefined,
     defaults: typeof health.allowAch === "boolean" && typeof health.allowCard === "boolean" ? { allowAch: health.allowAch, allowCard: health.allowCard } : undefined,
     missingEmails, remoteRevocationUnresolved: disconnectStatus(health) === "unresolved",
   };

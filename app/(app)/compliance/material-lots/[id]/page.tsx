@@ -12,5 +12,5 @@ export default async function MaterialLotTracePage({ params }: { params: Promise
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const trace = await orNotFound(runPageQuery("trace_material_lot", { materialLotId: id }, ctx)) as MaterialLotTraceSnapshot;
-  return <MaterialLotTraceView model={toMaterialLotTraceViewProps(trace, "/compliance")} />;
+  return <MaterialLotTraceView model={toMaterialLotTraceViewProps(trace, brewery.timeZone, "/compliance")} />;
 }

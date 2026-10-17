@@ -28,6 +28,18 @@ import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
+
+describe("Production dates (#991)", () => {
+  it("prints packaged, best-by, planned and brewed days in the one date format", () => {
+    const closed = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, lot: { ...runClosedHazy.lot!, best_by: "2027-03-04" } } }));
+    expect(closed).toContain("Sep 5, 2026");
+    expect(closed).toContain("Mar 4, 2027");
+    expect(htmlOf(createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28" } }))).toContain("Sep 28, 2026");
+    const brewed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }));
+    expect(brewed).toContain("Sep 4, 2026");
+    expect(brewed).not.toMatch(/Brewed on<[^]*?2026-09-04/);
+  });
+});
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 

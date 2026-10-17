@@ -62,6 +62,14 @@ describe("packaging views", () => {
     expect(page).not.toMatch(/\bE\./);
   });
 
+  it("prints an upcoming run's planned day in the one date format (#991)", () => {
+    const [upcoming] = toPackagingRunsViewProps([{
+      id: "u", run_no: 8, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null,
+      brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
+    }], DEMO_TIME_ZONE).upcoming;
+    expect(upcoming.detail).toMatch(/^Sep 5, 2026 · FV1/);
+  });
+
   it("dates a closed run by when it closed, not when it was planned (#439)", () => {
     const [recent] = toPackagingRunsViewProps([{
       id: "r", run_no: 7, planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", closed_at: "2026-09-04T18:30:00Z", cancelled_at: null,

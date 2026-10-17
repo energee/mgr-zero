@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { RouteView } from "@/components/mgr/views/route";
+import { formatDate } from "@/lib/date-format";
 import { useRouter } from "next/navigation";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { StopDoc } from "@/lib/commands/delivery";
@@ -32,7 +33,7 @@ export function RouteForm({ route, candidates, drivers, today }: { route: Route 
     if (await run("save_route", input()) && !route) router.push("/routes");
   }
   return <RouteView model={{
-    title: route ? (route.name ?? "Route") + " · " + route.delivery_date : "New route", backTo: "Deliveries", backHref: "/routes",
+    title: route ? (route.name ?? "Route") + " · " + formatDate(route.delivery_date) : "New route", backTo: "Deliveries", backHref: "/routes",
     date: deliveryDate, driverId: driverUserId, vehicle, name, selection: stops, saved: Boolean(route), savedDriverId: route?.driver_user_id,
     driverOptions: drivers.map(driver => ({ id: driver.user_id, label: driverLabel(driver.user_id) + " · " + driver.roles.join(", ") })),
     stops: candidates.map(candidate => ({ key: candidate.id, title: candidate.label, detail: "shipped · no route", locked: delivered.has(candidate.id), warning: !(candidate.id in stops) })),

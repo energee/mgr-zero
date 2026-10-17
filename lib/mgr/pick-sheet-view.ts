@@ -2,6 +2,7 @@
 // Groups daily_pick_sheet rows by requested_ship_date the way the live page
 // does; weekday chips stay a filters slot, not this mapping.
 import type { EmptyState } from "./empty-state";
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { plural } from "./plural";
 
@@ -69,7 +70,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
       });
       return {
         key: shipDate,
-        title: shipDate,
+        title: shipDate === "Unscheduled" ? shipDate : formatDate(shipDate),
         rows,
         totals: [...totals].map(([name, qty]) => `${name} ${qty}`).join(" · "),
       };

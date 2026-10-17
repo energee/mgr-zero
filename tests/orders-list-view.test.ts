@@ -45,6 +45,12 @@ describe("Orders list view loop", () => {
     expect(model.rows[1]?.verb).toBe("Open");
   });
 
+  it("prints the ship date in the one date format, never ISO (#991)", () => {
+    const model = toOrdersListViewProps({ roles: ["sales"], orders: [{ ...ordersWorkList.orders[0], requested_ship_date: "2026-09-14" }] });
+    expect(model.rows[0]?.detail).toContain("ships Sep 14, 2026");
+    expect(model.rows[0]?.detail).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
   it("names an empty filtered list without inventing rows", () => {
     const model = toOrdersListViewProps({ roles: ["sales"], status: "shipped", orders: [] });
     expect(model.empty?.title).toBe("No shipped orders");
