@@ -37,10 +37,8 @@ the baseline revision; this change does not remove a user's local lock.
 
 [PR #938](https://github.com/energee/mgr-zero/pull/938) already merged the
 dependency upgrades: Next 16.4.2, Undici 7.30.1, Sharp 0.35.5, and MCP SDK
-1.32.1 are locked and absent from this audit's findings. Its original
-`chore/dependency-upgrades` worktree was clean when inspected; its commits are
-already ancestors of the inventory revision. Do not duplicate those upgrades
-or push to that merged branch.
+1.32.1 are locked and absent from this audit's findings. Its commits are
+ancestors of the inventory revision; do not duplicate those upgrades.
 
 The [owner's issue approval](https://github.com/energee/mgr-zero/issues/934#issuecomment-6221592817)
 allows patch bumps within the existing minor. The owner separately authorized
@@ -52,11 +50,10 @@ three consumers without downgrading either previously fixed copy. No other
 dependency version is changed; no provider operation is authorized.
 
 For an existing install after this override changes, run
-`bun install --force --frozen-lockfile` before runtime proof. In this worktree,
-ordinary install and frozen install retained the obsolete nested 0.16.47
-directory even after the lock audit stopped reporting KaTeX. The forced frozen
-install removed it; the consumer then resolved the root 0.19.0 renderer.
-Lock inventory alone does not prove which installed module a process loads.
+`bun install --force --frozen-lockfile` before runtime proof: an ordinary or
+frozen install can keep the obsolete nested 0.16.47 directory even after the
+lock no longer lists it. Lock inventory alone does not prove which installed
+module a process loads.
 
 ### Advisory inventory and exact lock paths
 
