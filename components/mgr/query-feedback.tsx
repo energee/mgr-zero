@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/date-format";
 
 /** Inline request feedback, never replacement skeleton rows. */
-export function QueryFeedback({ error, loading, retry, fetching, paused, updatedAt }: {
-  error?: Error | null; loading?: string; retry?: () => void;
+export function QueryFeedback({ timeZone, error, loading, retry, fetching, paused, updatedAt }: {
+  timeZone: string; error?: Error | null; loading?: string; retry?: () => void;
   fetching?: boolean; paused?: boolean; updatedAt?: number;
 }) {
   const checkedAt = updatedAt ? new Date(updatedAt) : null;
-  const checked = checkedAt && <>Last checked <time dateTime={checkedAt.toISOString()}>{checkedAt.toLocaleString()}</time>.</>;
+  const checked = checkedAt && <>Last checked <time dateTime={checkedAt.toISOString()}>{formatDateTime(checkedAt, timeZone)}</time>.</>;
   if (error) return <div role="alert" className="text-sm text-destructive">
     {error.message} {checked && "Showing last-known data. "}
     <Button type="button" variant="ghost" onClick={retry}>Try again</Button> {checked}
