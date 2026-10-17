@@ -17,6 +17,17 @@ it("keeps last success distinct from a newer failed attempt and offers the saved
   expect(html).toContain("Retry saved sync");
   expect(html).toContain("Payment status may be stale");
 });
+it("shows the latest attempt only when it did not finish or was superseded", () => {
+  const status = (latest: { completed: boolean; superseded?: boolean }) => renderToStaticMarkup(createElement(QboSyncView, { status: {
+    latest: { at: "Sep 28, 2026, 8:00 AM", operator: "buyer@example.test", ...latest },
+    lastSuccess: { at: "Sep 28, 2026, 8:00 AM", operator: "buyer@example.test" },
+    latestFailure: null, retryRequestId: null,
+  } }));
+  expect(status({ completed: true })).not.toContain("Latest sync activity");
+  expect(status({ completed: false })).toContain("not completed");
+  expect(status({ completed: false, superseded: true })).toContain("superseded");
+});
+
 it("does not invent a successful reconciliation before the first completed batch", () => {
   const html = renderToStaticMarkup(createElement(QboSyncView, { status: { latest: null, lastSuccess: null, latestFailure: null, retryRequestId: null } }));
   expect(html).toContain("No successful sync recorded");

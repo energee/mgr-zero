@@ -62,7 +62,9 @@ describe("hint roles", () => {
       latest: { at: "Oct 16", operator: "Operator", completed: false, superseded: true }, latestFailure: { at: "Oct 15", operator: "Operator" }, lastSuccess: null, retryRequestId: null,
     } }) }));
     for (const error of ["Last connection error: Reconnect required", "could not confirm remote revocation", "Latest failed attempt", "saved batch was superseded"]) expect(cards(html, "alert")).toContain(error);
-    expect(cards(html, "note")).toContain("Payment status may be stale");
+    // The staleness line is plain text in the sync row (#945): present, never announced.
+    expect(html).toContain("Payment status may be stale");
+    expect(cards(html, "alert")).not.toContain("Payment status may be stale");
     expect(cards(html, "note")).toContain("QuickBooks remains the accounting record");
     const disconnect = renderToStaticMarkup(createElement(DisconnectQuickBooksView, { status: "unresolved" }));
     expect(cards(disconnect, "alert")).toContain("did not confirm revocation");

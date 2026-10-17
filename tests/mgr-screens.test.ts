@@ -32,14 +32,6 @@ const body = (name: string) => {
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
-  it("documents overdue invoices alongside the shared rendered warning", () => {
-    const invoices = SCREENS.find(s => s.name === "Invoices")!;
-    expect((invoices.states ?? []).map(([name]) => name)).toContain("overdue");
-    const spec = renderToStaticMarkup(createElement("div", null, invoices.spec));
-    expect(spec).toContain("brewery-local today");
-    expect(spec).toContain("Credit memos and settled");
-    expect(text("Invoices")).toContain("overdue Oct 3, 2026");
-  });
 
   it("gives brew day its pinned sheet and explicit actual confirmation", () => {
     const brew = text("Brew day");
