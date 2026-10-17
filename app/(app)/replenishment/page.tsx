@@ -40,7 +40,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   ]);
   const locationRows = [...taprooms, ...warehouses];
   // A location can be both warehouse and taproom; it is never its own source (#454).
-  const canEdit = ctx.role === "admin" || ctx.role === "sales";
+  const canEdit = ctx.roles.includes("admin") || ctx.roles.includes("sales");
   const parValues = Object.fromEntries(suggestions.map(s => [s.skuId, s.par]));
   const standingValues = Object.fromEntries(allocations.map(a => [a.sku_id, Number(a.qty)]));
   return (

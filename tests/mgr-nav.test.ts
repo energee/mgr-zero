@@ -3,23 +3,25 @@
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
 import { activeChild, activeTab, canOpen, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { STAFF_ROLES } from "../lib/mgr/enums";
+import { workHrefsFor } from "../components/mgr/work-tabs";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
-    const labels = navFor(STAFF_NAV, "admin").flatMap((t) => (t.children ?? []).map((c) => c.label));
+    const labels = navFor(STAFF_NAV, ["admin"]).flatMap((t) => (t.children ?? []).map((c) => c.label));
     for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
       expect.soft(labels).toContain(label);
     }
   });
   it("hides role-restricted children without leaving an empty entry", () => {
-    const sales = navFor(STAFF_NAV, "sales");
+    const sales = navFor(STAFF_NAV, ["sales"]);
     const work = sales.find((t) => t.label === "Work")!;
     expect(work.children!.map((c) => c.label)).toEqual(["Orders", "Replenishment"]);
     expect(sales.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    expect(navFor(STAFF_NAV, "sales").flatMap((t) => t.children ?? []).some((c) => c.label === "Settings")).toBe(false);
+    expect(navFor(STAFF_NAV, ["sales"]).flatMap((t) => t.children ?? []).some((c) => c.label === "Settings")).toBe(false);
   });
   it("keeps only groups with a permitted child", () => {
-    const warehouse = navFor(STAFF_NAV, "warehouse");
+    const warehouse = navFor(STAFF_NAV, ["warehouse"]);
     expect(warehouse.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     // Menu is still planned; Vendors and Planning shipped with purchasing;
     // Units is shipped and open to every staff role, since a gravity display
@@ -42,7 +44,7 @@ describe("isUnder", () => {
 
 describe("navFor brewer", () => {
   it("offers the brewer's production areas", () => {
-    expect(navFor(STAFF_NAV, "brewer").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
+    expect(navFor(STAFF_NAV, ["brewer"]).map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
   });
 });
 
@@ -80,7 +82,7 @@ describe("activeChild", () => {
 });
 
 it("taproom has Beer and own settings without forbidden Work", () => {
-  const nav = navFor(shippedNav(STAFF_NAV), "taproom");
+  const nav = navFor(shippedNav(STAFF_NAV), ["taproom"]);
   expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
   expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
   expect(nav.find(t => t.label === "Beer")!.children).toEqual([
@@ -93,14 +95,39 @@ it("taproom has Beer and own settings without forbidden Work", () => {
 describe("canOpen", () => {
   it("reads the role gate of the deepest nav entry covering the path (#444)", () => {
     // /settings is admin-only; Units and POS mapping under it are not.
-    expect(canOpen("admin", "/settings")).toBe(true);
+    expect(canOpen(["admin"], "/settings")).toBe(true);
     for (const role of ["sales", "brewer", "warehouse", "taproom"] as const) {
-      expect.soft(canOpen(role, "/settings"), role).toBe(false);
-      expect.soft(canOpen(role, "/settings/pos"), role).toBe(false);
-      expect.soft(canOpen(role, "/settings/units"), role).toBe(true);
+      expect.soft(canOpen([role], "/settings"), role).toBe(false);
+      expect.soft(canOpen([role], "/settings/pos"), role).toBe(false);
+      expect.soft(canOpen([role], "/settings/units"), role).toBe(true);
     }
-    expect(canOpen("warehouse", "/settings/pos/mapping")).toBe(true);
-    expect(canOpen("brewer", "/settings/pos/mapping")).toBe(false);
-    expect(canOpen("warehouse", "/more")).toBe(true);
+    expect(canOpen(["warehouse"], "/settings/pos/mapping")).toBe(true);
+    expect(canOpen(["brewer"], "/settings/pos/mapping")).toBe(false);
+    expect(canOpen(["warehouse"], "/more")).toBe(true);
+  });
+});
+
+describe("multi-role navigation", () => {
+  it("offers the exact union of every pair's destinations without duplicates", () => {
+    for (const first of STAFF_ROLES) for (const second of STAFF_ROLES) {
+      const paths = (roles: typeof STAFF_ROLES[number][]) => navFor(shippedNav(STAFF_NAV), roles)
+        .flatMap(item => [item.href, ...(item.children ?? []).map(child => child.href)]);
+      const union = [...new Set([...paths([first]), ...paths([second])])].sort();
+      const combined = paths([first, second]);
+      expect(combined.toSorted(), `${first}+${second}`).toEqual(union);
+      expect(new Set(combined).size).toBe(combined.length);
+    }
+  });
+
+  it("lets brewer+sales open production and customer work but not admin settings", () => {
+    const roles = ["brewer", "sales"] as const;
+    const labels = navFor(STAFF_NAV, roles).flatMap(item => (item.children ?? []).map(child => child.label));
+    expect(labels).toEqual(expect.arrayContaining(["Batches", "Customers"]));
+    expect(canOpen(roles, "/batches/new")).toBe(true);
+    expect(canOpen(roles, "/customers/example")).toBe(true);
+    expect(canOpen(roles, "/settings")).toBe(false);
+    expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging" });
+    expect(navFor(STAFF_NAV, roles).some(item => item.href.startsWith("/portal"))).toBe(false);
+    expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/orders", "/portal/invoices", "/portal/account"]);
   });
 });

@@ -10,6 +10,8 @@ import type { TodayItem } from "./today";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
 import { TODAY_VERB } from "@/lib/mgr/today-view";
+import { onlyRoles } from "@/lib/mgr/roles";
+import type { StaffRole } from "./registry";
 
 export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "routes";
 /** `id` is the row's own identity: two rows can share an href (two open questions on one invoice). */
@@ -19,11 +21,17 @@ export type WorkRow = { kind: WorkKind; id: string; label: string; detail: strin
 const KIND: Record<TodayItem["reason"], WorkKind> = {
   submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", refused_return: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
 };
-/** The Work chips a role opens by default; an explicit chip choice is remembered on the client. */
-export const DEFAULT_WORK_KINDS: Record<string, WorkKind[]> = {
+/** Each role's default Work chips; explicit chip choices are remembered on the client. */
+const DEFAULT_WORK_KINDS: Record<StaffRole, readonly WorkKind[]> = {
   admin: ["orders", "transfers", "batches", "runs", "POs", "routes"],
-  sales: ["orders"], warehouse: ["orders", "transfers", "POs", "routes"], brewer: ["batches", "runs", "POs"],
+  sales: ["orders"], warehouse: ["orders", "transfers", "POs", "routes"], brewer: ["batches", "runs", "POs"], taproom: [],
 };
+
+/** Union the caller's defaults in the same stable order as the Work chips. */
+export function defaultWorkKinds(roles: readonly (StaffRole | "customer")[]): WorkKind[] {
+  return DEFAULT_WORK_KINDS.admin.filter(kind => roles.some(role =>
+    role !== "customer" && DEFAULT_WORK_KINDS[role].includes(kind)));
+}
 
 const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) => {
   const { count: n, error } = await q;
@@ -52,7 +60,7 @@ defineQuery({
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;
-    if (ctx.role === "taproom") {
+    if (onlyRoles(ctx.roles, ["taproom"])) {
       const stock = await completeRows("Stock", start => ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" })
         .eq("brewery_id", b).order("sku_id").order("location_id").range(start, start + PAGE_SIZE - 1));
       // Resolve only referenced labels in bounded batches, through the same RLS boundary.

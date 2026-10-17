@@ -49,9 +49,9 @@ describe("staff linking", () => {
     await expect(issueChatLinkProof(admin, inst.id, "U100")).rejects.toThrow(/not active/i);
   });
 
-  it("consumes a proof once for a current staff member and resolves the actor with the live role", async () => {
+  it("consumes a proof once for a current staff member and resolves all live roles", async () => {
     const b = await makeBrewery();
-    const ctx = await makeStaffCtx(b.id, "warehouse");
+    const ctx = await makeStaffCtx(b.id, ["sales", "warehouse"]);
     const inst = await activeInstallation(b.id, ctx.userId);
     const issued = await issueChatLinkProof(admin, inst.id, "U200");
     const result = await runCommand("consume_chat_link_proof", { proof: issued.proof }, ctx);
@@ -65,10 +65,10 @@ describe("staff linking", () => {
     await expect(runCommand("consume_chat_link_proof", { proof: issued.proof }, ctx)).rejects.toThrow(/invalid|expired/i);
 
     await expect(resolveChatActor(admin, "slack", inst.external_installation_id, "U200")).resolves.toEqual({
-      installationId: inst.id, breweryId: b.id, externalUserId: "U200", userId: ctx.userId, role: "warehouse",
+      installationId: inst.id, breweryId: b.id, externalUserId: "U200", userId: ctx.userId, roles: ["sales", "warehouse"],
     });
-    await admin.from("brewery_users").update({ role: "brewer" }).eq("user_id", ctx.userId).eq("brewery_id", b.id);
-    expect((await resolveChatActor(admin, "slack", inst.external_installation_id, "U200"))?.role).toBe("brewer");
+    expect((await admin.from("brewery_users").update({ roles: ["brewer", "taproom"] }).eq("user_id", ctx.userId).eq("brewery_id", b.id)).error).toBeNull();
+    expect((await resolveChatActor(admin, "slack", inst.external_installation_id, "U200"))?.roles).toEqual(["brewer", "taproom"]);
   });
 
   it("rejects expired proofs, forged proofs, customers, and members of another brewery", async () => {
@@ -84,7 +84,7 @@ describe("staff linking", () => {
 
     const customer = { id: (await seedCustomer(b.id, { name: "Cust" })).customerId };
     const customerUser = await makeCustomerUser(customer.id);
-    const customerCtx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId: customer.id };
+    const customerCtx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, roles: ["customer" as const], customerId: customer.id };
     const forCustomer = await issueChatLinkProof(admin, inst.id, "U301");
     await expect(runCommand("consume_chat_link_proof", { proof: forCustomer.proof }, customerCtx)).rejects.toThrow(/permission/i);
     expect((await linkRow(forCustomer.linkId)).state).toBe("pending");
@@ -129,10 +129,34 @@ describe("staff linking", () => {
     await expect(resolveChatActor(admin, "slack", inst.external_installation_id, "U500")).resolves.toBeNull();
 
     const removedStaff = await makeStaff(b.id, "brewer");
-    const removedCtx = { db: await asUser(removedStaff.email), userId: removedStaff.id, breweryId: b.id, role: "brewer" as const };
+    const removedCtx = { db: await asUser(removedStaff.email), userId: removedStaff.id, breweryId: b.id, roles: ["brewer" as const] };
     const third = await issueChatLinkProof(admin, inst.id, "U501");
     await runCommand("consume_chat_link_proof", { proof: third.proof }, removedCtx);
     await admin.from("chat_installations").update({ state: "disabled", disabled_at: new Date().toISOString() }).eq("id", inst.id);
     await expect(resolveChatActor(admin, "slack", inst.external_installation_id, "U501")).resolves.toBeNull();
+  });
+
+  it("lets a combined-role admin list role arrays and unlink another member but denies nonmembers", async () => {
+    const b = await makeBrewery();
+    const adminCtx = await makeStaffCtx(b.id, ["admin", "sales"]);
+    const member = await makeStaffCtx(b.id, ["sales", "warehouse"]);
+    const outsider = await makeStaffCtx((await makeBrewery()).id, "admin");
+    const inst = await activeInstallation(b.id, adminCtx.userId);
+    const issued = await issueChatLinkProof(admin, inst.id, "U-multi");
+    await runCommand("consume_chat_link_proof", { proof: issued.proof }, member);
+
+    const links = await adminCtx.db.rpc("list_chat_user_links", { p_brewery: b.id });
+    expect(links.error).toBeNull();
+    expect(links.data).toEqual([expect.objectContaining({ id: issued.linkId, roles: ["sales", "warehouse"] })]);
+    const deniedList = await outsider.db.rpc("list_chat_user_links", { p_brewery: b.id });
+    expect(deniedList.error?.code).toBe("42501");
+    const deniedUnlink = await outsider.db.rpc("unlink_chat_user", {
+      p_brewery: b.id, p_link: issued.linkId, p_request_id: crypto.randomUUID(),
+    });
+    expect(deniedUnlink.error?.code).toBe("42501");
+    expect((await linkRow(issued.linkId)).state).toBe("active");
+
+    await runCommand("unlink_chat_user", { linkId: issued.linkId }, adminCtx);
+    expect((await linkRow(issued.linkId)).state).toBe("unlinked");
   });
 });

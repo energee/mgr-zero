@@ -35,7 +35,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
   const { params, queryWith, hrefWith } = listParams(catalogParams, (await searchParams) ?? {});
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const canWrite = brewery.role === "admin" || brewery.role === "sales";
+  const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [brands, formats, groups, categories] = await Promise.all([
     runCommand("list_brands", params, ctx) as Promise<Brand[]>, runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>, runCommand("list_price_groups", {}, ctx) as Promise<PriceGroup[]>,
     runCommand("list_catalog_categories", {}, ctx) as Promise<{ name: string }[]>,

@@ -5,9 +5,10 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatPreferences } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatPersonalPreferences } from "../chat-settings-client";
+import { onlyRoles } from "@/lib/mgr/roles";
 export default async function ChatPreferencesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const preferences = await runCommand("get_notification_preferences", {}, ctx) as ChatPreferences;
-  return <ChatPersonalPreferences key={brewery.id} preferences={preferences} canSetQuietHours={brewery.role !== "taproom"} back={brewery.role === "admin" ? "Chat" : "More"} backHref={brewery.role === "admin" ? "/settings/chat" : "/more"} />;
+  return <ChatPersonalPreferences key={brewery.id} preferences={preferences} canSetQuietHours={!onlyRoles(brewery.roles, ["taproom"])} back={brewery.roles.includes("admin") ? "Chat" : "More"} backHref={brewery.roles.includes("admin") ? "/settings/chat" : "/more"} />;
 }

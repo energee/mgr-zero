@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
+import { ReceiptView } from "@/components/mgr/views/receipt";
 import { CLOSURE_FORM_ID, CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
-import { receiptHref } from "@/lib/mgr/receipt-view";
+import { receiptBillRequest, receiptHref, type ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { discardRecovery } from "@/lib/commands/recovery";
 
 export type PoLine = {
   id: string; material_id: string; qty_ordered: number; qty_received: number; qty_open: number; expected_lot_code: string | null;
@@ -81,4 +83,27 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
     void run(model.closure === "cancel" ? "cancel_purchase_order" : "close_purchase_order_short", { poId, reason: closureReason });
   }} />}
   </>;
+}
+
+/** The shared view owns Bill presentation and confirmation; this adapter only executes the command. */
+export function ReceiptBillAdapter({ model }: { model: ReceiptViewModel }) {
+  const target = model.bill ? `receipt-bill:${model.bill.receiptId}` : undefined;
+  const action = useCommandAction(target);
+  const router = useRouter();
+  return <ReceiptView model={model} busy={action.busy || Boolean(model.bill?.action && action.pending === undefined)} error={action.error} onPostBill={model.bill?.action ? async () => {
+    if (action.busy || action.pending === undefined || !model.bill) return false;
+    const request = receiptBillRequest(model.bill, action.pending);
+    try {
+      if (request.discardRequestId && action.pending) discardRecovery(sessionStorage, action.pending.expectedContext, request.discardRequestId);
+    } catch (error) {
+      action.setError(error instanceof Error ? error.message : "The previous Bill request is still being sent.");
+      return false;
+    }
+    const posted = await action.run("post_receipt_bill", request.input, undefined, {
+      target, requestId: request.requestId, refresh: false,
+    });
+    // A failed response can still leave a durable unknown outcome. Read its canonical status.
+    router.refresh();
+    return posted;
+  } : undefined} />;
 }

@@ -26,7 +26,7 @@ describe("shippedNav", () => {
 
   it("renders only links whose fragment exists in the target page source", () => {
     for (const role of ROLES) {
-      for (const item of flatten(navFor(shippedNav(STAFF_NAV), role))) {
+      for (const item of flatten(navFor(shippedNav(STAFF_NAV), [role]))) {
         const hash = item.href.split("#")[1];
         if (hash) expect.soft(sources, `${role}: ${item.label} -> ${item.href}`).toContain(`id="${hash}"`);
       }
@@ -41,16 +41,16 @@ describe("shippedNav", () => {
   });
 
   it("drops a group whose every child is planned or hidden from the role", () => {
-    expect(navFor(shippedNav(STAFF_NAV), "brewer").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
+    expect(navFor(shippedNav(STAFF_NAV), ["brewer"]).map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     // Warehouse now keeps More: Units is a personal display preference every
     // staff role may set (set_my_gravity_unit admits all four), so it is the
     // one child of that group warehouse can see. The group's own href
     // (/invoices) stays openable for warehouse — list_invoices admits it — so
     // the phone tab still lands somewhere real.
-    expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    expect(navFor(shippedNav(STAFF_NAV), "warehouse").find((t) => t.label === "More")!.children!.map((c) => c.label))
+    expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
+    expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find((t) => t.label === "More")!.children!.map((c) => c.label))
       .toEqual(["Menu", "POS mapping", "Vendors", "Planning", "Chat", "Units"]);
-    expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
+    expect(navFor(shippedNav(STAFF_NAV), ["admin"]).find((t) => t.label === "More")!.children!.map((c) => c.label))
       .toEqual(["Invoices", "Catalog", "Menu", "POS mapping", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Import", "Settings", "Chat", "Sale channels", "Locations", "Units"]);
   });
 });

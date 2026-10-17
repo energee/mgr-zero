@@ -12,7 +12,7 @@ import { ChatConnectionAction, ChatSettingsControls, ChatDelivery } from "./chat
 
 export default async function ChatSettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; installed?: string }> }) {
   const brewery = await getActiveBrewery();
-  if (brewery.role !== "admin") redirect("/settings/chat/preferences");
+  if (!brewery.roles.includes("admin")) redirect("/settings/chat/preferences");
   const ctx = await buildContext(brewery.id);
   const [health, defaults, params] = await Promise.all([
     runCommand("get_chat_integration_health", {}, ctx) as Promise<ChatHealth>,

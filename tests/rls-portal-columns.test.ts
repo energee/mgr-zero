@@ -17,7 +17,7 @@ let customerDb: Awaited<ReturnType<typeof asUser>>;
 let staffDb: Awaited<ReturnType<typeof asUser>>;
 let invoiceId: string, invoiceLineId: string, orderId: string, shipmentId: string, deliveryId: string, foreignInvoiceId: string;
 let ownCustomerId: string, otherCustomerId: string;
-let custCtx: { db: typeof customerDb; userId: string; breweryId: string; role: "customer"; customerId: string };
+let custCtx: { db: typeof customerDb; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
 
 beforeAll(async () => {
   const b = await makeBrewery();
@@ -48,7 +48,7 @@ beforeAll(async () => {
   foreignInvoiceId = (await ins("invoices", { brewery_id: b.id, customer_id: other.customerId, kind: "invoice" })).id;
   const user = await makeCustomerUser(mine.customerId);
   customerDb = await asUser(user.email);
-  custCtx = { db: customerDb, userId: user.id, breweryId: b.id, role: "customer", customerId: mine.customerId };
+  custCtx = { db: customerDb, userId: user.id, breweryId: b.id, roles: ["customer"], customerId: mine.customerId };
 });
 
 describe("portal customers cannot read internal columns (#754)", () => {
@@ -129,7 +129,7 @@ describe("portal customer identity boundary (#793)", () => {
       customerId: ownCustomerId, customerName: "Buyer", breweryId: custCtx.breweryId, breweryName: expect.any(String),
     }]);
     expect(await request.getCustomerMembership(custCtx.breweryId, otherCustomerId)).toBeNull();
-    expect(await ctxForBearer(customerDb, custCtx.userId, custCtx.breweryId, ownCustomerId)).toMatchObject({ role: "customer", customerId: ownCustomerId });
+    expect(await ctxForBearer(customerDb, custCtx.userId, custCtx.breweryId, ownCustomerId)).toMatchObject({ roles: ["customer"], customerId: ownCustomerId });
     await expect(ctxForBearer(customerDb, custCtx.userId, custCtx.breweryId, otherCustomerId)).rejects.toMatchObject({ code: "not_member" });
   });
 

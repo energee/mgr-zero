@@ -6,7 +6,7 @@ import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuer
 defineCommand({
   name: "invite_staff",
   description: "Invite staff",
-  input: z.object({ email: z.string().email(), role: z.enum(STAFF_ROLES as [StaffRole, ...StaffRole[]]) }),
+  input: z.object({ email: z.string().email(), role: z.enum(STAFF_ROLES) }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
 });
@@ -19,21 +19,21 @@ defineCommand({
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });
 
-export type TeamMember = { userId: string; email: string; handle: string; role: string; createdAt: string };
+export type TeamMember = { userId: string; email: string; handle: string; roles: StaffRole[]; createdAt: string };
 
 defineQuery({
-  name: "list_team_members", description: "Staff roster for the brewery: user id, email, @handle (the email's local part) and role",
+  name: "list_team_members", description: "Staff roster for the brewery: user id, email, @handle (the email's local part) and roles",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx): Promise<TeamMember[]> => {
-    const rows = await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })) as { user_id: string; email: string; role: string; created_at: string }[];
-    return rows.map((r) => ({ userId: r.user_id, email: r.email, handle: `@${r.email.split("@")[0]}`, role: r.role, createdAt: r.created_at }));
+    const rows = await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })) as { user_id: string; email: string; roles: StaffRole[]; created_at: string }[];
+    return rows.map((r) => ({ userId: r.user_id, email: r.email, handle: `@${r.email.split("@")[0]}`, roles: r.roles, createdAt: r.created_at }));
   },
 });
 
 defineCommand({
-  name: "update_staff_role", description: "Change one member's role (admin); refused when it would leave the brewery without an admin",
-  input: z.object({ userId: z.string().uuid(), role: z.enum(STAFF_ROLES) }), roles: ["admin"],
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_staff_role", { p_brewery: ctx.breweryId, p_user: i.userId, p_role: i.role, p_request_id: execution.requestId })),
+  name: "update_staff_role", description: "Change one member's roles (admin); refused when it would leave the brewery without an admin",
+  input: z.object({ userId: z.string().uuid(), roles: z.array(z.enum(STAFF_ROLES)).min(1) }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_staff_role", { p_brewery: ctx.breweryId, p_user: i.userId, p_roles: i.roles, p_request_id: execution.requestId })),
 });
 
 defineCommand({

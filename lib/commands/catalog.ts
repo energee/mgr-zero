@@ -51,11 +51,12 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_sku", description: "Edit a SKU's active state, optional UPC and keg pool (omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
-  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional() }),
+  name: "update_sku", description: "Edit a SKU's active state, optional UPC, keg pool and default batch share (fraction over 0 through 1; brand shares total at most 1; omit to keep, null to clear); brand, format, provider mappings and history stay unchanged",
+  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: upc.optional(), kegPoolId: z.string().uuid().nullable().optional(), batchShare: z.number().positive().max(1).nullable().optional().describe("Fraction of a planned batch's volume for this SKU; omit to keep, null to clear") }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
     p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId, p_keg_pool: i.kegPoolId ?? null, p_clear_keg_pool: i.kegPoolId === null,
+    p_batch_share: i.batchShare ?? null, p_clear_batch_share: i.batchShare === null,
   })),
 });
 
@@ -342,7 +343,7 @@ defineQuery({
     category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source)").eq("brewery_id", ctx.breweryId);
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share)").eq("brewery_id", ctx.breweryId);
     if (i.q) {
       // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again.
       const pattern = `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;

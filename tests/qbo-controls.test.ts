@@ -26,7 +26,7 @@ describe("QuickBooks control boundaries", () => {
   it("uses QuickBooks presentation for unpaid pushed rows even when they drifted", () => {
     // The page delegates to the list-row adapter, which uses qbo.detail
     // unconditionally — so assert the behaviour, not the shape of the source.
-    expect(invoiceList).toMatch(/toInvoiceListRow\(invoice, brewery\.role/);
+    expect(invoiceList).toMatch(/toInvoiceListRow\(invoice, brewery\.roles/);
     expect(listRow).not.toMatch(/&& !inv\.qbo_accountant_drift/);
     const row = toInvoiceListRow({
       id: "inv", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null,
@@ -34,7 +34,7 @@ describe("QuickBooks control boundaries", () => {
       qbo_balance_cents: 98000, qbo_cash_collected_cents: 0, qbo_accountant_drift: true,
       written_off_at: null, subtotal_cents: 98000, total_cents: 99000, has_pending_qbo_push: false,
       customers: { name: "Ridgeline" },
-    }, "admin", true, "America/New_York");
+    }, ["admin"], true, "America/New_York");
     expect(row.detail).toContain("edited in QuickBooks · review there");
     expect(row.detail).toContain("local subtotal");
     expect(row.tone).toBe("w");

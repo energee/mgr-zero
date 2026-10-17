@@ -1,7 +1,7 @@
 // tests/null-role-guards.test.ts — #895: a signed-in user who is not a member
 // of a brewery must be refused by every QuickBooks RPC on that brewery.
-// public.staff_role(b) is NULL for a non-member, and `NULL <> 'admin'` is NULL,
-// so a guard written that way never raised. Each case runs against a brewery
+// A missing membership must fail closed; comparing a nullable membership
+// value with an allowed role once let non-members through. Each case runs against a brewery
 // that has a connected QuickBooks company, a customer, a SKU, and an invoice,
 // so the role guard is the only thing that can refuse the call.
 import { beforeAll, describe, expect, it } from "vitest";

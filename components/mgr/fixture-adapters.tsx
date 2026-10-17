@@ -9,6 +9,10 @@ import type { FormatView } from "@/components/mgr/views/format";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { deleteCategory, saveCategory } from "@/lib/mgr/catalog-categories-view";
 import { formatControls, type FormatViewModel } from "@/lib/mgr/format-view";
+import type { ReceiptView } from "@/components/mgr/views/receipt";
+import type { StaffRole } from "@/lib/commands/registry";
+import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 /** Wraps the inventory `<FormatView>` as a child, so the drawn element stays FormatView
  *  (screen-view-composition finds it) while this adapter owns its state. */
@@ -29,4 +33,19 @@ export function CatalogCategoriesFixture({ categories }: { categories: string[] 
       setError(null); setNames(result.names); return true;
     }}
     onDelete={async name => { setNames(deleteCategory(names, name)); return true; }} />;
+}
+
+/** Inventory-only simulation: a lost response followed by successful reconciliation. */
+export function ReceiptFixture({ children, roles = ["admin"] }: {
+  children: ReactElement<ComponentProps<typeof ReceiptView>>; roles?: readonly StaffRole[];
+}) {
+  const [model, setModel] = useState(children.props.model);
+  const canPost = hasAnyRole(roles, ["admin"]);
+  return cloneElement(children, {
+    model: canPost || !model.bill ? model : { ...model, bill: { ...model.bill, action: undefined, mappingHref: undefined } },
+    onPostBill: canPost ? async () => {
+      setModel(previous => ({ ...previous, bill: previous.bill?.status === "pending" ? receiptPoBillPosted.bill : receiptPoBillPending.bill }));
+      return true;
+    } : undefined,
+  });
 }

@@ -21,7 +21,7 @@ export default async function BeerPage() {
     <BeerView
       model={toBeerViewProps({
         overview: o,
-        showTaproom: brewery.role === "admin" || brewery.role === "warehouse",
+        showTaproom: brewery.roles.includes("admin") || brewery.roles.includes("warehouse") || brewery.roles.includes("taproom"),
       })}
       linkRows
     />

@@ -12,6 +12,7 @@ import {
   discardOutbox,
   dismissOutboxQuarantine,
   flushOutbox,
+  OUTBOX_ENTRY_PREFIX,
   OUTBOX_QUARANTINE_KEY,
   outboxQuarantineNotice,
   OUTBOX_RETIREMENT_MAX_AGE_MS,
@@ -30,7 +31,7 @@ const ids = {
   occupancy: "33333333-3333-4333-8333-333333333333",
   request: "44444444-4444-4444-8444-444444444444",
 };
-const scope: OfflineScope = { actorId: ids.actor, breweryId: ids.brewery, role: "brewer" };
+const scope: OfflineScope = { actorId: ids.actor, breweryId: ids.brewery, roles: ["brewer"] };
 const input = { occupancyId: ids.occupancy, at: "2026-09-10T14:15:16.000Z", tempF: 68, gravityPlato: 4.2, ph: 4.1, note: "steady" };
 
 class MemoryStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length"> {
@@ -79,6 +80,45 @@ describe("action-specific offline outbox", () => {
     for (const name of ["record_pick", "record_movement", "record_stock_transfer_pick", "receive_stock_transfer"]) {
       expect(getCommandDefinition(name)?.offlineReplay, name).not.toBe(true);
     }
+  });
+
+  it("keeps an offline reading eligible while any held role permits it", async () => {
+    const storage = new MemoryStorage();
+    const held: OfflineScope = { ...scope, roles: ["sales", "brewer"] };
+    const frozen = attempt(ids.request, held);
+    storeOutboxAttempt(storage, frozen);
+    const send = vi.fn(async () => ({ id: "reading" }));
+    await expect(sendOutboxAttempt(storage, frozen.id, held, send)).resolves.toMatchObject({ status: "sent" });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(readOutbox(storage)).toEqual([]);
+  });
+
+  it.each(["row", "legacy-array"])("migrates a scalar-role %s without changing an uncertain request", async format => {
+    const storage = new MemoryStorage();
+    const expected = { ...attempt(), state: "uncertain" as const, attempts: 2, hadUncertainOutcome: true, lastError: "Response lost" };
+    const previous = { ...expected, scope: { actorId: scope.actorId, breweryId: scope.breweryId, role: "brewer" } };
+    const key = `${OUTBOX_ENTRY_PREFIX}${ids.request}`;
+    storage.setItem(format === "row" ? key : "mgr-offline-outbox:v1", JSON.stringify(format === "row" ? previous : [previous]));
+    expect(readOutbox(storage)).toEqual([expected]);
+    expect(JSON.parse(storage.getItem(key)!)).toEqual(expected);
+    expect(readOutboxAttempt(storage, ids.request)).toEqual(expected);
+    const send = vi.fn(async () => ({ id: "reading" }));
+    await expect(sendOutboxAttempt(storage, ids.request, { ...scope, roles: ["sales", "brewer"] }, send))
+      .resolves.toMatchObject({ status: "sent" });
+    expect(send).toHaveBeenCalledWith(ids.brewery, expected.name, expected.input, ids.request, {
+      actorId: ids.actor, breweryId: ids.brewery,
+    });
+    expect(readOutbox(storage)).toEqual([]);
+  });
+
+  it("retains and surfaces a scalar-role reading if its storage migration cannot be saved", () => {
+    const storage = new MemoryStorage();
+    const key = `${OUTBOX_ENTRY_PREFIX}${ids.request}`;
+    const raw = JSON.stringify({ ...attempt(), scope: { actorId: scope.actorId, breweryId: scope.breweryId, role: "brewer" } });
+    storage.setItem(key, raw);
+    storage.setItem = () => { throw new Error("quota"); };
+    expect(() => readOutbox(storage)).toThrow(/save.*outbox/i);
+    expect(storage.getItem(key)).toBe(raw);
   });
 
   it("does not send when durable storage fails", async () => {
@@ -284,7 +324,7 @@ describe("action-specific offline outbox", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect((send.mock.calls[0] as unknown[])[3]).toBe(other.requestId);
 
-    await expect(sendOutboxAttempt(storage, ids.request, { ...scope, role: "sales" }, send)).resolves.toMatchObject({ status: "permission_changed" });
+    await expect(sendOutboxAttempt(storage, ids.request, { ...scope, roles: ["sales", "warehouse"] }, send)).resolves.toMatchObject({ status: "permission_changed" });
     expect(send).toHaveBeenCalledTimes(1);
     expect(readOutbox(storage)[0]).toMatchObject({ id: ids.request, state: "permission_changed" });
   });

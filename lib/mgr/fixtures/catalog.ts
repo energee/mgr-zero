@@ -122,6 +122,7 @@ export const skuHazyHalf: SkuSnapshot = {
     upc: "00810123450127",
     active: true,
     format_id: FMT_HALF,
+    batch_share: 0.25,
     formats: { name: "½ bbl keg", package_type: "keg" },
   },
   formats: packagedFormats,

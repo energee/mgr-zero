@@ -4,6 +4,7 @@
 // open when B's starts, so without a lock both count two admins and commit.
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
+import type { StaffRole } from "@/lib/commands/registry";
 import { DB, makeBrewery, makeStaffCtx } from "./helpers";
 
 const clients: Client[] = [];
@@ -35,19 +36,19 @@ async function plain() {
 
 async function admins(breweryId: string) {
   const c = await plain();
-  return Number((await c.query("select count(*) n from public.brewery_users where brewery_id=$1 and role='admin'", [breweryId])).rows[0].n);
+  return Number((await c.query("select count(*) n from public.brewery_users where brewery_id=$1 and 'admin'=any(roles)", [breweryId])).rows[0].n);
 }
 
 type Write = (c: Client, brewery: string, target: string) => Promise<unknown>;
 const demote: Write = (c, brewery, target) =>
-  c.query("select public.update_staff_role($1,$2,'sales',$3)", [brewery, target, crypto.randomUUID()]);
+  c.query("select public.update_staff_role($1,$2,array['sales']::public.staff_role[],$3)", [brewery, target, crypto.randomUUID()]);
 const remove: Write = (c, brewery, target) =>
   c.query("select public.revoke_staff($1,$2,$3)", [brewery, target, crypto.randomUUID()]);
 
-async function race(first: Write, second: Write) {
+async function race(first: Write, second: Write, roles: StaffRole[] = ["admin"]) {
   const brewery = (await makeBrewery()).id;
-  const a = await makeStaffCtx(brewery, "admin");
-  const b = await makeStaffCtx(brewery, "admin");
+  const a = await makeStaffCtx(brewery, roles);
+  const b = await makeStaffCtx(brewery, roles);
   const ca = await adminTx(a.userId);
   const cb = await adminTx(b.userId);
   const observer = await plain(); // outside any transaction, so pg_stat_activity is fresh
@@ -63,6 +64,7 @@ async function race(first: Write, second: Write) {
   await expect.poll(async () => settled
     || (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type === "Lock",
   { timeout: 5000 }).toBe(true);
+  expect(settled, "the second admin mutation waits for the first transaction").toBe(false);
   await ca.query("commit");
   const outcome = await pending;
   await cb.query(outcome.ok ? "commit" : "rollback");
@@ -80,4 +82,36 @@ describe("last admin under concurrency (#458)", { concurrent: false }, () => {
   it("two admins removing each other leave one admin", async () => {
     await race(remove, remove);
   });
+
+  it("the last admin+sales member cannot remove admin from their roles", async () => {
+    const brewery = (await makeBrewery()).id;
+    const staff = await makeStaffCtx(brewery, ["admin", "sales"]);
+    const c = await adminTx(staff.userId);
+    await expect(demote(c, brewery, staff.userId)).rejects.toThrow(/keep at least one admin/);
+    await c.query("rollback");
+    expect(await admins(brewery)).toBe(1);
+    const observer = await plain();
+    expect((await observer.query("select roles::text[] roles from public.brewery_users where brewery_id=$1 and user_id=$2", [brewery, staff.userId])).rows)
+      .toEqual([{ roles: ["admin", "sales"] }]);
+  });
+
+  it("an admin+sales member still cannot revoke their own membership", async () => {
+    const brewery = (await makeBrewery()).id;
+    const staff = await makeStaffCtx(brewery, ["admin", "sales"]);
+    const c = await adminTx(staff.userId);
+    await expect(remove(c, brewery, staff.userId)).rejects.toThrow(/you cannot remove yourself/);
+    await c.query("rollback");
+    expect(await admins(brewery)).toBe(1);
+  });
+
+  for (const [name, first, second] of [
+    ["demotion / demotion", demote, demote],
+    ["revocation / revocation", remove, remove],
+    ["demotion / revocation", demote, remove],
+    ["revocation / demotion", remove, demote],
+  ] as const) {
+    it(`serializes admin+sales ${name}, retaining one admin membership`, async () => {
+      await race(first, second, ["admin", "sales"]);
+    });
+  }
 });

@@ -107,7 +107,7 @@ describe("chat integration state", () => {
   });
   it("binds unlink to selected brewery and rejects request reuse after switching breweries", async () => {
     const b=await makeBrewery();
-    await ins("brewery_users",{brewery_id:b.id,user_id:ctx.userId,role:"admin"});
+    await ins("brewery_users",{brewery_id:b.id,user_id:ctx.userId,roles:["admin"]});
     const installationB=await ins("chat_installations",{brewery_id:b.id,provider:"slack",external_installation_id:b.id,display_label:"B",state:"active",installer_user_id:ctx.userId,token_store_key:b.id});
     const link=await ins("chat_user_links",{brewery_id:b.id,installation_id:installationB.id,provider:"slack",external_user_id:"U-B",user_id:ctx.userId,state:"active",linked_at:new Date().toISOString()});
     const input={linkId:link.id};
@@ -134,7 +134,7 @@ describe("chat integration state", () => {
     const removed = await receipt(removedToken, "mgr_refresh");
     assert(removed !== null);
     expect((await rpc("consume_chat_action_intent", { p_receipt: removed.receipt_id, p_intent: removedToken, p_action: "mgr_refresh", p_input: {} })).disposition).toBe("ignored");
-    await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: ctx.userId, role: "admin" });
+    await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: ctx.userId, roles: ["admin"] });
   });
 });
 
@@ -167,7 +167,7 @@ describe("live Chat settings", () => {
     await runCommand("set_brewery_quiet_hours", input, ctx, execution);
     expect((await admin.from("chat_installations").select("quiet_hours_start").eq("id", installation).single()).data?.quiet_hours_start).toBe("22:00:00");
     const b = await makeBrewery();
-    await ins("brewery_users", { brewery_id: b.id, user_id: ctx.userId, role: "admin" });
+    await ins("brewery_users", { brewery_id: b.id, user_id: ctx.userId, roles: ["admin"] });
     await expect(runCommand("set_brewery_quiet_hours", input, { ...ctx, breweryId: b.id })).rejects.toMatchObject({ status: 403 });
   });
 });
@@ -220,7 +220,7 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
       p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request, p_actor: ctx.userId, p_version: version,
     })).error?.code).toBe("42501");
     expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
-    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
     read.mockClear();
     try {
       await expect(runCommand("set_notification_destination", input, ctx, execution)).rejects.toMatchObject({ status: 403 });
@@ -229,7 +229,7 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
         p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-VALIDATED",
         p_request_id: execution.requestId, p_actor: ctx.userId, p_version: version,
       })).error?.code).toBe("42501");
-    } finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
+    } finally { await admin.from("brewery_users").update({ roles: ["admin"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
 
   } finally { read.mockRestore(); }
 });
@@ -260,7 +260,7 @@ it("admits only current admins for disable and preserves completed lifecycle rep
   await runCommand("disable_chat_installation", input, owner, execution);
   expect(await runCommand("get_chat_integration_health", {}, owner)).toMatchObject({ installation: { state: "active" } });
   const other = { ...owner, breweryId: ctx.breweryId };
-  await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: owner.userId, role: "admin" });
+  await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: owner.userId, roles: ["admin"] });
   await expect(runCommand("disable_chat_installation", input, other)).rejects.toMatchObject({ status: 403 });
 });
 
@@ -306,7 +306,7 @@ it("replays a completed shared destination after replacing its installation with
     await expect(runCommand("set_notification_destination", { ...input, installationId: replacement.data.installation_id }, owner, execution)).rejects.toMatchObject({ status: 409, code: "conflict" });
     expect((await admin.from("notification_destinations").select().eq("installation_id", initial.id)).data).toEqual(before.data);
     expect((await admin.from("notification_destinations").select().eq("installation_id", replacement.data.installation_id)).data).toEqual([]);
-    expect((await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", owner.breweryId).eq("user_id", owner.userId)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", owner.breweryId).eq("user_id", owner.userId)).error).toBeNull();
     await expect(runCommand("set_notification_destination", input, owner, execution)).rejects.toMatchObject({ status: 403 });
     expect((await admin.rpc("set_notification_destination", { p_brewery: owner.breweryId, p_installation: initial.id,
       p_external_destination_id: input.externalDestinationId, p_request_id: execution.requestId, p_actor: owner.userId, p_version: null })).error?.code).toBe("42501");

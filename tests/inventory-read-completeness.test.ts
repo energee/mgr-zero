@@ -185,7 +185,7 @@ describe("complete finished-goods reads", () => {
       } },
     });
     expect((await db.auth.signInWithPassword({ email: staff.email, password: "test-password-1" })).error).toBeNull();
-    await expect(runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, role: "admin" }))
+    await expect(runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, roles: ["admin"] }))
       .rejects.toMatchObject({ status: 409, code: "conflict", message: expect.stringMatching(/changed while loading/i) });
     expect(churned).toBe(true);
   }, 30_000);

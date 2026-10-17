@@ -1,6 +1,8 @@
 // tests/rls-orders.test.ts — order_events RLS + append-only; customer scoping for 1B tables.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 
 let b1: { id: string }, b2: { id: string };
 let staff1: { id: string; email: string }, staff2: { id: string; email: string };
@@ -114,5 +116,41 @@ describe("customer writes are locked once an order leaves draft", () => {
     const db = await asUser(custUser.email);
     const { error } = await db.from("order_lines").update({ qty_ordered: 99 }).eq("id", line!.id).select();
     expect(error?.code).toBe("42501"); // no direct DML grant: writes go through the command RPCs
+  });
+});
+
+describe("multi-role order authorization", () => {
+  it("warehouse + sales can edit and submit a draft; warehouse alone cannot", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const held = await makeStaffCtx(brewery.id, ["sales", "warehouse"]);
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    const location = await seedLocation(brewery.id);
+    const customer = await seedCustomer(brewery.id);
+    const catalog = await seedCatalog(brewery.id);
+    await priceSku(brewery.id, { saleChannelId: customer.saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 1000 });
+    const created = await runCommand("create_order", {
+      kind: "wholesale", customerId: customer.customerId, shipToId: customer.shipToId,
+      fromLocationId: location.id, lines: [{ skuId: catalog.skuId, qty: 1 }],
+    }, owner) as { order_id: string };
+    const args = {
+      p_order: created.order_id, p_ship_to: customer.shipToId, p_requested: null,
+      p_po: "UNION", p_note: "Both roles", p_lines: [{ sku_id: catalog.skuId, qty: 2 }],
+      p_request_id: crypto.randomUUID(),
+    };
+    expect((await warehouse.db.rpc("update_draft_order", args)).error?.code).toBe("42501");
+    expect((await warehouse.db.rpc("submit_order", {
+      p_order: created.order_id, p_request_id: crypto.randomUUID(),
+    })).error?.code).toBe("42501");
+    const edited = await held.db.rpc("update_draft_order", args);
+    expect(edited.error).toBeNull();
+    const lines = await held.db.from("order_lines").select("qty_ordered").eq("order_id", created.order_id);
+    expect(lines.error).toBeNull();
+    expect(lines.data?.map(line => Number(line.qty_ordered))).toEqual([2]);
+    const submitted = await held.db.rpc("submit_order", {
+      p_order: created.order_id, p_request_id: crypto.randomUUID(),
+    });
+    expect(submitted.error).toBeNull();
+    expect((await held.db.from("orders").select("status").eq("id", created.order_id).single()).data?.status).toBe("submitted");
   });
 });

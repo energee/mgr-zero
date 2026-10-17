@@ -3,7 +3,7 @@ import type { Ctx } from "@/lib/commands/registry";
 const boundary = vi.hoisted(() => ({ beginQboInvoiceSync: vi.fn(), completeQboInvoiceSync: vi.fn(), recordQboInvoiceSyncFailure: vi.fn(), readVersionedIntegrationTokens: vi.fn() }));
 vi.mock("@/lib/supabase/integration-tokens", () => boundary);
 import { syncQboInvoices, QboOAuthClient } from "@/lib/qbo";
-const ctx = { role: "sales", userId: "actor", breweryId: "brewery" } as Ctx;
+const ctx = { roles: ["sales"], userId: "actor", breweryId: "brewery" } as Ctx;
 const requestId = "request";
 const client = new QboOAuthClient({ clientId: "id", clientSecret: "secret", redirectUri: "https://example.test", apiBaseUrl: "https://example.test" });
 beforeEach(() => {
@@ -25,7 +25,7 @@ it("replays a completed batch without another provider read or failure record", 
   expect(boundary.recordQboInvoiceSyncFailure).not.toHaveBeenCalled();
 });
 it("refuses unauthorized operators before claiming a batch", async () => {
-  await expect(syncQboInvoices({ ...ctx, role: "warehouse" }, requestId, client)).rejects.toThrow("permission denied");
+  await expect(syncQboInvoices({ ...ctx, roles: ["warehouse"] }, requestId, client)).rejects.toThrow("permission denied");
   expect(boundary.beginQboInvoiceSync).not.toHaveBeenCalled();
 });
 
