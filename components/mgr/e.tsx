@@ -489,7 +489,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (role: StaffRole = "admin") => <ComposerDrawerView><ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
+  comp: (role: StaffRole = "admin", container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
 };
 
 function isPin(n: ReactNode) {
