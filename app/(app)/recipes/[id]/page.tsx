@@ -1,5 +1,5 @@
 // app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView: its
-// latest version read out as text (toRecipePageModel), with the OG/FG/ABV
+// selected version read out as text (toRecipePageModel), with the OG/FG/ABV
 // get_recipe predicts (never stored) or why it predicted none. The page only
 // fetches and renders. Create recipe version opens ./new, where
 // recipe-version-form.tsx makes every field live for create_recipe_version.
@@ -14,12 +14,15 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
 import { toRecipePageModel, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 
-export default async function RecipePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function RecipePage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ v?: string | string[] }>;
+}) {
+  const [{ id }, { v }] = await Promise.all([params, searchParams]);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [snapshot, materials, gravityUnit, profiles, brands] = (await Promise.all([
-    orNotFound(runCommand("get_recipe", { recipeId: id }, ctx)),
+    orNotFound(runCommand("get_recipe", { recipeId: id, version: v === undefined ? undefined : typeof v === "string" ? Number(v) : NaN }, ctx)),
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),

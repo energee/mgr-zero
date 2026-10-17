@@ -33,16 +33,16 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
   return <>
     {E.back("Settings", "Chat", undefined, backHref)}
     {!connected && <>{E.ttl("Chat notifications")}{E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}</>}
-    {oauthError && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.")}
+    {oauthError && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.", "alert")}
     {installed && E.info("Slack authorization completed. Choose a private operations channel below.")}
     {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? installation.state.replaceAll("_", " ") : "Not connected", connected ? E.act("Disconnect", "destructive", disconnectHref) : "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
     <details><summary>Connection permissions</summary>{E.fld("Required scopes", "chat:write · im:write · groups:read")}{connected && E.fld("Granted scopes", installation.scopes.join(" · ") || "None recorded; reauthorize Slack")}</details>
-    {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`)}
+    {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`, "alert")}
     {installation?.state === "disconnected" && installation.lastError === "credential_delete_failed" && E.btn("Retry credential cleanup", "g", disconnectHref)}
     {(!connected || installation.state !== "active") && (connection !== undefined ? connection : <ChatConnectionView configured={configured} reauthorize={Boolean(connected)} />)}
     {connected && <>
       {health.destinations.map(destination => <div key={destination.id}>{E.row(`Operations channel · ${destination.channelId}`, `${destination.privacy.replaceAll("_", " ")} · ${destination.state}${destination.reason ? ` · ${destination.reason.replaceAll("_", " ")}` : ""}`)}</div>)}
-      {!health.destinations.length && E.note("No operations channel selected. Eligible personal reminders can still be delivered.")}
+      {!health.destinations.length && E.note("No operations channel selected. Eligible personal reminders can still be delivered.", "alert")}
       {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={String(readingDueHours)} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
       {E.nav("Health", `${health.queue.retrying ?? "unavailable"} retrying · ${health.queue.queued ?? "unavailable"} queued`, "", undefined, healthHref)}
       {E.nav("Linked people", `${health.linkedCount} linked`, "", undefined, peopleHref)}
@@ -156,7 +156,7 @@ export function ChatHealthView({ health, configured = true, connection, disable,
     {E.row("Last successful message from Slack", health.lastCallback ?? "None yet", health.lastCallback ? E.status("Succeeded", "ok") : "")}
     {E.row("Last successful delivery", health.lastDelivery ?? "None yet", health.lastDelivery ? E.status("Succeeded", "ok") : "")}
     {Object.entries(health.queue).map(([state, count]) => <div key={state}>{E.row(state.replaceAll("_", " "), `${count} deliveries`, state === "queued" && installation?.state !== "active" ? E.status("Paused", "w") : "", count ? "w" : "")}</div>)}
-    {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`)}
+    {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`, "alert")}
     {installation && ["active", "disabled", "needs_reauthorization"].includes(installation.state) && (connection !== undefined ? connection : <ChatConnectionView configured={configured} reauthorize />)}
     {installation && ["active", "needs_reauthorization"].includes(installation.state) && (disable !== undefined ? disable : <ChatDisableView />)}
     {E.btn("Manage delivery", "g", backHref)}
@@ -168,7 +168,7 @@ export function ChatDisconnectView({ connected = true, cleanupPending = false, b
   return <div className="flex flex-col gap-4">
     {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
     {E.info("Stays: MGR work, assignments, notification preferences and history.")}
-    {cleanupPending && E.note("Slack delivery has stopped. Credential cleanup failed; retry cleanup to finish disconnecting.")}
+    {cleanupPending && E.note("Slack delivery has stopped. Credential cleanup failed; retry cleanup to finish disconnecting.", "alert")}
     {connected ? <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{cleanupPending ? "Retry credential cleanup" : "Disconnect Slack"}</Button> : E.info("Slack is not connected.")}
     <CommandFormMessage error={error} />
   </div>;
@@ -191,7 +191,7 @@ export function ChatLinkConsentView({ intent, backHref, busy = false, error, onL
       {E.info(`Slack user ${intent.slackIdentity} in ${intent.workspace} will be linked to ${intent.mgrIdentity} in ${intent.brewery}.`)}
       {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
       <Button data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={busy} onClick={onLink}>Link accounts</Button>
-    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open MGR’s App Home in Slack and choose Link MGR account for a fresh link.")}
+    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open MGR’s App Home in Slack and choose Link MGR account for a fresh link.", "alert")}
     <CommandFormMessage error={error} />
     {E.btn("Back", "g", backHref)}
   </>;

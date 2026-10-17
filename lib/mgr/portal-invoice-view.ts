@@ -29,6 +29,18 @@ export type PortalInvoiceViewModel = {
   lines: PortalInvoiceLineView[];
 };
 
+/** Financial state, not payment availability or provider-sync success. */
+export const portalInvoiceStatusTone = {
+  Paid: "ok",
+  Settled: "ok",
+  Unpaid: "w",
+  Review: "w",
+  Voided: "",
+  Deleted: "",
+  "Written off": "",
+  Credit: "",
+} as const satisfies Record<PortalInvoiceViewModel["status"], "" | "ok" | "w">;
+
 export type PortalInvoiceSnapshot = {
   backHref?: string;
   invoice: {

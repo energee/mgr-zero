@@ -58,7 +58,7 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     <p className="text-sm text-muted-foreground">Shared format · {volume == null ? "No beer volume yet — add package contents" : `${formatVolume(volume)} of beer per package`}</p>
     {composable || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
       {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case · managed in Edit format")}
-      {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty])) : E.blank("Add the packages inside to calculate the total volume")}
+      {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty]), ["l", "r"]) : E.blank("Add the packages inside to calculate the total volume")}
     </section> : null}
     <PackageBomView
       model={bomModel}

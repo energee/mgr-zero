@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { consumeAdmission } from "@/lib/commands/admission";
 import {
   beginQboInvoiceSync,
   compareAndSwapPortalInvoicePaymentTokens,
@@ -141,6 +142,21 @@ export function sanitizeQboError(error: unknown) {
   return "QuickBooks is unavailable";
 }
 
+const QBO_SETUP_UNAVAILABLE = "QuickBooks setup is unavailable";
+
+/**
+ * The payment-failure log fields: enough cause for staff, never a provider body.
+ * Only messages MGR writes itself (a CommandError, the missing-setup error) are
+ * kept; any other error, which may carry tokens or a bearer link, logs its name.
+ */
+export function qboPaymentFailureCause(error: unknown) {
+  if (error instanceof CommandError) {
+    return { name: error.name, status: error.status, code: error.code, message: error.message };
+  }
+  if (!(error instanceof Error)) return { name: typeof error };
+  return error.message === QBO_SETUP_UNAVAILABLE ? { name: error.name, message: error.message } : { name: error.name };
+}
+
 export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<string>) {
   try {
     const url = new URL(value);
@@ -153,7 +169,7 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
 
 export type PortalInvoicePaymentResult =
   | { kind: "redirect"; url: string }
-  | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" };
+  | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" | "rate_limited" };
 
 async function refreshPortalInvoicePayment(
   ctx: Ctx,
@@ -167,7 +183,7 @@ async function refreshPortalInvoicePayment(
   }
   const next = await client.refresh(claim.refreshToken).catch(async (error) => {
     if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-    else console.error("qbo_payment_refresh_failed", error);
+    else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
     // A failed provider refresh keeps the buyer on Payment unavailable.
     return null;
   });
@@ -183,6 +199,9 @@ export async function resolvePortalInvoicePayment(
 ): Promise<PortalInvoicePaymentResult> {
   let claim = await readPortalInvoicePayment(ctx, invoiceId);
   if (!claim) return { kind: "unavailable", reason: "not_configured" };
+  // Authorize the concrete invoice before spending the shared per-user budget.
+  // Admission precedes every provider read, including refresh and its retry.
+  if (!(await consumeAdmission(ctx.db)).allowed) return { kind: "unavailable", reason: "rate_limited" };
   let refreshed = false;
   if (isPast(claim.accessExpiresAt)) {
     const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
@@ -930,7 +949,7 @@ function meaningfulInvoiceContentMatches(expectedInvoice: unknown, actual: Recor
 }
 
 export function qboConfig(env: Record<string, string | undefined> = process.env): QboConfig {
-  try { return readQboEnv(env); } catch { throw new Error("QuickBooks setup is unavailable"); }
+  try { return readQboEnv(env); } catch { throw new Error(QBO_SETUP_UNAVAILABLE); }
 }
 
 export function isQboConfigured(env: Record<string, string | undefined> = process.env) {

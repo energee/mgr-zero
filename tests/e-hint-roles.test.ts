@@ -1,13 +1,29 @@
-// QW24 (narrowed): a result or prediction that is not an error reaches a screen
-// reader through a polite, always-mounted role="status" region; an error keeps
-// E.note's role="alert". E.note and E.info themselves stay alerts (the global
-// sweep is a separate issue).
+// #904: static hint cards are notes; explicit errors remain assertive on the
+// shared surfaces used by inventory and live adapters. QW24's always-mounted
+// polite result regions retain their separate announcement contract.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { PublicationResult, SyncFeedback } from "@/components/mgr/views/pos-controls";
-import { recipeHazyV4 } from "@/lib/mgr/fixtures/production";
+import { cellarAdditionCitra, recipeHazyV4 } from "@/lib/mgr/fixtures/production";
+import { E } from "@/components/mgr/e";
+import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
+import { AccountingView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
+import { ChatDisconnectView, ChatHealthView, ChatSettingsView } from "@/components/mgr/views/chat";
+import { DisconnectSquareView, PointOfSaleView } from "@/components/mgr/views/pos";
+import { EntryView } from "@/components/mgr/views/entry";
+import { FormatView } from "@/components/mgr/views/format";
+import { toAccountingViewProps } from "@/lib/mgr/accounting-view";
+import { toSetPasswordViewProps } from "@/lib/mgr/entry-view";
+import { toFormatViewProps } from "@/lib/mgr/format-view";
+import type { ChatHealth } from "@/lib/commands/chat";
+import { CycleCountView } from "@/components/mgr/views/cycle-count";
+import { PackagingMaterialActuals } from "@/components/mgr/views/packaging-materials";
+import { cycleCountCans } from "@/lib/mgr/fixtures/purchasing";
+import { CellarAdditionView } from "@/components/mgr/views/cellar-addition";
+import { FormatRowsView } from "@/components/mgr/views/format-rows";
+import { ChatLinkConsentView } from "@/components/mgr/views/chat";
 
 type ExactCommand = Parameters<typeof PublicationResult>[0]["action"];
 const command = (over: Partial<Record<string, unknown>>) =>
@@ -17,6 +33,101 @@ const noop = () => {};
 const statusRegion = (html: string) => html.match(/<div role="status">([\s\S]*?)<\/div>/)?.[1] ?? null;
 
 describe("hint roles", () => {
+  it.each(["note", "info"] as const)("E.%s defaults to a non-live note and opts errors into alerts", kind => {
+    const hint = renderToStaticMarkup(E[kind]("Static guidance"));
+    expect(hint).toContain('role="note"');
+    expect(hint).not.toContain('role="alert"');
+    expect(hint).not.toContain("aria-live");
+    const error = renderToStaticMarkup(E[kind]("Something failed", "alert"));
+    expect(error).toContain('role="alert"');
+    expect(error).not.toContain('role="note"');
+  });
+
+  // Read the rendered card, not source strings or an import that may be unused.
+  const cards = (html: string, role: "note" | "alert") => [...html.matchAll(new RegExp(`<div\\b[^>]*role="${role}"[^>]*>([\\s\\S]*?)<\\/div>`, "g"))].map(match => match[1].replace(/<[^>]+>/g, "")).join(" · ");
+  const health: ChatHealth = {
+    installation: { id: "slack", workspace: "Fixture workspace", state: "active", scopes: [], quietStart: null, quietEnd: null, timezone: null, lastError: "credential_delete_failed" },
+    destinations: [], queue: {}, linkedCount: 0, lastCallback: null, lastDelivery: null,
+  };
+
+  it("keeps invitation failures assertive without announcing the joining hint", () => {
+    const html = renderToStaticMarkup(createElement(AccountInvitationsView, { invitations: [], error: "Invitation could not be accepted" }));
+    expect(cards(html, "alert")).toBe("Invitation could not be accepted");
+    expect(cards(html, "note")).toContain("Joining grants access");
+  });
+
+  it("keeps QuickBooks connection, sync and revocation failures assertive", () => {
+    const model = { ...toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: "Reconnect required" }), remoteRevocationUnresolved: true };
+    const html = renderToStaticMarkup(createElement(AccountingView, { model, sync: createElement(QboSyncView, { status: {
+      latest: { at: "Oct 16", operator: "Operator", completed: false, superseded: true }, latestFailure: { at: "Oct 15", operator: "Operator" }, lastSuccess: null, retryRequestId: null,
+    } }) }));
+    for (const error of ["Last connection error: Reconnect required", "could not confirm remote revocation", "Latest failed attempt", "saved batch was superseded"]) expect(cards(html, "alert")).toContain(error);
+    expect(cards(html, "note")).toContain("Payment status may be stale");
+    expect(cards(html, "note")).toContain("QuickBooks remains the accounting record");
+    const disconnect = renderToStaticMarkup(createElement(DisconnectQuickBooksView, { status: "unresolved" }));
+    expect(cards(disconnect, "alert")).toContain("did not confirm revocation");
+    expect(cards(disconnect, "note")).toContain("Stops: invoice push");
+  });
+
+  it("keeps Square OAuth, connection and unresolved disconnect outcomes assertive", () => {
+    const html = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "disconnected", oauthFailed: true, error: "Reconnect required" } }));
+    expect(cards(html, "alert")).toContain("Square authorization was cancelled");
+    expect(cards(html, "alert")).toContain("Last connection error: Reconnect required");
+    expect(cards(html, "note")).toContain("Publish what the taproom can sell");
+    for (const status of ["unresolved", "pending"] as const) {
+      const disconnect = renderToStaticMarkup(createElement(DisconnectSquareView, { status }));
+      expect(cards(disconnect, "alert")).toContain(status === "unresolved" ? "did not confirm revocation" : "outcome was not recorded");
+      expect(cards(disconnect, "note")).toContain("Stops: menu publishing");
+    }
+  });
+
+  it("keeps Slack OAuth, provider, missing channel and cleanup failures assertive", () => {
+    const html = renderToStaticMarkup(createElement(ChatSettingsView, { health, timezone: "America/New_York", readingDueHours: 24, oauthError: true, fields: null, connection: null }));
+    for (const error of ["Slack connection was cancelled", "Last provider error: credential delete failed", "No operations channel selected"]) expect(cards(html, "alert")).toContain(error);
+    expect(cards(renderToStaticMarkup(createElement(ChatHealthView, { health, connection: null, disable: null })), "alert")).toContain("Last provider error: credential delete failed");
+    const disconnect = renderToStaticMarkup(createElement(ChatDisconnectView, { cleanupPending: true }));
+    expect(cards(disconnect, "alert")).toContain("Credential cleanup failed");
+    expect(cards(disconnect, "note")).toContain("Stops: App Home");
+  });
+
+  it("keeps password submission and format sizing errors assertive", () => {
+    const password = renderToStaticMarkup(createElement(EntryView, { model: toSetPasswordViewProps("operator@example.com", "same_password") }));
+    expect(cards(password, "alert")).toContain("Choose a password different");
+    const model = toFormatViewProps({ format: { id: "format", name: "Case", basis: "packaged", package_type: "can", units_per_case: 0, bbl_per_unit: 0 } });
+    expect(cards(renderToStaticMarkup(createElement(FormatView, { model })), "alert")).toContain("Enter a whole number of containers");
+  });
+
+  it("keeps frozen counts and overdrawn packaging inputs assertive, not their previews", () => {
+    const count = renderToStaticMarkup(createElement(CycleCountView, { model: cycleCountCans, frozen: true }));
+    expect(cards(count, "alert")).toContain("No trustworthy response arrived");
+    expect(cards(count, "note")).toContain(cycleCountCans.preview);
+    for (const restoring of [false, true]) {
+      const packaging = renderToStaticMarkup(createElement(PackagingMaterialActuals, {
+        plan: { revision: "1", planned: [], sources: [], materials: [], lots: [] }, locations: [], bins: [], restoring,
+        rows: [{ key: "row", materialId: "cans", locationId: "warehouse", binId: "shelf", lotId: null, used: "1", loss: "0", unused: "0" }],
+      }));
+      expect(cards(packaging, "alert")).toContain(restoring ? "Replacement use plus loss exceeds" : "Used plus loss exceeds");
+      expect(cards(packaging, "note")).toContain("Unused returned is an observation");
+    }
+  });
+
+  it("keeps cellar selection guidance quiet but an entered lot overdraw assertive", () => {
+    const prompt = renderToStaticMarkup(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, lotId: "" } }));
+    expect(cards(prompt, "note")).toContain("Choose a lot");
+    expect(cards(prompt, "alert")).toBe("");
+    const overdraw = renderToStaticMarkup(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" } }));
+    expect(cards(overdraw, "alert")).toContain("Only 40 lb of L-0790 on hand");
+    const preview = renderToStaticMarkup(createElement(CellarAdditionView, { model: cellarAdditionCitra }));
+    expect(cards(preview, "note")).toContain("Preview:");
+    expect(cards(preview, "alert")).toBe("");
+  });
+
+  it("keeps format row validation and an unusable Slack link assertive", () => {
+    const rows = renderToStaticMarkup(createElement(FormatRowsView, { kind: "components", rows: [{ id: "can", qty: "0" }], options: [{ id: "can", name: "Can" }], valid: false, onChange: noop, confirmClear: false, onConfirmClear: noop }));
+    expect(cards(rows, "alert")).toContain("Choose a different item for each row");
+    expect(cards(renderToStaticMarkup(createElement(ChatLinkConsentView, { intent: null })), "alert")).toContain("This link is missing, expired");
+  });
+
   it("RecipeView renders Predicted inside a polite status region, not an alert", () => {
     const html = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(statusRegion(html)).toContain("Predicted: OG 15.2 °P");

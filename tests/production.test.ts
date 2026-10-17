@@ -75,6 +75,58 @@ describe("recipes and immutable versions", () => {
     expect(listed.map((r) => r.id)).toContain(recipe.id);
   });
 
+  it("get_recipe returns the requested older version and lists all versions", async () => {
+    const recipe = await runCommand("create_recipe", { name: "History IPA" }, ctx) as { id: string };
+    const historyMalt = await seedMaterial(b.id, { name: "History malt", category: "malt", extractPotential: 1.037 });
+    const input = {
+      recipeId: recipe.id, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      mashSchedule: [{ name: "Rest", kind: "infusion", tempF: 152, minutes: 60 }],
+      ingredients: [{ materialId: historyMalt, perBblQty: 60, stage: "mash" }],
+      water: { additions: [{ materialId: hop, qty: 2, unit: "g", stage: "mash" }] },
+      note: "Original",
+    };
+    const first = await runCommand("create_recipe_version", input, ctx) as { id: string };
+    const second = await runCommand("create_recipe_version", {
+      ...input, note: "Revised", ingredients: [{ materialId: hop, perBblQty: 1, stage: "boil" }],
+      water: { additions: [] },
+    }, ctx) as { id: string };
+    const older = await runCommand("get_recipe", { recipeId: recipe.id, version: 1 }, ctx);
+    expect(older).toMatchObject({
+      version: { id: first.id, version: 1, note: "Original" }, versions: [2, 1],
+      ingredients: [{ material_id: historyMalt, per_bbl_qty: 60 }],
+      waterAdditions: [{ material_id: hop, qty: 2 }],
+    });
+    expect(older).toMatchObject(recipeGravity({
+      brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ perBblQty: 60, extractPotential: 1.037, stage: "mash", unit: "lb" }],
+    })!);
+    expect(await runCommand("get_recipe", { recipeId: recipe.id }, ctx)).toMatchObject({
+      version: { id: second.id, version: 2, note: "Revised" }, versions: [2, 1],
+      ingredients: [{ material_id: hop }], waterAdditions: [],
+    });
+    await expect(runCommand("get_recipe", { recipeId: recipe.id, version: 3 }, ctx))
+      .rejects.toMatchObject({ status: 404, code: "not_found" });
+    for (const version of [0, -1, 1.5, "1"]) {
+      await expect(runCommand("get_recipe", { recipeId: recipe.id, version }, ctx))
+        .rejects.toMatchObject({ code: "invalid_input" });
+    }
+    const other = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    await expect(runCommand("get_recipe", { recipeId: recipe.id, version: 1 }, other))
+      .rejects.toMatchObject({ status: 404, code: "not_found" });
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("get_recipe", { recipeId: recipe.id, version: 1 }, sales))
+      .rejects.toMatchObject({ status: 403 });
+  });
+
+  it("lists no versions before the first save, without inventing a requested version", async () => {
+    const recipe = await runCommand("create_recipe", { name: "Not brewed yet" }, ctx) as { id: string };
+    expect(await runCommand("get_recipe", { recipeId: recipe.id }, ctx)).toMatchObject({
+      version: null, versions: [], ingredients: [], waterAdditions: [],
+    });
+    await expect(runCommand("get_recipe", { recipeId: recipe.id, version: 1 }, ctx))
+      .rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+
   // The recipe version editor needs a name to show beside each ingredient
   // row; this is the query it reads that from.
   it("lists materials alphabetically for the ingredient picker", async () => {

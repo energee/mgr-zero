@@ -1,18 +1,20 @@
 // tests/search.test.ts — Program 10 task 3: one registered search across the
 // entity kinds the caller may read. A document number (ORD-0001) matches
 // exactly and sorts first; names match on prefix; a customer role is refused.
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { asUser, channelId, ins, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
-import type { SearchHit } from "@/lib/commands/search";
+import { SEARCH_KINDS, type SearchHit } from "@/lib/commands/search";
 import "@/lib/commands/all";
+import { POST } from "@/app/api/command/route";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-let b: { id: string }, adminCtx: Ctx, orderId: string, skuId: string, customerId: string;
+let b: { id: string }, adminCtx: Ctx, salesCtx: Ctx, orderId: string, skuId: string, customerId: string;
 
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
+  salesCtx = await makeStaffCtx(b.id, "sales");
   const wh = await ins("locations", { brewery_id: b.id, name: "WH", uses: ["warehouse"] });
   const brand = await ins("brands", { brewery_id: b.id, name: "Hazy IPA" });
   const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
@@ -65,6 +67,66 @@ describe("search_entities", () => {
   it("kinds narrow the search and never widen it", async () => {
     const hits = await search("Haz", adminCtx, ["customer"]);
     expect(hits.map((h) => h.kind)).not.toContain("sku");
+  });
+  it.each([SEARCH_KINDS.length + 1, 16])("rejects %i kinds before any database reads", async (count) => {
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      await expect(search("Haz", salesCtx, Array(count).fill("sku"))).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+  it.each([2, SEARCH_KINDS.length])("searches %i repeated SKU kinds only once", async (count) => {
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      const hits = await search("Haz", salesCtx, Array(count).fill("sku"));
+      expect(hits).toEqual([expect.objectContaining({ kind: "sku", id: skuId })]);
+      expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(["/rest/v1/skus", "/rest/v1/skus"]);
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+  it("accepts all eight kinds while retaining role-filtered results", async () => {
+    const expected = await search("Haz", salesCtx);
+    expect(expected).toContainEqual(expect.objectContaining({ kind: "sku", id: skuId }));
+    expect(await search("Haz", salesCtx, [...SEARCH_KINDS])).toEqual(expected);
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      expect(await search("PO-0001", salesCtx, ["po", "po"])).toEqual([]);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+  it("bounds actual search reads through the authenticated HTTP endpoint", async () => {
+    const { data: { session } } = await salesCtx.db.auth.getSession();
+    expect(session).not.toBeNull();
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      for (const count of [1, 2, 16]) {
+        fetch.mockClear();
+        const response = await POST(new Request("http://localhost/api/command", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${session!.access_token}` },
+          body: JSON.stringify({ breweryId: b.id, name: "search_entities", input: { q: "Haz", kinds: Array(count).fill("sku") } }),
+        }));
+        const body = await response.json();
+        const skuReads = fetch.mock.calls.filter(([url]) => new URL(String(url)).pathname === "/rest/v1/skus");
+        if (count > SEARCH_KINDS.length) {
+          expect(response.status).toBe(400);
+          expect(body).toMatchObject({ ok: false, error: { code: "invalid_input" } });
+          expect(skuReads).toHaveLength(0);
+        } else {
+          expect(response.status).toBe(200);
+          expect(body).toMatchObject({ ok: true, data: [expect.objectContaining({ kind: "sku", id: skuId })] });
+          expect(body.data).toHaveLength(1);
+          expect(skuReads).toHaveLength(2);
+        }
+      }
+    } finally {
+      fetch.mockRestore();
+    }
   });
   it("refuses a customer role", async () => {
     const u = await makeCustomerUser(customerId);

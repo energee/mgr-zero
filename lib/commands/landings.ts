@@ -74,30 +74,20 @@ defineQuery({
       ]);
       return { taproomStock: labeledTaproomStock(stock, skuNames, locationNames) };
     }
-    const [fgShortages, pars, onHand, openTaps, openOccupancies, materialShortages, kegs] = await Promise.all([
+    const [fgShortages, aggregates, openTaps, openOccupancies, materialShortages] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
-      // Paged past PostgREST's 1000-row cap (#475): a missing on-hand row reads as 0.
-      completeRows("Taproom pars", start => ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty", { count: "exact" }).eq("brewery_id", b)
-        .order("location_id").order("sku_id").range(start, start + PAGE_SIZE - 1)),
-      completeRows("On-hand stock", start => ctx.db.from("on_hand").select("location_id, sku_id, qty", { count: "exact" }).eq("brewery_id", b)
-        .order("location_id").order("sku_id").range(start, start + PAGE_SIZE - 1)),
+      unwrap(ctx.db.rpc("get_beer_overview_aggregates", { p_brewery: b }).single()),
       count(ctx.db.from("tap_intervals").select("id", { count: "exact", head: true }).eq("brewery_id", b).is("closed_at", null)),
       count(ctx.db.from("occupancy_volumes").select("occupancy_id", { count: "exact", head: true }).eq("brewery_id", b).is("ended_at", null)),
       count(ctx.db.from("material_requirements").select("material_id", { count: "exact", head: true }).eq("brewery_id", b).gt("short", 0)),
-      completeRows("Kegs out", start => ctx.db.from("keg_customer_balances").select("qty", { count: "exact" }).eq("brewery_id", b)
-        .order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
     ]);
-    // ponytail: taproom_pars and on_hand are joined here rather than in SQL; a
-    // view returning below-par and kegs-out as two scalars is the upgrade path
-    // if a brewery's location × SKU grid outgrows one page
-    const have = new Map((onHand ?? []).map((r) => [`${r.location_id}:${r.sku_id}`, Number(r.qty)]));
     return {
       fgShortages,
-      taproomBelowPar: (pars ?? []).filter((p) => (have.get(`${p.location_id}:${p.sku_id}`) ?? 0) < Number(p.par_qty)).length,
+      taproomBelowPar: Number(aggregates!.taproom_below_par),
       openTaps,
       openOccupancies,
       materialShortages,
-      kegsOut: (kegs ?? []).reduce((n, k) => n + Number(k.qty), 0),
+      kegsOut: Number(aggregates!.kegs_out),
     };
   },
 });
