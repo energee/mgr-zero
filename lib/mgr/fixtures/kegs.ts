@@ -31,7 +31,7 @@ export const kegBalanceRidgeline: KegBalanceSnapshot = {
   rows: [
     { key: "half", title: "Owned ½ bbl", detail: "34 out · $30 deposit each", trailing: "$1,020" },
     { key: "sixth", title: "Owned ⅙ bbl", detail: "4 out · 3 on deposit", trailing: "$90", warning: true },
-    { key: "over", title: "Over 90 days", detail: "9 kegs · oldest shipped 5/12/2026", trailing: "", verb: "Review history", warning: true },
+    { key: "over", title: "Over 90 days", detail: "9 kegs · oldest shipped May 12, 2026", trailing: "", verb: "Review history", warning: true },
   ],
 };
 
@@ -41,11 +41,11 @@ export const kegHistoryLedger: KegHistorySnapshot = {
   customer: "all",
   customerOptions: [{ value: "all", label: "All customers" }, { value: "ridgeline", label: "Ridgeline Tap Room" }, { value: "als", label: "Al’s Bar" }],
   rows: [
-    { key: "r1", title: "Returned · Ridgeline", detail: "9/03 · 4 × Owned ½ bbl", ok: true },
-    { key: "r2", title: "Lost · Al’s Bar", detail: "9/01 · 1 × Owned ½ bbl", warning: true },
-    { key: "r3", title: "Found · Al’s Bar", detail: "8/30 · 1 × Owned ½ bbl" },
-    { key: "r4", title: "Acquired", detail: "8/28 · 12 × Owned ⅙ bbl" },
-    { key: "r5", title: "Retired", detail: "8/22 · 2 × Owned ½ bbl" },
+    { key: "r1", title: "Returned · Ridgeline", detail: "Sep 3, 2026 · 4 × Owned ½ bbl", ok: true },
+    { key: "r2", title: "Lost · Al’s Bar", detail: "Sep 1, 2026 · 1 × Owned ½ bbl", warning: true },
+    { key: "r3", title: "Found · Al’s Bar", detail: "Aug 30, 2026 · 1 × Owned ½ bbl" },
+    { key: "r4", title: "Acquired", detail: "Aug 28, 2026 · 12 × Owned ⅙ bbl" },
+    { key: "r5", title: "Retired", detail: "Aug 22, 2026 · 2 × Owned ½ bbl" },
   ],
 };
 

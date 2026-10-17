@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
@@ -24,7 +25,7 @@ function verb(po: Po): [string, "info" | "attention" | "success"] {
 }
 const status = (po: Po) => {
   if (po.status === "partially_received") return `partially received · ${po.lines_open} ${po.lines_open === 1 ? "line" : "lines"} still due`;
-  if (po.status === "sent") return `sent${po.ordered_on ? ` ${po.ordered_on}` : ""}${po.expected_on ? ` · expected ${po.expected_on}` : ""}`;
+  if (po.status === "sent") return `sent${po.ordered_on ? ` ${formatDate(po.ordered_on)}` : ""}${po.expected_on ? ` · expected ${formatDate(po.expected_on)}` : ""}`;
   return po.status;
 };
 

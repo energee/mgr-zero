@@ -441,6 +441,7 @@ it("receipt history uses frozen units and names and exposes explicit revision li
   };
   const model = toPostedReceiptViewProps(snapshot, "old", "/purchase-orders/po")!;
   expect(model.tape[0][0]).toBe("+15 lb Original malt · receipt");
-  expect(model.tape[0][1]).toContain("MALT-A");
+  expect(model.tape[0][1]).toContain("MALT-A · best by Jan 1, 2027");
+  expect(model.info).toMatch(/^Received Sep 20, 2026\./);
   expect(model.info).toContain("superseded");
 });

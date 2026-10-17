@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { PackagingMaterialHistory, PackagingMaterialCorrection } from "./packaging-materials";
 import { E } from "@/components/mgr/e";
+import { formatDate } from "@/lib/date-format";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 
 export type { RunClosedViewModel };
@@ -19,8 +20,8 @@ export function RunClosedView({
       {model.bblDrawn !== undefined ? E.fld("Barrels drawn", model.bblDrawn === null ? "Not recorded" : model.bblDrawn) : null}
       {model.lot !== undefined ? <>
         {E.fld("Lot", model.lot?.code ?? "Not recorded")}
-        {model.lot ? E.fld("Packaged on", model.lot.packaged_on) : null}
-        {model.lot?.best_by ? E.fld("Best by", model.lot.best_by) : null}
+        {model.lot ? E.fld("Packaged on", formatDate(model.lot.packaged_on)) : null}
+        {model.lot?.best_by ? E.fld("Best by", formatDate(model.lot.best_by)) : null}
       </> : null}
       {model.outputs ? <>
         {E.ttl("Actual outputs")}

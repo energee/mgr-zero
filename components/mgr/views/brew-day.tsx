@@ -1,6 +1,7 @@
 "use client";
 import { cloneElement, Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
@@ -37,7 +38,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
     {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
-      {E.fld("Brewed on", model.brewedOn || "Unavailable")}
+      {E.fld("Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}
       {!(model.records?.length) && E.note("Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}
       {(model.records ?? []).map(record => <section key={record.id} className="flex flex-col gap-2 rounded border p-3">
         {E.ttl(`Turn ${record.turn} · ${record.corrects_id ? "Corrected brew record" : "Original brew record"}`)}

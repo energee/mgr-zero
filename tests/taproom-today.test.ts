@@ -12,7 +12,7 @@ it("shows permitted Taproom exits from observed facts without inventing due poli
     ["Variance · 4 weeks", "Review", `/taproom/variance?location=${location.id}&weeks=4`],
   ]);
   expect(rows[0].detail).toContain("no open kegs observed");
-  expect(rows[1].detail).toContain("last saved 2026-09-07");
+  expect(rows[1].detail).toContain("last saved Sep 7, 2026");
   expect(rows[2].detail).toContain("0 bbl expected minus actual");
   expect(JSON.stringify(rows)).not.toMatch(/overdue|shift/i);
 });

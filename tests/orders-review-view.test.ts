@@ -30,7 +30,7 @@ describe("Confirm order view loop", () => {
     const model = toConfirmOrderViewProps(orderSubmittedRidgeline);
     expect(model.title).toBe("ORD-0231");
     expect(model.where).toBe("Ridgeline Tap Room");
-    expect(model.state).toBe("Submitted · ships 2026-09-10");
+    expect(model.state).toBe("Submitted · ships Sep 10, 2026");
     expect(model.fulfillmentSource).toBe("Warehouse");
     expect(model.lines[1]?.tone).toBe("w");
     expect(model.oversellNotes[0]).toMatch(/Pils · 16 oz case/);
@@ -107,7 +107,7 @@ describe("Confirm order view loop", () => {
   });
 
   it("the inventory drawing still shows the two-tap confirm verbs", () => {
-    expect(html("Confirm order")).toMatch(/Submitted · ships 2026-09-10/);
+    expect(html("Confirm order")).toMatch(/Submitted · ships Sep 10, 2026/);
     expect(html("Confirm order")).toMatch(/>Confirm order</);
     expect(html("Confirm order")).not.toMatch(/Next: confirm/);
   });

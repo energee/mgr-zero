@@ -23,6 +23,7 @@ import { toBrandViewProps } from "../lib/mgr/brand-view";
 import { colaChoice, colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
 import { toLotTraceViewProps, type LotTraceSnapshot } from "../lib/mgr/lot-trace-view";
+import { DEMO_TIME_ZONE } from "../lib/mgr/fixtures/settings";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
@@ -55,7 +56,7 @@ describe("Licenses", () => {
     const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicensesView);
     expect(body.props.model).toEqual(toLicensesViewProps(licensesDemo));
-    expect(toLicensesViewProps(licensesDemo).licenses[0]).toEqual({ key: "pa", title: "PA brewery", detail: "G-21884 · expires 2027-06-30", verb: "Edit" });
+    expect(toLicensesViewProps(licensesDemo).licenses[0]).toEqual({ key: "pa", title: "PA brewery", detail: "G-21884 · expires Jun 30, 2027", verb: "Edit" });
     const html = htmlOf(screen("Licenses").body);
     expect(html).not.toMatch(/tablist/);
     expect(html).not.toMatch(/Hazy IPA|COLA|registration/);
@@ -114,6 +115,12 @@ describe("registry sheets", () => {
     expect(cola.title).toBe("COLA TTB ID 25318001000034");
     expect(cola.detail).toMatch(/^approved |^approval date unknown/);
     expect(cola.detail).not.toMatch(/expires/);
+  });
+
+  it("dates brand approvals and registrations in the one date format (#991)", () => {
+    const rows = toBrandViewProps(brandHazy).compliance;
+    expect(rows.find((row) => row.key === "cola")?.detail).toBe("approved Jan 15, 2026 · serial 260135");
+    expect(rows.find((row) => row.key === "oh")?.detail).toBe("OH-88214 · expires Dec 31, 2026");
   });
 
   it("states a known brand on a registration instead of picking one", () => {
@@ -204,9 +211,9 @@ describe("registry sheets", () => {
 
 describe("Lot trace", () => {
   it("renders blend members and stored transfer facts without proportional attribution", () => {
-    const model = toLotTraceViewProps(lotTraceHazy);
+    const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
     expect(model.memberBatches.map(row => row.title)).toEqual(["Batch 40", "Batch 41"]);
-    expect(model.sourceTransfers).toEqual([{ key: "blend", title: "FV-2 to FV-3", detail: "8/30", trailing: "10.00 bbl transferred" }]);
+    expect(model.sourceTransfers).toEqual([{ key: "blend", title: "FV-2 to FV-3", detail: "Aug 30, 2026", trailing: "10.00 bbl transferred" }]);
     const html = htmlOf(createElement(LotTraceView, { model }));
     expect(html).toMatch(/Member batches/);
     expect(html).toMatch(/Recorded source transfers/);
@@ -217,7 +224,7 @@ describe("Lot trace", () => {
   it("the Lot trace inventory record is LotTraceView", () => {
     const body = screen("Lot trace").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LotTraceView);
-    expect(body.props.model).toEqual(toLotTraceViewProps(lotTraceHazy));
+    expect(body.props.model).toEqual(toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE));
   });
 
   it("the live lot page mounts LotTraceView", () => {
@@ -229,7 +236,7 @@ describe("Lot trace", () => {
 
   it("lets the live page suppress the inventory tape", () => {
     const html = htmlOf(createElement(LotTraceView, {
-      model: toLotTraceViewProps(lotTraceHazy),
+      model: toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE),
       tape: null,
       movements: createElement("p", null, "Live movements"),
     }));
@@ -241,7 +248,7 @@ describe("Lot trace", () => {
     const model = toLotTraceViewProps({
       ...lotTraceHazy,
       recipients: [{ id: "order", order_no: 7, customers: { id: "customer", name: "Buyer" }, ship_tos: null, shipments: [{ id: "shipment", carrier: null, tracking: null, invoices: [{ id: "invoice", invoice_no: 9 }] }] }],
-    });
+    }, DEMO_TIME_ZONE);
     const html = htmlOf(createElement(LotTraceView, { model, tape: null, balances: null, recipients: null, movements: null }));
     expect(html).not.toMatch(/href="\/(orders|customers|invoices)/);
     expect(html).not.toMatch(/Recorded balances by SKU and bin[\s\S]*118 units/);
@@ -250,7 +257,7 @@ describe("Lot trace", () => {
 
   it("names a recipient ship-to's country and never prints a missing part as null", () => {
     const recipient = (ship_tos: LotTraceSnapshot["recipients"][number]["ship_tos"]) => ({ id: "order", order_no: 7, customers: null, ship_tos, shipments: [] });
-    const shipTo = (s: LotTraceSnapshot["recipients"][number]["ship_tos"]) => toLotTraceViewProps({ ...lotTraceHazy, recipients: [recipient(s)] }).recipients?.[0]?.shipTo;
+    const shipTo = (s: LotTraceSnapshot["recipients"][number]["ship_tos"]) => toLotTraceViewProps({ ...lotTraceHazy, recipients: [recipient(s)] }, DEMO_TIME_ZONE).recipients?.[0]?.shipTo;
     expect(shipTo({ label: "main", country: "JP", address1: null, city: null, state: null, zip: null })).toBe("main · Japan");
     expect(shipTo({ label: "main", country: "US", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" })).toBe("main · 1 Sample St · Sample, PA 19100");
   });
@@ -259,38 +266,49 @@ describe("Lot trace", () => {
     const model = toLotTraceViewProps({
       ...lotTraceHazy,
       movements: [{ ...lotTraceHazy.movements[1], id: "return", type: "return_in", bin: "Returns", bbl: 0.13, ref: "credit", source_movement_id: "shipped" }],
-    }, "/compliance");
+    }, DEMO_TIME_ZONE, "/compliance");
     const html = htmlOf(createElement(LotTraceView, { model, tape: null }));
-    expect(html).toMatch(/Returns · 9\/2/);
+    expect(html).toMatch(/Returns · Sep 2, 2026/);
     expect(html).toMatch(/0\.13 bbl recorded/);
     expect(html).toMatch(/href="#movement-shipped"/);
     expect(html).toMatch(/href="\/invoices\/credit"/);
   });
 
   it("formats every date as a short calendar day and owns every movement SKU", () => {
-    const model = toLotTraceViewProps(lotTraceHazy);
-    expect(model.skuDetail).toBe("run 28 · packaged 8/31 · best by 2/27");
-    expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed 8/10");
+    const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
+    expect(model.skuDetail).toBe("run 28 · packaged Aug 31, 2026 · best by Feb 27, 2027");
+    expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed Aug 10, 2026");
     expect(model.tape).toEqual([
-      { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
-      { key: "sample", label: "−2 · Sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
+      { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "Aug 31, 2026" },
+      { key: "sample", label: "−2 · Sample · Hazy IPA · 16 oz case · Warehouse", when: "Sep 2, 2026" },
     ]);
     expect(model.movements?.map(({ title, detail }) => ({ title, detail }))).toEqual([
-      { title: "+120 · Production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
-      { title: "-2 · Sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
+      { title: "+120 · Production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · Aug 31, 2026" },
+      { title: "-2 · Sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · Sep 2, 2026" },
     ]);
     expect(model.balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
     expect(toLotTraceViewProps({
       ...lotTraceHazy,
       balances: [{ ...lotTraceHazy.balances[0], sku: "16 oz case" }],
-    }).balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
+    }, DEMO_TIME_ZONE).balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
+  });
+
+  it("dates a timestamp by the brewery's day, not its UTC prefix (#991)", () => {
+    const model = toLotTraceViewProps({
+      ...lotTraceHazy,
+      transfers: [{ ...lotTraceHazy.transfers[0], at: "2026-08-31T02:00:00Z" }],
+      movements: [{ ...lotTraceHazy.movements[0], created_at: "2026-09-01T03:00:00Z" }],
+    }, DEMO_TIME_ZONE);
+    expect(model.sourceTransfers[0].detail).toBe("Aug 30, 2026");
+    expect(model.tape[0].when).toBe("Aug 31, 2026");
+    expect(JSON.stringify(model)).not.toMatch(/\b\d{1,2}\/\d{1,2}\b/);
   });
 
   it("does not repeat a brand-owned SKU name and keeps the empty-recipient state", () => {
     const model = toLotTraceViewProps({
       ...lotTraceHazy,
       movements: [{ ...lotTraceHazy.movements[0], sku: "Hazy IPA · 16 oz case" }],
-    }, "/compliance");
+    }, DEMO_TIME_ZONE, "/compliance");
     const html = htmlOf(createElement(LotTraceView, { model, tape: null }));
     expect(html).toMatch(/Hazy IPA · 16 oz case/);
     expect(html).not.toMatch(/Hazy IPA · Hazy IPA/);
@@ -302,18 +320,24 @@ describe("Lot trace", () => {
 describe("Material lot trace (#817)", () => {
   it("shows current vessel/status for unpackaged batch use", () => {
     const snapshot = { ...materialLotTraceCitra, batches: materialLotTraceCitra.batches.map(batch => ({ ...batch, in_vessel: "FV-RECALL" })) };
-    expect(htmlOf(createElement(MaterialLotTraceView, { model: toMaterialLotTraceViewProps(snapshot) }))).toContain("FV-RECALL");
+    expect(htmlOf(createElement(MaterialLotTraceView, { model: toMaterialLotTraceViewProps(snapshot, DEMO_TIME_ZONE) }))).toContain("FV-RECALL");
+  });
+  it("prints received, used and packaged days in the one date format (#991)", () => {
+    const model = toMaterialLotTraceViewProps({ ...materialLotTraceCitra, used: [{ ...materialLotTraceCitra.used[0], at: "2026-08-10T02:00:00Z" }] }, DEMO_TIME_ZONE);
+    expect(model.detail).toBe("Citra hops · Fictional Hop Supply · received Aug 1, 2026");
+    expect(model.uses[0].detail).toBe("4 lb · boil · Aug 9, 2026 · No current vessel");
+    expect(model.lots[0].detail).toBe("packaged Aug 31, 2026");
   });
   it("does not offer an Open action for untracked ingredient facts", () => {
     const snapshot = { ...lotTraceHazy, ingredients: [{ ...lotTraceHazy.ingredients[0], lot_id: null, code: null }] };
-    const html = htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps(snapshot) }));
+    const html = htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps(snapshot, DEMO_TIME_ZONE) }));
     const section = html.split("Ingredients")[1].split("Member batches")[0];
     expect(section).toContain("Untracked");
     expect(section).not.toContain("data-tap");
   });
 
   it("inventory and live mount the same view and preserve recorded use and recipient data", () => {
-    const model = toMaterialLotTraceViewProps(materialLotTraceCitra);
+    const model = toMaterialLotTraceViewProps(materialLotTraceCitra, DEMO_TIME_ZONE);
     const record = screen("Material lot trace").body as { type: unknown; props: { model: unknown } };
     expect(record.type).toBe(MaterialLotTraceView);
     expect(record.props.model).toEqual(model);
@@ -323,13 +347,13 @@ describe("Material lot trace (#817)", () => {
     expect(html).toContain("B-0041");
     expect(html).toContain("Fictional Corner Bar");
     expect(model.lots[0].href).toBeUndefined();
-    expect(toMaterialLotTraceViewProps(materialLotTraceCitra, "/compliance").lots[0].href).toBe("/compliance/lots/finished");
+    expect(toMaterialLotTraceViewProps(materialLotTraceCitra, DEMO_TIME_ZONE, "/compliance").lots[0].href).toBe("/compliance/lots/finished");
     expect(src("app/(app)/compliance/material-lots/[id]/page.tsx")).toMatch(/<MaterialLotTraceView\b/);
   });
   it("finished-lot ingredient links are explicit live destinations and inert fixture links", () => {
-    const fixture = toLotTraceViewProps(lotTraceHazy);
+    const fixture = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
     expect(fixture.ingredients[0].href).toBeUndefined();
-    expect(toLotTraceViewProps(lotTraceHazy, "/compliance").ingredients[0].href).toBe("/compliance/material-lots/h77");
+    expect(toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE, "/compliance").ingredients[0].href).toBe("/compliance/material-lots/h77");
     expect(screen("Lot trace").to).toMatchObject({ "Citra hops": "Material lot trace" });
   });
 });

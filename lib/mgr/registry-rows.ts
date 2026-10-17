@@ -1,6 +1,7 @@
 // lib/mgr/registry-rows.ts — the one row shape and date rule shared by the
 // compliance lists: a brand's approvals and registrations (brand-view.ts)
 // and the brewery's licenses (licenses-view.ts).
+import { formatDate } from "@/lib/date-format";
 export type RegistryRowView = {
   key: string;
   title: string;
@@ -9,4 +10,4 @@ export type RegistryRowView = {
   warning?: boolean;
 };
 
-export const expires = (date: string | null) => date ? ` · expires ${date}` : "";
+export const expires = (date: string | null) => date ? ` · expires ${formatDate(date)}` : "";
