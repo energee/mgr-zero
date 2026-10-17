@@ -25,7 +25,7 @@ export function ClosePackagingRunView({
     {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
     {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
     {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
-    {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs)}</> : null}
+    {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs, ["l", "r", "r"])}</> : null}
   </>;
   return (
     <>

@@ -54,7 +54,7 @@ export function PortalInvoiceView({
             {model.due ? E.row("Due", model.due) : null}
           </>
         ) : null}
-      {E.tbl(["Item", "Qty", "Amount"], model.lines.map((l) => [l.item, l.qty, l.amount]))}
+      {E.tbl(["Item", "Qty", "Amount"], model.lines.map((l) => [l.item, l.qty, l.amount]), ["l", "r", "r"])}
       {kind === "pay" ? (
         <>
           {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}

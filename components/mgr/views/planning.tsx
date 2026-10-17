@@ -5,7 +5,7 @@ import type { PlanningViewModel } from "@/lib/mgr/planning-view";
 export function PlanningView({ model, footer }: { model: PlanningViewModel; footer?: ReactNode }) {
   return <>
     {E.back("More", "Planning")}
-    {model.horizon ? E.tbl(["week", "demand", "supply", "gap"], model.horizon) : null}
+    {model.horizon ? E.tbl(["week", "demand", "supply", "gap"], model.horizon, ["l", "r", "r", "r"]) : null}
     {model.reviews?.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, E.act("Review"), row.warning ? "w" : "")}</Fragment>)}
     {model.requirements.length === 0 && !model.horizon ? E.blank("Nothing short: every committed batch and packaging run is covered by on hand and open orders") : null}
     {model.requirements.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, row.quantity, row.warning ? "w" : "")}</Fragment>)}
