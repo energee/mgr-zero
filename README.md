@@ -125,6 +125,45 @@ migration; it resets automatically when the migrations change. The app stack (`b
 survives a test run and stale test rows (see `chat-jobs`) cannot pile up there.
 Without `.env.test.local`, local vitest refuses to run. CI keeps its separately provisioned disposable configuration.
 
+Every database-project run takes the shared `/tmp/mgr-test-db.lock`, then checks
+the newest local migration against SQL history. Local runs also compare the existing migration/config
+fingerprint and a per-reset identity through SQL and REST, before and after the suite.
+Reset readiness executes the newly installed identity RPC; an old readable table is
+not proof of a fresh PostgREST cache. These harness-only functions are installed only
+on the disposable local stack, never by an application migration or on hosted.
+Their reserved `mgr_test_identity_<nonce>` signatures are removed structurally by
+`types:database`, so a local readiness probe never enters the committed app types.
+The diagnostic names expected/actual identities and the pinned DB/API endpoints.
+The exhaustive service-RPC RLS matrix admits only the exact verified reset probe,
+checks its signature and grants, and still exercises anonymous/authenticated denial
+plus a service-role identity positive control. Unexpected RPCs remain failures.
+
+The explicit pure project in `vitest.config.mts` keeps the existing screen-only
+gates and pure harness regressions independent of the running database. Vitest
+routes the actual selected files: any mixed selection or unlisted/DB file still
+initializes the database project's lock and identity guard. There is no user-set
+flag to skip that protection.
+
+For an uninterrupted reset plus proof, keep the same exclusive lock throughout:
+
+```bash
+perl scripts/test-db-lock.pl ex bash -c 'MGR_TEST_DB_RESET=1 bash scripts/test-db.sh --locked-reset && node_modules/.bin/vitest run'
+```
+
+Use the direct Vitest executable inside this outer lock. Bunx drops the inherited
+descriptor on the tested local runtime; that launch is rejected, not silently
+accepted with a different lock. Normal standalone `bun run test` still takes its
+own shared lock.
+
+The child inherits and validates the actual lock descriptor; do **not** override
+`MGR_TEST_DB_LOCK` to avoid a recursive lock. An override gives up protection from
+other worktrees. `--locked-reset` now refuses an unprotected invocation. Startup,
+reset and env publication all hold the exclusive lock; each checkout replaces its
+own env symlink instead of rewriting another worktree's configuration. Direct
+`supabase db reset` / stop/start bypass this cooperative lock and must not run while
+another proof owns the stack. Parallel full proofs need separately configured
+isolated stacks (for example 5436x), not alternate lock files on the same 5435x DB.
+
 ### Database types
 
 Supabase clients use `lib/supabase/database.generated.ts`, generated from the

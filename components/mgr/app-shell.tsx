@@ -47,7 +47,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
   );
   return (
     <TooltipProvider>
-    <SidebarProvider defaultOpen={sidebarOpen}>
+    <SidebarProvider defaultOpen={sidebarOpen} className="h-dvh min-h-0 print:h-auto">
       <Sidebar collapsible="icon">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
@@ -84,16 +84,17 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="min-h-svh min-w-0">
-        <header className="flex h-12 items-center justify-between gap-2 border-b px-2">
+      <SidebarInset className="h-full min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-2">
           <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
             <SidebarTrigger className="hidden md:inline-flex" />
             <span className="md:hidden">{brandMark}</span>
           </span>
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
-        {/* SidebarInset is already the <main> landmark; this is the content column. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:px-8 md:py-6">{children}</div>
+        {/* Keep page scrolling above the reserved composer and Tabs, rather than behind their portals.
+            SidebarInset is already the <main> landmark. */}
+        <div data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:px-8 md:py-6 print:overflow-visible">{children}</div>
         {composer && <div className="h-11 shrink-0">{composer}</div>}
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
@@ -107,7 +108,7 @@ export function TabBar({ items, active, className }: { items: readonly NavItem[]
   return (
     <nav
       aria-label="Tabs"
-      className={cn("relative z-40 grid border-t bg-background pb-[env(safe-area-inset-bottom)] text-xs", className)}
+      className={cn("relative z-40 grid shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)] text-xs", className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((t) => (
