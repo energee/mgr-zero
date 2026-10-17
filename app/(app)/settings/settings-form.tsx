@@ -7,9 +7,10 @@ import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, brewery
 
 export type { BrewerySettings } from "@/lib/mgr/settings-view";
 
-export function SettingsForm({ brewery }: { brewery: BrewerySettings }) {
+export function SettingsForm({ brewery, hasFiledReports = false }: { brewery: BrewerySettings; hasFiledReports?: boolean }) {
   const action = useCommandAction();
   return <BrewerySettingsFormView
+    basisLocked={hasFiledReports}
     initial={toBrewerySettingsValues(brewery)}
     busy={action.busy} error={action.error}
     onSave={(v) => {

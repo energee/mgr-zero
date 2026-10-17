@@ -60,6 +60,26 @@ describe("packaging operating defaults", () => {
     expect(action.run).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps packaging defaults editable while the filed reporting basis stays locked in both paths", () => {
+    action.run.mockReset();
+    action.run.mockImplementation((_name, _input, saved) => saved?.());
+    const filedBrewery = { ...brewery, books_opened_on: "2026-10-01" };
+    const live = SettingsForm({ brewery: filedBrewery, hasFiledReports: true });
+    const inventory = SettingsView({ model: { ...settingsDemo, booksOpenedOn: filedBrewery.books_opened_on, hasFiledReports: true } });
+    const fixtureForm = elements(inventory).find(node => node.type === BrewerySettingsFormView)!;
+    expect(live.props.basisLocked).toBe(true);
+    expect(fixtureForm.props.basisLocked).toBe(true);
+    expect(fixtureForm.props.initial).toEqual(live.props.initial);
+    const html = renderToStaticMarkup(inventory);
+    expect(html).toContain('aria-label="Days to package"');
+    expect(html).toContain("Filed reporting basis");
+    expect(html).toContain("Reporting basis history");
+    live.props.onSave({ ...live.props.initial, daysToPackage: "28" });
+    expect(action.run).toHaveBeenNthCalledWith(1, "update_brewery", expect.any(Object), expect.any(Function));
+    expect(action.run).toHaveBeenNthCalledWith(2, "set_brewery_operating_defaults", { readingDueHours: 24, daysToPackage: 28 }, expect.any(Function));
+    expect(action.run).toHaveBeenCalledTimes(2);
+  });
+
   it("requires whole days from 1 through 120", () => {
     const values = toBrewerySettingsValues(brewery);
     expect(breweryOperatingDefaultsCommand({ ...values, daysToPackage: "120" })).toEqual({
