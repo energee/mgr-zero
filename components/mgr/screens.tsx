@@ -918,7 +918,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and state changes happen on their own surfaces]",
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"], ["loading", "inline status on first visit; cached rows remain during refresh"], ["error", "inline error and Try again; existing rows remain"]],
     spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use shared QueryFeedback: first-load text without skeletons, Last checked with Updating during refresh, and last-known data with connection or retry feedback. The visible list checks every five seconds and on tab return or reconnect; hidden and unmounted lists do not poll.",
-    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,
@@ -1188,14 +1188,14 @@ export const SCREENS: Screen[] = [
     writes: "create_order",
     states: [...permitted("sales or admin required"), ["pricing loading", "Loading customer-priced SKUs; no empty claim"], ["pricing offline", "Waiting for connection; resumes on reconnect"], ["pricing failed", "error and Try again; cached choices marked last-known", 1], ["pricing empty", "no active SKUs priced for this customer; check Price groups"], ["customer changed", "unavailable selections keep quantities and labels; replace or remove before saving", 1]],
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Last checked uses the oldest option-list check, Updating preserves inputs, and connection or retry feedback identifies last-known data. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft. Offline, error and empty states are supplied through the shared feedback contract rather than additional fixture frames. Customer pricing uses the same feedback below the PO field and inside Select SKU: initial loading, paused connection, failed read with Try again, and last-known cached choices stay distinct from a successful empty list. A customer change preserves quantities and selections; an unavailable SKU keeps its label and a visible warning until replaced or removed. Save draft cannot count or submit an unavailable selection.",
-    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5, slice: 1, tab: "Work", name: "New order pricing loading",
     job: "Wait for the customer's priced SKU choices", reads: "list_skus", writes: "create_order",
     states: [["pricing loading", "first read; Save draft waits"]],
     spec: "The first customer pricing read shows loading feedback, never an empty claim. Save draft waits for the choices.",
-    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [] }} skuOptionsReady={false} skuFeedback={<QueryFeedback loading="Loading customer-priced SKUs" />} disabled />,
+    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [] }} skuOptionsReady={false} skuFeedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} loading="Loading customer-priced SKUs" />} disabled />,
   },
   {
     step: 5, slice: 1, tab: "Work", name: "New order unavailable SKU",
