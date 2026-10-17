@@ -59,7 +59,7 @@ jobs:
           title="Dreaming stale: no dream on main for 3+ days"
           echo "title=$title" >> "$GITHUB_OUTPUT"
           echo "number=$(gh issue list --state open --search "in:title \"$title\"" --json number,title --jq "map(select(.title == \"$title\"))[0].number // empty")" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         if: steps.open.outputs.number == ''
         with:
           fetch-depth: 0

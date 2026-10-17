@@ -26,14 +26,14 @@ jobs:
       rebuilt: ${{ steps.prepare.outputs.rebuilt }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Mint MGR GitHub App identity
         id: mgr-app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.MGR_APP_ID }}
           private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
@@ -104,7 +104,7 @@ jobs:
       # that item out of TODO.md and onto PROGRESS.md's Done log here, as does an item whose linked
       # issue closed as completed, so the roadmap advances even when the model has nothing to dream
       # about. scripts/pr-directives.ts.
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: steps.window.outputs.new == 'true'
         with: { bun-version-file: ".bun-version" }
       - name: Move finished TODO items to Done
@@ -128,7 +128,7 @@ jobs:
 
       - name: Run dream
         if: steps.window.outputs.new == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -182,7 +182,7 @@ jobs:
 
       - name: Save dream bundle
         if: steps.validate.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dream-bundle
           if-no-files-found: error
@@ -199,7 +199,7 @@ jobs:
     steps:
       - name: Mint MGR GitHub App token
         id: mgr-app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.MGR_APP_ID }}
           private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
@@ -207,7 +207,7 @@ jobs:
           permission-pull-requests: write
           permission-issues: read
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
           fetch-depth: 0
@@ -215,7 +215,7 @@ jobs:
 
       - name: Restore dream bundle
         if: needs.maintain.outputs.changed == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dream-bundle
           path: ${{ runner.temp }}

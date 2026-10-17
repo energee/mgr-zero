@@ -58,7 +58,6 @@
     },
   },
   "trustedDependencies": [
-    "agent-browser",
     "esbuild",
     "unrs-resolver",
   ],

@@ -122,7 +122,10 @@ describe("dreaming workflow", () => {
   it("commits every dream commit, merges included, as the MGR GitHub App", () => {
     const workflow = read(".github/workflows/dreaming.yml");
 
-    expect(workflow.split("uses: actions/create-github-app-token@v2")).toHaveLength(3);
+    const jobs = load(workflow).jobs as Record<string, { steps: { uses?: string }[] }>;
+    const appTokenSteps = Object.values(jobs).flatMap((job) => job.steps)
+      .filter((step) => step.uses?.startsWith("actions/create-github-app-token@"));
+    expect(appTokenSteps).toHaveLength(2);
     expect(workflow).toContain("permission-metadata: read");
     expect(workflow).not.toContain("github-actions[bot]");
     expect(workflow).not.toContain("--reset-author");

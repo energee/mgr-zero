@@ -29,16 +29,27 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
+          persist-credentials: false
+
+      # The action accepts local marketplace paths, but not URL#commit refs.
+      # Pin the checkout instead; the selected plugin's sources are all local.
+      - name: Checkout reviewed plugin marketplace
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: anthropics/claude-code
+          ref: 03b5892ee77de289bcd5dfa39f541525ade74aff
+          path: .claude-review-marketplace
+          persist-credentials: false
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugin_marketplaces: './.claude-review-marketplace'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # Skill: the code-review plugin invokes sub-skills; without it every
