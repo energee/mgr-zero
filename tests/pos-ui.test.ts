@@ -108,7 +108,7 @@ describe("POS UI truth", () => {
   });
 
   it("gives Warehouse a direct route to POS mapping and retained sales", () => {
-    expect(navFor(shippedNav(STAFF_NAV), "warehouse").find(item => item.label === "More")?.children)
+    expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find(item => item.label === "More")?.children)
       .toEqual(expect.arrayContaining([expect.objectContaining({ label: "POS mapping", href: "/settings/pos/mapping" })]));
   });
 

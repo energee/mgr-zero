@@ -80,7 +80,7 @@ describe("AI composer", () => {
 
   it("offers the browser's full timezone index in a searchable control", () => {
     const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, {
-      initial: { name: "Demo", timezone: "America/New_York", ttb: "", pa: "", phone: "", hours: "24", booksOpenedOn: "", oneWayKegFee: "0.00" },
+      initial: { name: "Demo", timezone: "America/New_York", ttb: "", pa: "", phone: "", hours: "24", daysToPackage: "14", booksOpenedOn: "", oneWayKegFee: "0.00" },
     }));
     expect(Intl.supportedValuesOf("timeZone").length).toBeGreaterThan(400);
     expect(html).toContain('placeholder="Search timezones…"');
@@ -132,7 +132,7 @@ describe("AI composer", () => {
   });
 
   it("keeps chat and history staff-only", () => {
-    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, role: "customer" } as Parameters<typeof canRun>[0];
+    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, roles: ["customer"] } as Parameters<typeof canRun>[0];
     for (const name of ["create_chat_conversation", "append_chat_message", "list_chat_conversations", "get_chat_history"]) expect(canRun(customer, name)).toBe(false);
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });

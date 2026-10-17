@@ -12,6 +12,8 @@ import { LinkTabs } from "@/components/mgr/work-tabs";
 import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
 import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
+import type { StaffRole } from "@/lib/commands/registry";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
 export function WeeklyCountPrintAction({ busy = false, empty = false, error, onPrint }: { busy?: boolean; empty?: boolean; error?: string | null; onPrint?: () => void }) {
@@ -20,7 +22,7 @@ export function WeeklyCountPrintAction({ busy = false, empty = false, error, onP
 
 export type WeeklyCountViewModel = {
   backHref?: string; boardHref?: string; varianceHref?: string; locations: [string, string?][]; location: string;
-  draft?: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>;
+  draft?: TaproomCountState; roles: readonly StaffRole[]; lotLabels: Record<string, string>;
   receipt?: { date: string; recorded: string; priorHref?: string; correction?: string; correctionForm?: TaproomCorrectionState; canCorrect: boolean; lines: { key: string; name: string; detail: string; result: string }[] };
   history: { key: string; date: string; detail: string; href?: string }[];
   /** breweries.timezone: the server renders these client views first, so both sides format in it (#442). */
@@ -35,14 +37,14 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
       {model.locations.length > 0 && (model.locations.some(([, href]) => href) ? <LinkTabs items={model.locations.map(([name, href]) => [name, href ?? "#"])} current={model.location} className="w-full" /> : E.tabs(model.locations.map(([name]) => name), model.locations.findIndex(([name]) => name === model.location), "w-full"))}
     </div>
     {model.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
-      {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} role={model.role} lotLabels={model.lotLabels} timeZone={model.timeZone} />}
+      {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} roles={model.roles} lotLabels={model.lotLabels} timeZone={model.timeZone} />}
       <div className="contents print:hidden">
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
           {E.note(<>{model.receipt.recorded}{model.receipt.priorHref && <> · <Link href={model.receipt.priorHref}>prior count</Link></>}</>)}
           {model.receipt.correction && E.note(model.receipt.correction)}
           {model.receipt.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail, <span className="break-all text-xs">{line.result}</span>)}</div>)}
-          {model.role === "admin" && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}
+          {hasAnyRole(model.roles, ["admin"]) && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}
         </section>}
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
@@ -53,8 +55,8 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
   </>;
 }
 
-export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, timeZone, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onDisposition, onSubmit }: {
-  state: TaproomCountState; role: "admin" | "warehouse" | "taproom"; lotLabels: Record<string, string>; timeZone: string; priorHref?: string; print?: ReactNode;
+export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels, timeZone, priorHref, print, projectionBusy = false, projectionError, onRefreshExpected, onRefreshSnapshot, onQuantity, onDisposition, onSubmit }: {
+  state: TaproomCountState; roles: readonly StaffRole[]; lotLabels: Record<string, string>; timeZone: string; priorHref?: string; print?: ReactNode;
   projectionBusy?: boolean; projectionError?: string | null; onRefreshExpected?: () => void; onRefreshSnapshot?: () => void;
   onDisposition?: (key: string, value: "sold" | "destroyed") => void;
   onQuantity?: (key: string, value: string) => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
@@ -90,11 +92,11 @@ export function WeeklyCountDraftView({ state: controlledState, role, lotLabels, 
       {print !== undefined ? print : <WeeklyCountPrintAction />}
       <div className="contents print:hidden">
       {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
-      {state.draft.lines.some(line => line.lotId !== null) && role === "taproom" && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
+      {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
       {state.draft.lines.length === 0 && E.blank("No stock buckets are recorded at this taproom. Saving records an empty observation.")}
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
-          const lot = line.lotId ? (role === "taproom" ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
+          const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
           return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}{isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}</div>;
         })}
       </fieldset>

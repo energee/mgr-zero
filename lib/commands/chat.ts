@@ -3,8 +3,9 @@
 // (personal preferences/quiet hours, brewery quiet hours, operations channel).
 // None of these touch MGR due state. Every write is one Postgres RPC.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError } from "./registry";
+import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError, type StaffRole } from "./registry";
 import { sha256 } from "@/lib/hash";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -16,7 +17,7 @@ defineCommand({
   input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
-    if (ctx.role === "taproom" && i.quietHours !== undefined) throw new CommandError("permission denied", 403, "permission_denied");
+    if (onlyRoles(ctx.roles, ["taproom"]) && i.quietHours !== undefined) throw new CommandError("permission denied", 403, "permission_denied");
     await unwrap(ctx.db.rpc("set_notification_preference", {
       p_request_id: execution.requestId, p_set_quiet: i.quietHours !== undefined,
       p_brewery: ctx.breweryId, p_reason: i.reason, p_enabled: i.enabled,
@@ -46,7 +47,7 @@ defineCommand({
     if ("personalDestinationId" in i) return await unwrap(ctx.db.rpc("set_personal_notification_destination", {
       p_brewery: ctx.breweryId, p_reason: i.reason, p_personal_destination: i.personalDestinationId, p_request_id: execution.requestId,
     })) as { id: string };
-    if (ctx.role !== "admin") throw new CommandError("permission denied", 403, "permission_denied");
+    if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied", 403, "permission_denied");
     const { saveChatNotificationDestination } = await import("@/lib/chat/jobs");
     return saveChatNotificationDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
   },
@@ -114,7 +115,7 @@ export type ChatHealth = {
 };
 export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; enabled: boolean; personalDestinationId?: string | null }[]; destinations?: { id: string; external_destination_id: string }[]; quietStart: string | null; quietEnd: string | null; timezone: string; link: { id: string; external_user_id: string } | null };
 export type ChatLinkIntent = { brewery: string; mgrIdentity: string; slackIdentity: string; workspace: string; expiresAt: string };
-export type ChatLinkedPerson = { id: string; name: string; role: string; slackIdentity: string; linkedAt: string };
+export type ChatLinkedPerson = { id: string; name: string; roles: StaffRole[]; slackIdentity: string; linkedAt: string };
 
 defineQuery({ name: "get_chat_integration_health", description: "Read bounded, redacted Slack integration health for brewery admins",
   input: z.object({}), roles: ["admin"], handler: (ctx) => unwrap(ctx.db.rpc("get_chat_integration_health", { p_brewery: ctx.breweryId })) as Promise<ChatHealth>,

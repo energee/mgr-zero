@@ -7,6 +7,7 @@ import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, t
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
@@ -355,7 +356,7 @@ defineQuery({
 
 // Both invoice reads use the same current connection and exact successful push provenance.
 async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id: string })[]) {
-  if (!invoices.length || (ctx.role !== "admin" && ctx.role !== "sales")) return new Map(invoices.map(invoice => [invoice.id, null]));
+  if (!invoices.length || !hasAnyRole(ctx.roles, ["admin", "sales"])) return new Map(invoices.map(invoice => [invoice.id, null]));
   const connection = await runCommand("get_qbo_connection", {}, ctx) as QboStaffConnection;
   const pushes = connection.connected && connection.connectionId && connection.realmId
     ? await completeRows("Invoice provider identities", start => ctx.db.from("qbo_pushes")
@@ -364,7 +365,7 @@ async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id:
       .eq("status", "pushed").eq("entity_type", "Invoice").in("invoice_id", invoices.map(invoice => invoice.id))
       .order("id").range(start, start + PAGE_SIZE - 1)) as (QboPushedIdentity & { invoice_id: string })[] : [];
   const pushByEntity = new Map(pushes.map(push => [`${push.invoice_id}:${push.qbo_entity_id}`, push]));
-  return new Map(invoices.map(invoice => [invoice.id, qboStaffInvoiceLink(invoice, ctx.role, connection,
+  return new Map(invoices.map(invoice => [invoice.id, qboStaffInvoiceLink(invoice, ctx.roles, connection,
     pushByEntity.get(`${invoice.id}:${invoice.qbo_invoice_id}`))]));
 }
 

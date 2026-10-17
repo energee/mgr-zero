@@ -8,6 +8,8 @@ export type SkuViewModel = {
   formatOptions: string[];
   active: boolean;
   upc: string;
+  /** Percentage text for existing packaged SKUs; undefined on creation. Blank clears the share. */
+  batchSharePercent?: string;
   volumeInfo: string;
   showKegPool?: boolean;
   kegPool?: string;
@@ -25,6 +27,7 @@ export type SkuSnapshot = {
     active: boolean;
     format_id: string;
     keg_pool_id?: string | null;
+    batch_share?: number | string | null;
     formats: { name: string; package_type?: string | null } | null;
   };
   /** Packaged formats from list_formats for the Format pick. */
@@ -44,6 +47,7 @@ export function toSkuViewProps({ sku, formats, pools = [] }: SkuSnapshot): SkuVi
     formatOptions: formats.map((f) => f.name),
     active: sku?.active ?? true,
     upc: sku?.upc ?? "",
+    batchSharePercent: sku ? (sku.batch_share == null ? "" : String(Number((Number(sku.batch_share) * 100).toPrecision(15)))) : undefined,
     volumeInfo: VOLUME_INFO,
     showKegPool: (sku?.formats ?? selectedFormat)?.package_type === "keg",
     kegPool: sku?.keg_pool_id ?? "",
@@ -54,6 +58,16 @@ export function toSkuViewProps({ sku, formats, pools = [] }: SkuSnapshot): SkuVi
 /** New SKU is one brand in one packaged format; pours are added on the price group (PourForm). */
 export function skuCreateCommand(fields: { brandId: string; formatId: string; name: string; upc: string; kegPoolId?: string | null }) {
   return { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined, kegPoolId: fields.kegPoolId }, valid: Boolean(fields.formatId) };
+}
+
+/** An edit saves one command. Creation deliberately leaves the optional share unset. */
+export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: string; batchSharePercent: string; kegPoolId?: string | null }) {
+  const batchShare = fields.batchSharePercent.trim() === "" ? null : Number(fields.batchSharePercent) / 100;
+  return {
+    name: "update_sku",
+    input: { skuId: fields.skuId, active: fields.active, upc: fields.upc, batchShare, ...(fields.kegPoolId === undefined ? {} : { kegPoolId: fields.kegPoolId }) },
+    valid: batchShare === null || (batchShare > 0 && batchShare <= 1),
+  };
 }
 
 export const pourSkuName = (name: string, ounces: string) => name.trim() || `${Number(ounces)} oz pour`;

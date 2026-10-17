@@ -16,7 +16,7 @@ export default async function WaterProfilesPage() {
   const profiles = (await runCommand("list_water_profiles", {}, await buildContext(brewery.id))) as WaterProfile[];
   return (
     <WaterProfilesView
-      model={toWaterProfilesViewProps({ profiles, back: waterProfilesBack(brewery.role) })}
+      model={toWaterProfilesViewProps({ profiles, back: waterProfilesBack(brewery.roles) })}
       createAction={<WaterProfileForm />}
       profileActions={Object.fromEntries(profiles.map((p) => [p.id, <WaterProfileForm key={JSON.stringify(p)} profile={p} />]))}
     />

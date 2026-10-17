@@ -46,8 +46,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
-  const canMove = brewery.role === "admin" || brewery.role === "warehouse";
-  const canAddSku = brewery.role === "admin" || brewery.role === "sales";
+  const canMove = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
+  const canAddSku = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const requestedQty = Number(params.qty);
   const handoffId = isUuid(params.movementHandoff) ? params.movementHandoff : undefined;
   const initial: Partial<MovementInput> | undefined = recordMovement === "1" ? {

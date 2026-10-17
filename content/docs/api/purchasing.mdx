@@ -18,6 +18,50 @@ least one receipt is closed short (`close_purchase_order_short`), which keeps
 the received stock and releases only the unreceived remainder. Each call is
 refused for the other case, and the actor and time are recorded with the reason.
 
+`get_material_requirements` returns one row per material. `required` includes
+firm demand and projected packaging; `projected` is the projected part in the
+material's base units. Order projection nets finished goods, open run outputs
+and projected batch packages against open order allocations. Standing
+allocations hold stock but never project alone. Order `needed_by` is the
+earliest open requested ship date, falling back to today. Batch projection
+uses each active SKU's default volume share and the brewery's days-to-package
+estimate. A non-cancelled run linked directly or through its source occupancy
+replaces the entire batch projection, even after the run closes. An unlinked
+tankless run cannot replace a particular batch. Projected shortfalls draft
+with the same vendor, lead-time and whole-purchase-unit rules as firm demand.
+
+`set_qbo_vendor_mapping` accepts the vendor's exact QuickBooks ID and
+`set_qbo_purchase_account` sets one expense or inventory asset account for all
+materials. Both require Admin and a connected company. A different company
+clears these mappings. There is no vendor-name matching or per-material account.
+
+Admin calls `post_receipt_bill` with a saved `receiptId`. It creates one Bill
+for that receipt revision chain, never a QuickBooks purchase order. Positive
+receipt lines use the frozen movement's base quantity times `unit_cost_cents`,
+rounded to cents per line. Missing vendor/account mappings or recorded costs
+block the first attempt before a provider request is reserved.
+
+The first call persists the exact payload, company, and provider request ID
+before its single POST. Success returns `{ receiptId, status: "pushed", remoteId }`.
+Every retry first reconciles by the frozen document number and request marker.
+An exact match records the existing Bill; an empty query replays the identical
+payload and provider request ID, using Intuit's documented idempotence guarantee.
+An ambiguous identity or unsuccessful lookup never authorizes a POST.
+A definite rejection records `push_failed`; after fixing mappings, explicitly
+send `newAttemptReason: "corrected"` with a new command request ID to freeze a
+new attempt. A pending uncertain request cannot use that option.
+Mapping changes cannot rewrite a reserved request.
+`get_purchase_order` includes each receipt's `qbo_bill_id`, `qbo_bill_request_id`,
+`qbo_bill_status`, `qbo_bill_error`, and canonical `qbo_bill_receipt_id`.
+Its `vendor` carries `qbo_vendor_id` and `qbo_realm_id`, so a caller can check
+the vendor mapping without listing every vendor.
+
+Correcting a receipt after an attempt preserves that payable identity and
+payload. Posted corrections must be adjusted in QuickBooks, not by another Bill
+or vendor credit. Bill payments are QuickBooks-only and are not included in
+`sync_qbo_payments`. Reconnecting another company cannot retarget a pending Bill; after a definitive
+rejection, `newAttemptReason: "corrected"` posts to the currently connected company.
+
 {/* ops:purchasing */}
 
 ## cancel_purchase_order [#cancel_purchase_order]
@@ -152,7 +196,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft
+Material gaps for Planning: required including projected order and batch packaging demand, projected portion, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and resolved vendor and contract; a null vendor or an out-of-reach buy-by cannot draft
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -264,6 +308,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_vendors_and_contracts", "input": {} }'
 ```
 
+## post_receipt_bill [#post_receipt_bill]
+
+`command` · admin
+
+Post one frozen Bill per receipt revision chain; an uncertain retry reconciles the original Bill without creating another; corrections and payments remain in QuickBooks
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `receiptId` | uuid | yes |
+| `newAttemptReason` | corrected | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "post_receipt_bill", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "receiptId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## receive_purchase_order [#receive_purchase_order]
 
 `command` · admin, warehouse
@@ -322,6 +384,41 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "send_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "sentVia": "mailto" } }'
+```
+
+## set_qbo_purchase_account [#set_qbo_purchase_account]
+
+`command` · admin
+
+Set the exact QuickBooks expense or inventory asset account ID used by all material receipt Bills
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `qboAccountId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_purchase_account", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qboAccountId": "string" } }'
+```
+
+## set_qbo_vendor_mapping [#set_qbo_vendor_mapping]
+
+`command` · admin
+
+Bind a vendor's exact QuickBooks ID to the connected company for receipt Bills
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `vendorId` | uuid | yes |
+| `qboVendorId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_vendor_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "qboVendorId": "string" } }'
 ```
 
 ## upsert_material [#upsert_material]

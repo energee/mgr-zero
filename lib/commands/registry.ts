@@ -2,16 +2,16 @@ import type { Database } from "@/lib/supabase/database";
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
 import { z, ZodType } from "zod";
-import { COUNTRY_CODES, US_STATE_CODES } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, STAFF_ROLES, US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 
-export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
-/** Every staff role: the `roles` of a read that all of staff may run. */
-export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer", "taproom"];
-export type PreTenantCtx = { db: SupabaseClient<Database>; userId: string; breweryId: null; role: null };
+export type StaffRole = (typeof STAFF_ROLES)[number];
+export { STAFF_ROLES } from "@/lib/mgr/enums";
+export type PreTenantCtx = { db: SupabaseClient<Database>; userId: string; breweryId: null; roles: [] };
 export type OperationCtx = Ctx | PreTenantCtx;
-export type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
+export type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; roles: (StaffRole | "customer")[]; customerId?: string };
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */
 export type OperationKind = "query" | "command";
@@ -209,7 +209,7 @@ type DefinitionBase<In> = {
   name: string;
   description?: string;
   input: ZodType<In>;
-  roles: StaffRole[] | "customer" | "any";
+  roles: readonly StaffRole[] | "customer" | "any";
   requiresConfirmation?: boolean;
   aiExposed?: boolean;
 };
@@ -365,7 +365,7 @@ function createExecution(): CommandExecution {
 }
 
 /**
- * Whether `ctx`'s role may run `name` at all — the same check runCommand makes,
+ * Whether `ctx`'s roles may run `name` at all — the same check runCommand makes,
  * for a handler that composes optional reads (the Work landing skips the areas
  * its caller may not open) instead of refusing outright. One rule, one place.
  */
@@ -374,7 +374,10 @@ export function canRun(ctx: OperationCtx, name: string): boolean {
   if (!def) return false;
   if (def.scope === "pretenant") return ctx.breweryId === null;
   if (ctx.breweryId === null) return false;
-  return def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
+  if (def.roles === "any") return true;
+  // A portal context is never a staff context, even if a malformed caller mixes roles.
+  if (ctx.roles.includes("customer")) return def.roles === "customer" && onlyRoles(ctx.roles, ["customer"]);
+  return Array.isArray(def.roles) && hasAnyRole(ctx.roles, def.roles);
 }
 
 /** Canonicalizes one candidate with its registered schema and preview hook without invoking its write handler. */
@@ -417,7 +420,7 @@ export function listTools(options: { aiOnly?: boolean; ctx?: OperationCtx } = {}
   return [...registry.values()].filter((d) => {
     if (!options.aiOnly) return true;
     if (!options.ctx || !d.aiExposed || !canRun(options.ctx, d.name)) return false;
-    return options.ctx.role !== "customer" || d.name.startsWith("portal_");
+    return options.ctx.breweryId === null || !options.ctx.roles.includes("customer") || d.name.startsWith("portal_");
   }).map(d => ({
     name: d.name,
     description: d.description ?? "",
