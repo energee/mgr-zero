@@ -124,7 +124,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Cans \u00b7 16 oz", "Material"],
   ["Add contract", "Contract"],
   [/^(YCH|Country Malt) · /, "Contract"],
-  ["Create recipe", "Recipe"],
+  ["New recipe", "Recipe"],
   [/^(Hazy IPA|Pils|Stout) v\d+$/, "Recipe"],
   [/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/, "Monthly compliance"],
   ["Save filed snapshot", "Compliance months"],
