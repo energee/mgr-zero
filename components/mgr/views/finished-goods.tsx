@@ -12,7 +12,7 @@ import type { FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/fin
 
 export type { FinishedGoodsViewModel };
 
-const LINK = "font-medium underline underline-offset-4";
+const LINK = "min-w-0 max-w-full [overflow-wrap:anywhere] font-medium underline underline-offset-4 pointer-coarse:min-h-12";
 
 /** The Available figure. Negative stock is red and also says Shortfall in
  *  words, so color is never the only signal; that word links to replenishment. */
@@ -39,8 +39,9 @@ export function FinishedGoodsView({
   afterHeader?: ReactNode;
   /** Live: movements ledger. Inventory omits this. */
   footer?: ReactNode;
-  /** Live: the name and Shortfall go to their pages. Inventory leaves them "#";
-   *  their data-to names the screen the explorer opens. */
+  /** Live: the name and Shortfall go to their pages. Inventory leaves them "#".
+   *  Each link's data-to names its screen, because tests/mgr-screens.test.ts
+   *  requires it of every link whose text is not a screen name. */
   linkRows?: boolean;
 }) {
   const to = (href: string) => (linkRows ? href : "#");
@@ -80,9 +81,9 @@ export function FinishedGoodsView({
             <Fragment key={row.key}>
               {i > 0 ? <ItemSeparator /> : null}
               <Item role="listitem" className="px-0">
-                <ItemContent>
-                  <ItemTitle className="line-clamp-none">
-                    <Link href={to(row.href)} data-to="SKU detail" className={`inline-flex min-h-6 items-center ${LINK}`}>{row.name}</Link>
+                <ItemContent className="min-w-0">
+                  <ItemTitle className="w-full whitespace-normal line-clamp-none">
+                    <Link href={to(row.href)} data-to="SKU detail" className={`flex min-h-6 w-full items-center ${LINK}`}>{row.name}</Link>
                   </ItemTitle>
                   {E.fld("On hand", row.onHand)}
                   {E.fld("Allocated", row.allocated)}
