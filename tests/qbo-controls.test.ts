@@ -33,11 +33,10 @@ describe("QuickBooks control boundaries", () => {
       qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live",
       qbo_balance_cents: 98000, qbo_cash_collected_cents: 0, qbo_accountant_drift: true,
       written_off_at: null, subtotal_cents: 98000, total_cents: 99000, has_pending_qbo_push: false,
-      customers: { name: "Ridgeline" },
+      customers: { name: "Ridgeline" }, quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7&companyId=9341", reason: null },
     }, "admin", true, "America/New_York");
-    expect(row.detail).toContain("edited in QuickBooks · review there");
-    expect(row.detail).toContain("local subtotal");
-    expect(row.tone).toBe("w");
-    expect(row.remoteReview).toBe(true);
+    expect(row.status).toContain("edited in QuickBooks · review there");
+    expect(row.localSubtotal).toBe("$980.00");
+    expect(row.quickbooksHref).toContain("txnId=7");
   });
 });
