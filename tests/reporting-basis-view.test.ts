@@ -53,8 +53,16 @@ describe("reporting basis correction presentation", () => {
     expect(html).toContain("Reporting basis history");
     expect(html).toContain("Record correction and flag amendments");
     expect(html).toContain("Filed reporting basis");
+    const ordinaryDate = html.match(/<button[^>]*aria-describedby="([^"]*booksOpenedOn-help)"[^>]*>/);
+    expect(ordinaryDate).not.toBeNull();
+    expect(ordinaryDate![0]).toContain('disabled=""');
+    expect(html).toContain(`id="${ordinaryDate![1]}"`);
     const beforeFiling = renderToStaticMarkup(createElement(SettingsView, { model: { ...settingsDemo, hasFiledReports: false } }));
     expect(beforeFiling).not.toContain("Record correction and flag amendments");
+    const editableDate = beforeFiling.match(/<button[^>]*aria-describedby="([^"]*booksOpenedOn-help)"[^>]*>/);
+    expect(editableDate).not.toBeNull();
+    expect(editableDate![0]).not.toContain('disabled=""');
+    expect(beforeFiling).toContain(`id="${editableDate![1]}"`);
   });
 
   it("requires a reason and explicit acknowledgement, and freezes uncertain requests for unchanged retry", () => {

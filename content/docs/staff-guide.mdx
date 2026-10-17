@@ -857,7 +857,9 @@ Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the
 
 <Screen name="Settings" />
 
-On desktop, **Brewery details** and **Team defaults** sit side by side. **People and places** groups Team and Locations; **Connections and data** groups Accounting, Point of sale, Chat, and Import. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+**Brewery details**, **Ask MGR** and **Wholesale fulfillment** are separate forms, each with its own Save button. Saving one never saves edits in the others, and pressing Enter in a field saves only that field's form. On desktop, Brewery details sits beside the other two. **People and places** groups Team, Locations, Source water, and Import; **Connections** groups Accounting, Point of sale, and Chat. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+
+After filing, **Correct reporting basis** is another independently saved form. **Save brewery**, **Save AI model**, and **Save warehouse** never submit a reporting-basis correction or change its permanent history.
 
 **Days to package** under **Brewery details** estimates when batch packaging materials will be needed. It starts at 14 days; enter a whole number from 1 to 120 and **Save brewery**. Changing it updates projected batch needed-by and buy-by dates on Planning without rescheduling any actual packaging run.
 
@@ -1034,7 +1036,7 @@ The [screen explorer](/docs/screens-explore) is a drawing of MGR, including scre
 
 ### Portal fulfillment warehouse
 
-In **Settings**, Admin can see the current **Portal fulfillment warehouse**, choose a warehouse directly in Settings, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
+In **Settings**, under **Wholesale fulfillment**, Admin can see the current **Portal fulfillment warehouse**, choose a warehouse directly in Settings, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
 
 For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.
 
