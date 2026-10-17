@@ -68,7 +68,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     </>}
     {step === 2 && <>
       <p>{ready} ready · {rows.length - ready} blocked. Edit values here or go back to mapping. Only ready rows are sent, and each commits independently; fix blocked rows first or they are left out.</p>
-      <div className="[&_td]:whitespace-normal [&_td]:[overflow-wrap:anywhere] [&_th:first-child]:w-10 [&_th:last-child]:w-20 [&_table]:table-fixed [&_table]:min-w-0 [&_table]:w-full">{E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]))}</div>
+      {E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]), ["r", "l", "l", "l"])}
       {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name ?? row.product ?? row.label ?? kind.replaceAll("_", " ")}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
           {E.edit(`${field.name}${field.required ? " *" : ""}`, row[field.name] ?? "", "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${field.name}` })}
@@ -82,7 +82,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       <p>{busy ? "Committing rows…" : result ? `${result.committed} committed · ${result.blocked} blocked` : "Batch results need recovery"}</p>
       <p className="break-all text-sm">Batch request: {model.batchId}</p>
       {E.note("Retry keeps the exact batch and returns its first results. Reloading this browser tab restores an unresolved batch. Keep the tab open until results are recovered. To correct blocked records, start a batch containing only those rows; never resend committed opening balances as a new batch.")}
-      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]))}
+      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]), ["r", "l"])}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
       {result && !busy && <Button variant="outline" onClick={onNextFile}>Import another file</Button>}

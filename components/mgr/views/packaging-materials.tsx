@@ -10,7 +10,7 @@ import type { PackagingActualDraft, PackagingClosePlan, PackagingMaterialRecord,
 
 const qty = (value: number | undefined) => value === undefined ? "—" : value.toLocaleString("en-US", { maximumFractionDigits: 4 });
 export function PackagingRequirements({ planned }: { planned: PackagingRequirement[] }) {
-  return <>{E.ttl("Planned materials")}{planned.length ? E.tbl(["Material", "Planned", "On hand", "On order", "Short"], planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`, qty(row.onHand), qty(row.onOrder), qty(row.short === undefined ? undefined : Math.max(0, row.short))])) : E.info("No materials on this plan’s BOM.")}</>;
+  return <>{E.ttl("Planned materials")}{planned.length ? E.tbl(["Material", "Planned", "On hand", "On order", "Short"], planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`, qty(row.onHand), qty(row.onOrder), qty(row.short === undefined ? undefined : Math.max(0, row.short))]), ["l", "r", "r", "r", "r"]) : E.info("No materials on this plan’s BOM.")}</>;
 }
 
 export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled, restoring, onChange, onAdd, onRemove }: {
@@ -33,7 +33,7 @@ export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled
         {material?.lotTracked ? E.pick(`Source lot ${index + 1}`, row.lotId ?? "", [{ value: "", label: "No lot · only all-zero actuals" }, ...plan.lots.filter(item => item.materialId === row.materialId).map(item => ({ value: item.id, label: item.code }))], { disabled, onChange: value => patch({ lotId: value || null }) }) : E.fld("Source lot", "Untracked stock")}
         {E.fld(restoring ? "Available after reversal" : "Available at source", `${qty(source?.qty ?? 0)} ${material?.unit ?? ""}`)}
         {([['used', 'Used'], ['loss', 'Damaged / lost'], ['unused', 'Unused returned']] as const).map(([field, label]) => <div key={field}>{E.edit(`${label} ${index + 1} (${material?.unit ?? "base units"})`, row[field], "number", undefined, { min: 0, step: material?.unit === "each" ? 1 : 0.0001, disabled, required: true, onChange: value => patch({ [field]: value }) })}</div>)}
-        {toTicks(Number(row.used)) + toTicks(Number(row.loss)) > toTicks(source?.qty ?? 0) ? E.note(restoring ? "Replacement use plus loss exceeds stock after reversal. Choose or split the source." : "Used plus loss exceeds this source’s current stock. Choose or split the source before closing.") : null}
+        {toTicks(Number(row.used)) + toTicks(Number(row.loss)) > toTicks(source?.qty ?? 0) ? E.note(restoring ? "Replacement use plus loss exceeds stock after reversal. Choose or split the source." : "Used plus loss exceeds this source’s current stock. Choose or split the source before closing.", "alert") : null}
         <Button type="button" variant="ghost" disabled={disabled} onClick={() => onRemove?.(row.key)}>Remove source {index + 1}</Button>
       </div>;
     })}
@@ -44,8 +44,8 @@ export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled
 export function PackagingMaterialHistory({ records }: { records: PackagingMaterialRecord[] }) {
   return <>{E.ttl("Material record history")}{records.length ? records.map(record => <section key={record.id} className="flex flex-col gap-2">
     {E.fld(record.corrects_id ? "Correction" : "Original close", record.correction_reason ?? record.created_at)}
-    {E.tbl(["Planned material", "Quantity"], record.planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`]))}
-    {E.tbl(["Material / source", "Used", "Lost", "Unused"], record.actuals.map(row => [`${row.material_name} · ${row.location_name} / ${row.bin_name} · ${row.lot_code ?? "untracked"} (${row.unit})`, qty(row.qty_used), qty(row.qty_loss), qty(row.qty_unused)]))}
+    {E.tbl(["Planned material", "Quantity"], record.planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`]), ["l", "r"])}
+    {E.tbl(["Material / source", "Used", "Lost", "Unused"], record.actuals.map(row => [`${row.material_name} · ${row.location_name} / ${row.bin_name} · ${row.lot_code ?? "untracked"} (${row.unit})`, qty(row.qty_used), qty(row.qty_loss), qty(row.qty_unused)]), ["l", "r", "r", "r"])}
   </section>) : E.info("This run closed before confirmed material records were available.")}</>;
 }
 

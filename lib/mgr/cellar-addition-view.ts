@@ -25,6 +25,6 @@ export function additionPreview(m: CellarAdditionViewModel) {
   if (!Number.isFinite(qty) || qty <= 0) return { valid: false as const, reason: "Enter a quantity" };
   const lot = (m.lotsByMaterial[m.materialId] ?? []).find((l) => l.lot_id === m.lotId);
   if (material.lot_tracked && !lot) return { valid: false as const, reason: `Choose a lot · ${material.name} is lot-tracked` };
-  if (lot && qty > lot.qty) return { valid: false as const, reason: `Only ${lot.qty} ${material.base_uom} of ${lot.lot_code} on hand` };
+  if (lot && qty > lot.qty) return { valid: false as const, error: true as const, reason: `Only ${lot.qty} ${material.base_uom} of ${lot.lot_code} on hand` };
   return { valid: true as const, text: `Preview: −${qty} ${material.base_uom} ${material.name}${lot ? ` · ${lot.lot_code}` : ""} · consumption · ${ADDITION_STAGES[m.stage]} · ${occupancyIdentity(occupancy)}` };
 }

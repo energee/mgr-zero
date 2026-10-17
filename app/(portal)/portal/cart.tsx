@@ -146,10 +146,10 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
       }}
       messages={<>
         {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
-        {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`) : null}
-        {!lines && E.info("Enter whole quantities of zero or more.")}
-        {missingInput && E.info(missingInput)}
-        {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`)}
+        {removed.length ? E.info(`Removed unavailable or unpriced items: ${removed.join(", ")}. Review the remaining quantities.`, "alert") : null}
+        {!lines && E.info("Enter whole quantities of zero or more.", "alert")}
+        {missingInput && E.info(missingInput, "alert")}
+        {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(line => `${line.skuId} × ${line.qty}`).join(", ")}. Retry retains the original quantities.`, "alert")}
         {feedback}
       </>} />
     <CommandForm open={review && quote !== null} onOpenChange={open => { setReview(open); if (!open) setQuote(null); }} title="Review order">
