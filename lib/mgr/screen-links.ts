@@ -264,7 +264,6 @@ export const INERT: (string | RegExp)[] = [
   "Deposit refund",
   "Disable integration",
   "Disable",
-  "Download PDF",
   "Due",
   "Issued",
   "Credit",

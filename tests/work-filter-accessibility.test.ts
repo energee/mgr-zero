@@ -51,7 +51,7 @@ describe("Work filter tab accessibility (#727)", () => {
       { id: "order-1", kind: "orders", label: "ORD-LIVE-1", detail: "submitted", href: "/orders/1", verb: "Confirm", tone: "success", dueAt: null },
       { id: "route-1", kind: "routes", label: "Route-LIVE-1", detail: "3 stops", href: "/routes/1", verb: "Resume", tone: "info", dueAt: null },
     ];
-    const html = render(createElement(WorkList, { rows, defaults: ["orders", "routes"], subtitle: "warehouse default", createAction: null, chips: ["all", "orders", "transfers", "batches", "runs", "POs", "routes"] }));
+    const html = render(createElement(WorkList, { rows, defaults: ["orders", "routes"], createAction: null, chips: ["all", "orders", "transfers", "batches", "runs", "POs", "routes"] }));
     const { shown } = expectTabsToControlPanels(html);
     expect(shown).toContain("ORD-LIVE-1");
     expect(shown).toContain("Route-LIVE-1");
@@ -66,7 +66,7 @@ describe("Work filter tab accessibility (#727)", () => {
   });
 
   it("puts the empty state inside the shown panel", () => {
-    const html = render(createElement(WorkView, { model: toWorkViewProps({ subtitle: "warehouse default", rows: [] }) }));
+    const html = render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }) }));
     expect(expectTabsToControlPanels(html).shown).toContain("Nothing in motion");
   });
 

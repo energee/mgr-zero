@@ -16,7 +16,7 @@ export default async function WorkPage() {
   const canCreate = brewery.role === "admin" || brewery.role === "sales";
   return (
     <WorkList
-      rows={rows} defaults={DEFAULT_WORK_KINDS[brewery.role] ?? []} subtitle={`${brewery.role} default`}
+      rows={rows} defaults={DEFAULT_WORK_KINDS[brewery.role] ?? []}
       chips={Object.keys(workHrefsFor(brewery.role))}
       createAction={canCreate ? E.btn("New order", "g", "/orders") : null}
     />

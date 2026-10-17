@@ -14,7 +14,6 @@ export type OrdersListRowView = {
 };
 
 export type OrdersListViewModel = {
-  subtitle: string;
   rows: OrdersListRowView[];
   empty?: EmptyState;
 };
@@ -38,7 +37,6 @@ export function toOrdersListViewProps({ role, status, customer, orders }: Orders
   const what = status ? `${status} orders` : "orders";
   const title = customer ? `No ${what} for ${customer}` : status ? `No ${what}` : "No orders yet";
   return {
-    subtitle: `${role} default`,
     empty: orders.length === 0 ? { title, description: "Orders appear here once they are placed." } : undefined,
     rows: orders.map((o) => {
       const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, role);
