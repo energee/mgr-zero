@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STAFF invoice detail — desktop and phone design proposal</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.board{min-height:0}.desktop,.phone{overflow:visible}.chrome{border-radius:11px 11px 0 0}.content,.content *{min-width:0;overflow-wrap:anywhere}.button,.badge{white-space:normal;text-align:center}.doc-top{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}.document-head{padding:4px 0 20px}.document-head h2{font-size:27px;margin:10px 0 8px}.customer-name{font-size:19px;line-height:1.35;font-weight:600;margin:13px 0 18px}.doc-facts{display:grid;grid-template-columns:1fr 1fr;gap:16px}.doc-facts dt,.line-facts dt{font-size:11px;color:var(--muted)}.doc-facts dd,.line-facts dd{margin:3px 0 0;font-size:13px}.doc-facts dl{margin:0}.summary{padding:20px;background:#F5F3FB;border:1px solid #DCD5EF;border-radius:9px}.summary h3{color:var(--primary);font-size:12px;letter-spacing:.04em}.summary dl{display:flex;justify-content:space-between;gap:14px;margin:10px 0;font-size:12px}.summary dt{color:var(--muted)}.summary dd{margin:0;font-variant-numeric:tabular-nums;text-align:right}.total-block{border-top:1px solid #DCD5EF;margin-top:16px;padding-top:16px}.total-label{font-size:12px;font-weight:600}.total-value{font-size:34px;line-height:1.2;font-weight:700;letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin:5px 0}.summary .balance{margin-top:14px;border-top:1px solid #DCD5EF;padding-top:12px}.balance dd{font-size:20px;font-weight:650;color:var(--fg)}.balance dt{color:var(--fg)}.section{margin-top:25px;padding-top:22px;border-top:1px solid var(--border)}.section-title{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:12px}.section-title h3{margin:0;font-size:16px}.accounting-box{border:1px solid var(--border);border-radius:8px;padding:16px}.accounting-title{display:flex;align-items:start;justify-content:space-between;gap:12px}.accounting-title h4{margin:0 0 5px;font-size:14px}.mapping-row{display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--border);padding-top:11px;margin-top:12px;font-size:12px}.question{padding:14px 0;border-bottom:1px solid var(--border)}.question:last-child{border:0;padding-bottom:0}.question-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}.quote{font-size:13px;margin:9px 0;line-height:1.6}.correction{display:flex;align-items:center;justify-content:space-between;gap:18px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:23px}.correction h3{margin-bottom:4px}.phone .doc-top{display:block}.phone .summary{margin-top:18px;padding:18px}.phone .document-head{padding-bottom:0}.phone .document-head h2{font-size:25px}.phone .customer-name{font-size:18px;margin:12px 0 16px}.phone .doc-facts{gap:16px 12px}.phone .section{margin-top:22px;padding-top:20px}.phone .section-title h3{font-size:16px}.phone .accounting-title,.phone .question-top,.phone .correction{align-items:flex-start;flex-direction:column}.phone .mapping-row{gap:10px}.phone .accounting-title .button,.phone .correction .button{width:100%}.phone .question-top{gap:8px}.phone-line{border-bottom:1px solid var(--border);padding:15px 0}.phone-line:last-child{border:0;padding-bottom:0}.phone-line h4{font-size:14px;line-height:1.5;margin:0 0 3px;font-weight:650}.line-facts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:13px 0 0}.line-facts dd{font-variant-numeric:tabular-nums}.line-facts .amount dd{font-weight:650}.state-insets{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}.state-inset{padding:17px;border:1px solid var(--border);border-radius:8px;background:white;font-size:12px}.state-inset h3{font-size:14px}.state-inset dl{display:flex;justify-content:space-between;gap:12px;margin:10px 0}.state-inset dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}.state-inset .inset-price{font-size:25px;font-weight:700;margin:8px 0}.recovery-insets{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.recovery-inset{padding:17px;background:var(--warning-bg);border:1px solid #E6D6AA;border-radius:8px;font-size:12px}.recovery-inset p{margin:8px 0}.recovery-inset .button{margin:4px 5px 0 0}.inset-label{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}.phone .chrome{padding:12px 16px}.phone-end{margin-top:24px;border-top:1px solid var(--border);padding:13px 12px;display:flex;justify-content:space-around;font-size:11px;color:var(--muted);background:var(--soft);border-radius:0 0 11px 11px}.section-note{font-size:11px;color:var(--muted);margin-top:8px}.note{overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main class="board">
+<div class="eyebrow">Design proposal · STAFF · /invoices/[id]</div>
+<h1>A document first. One clear price summary.</h1>
+<p class="intro">Desktop keeps the summary beside document facts; phone places the same summary before all line items. Accounting and buyer questions stay separate from pricing. Fictional data, static controls and illustrative shell — not a live screen or a parity claim.</p>
+<div class="columns">
+<div>
+<p class="caption">Desktop · 962 px panel · normal invoice / known partial balance</p>
+<section class="desktop" aria-label="Proposed desktop invoice detail">
+<div class="chrome"><span class="brand">MGR</span><span>More / Invoices <span aria-hidden="true">·</span> Sales</span></div>
+<div class="content">
+<div class="doc-top">
+<header class="document-head">
+<span class="link small">← Invoices</span>
+<h2>INV-1086</h2>
+<span class="badge info">Partially paid</span>
+<p class="customer-name">Juniper House Kitchen &amp; Bottle Shop</p>
+<div class="doc-facts">
+<dl><dt>Document</dt><dd>Invoice</dd></dl>
+<dl><dt>Line items</dt><dd>4 stored lines</dd></dl>
+<dl><dt>Issued</dt><dd>Oct 12, 2026</dd></dl>
+<dl><dt>Due</dt><dd>Nov 11, 2026</dd></dl>
+</div>
+</header>
+<aside class="summary" aria-label="Invoice price summary">
+<h3>PRICE SUMMARY</h3>
+<dl><dt>Items</dt><dd>$768.00</dd></dl>
+<dl><dt>Keg deposits</dt><dd>$120.00</dd></dl>
+<dl><dt>One-way keg fees</dt><dd>$60.00</dd></dl>
+<div class="total-block"><p class="total-label">Current invoice total</p><p class="total-value">$948.00</p><p class="tiny muted">From QuickBooks · matches frozen MGR lines</p></div>
+<dl class="balance"><dt>Outstanding balance</dt><dd>$648.00</dd></dl>
+<dl><dt>Cash received in QuickBooks</dt><dd>$300.00</dd></dl>
+</aside>
+</div>
+<section class="section" aria-label="Invoice line items">
+<div class="section-title"><h3>Line items</h3><span class="small muted">Frozen MGR invoice details</span></div>
+<table class="table">
+<colgroup><col style="width:54%"><col style="width:12%"><col style="width:17%"><col style="width:17%"></colgroup>
+<thead><tr><th scope="col">Description</th><th scope="col" class="num">Quantity</th><th scope="col" class="num">Unit price</th><th scope="col" class="num">Amount</th></tr></thead>
+<tbody>
+<tr><td><strong>Copper Finch · ½ bbl returnable keg</strong><div class="subline">Copper Finch amber ale · returnable keg</div></td><td class="num">4</td><td class="num">$120.00</td><td class="num strong">$480.00</td></tr>
+<tr><td><strong>Cloud Orchard · ⅙ bbl one-way keg</strong><div class="subline">Cloud Orchard pale ale · one-way keg</div></td><td class="num">2</td><td class="num">$144.00</td><td class="num strong">$288.00</td></tr>
+<tr><td><strong>Keg deposits · returnable ½ bbl</strong><div class="subline">Deposit on four returnable kegs</div></td><td class="num">4</td><td class="num">$30.00</td><td class="num strong">$120.00</td></tr>
+<tr><td><strong>One-way keg fee</strong><div class="subline">Fee on two one-way kegs</div></td><td class="num">2</td><td class="num">$30.00</td><td class="num strong">$60.00</td></tr>
+</tbody>
+</table>
+<p class="section-note">Amounts are the stored invoice-line amounts. The original lines do not change when accounting edits the QuickBooks total.</p>
+</section>
+<section class="section" aria-label="QuickBooks and accounting">
+<div class="section-title"><h3>QuickBooks &amp; accounting</h3><span class="badge ok">Pushed</span></div>
+<div class="accounting-box">
+<div class="accounting-title"><div><h4>Partially paid in QuickBooks</h4><p class="small muted">Review accounting in the connected company.</p></div><span class="button quiet">Open in QuickBooks ↗</span></div>
+<div class="mapping-row"><span>Customer mapping<br><span class="muted">Juniper House Kitchen &amp; Bottle Shop</span></span><span class="badge ok">Mapped</span></div>
+</div>
+</section>
+<section class="section" aria-label="Buyer questions">
+<div class="section-title"><h3>Buyer questions</h3><span class="small muted">1 unanswered · 1 answered</span></div>
+<article class="question"><div class="question-top"><span class="badge warn">Needs answer</span><span class="small muted">Juniper House Kitchen &amp; Bottle Shop · Oct 13, 2026</span></div><p class="quote">“Can you confirm which of these keg charges are refundable deposits? I need to explain the difference to our team.”</p><span class="button quiet">Mark answered</span><p class="section-note">Reply by phone or email, then mark answered. This does not change the invoice.</p></article>
+<article class="question"><div class="question-top"><span class="badge ok">Answered</span><span class="small muted">Juniper House Kitchen &amp; Bottle Shop · Oct 12, 2026</span></div><p class="quote">“Is the due date November 11?”</p></article>
+</section>
+<section class="correction" aria-label="Invoice correction"><div><h3>Correct a shipment</h3><p class="small muted">Return opens the existing beer-return and credit workflow. It does not record a payment.</p></div><span class="button quiet">Return</span></section>
+</div>
+</section>
+</div>
+<div>
+<p class="caption">Phone · 390 px panel · full scroll content</p>
+<section class="phone" aria-label="Proposed phone invoice detail">
+<div class="chrome"><span class="brand">MGR</span><span>Invoices · Sales</span></div>
+<div class="content">
+<div class="doc-top">
+<header class="document-head"><span class="link small">← Invoices</span><h2>INV-1086</h2><span class="badge info">Partially paid</span><p class="customer-name">Juniper House Kitchen &amp; Bottle Shop</p><div class="doc-facts"><dl><dt>Document</dt><dd>Invoice</dd></dl><dl><dt>Line items</dt><dd>4 stored lines</dd></dl><dl><dt>Issued</dt><dd>Oct 12, 2026</dd></dl><dl><dt>Due</dt><dd>Nov 11, 2026</dd></dl></div></header>
+<aside class="summary" aria-label="Invoice price summary"><h3>PRICE SUMMARY</h3><dl><dt>Items</dt><dd>$768.00</dd></dl><dl><dt>Keg deposits</dt><dd>$120.00</dd></dl><dl><dt>One-way keg fees</dt><dd>$60.00</dd></dl><div class="total-block"><p class="total-label">Current invoice total</p><p class="total-value">$948.00</p><p class="tiny muted">From QuickBooks · matches frozen MGR lines</p></div><dl class="balance"><dt>Outstanding balance</dt><dd>$648.00</dd></dl><dl><dt>Cash received in QuickBooks</dt><dd>$300.00</dd></dl></aside>
+</div>
+<section class="section" aria-label="Invoice line items"><div class="section-title"><h3>Line items</h3><span class="small muted">4 lines</span></div><p class="small muted">Frozen MGR invoice details</p>
+<article class="phone-line"><h4>Copper Finch · ½ bbl returnable keg</h4><p class="small muted">Copper Finch amber ale · returnable keg</p><dl class="line-facts"><div><dt>Quantity</dt><dd>4</dd></div><div><dt>Unit price</dt><dd>$120.00</dd></div><div class="amount"><dt>Amount</dt><dd>$480.00</dd></div></dl></article>
+<article class="phone-line"><h4>Cloud Orchard · ⅙ bbl one-way keg</h4><p class="small muted">Cloud Orchard pale ale · one-way keg</p><dl class="line-facts"><div><dt>Quantity</dt><dd>2</dd></div><div><dt>Unit price</dt><dd>$144.00</dd></div><div class="amount"><dt>Amount</dt><dd>$288.00</dd></div></dl></article>
+<article class="phone-line"><h4>Keg deposits · returnable ½ bbl</h4><p class="small muted">Deposit on four returnable kegs</p><dl class="line-facts"><div><dt>Quantity</dt><dd>4</dd></div><div><dt>Unit price</dt><dd>$30.00</dd></div><div class="amount"><dt>Amount</dt><dd>$120.00</dd></div></dl></article>
+<article class="phone-line"><h4>One-way keg fee</h4><p class="small muted">Fee on two one-way kegs</p><dl class="line-facts"><div><dt>Quantity</dt><dd>2</dd></div><div><dt>Unit price</dt><dd>$30.00</dd></div><div class="amount"><dt>Amount</dt><dd>$60.00</dd></div></dl></article>
+<p class="section-note">Amounts are the stored invoice-line amounts. Accounting edits do not rewrite these lines.</p></section>
+<section class="section" aria-label="QuickBooks and accounting"><div class="section-title"><h3>QuickBooks &amp; accounting</h3><span class="badge ok">Pushed</span></div><div class="accounting-box"><div class="accounting-title"><div><h4>Partially paid in QuickBooks</h4><p class="small muted">Review accounting in the connected company.</p></div><span class="button quiet">Open in QuickBooks ↗</span></div><div class="mapping-row"><span>Customer mapping<br><span class="muted">Juniper House Kitchen &amp; Bottle Shop</span></span><span class="badge ok">Mapped</span></div></div></section>
+<section class="section" aria-label="Buyer questions"><div class="section-title"><h3>Buyer questions</h3></div><p class="small muted">1 unanswered · 1 answered</p><article class="question"><div class="question-top"><span class="badge warn">Needs answer</span><span class="small muted">Juniper House Kitchen &amp; Bottle Shop · Oct 13, 2026</span></div><p class="quote">“Can you confirm which of these keg charges are refundable deposits? I need to explain the difference to our team.”</p><span class="button quiet">Mark answered</span><p class="section-note">Reply by phone or email, then mark answered. This does not change the invoice.</p></article><article class="question"><div class="question-top"><span class="badge ok">Answered</span><span class="small muted">Juniper House Kitchen &amp; Bottle Shop · Oct 12, 2026</span></div><p class="quote">“Is the due date November 11?”</p></article></section>
+<section class="correction" aria-label="Invoice correction"><div><h3>Correct a shipment</h3><p class="small muted">Return opens the existing beer-return and credit workflow. It does not record a payment.</p></div><span class="button quiet">Return</span></section>
+</div>
+<div class="phone-end"><span>Today</span><span>Beer</span><span>Work</span><span class="strong">More</span></div>
+</section>
+</div>
+</div>
+<div class="notes"><div class="note"><b>01 · One price-summary owner</b>No repeated total beneath the line table. Phone reflows the same summary above lines; it is not a second sticky payment card.</div><div class="note"><b>02 · Stored facts, not inferred charges</b>Grouped subtotals require the existing structured line kind to reach the adapter. Line amounts stay authoritative, including credit and rounding cases.</div><div class="note"><b>03 · Actions keep their gates</b>The normal Sales example has no accounting write action. Return is a correction. No Mark paid, new payment form or automatic provider operation.</div></div>
+<p class="section-label">Alternative summary states · separate examples, not additional active totals on INV-1086</p>
+<div class="state-insets">
+<article class="state-inset"><p class="inset-label">A · Edited in QuickBooks</p><h3>Current invoice total</h3><p class="inset-price">$1,020.00</p><dl><dt>Frozen MGR line subtotal</dt><dd>$948.00</dd></dl><p class="muted">Totals differ. Review in QuickBooks. Do not invent a tax, discount or delivery explanation for the $72 difference.</p></article>
+<article class="state-inset"><p class="inset-label">B · Balance not supplied</p><h3>Current invoice total</h3><p class="inset-price">$948.00</p><dl><dt>Outstanding balance</dt><dd>Unknown</dd></dl><p class="muted">No current balance supplied. Unknown is not $0.00 and not a Paid state.</p></article>
+<article class="state-inset"><p class="inset-label">C · Credit memo CM-0028</p><h3>Credit memo total</h3><p class="inset-price">−$120.00</p><p class="muted">Signed frozen MGR amount: a deposit-refund line, quantity −4, unit price $30.00, amount −$120.00. Not an amount due; no Return or payment action.</p></article>
+<article class="state-inset"><p class="inset-label">D · Zero balance, no cash</p><h3>Settled in QuickBooks</h3><dl><dt>Outstanding balance</dt><dd>$0.00</dd></dl><p class="muted">No cash payment recorded. A zero balance alone must not say Paid. Voided, deleted and written-off documents instead show their non-payable state, not a stale balance as due.</p></article>
+</div>
+<p class="section-label">Accounting exception designs · always expanded in their own applicable state</p>
+<div class="recovery-insets">
+<article class="recovery-inset"><p class="inset-label">E · Mapping unavailable / rejected push</p><h3>Push failed · mapping needs attention</h3><p>Show the returned failure message and each missing customer, SKU, deposit or one-way-fee mapping. Missing local identity says <strong>Mapping unavailable</strong> rather than offering a dead Fix link.</p><p>Sales cannot repair deposit or fee defaults here; preserve the unavailable explanation and admin-owned mapping destination. After a rejected mapping is fixed, use the existing corrected-attempt confirmation.</p><span class="button quiet">Fix mapping</span><span class="button quiet">Push corrected invoice</span><p class="small">Buttons shown only when their existing action gates permit them. Unavailable staff links keep their exact reason visible.</p></article>
+<article class="recovery-inset"><p class="inset-label">F · Push result unknown</p><h3>Result unknown · exact request retained</h3><p>Retry resends the exact saved request; it does not rebuild the invoice. Keep the confirmation, Sending state and returned command error visible. When disconnected, explain that reconnecting is required before exact retry.</p><span class="button quiet">Retry exact push</span><p class="small">Deleted-document re-push is a different, confirmed action. Admin-only write-off keeps a required reason and clearly says it records no cash, creates no credit and changes nothing in QuickBooks.</p></article>
+</div>
+<p class="footnote">Planning artifact only. Alternate states and implementation annotations sit outside both screenshot panels. All names and amounts are fictional. Proposed shared rendering must be proved from inventory → InvoiceView ← live route/actions, not from these images. Dates are issued and due dates only; no settlement date is asserted. Full-document subtotals require a proven complete line payload; the existing query row-cap risk must be resolved before implementation claims a full total. Inventory-only facts that live adapters cannot supply remain explicitly gated prerequisites, never invented production values.</p>
+</main>
+</body>
+</html>
