@@ -75,12 +75,13 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
   });
-  it("offers Brew only on the planned fixture batch", () => {
+  it("offers Brew only on the planned fixture batches", () => {
     const model = toBatchesViewProps(batchesBrewer);
-    expect(model.planned.map(row => row.brewable)).toEqual([true]);
-    expect(model.active.map(row => row.brewable)).toEqual([false, false]);
+    expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
+    expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
   });
+
   it("maps each vessel to its own fields and edit destination", () => {
     const vessels = batchesFromQuery([], [{ id: "v4", name: "FV4", kind: "fermenter", capacity_bbl: 10, active: false }], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }).vessels;
     expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
