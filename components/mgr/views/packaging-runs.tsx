@@ -10,7 +10,7 @@ export function PackagingRunsView({ model, actions, workHrefs }: { model: Packag
     {items.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, row.verb ? E.act(row.verb, row.tone, row.href) : "", row.warning ? "w" : "")}</Fragment>)}
   </> : null;
   return <>
-    {E.hd("Packaging", "runs", actions !== undefined ? actions : E.btn("Schedule run"))}
+    {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}
     <TabBar names={names} on={names.indexOf(model.workChips[4])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
     {model.upcoming.length || model.recent.length ? <>{rows("Upcoming", model.upcoming)}{rows("Recent", model.recent)}</> : E.blank("No runs planned")}
     {model.recent.length ? E.info("Recent keeps the last few weeks. Older runs are under Search and Lot trace.") : null}

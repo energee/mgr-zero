@@ -836,7 +836,7 @@ describe("SCREENS", () => {
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
       ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
-      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price groups", "Create price group"],
+      ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "Create price group"],
     ] as const) {
       const html = body(name);
       expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));

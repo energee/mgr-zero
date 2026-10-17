@@ -240,7 +240,18 @@ describe("Recipes view", () => {
     expect(html).not.toContain(">Open<");
   });
 
-  it("the live Recipes page mounts RecipesView and links Create recipe to New recipe", () => {
+  it("both paths draw one header: a More back and New recipe, with live destinations passed in (#909)", () => {
+    const model = toRecipesViewProps({ recipes: [], backHref: "/more", createHref: "/recipes/new" });
+    expect(model).toMatchObject({ backHref: "/more", createHref: "/recipes/new" });
+    const live = htmlOf(createElement(RecipesView, { model }));
+    expect(live).toMatch(/<a[^>]*href="\/more"[^>]*>[\s\S]*?More<\/a>/);
+    expect(live).toMatch(/<a[^>]*href="\/recipes\/new"[^>]*>New recipe<\/a>/);
+    const fixture = htmlOf(createElement(RecipesView, { model: toRecipesViewProps(recipesList) }));
+    expect(fixture).toMatch(/>New recipe<\/button>/);
+    expect(fixture).not.toMatch(/href="\/(more|recipes\/new)"/);
+  });
+
+  it("the live Recipes page mounts RecipesView and links New recipe to /recipes/new", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
     expect(page).toMatch(/\/recipes\/new/);
