@@ -1,6 +1,7 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
 import type { GatewayModelOption } from "@/lib/chat/models";
 import { toCents } from "@/lib/mgr/money";
+import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
 
 export type SettingsViewModel = {
   backHref?: string;
@@ -13,6 +14,8 @@ export type SettingsViewModel = {
   overdueHours: string;
   /** The day compliance reports start counting (YYYY-MM-DD), or "" when unset. */
   booksOpenedOn: string;
+  hasFiledReports?: boolean;
+  basisCorrections?: ReportingBasisCorrection[];
   /** The one-way keg fee in dollars ("10.00"); "0.00" bills none. */
   oneWayKegFee: string;
   aiModel: string;

@@ -212,7 +212,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
@@ -485,8 +485,8 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water": "Water profiles" },
-    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
-    states: permitted("admin only"),
+    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
+    states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
@@ -2121,7 +2121,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Compliance months",
-    to: { "September 2026": "Period in progress" },
+    to: { "September 2026": "Period in progress", "August 2026": "Filed period needs amendment" },
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
@@ -2141,6 +2141,16 @@ export const SCREENS: Screen[] = [
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
+    to: { "Reattribute loss": "Filed period needs amendment" },
+    job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
+    reads: "list_compliance_reports · get_loss_review",
+    writes: "reattribute_loss",
+    states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
+    spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
   },
   {
     step: 7,

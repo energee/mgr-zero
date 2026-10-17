@@ -8,9 +8,10 @@ import { dollarsInput } from "@/lib/mgr/money";
 
 export type BrewerySettings = { name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null; customer_phone: string | null; fermentation_reading_due_hours: number; books_opened_on: string | null; one_way_keg_fee_cents: number };
 
-export function SettingsForm({ brewery }: { brewery: BrewerySettings }) {
+export function SettingsForm({ brewery, hasFiledReports = false }: { brewery: BrewerySettings; hasFiledReports?: boolean }) {
   const action = useCommandAction();
   return <BrewerySettingsFormView
+    basisLocked={hasFiledReports}
     initial={{ name: brewery.name, timezone: brewery.timezone, ttb: brewery.ttb_registry_no ?? "", pa: brewery.pa_license_no ?? "", phone: brewery.customer_phone ?? "", hours: String(brewery.fermentation_reading_due_hours), booksOpenedOn: brewery.books_opened_on ?? "", oneWayKegFee: dollarsInput(brewery.one_way_keg_fee_cents) }}
     busy={action.busy} error={action.error}
     onSave={(v) => {
