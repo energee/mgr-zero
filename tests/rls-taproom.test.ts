@@ -29,6 +29,7 @@ const matrix = {
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
+  reporting_basis_corrections: "deny", report_basis_amendments: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
   notification_preferences: "self", notification_occurrences: "deny", notification_deliveries: "deny",
   chat_callback_receipts: "deny", chat_action_intents: "deny",
@@ -46,13 +47,14 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   pos_catalog_ownership: ["connection_id", "format_id", "brand_id"],
   catalog_categories: ["brewery_id", "name"],
   qbo_customer_snapshots: ["realm_id", "qbo_customer_id"],
+  report_basis_amendments: ["filing_id", "correction_id"],
 };
 const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
 // These tables intentionally have no authenticated SELECT privilege, in addition to RLS.
 const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_reclassifications", "notification_occurrences", "notification_deliveries", "chat_callback_receipts", "chat_action_intents"]);
 // These tables grant service_role no SELECT either (writes arrive only through future definer RPCs), so the
 // service positive control reads them with privileged SQL instead of widening the grant for the harness.
-const privilegedRead = new Set<Table>(["qbo_customer_snapshots", "qbo_customer_decisions"]);
+const privilegedRead: Partial<Record<Table, true>> = { qbo_customer_snapshots: true, qbo_customer_decisions: true, reporting_basis_corrections: true, report_basis_amendments: true };
 const day = "2026-09-08";
 const now = "2026-09-08T12:00:00Z";
 
@@ -155,7 +157,12 @@ async function fixtures() {
   await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "PRIVATE-COLA" });
   await put("state_registrations", { brand_id: cat.brandId, state: "PA" });
   await put("brewery_state_licenses", { state: "PA", kind: "brewery" });
-  await put("report_filings", { jurisdiction: "TTB", period_start: day, period_end: day, figures: { private: true } });
+  const filing = await put("report_filings", { jurisdiction: "TTB", period_start: day, period_end: day, figures: { private: true } });
+  const basisCorrection = crypto.randomUUID();
+  sql(`insert into public.reporting_basis_corrections(id,brewery_id,old_basis,new_basis,corrected_by,reason)
+    values ('${basisCorrection}','${brewery.id}',null,'${day}','${owner.id}','Authorization fixture');
+    insert into public.report_basis_amendments(brewery_id,filing_id,correction_id,old_figures,new_figures)
+    values ('${brewery.id}','${filing.id}','${basisCorrection}','{}','{}')`, true);
   const route = await put("routes", { delivery_date: day });
   await put("deliveries", { route_id: route.id, shipment_id: shipment.id, stop_no: 1 });
   const installation = await put("chat_installations", { provider: "slack", external_installation_id: brewery.id, display_label: "Fixture only", state: "active", installer_user_id: owner.id, token_store_key: `fixture-${brewery.id}` });
@@ -185,7 +192,7 @@ async function tenantRows(db: SupabaseClient<Database>, table: Table, f: Fixture
   if (table === "breweries") query = query.eq("id", f.brewery.id);
   else if (table === "customer_users") query = query.eq("customer_id", f.customer.customerId);
   else query = query.eq("brewery_id", f.brewery.id);
-  if (db === admin && privilegedRead.has(table)) {
+  if (db === admin && privilegedRead[table]) {
     return sql(`select to_jsonb(t)::text from public.${table} t where brewery_id='${f.brewery.id}'`, true).map(r => JSON.parse(r) as Row);
   }
   const result = await query;
@@ -258,6 +265,7 @@ describe("taproom complete public RLS read boundary", () => {
       deliveries: "get_delivery_stop", routes: "list_routes", stock_transfers: "list_stock_transfers", stock_transfer_lines: "get_stock_transfer",
       lots: "list_movements", channel_prices: "list_channel_prices", price_group_barcodes: "list_price_group_barcodes",
       report_filings: "list_compliance_reports", brand_approvals: "get_compliance_registry",
+      reporting_basis_corrections: "list_reporting_basis_corrections", report_basis_amendments: "list_compliance_reports",
       state_registrations: "get_compliance_registry", brewery_state_licenses: "get_compliance_registry",
       pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",
       pos_item_mappings: "list_pos_variations", pos_locations: "list_pos_locations",
@@ -351,6 +359,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
     set_brewery_operating_defaults: [B,24,R()], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_one_way_keg_fee: [B,1000,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
+    correct_reporting_basis: [B,"2026-09-01",null,"Correct basis",R()],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     revoke_account_invitation: [B,consentInvite,R()],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],

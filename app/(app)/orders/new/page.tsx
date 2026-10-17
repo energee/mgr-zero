@@ -11,5 +11,5 @@ export default async function NewOrderPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "create_order", "New order");
-  return <NewOrderClient />;
+  return <NewOrderClient timeZone={brewery.timeZone} />;
 }

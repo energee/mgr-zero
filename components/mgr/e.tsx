@@ -191,7 +191,7 @@ export const E = {
     );
   },
   /** An on/off setting. */
-  sw: (on: boolean, label: string, onChange?: (checked: boolean) => void) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} />,
+  sw: (on: boolean, label: string, onChange?: (checked: boolean) => void, disabled = false) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} disabled={disabled} />,
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk. */

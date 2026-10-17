@@ -27,7 +27,7 @@ export default async function PeriodPage({ params }: { params: Promise<{ period:
   ]);
   const report: Report = filing ? { figures: filing.figures, warnings: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
   return <MonthlyComplianceView
-    model={toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), report, filing, losses, backHref: "/compliance" })}
+    model={toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" })}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
     monthOpen={!filing && !periodOver(period, today)}
     fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} />}
