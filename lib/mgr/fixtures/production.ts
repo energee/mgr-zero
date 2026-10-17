@@ -29,18 +29,33 @@ export const cellarMapBrewer: CellarMapViewModel = {
 
 export const batchesBrewer: BatchesSnapshot = {
   title: "Work",
-  subtitle: "brewer default",
   vessels: [
-    { key: "fv1", title: "FV1", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
-    { key: "fv3", title: "FV3", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+    { key: "fv1", name: "FV1", kind: "fermenter", capacityBbl: 15, active: true },
+    { key: "fv3", name: "FV3", kind: "fermenter", capacityBbl: 15, active: true },
+    { key: "fv4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false },
   ],
   planned: [
-    { key: "b0416", title: "B-0416 · Hazy IPA v4", detail: "Fri 9/4 · 15 bbl", verb: "Start", tone: "info" },
+    { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null, brewable: true },
+    { key: "b0417", batchNo: "B-0417", brand: null, recipe: null, plannedOn: "Sep 8, 2026", plannedBbl: 10, vessel: null, brewable: true },
   ],
   active: [
-    { key: "b0409", title: "B-0409 · Pils", detail: "FV1 · 12.8 bbl", verb: "Open", tone: "primary", readings: [{ key: "pils-fv1", title: "FV1", detail: "1.9 °P · 68 °F · read 4 h ago" }] },
-    { key: "b0413", title: "B-0413 · Stout", detail: "FV3 · 13.5 bbl", verb: "Open", tone: "primary", warning: true, readings: [{ key: "stout-fv3", title: "FV3", detail: "5.2 °P · 68 °F · reading overdue 31 h" }] },
+    { key: "b0409", batchNo: "B-0409", brand: "Pils", recipe: "Pils", plannedOn: "Aug 28, 2026", plannedBbl: 15, vessel: "FV1", brewable: false, readings: [{ key: "pils-fv1", vessel: "FV1", reading: "No readings yet" }] },
+    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3, FV4", brewable: false, readings: [{ key: "stout-fv3", vessel: "FV3", reading: "0.0 °P · pH 4.2 · Sep 2, 2026, 5:00 PM" }, { key: "stout-fv4", vessel: "FV4", reading: "5.2 °P · 68 °F · Sep 3, 2026, 8:10 AM" }] },
+    { key: "b0414", batchNo: "B-0414", brand: "Porter", recipe: "Robust porter", plannedOn: "Sep 1, 2026", plannedBbl: 10, vessel: null, brewable: false, readings: [] },
   ],
+  completed: [
+    { key: "b0401", batchNo: "B-0401", brand: "Amber ale", recipe: "Amber ale", plannedOn: "Aug 2, 2026", plannedBbl: 10, vessel: null, brewable: false },
+  ],
+  cancelled: [
+    { key: "b0412", batchNo: "B-0412", brand: null, recipe: "Pale ale", plannedOn: "Aug 30, 2026", plannedBbl: 15, vessel: null, brewable: false },
+  ],
+};
+
+export const batchesEmpty: BatchesSnapshot = {
+  title: "Work",
+  planned: [],
+  active: [],
+  vessels: [],
 };
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {

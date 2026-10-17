@@ -351,7 +351,7 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
@@ -501,6 +501,12 @@ describe("SCREENS", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
     expect(html).toContain("August 31, 2027");
   });
+
+  it("points a date field at its description, as the other fields do", () => {
+    const html = renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date", undefined, { "aria-describedby": "best-by-help" })));
+    expect(html).toMatch(/<button[^>]*aria-describedby="best-by-help"/);
+  });
+
 
   it("falls back to initials when a person has no fixture photo", () => {
     const render = (node: ReturnType<typeof E.face>) => renderToStaticMarkup(createElement("div", null, node));
@@ -940,7 +946,9 @@ describe("SCREENS", () => {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const html = renderToStaticMarkup(createElement("div", null, s!.hd, s!.body));
-      expect(filled(html).length, name).toBeLessThanOrEqual(1);
+      // Settings has three independent forms. Its equal-weight Save buttons
+      // intentionally remain filled rather than implying one page-wide action.
+      expect(filled(html).length, name).toBeLessThanOrEqual(name === "Settings" ? 3 : 1);
     }
   });
 
@@ -1014,5 +1022,28 @@ describe("screen command tokens", () => {
         .filter((t) => !getCommandDefinition(t.name) && !/\[design|GATE|\[platform|\[client state/.test(t.tag))
         .map((t) => `${s.name} ${field}: ${t.name}`)));
     expect(bad).toEqual([]);
+  });
+});
+
+describe("vessel tile fill (#909)", () => {
+  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]], "c2"));
+
+  it("draws a named progressbar carrying its whole-percent value", () => {
+    const html = tile(50);
+    expect(html).toContain('role="progressbar"');
+    expect(html).toMatch(/aria-label="[^"]+"/);
+    expect(html).toContain('aria-valuenow="50"');
+    expect(html).toContain('aria-valuemin="0"');
+    expect(html).toContain('aria-valuemax="100"');
+  });
+
+  it("bounds fill values to the progress range", () => {
+    expect(tile(-10)).toContain('aria-valuenow="0"');
+    expect(tile(200 / 3)).toContain('aria-valuenow="67"');
+    expect(tile(125)).toContain('aria-valuenow="100"');
+  });
+
+  it("draws no bar for a tile without a fill", () => {
+    expect(tile()).not.toContain("progressbar");
   });
 });

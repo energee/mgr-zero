@@ -54,7 +54,7 @@ export function CustomerView({
   const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: value })) });
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
   return (
-    <div className="@container flex min-w-0 flex-col gap-6 [&_[data-slot=item]]:rounded-none [&_[data-slot=item]]:border-0 [&_[data-slot=item]]:border-b [&_[data-slot=item]]:px-0">
+    <div className="@container flex min-w-0 flex-col gap-6">
       <header className="[&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
         {E.back("Customers", model.name, undefined, model.backHref)}
       </header>
