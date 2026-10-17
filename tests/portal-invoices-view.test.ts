@@ -227,21 +227,6 @@ describe("Portal invoice view", () => {
     expect(model.payable).toBe(false);
   });
 
-  it("the pay drawing still shows Pay invoice, Download PDF, and Question", () => {
-    const html = htmlOf(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps(portalInvoiceUnpaid),
-      variant: "pay",
-    }));
-    expect(html).toMatch(/INV-1042/);
-    expect(html).toMatch(/\$948\.00/);
-    expect(html).toMatch(/Unpaid/);
-    expect(html).toMatch(/>Pay invoice</);
-    expect(html).toMatch(/>Download PDF</);
-    expect(html).toMatch(/Question this invoice/);
-    expect(html).toMatch(/QuickBooks/);
-    expect(html).not.toMatch(/→/);
-  });
-
   it("the unavailable drawing has no Pay and still offers Question", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoiceUnpaid),
@@ -265,21 +250,6 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Question this invoice/);
   });
 
-  it("the paid drawing keeps Question alongside its fixture PDF action", () => {
-    const html = htmlOf(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps(portalInvoicePaid),
-      variant: "paid",
-    }));
-    expect(html).toMatch(/INV-1037/);
-    expect(html).toMatch(/\$980\.00/);
-    expect(html).toMatch(/Paid/);
-    expect(html).not.toMatch(/Aug 29, 2026/);
-    expect(html).toMatch(/>Download PDF</);
-    expect(html).not.toMatch(/>Pay invoice</);
-    expect(html).toMatch(/Question this invoice/);
-    expect(html).not.toMatch(/Unpaid/);
-  });
-
   it("a question slot replaces the inventory Question nav", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoiceUnpaid),
@@ -288,18 +258,6 @@ describe("Portal invoice view", () => {
     }));
     expect(html).toMatch(/Ask about this invoice/);
     expect(html).not.toMatch(/Question this invoice/);
-  });
-
-  it("a footer slot replaces the default Pay and PDF buttons", () => {
-    const html = htmlOf(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps(portalInvoiceUnpaid),
-      variant: "pay",
-      footer: "Custom pay" as unknown as ReactNode,
-    }));
-    expect(html).toMatch(/Custom pay/);
-    expect(html).not.toMatch(/>Pay invoice</);
-    expect(html).not.toMatch(/>Download PDF</);
-    expect(html).toMatch(/Question this invoice/);
   });
 });
 

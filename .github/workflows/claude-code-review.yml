@@ -44,13 +44,25 @@ jobs:
           path: .claude-review-marketplace
           persist-credentials: false
 
+      # Official names are reserved for GitHub installs, not local checkouts.
+      # Rename only the catalog identity; plugin code remains at the pin above.
+      - name: Name the pinned local marketplace
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = ".claude-review-marketplace/.claude-plugin/marketplace.json";
+          const manifest = JSON.parse(fs.readFileSync(path, "utf8"));
+          manifest.name = "mgr-reviewed-plugins";
+          fs.writeFileSync(path, JSON.stringify(manifest, null, 2) + "\n");
+          NODE
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: './.claude-review-marketplace'
-          plugins: 'code-review@claude-code-plugins'
+          plugins: 'code-review@mgr-reviewed-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # Skill: the code-review plugin invokes sub-skills; without it every
           # run logged one permission denial and a wasted retry.
