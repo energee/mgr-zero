@@ -42,7 +42,7 @@ About twenty placements product-wide; most screens show two or three.
 
 `E.btn` / `E.act` verbs; the irreversible teal button (color already carries
 it); `E.tape`; tables; chips; composer; venue frames (they speak the vendor's
-language). Lucide stays inside `components/ui/*` for shadcn chrome. One exception today: the close mark in `components/mgr/command-form.tsx` imports `XIcon` from `lucide-react`; move it to the `Icon` wrapper when that file is next touched.
+language). Lucide stays inside `components/ui/*` for shadcn chrome.
 
 ## Treatment
 

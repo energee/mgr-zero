@@ -371,15 +371,17 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--background` | `#FAFAF7` | `#1B1C18` | Page ground |
 | `--card` / `--popover` | `#FFFFFF` | `#22231F` / `#262721` | Cards, sheets, menus |
 | `--foreground` | `#1E1F1A` | `#EDEDE6` | Text |
-| `--primary` | `#6F4FD6` | `#AE81FF` | Mutable primary action, active nav, progress |
-| `--irreversible` | `#0F6B78` | `#0F6B78` | Append-only, filed, external, sign-out actions only |
-| `--warning` / `--warning-foreground` | `#FDECD2` / `#8A4A00` | `#3B2A12` / `#FDB44B` | Attention surface and text; never yellow on white |
+| `--primary` | `#6453B3` | `#ab9df2` | Mutable primary action, active nav, progress |
+| `--irreversible` | `#0F6B78` | `#78dce8` | Append-only, filed, external, sign-out actions only |
+| `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#33271F` / `#fc9867` | Review (needs attention) surface and text |
+| `--warning` / `--warning-foreground` | `#FDF3DC` / `#755800` | `#26231A` / `#ffd866` | Warning surface and text; never yellow on white |
 | `--border` | `#E3E3DC` | `#33342E` | Hairline dividers |
 
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The
 mood is Linear-quiet: near-grayscale neutrals with a faint warm tint, one
-violet accent, teal reserved for irreversible actions, amber for attention.
+violet accent, cyan reserved for irreversible actions, orange for review, yellow for
+warning.
 
 Every pair passes WCAG AA in both modes. Semantic pairs replace manual `dark:`
 overrides. The irreversible accent never decorates headings, tabs, validation/errors,
@@ -391,8 +393,8 @@ command classes named above.
   phone primary label.
 - Data: **JetBrains Mono** for quantities, units, times, document numbers, tape rows; all
   numerals use `font-variant-numeric: tabular-nums`.
-- Scale: 12 / 14 / 16 / 20 / 28 / 44; 16px phone gutter, 8px grid, 4px equipment-like
-  radius rather than pill-heavy consumer styling.
+- Scale: 12 / 14 / 16 / 20 / 28 / 44; 16px phone gutter, 8px grid, 6px (`--radius: 0.375rem`)
+  equipment-like radius rather than pill-heavy consumer styling.
 - Every target is ≥48×48px. Under `(pointer: coarse)`, primary actions and QtyPad keys are
   ≥56px high, adjacent targets have ≥8px separation, rules are 2px, and icons use 2px
   stroke. Pointer type, not viewport, handles a cooler wall tablet.
