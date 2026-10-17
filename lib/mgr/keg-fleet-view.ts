@@ -36,11 +36,9 @@ export type KegFleetViewModel = {
   /** Inventory only: the pool form drawn inline, and its vendor options. */
   poolForm?: KegPoolValue;
   vendors?: KegOption[];
-  /** Inventory only: the event form drawn inline. */
+  /** Inventory only: initial values for the shared event dialog/sheet. */
   eventForm?: KegEventValue;
   eventOptions?: KegEventOptions;
-  /** A balance preview the fixture can state; the live form has no per-customer, per-size balance to show. */
-  eventPreview?: { qty: number; name: string; from: string; to: string };
   /** Why Record keg event is not offered; the view draws it in place of the form. */
   eventUnavailable?: string | null;
 };

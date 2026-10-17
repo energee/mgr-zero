@@ -22,7 +22,6 @@ export const kegFleetMicrostar: KegFleetViewModel = {
     bins: [{ value: "walk-in", label: "Walk-in" }],
     customers: [{ value: "ridgeline", label: "Ridgeline Tap Room" }, { value: "als", label: "Al’s Bar" }],
   },
-  eventPreview: { qty: 4, name: "Ridgeline", from: "38", to: "34" },
 };
 
 export const kegBalanceRidgeline: KegBalanceSnapshot = {
