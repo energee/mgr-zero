@@ -7,7 +7,7 @@ export function AccountInvitationsView({ invitations, action, error, continueHre
   return <>
     {E.hd("Invitations")}
     {E.info("Joining grants access to the brewery or customer account shown. Your existing password stays the same.")}
-    {error && E.note(error)}
+    {error && E.note(error, "alert")}
     {invitations.length ? invitations.map(invite => <form key={invite.id} action={action}>
       <input type="hidden" name="inviteId" value={invite.id} />
       {E.row(invite.breweryName, invite.kind === "staff" ? `Staff · ${invite.role}` : `Customer · ${invite.customerName}`,

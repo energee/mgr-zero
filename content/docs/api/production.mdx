@@ -6,6 +6,12 @@ description: "Recipes, batches, brew days, vessels and fermentation."
 A recipe is versioned: a batch references the version it was brewed to, so a
 later recipe change never rewrites the history of beer already made.
 
+`get_recipe` defaults to the latest version. Pass a positive integer `version`
+to read an older saved version, including its own ingredients, water additions
+and predicted gravity. `versions` lists all available version numbers, newest
+first. A missing recipe or version returns `404 not_found`; history has the
+same Admin/Brewer and brewery access restrictions as the current recipe.
+
 The cellar map is the read behind vessel work: what is in each tank, and for how
 long. Fermentation readings are appended per open occupancy and are what an
 overdue reading notification is measured against. A reading must carry at
@@ -189,11 +195,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One recipe with its latest version, that version's ingredients, and the OG/FG/ABV they predict
+One recipe with its requested version (latest by default), all version numbers, that version's ingredients, and the OG/FG/ABV they predict
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `recipeId` | uuid | yes |
+| `version` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

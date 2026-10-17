@@ -21,7 +21,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     </section>)}
     {model.losses.length ? E.info("An allocation changes removal categories in the period you save it. Earlier filed snapshots stay unchanged.") : null}
     {E.row("2 · Review generated figures", "", E.status(model.filingDate ? `Filed ${model.filingDate}` : model.balances ? "Current" : "Does not balance", model.filingDate || model.balances ? "ok" : "w"))}
-    {E.tbl(["class", "begin", "+", "−", "end"], model.lines)}
+    {E.tbl(["class", "begin", "+", "−", "end"], model.lines, ["l", "r", "r", "r", "r"])}
     {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once in the removal totals below. Zeros print 0.00.")}
     {model.warnings.map((warning) => <Fragment key={warning}>{E.note(warning)}</Fragment>)}
     {E.row("Beer in process", "tanks now, not at period end", model.inProcess)}
@@ -30,7 +30,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · non-additive breakdown`, row.bbl)}</Fragment>)}</> : null}
     {E.ttl("Destination-state totals")}
     {model.stateExport ? <>
-      {E.tbl(["state", "outward BBL", "returned BBL", "adjustment BBL", "net BBL", "sales", "credits", "net sales"], model.stateRows)}
+      {E.tbl(["state", "outward BBL", "returned BBL", "adjustment BBL", "net BBL", "sales", "credits", "net sales"], model.stateRows, ["l", "r", "r", "r", "r", "r", "r", "r"])}
       {E.info("Physical movement and invoiced beer sales have separate event dates. Returns reduce outward volume. Credits reduce beer sales; keg deposits are excluded. Unassigned facts have no recorded destination. Exported facts reconcile to these totals. State taxes and filing forms remain external.")}
       <DestinationStateExport {...model.stateExport} />
     </> : E.info("Supporting destination-state facts were not captured in this snapshot.")}

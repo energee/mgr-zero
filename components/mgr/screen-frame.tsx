@@ -38,7 +38,7 @@ export function ScreenSheet({ screen: s, container, onClose }: { screen: Screen;
 /** `persona` is the demo user the shell is drawn as (the explorer's switch,
  * lib/mgr/demo-personas.ts): their face and name in the header, their role's
  * rail. The default is the inventory's fixture, Maria the admin. */
-export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Screen; persona?: Persona }) {
+export function ScreenFrame({ screen: s, persona = PERSONAS[0], container }: { screen: Screen; persona?: Persona; container?: HTMLElement | null }) {
   // A venue frame is not an MGR screen: it brings its own product's chrome and
   // never the app shell (components/mgr/venue.tsx).
   if (s.venue) {
@@ -71,7 +71,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, persona.role)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={E.comp(persona.role)}
+      composer={E.comp(persona.role, container)}
       active={s.tab}
     >
       {body}

@@ -70,7 +70,7 @@ export function SyncFeedback({ runs }: { runs: [kind: string, action: ExactComma
   }
   return <>
     <div role="status">{E.polite(done.join(" · ") || null)}</div>
-    {problems.map(problem => <Fragment key={problem}>{E.note(problem)}</Fragment>)}
+    {problems.map(problem => <Fragment key={problem}>{E.note(problem, "alert")}</Fragment>)}
   </>;
 }
 
@@ -117,7 +117,7 @@ export function PublicationResult({ action, onRetry, onCorrected }: { action: Ex
   const text = notice && `${notice.label} · ${notice.detail}`;
   return <div className="flex flex-col gap-2">
     <div role="status">{E.polite(notice?.tone === "success" ? text : null)}</div>
-    {notice && notice.tone !== "success" && E.note(text)}
+    {notice && notice.tone !== "success" && E.note(text, "alert")}
     {notice?.retry && <Button variant="outline" disabled={action.busy} onClick={onRetry}>Retry exact attempt</Button>}
     {notice && (status === "rejected" || status === "superseded") && <Button variant="outline" disabled={action.busy} onClick={onCorrected}>Start corrected attempt</Button>}
   </div>;
