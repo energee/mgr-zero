@@ -70,6 +70,7 @@ export const receiptPoCountryMalt: ReceiptViewModel = {
     ["+300 lb rice hulls · receipt", "not lot-tracked"],
   ],
   info: "2-row is over by 2 bags and Citra short 1 on a substituted lot.",
+  revisions: [{ label: "Original receipt", href: "#" }, { label: "Corrected receipt", href: "#" }],
 };
 
 export const receiptPoBillPending: ReceiptViewModel = {

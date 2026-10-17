@@ -1016,3 +1016,26 @@ describe("screen command tokens", () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe("vessel tile fill (#909)", () => {
+  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]], "c2"));
+
+  it("draws a named progressbar carrying its whole-percent value", () => {
+    const html = tile(50);
+    expect(html).toContain('role="progressbar"');
+    expect(html).toMatch(/aria-label="[^"]+"/);
+    expect(html).toContain('aria-valuenow="50"');
+    expect(html).toContain('aria-valuemin="0"');
+    expect(html).toContain('aria-valuemax="100"');
+  });
+
+  it("bounds fill values to the progress range", () => {
+    expect(tile(-10)).toContain('aria-valuenow="0"');
+    expect(tile(200 / 3)).toContain('aria-valuenow="67"');
+    expect(tile(125)).toContain('aria-valuenow="100"');
+  });
+
+  it("draws no bar for a tile without a fill", () => {
+    expect(tile()).not.toContain("progressbar");
+  });
+});
