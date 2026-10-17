@@ -13,7 +13,7 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
     {model.locations && <LinkTabs items={model.locations} current={model.location ?? ""} className="w-full md:w-fit" />}
     {model.weekHrefs ? <LinkTabs items={model.weekHrefs} current={`${model.weeks} weeks`} className="w-full md:w-fit" /> : E.tabs(["4 weeks", "12 weeks"], model.weeks === 12 ? 1 : 0)}
     {!report ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
-      {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]))}
+      {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]), ["l", "r", "r", "r", "r"])}
       {model.trend ? E.nav(model.trend.brand, model.trend.detail, "", undefined, model.trend.href) : E.gated("Recurring brand trend", "The report returns brand totals and period coverage, not brand-by-period trends.")}
       {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
       {E.note("Reported, never posted. The count already wrote sold depletion or destruction; this is the explanation for it.")}

@@ -32,7 +32,7 @@ export function ConfirmDeliveryView({
       {E.back(model.backTo ?? "Driver route", model.title, undefined, model.backHref)}
       {E.ttl(model.heading)}
       {model.shipTo !== undefined && E.fld("Ship to", model.shipTo ? [model.shipTo.label, shipToAddress(model.shipTo)].filter(Boolean).join(" · ") : "Not recorded")}
-      {missingAddress.length > 0 && E.note(`${missingAddress.join(" · ")}. Confirm the destination before travelling.`)}
+      {missingAddress.length > 0 && E.note(`${missingAddress.join(" · ")}. Confirm the destination before travelling.`, "alert")}
       {E.fld("Invoice timing", model.invoiceTiming)}
       {model.lines.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, "", row.qty)}</Fragment>

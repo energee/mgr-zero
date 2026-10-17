@@ -6,22 +6,19 @@
 # that window fails with "Could not find the table 'public.breweries' in the
 # schema cache" or PGRST202 — a race that looks like a broken migration.
 #
-# Nudge the reload, then poll a known table until it answers.
+# The reset installs and reloads a new identity RPC; wait for that exact reset.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-key=$(grep -m1 '^SUPABASE_SECRET_KEY=' .env.test.local | cut -d= -f2-)
-url=$(grep -m1 '^NEXT_PUBLIC_SUPABASE_URL=' .env.test.local | cut -d= -f2-)
-psql "${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54352/postgres}" \
-  -qc "notify pgrst, 'reload schema'" >/dev/null 2>&1 || true
+# test-db-schema.mjs reads the pinned test env file, never inherited app URLs.
 
 for _ in $(seq 1 60); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' \
-    "$url/rest/v1/breweries?select=id&limit=1" \
-    -H "apikey: $key" -H "Authorization: Bearer $key" || true)
-  [ "$code" = "200" ] && exit 0
+  if actual=$(node scripts/test-db-schema.mjs check 2>&1); then
+    echo "$actual"
+    exit 0
+  fi
   sleep 1
 done
 
-echo "wait-rest: PostgREST did not serve public.breweries within 60s (last: ${code:-none})" >&2
+echo "wait-rest: PostgREST did not serve this reset's identity within 60 checks: ${actual:-none}" >&2
 exit 1

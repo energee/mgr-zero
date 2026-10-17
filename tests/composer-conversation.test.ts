@@ -36,6 +36,15 @@ describe("composer conversation surface", () => {
     expect(html).toContain("Stock remains private.");
   });
 
+  it("renders assistant markdown while keeping unsupported math literal (#934)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, {
+      messages: [{ id: "assistant", role: "assistant", content: "**Gravity** is $x^2$." }],
+    }));
+    expect(html).toContain('data-streamdown="strong">Gravity</span>');
+    expect(html).toContain("$x^2$");
+    expect(html).not.toContain('class="katex"');
+  });
+
   it("supports stopping a stream and documents the input keyboard behavior", () => {
     const html = renderToStaticMarkup(createElement(ComposerStripView, { value: "hello", onChange: () => undefined, streaming: true, onStop: () => undefined }));
     expect(html).toContain("Stop response");
