@@ -33,7 +33,7 @@ export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled
         {material?.lotTracked ? E.pick(`Source lot ${index + 1}`, row.lotId ?? "", [{ value: "", label: "No lot · only all-zero actuals" }, ...plan.lots.filter(item => item.materialId === row.materialId).map(item => ({ value: item.id, label: item.code }))], { disabled, onChange: value => patch({ lotId: value || null }) }) : E.fld("Source lot", "Untracked stock")}
         {E.fld(restoring ? "Available after reversal" : "Available at source", `${qty(source?.qty ?? 0)} ${material?.unit ?? ""}`)}
         {([['used', 'Used'], ['loss', 'Damaged / lost'], ['unused', 'Unused returned']] as const).map(([field, label]) => <div key={field}>{E.edit(`${label} ${index + 1} (${material?.unit ?? "base units"})`, row[field], "number", undefined, { min: 0, step: material?.unit === "each" ? 1 : 0.0001, disabled, required: true, onChange: value => patch({ [field]: value }) })}</div>)}
-        {toTicks(Number(row.used)) + toTicks(Number(row.loss)) > toTicks(source?.qty ?? 0) ? E.note(restoring ? "Replacement use plus loss exceeds stock after reversal. Choose or split the source." : "Used plus loss exceeds this source’s current stock. Choose or split the source before closing.") : null}
+        {toTicks(Number(row.used)) + toTicks(Number(row.loss)) > toTicks(source?.qty ?? 0) ? E.note(restoring ? "Replacement use plus loss exceeds stock after reversal. Choose or split the source." : "Used plus loss exceeds this source’s current stock. Choose or split the source before closing.", "alert") : null}
         <Button type="button" variant="ghost" disabled={disabled} onClick={() => onRemove?.(row.key)}>Remove source {index + 1}</Button>
       </div>;
     })}

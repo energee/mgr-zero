@@ -377,26 +377,26 @@ export const E = {
   ),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
-  note: (t: React.ReactNode) => (
+  note: (t: React.ReactNode, role: "note" | "alert" = "note") => (
     // A warm card, sitting at the same lift off the page as a plain Alert's
     // bg-card, so attention is carried by the amber ink and rule rather than by
     // a filled panel competing with the row beside it.
-    <Alert className="border-warning-foreground/40 bg-warning text-warning-foreground">
+    <Alert role={role} className="border-warning-foreground/40 bg-warning text-warning-foreground">
       <Icon icon={Alert02Icon} />
       {/* text-pretty, not shadcn's text-balance: balancing shortens every line to
           even them up, so a two-line note reads as a narrow block in a wide card. */}
       <AlertDescription className="text-pretty text-warning-foreground">{t}</AlertDescription>
     </Alert>
   ),
-  info: (t: React.ReactNode) => (
-    <Alert className="border-info-foreground/40 bg-info text-info-foreground">
+  info: (t: React.ReactNode, role: "note" | "alert" = "note") => (
+    <Alert role={role} className="border-info-foreground/40 bg-info text-info-foreground">
       <Icon icon={InformationCircleIcon} />
       <AlertDescription className="text-pretty text-info-foreground">{t}</AlertDescription>
     </Alert>
   ),
   /** Plain muted text, or nothing, for the caller's always-mounted role="status"
-   *  region, so a screen reader hears the change politely. E.info and E.note are
-   *  alerts and would interrupt the screen reader on every change. */
+   *  region, so a screen reader hears the change politely. E.info and E.note
+   *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
   /** Annotation chips; the gallery renders this under the frame, never inside it. */
   states: (arr: [string, string, (0 | 1)?][]) => (
