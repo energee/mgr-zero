@@ -387,10 +387,10 @@ export const E = {
   /** A picked value from a list too long for a Select (materials): the trigger opens a
    *  searchable sheet (phone) or dialog (desk). `placeholder` is the trigger text when
    *  nothing is picked; `selectedLabel` names a retained value missing from `options`. */
-  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string }) => (
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean }) => (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={controls?.["aria-describedby"]} selectedLabel={controls?.selectedLabel}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={controls?.["aria-describedby"]} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
         title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} />
     </Field>
   ),

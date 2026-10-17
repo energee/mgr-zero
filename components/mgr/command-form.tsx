@@ -23,9 +23,9 @@ import { cn } from "@/lib/utils";
 // ghost X, and overridden here (not in components/ui) so a harmless Sheet like
 // MeSheet keeps its neutral close. Route it through the controlled boundary
 // directly so both the Dialog and aliased Sheet branches reset their form state.
-function FormClose({ className, onClose }: { className: string; onClose?: (open: boolean) => void }) {
+function FormClose({ className, onClose, previewAction }: { className: string; onClose?: (open: boolean) => void; previewAction?: boolean }) {
   return (
-    <Button type="button" variant="destructive" size="icon-sm" className={className} onClick={() => onClose?.(false)}>
+    <Button type="button" variant="destructive" size="icon-sm" className={className} onClick={() => onClose?.(false)} data-preview-action={previewAction || undefined}>
       <XIcon />
       <span className="sr-only">Close</span>
     </Button>
@@ -40,10 +40,13 @@ export function CommandForm({
   footer,
   container,
   children,
+  previewAction,
 }: {
   open: boolean;
   /** Where the sheet or dialog portals to; the screen explorer keeps it inside its box. */
   container?: HTMLElement | null;
+  /** Keeps this inventory picker and its dismissal controls inside the explorer. */
+  previewAction?: boolean;
   /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
   /** Omit when the caller controls `open` itself (the screen inventory's frames). */
@@ -63,6 +66,7 @@ export function CommandForm({
       <DialogPrimitive.Portal container={container}>
         <DialogPrimitive.Content
           data-slot="dialog-content"
+          data-preview-action={previewAction || undefined}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
@@ -71,7 +75,7 @@ export function CommandForm({
           <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
           {body("-mx-4")}
           {foot("-mx-4")}
-          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} />
+          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} previewAction={previewAction} />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </Dialog>
@@ -80,13 +84,13 @@ export function CommandForm({
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <SheetContent showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]" data-preview-action={previewAction || undefined}>
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
           {body("")}
           {foot("")}
-          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} />
+          <FormClose className="absolute top-3 right-3" onClose={onOpenChange} previewAction={previewAction} />
         </SheetContent>
       </Sheet>
     );
@@ -94,13 +98,13 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
+      <DialogContent showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md" data-preview-action={previewAction || undefined}>
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {body("-mx-4")}
         {foot("-mx-4")}
-        <FormClose className="absolute top-2 right-2" onClose={onOpenChange} />
+        <FormClose className="absolute top-2 right-2" onClose={onOpenChange} previewAction={previewAction} />
       </DialogContent>
     </Dialog>
   );

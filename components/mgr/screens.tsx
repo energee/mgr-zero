@@ -2273,7 +2273,7 @@ export const SCREENS: Screen[] = [
     job: "Audit acquired, returned, lost, found and retired keg events",
     reads: "list_keg_events · list_keg_pools · list_customers",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["all", "newest first"], ["filtered", "customer and pool filters combine"], ["empty", "no matching events"]],
+    states: [["permission", "warehouse or admin required", 1], ["all", "newest first"], ["filtered", "pool and customer picks combine · each has All · the URL keeps them"], ["empty", "no matching events"]],
     spec: "This is the immutable keg ledger, not an editor.",
     body: <KegHistoryView model={toKegHistoryViewProps(kegHistoryLedger)} />,
   },
