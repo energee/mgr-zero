@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
-import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { consumeAdmission } from "@/lib/commands/admission";
 import {
   beginQboInvoiceSync,
@@ -11,6 +11,7 @@ import {
   recordQboInvoiceSyncFailure,
   confirmPortalInvoicePayment,
   finishQboPush,
+  finishQboReceiptBill,
   markQboAuthorizationFailed,
   readPortalInvoicePayment,
   readVersionedIntegrationTokens,
@@ -380,6 +381,58 @@ export async function pushInvoiceToQbo(
   });
 }
 
+type ReceiptBillStart = {
+  receiptId: string; status: "pending" | "pushed" | "push_failed"; remoteId?: string; error?: string;
+  mayPost?: boolean; providerRequestId?: string; requestBody?: string; realmId?: string; connectionId?: string;
+};
+
+/** Query before retry; replay only the frozen payload and provider request ID. */
+export async function postReceiptBill(ctx: Ctx, receiptId: string, requestId: string, client: QboOAuthClient, newAttemptReason?: "corrected") {
+  if (!canRun(ctx, "post_receipt_bill")) throw new CommandError("permission denied: receipt Bills require admin", 403, "permission_denied");
+  const start = await unwrap(ctx.db.rpc("start_qbo_receipt_bill", {
+    p_brewery: ctx.breweryId, p_receipt: receiptId, p_request_id: requestId, p_new_attempt_reason: newAttemptReason ?? null,
+  })) as ReceiptBillStart;
+  if (start.status === "pushed" && start.remoteId) return { receiptId: start.receiptId, status: "pushed" as const, remoteId: start.remoteId };
+  if (start.status === "push_failed") throw new CommandError(start.error ?? "QuickBooks rejected the Bill; fix mappings and choose Post corrected Bill", 400);
+  if (!start.providerRequestId || !start.requestBody || !start.realmId || !start.connectionId) throw new Error("Bill snapshot was invalid");
+  const { providerRequestId, requestBody, realmId, connectionId } = start;
+  const outcomeUnknown = "Bill outcome is uncertain; retry the exact Bill request to reconcile it without duplication.";
+  const record = (remoteId: string | null, error: string | null, response: Record<string, unknown>, definitiveRejection = false) => finishQboReceiptBill(ctx, {
+    receiptId: start.receiptId, providerRequestId, remoteId, error, response, definitiveRejection,
+  });
+  let definitiveRejection = false;
+  try {
+    let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+    if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed; reconcile the Bill in its original company", 409, "conflict");
+    if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
+    if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+    if (!start.mayPost) {
+      let found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
+      if (!found.ok && found.status === 401) {
+        tokens = await refreshQboCredentials(ctx, client, tokens);
+        if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+        found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
+      }
+      if (found.ok && found.remoteId) return await record(found.remoteId, null, { Id: found.remoteId });
+      if (!found.ok) throw new CommandError(outcomeUnknown, 409, "conflict");
+    }
+    // Intuit guarantees idempotence for the same company + requestid + content:
+    // https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions
+    // A retry with no query match replays these frozen bytes, never a new key.
+    const created = await client.createTransaction(realmId, "Bill", providerRequestId, requestBody, tokens.accessToken);
+    if (created.ok) return await record(created.remoteId, null, created.response);
+    definitiveRejection = created.definitive;
+    throw new CommandError(created.definitive
+      ? "QuickBooks rejected this Bill. Fix its vendor or purchase account in Accounting, then choose Post corrected Bill."
+      : outcomeUnknown, created.definitive ? 400 : 409, created.definitive ? "validation_error" : "conflict");
+  } catch (error) {
+    const message = error instanceof CommandError ? error.message : outcomeUnknown;
+    await record(null, message, {}, definitiveRejection);
+    if (error instanceof CommandError) throw error;
+    throw new CommandError(message, 409, "conflict");
+  }
+}
+
 export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOAuthClient) {
   if (ctx.role !== "admin" && ctx.role !== "sales") {
     throw new CommandError("permission denied: QuickBooks sync requires admin or sales", 403, "permission_denied");
@@ -611,7 +664,7 @@ export class QboOAuthClient {
     if (!response.ok) throw new Error("QuickBooks revoke failed");
   }
 
-  async createTransaction(realmId: string, entityType: "Invoice" | "CreditMemo", requestId: string, body: string, accessToken: string) {
+  async createTransaction(realmId: string, entityType: "Invoice" | "CreditMemo" | "Bill", requestId: string, body: string, accessToken: string) {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     url.searchParams.set("requestid", requestId);
@@ -637,6 +690,32 @@ export class QboOAuthClient {
       safe.TotalTax = (tax as Record<string, unknown>).TotalTax;
     }
     return { ok: true as const, remoteId: row.Id as string, response: safe };
+  }
+
+  async findReceiptBill(realmId: string, requestId: string, body: string, accessToken: string) {
+    const frozen = JSON.parse(body) as { DocNumber: string };
+    if (!/^MGR-[a-f0-9]{17}$/.test(frozen.DocNumber)) throw new Error("Bill identity was invalid");
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    url.searchParams.set("query", `select * from Bill where DocNumber = '${frozen.DocNumber}'`);
+    const response = await this.transport(url, {
+      method: "GET", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, redirect: "error",
+    });
+    if (!response.ok) return { ok: false as const, status: response.status };
+    const payload = await response.json() as { QueryResponse?: { Bill?: unknown } };
+    if (!payload?.QueryResponse || typeof payload.QueryResponse !== "object" || Array.isArray(payload.QueryResponse)) {
+      throw new Error("Bill reconciliation response was invalid");
+    }
+    const rows = payload.QueryResponse.Bill ?? [];
+    if (!Array.isArray(rows)) throw new Error("Bill reconciliation response was invalid");
+    const matches = rows.filter((value: unknown): value is Record<string, unknown> => {
+      if (!value || typeof value !== "object") return false;
+      const row = value as Record<string, unknown>;
+      return row.DocNumber === frozen.DocNumber && row.PrivateNote === `MGR receipt bill ${requestId}`
+        && typeof row.Id === "string" && row.Id.length > 0;
+    });
+    if (rows.length !== 0 && (matches.length !== 1 || rows.length !== 1)) throw new Error("Bill reconciliation identity was ambiguous");
+    return { ok: true as const, remoteId: matches.length === 1 ? matches[0].Id as string : null };
   }
 
   async readInvoice(
