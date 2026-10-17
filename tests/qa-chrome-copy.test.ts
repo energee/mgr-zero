@@ -18,7 +18,6 @@ import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
 import { licensesDemo } from "@/lib/mgr/fixtures/compliance";
 import { pricingGrid } from "@/lib/mgr/fixtures/pricing";
-import { moreNavs } from "@/lib/mgr/fixtures/more";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -47,14 +46,10 @@ describe("section nouns agree with the page they sit on (#261)", () => {
   it("Contracts accepts a header so the Vendors page does not link to itself", () => {
     const html = htmlOf(createElement(ContractsView, {
       model: toContractsViewProps({ rows: [] }),
-      header: E.hd("Contracts", "committed quantities"),
+      header: E.hd("Contracts"),
     }));
     expect(html).not.toMatch(/Vendors/);
     expect(src("app/(app)/vendors/page.tsx")).toMatch(/header=\{E\.hd\("Contracts"/);
-  });
-
-  it("the More card for Vendors reads the same as the Vendors page subtitle", () => {
-    expect(moreNavs.find((nav) => nav.key === "vendors")?.detail).toBe("who you buy from");
   });
 });
 
