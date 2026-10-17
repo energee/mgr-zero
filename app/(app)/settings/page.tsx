@@ -18,7 +18,7 @@ import type { Filing, ReportingBasisCorrection } from "@/lib/commands/compliance
 export default async function SettingsPage() {
   const brewery = await getActiveBrewery();
   const serverEnv = getServerEnv();
-  if (brewery.role !== "admin") redirect(deniedHref("Settings", ["admin"]));
+  if (!brewery.roles.includes("admin")) redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
   const [row, locations, team, ai, aiModels, reports, basisCorrections] = await Promise.all([
     runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null }>,
@@ -44,6 +44,7 @@ export default async function SettingsPage() {
         paLicense: row.pa_license_no ?? "",
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
+        daysToPackage: String(row.days_to_package),
         booksOpenedOn: row.books_opened_on ?? "",
         hasFiledReports,
         basisCorrections,

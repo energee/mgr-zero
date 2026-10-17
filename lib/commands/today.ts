@@ -5,6 +5,7 @@
 // get_first_run_state, the four facts the First-run checklist reads.
 import { z } from "zod";
 import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 export type TodayItem = {
   reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "refused_return" | "fermentation_reading_overdue" | "invoice_question";
@@ -38,7 +39,7 @@ defineQuery({
         safeLabel: r.safe_label, detail: r.detail, dueAt: r.due_at, href: r.href, recipientRoles: r.recipient_roles,
         assignedUserId: r.assigned_user_id,
       }))
-      .filter((it) => ctx.role === "admin" || (it.recipientRoles.includes(ctx.role as StaffRole) && (!it.assignedUserId || it.assignedUserId === ctx.userId)));
+      .filter((it) => hasAnyRole(ctx.roles, ["admin"]) || (hasAnyRole(ctx.roles, it.recipientRoles) && (!it.assignedUserId || it.assignedUserId === ctx.userId)));
   },
 });
 

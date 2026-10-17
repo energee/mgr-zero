@@ -32,7 +32,7 @@ weeklyDraft.draft.lines[1].quantity = "2";
 weeklyDraft.draft.lines[1].disposition = "destroyed";
 export const weeklyCount: WeeklyCountViewModel = {
   timeZone: DEMO_TIME_ZONE,
-  locations: [["Ridgeline Tap Room"], ["Downtown"]], location: "Ridgeline Tap Room", role: "admin", draft: weeklyDraft,
+  locations: [["Ridgeline Tap Room"], ["Downtown"]], location: "Ridgeline Tap Room", roles: ["admin"], draft: weeklyDraft,
   lotLabels: { "cold:hazy-half:hazy-lot": "L-260901-HZ" },
   receipt: { date: "Sep 8", recorded: "Latest uncorrected count", canCorrect: true,
     correctionForm: correctionStateFromReceipt("saved-sep8", [{ id: "saved2", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold", lot_id: "L-260901-HZ", qty_before: 7, qty_counted: 2 }]),

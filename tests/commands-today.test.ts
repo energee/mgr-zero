@@ -66,6 +66,16 @@ describe("get_today (registered reader)", () => {
     expect(forWarehouse[0].dueAt).toBe("2026-09-05T04:00:00+00:00");
   });
 
+  it("shows both sales and warehouse work once to a member holding both roles", async () => {
+    const combined = await makeStaffCtx(b.id, ["sales", "warehouse"]);
+    const submitted = await createOrder("2026-09-05", true);
+    const confirmed = await createOrder("2026-09-05", true, true);
+    const ownRows = (await today(combined, "2026-09-05T12:00:00Z"))
+      .filter((item) => item.subjectId === submitted || item.subjectId === confirmed);
+    expect(ownRows.map((item) => [item.reason, item.subjectId]).sort())
+      .toEqual([["pick_due", confirmed], ["submitted_order", submitted]]);
+  });
+
   it("keeps an undated confirmed order always pick due, after dated work (#820)", async () => {
     const dated = await createOrder("2026-09-05", true, true);
     const id = await createOrder(null, true, true);
@@ -179,7 +189,7 @@ describe("get_today (registered reader)", () => {
 
   it("rejects customers", async () => {
     const customerUser = await makeCustomerUser(customerId);
-    const ctx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId };
+    const ctx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, roles: ["customer" as const], customerId };
     await expect(today(ctx, "2026-09-05T12:00:00Z")).rejects.toThrow(/permission/i);
   });
 

@@ -11,7 +11,7 @@ const can = (report: Report) => report.figures.lines.find(line => line.class ===
 describe("recorded reporting-basis correction", () => {
   it("changes regenerated balances only through an admin correction, flags all dependent periods, preserves snapshots and immutable history", async () => {
     const breweryId = (await makeBrewery()).id;
-    const ctx = await makeStaffCtx(breweryId);
+    const ctx = await makeStaffCtx(breweryId, ["sales", "admin"]);
     const { skuId } = await seedCatalog(breweryId, { packageType: "can", bblPerUnit: 0.5 });
     const loc = await seedLocation(breweryId);
     insertFixture("inventory_movements", { brewery_id: breweryId, sku_id: skuId, location_id: loc.id, bin_id: loc.binId, created_by: ctx.userId, qty: 10, type: "opening_balance", occurred_on: "2025-01-15" });

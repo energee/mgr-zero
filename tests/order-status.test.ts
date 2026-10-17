@@ -22,9 +22,17 @@ describe("nextAction", () => {
     for (const [status, restock, command] of COMMAND) {
       const roles = getCommandDefinition(command)!.roles as readonly string[];
       for (const role of STAFF_ROLES) {
-        expect(nextAction(status, restock, "o", role).verb !== "Open", `${command} as ${role}`).toBe(roles.includes(role));
+        expect(nextAction(status, restock, "o", [role]).verb !== "Open", `${command} as ${role}`).toBe(roles.includes(role));
       }
     }
+  });
+
+  it("offers each lifecycle step to a member holding both sales and warehouse", () => {
+    expect(nextAction("submitted", false, "o", ["sales", "warehouse"])).toMatchObject({ verb: "Confirm", href: "/orders/o/confirm" });
+    expect(nextAction("confirmed", false, "o", ["sales", "warehouse"])).toMatchObject({ verb: "Pick", href: "/orders/o" });
+    expect(nextAction("confirmed", true, "o", ["brewer", "warehouse"])).toMatchObject({ verb: "Put back", href: "/orders/o/restock" });
+    expect(nextAction("submitted", false, "o", ["brewer", "warehouse"]).verb).toBe("Open");
+    expect(nextAction("submitted", false, "o", []).verb).toBe("Open");
   });
 
   it("shares its role lists with the order commands", () => {

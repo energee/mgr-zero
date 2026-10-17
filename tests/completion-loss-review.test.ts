@@ -232,7 +232,7 @@ describe("completion loss review", () => {
     const currentRequest = crypto.randomUUID();
     const currentPayload = { adjustmentId: current.adjustmentId, bbl: 0.01, classification: "destruction" as const };
     await runCommand("reattribute_loss", currentPayload, currentActor, { requestId: currentRequest, correlationId: crypto.randomUUID() });
-    await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", breweryId).eq("user_id", currentActor.userId);
+    await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", breweryId).eq("user_id", currentActor.userId);
     expect((await currentActor.db.rpc("reattribute_loss", {
       p_brewery: breweryId, p_adjustment: current.adjustmentId, p_bbl: 0.01,
       p_classification: "destruction", p_destination_state: null, p_request_id: currentRequest,

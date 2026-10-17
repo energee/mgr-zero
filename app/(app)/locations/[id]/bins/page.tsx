@@ -25,7 +25,7 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   const location = ((await runCommand("list_locations", {}, ctx)) as LocationRow[]).find((l) => l.id === id);
   if (!location) notFound();
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as BinRow[];
-  const canWrite = brewery.role === "admin" || brewery.role === "warehouse";
+  const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : [];
   return <LocationBinsView
     model={{ ...toLocationBinsViewProps({ location, bins, backHref: `/locations/${id}` }), moveUnavailable: canWrite ? moveStockUnavailable({ bins: bins.length, stock: stock.length }) : null }}

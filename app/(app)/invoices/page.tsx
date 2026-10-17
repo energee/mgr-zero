@@ -12,7 +12,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
   const cursor = pageCursor(params.cursor);
   const ctx = await buildContext(brewery.id);
-  const canManage = brewery.role === "admin" || brewery.role === "sales";
+  const canManage = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [records, health, syncStatus] = await Promise.all([
     runCommand("list_invoices", { cursor }, ctx) as Promise<HistoryPage<InvoiceListRecord & HistoryRow>>,
     canManage ? runCommand("get_qbo_connection", {}, ctx) as Promise<{ connected: boolean; state: string; realmLabel: string | null; realmId?: string }> : null,
@@ -20,9 +20,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   ]);
   const page = historyPage(records, "/invoices", cursor);
   return <InvoicesView pagination={page.pagination} backHref="/more" rows={page.rows.map(invoice => ({
-    ...toInvoiceListRow(invoice, brewery.role, Boolean(health?.connected), brewery.timeZone), href: `/invoices/${invoice.id}`,
+    ...toInvoiceListRow(invoice, brewery.roles, Boolean(health?.connected), brewery.timeZone), href: `/invoices/${invoice.id}`,
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `connected · ${qboCompanyName(health) ?? "verified company"}` : health.state.replaceAll("_", " "),
-    canConnect: brewery.role === "admin", connectHref: "/settings/accounting/connect",
+    canConnect: brewery.roles.includes("admin"), connectHref: "/settings/accounting/connect",
   } : undefined} sync={<QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} disabled={!health?.connected} />} />;
 }

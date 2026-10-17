@@ -72,7 +72,7 @@ describe("scoped composer history and provenance", () => {
       expect(attempts.map((result) => result.error?.code ?? null)).toEqual(["42501", "42501", "42501", "42501", "42501"]);
     } finally {
       await admin.from("customer_users").delete().eq("customer_id", customer.customerId).eq("user_id", owner.userId);
-      await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: owner.userId, role: "admin" });
+      await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: owner.userId, roles: ["admin"] });
     }
     const restored = await owner.db.rpc("get_chat_history", { p_brewery: breweryId, p_conversation: conversationId });
     expect(restored.error).toBeNull();

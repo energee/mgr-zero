@@ -4,7 +4,7 @@
 // what a person sees and types. The brewery setter is admin-only, the personal
 // one is any staff role, and neither reaches another brewery.
 import { beforeAll, describe, expect, it } from "vitest";
-import { makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -78,5 +78,76 @@ describe("brewery settings (Program 10 task 4)", () => {
     expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "openai/gpt-5.4" });
     expect(await runCommand("get_brewery_ai_model", {}, taproomCtx)).toEqual({ model: "openai/gpt-5.4" });
     await expect(runCommand("set_brewery_ai_model", { model: "not a model" }, adminCtx)).rejects.toThrow();
+  });
+});
+
+describe("projected packaging operating defaults", () => {
+  it("defaults to fourteen days, saves both defaults once, and exposes packaging days to staff", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    expect(await runCommand("get_brewery", {}, brewer)).toMatchObject({ days_to_package: 14 });
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const input = { readingDueHours: 36, daysToPackage: 21 };
+    const saved = await runCommand("set_brewery_operating_defaults", input, owner, execution);
+    expect(await runCommand("set_brewery_operating_defaults", input, owner, execution)).toEqual(saved);
+    await expect(runCommand("set_brewery_operating_defaults", { ...input, daysToPackage: 22 }, owner, execution)).rejects.toThrow(/different payload/);
+    expect(await runCommand("get_brewery", {}, brewer)).toMatchObject({ fermentation_reading_due_hours: 36, days_to_package: 21 });
+    const stored = await admin.from("breweries").select("fermentation_reading_due_hours, days_to_package").eq("id", brewery.id).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data).toEqual({ fermentation_reading_due_hours: 36, days_to_package: 21 });
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 48 }, owner);
+    expect(await runCommand("get_brewery", {}, brewer)).toMatchObject({ fermentation_reading_due_hours: 48, days_to_package: 21 });
+  });
+
+  it("enforces integer packaging days from one to 120 at command and database boundaries without changing either default", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 36, daysToPackage: 21 }, owner);
+    for (const daysToPackage of [0, 121, 1.5]) {
+      await expect(runCommand("set_brewery_operating_defaults", { readingDueHours: 48, daysToPackage }, owner)).rejects.toThrow();
+    }
+    for (const p_days_to_package of [0, 121]) {
+      const invalid = await owner.db.rpc("set_brewery_operating_defaults", {
+        p_brewery: brewery.id, p_reading_due_hours: 48, p_days_to_package, p_request_id: crypto.randomUUID(),
+      });
+      expect(invalid.error).not.toBeNull();
+    }
+    expect(await runCommand("get_brewery", {}, owner)).toMatchObject({ fermentation_reading_due_hours: 36, days_to_package: 21 });
+    for (const daysToPackage of [1, 120]) {
+      await runCommand("set_brewery_operating_defaults", { readingDueHours: 36, daysToPackage }, owner);
+      expect(await runCommand("get_brewery", {}, owner)).toMatchObject({ days_to_package: daysToPackage });
+    }
+  });
+
+  it("keeps operating defaults admin-only and prevents a forged foreign brewery from changing them", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    const brewer = await makeStaffCtx(brewery.id, "brewer");
+    const input = { readingDueHours: 36, daysToPackage: 21 };
+    await expect(runCommand("set_brewery_operating_defaults", input, brewer)).rejects.toThrow(/permission denied/);
+    const denied = await brewer.db.rpc("set_brewery_operating_defaults", {
+      p_brewery: brewery.id, p_reading_due_hours: 36, p_days_to_package: 21, p_request_id: crypto.randomUUID(),
+    });
+    expect(denied.error).not.toBeNull();
+    const foreign = await makeBrewery();
+    await expect(runCommand("set_brewery_operating_defaults", input, { ...owner, breweryId: foreign.id })).rejects.toThrow();
+    const untouched = await admin.from("breweries").select("days_to_package").eq("id", foreign.id).single();
+    expect(untouched.error).toBeNull();
+    expect(untouched.data).toEqual({ days_to_package: 14 });
+  });
+
+  it("replays a previously accepted reading-hours-only request unchanged and leaves newer packaging defaults alone", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id);
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 48, daysToPackage: 21 }, owner);
+    const requestId = crypto.randomUUID();
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${owner.userId}','${brewery.id}','${requestId}','set_brewery_operating_defaults',
+        extensions.digest(jsonb_build_object('hours',36)::text,'sha256'),'{"ok":true}'::jsonb)`);
+    const execution = { requestId, correlationId: requestId };
+    expect(await runCommand("set_brewery_operating_defaults", { readingDueHours: 36 }, owner, execution)).toEqual({ ok: true });
+    await expect(runCommand("set_brewery_operating_defaults", { readingDueHours: 36, daysToPackage: 14 }, owner, execution)).rejects.toThrow(/different payload/);
+    expect(await runCommand("get_brewery", {}, owner)).toMatchObject({ fermentation_reading_due_hours: 48, days_to_package: 21 });
   });
 });

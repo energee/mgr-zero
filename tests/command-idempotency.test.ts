@@ -72,11 +72,7 @@ describe("command request idempotency", () => {
     expect(commandMismatch.error?.message).toMatch(/request id.*different payload/i);
 
     const otherBrewery = await makeBrewery();
-    await admin.from("brewery_users").insert({
-      brewery_id: otherBrewery.id,
-      user_id: staffUserId,
-      role: "admin",
-    });
+    await admin.from("brewery_users").insert({ brewery_id: otherBrewery.id, user_id: staffUserId, roles: ["admin"] });
     const breweryMismatch = await staffDb.rpc("upsert_brand", {
       p_brewery: otherBrewery.id,
       p_name: "Wrong brewery",

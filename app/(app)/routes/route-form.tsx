@@ -13,7 +13,7 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { StopDoc } from "@/lib/commands/delivery";
 import { driverLabel, type Route } from "./labels";
 
-export function RouteForm({ route, candidates, drivers, today }: { route: Route | null; candidates: StopDoc[]; drivers: { user_id: string; role: string }[]; today: string }) {
+export function RouteForm({ route, candidates, drivers, today }: { route: Route | null; candidates: StopDoc[]; drivers: { user_id: string; roles: string[] }[]; today: string }) {
   const router = useRouter();
   const [deliveryDate, setDeliveryDate] = useState(route?.delivery_date ?? today);
   const [driverUserId, setDriverUserId] = useState(route?.driver_user_id ?? "");
@@ -34,7 +34,7 @@ export function RouteForm({ route, candidates, drivers, today }: { route: Route 
   return <RouteView model={{
     title: route ? (route.name ?? "Route") + " · " + route.delivery_date : "New route", backTo: "Deliveries", backHref: "/routes",
     date: deliveryDate, driverId: driverUserId, vehicle, name, selection: stops, saved: Boolean(route), savedDriverId: route?.driver_user_id,
-    driverOptions: drivers.map(driver => ({ id: driver.user_id, label: driverLabel(driver.user_id) + " · " + driver.role })),
+    driverOptions: drivers.map(driver => ({ id: driver.user_id, label: driverLabel(driver.user_id) + " · " + driver.roles.join(", ") })),
     stops: candidates.map(candidate => ({ key: candidate.id, title: candidate.label, detail: "shipped · no route", locked: delivered.has(candidate.id), warning: !(candidate.id in stops) })),
   }} controls={{ date: setDeliveryDate, driverId: setDriverUserId, vehicle: setVehicle, name: setName, selection: setStops }} busy={busy} error={error}
     onSave={() => { void save(); }} onDepart={() => { if (route) void run("depart_route", { routeId: route.id }); }}

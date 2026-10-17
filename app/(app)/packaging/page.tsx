@@ -33,7 +33,7 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
   const { repack } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const canRepack = brewery.role === "admin" || brewery.role === "warehouse";
+  const canRepack = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   const [runs, brands, occupancies, skus, locations, bins, parents] = (await Promise.all([
     runCommand("list_packaging_runs", {}, ctx), runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
     runCommand("list_skus", {}, ctx),
@@ -43,7 +43,7 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
   ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[], RepackParent[]];
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
-    workHrefs={workHrefsFor(brewery.role)}
+    workHrefs={workHrefsFor(brewery.roles)}
     actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
   />;
 }

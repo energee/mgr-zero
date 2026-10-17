@@ -14,7 +14,7 @@ describe("reporting basis correction presentation", () => {
   it("keeps the correction form admin-only and amended filing review available to Sales", () => {
     expect(needsFor("Settings")).toEqual(["admin"]);
     expect(needsFor("Filed period needs amendment")).toEqual(["admin", "sales"]);
-    expect(deniedFor("brewer", "Filed period needs amendment")).toBe(true);
+    expect(deniedFor(["brewer"], "Filed period needs amendment")).toBe(true);
   });
 
   it("shares the amendment surface with the inventory and preserves original balances beside corrected evidence", () => {

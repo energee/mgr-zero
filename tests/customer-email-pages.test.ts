@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 const calls = vi.hoisted(() => [] as string[]);
-vi.mock("@/lib/brewery", () => ({ requireAdminContext: async () => ({ brewery: { timeZone: "UTC" }, ctx: { breweryId: "brewery", role: "admin" } }) }));
+vi.mock("@/lib/brewery", () => ({ requireAdminContext: async () => ({ brewery: { timeZone: "UTC" }, ctx: { breweryId: "brewery", roles: ["admin"] } }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: async (name: string) => {
   calls.push(name);
   if (name === "get_qbo_connection") return { connected: false, state: "disconnected", realmLabel: null, lastError: null };

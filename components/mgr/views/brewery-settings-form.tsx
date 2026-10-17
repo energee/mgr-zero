@@ -7,10 +7,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-
-export type BrewerySettingsValues = { name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string; booksOpenedOn: string;
-  /** The one-way keg fee in dollars ("10.00"), billed per one-way keg shipped. */
-  oneWayKegFee: string };
+import { breweryOperatingDefaultsCommand, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
@@ -27,10 +24,11 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   const { anchor: timezoneAnchor, props: timezoneSearch } = useComboboxSearch(timezoneLabel(values.timezone));
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
+  const defaults = breweryOperatingDefaultsCommand(values);
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
     E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required })
   );
-  return <form onSubmit={(event) => { event.preventDefault(); onSave?.(values); }}>
+  return <form onSubmit={(event) => { event.preventDefault(); if (defaults.valid) onSave?.(values); }}>
     <FieldSet className="min-w-0">
       <FieldLegend><h2 className="font-heading text-xl font-semibold">Brewery details</h2></FieldLegend>
       <div className="grid gap-4 @min-[24rem]:grid-cols-2">
@@ -66,9 +64,13 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
           <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
           {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168 })}
         </div>
+        <div className="flex min-w-0 flex-col gap-2">
+          {E.edit("Days to package", values.daysToPackage, "number", undefined, { onChange: (value) => change("daysToPackage", value), id: `${id}-daysToPackage`, min: 1, max: 120, step: 1, required: true })}
+          <FieldDescription>Expected days from brewing to packaging. Planning uses this for projected batch packaging materials.</FieldDescription>
+        </div>
       </div>
       <CommandFormMessage error={error} />
-      <Button type="submit" className="w-full @min-[24rem]:w-auto @min-[24rem]:self-end" disabled={busy || !values.name.trim() || !values.timezone.trim()}>{busy ? "Saving…" : "Save brewery"}</Button>
+      <Button type="submit" className="w-full @min-[24rem]:w-auto @min-[24rem]:self-end" disabled={busy || !values.name.trim() || !values.timezone.trim() || !defaults.valid}>{busy ? "Saving…" : "Save brewery"}</Button>
     </FieldSet>
   </form>;
 }

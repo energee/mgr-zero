@@ -14,7 +14,7 @@ beforeAll(async () => {
   const other = await seedCustomer(brewery.id, { name: "Other buyer" });
   const location = await seedLocation(brewery.id);
   const user = await makeCustomerUser(customerId);
-  buyer = { db: await asUser(user.email), userId: user.id, breweryId: brewery.id, role: "customer", customerId };
+  buyer = { db: await asUser(user.email), userId: user.id, breweryId: brewery.id, roles: ["customer"], customerId };
   const rows = [...ids.map(id => ({ id, customer_id: customerId, ship_to_id: customer.shipToId })),
     { id: crypto.randomUUID(), customer_id: other.customerId, ship_to_id: other.shipToId }];
   const common = { brewery_id: brewery.id, created_at: "2026-09-20T12:00:00.123456Z" };

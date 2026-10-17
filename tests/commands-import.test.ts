@@ -120,16 +120,16 @@ describe("import_csv rows", () => {
     const id = crypto.randomUUID(); const rows = [{ skuId: sku, locationId: location, binId: bin, qty: "3" }];
     const first = await execute("opening_balances", rows, id); expect(first.committed).toBe(1);
     const other = await makeBrewery();
-    await admin.from("brewery_users").insert({ brewery_id: other.id, user_id: ctx.userId, role: "admin" });
+    await admin.from("brewery_users").insert({ brewery_id: other.id, user_id: ctx.userId, roles: ["admin"] });
     const begin = (args: Record<string, unknown>) => ctx.db.rpc("begin_csv_import", { p_brewery: ctx.breweryId, p_request_id: crypto.randomUUID(), p_kind: "opening_balances", p_rows: rows, ...args });
     expect((await begin({ p_brewery: other.id, p_request_id: id })).error?.code).toBe("MG409");
     for (const p_rows of [null, {}, [], Array(5001).fill({}), [{ qty: 2 }], [null]]) expect((await begin({ p_rows })).error).not.toBeNull();
     expect((await begin({ p_kind: "made_up" })).error).not.toBeNull();
     for (const p_row_n of [-1, 1, 5000, null]) expect((await ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: id, p_row_n })).error).not.toBeNull();
     expect((await ctx.db.rpc("import_csv_row", { p_brewery: other.id, p_request_id: id, p_row_n: 0 })).error).not.toBeNull();
-    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
     expect((await ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: id, p_row_n: 0 })).error?.code).toBe("42501");
-    await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    await admin.from("brewery_users").update({ roles: ["admin"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
   });
   it("validates direct Data API number shape, required fields and cross-tenant references per row", async () => {
     const other = await makeBrewery(); const otherLocation = await seedLocation(other.id);
@@ -166,9 +166,9 @@ describe("import_csv rows", () => {
     expect((await admin.from("channel_prices").select("unit_price_cents").eq("price_group_id", ownGroup).order("unit_price_cents")).data).toEqual([{ unit_price_cents: 100 }, { unit_price_cents: 200 }]);
     const direct = (db: Ctx["db"]) => db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: requestId, p_row_n: 1 });
     expect((await direct(sales.db)).error?.code).toBe("42501");
-    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
     try { expect((await direct(ctx.db)).error?.code).toBe("42501"); }
-    finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
+    finally { await admin.from("brewery_users").update({ roles: ["admin"] }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
   });
   // #758: rows run concurrently, but rows sharing an import key keep file order.
   // Row 0 is held back, so without grouping its adjacent duplicate would win.

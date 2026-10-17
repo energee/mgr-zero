@@ -59,7 +59,7 @@ describe("customer controls", () => {
     const unchanged = await admin.from("ship_tos").select("id").eq("customer_id", c.id).eq("is_default", true);
     expect(unchanged.data).toEqual([{ id: first.id }]);
     const login = await makeCustomerUser(c.id);
-    const portalCtx = { db: await asUser(login.email), userId: login.id, breweryId, role: "customer" as const, customerId: c.id };
+    const portalCtx = { db: await asUser(login.email), userId: login.id, breweryId, roles: ["customer" as const], customerId: c.id };
     const account = await runCommand("get_portal_account", {}, portalCtx) as { shipTos: { id: string; is_default: boolean }[] };
     expect(account.shipTos.filter((s) => s.is_default).map((s) => s.id)).toEqual([first.id]);
     await runCommand("upsert_ship_to", { ...address, id: first.id, customerId: c.id, isDefault: false }, ctx);

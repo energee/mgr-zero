@@ -160,8 +160,8 @@ describe("format editing detail", () => {
     await expect(runCommand("get_format_composition", { formatId: parent.id }, warehouse)).resolves.toMatchObject({ format: { id: parent.id } });
     const outsider = await makeStaffCtx((await makeBrewery()).id, "admin");
     await expect(runCommand("get_format_composition", { formatId: parent.id }, outsider)).rejects.toMatchObject({ code: "not_found" });
-    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, role: "brewer" })).rejects.toMatchObject({ code: "permission_denied" });
-    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, role: "customer" })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, roles: ["brewer"] })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, roles: ["customer"] })).rejects.toMatchObject({ code: "permission_denied" });
     await expect(runCommand("get_format_composition", { formatId: "bad" }, sales)).rejects.toMatchObject({ code: "invalid_input" });
     await runCommand("replace_format_components", { formatId: parent.id, components: [] }, sales);
     await runCommand("replace_format_bom", { formatId: parent.id, lines: [] }, sales);

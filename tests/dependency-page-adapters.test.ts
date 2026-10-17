@@ -1,12 +1,12 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-const state = vi.hoisted(() => ({ role: "warehouse", calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role, timeZone: "America/Los_Angeles" }) }));
+const state = vi.hoisted(() => ({ roles: ["warehouse"], calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles, timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/portal", () => {
   const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
-  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { role: state.role } }) };
+  return { getActiveCustomer: async () => customer, getPortalContext: async () => ({ customer, ctx: { roles: ["customer"] } }) };
 });
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: state.roles }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: string, input: unknown) => {
   state.calls.push([name, input]);
@@ -50,14 +50,14 @@ it("does not fetch customer options when Orders has no customer filter", async (
 });
 
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
-  state.role = "warehouse"; state.calls = [];
+  state.roles = ["warehouse"]; state.calls = [];
   const readonly = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) })).props);
   expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined }]);
   expect(state.calls).toContainEqual(["get_customer", { customerId: "buyer" }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("Buyer");
-  state.role = "sales";
+  state.roles = ["sales"];
   // New order is its own route now; the list only links to it, and the route
   // itself carries the create_order gate and the picker options.
   const writable = OrdersClient((await OrdersPage({ searchParams: Promise.resolve({}) })).props);
@@ -91,7 +91,7 @@ it("slots the scoped recoverable Cart with the actual configured source or no so
 // asks for no particular use — so the shortfall card names the place it is held
 // even when that place is not a taproom. Reading only the taprooms showed a raw id.
 it("names the location a standing allocation is held at, taproom or not", async () => {
-  state.role = "warehouse"; state.calls = [];
+  state.roles = ["warehouse"]; state.calls = [];
   state.locations = [{ id: "tap", name: "Taproom", uses: ["taproom"] }, { id: "shed", name: "Overflow shed", uses: ["storage"] }];
   state.reservations = [{ id: "standing", source: "taproom_standing", ref: "shed", qty: 2 }];
   const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
@@ -101,7 +101,7 @@ it("names the location a standing allocation is held at, taproom or not", async 
 });
 
 it("renders the selected shortfall with actual package volume and competing order", async () => {
-  state.role = "warehouse"; state.calls = [];
+  state.roles = ["warehouse"]; state.calls = [];
   const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active", location: "not-a-taproom" }) });
   expect(state.calls).toContainEqual(["get_shortfalls", { skuId: "active" }]);
   expect(state.calls).toContainEqual(["list_standing_allocations", { locationId: "tap" }]);
@@ -117,7 +117,7 @@ it("renders the selected shortfall with actual package volume and competing orde
 });
 
 it.each(["warehouse", "admin", "sales"])("renders the actual Orders page with the permitted create control for %s", async role => {
-  state.role = role;
+  state.roles = [role];
   const html = renderToStaticMarkup(await OrdersPage({ searchParams: Promise.resolve({}) }));
   if (role === "warehouse") expect(html).not.toMatch(/New order|New Order/);
   else expect(html).toMatch(/New order|New Order/);
