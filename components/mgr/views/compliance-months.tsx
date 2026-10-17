@@ -20,7 +20,7 @@ export function ComplianceMonthsView({
 }) {
   return (
     <>
-      {E.hd("Compliance", "filing periods")}
+      {E.hd("Compliance")}
       <TabBar names={model.cadences} on={model.cadence} cls="w-full" hrefs={cadenceHrefs} />
       {model.months.map((row) => (
         <Fragment key={row.key}>

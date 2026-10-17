@@ -1,8 +1,10 @@
-// Catalog draws one row per brand. Packaged and poured SKUs live in its SKU list.
-import { Fragment, type ReactNode } from "react";
+// Catalog draws one row per brand in the shared RecordTable: the name links to
+// the brand, with its alias under it. Packaged and poured SKUs live in its SKU list.
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CatalogViewModel } from "@/lib/mgr/catalog-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
+import { RecordTable } from "@/components/mgr/views/record-table";
 
 export type { CatalogViewModel };
 
@@ -20,7 +22,7 @@ export function CatalogView({
   controls?: ReactNode;
   createAction?: ReactNode;
   footer?: ReactNode;
-  /** Live: brand rows, Price groups and water profiles are links. Inventory leaves them unlabeled taps. */
+  /** Live: brand names, Price groups and water profiles are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
   formats?: FormatsViewModel;
   formatAction?: ReactNode;
@@ -31,17 +33,22 @@ export function CatalogView({
       {controls}
       {model.empty
         ? E.blank(model.empty)
-        : model.brands.map((row) => (
-          <Fragment key={row.key}>
-            {E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
-          </Fragment>
-        ))}
+        : <RecordTable
+          headers={["Brand", "Style", "ABV", "SKUs"]}
+          align={["l", "l", "r", "r"]}
+          rows={model.brands.map((brand) => ({
+            key: brand.key,
+            cells: [brand.name, brand.style, brand.abv, brand.skus],
+            note: brand.alias,
+            href: linkRows ? brand.href : undefined,
+          }))}
+        />}
       {E.nav("Price groups", model.priceGroups, "", undefined, linkRows ? model.priceGroupsHref : undefined)}
       {model.waterProfiles != null
         ? E.nav("Water profiles", model.waterProfiles, "", undefined, linkRows ? model.waterProfilesHref : undefined)
         : null}
       {footer}
-      {formats && <FormatsView model={formats} header={E.hd("Formats", "Shared sizes and packaging for every brand", formatAction !== undefined ? formatAction : E.btn("New Format"))} />}
+      {formats && <FormatsView model={formats} header={E.hd("Formats", "", formatAction !== undefined ? formatAction : E.btn("New Format"))} />}
     </>
   );
 }

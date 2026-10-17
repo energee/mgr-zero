@@ -30,21 +30,27 @@ describe("Finished goods view", () => {
     expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }) }))).not.toContain("Inventory value");
   });
 
-  it("maps on-hand and ATP onto Review / Shortfall rows", () => {
-    const model = toFinishedGoodsViewProps(finishedGoodsList);
-    expect(model.rows.map((r) => [r.title, r.detail, r.verb])).toEqual([
-      [SKU_HAZY.name, "15 on hand · 4 allocated · ATP 11", "Review"],
-      [SKU_PILS.name, "18 on hand · 24 allocated · ATP −6", "Shortfall"],
-      [SKU_STOUT.name, "9 on hand · 2 allocated · ATP 7", "Review"],
+  it("maps each SKU onto a register row with on hand, allocated, available and its links (#942)", () => {
+    const row = (sku: { sku_id: string; name: string }, onHand: string, allocated: string, atp: string, short: boolean) => ({
+      key: sku.sku_id, name: sku.name, onHand, allocated, atp, short,
+      href: `/inventory/${sku.sku_id}`, shortfallHref: `/replenishment?sku=${sku.sku_id}`,
+    });
+    expect(toFinishedGoodsViewProps(finishedGoodsList).rows).toEqual([
+      row(SKU_HAZY, "15", "4", "11", false),
+      row(SKU_PILS, "18", "24", "−6", true),
+      row(SKU_STOUT, "9", "2", "7", false),
     ]);
-    expect(model.rows[1]?.warning).toBe(true);
-    expect(model.rows[1]?.shortfallHref).toBe(`/replenishment?sku=${SKU_PILS.sku_id}`);
+  });
+
+  it("keeps a known zero available as zero, not a shortfall (#942)", () => {
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Sold out" }], [{ sku_id: "s1", qty: 5 }], [{ sku_id: "s1", qty: 0 }]);
+    expect(toFinishedGoodsViewProps(snapshot).rows[0]).toMatchObject({ onHand: "5", allocated: "5", atp: "0", short: false });
   });
 
   it("rounds summed decimal on-hand rows to the two-decimal qty (#472)", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Hazy" }], [{ sku_id: "s1", qty: "0.10" }, { sku_id: "s1", qty: "0.20" }], [{ sku_id: "s1", qty: "0.10" }]);
     expect(snapshot.skus[0]?.on_hand).toBe(0.3);
-    expect(toFinishedGoodsViewProps(snapshot).rows[0]?.detail).toBe("0.3 on hand · 0.2 allocated · ATP 0.1");
+    expect(toFinishedGoodsViewProps(snapshot).rows[0]).toMatchObject({ onHand: "0.3", allocated: "0.2", atp: "0.1" });
   });
 
   it("names an empty list without inventing rows", () => {
@@ -53,25 +59,27 @@ describe("Finished goods view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("the inventory drawing still offers Add SKU, Review, and Shortfall", () => {
+  it("the inventory drawing offers Add SKU and a worded Shortfall, with no Review and no live hrefs (#942)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
     expect(html).toMatch(/>Add SKU</);
-    expect(html).toMatch(/>Review</);
     expect(html).toMatch(/>Shortfall</);
+    expect(html).not.toMatch(/>Review</);
     expect(html).toContain(SKU_HAZY.name);
-    expect(html).toMatch(/ATP −6/);
+    expect(html).toContain("−6");
     expect(html).not.toMatch(/href="\/inventory\//);
+    expect(html).not.toMatch(/href="\/replenishment/);
     expect(html).not.toMatch(/→/);
   });
 
-  it("linkRows turns Review into the SKU link and keeps Shortfall", () => {
+  it("linkRows makes the SKU name the stock-detail link and Shortfall the replenishment link (#942)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, {
       model: toFinishedGoodsViewProps(finishedGoodsList),
       linkRows: true,
     }));
-    expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"`));
-    expect(html).toMatch(new RegExp(`href="/replenishment\\?sku=${SKU_PILS.sku_id}"`));
-    expect(html).toMatch(/>Review</);
+    expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"[^>]*>${SKU_HAZY.name}<`));
+    expect(html).toMatch(new RegExp(`href="/replenishment\\?sku=${SKU_PILS.sku_id}"[^>]*>Shortfall<`));
+    expect(html).not.toMatch(new RegExp(`/replenishment\\?sku=${SKU_HAZY.sku_id}`));
+    expect(html).not.toMatch(/>Review</);
   });
 
   it("createAction, afterHeader, and footer slot for live Finished goods", () => {

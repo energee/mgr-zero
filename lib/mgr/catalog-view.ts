@@ -1,14 +1,21 @@
 // lib/mgr/catalog-view.ts — view-model for Catalog. list_brands plus
 // list_price_groups (and optional list_sale_channels / water-profile count)
 // paint the inventory Catalog drawing.
-import { brandLabel } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 
+/** One brand row's facts, each drawn in its own column. */
 export type CatalogBrandView = {
   key: string;
-  title: string;
-  detail: string;
+  name: string;
+  /** Staff-only informal name, drawn under the name; absent when the brand has none. */
+  alias?: string;
+  /** "Not set" when the brand has no style. */
+  style: string;
+  /** "6.8%", a real "0%", or "Not set". */
+  abv: string;
+  /** Packaged SKUs plus the pours its price group owns, active or not: "4". */
+  skus: string;
   href: string;
 };
 
@@ -46,12 +53,7 @@ export type CatalogSnapshot = {
   filtered?: boolean;
 };
 
-function brandDetail(b: CatalogBrandRow): string {
-  const parts = [b.styles?.name ?? "style not set"];
-  if (b.abv != null && b.abv !== "") parts.push(`${Number(b.abv)}%`);
-  parts.push(plural(b.skus.length + (b.pours?.length ?? 0), "SKU"));
-  return parts.join(" · ");
-}
+const NOT_SET = "Not set";
 
 export function toCatalogViewProps({
   brands,
@@ -69,8 +71,11 @@ export function toCatalogViewProps({
       : { title: "No brands yet", description: "Add a brand to start building the catalog." },
     brands: brands.map((b) => ({
       key: b.id,
-      title: brandLabel(b),
-      detail: brandDetail(b),
+      name: b.name,
+      alias: b.alias || undefined,
+      style: b.styles?.name ?? NOT_SET,
+      abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
+      skus: String(b.skus.length + (b.pours?.length ?? 0)),
       href: `/catalog/brands/${b.id}`,
     })),
     priceGroups: channels
