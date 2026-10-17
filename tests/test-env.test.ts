@@ -7,6 +7,11 @@ it("pins local test credentials and endpoints over inherited Bun app settings", 
   expect(env.SUPABASE_SECRET_KEY).toBe("fixture-secret");
   expect(env.EXTRA).toBe("keep");
 });
+it("does not let inherited CI=true bypass a worktree's pinned local endpoints", () => {
+  const env = resolveTestEnv({ CI: "true", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54341", DATABASE_URL: "postgresql://localhost:54342/postgres" }, local);
+  expect(env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
+  expect(env.DATABASE_URL).toBe("postgresql://postgres:postgres@127.0.0.1:54352/postgres");
+});
 it("fails closed before setup for missing or nonisolated local configuration", () => {
   expect(() => resolveTestEnv({}, undefined)).toThrow(/test-db/);
   for (const text of [local.replace("54351", "54341"), local.replace("54352", "54342"), local.replaceAll("127.0.0.1", "remote.invalid"), local.replace("MGR_TEST_STACK=1", "MGR_TEST_STACK=0"), local.replace("SUPABASE_SECRET_KEY=fixture-secret", "")]) expect(() => resolveTestEnv({}, text)).toThrow(/isolated/);

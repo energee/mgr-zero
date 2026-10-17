@@ -18,6 +18,11 @@ member. Quiet hours use `HH:MM` start and end
 with an optional timezone. Brewery-wide quiet hours set by an admin apply on
 top of them.
 
+`search_entities` accepts at most eight `kinds` entries. Repeated kinds are
+searched only once; arrays longer than eight are rejected before any search
+reads. Omit `kinds` or pass an empty array to search all kinds your role can
+open.
+
 {/* ops:today */}
 
 ## append_chat_message [#append_chat_message]

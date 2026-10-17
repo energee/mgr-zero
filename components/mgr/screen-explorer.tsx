@@ -173,11 +173,9 @@ export function ScreenExplorer() {
     const next = hits[at + (e.key === "ArrowDown" ? 1 : -1)];
     if (next) pick(next[0]);
   };
-  // Everything a preview box rewrites about the shell it draws, in one place:
-  // the rail is sized to the box (its own h-svh is the docs viewport, taller
-  // than 80svh), and tabs that open a screen this persona may not are hidden,
-  // as the app would hide them.
-  const boxCss = ".screen-box [data-slot=sidebar-container]{height:100%}"
+  // Keep the shared shell and its fixed rail within the preview's bounded height.
+  // Hide tabs this persona cannot open, as the application does.
+  const boxCss = ".screen-box [data-slot=sidebar-wrapper],.screen-box [data-slot=sidebar-container]{height:100%}"
     + Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
   // The selected row stays in view when a tap or a link lands far down the list.
   useEffect(() => {
@@ -272,16 +270,16 @@ export function ScreenExplorer() {
                    with it, so the scrolling is an inner box and this one holds
                    still. Keyed by screen: a drawing never inherits another's
                    filtered rows or added lines. */
-                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-hidden rounded-lg border outline-none [transform:translateZ(0)]">
+                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-clip rounded-lg border outline-none [transform:translateZ(0)]">
                   <style>{boxCss}</style>
                   <div className="h-full overflow-auto">
                     {s.surface === "sheet" ? (
                       <>
-                        <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} />
+                        <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} container={box} />
                         {box && <ScreenSheet screen={s} container={box} onClose={back} />}
                       </>
                     ) : (
-                      <ScreenFrame screen={s} persona={persona} />
+                      <ScreenFrame screen={s} persona={persona} container={box} />
                     )}
                   </div>
                 </div>
