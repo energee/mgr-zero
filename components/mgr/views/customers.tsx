@@ -16,7 +16,7 @@ export function CustomersView({
 }: {
   model: CustomersViewModel;
   createAction?: ReactNode;
-  /** Live has no search yet; pass null to hide. Inventory draws E.search. */
+  /** Live: ListControls (components/mgr/list-controls.tsx); null hides it. Inventory draws E.search. */
   search?: ReactNode;
   linkRows?: boolean;
   backHref?: string;

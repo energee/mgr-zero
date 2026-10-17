@@ -321,6 +321,8 @@ Empty sections say **No inventory recorded yet** or **No movements recorded yet*
 
 *Admin and Sales can create and edit customers and ship-to addresses. Warehouse can read these pages at their addresses; customer, ship-to, and invitation controls are hidden. The list shows name and alias, type, home state (or the country, outside the US), sale channel, and payment terms.*
 
+Above the list, **Search customers** finds customers whose name or alias contains what you type (press Enter); the search stays in the page address, and **No customers match** means nothing does.
+
 ### Create or edit a customer
 
 <Screen name="Customer detail" />
@@ -698,6 +700,8 @@ The page says **No taprooms yet: add one under Locations** when none exist, or *
 <Screen name="Water" />
 <Screen name="Water addition" />
 
+**Recipes** (More tab) lists each recipe with its current version; **Search recipes** above the list finds recipes whose name contains what you type (press Enter), and **No recipes match** means nothing does.
+
 A version is the brew sheet. A recipe page shows its newest version by default, read only: the title names the version (*Hazy IPA v4*), **Saved** gives the date it was saved, and the recipe's note sits above it. Under **Ingredients** each line reads its material, stage, timing and quantity per barrel; under **Process** come the process numbers the version set, then the **Mash schedule**, **Fermentation schedule** and **Water** headings with their steps, stages and additions listed inline. Quantities on the page show three significant digits (40.9, 0.0114); a draft keeps exactly what you typed. A saved version cannot change, and a batch's **Brew day** keeps the plan it was brewed from.
 
 Beside **Saved**, **Versions** links to each saved version, newest first. The
@@ -814,6 +818,8 @@ Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **
 
 **Vendors** (More tab; Admin, Warehouse, Brewer) lists your suppliers. **Add vendor** and **Edit** take a name, optional email and phone (7 to 15 digits; spaces, dots, dashes and parentheses are fine), payment terms (**Due on receipt**, **Net 15**, or **Net 30**, the default; the same list customers use), and a **Lead time** in days. The lead time is the vendor's, not the material's: it is what Planning subtracts from a needed-by date to get a buy-by date. Once a vendor has received orders, the row also shows the observed average from sent to last receipt, with how many orders it rests on (n=3 is weak evidence) and how it was sent, because a date someone typed for an order phoned in is not the same evidence as one MGR stamped.
 
+Above the list, **Search vendors** finds vendors whose name contains what you type (press Enter), and **Contracts** below then lists only those vendors' contracts; **No vendors match** means nothing does.
+
 Below the vendors, **Contracts** lists commitments: one vendor, one material, a quantity in purchase units, an optional price, window, and **Contract number**. A contract with a number shows it as the row's label; without one, the row falls back to the material name. A contract is not an order. You order against it all year, so each row shows four numbers: **committed**, **received**, **on order** (placed but not yet arrived), and **available**, which is committed less both. Available is the one to decide against; received is the one accounting reconciles. A contract never stops you ordering: exceed it and the extra lines are ordinary spot lines.
 
 ### Materials
@@ -822,6 +828,8 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 <Screen name="Materials" />
 
 **Materials on hand** (Beer tab; Admin, Warehouse, Brewer) shows quantities summed across every bin, including inactive materials, marked **inactive**. **Material definitions** opens the separate definition list, where **Edit** changes a material. **Add material** and **Edit** take a name, a kind (malt, hop, yeast, adjunct, chemical, packaging, other), the base unit you consume in, the purchase unit you buy in and how many base units one purchase unit holds (a 44 lb hop box is purchase unit *each*, 44 base units), whether it is **lot-tracked**, an optional **default vendor**, for malt and adjunct an optional **Extract potential** (specific-gravity style between 1.000 and 1.050, so 1.037 for a malt of 37 points per pound per gallon; recipe predictions read it, and leaving it blank on an edit keeps the one saved), and whether it is **Active** (available to recipes and purchase orders; on by default). Units are refused once anything stores a quantity of the material: movements, a recipe version's ingredients, a format's packaging materials, a purchase order line, a contract, or a transfer line. Each of those was written in the units the material had then, and a recipe's predicted gravity would otherwise change under it. A lot-tracked material asks for a lot code at every receipt of a counted quantity; an untracked one never does. **Lot-tracked** cannot be turned on while the material has stock recorded without a lot: saving says "material has stock without a lot: count it to zero before turning on lot tracking". Count that stock to zero at each bin first, then turn tracking on.
+
+Above the list, **Search materials** finds materials whose name contains what you type (press Enter); **No materials match** means nothing does.
 
 Stock totals include every recorded material-and-bin balance, even in a large inventory. If MGR cannot read the complete list, reload before using its totals. A failed stock read is not a zero balance.
 
