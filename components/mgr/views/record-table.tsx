@@ -1,10 +1,12 @@
 // components/mgr/views/record-table.tsx — comparable records (Catalog's brands,
-// Formats) drawn once for both surfaces: a table from md up, and on the phone
-// a list of records separated by rules, each fact labeled by its column header.
-// The first cell names the record and is its one link, so no row repeats an
-// Open button; on the phone that link covers the whole record.
+// Formats) drawn once for both surfaces: a table from md up, and on the phone a
+// list of records separated by rules, each fact labeled by its column header.
+// The first cell names the record and is its one link; it covers each whole
+// record, so no row repeats an Open button. Without an href (the inventory) the
+// name is an inert tap, the way E.act draws one.
 import { Fragment } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -15,13 +17,21 @@ export type RecordTableRow = {
   cells: string[];
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: string;
-  /** Where the name links on a live page; inventory leaves it out and the link stays "#". */
+  /** Where the name links on a live page; the inventory leaves it out. */
   href?: string;
 };
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
-// 24px tall at least (WCAG 2.5.8), underlined so the name reads as the link.
-const LINK = "inline-flex min-h-6 items-center font-medium underline underline-offset-4";
+// Identity targets wrap and retain the shared 48px minimum on coarse pointers.
+const LINK = "inline-flex min-h-6 min-w-0 max-w-full shrink items-center whitespace-normal wrap-anywhere text-left font-medium underline underline-offset-4 pointer-coarse:min-h-12";
+
+/** The name as a link (live) or a tap (inventory); it covers its whole record. */
+function name(row: RecordTableRow) {
+  const cls = cn(LINK, "after:absolute after:inset-0");
+  return row.href
+    ? <Link href={row.href} className={cls}>{row.cells[0]}</Link>
+    : <Button variant="link" type="button" data-tap className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
+}
 
 export function RecordTable({ headers, align, rows }: {
   headers: string[];
@@ -32,20 +42,24 @@ export function RecordTable({ headers, align, rows }: {
   return (
     <>
       <div className="hidden md:block">
-        <Table>
+        <Table className="min-w-max">
           <TableHeader>
             <TableRow>
-              {headers.map((header, i) => <TableHead key={header} className={alignClass(align[i])}>{header}</TableHead>)}
+              {headers.map((header, index) => (
+                <TableHead key={header} className={alignClass(align[index])}>{header}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.key}>
-                <TableCell className="text-left">
-                  <Link href={row.href ?? "#"} className={LINK}>{row.cells[0]}</Link>
+              <TableRow key={row.key} className="relative">
+                <TableCell className={alignClass(align[0])}>
+                  {name(row)}
                   {row.note && <p className="text-muted-foreground">{row.note}</p>}
                 </TableCell>
-                {row.cells.slice(1).map((cell, i) => <TableCell key={headers[i + 1]} className={alignClass(align[i + 1])}>{cell}</TableCell>)}
+                {row.cells.slice(1).map((cell, index) => (
+                  <TableCell key={headers[index + 1]} className={alignClass(align[index + 1])}>{cell}</TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
@@ -57,9 +71,7 @@ export function RecordTable({ headers, align, rows }: {
             {index > 0 && <ItemSeparator className="my-0" />}
             <Item role="listitem" className="relative px-0">
               <ItemContent className="min-w-0">
-                <ItemTitle className="line-clamp-none break-words">
-                  <Link href={row.href ?? "#"} className={cn(LINK, "after:absolute after:inset-0")}>{row.cells[0]}</Link>
-                </ItemTitle>
+                <ItemTitle className="min-w-0 max-w-full line-clamp-none wrap-anywhere">{name(row)}</ItemTitle>
                 {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}
                 <dl className="mt-1 grid gap-2 text-sm">
                   {row.cells.slice(1).map((cell, i) => (

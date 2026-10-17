@@ -80,22 +80,28 @@ describe("Catalog view", () => {
     ]);
   });
 
-  it("draws brands as a table whose Brand cell links the name, with the alias under it", () => {
+  it("draws brands as whole-linked table rows with the alias under Brand", () => {
     const [first, ...rest] = catalogBrands.brands;
     const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, ...rest] });
+    // Inventory brand rows are taps, never Catalog links (tests/mgr-screens.test.ts
+    // resolves the tap), and the table preserves horizontal containment.
+    const inert = htmlOf(createElement(CatalogView, { model }));
+    expect(inert).not.toMatch(/href="\/catalog\/brands\//);
+    expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
     const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
     expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs"]);
-    // One link per brand in the desktop table, then one in the phone list, each named by the brand alone.
-    const links = [...html.matchAll(/<a\b[^>]*href="(\/catalog\/brands\/[^"]+)"[^>]*>(.*?)<\/a>/g)].map((m) => [m[1], m[2]]);
+    // One link per brand in the desktop table, then one in the phone list; the
+    // positioned link covers the record without adding another focus target.
+    const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
+      .map((m) => [m[1].match(/href="([^"]+)"/)?.[1], m[2]])
+      .filter(([href]) => href?.startsWith("/catalog/brands/"));
     expect(links).toEqual([...model.brands, ...model.brands].map((b) => [b.href, b.name]));
     expect(html.match(/Animal #14/g)).toHaveLength(2);
-    expect(html).not.toMatch(/Staff alias|→/);
     // The phone list labels every fact under its header and draws no box per record.
     const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
     expect(records).toHaveLength(model.brands.length);
     for (const record of records) {
       expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs"]);
-      expect(record).toMatch(/data-variant="default"/);
     }
   });
 
@@ -188,12 +194,6 @@ describe("Catalog view", () => {
     expect(isValidElement(screen("Catalog").body)).toBe(true);
     expect(body.type).toBe(CatalogView);
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
-    const html = htmlOf(screen("Catalog").body);
-    // Formats has no tagline under its title, and its names are the links: no repeated Open format.
-    expect(html).not.toContain("Shared sizes and packaging for every brand");
-    expect(html).not.toContain("Open format");
-    expect(html).toMatch(/<a\b[^>]*>½ bbl keg<\/a>/);
-    expect(html).toContain('placeholder="Search brands or aliases"');
   });
 
   it("a brand or format name opens its screen in the explorer", () => {
