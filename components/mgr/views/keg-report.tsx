@@ -14,7 +14,7 @@ export function KegReportView({ model }: { model: KegReportViewModel }) {
       {model.empty ? E.blank(model.empty) : (
         <>
           {E.num(model.headline[0], model.headline[1])}
-          {E.tbl(["Age", "Kegs", "Deposits"], model.aging)}
+          {E.tbl(["Age", "Kegs", "Deposits"], model.aging, ["l", "r", "r"])}
           {model.customers.map((c) => <div key={c.key}>{E.row(c.title, c.detail, E.act("Open balance", "primary", c.href), c.overdue ? "w" : "")}</div>)}
           {model.mismatches.length > 0 && E.ttl("Deposit mismatches")}
           {model.mismatches.map((m) => <div key={m.key}>{E.row(m.title, m.detail, E.act("Open balance", "primary", m.href), "w")}</div>)}

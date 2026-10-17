@@ -34,7 +34,7 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
         {Object.entries(ADDITION_STAGES).map(([id, label]) => <ToggleGroupItem key={id} value={id}>{label}</ToggleGroupItem>)}
       </ToggleGroup>
       <Qty label="Quantity" value={model.qty} unit={material?.base_uom ?? ""} onChange={onChange ? (qty) => onChange({ qty }) : undefined} />
-      {preview.valid ? E.info(preview.text) : E.note(preview.reason)}
+      {preview.valid ? E.info(preview.text) : E.note(preview.reason, preview.error ? "alert" : "note")}
     </fieldset>
     {messages}
     {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} />)}

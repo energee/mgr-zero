@@ -42,6 +42,7 @@ export function PriceGroupsView({
                   ? renderCell(channel, row, col, cell ?? <span key="label" className="text-muted-foreground">not priced</span>)
                   : null),
               ]),
+              ["l", ...model.formats.map(() => "r" as const)],
             )}
           </div>
         </Fragment>

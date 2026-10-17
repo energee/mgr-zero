@@ -68,7 +68,7 @@ export function FormatView({ model, createAction, controls = {}, messages, foote
         <p className="text-xs text-muted-foreground">Choose packages with their own volume; packages already built from contents cannot be nested. Create format saves the format and its contents together. Volume is derived from the saved contents.</p>
       </section>}
       {editing && <p className="text-xs text-muted-foreground">Shared by every SKU using this format. Sizing changes affect future calculations and open plans; recorded movement volumes stay unchanged.</p>}
-      {sizing.error && E.info(sizing.error)}
+      {sizing.error && E.info(sizing.error, "alert")}
       {messages}
     </form>
     {model.composed && contents}

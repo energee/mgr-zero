@@ -35,8 +35,8 @@ export function PointOfSaleView({ model, syncAction, paths }: {
     {model.connected
       ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
       : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", paths?.connect)}</>, "w", SquareMark)}
-    {model.oauthFailed && <>{E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.")}{model.connected && E.btn("Try connecting again", "g", paths?.connect)}</>}
-    {model.error && E.note(`Last connection error: ${model.error}`)}
+    {model.oauthFailed && <>{E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}{model.connected && E.btn("Try connecting again", "g", paths?.connect)}</>}
+    {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
       {E.nav("POS mapping", "Map or ignore every Square variation; review sales and coverage", "", undefined, paths?.mapping)}
@@ -105,10 +105,10 @@ export function DisconnectSquareView({ status = "available", busy = false, error
       <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect Square"}</Button>
     </>}
     {status === "unresolved" && <>
-      {E.note("MGR deleted its stored Square credential, but Square did not confirm revocation. Retry asks Square to revoke MGR's access for this seller; you can also remove it in your Square account, or reconnect.")}
+      {E.note("MGR deleted its stored Square credential, but Square did not confirm revocation. Retry asks Square to revoke MGR's access for this seller; you can also remove it in your Square account, or reconnect.", "alert")}
       <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Retrying…" : "Retry revocation"}</Button>
     </>}
-    {status === "pending" && E.note("A disconnect started but its Square revocation outcome was not recorded. MGR no longer holds a usable credential.")}
+    {status === "pending" && E.note("A disconnect started but its Square revocation outcome was not recorded. MGR no longer holds a usable credential.", "alert")}
     {status === "disconnected" && E.info("Square is already disconnected.")}
     <CommandFormMessage error={error ?? null} />
   </>;

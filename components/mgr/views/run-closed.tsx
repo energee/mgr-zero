@@ -26,7 +26,7 @@ export function RunClosedView({
         {E.ttl("Actual outputs")}
         {model.outputs.length ? E.tbl(["SKU", "Actual quantity"], model.outputs.map(row => [
           row.sku_name ?? row.sku_id, row.qty_actual === null ? "Not recorded" : row.qty_actual,
-        ])) : E.info("No outputs recorded.")}
+        ]), ["l", "r"]) : E.info("No outputs recorded.")}
       </> : null}
       {model.records ? <PackagingMaterialHistory records={model.records} /> : null}
       {model.correction ? <PackagingMaterialCorrection {...model.correction} /> : null}

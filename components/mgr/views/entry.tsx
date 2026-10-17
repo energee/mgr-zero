@@ -67,6 +67,7 @@ export function EntryView({
       {E.sp()}
       {E.ttl(model.title)}
       {model.note ? E.note(model.note) : null}
+      {model.error ? E.note(model.error, "alert") : null}
       {model.field ? E.fld(model.field.label, model.field.value) : null}
       {/* A local fixture action prevents native GET submission before hydration too. */}
       {action || emailLink ? <form action={action ?? (() => {})} onSubmit={action ? undefined : (event) => event.preventDefault()}>{controls}</form> : controls}
