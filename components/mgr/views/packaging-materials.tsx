@@ -10,7 +10,7 @@ import type { PackagingActualDraft, PackagingClosePlan, PackagingMaterialRecord,
 
 const qty = (value: number | undefined) => value === undefined ? "—" : value.toLocaleString("en-US", { maximumFractionDigits: 4 });
 export function PackagingRequirements({ planned }: { planned: PackagingRequirement[] }) {
-  return <>{E.ttl("Planned materials")}{planned.length ? E.tbl(["Material", "Planned", "On hand", "On order", "Short"], planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`, qty(row.onHand), qty(row.onOrder), qty(row.short === undefined ? undefined : Math.max(0, row.short))])) : E.info("No materials on this plan’s BOM.")}</>;
+  return <>{E.ttl("Planned materials")}{planned.length ? E.tbl(["Material", "Planned", "On hand", "On order", "Short"], planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`, qty(row.onHand), qty(row.onOrder), qty(row.short === undefined ? undefined : Math.max(0, row.short))]), ["l", "r", "r", "r", "r"]) : E.info("No materials on this plan’s BOM.")}</>;
 }
 
 export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled, restoring, onChange, onAdd, onRemove }: {
@@ -44,8 +44,8 @@ export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled
 export function PackagingMaterialHistory({ records }: { records: PackagingMaterialRecord[] }) {
   return <>{E.ttl("Material record history")}{records.length ? records.map(record => <section key={record.id} className="flex flex-col gap-2">
     {E.fld(record.corrects_id ? "Correction" : "Original close", record.correction_reason ?? record.created_at)}
-    {E.tbl(["Planned material", "Quantity"], record.planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`]))}
-    {E.tbl(["Material / source", "Used", "Lost", "Unused"], record.actuals.map(row => [`${row.material_name} · ${row.location_name} / ${row.bin_name} · ${row.lot_code ?? "untracked"} (${row.unit})`, qty(row.qty_used), qty(row.qty_loss), qty(row.qty_unused)]))}
+    {E.tbl(["Planned material", "Quantity"], record.planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`]), ["l", "r"])}
+    {E.tbl(["Material / source", "Used", "Lost", "Unused"], record.actuals.map(row => [`${row.material_name} · ${row.location_name} / ${row.bin_name} · ${row.lot_code ?? "untracked"} (${row.unit})`, qty(row.qty_used), qty(row.qty_loss), qty(row.qty_unused)]), ["l", "r", "r", "r"])}
   </section>) : E.info("This run closed before confirmed material records were available.")}</>;
 }
 

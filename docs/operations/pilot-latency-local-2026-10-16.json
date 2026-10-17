@@ -1,0 +1,480 @@
+{
+  "issue": "https://github.com/energee/mgr-zero/issues/728",
+  "releaseIndex": "https://github.com/energee/mgr-zero/issues/311",
+  "ownerValues": "https://github.com/energee/mgr-zero/pull/941",
+  "appRevision": "b74c620869b7fa98e61b588ab36e8b183d8b2708",
+  "environment": {
+    "application": "http://localhost:3728",
+    "supabaseApi": "http://127.0.0.1:54341",
+    "databaseContainer": "supabase_db_mgr",
+    "databasePort": 54342,
+    "region": "local host only",
+    "network": "unthrottled loopback; no Internet/provider requests required"
+  },
+  "device": {
+    "model": "MacBook Air Mac16,12",
+    "chip": "Apple M4, 10 cores (4 performance / 6 efficiency)",
+    "memoryGb": 32,
+    "os": "macOS 26.6.2 (25G83)",
+    "kernel": "Darwin 25.6.0 arm64"
+  },
+  "dataset": {
+    "source": "Fictional disposable tenant; existing tests/helpers.ts ownership reused for staff, buyer, customer and location seeding. Owner-authorized supplemental local-only run, not real pilot data.",
+    "breweryId": "04019e51-6744-4058-9ff2-ef805583b685",
+    "name": "Pilot latency 728 disposable",
+    "countsBeforeTiming": {
+      "activeSkus": 150,
+      "customers": 90,
+      "shipTos": 120,
+      "orders": 9000,
+      "orderLines": 45000,
+      "inventoryMovements": 90000,
+      "invoices": 9000,
+      "invoiceLines": 45000,
+      "shipments": 9000
+    },
+    "historyStart": "2024-10-16T00:00:00.000Z",
+    "historyEnd": "2026-10-15T22:03:12.000Z",
+    "distribution": "50 brands x 3 can-case formats; 90 rotating customers, 30 with second ship-to; 5 lines/order, rotating all 150 SKUs; two units/line. Orders evenly spaced across 730 days, all shipped. One shipment and invoice/order with 5 invoice lines. Ledger: 150 opening balances of 20 units, 44,850 production entries of 2 units, 45,000 sale removals of 2 units. No connected providers, no real customer source.",
+    "olderOrder": {
+      "id": "2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "number": 81,
+      "poNumber": "PILOT-00001",
+      "createdAt": "2024-10-16T00:00:00.000Z"
+    },
+    "representativeReport": {
+      "route": "/compliance/2026-09",
+      "period": "2026-09-01/2026-09-30",
+      "periodLedgerRows": 3700,
+      "periodInvoices": 370,
+      "periodInvoiceLines": 1850
+    },
+    "countsAfterTiming": {
+      "orders": 9008,
+      "orderLines": 45008,
+      "allocations": 8,
+      "confirmedTimedOrders": 8,
+      "inventoryMovements": 90000,
+      "invoices": 9000
+    },
+    "accounts": {
+      "staff": {
+        "id": "de42d446-ed1f-46f4-adb4-5d11aba7c461",
+        "email": "bf03c42c-b5ec-464b-b3f3-5cae2366676e@test.local",
+        "role": "admin"
+      },
+      "buyer": {
+        "id": "5936b757-5708-4c92-9fa9-c64835853a18",
+        "email": "038cd66d-d26c-49cb-b809-c88b09d20474@test.local",
+        "role": "customer",
+        "customerId": "386fdadd-f286-4073-91ef-6aa0547e6371"
+      }
+    },
+    "fulfillment": {
+      "warehouseId": "a700be26-b554-4696-bbaf-4b9d996a29f2",
+      "binId": "b48dd429-2143-4130-83cc-2f1aa6c920d6",
+      "shipToId": "0e629c32-5407-4f80-a563-e5b82beddaaa",
+      "saleChannelId": "70f821d9-9c05-45b7-ad49-240c295bd2cb"
+    },
+    "formats": [
+      {
+        "canCase": 1,
+        "bblPerUnit": 0.0645,
+        "unitPriceCents": 3600
+      },
+      {
+        "canCase": 2,
+        "bblPerUnit": 0.0968,
+        "unitPriceCents": 7200
+      },
+      {
+        "canCase": 3,
+        "bblPerUnit": 0.129,
+        "unitPriceCents": 10800
+      }
+    ]
+  },
+  "limitsSeconds": {
+    "warmMedian": 1,
+    "coldFirst": 3
+  },
+  "authorityBoundary": "Supplemental disposable local synthetic evidence only. Owner still chooses actual pilot environment, data source, write accounts and representative report for pilot-time real-data measurements. No hosted changes, provider calls, production writes or release approval.",
+  "runtime": {
+    "node": "24.19.0",
+    "bun": "1.3.10",
+    "next": "16.4.2",
+    "postgres": "17.6",
+    "browser": "HeadlessChrome/155.0.0.0",
+    "viewport": {
+      "width": 1365,
+      "height": 900
+    }
+  },
+  "conditions": {
+    "coldProcess": "Production Node server hard-stopped and restarted before action; authenticated browser and PostgreSQL/PostgREST/OS caches retained. Not DB-cold or browser-cache-cold.",
+    "warm": "Production process reused; fresh source page loaded before each task; same authenticated browser.",
+    "clock": "performance.now at captured input/click event through matching usable DOM, then two requestAnimationFrame callbacks; automation selection adds no human think time.",
+    "scope": "Single-user sequential tasks, not load/concurrency/CWV or hosted acceptance."
+  },
+  "cleanup": {
+    "deletedFixtureRows": 207524,
+    "remainingTenants": 0,
+    "remainingAccounts": 0
+  },
+  "finalRuns": [
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 1,
+      "elapsedMs": 562.4000000953674,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:36.602Z"
+    },
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 2,
+      "elapsedMs": 735.0999999046326,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:38.322Z"
+    },
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 3,
+      "elapsedMs": 933.5999999046326,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:40.547Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 1,
+      "elapsedMs": 546.6999998092651,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:42.483Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 2,
+      "elapsedMs": 607.6999998092651,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:43.956Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 3,
+      "elapsedMs": 622.9000000953674,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:45.474Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 4,
+      "elapsedMs": 583.1999998092651,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:47.180Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 5,
+      "elapsedMs": 679.5999999046326,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T21:01:48.567Z"
+    },
+    {
+      "task": "T2",
+      "condition": "cold-process",
+      "iteration": 1,
+      "elapsedMs": 1069.1999998092651,
+      "failed": false,
+      "path": "/portal/orders/845cd0ef-a37b-42d9-a858-36207167b4d5",
+      "startedAt": "2026-10-16T21:01:51.570Z"
+    },
+    {
+      "task": "T3",
+      "condition": "cold-process",
+      "iteration": 1,
+      "elapsedMs": 1219.1999998092651,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:01:53.882Z"
+    },
+    {
+      "task": "T2",
+      "condition": "cold-process",
+      "iteration": 2,
+      "elapsedMs": 706.6000003814697,
+      "failed": false,
+      "path": "/portal/orders/f1228982-aff1-4896-a38d-aa7f01b2dbe7",
+      "startedAt": "2026-10-16T21:01:57.451Z"
+    },
+    {
+      "task": "T3",
+      "condition": "cold-process",
+      "iteration": 2,
+      "elapsedMs": 697.4000000953674,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:01:59.165Z"
+    },
+    {
+      "task": "T2",
+      "condition": "cold-process",
+      "iteration": 3,
+      "elapsedMs": 634.5999999046326,
+      "failed": false,
+      "path": "/portal/orders/60bb0ef6-1b3d-4859-b5e1-965ff526ec99",
+      "startedAt": "2026-10-16T21:02:02.356Z"
+    },
+    {
+      "task": "T3",
+      "condition": "cold-process",
+      "iteration": 3,
+      "elapsedMs": 780.4000000953674,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:04.016Z"
+    },
+    {
+      "task": "T2",
+      "condition": "warm",
+      "iteration": 1,
+      "elapsedMs": 228,
+      "failed": false,
+      "path": "/portal/orders/3e299df4-cddb-44ae-be45-8f4149bab03f",
+      "startedAt": "2026-10-16T21:02:06.495Z"
+    },
+    {
+      "task": "T3",
+      "condition": "warm",
+      "iteration": 1,
+      "elapsedMs": 296.69999980926514,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:07.283Z"
+    },
+    {
+      "task": "T2",
+      "condition": "warm",
+      "iteration": 2,
+      "elapsedMs": 192.5,
+      "failed": false,
+      "path": "/portal/orders/47599e21-fc07-4e71-acc9-ad2afd4a8a11",
+      "startedAt": "2026-10-16T21:02:09.151Z"
+    },
+    {
+      "task": "T3",
+      "condition": "warm",
+      "iteration": 2,
+      "elapsedMs": 331.69999980926514,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:09.965Z"
+    },
+    {
+      "task": "T2",
+      "condition": "warm",
+      "iteration": 3,
+      "elapsedMs": 297.80000019073486,
+      "failed": false,
+      "path": "/portal/orders/1325eebf-8bbb-4c56-91bc-547f677f9bda",
+      "startedAt": "2026-10-16T21:02:12.060Z"
+    },
+    {
+      "task": "T3",
+      "condition": "warm",
+      "iteration": 3,
+      "elapsedMs": 551.5,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:13.331Z"
+    },
+    {
+      "task": "T2",
+      "condition": "warm",
+      "iteration": 4,
+      "elapsedMs": 269,
+      "failed": false,
+      "path": "/portal/orders/0d50a4bf-eeb0-405f-9740-018ad050057f",
+      "startedAt": "2026-10-16T21:02:15.775Z"
+    },
+    {
+      "task": "T3",
+      "condition": "warm",
+      "iteration": 4,
+      "elapsedMs": 431,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:16.902Z"
+    },
+    {
+      "task": "T2",
+      "condition": "warm",
+      "iteration": 5,
+      "elapsedMs": 231.2999997138977,
+      "failed": false,
+      "path": "/portal/orders/98da89ac-6577-4a9d-bf26-c8a38d974d89",
+      "startedAt": "2026-10-16T21:02:19.009Z"
+    },
+    {
+      "task": "T3",
+      "condition": "warm",
+      "iteration": 5,
+      "elapsedMs": 357.69999980926514,
+      "failed": false,
+      "path": "/orders",
+      "startedAt": "2026-10-16T21:02:19.954Z"
+    },
+    {
+      "task": "T4",
+      "condition": "cold-process",
+      "iteration": 1,
+      "elapsedMs": 1117.0999999046326,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:21.462Z"
+    },
+    {
+      "task": "T4",
+      "condition": "cold-process",
+      "iteration": 2,
+      "elapsedMs": 657.3999996185303,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:23.521Z"
+    },
+    {
+      "task": "T4",
+      "condition": "cold-process",
+      "iteration": 3,
+      "elapsedMs": 771.7000002861023,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:25.243Z"
+    },
+    {
+      "task": "T4",
+      "condition": "warm",
+      "iteration": 1,
+      "elapsedMs": 743.5,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:26.869Z"
+    },
+    {
+      "task": "T4",
+      "condition": "warm",
+      "iteration": 2,
+      "elapsedMs": 1046,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:28.373Z"
+    },
+    {
+      "task": "T4",
+      "condition": "warm",
+      "iteration": 3,
+      "elapsedMs": 829.5,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:30.149Z"
+    },
+    {
+      "task": "T4",
+      "condition": "warm",
+      "iteration": 4,
+      "elapsedMs": 739.1999998092651,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:31.556Z"
+    },
+    {
+      "task": "T4",
+      "condition": "warm",
+      "iteration": 5,
+      "elapsedMs": 761.1999998092651,
+      "failed": false,
+      "path": "/compliance/2026-09",
+      "startedAt": "2026-10-16T21:02:33.057Z"
+    }
+  ],
+  "excludedAttempts": [
+    {
+      "attempt": 1,
+      "startedAt": "2026-10-16T20:06:24.650Z",
+      "classification": "measurement harness failure; not an application latency sample",
+      "failure": "Finite runner reached 1800-second command deadline before emitting its first timing row.",
+      "observedState": "Staff Chrome 155 remained on an empty Search sheet; no TCP listener on production port3728; no /tmp/728-results.json produced.",
+      "diagnosis": "[INFERENCE] Runner stalled awaiting its first cold-process restart; no timed action was observed.",
+      "correction": "Use bounded hard termination of only the runner-owned production process, then fresh Ready handshake; add stage output."
+    },
+    {
+      "attempt": 2,
+      "startedAt": "2026-10-16T20:37:27.823Z",
+      "classification": "cancelled calibration; excluded from final acceptance sample",
+      "failure": "Parent pause instruction arrived after corrected Node runner started; runner immediately cancelled.",
+      "observedState": "Five successful T1 samples retained separately in 728-aborted-attempt-2-results.json; no T2/T3 writes.",
+      "correction": "Three independent production start/stop cycles then proved bounded readiness; wait for a fresh exclusive measurement grant."
+    }
+  ],
+  "excludedCalibrationRuns": [
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 1,
+      "elapsedMs": 552.7000002861023,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T20:37:27.823Z"
+    },
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 2,
+      "elapsedMs": 527.3999996185303,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T20:37:29.382Z"
+    },
+    {
+      "task": "T1",
+      "condition": "cold-process",
+      "iteration": 3,
+      "elapsedMs": 511,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T20:37:30.832Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 1,
+      "elapsedMs": 498.59999990463257,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T20:37:31.961Z"
+    },
+    {
+      "task": "T1",
+      "condition": "warm",
+      "iteration": 2,
+      "elapsedMs": 496.40000009536743,
+      "failed": false,
+      "path": "/orders/2fdc51b3-9f88-42fa-9159-7a66d45367cb",
+      "startedAt": "2026-10-16T20:37:33.046Z"
+    }
+  ]
+}

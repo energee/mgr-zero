@@ -185,7 +185,7 @@ export const E = {
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
     const body = <>{tone === "ok" ? <Dot cls="ok" /> : null}{t}</>;
     return (
-      <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5" asChild={Boolean(href)}>
+      <Badge variant={tone === "w" ? "secondary" : "outline"} className={cn("gap-1.5", tone === "w" && "bg-warning text-warning-foreground [a]:hover:bg-warning/80")} asChild={Boolean(href)}>
         {href ? <a href={href}>{body}</a> : body}
       </Badge>
     );
@@ -428,12 +428,12 @@ export const E = {
       ))}
     </ItemGroup>
   ),
-  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][]) => (
+  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[]) => (
     <Table className="min-w-max">
       <TableHeader>
         <TableRow>
           {hd.map((h, i) => (
-            <TableHead key={i} className={cn(i && "text-right")}>{h}</TableHead>
+            <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
           ))}
         </TableRow>
       </TableHeader>
@@ -441,7 +441,7 @@ export const E = {
         {rows.map((r, i) => (
           <TableRow key={i}>
             {r.map((c, j) => (
-              <TableCell key={j} className={cn(j && "text-right")}>{c}</TableCell>
+              <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
             ))}
           </TableRow>
         ))}

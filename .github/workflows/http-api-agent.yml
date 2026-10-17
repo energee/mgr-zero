@@ -36,14 +36,14 @@ jobs:
     outputs:
       changed: ${{ steps.validate.outputs.changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with: { bun-version-file: ".bun-version" }
       - run: bun install --frozen-lockfile
 
@@ -70,7 +70,7 @@ jobs:
 
       - name: Maintain the HTTP API reference
         if: steps.context.outputs.skip != 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
@@ -85,40 +85,37 @@ jobs:
           show_full_output: false
           settings: .github/claude-ci-settings.json
           # API prose and annotations are bounded maintenance, not implementation.
-          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/api/*.mdx),Write(content/docs/api/*.mdx),Edit(components/mgr/screens.tsx),Edit(lib/mgr/api-operations.ts)"'
+          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/api/*.mdx),Write(content/docs/api/*.mdx),Edit(components/mgr/screens.tsx)"'
 
       - name: Validate the maintained reference
         id: validate
         run: |
           # The job's own scratch files go first so `git add -A` stays honest.
           rm -f .api-agent-pr.diff .api-agent-pr.json
-          # The agent edits prose and annotations; rendering is ours. Running it
-          # here keeps Bash out of the agent's allowlist and guarantees the
-          # generated blocks match the sources it just changed.
-          bun run docs:api
           git add -A
           changed=$(git diff --cached --name-only)
           if [ -z "$changed" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^(content/docs/api/[a-z-]+\.mdx|components/mgr/screens\.tsx|lib/mgr/api-operations\.ts|\.agents/superpowers/plans/2026-09-06-api-operations-backlog\.md)$' || true)
+          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^(content/docs/api/[a-z-]+\.mdx|components/mgr/screens\.tsx)$' || true)
           if [ -n "$unexpected" ]; then
             echo "HTTP API agent changed files outside the reference and its sources:"
             echo "$changed"
             exit 1
           fi
-          # screens.tsx is the current focus and several worktrees touch it at
-          # once. The agent may retitle an operation in a `reads`/`writes` string
-          # and nothing else: a screen's body, spec and states are product design.
-          screens=$(git diff --cached -U0 -- components/mgr/screens.tsx \
-            | grep '^[+-]' | grep -v '^[+-][+-]' \
-            | grep -vE '(reads|writes):' || true)
-          if [ -n "$screens" ]; then
-            echo "HTTP API agent edited screens.tsx outside its reads/writes lines:"
-            echo "$screens"
-            exit 1
-          fi
+          # Parse the staged source without importing it. Only existing SCREENS
+          # reads/writes literal values may change; all other bytes, including
+          # comments and context, must match the trusted checkout.
+          bun scripts/validate-api-agent-screens.ts
+          # Only validated literal annotations can now reach the generator's
+          # imports. Rendering remains ours, never a model tool.
+          bun run docs:api
+          # Include the trusted generator's tables and backlog in the patch.
+          git add -- content/docs/api/ .agents/superpowers/plans/2026-09-06-api-operations-backlog.md
+          # Parse untrusted prose without app imports, evaluation or includes.
+          # Reject active content before it can reach the App-authenticated job.
+          bunx vitest run --config vitest.mdx.config.mts tests/mdx-safety.test.ts
           git diff --cached --check
           # The work travels to publish as a patch, not as copies of the files.
           # Copies meant publish laid a snapshot of this (older) tree over a
@@ -137,7 +134,7 @@ jobs:
 
       - name: Save the maintained reference
         if: steps.validate.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: http-api-reference
           path: api-reference.patch
@@ -156,14 +153,14 @@ jobs:
       # token's pushes do trigger it. Same App as dreaming.yml.
       - name: Mint MGR GitHub App token
         id: mgr-app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ vars.MGR_APP_ID }}
           private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: main
           token: ${{ steps.mgr-app.outputs.token }}
@@ -171,7 +168,7 @@ jobs:
           # which a depth-1 checkout of main does not necessarily contain.
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: http-api-reference
 
