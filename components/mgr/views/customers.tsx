@@ -1,6 +1,6 @@
 // components/mgr/views/customers.tsx — Customers list. Live passes
 // CustomerForm as createAction and linkRows; inventory uses Add customer
-// and unlabeled Open.
+// and unlinked rows.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CustomersViewModel } from "@/lib/mgr/customers-view";
@@ -30,7 +30,7 @@ export function CustomersView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act("Open", "primary", linkRows ? row.href : undefined), row.warning ? "w" : "")}
+            {E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
     </>
