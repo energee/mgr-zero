@@ -21,8 +21,8 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
     {E.ttl("Manual payment sync")}
     {E.fld("Last successful sync", status?.lastSuccess ? `${status.lastSuccess.at} · ${status.lastSuccess.operator}` : "No successful sync recorded")}
     {status?.latest && E.fld("Latest sync activity", `${status.latest.at} · ${status.latest.operator} · ${status.latest.superseded ? "superseded · no payment changes applied" : status.latest.completed ? "completed" : "not completed"}`)}
-    {status?.latest?.superseded && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.")}
-    {status?.latestFailure && E.note(`Latest failed attempt: ${status.latestFailure.at} · ${status.latestFailure.operator}. Sync not completed for that attempt.`)}
+    {status?.latest?.superseded && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.", "alert")}
+    {status?.latestFailure && E.note(`Latest failed attempt: ${status.latestFailure.at} · ${status.latestFailure.operator}. Sync not completed for that attempt.`, "alert")}
     {status?.retryRequestId && E.info(disabled ? "QuickBooks must be reconnected before you retry the saved batch." : "Retry saved sync keeps your original invoice set and request identity.")}
     {E.info("Payment status may be stale until you complete a manual sync. No automatic reconciliation runs.")}
     {E.btn(busy ? "Syncing…" : status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", busy || disabled ? "g disabled" : "g", undefined, onSync)}
@@ -55,7 +55,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {E.back("Settings", "Accounting", undefined, model.backHref)}
     {E.ttl("QuickBooks")}{messages}
     {E.row(model.company, model.status, model.canDisconnect ? E.act("Disconnect", "destructive", model.disconnectHref) : "", model.connected ? "ok" : "w", QuickBooksMark)}
-    {model.error && E.note(`Last connection error: ${model.error}`)}
+    {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
     {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
@@ -63,7 +63,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Push defaults", "Connect QuickBooks to read and save the company's payment options.")}
     {E.row("Customers missing a portal login email", model.missingEmails === undefined ? "Count unavailable · review portal login emails" : `${model.missingEmails} · no portal login email`, E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
-    {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.")}
+    {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}
   </>;
 }
@@ -81,7 +81,7 @@ export function DisconnectQuickBooksView({ status = "available", busy = false, e
       {E.info("MGR deletes its stored QuickBooks credential first, then asks QuickBooks to revoke it. If QuickBooks does not confirm, this page says so.")}
       <Button type="button" variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect QuickBooks"}</Button>
     </>}
-    {status === "unresolved" && E.note("MGR deleted its stored QuickBooks credential, but QuickBooks did not confirm revocation. Remove MGR's access in your QuickBooks company, or reconnect.")}
+    {status === "unresolved" && E.note("MGR deleted its stored QuickBooks credential, but QuickBooks did not confirm revocation. Remove MGR's access in your QuickBooks company, or reconnect.", "alert")}
     {status === "disconnected" && E.info("QuickBooks is already disconnected.")}
     <CommandFormMessage error={error} />
   </>;

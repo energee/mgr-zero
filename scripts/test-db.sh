@@ -7,40 +7,42 @@
 # untouched. CI skips this: it starts one fresh stack per run.
 #
 # Parallel sessions share this database. The reset runs under
-# scripts/test-db-lock.pl held exclusive, and every vitest run holds that lock
-# shared (tests/test-db-lock.setup.ts), so a reset never lands under a running
-# suite and a suite never starts mid-reset.
+# scripts/test-db-lock.pl held exclusive, and the database Vitest project holds
+# that lock shared (tests/test-db-lock.setup.ts), so a reset never lands under
+# database-backed suites and those suites never start mid-reset.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Lock startup and env publication too: start can rebuild a stopped stack.
+# --locked-reset is internal, and cannot be used to bypass the lock.
+if [ "${1:-}" != --locked-reset ]; then
+  exec perl scripts/test-db-lock.pl ex bash scripts/test-db.sh --locked-reset
+fi
+perl scripts/test-db-lock.pl check
 WD=tests/supabase
 scripts/test-stack-templates.sh
 psql_test() { PGPASSWORD=postgres psql -h 127.0.0.1 -p 54352 -U postgres -d postgres -qtAc "$1"; }
-# Hash of everything a reset builds from: the migrations (names and contents)
-# and the stack config; seed is off. It is stored as the database's comment,
-# because worktrees on different branches share this one database.
-want="mgr-schema $({ ls supabase/migrations; cat supabase/migrations/*.sql "$WD/supabase/config.toml"; } | git hash-object --stdin)"
+# Keep the existing mgr-schema migration/config fingerprint in the database.
+want=$(node scripts/test-db-schema.mjs fingerprint)
 have() { psql_test "select shobj_description(oid, 'pg_database') from pg_database where datname = 'postgres'"; }
 
-if [ "${1:-}" = --locked-reset ]; then
-  # Another session may have reset while this one waited for the lock.
-  [ "$(have)" = "$want" ] && [ -z "${MGR_TEST_DB_RESET:-}" ] && exit 0
-  bunx supabase db reset --workdir "$WD"
-  # PostgREST cached the old schema; wait-rest.sh reloads it and waits until
-  # it serves, or the suite fails with "not in the schema cache" errors.
-  bash scripts/wait-rest.sh
-  psql_test "comment on database postgres is '$want'"
-  exit 0
-fi
-
 bunx supabase start --workdir "$WD" -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
+# Replace a worktree's env symlink rather than changing another checkout's file.
+env_file=$(mktemp .env.test.local.XXXXXX)
+trap 'rm -f "$env_file"' EXIT
 {
   bunx supabase status --workdir "$WD" -o env | node scripts/supabase-env.mjs
   echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54352/postgres"
   echo "MGR_TEST_STACK=1"
-} > .env.test.local
-if [ "$(have)" = "$want" ] && [ -z "${MGR_TEST_DB_RESET:-}" ]; then
+} > "$env_file"
+mv "$env_file" .env.test.local
+if [ "$(have)" = "$want" ] && [ -z "${MGR_TEST_DB_RESET:-}" ] &&
+  [ "$(psql_test "select count(*) from pg_proc where pronamespace='public'::regnamespace and proname ~ '^mgr_test_identity_[a-f0-9]{32}$'")" = 1 ]; then
   echo "test-db: schema unchanged; skipping reset"
 else
-  perl scripts/test-db-lock.pl ex bash scripts/test-db.sh --locked-reset
+  bunx supabase db reset --local --workdir "$WD"
+  node scripts/test-db-schema.mjs install
+  # Readiness must execute this reset's new identity RPC, not an old table.
+  bash scripts/wait-rest.sh
 fi
+node scripts/test-db-schema.mjs check
 echo "wrote .env.test.local (test stack: API 54351, DB 54352)"

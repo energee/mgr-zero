@@ -103,6 +103,7 @@ the rendered page (step 4), and:
 | Task | Read first |
 | --- | --- |
 | Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
+| Finding where something lives (routes, commands, tables, pages, services) | `.agents/codemaps/` — `architecture`, `backend`, `frontend`, `data`, `dependencies`; paths and counts only, as of the commit in each header |
 | Setup, ports, dev login, env vars | `README.md`; operator runbooks (Slack, order email, hosted config, retention) in `docs/operations/` |
 | Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `content/docs/index.mdx` (Fumadocs, served at `/docs`); master chooser linking `staff-guide.mdx` and `portal-guide.mdx`; update the applicable guide with the behavior |
 | Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
@@ -173,12 +174,18 @@ Do freely: edit code, `supabase db reset` on the app stack, reseed, create workt
 Never edit a committed migration. `supabase db push` applies a version once and
 never reads that file again, so an edit reaches CI — which builds a database
 from scratch — and never reaches hosted. That is what broke `/settings`, `/menu`
-and Ask MGR on live (#329, #330). A schema change is a new migration file, and
-`supabase/migrations.lock.json` pins every file's hash so an edit fails
+and Ask MGR on live (#329, #330). A schema change is a new migration file.
+`supabase/migrations.lock.json` pins every file's hash for
 `tests/migrations-applied.test.ts`. After adding a migration, run
-`bun run migrations:lock`. A new migration's timestamp must be later than
-every migration on main: `supabase db push` refuses an older one, and CI
-(`scripts/check-migration-order.ts`) rejects it. (Before #285 the baseline was edited in place; that
+`bun run migrations:lock`; it preserves pins from trusted `origin/main`
+merge-base history, re-hashes branch-only files, and drops removed branch-only
+pins. Fetch main's history first; generation fails if that history is unavailable.
+CI and `scripts/land-pr.sh` run `scripts/check-migration-order.ts` against a
+trusted main ref. That guard rejects edits, renames, deletions, and changed or
+missing existing lock entries independently of the checkout's hashes. A new
+migration's timestamp must be later than every migration on main:
+`supabase db push` refuses an older one, and the same guard rejects it.
+(Before #285 the baseline was edited in place; that
 window closed the day it was first pushed.)
 
 Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a

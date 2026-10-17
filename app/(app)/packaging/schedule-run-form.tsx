@@ -34,7 +34,7 @@ export function ScheduleRunForm(data: ScheduleRunData) {
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule run" trigger={<Button size="sm">Schedule run</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <SchedulePackagingRunView
-          model={{ ...model, materials: materials.data?.planned.map(row => [`${row.name} ${row.qty} ${row.unit}`, row.onHand ?? "—", row.short === undefined ? "—" : Math.max(0, row.short)]), materialsMessage: outputs.length ? "Loading material requirements…" : "Choose planned outputs to preview materials.", warning: materials.data?.planned.some(row => row.short !== undefined && row.short > 0) ? "Shortages do not prevent saving this plan. Closing requires enough stock for confirmed used plus lost quantities." : undefined }}
+          model={{ ...model, materials: materials.data?.planned.map(row => [row.name, `${row.qty} ${row.unit}`, row.onHand ?? "—", row.short === undefined ? "—" : Math.max(0, row.short)]), materialsMessage: outputs.length ? "Loading material requirements…" : "Choose planned outputs to preview materials.", warning: materials.data?.planned.some(row => row.short !== undefined && row.short > 0) ? "Shortages do not prevent saving this plan. Closing requires enough stock for confirmed used plus lost quantities." : undefined }}
           controls={{
             plannedOn: (plannedOn) => change({ plannedOn }),
             brand: (brandId) => change({ brandId }),

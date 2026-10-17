@@ -20,9 +20,9 @@ it("uses the authenticated account in the shared password form", () => {
 });
 
 it("shows fixed text for a ?error= code, never the query string itself (#472)", () => {
-  expect(toSetPasswordViewProps("a@example.com").note).toBeUndefined();
-  expect(toSetPasswordViewProps("a@example.com", "same_password").note).toBe("Choose a password different from your current one.");
-  expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").note).toBe("Your password was not saved. Try again.");
+  expect(toSetPasswordViewProps("a@example.com").error).toBeUndefined();
+  expect(toSetPasswordViewProps("a@example.com", "same_password").error).toBe("Choose a password different from your current one.");
+  expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 
 it("binds verified invitation display data and keeps password validation", () => {

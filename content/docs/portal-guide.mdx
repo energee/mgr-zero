@@ -24,6 +24,8 @@ If you already have an MGR sign-in and the brewery invites that email to a custo
 
 The header shows your customer account name. Navigation offers **Order**, **Orders**, **Invoices**, and **Account** as tabs along the bottom on a phone and a left rail on wider screens. **Order** is the shop. Open **Me** in the header to see the email you signed in with and account you represent, open **Guide** for this portal guide, **Change password**, or select **Sign out**. Me is a centered dialog at every screen size. Phone form panels sit above the bottom navigation; forms with pinned footer actions keep those actions visible while you scroll the fields. On a phone, actions such as **Pay invoice** span the column. On a wider screen they hug their label. If MGR says the credentials are incorrect, or the account has no membership, contact the brewery.
 
+Scroll within the page to reach lower items and actions. The header and phone tabs stay outside that scrolling area.
+
 ## Shop [#shop]
 
 <Screen name="Shop" />
@@ -33,7 +35,7 @@ The header shows your customer account name. Navigation offers **Order**, **Orde
 The brewery's public taproom menu is a separate read-only website feed. Publishing a poured format there does not add it to this wholesale Shop, expose warehouse counts, or change your account's catalog and prices.
 
 1. Review each beer, its listed packages, and the unit price.
-2. Enter positive whole-unit quantities for the packages you want, using the minus/plus buttons or typing a number.
+2. Enter positive whole-unit quantities for the packages you want, using the minus/plus buttons or typing a number. Invalid quantities are rejected when saving or reviewing; a rejected save leaves the existing draft unchanged.
 3. Select **Change** beside the ship-to summary to open **Delivery details**, then choose **Ship to**. Your default address is selected for a new cart.
 4. Optionally enter **Requested date**, **PO number** and **Note** in Delivery details, select **Done**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft. Shop states that tax and keg deposits are not in that subtotal, and that the brewery confirms the final invoice amounts and the requested delivery date. The date you enter is a request, not a commitment.
 5. Select **Review order**. MGR takes a current server quote for the selected ship-to, fulfillment source, channel prices, and returnable-keg deposits. Review shows the deposit separately. When the brewery has entitled QuickBooks tax calculation configured, it also shows calculated **Tax** and **Estimated total**. Otherwise it says **Tax pending**: the subtotal and deposits are current, and the invoice supplies the final tax and total. Select **Place order** (the amount is marked **before tax** when tax is pending), or choose **Back to edit**. Changing a quantity in Review returns you to Shop and requires a fresh review before placing the order. **Save draft** on Shop saves without submitting. The brewery reviews submitted orders before they are confirmed.
@@ -118,6 +120,8 @@ and the brewery's full price grid are not available to buyer logins.
 **Account** shows the customer name on this login, each ship-to with its city and state and a default label when designated, the line **You · buyer** for this login, and any keg deposits the brewery holds for you; a keg deposit refund credit memo lowers that amount, and a voided or written-off invoice no longer counts toward it. Other people on the account are never listed. Open **Me** to sign out. There is no portal control to add ship-tos or change the account name; contact the brewery.
 
 ## Errors and current limits [#help]
+
+Screen readers can read the informational and warning hints as notes without interrupting. Errors still announce as alerts.
 
 **An action reports an error.** Read the message and fix the visible fields. Your entries stay on Shop until the action succeeds or you leave the page. If the error is about prices, ship-tos, access, or fulfillment setup, contact the brewery.
 
