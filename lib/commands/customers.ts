@@ -5,6 +5,7 @@ import { z } from "zod";
 import { cents, CommandError, completeRows, countryCode, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { escapeLike } from "@/lib/escape-like";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 const roles = ["admin", "sales"] as const;
 
@@ -93,7 +94,7 @@ defineQuery({
   }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
   handler: (ctx, i) => {
-    if (i.missingPortalEmail && ctx.role !== "admin" && ctx.role !== "sales") throw new CommandError("permission denied", 403, "permission_denied");
+    if (i.missingPortalEmail && !hasAnyRole(ctx.roles, ["admin", "sales"])) throw new CommandError("permission denied", 403, "permission_denied");
     // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again, as list_brands does.
     const pattern = i.q && `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
     return completeRows("Customer list", start => {

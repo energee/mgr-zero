@@ -4,7 +4,7 @@ import { z } from "zod";
 import { _clearRegistry, defineCommand, defineQuery, type Ctx } from "@/lib/commands/registry";
 import { boundToolResult, createComposerTools } from "@/lib/chat/agent";
 
-const ctx = { db: null, userId: "actor", breweryId: "brewery", role: "admin" } as unknown as Ctx;
+const ctx = { db: null, userId: "actor", breweryId: "brewery", roles: ["admin"] } as unknown as Ctx;
 const options = { toolCallId: "call", messages: [], context: undefined, abortSignal: new AbortController().signal };
 
 describe("composer agent tools", () => {

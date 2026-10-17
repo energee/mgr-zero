@@ -20,6 +20,87 @@ import {
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("QuickBooks durable lifecycle", () => {
+  it("lets warehouse plus sales push and finalize, but rechecks sales membership before credential and finish writes", async () => {
+    const brewery = await makeBrewery();
+    const operator = await makeStaffCtx(brewery.id, ["warehouse", "sales"]);
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    const foreign = await makeBrewery();
+    const outsider = await makeStaffCtx(foreign.id, ["admin", "sales"]);
+    const customer = await seedCustomer(brewery.id);
+    const catalog = await seedCatalog(brewery.id);
+    const realm = `multi-role-${crypto.randomUUID()}`;
+    const connection = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: realm, state: "connected", credential_version: 1,
+    }).select("id").single();
+    expect(connection.error).toBeNull();
+    expect((await admin.from("customers").update({ qbo_customer_id: "customer-multi", qbo_realm_id: realm })
+      .eq("id", customer.customerId)).error).toBeNull();
+    expect((await admin.from("skus").update({ qbo_item_id: "item-multi", qbo_realm_id: realm })
+      .eq("id", catalog.skuId)).error).toBeNull();
+    const invoice = await admin.from("invoices").insert({
+      brewery_id: brewery.id, customer_id: customer.customerId, issued_on: "2026-10-16",
+    }).select("id").single();
+    expect(invoice.error).toBeNull();
+    expect((await admin.from("invoice_lines").insert({
+      brewery_id: brewery.id, invoice_id: invoice.data!.id, kind: "sku", sku_id: catalog.skuId,
+      qty: 1, unit_price_cents: 1000, description: "Multi-role case",
+    })).error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection.data!.id}','multi-access','multi-refresh',1)`);
+    const start = (ctx: typeof operator) => ctx.db.rpc("start_qbo_push", {
+      p_brewery: brewery.id, p_invoice: invoice.data!.id, p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
+    });
+    for (const denied of [warehouse, outsider]) expect((await start(denied)).error?.code).toBe("42501");
+    expect(sql(`select count(*) from public.qbo_pushes where invoice_id='${invoice.data!.id}'`)).toEqual(["0"]);
+    const started = await start(operator);
+    expect(started.error).toBeNull();
+    const push = started.data as { pushId: string; finishRequestId: string; requestBody: string };
+    expect(JSON.parse(push.requestBody)).toMatchObject({ CustomerRef: { value: "customer-multi" } });
+    const finish = (actor: string) => admin.rpc("finish_qbo_push", {
+      p_brewery: brewery.id, p_push: push.pushId, p_actor: actor, p_status: "pushed",
+      p_qbo_entity_id: "multi-remote", p_error: null,
+      p_response: { Id: "multi-remote", SyncToken: "0", TotalAmt: 10, Balance: 10 },
+      p_request_id: push.finishRequestId,
+    });
+    const refresh = (actor: string) => admin.rpc("cas_integration_tokens", {
+      p_brewery: brewery.id, p_provider: "qbo", p_connection: connection.data!.id, p_actor: actor,
+      p_expected_version: 1, p_access_token: "updated-access", p_refresh_token: "updated-refresh",
+      p_received_at: new Date().toISOString(), p_access_seconds: 3600, p_refresh_seconds: null, p_hard_seconds: null,
+    });
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse"] })
+      .eq("brewery_id", brewery.id).eq("user_id", operator.userId)).error).toBeNull();
+    for (const denied of [operator, warehouse, outsider]) {
+      expect((await finish(denied.userId)).error?.code).toBe("42501");
+      expect(await refresh(denied.userId)).toMatchObject({ data: false, error: null });
+      expect((await admin.rpc("read_integration_tokens", {
+        p_brewery: brewery.id, p_provider: "qbo", p_connection: connection.data!.id, p_actor: denied.userId,
+      })).data).toEqual([]);
+    }
+    expect(sql(`select status from public.qbo_pushes where id='${push.pushId}'`)).toEqual(["pending"]);
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse", "sales"] })
+      .eq("brewery_id", brewery.id).eq("user_id", operator.userId)).error).toBeNull();
+    expect(await refresh(operator.userId)).toMatchObject({ data: true, error: null });
+    expect(await finish(operator.userId)).toMatchObject({ error: null, data: { status: "pushed", remoteId: "multi-remote" } });
+    expect((await admin.from("invoices").select("qbo_invoice_id,qbo_sync_status").eq("id", invoice.data!.id).single()).data)
+      .toEqual({ qbo_invoice_id: "multi-remote", qbo_sync_status: "pushed" });
+  });
+
+  it("requires admin membership for OAuth even when a non-admin has several integration roles", async () => {
+    const brewery = await makeBrewery();
+    const operator = await makeStaffCtx(brewery.id, ["sales", "warehouse"]);
+    const foreign = await makeBrewery();
+    const outsider = await makeStaffCtx(foreign.id, "admin");
+    const owner = await makeStaffCtx(brewery.id, ["sales", "admin"]);
+    const begin = (ctx: typeof operator) => ctx.db.rpc("begin_qbo_oauth", {
+      p_brewery: brewery.id, p_redirect_uri: "https://mgr.test/qbo", p_state_hash: hash(crypto.randomUUID()),
+      p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
+    });
+    for (const denied of [operator, outsider]) expect((await begin(denied)).error?.code).toBe("42501");
+    expect(sql(`select count(*) from private.qbo_oauth_intents where brewery_id='${brewery.id}'`)).toEqual(["0"]);
+    expect((await begin(owner)).error).toBeNull();
+    expect(sql(`select actor_id from private.qbo_oauth_intents where brewery_id='${brewery.id}'`)).toEqual([owner.userId]);
+  });
+
   it.each([400, 500])("records only definitive invalid_grant refresh rejection (%s)", async (status) => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
@@ -82,7 +163,7 @@ describe("QuickBooks durable lifecycle", () => {
 
     const buyer = await makeCustomerUser(customer.customerId);
     const portalCtx = { db: await asUser(buyer.email), userId: buyer.id, breweryId: brewery.id,
-      customerId: customer.customerId, role: "customer" as const };
+      customerId: customer.customerId, roles: ["customer" as const] };
     const taxFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
         taxTotals: { totalTaxAmountExcludingShipping: { value: "1.00", currency: "USD" } },
@@ -153,11 +234,11 @@ describe("QuickBooks durable lifecycle", () => {
 
     const demotedState = `demoted-${crypto.randomUUID()}`;
     expect((await begin(demotedState)).error).toBeNull();
-    expect((await admin.from("brewery_users").update({ role: "brewer" })
+    expect((await admin.from("brewery_users").update({ roles: ["brewer"] })
       .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     await expect(callback(demotedState)).rejects.toThrow("oauth state invalid");
     expect(fetch).not.toHaveBeenCalled();
-    expect((await admin.from("brewery_users").update({ role: "admin" })
+    expect((await admin.from("brewery_users").update({ roles: ["admin"] })
       .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
 
     const knownRealm = `known-${crypto.randomUUID()}`;
@@ -398,7 +479,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect(raced.map(({ data, error }) => [data, error]).sort()).toEqual([[false, null], [true, null]].sort());
     expect((await readVersionedIntegrationTokens(ctx, "qbo")).refreshToken).toMatch(/^race-refresh-[ab]$/);
 
-    expect((await admin.from("brewery_users").update({ role: "brewer" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ roles: ["brewer"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     await expect(readVersionedIntegrationTokens(ctx, "qbo")).rejects.toMatchObject({ status: 403 });
     expect((await rawDatabase(ctx.db).schema("private").from("integration_tokens").select("refresh_token")).error).not.toBeNull();
   });
@@ -460,7 +541,7 @@ describe("QuickBooks durable lifecycle", () => {
       } else if (change === "disconnect") {
         await disconnectQbo(ctx, connection!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID());
       } else {
-        expect((await admin.from("brewery_users").update({ role: "brewer" })
+        expect((await admin.from("brewery_users").update({ roles: ["brewer"] })
           .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
       }
       return Response.json({ error: "invalid_grant" }, { status: 400 });

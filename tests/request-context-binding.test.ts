@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env/public";
 import { runCommand } from "@/lib/commands/registry";
+import { buildContextFromBearer, ctxForBearer } from "@/lib/commands/context";
+import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { admin, asUser, makeBrewery, makeStaff, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import "@/lib/commands/all";
 
@@ -32,10 +34,10 @@ describe("request context headers", () => {
     breweryA = (await makeBrewery()).id;
     breweryB = (await makeBrewery()).id;
     actor = await makeStaff(breweryA, "admin");
-    await admin.from("brewery_users").insert({ brewery_id: breweryB, user_id: actor.id, role: "admin" });
+    await admin.from("brewery_users").insert({ brewery_id: breweryB, user_id: actor.id, roles: ["admin", "sales"] });
     const bAdmin = await makeStaff(breweryB, "admin");
     const bAdminDb = await asUser(bAdmin.email);
-    const ctxB = { db: bAdminDb, userId: bAdmin.id, breweryId: breweryB, role: "admin" as const };
+    const ctxB = { db: bAdminDb, userId: bAdmin.id, breweryId: breweryB, roles: ["admin" as const] };
     const catalog = await seedCatalog(breweryB);
     const customer = await seedCustomer(breweryB);
     customerA = customer.customerId;
@@ -60,7 +62,7 @@ describe("request context headers", () => {
     deliveryId = (await admin.from("deliveries").insert({ brewery_id: breweryB, route_id: routeB.id, stock_transfer_id: transferId, stop_no: 1 }).select("id").single()).data!.id;
 
     const actorDb = await asUser(actor.email);
-    const ctxA = { db: actorDb, userId: actor.id, breweryId: breweryA, role: "admin" as const };
+    const ctxA = { db: actorDb, userId: actor.id, breweryId: breweryA, roles: ["admin" as const] };
     const catalogA = await seedCatalog(breweryA);
     const customerOwnedA = await seedCustomer(breweryA);
     await admin.from("customer_users").insert({ customer_id: customerOwnedA.customerId, user_id: actor.id });
@@ -75,9 +77,39 @@ describe("request context headers", () => {
     resourcesA = { orderId: orderA, transferId: transferA, deliveryId: deliveryA, customerId: customerOwnedA.customerId, invoiceId: invoiceA };
   });
 
+  it("preserves every role in cookie memberships and bearer command contexts", async () => {
+    const member = await makeStaff(breweryB, ["sales", "brewer"]);
+    const memberDb = await asUser(member.email);
+    const request = createRequestAuthContext(async () => memberDb);
+    expect(await request.getStaffRoles(breweryB)).toEqual(["sales", "brewer"]);
+    expect(await request.getStaffMemberships()).toEqual([
+      expect.objectContaining({ breweryId: breweryB, roles: ["sales", "brewer"] }),
+    ]);
+    expect(await request.getStaffRoles(breweryB)).toEqual(["sales", "brewer"]);
+    expect(await ctxForBearer(memberDb, member.id, breweryB)).toMatchObject({ roles: ["sales", "brewer"] });
+    expect(await request.getStaffRoles(breweryA)).toBeNull();
+  });
+
+  it("resolves an explicit portal context without inheriting the actor's staff roles", async () => {
+    const actorDb = await db();
+    const { data } = await actorDb.auth.getSession();
+    const token = data.session!.access_token;
+    const expected = { actorId: actor.id, breweryId: breweryB, customerId: customerB };
+    const portal = await buildContextFromBearer(breweryB, token, expected);
+    expect(portal).toMatchObject({ userId: actor.id, breweryId: breweryB, roles: ["customer"], customerId: customerB });
+    await expect(runCommand("get_customer", { customerId: customerB }, portal)).rejects.toMatchObject({ status: 403 });
+    expect((await portal.db.from("portal_customers").select("id")).data).toEqual([{ id: customerB }]);
+    expect((await portal.db.from("orders").select("id")).data).toEqual([]);
+    const staff = await buildContextFromBearer(breweryB, token, { actorId: actor.id, breweryId: breweryB });
+    expect(staff).toMatchObject({ roles: ["admin", "sales"] });
+    expect(staff).not.toHaveProperty("customerId");
+    await expect(buildContextFromBearer(breweryB, token, { ...expected, actorId: crypto.randomUUID() }))
+      .rejects.toMatchObject({ status: 409, code: "context_changed" });
+  });
+
   it("limits selected-context reads across detail families while preserving explicit switching", async () => {
     const scopedA = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryA });
-    const ctxA = { db: scopedA, userId: actor.id, breweryId: breweryA, role: "admin" as const };
+    const ctxA = { db: scopedA, userId: actor.id, breweryId: breweryA, roles: ["admin" as const] };
     for (const [name, key, own, foreign] of [
       ["get_order", "orderId", resourcesA.orderId, orderId],
       ["get_invoice", "invoiceId", resourcesA.invoiceId, invoiceB],
@@ -90,15 +122,15 @@ describe("request context headers", () => {
     }
 
     const limited = await makeStaff(breweryA, "admin");
-    await admin.from("brewery_users").insert({ brewery_id: breweryB, user_id: limited.id, role: "brewer" });
+    await admin.from("brewery_users").insert({ brewery_id: breweryB, user_id: limited.id, roles: ["brewer"] });
     const limitedDb = createClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
       auth: { persistSession: false }, global: { headers: { "x-mgr-actor-id": limited.id, "x-mgr-brewery-id": breweryB } },
     });
     expect((await limitedDb.auth.signInWithPassword({ email: limited.email, password: "test-password-1" })).error).toBeNull();
-    await expect(runCommand("get_customer", { customerId: customerA }, { db: limitedDb, userId: limited.id, breweryId: breweryB, role: "brewer" })).rejects.toThrow(/permission denied/);
+    await expect(runCommand("get_customer", { customerId: customerA }, { db: limitedDb, userId: limited.id, breweryId: breweryB, roles: ["brewer"] })).rejects.toThrow(/permission denied/);
 
     const switchedB = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryB });
-    const ctxB = { db: switchedB, userId: actor.id, breweryId: breweryB, role: "admin" as const };
+    const ctxB = { db: switchedB, userId: actor.id, breweryId: breweryB, roles: ["admin" as const] };
     await expect(runCommand("get_order", { orderId }, ctxB)).resolves.toMatchObject({ order: { id: orderId } });
   });
 

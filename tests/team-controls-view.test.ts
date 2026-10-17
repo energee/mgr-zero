@@ -1,7 +1,71 @@
-import { createElement } from "react";
+import { Children, createElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { InviteView, TeamMemberView } from "../components/mgr/views/team-controls";
+import { E } from "../components/mgr/e";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group";
+
+type Element = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
+function elements(node: ReactNode): Element[] {
+  if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
+  return [node, ...Children.toArray(node.props.children).flatMap(elements)];
+}
+
+function member(props: Partial<ComponentProps<typeof TeamMemberView>> = {}) {
+  let tree: ReactNode;
+  function Harness() {
+    return tree = TeamMemberView({ name: "@actual", email: "actual@example.com", savedRoles: ["brewer"], ...props });
+  }
+  const html = renderToStaticMarkup(createElement(Harness));
+  return { html, nodes: elements(tree) };
+}
+
+it("extends the shared multiple picker with controlled values, labels and disabled state", () => {
+  const onChange = vi.fn();
+  const nodes = elements(E.picks("Roles", ["sales", "brewer"], [{ value: "sales", label: "Sales" }, { value: "brewer", label: "Brewer" }], { onChange, disabled: true }));
+  const group = nodes.find(node => node.type === ToggleGroup)!;
+  expect(group.props.value).toEqual(["sales", "brewer"]);
+  expect(group.props.defaultValue).toBeUndefined();
+  expect(group.props.disabled).toBe(true);
+  expect(nodes.filter(node => node.type === ToggleGroupItem).map(node => node.props.children)).toEqual(["Sales", "Brewer"]);
+  (group.props.onValueChange as (values: string[]) => void)(["brewer"]);
+  expect(onChange).toHaveBeenCalledWith(["brewer"]);
+  expect(elements(E.picks("Uses", ["Storage"], ["Storage", "Taproom"])).find(node => node.type === ToggleGroup)?.props.defaultValue).toEqual(["Storage"]);
+});
+
+it("offers every staff role in enum order and returns several canonical role values", () => {
+  const onRolesChange = vi.fn();
+  const { html, nodes } = member({ roles: ["sales", "brewer"], onRolesChange });
+  const group = nodes.find(node => node.type === ToggleGroup)!;
+  expect(group.props.type).toBe("multiple");
+  expect(group.props.value).toEqual(["sales", "brewer"]);
+  expect(nodes.filter(node => node.type === ToggleGroupItem).map(node => node.props.children)).toEqual(["Admin", "Sales", "Warehouse", "Brewer", "Taproom"]);
+  (group.props.onValueChange as (values: string[]) => void)(["brewer", "sales", "sales"]);
+  expect(onRolesChange).toHaveBeenCalledWith(["sales", "brewer"]);
+  expect(html).toContain("Admin includes every staff permission");
+  expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(false);
+});
+
+it("requires a nonempty changed role set and blocks empty, unchanged and pending submissions", () => {
+  for (const props of [
+    { roles: [] },
+    { savedRoles: ["sales", "brewer"], roles: ["brewer", "sales"] },
+    { roles: ["sales"], saving: true },
+    { roles: ["sales"], removing: true },
+  ] satisfies Partial<ComponentProps<typeof TeamMemberView>>[]) {
+    const onSubmit = vi.fn(), preventDefault = vi.fn();
+    const { html, nodes } = member({ ...props, onSubmit });
+    expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(true);
+    (nodes.find(node => node.type === "form")!.props.onSubmit as (event: unknown) => void)({ preventDefault });
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+    if (!props.roles.length) expect(html).toContain("Choose at least one role.");
+  }
+  const onSubmit = vi.fn();
+  const { nodes } = member({ roles: ["sales", "brewer"], onSubmit });
+  (nodes.find(node => node.type === "form")!.props.onSubmit as (event: unknown) => void)({ preventDefault: vi.fn() });
+  expect(onSubmit).toHaveBeenCalledOnce();
+});
 
 it("keeps buyer invitations fixed and staff invitations inclusive of taproom", () => {
   const staff = renderToStaticMarkup(createElement(InviteView, { buyer: false, role: "taproom", busy: true, error: "Retry unchanged details" }));
@@ -16,7 +80,7 @@ it("keeps buyer invitations fixed and staff invitations inclusive of taproom", (
 });
 
 it("locks both membership actions during either pending write and retains errors", () => {
-  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "@actual", email: "actual@example.com", savedRole: "brewer", removing: true, error: "Cannot remove the last admin" }));
+  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "@actual", email: "actual@example.com", savedRoles: ["brewer"], removing: true, error: "Cannot remove the last admin" }));
   expect(html).toContain("Cannot remove the last admin");
   expect(html).toContain("ends this brewery membership");
   // Remove opens the confirm sheet; its trigger is held while either write runs.

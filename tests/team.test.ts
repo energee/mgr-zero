@@ -1,14 +1,14 @@
 // tests/team.test.ts — Program 10 task 5: Team roster with @handles, one
-// member's role changed in one write, a membership ended in one write. The
+// member's roles changed in one write, a membership ended in one write. The
 // brewery never loses its last admin; nobody removes themselves; only admins
 // write; the Auth user survives a revoke (re-invite is the compensation).
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaff, makeStaffCtx } from "./helpers";
-import { runCommand } from "@/lib/commands/registry";
+import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-type Member = { userId: string; email: string; handle: string; role: string };
+type Member = { userId: string; email: string; handle: string; roles: StaffRole[] };
 let b: { id: string }, adminCtx: Ctx, sales: Ctx;
 
 beforeAll(async () => {
@@ -22,7 +22,7 @@ const roster = async (ctx: Ctx = adminCtx) => runCommand("list_team_members", {}
 describe("team", () => {
   it("lists members with email and @handle", async () => {
     const me = (await roster()).find((m) => m.userId === adminCtx.userId)!;
-    expect(me.role).toBe("admin");
+    expect(me.roles).toEqual(["admin"]);
     expect(me.email).toContain("@");
     expect(me.handle).toBe(`@${me.email.split("@")[0]}`);
     await expect(roster(sales)).resolves.toBeTruthy();
@@ -36,11 +36,21 @@ describe("team", () => {
     expect(data).toEqual([]);
   });
 
-  it("changes one member's role; the last admin cannot step down", async () => {
-    await expect(runCommand("update_staff_role", { userId: adminCtx.userId, role: "sales" }, adminCtx)).rejects.toThrow(/admin/);
-    await runCommand("update_staff_role", { userId: sales.userId, role: "warehouse" }, adminCtx);
-    expect((await roster()).find((m) => m.userId === sales.userId)?.role).toBe("warehouse");
-    await expect(runCommand("update_staff_role", { userId: adminCtx.userId, role: "sales" }, sales)).rejects.toThrow(/permission denied/);
+  it("changes all roles together and returns them in canonical enum order", async () => {
+    await expect(runCommand("update_staff_role", { userId: adminCtx.userId, roles: ["sales"] }, adminCtx)).rejects.toThrow(/admin/);
+    await runCommand("update_staff_role", { userId: sales.userId, roles: ["brewer", "warehouse", "brewer"] }, adminCtx);
+    expect((await roster()).find((m) => m.userId === sales.userId)?.roles).toEqual(["warehouse", "brewer"]);
+    await expect(runCommand("update_staff_role", { userId: adminCtx.userId, roles: ["sales"] }, sales)).rejects.toThrow(/permission denied/);
+    await expect(runCommand("update_staff_role", { userId: sales.userId, roles: [] }, adminCtx)).rejects.toThrow();
+    expect((await roster()).find((m) => m.userId === sales.userId)?.roles).toEqual(["warehouse", "brewer"]);
+  });
+
+  it("keeps admin when the last admin also has another role", async () => {
+    const isolatedBrewery = await makeBrewery();
+    const lastAdmin = await makeStaffCtx(isolatedBrewery.id, ["admin", "sales"]);
+    await expect(runCommand("update_staff_role", { userId: lastAdmin.userId, roles: ["sales"] }, lastAdmin)).rejects.toThrow(/admin/);
+    const members = await roster(lastAdmin);
+    expect(members.find((m) => m.userId === lastAdmin.userId)?.roles).toEqual(["admin", "sales"]);
   });
 
   it("revokes a membership but never self or the last admin, and keeps the Auth user", async () => {
@@ -54,9 +64,9 @@ describe("team", () => {
     const second = await makeStaffCtx(b.id, "admin");
     await runCommand("revoke_staff", { userId: adminCtx.userId }, second);
     await expect(runCommand("revoke_staff", { userId: second.userId }, second)).rejects.toThrow(/yourself/);
-    await runCommand("update_staff_role", { userId: sales.userId, role: "admin" }, second);
-    const promoted = { ...sales, role: "admin" as const }; // the registry reads ctx.role; the RPC re-derives it from the row
+    await runCommand("update_staff_role", { userId: sales.userId, roles: ["admin"] }, second);
+    const promoted = { ...sales, roles: ["admin" as const] }; // the registry reads ctx.roles; the RPC re-derives them from the row
     await runCommand("revoke_staff", { userId: second.userId }, promoted);
-    await expect(runCommand("update_staff_role", { userId: sales.userId, role: "brewer" }, promoted)).rejects.toThrow(/admin/);
+    await expect(runCommand("update_staff_role", { userId: sales.userId, roles: ["brewer"] }, promoted)).rejects.toThrow(/admin/);
   });
 });

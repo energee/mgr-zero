@@ -1,4 +1,4 @@
-// lib/commands/portal.ts — customer-portal commands. role: "customer" only;
+// lib/commands/portal.ts — customer-portal commands. roles: ["customer"] only;
 // ctx.customerId scopes everything. Mutations call request-ledger-backed RPCs
 // that derive the caller's tenant and role inside the database.
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";

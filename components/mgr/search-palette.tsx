@@ -32,7 +32,7 @@ export function SearchCacheProvider({ children }: { children: React.ReactNode })
 
 type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
 
-export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub, role, onNavigate }: { role?: StaffRole; onNavigate?: (href: string) => void; placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
+export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub, roles, onNavigate }: { roles?: readonly StaffRole[]; onNavigate?: (href: string) => void; placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
   const breweryId = useBrewery();
   const cache = useContext(SearchCache)!;
   const router = useRouter();
@@ -87,7 +87,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     if (onPick) onPick(hit);
     else navigate(hit.href);
   };
-  const pages = role ? searchDestinations(role, term) : [];
+  const pages = roles ? searchDestinations(roles, term) : [];
   const shown = !term ? visibleRecent : hits;
   const byKey = new Map(shown.map(hit => [`${hit.kind}:${hit.id}`, hit]));
   const groups = Map.groupBy(shown, hit => !term ? "recent" : hit.kind);
@@ -106,7 +106,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
   </>;
   return <SearchView model={{ placeholder, heading, sub, groups: viewGroups }}
     value={q} onValueChange={setQ} shouldFilter={false} before={before}
-    emptyMessage={term && currentStatus === "ready" ? role ? "No pages or records found · Try a page name, record name, or document number." : "No records found · Try a record name or number." : ""}
+    emptyMessage={term && currentStatus === "ready" ? roles ? "No pages or records found · Try a page name, record name, or document number." : "No records found · Try a record name or number." : ""}
     onSelect={key => {
       const page = pages.find(page => `page:${page.href}` === key);
       if (page) { navigate(page.href); return; }
@@ -114,10 +114,10 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     }} />;
 }
 
-export function SearchSheet({ role }: { role: StaffRole }) {
+export function SearchSheet({ roles }: { roles: readonly StaffRole[] }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  return <CommandForm open={open} onOpenChange={setOpen} title="Search" trigger={<Button variant="ghost" size="sm" aria-label="Search"><Icon icon={Search01Icon} />Search</Button>}><SearchPalette role={role} onNavigate={(href) => { setOpen(false); router.push(href); }} /></CommandForm>;
+  return <CommandForm open={open} onOpenChange={setOpen} title="Search" trigger={<Button variant="ghost" size="sm" aria-label="Search"><Icon icon={Search01Icon} />Search</Button>}><SearchPalette roles={roles} onNavigate={(href) => { setOpen(false); router.push(href); }} /></CommandForm>;
 }
 
 export function SkuPicker({ value, options, onChange, label = "Select SKU" }: { value: string; options: { id: string; label: string }[]; onChange: (id: string) => void; label?: string }) {

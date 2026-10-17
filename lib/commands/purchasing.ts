@@ -92,7 +92,7 @@ defineCommand({
 defineQuery({
   name: "list_vendors", description: "Vendors, alphabetical, with active flag and typed lead time",
   input: z.object({}), roles: [...PURCHASING],
-  handler: (ctx) => unwrap(ctx.db.from("vendors").select("id, name, active, lead_time_days").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("vendors").select("id, name, active, lead_time_days, qbo_vendor_id, qbo_realm_id").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 // Vendors with their contracts nested, each contract carrying the four
@@ -269,20 +269,35 @@ defineQuery({
   input: z.object({ poId: z.string().uuid(), correctionReceiptId: z.string().uuid().optional() }), roles: [...PO_ROLES],
   handler: async (ctx, i) => {
     const [po, lines, balances, receipts] = await Promise.all([
-      unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
+      unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email, qbo_vendor_id, qbo_realm_id)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
       unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("brewery_id", ctx.breweryId).eq("po_id", i.poId)),
       unwrap(ctx.db.from("po_open_balances").select("po_line_id, qty_received, qty_open").eq("po_id", i.poId)),
-      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
+      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, qbo_bill_id, qbo_bill_request_id, qbo_bill_status, qbo_bill_error, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
     ]);
     if (!po) throw new CommandError("purchase order not found", 404, "not_found");
     const balance = new Map((balances ?? []).map((b) => [b.po_line_id as string, b]));
     const { vendors, ...header } = po;
     const lineById = new Map((lines ?? []).map(line => [line.id as string, line]));
     const correctedBy = new Map((receipts ?? []).filter(r => r.corrects_receipt_id).map(r => [r.corrects_receipt_id as string, r.id as string]));
+    const receiptById = new Map((receipts ?? []).map(receipt => [receipt.id, receipt]));
+    // A replacement receipt describes the same payable, not another vendor bill.
+    const billForReceipt = (receipt: NonNullable<typeof receipts>[number]) => {
+      let owner = receipt;
+      while (!owner.qbo_bill_request_id && owner.corrects_receipt_id) {
+        const previous = receiptById.get(owner.corrects_receipt_id);
+        if (!previous) break;
+        owner = previous;
+      }
+      return {
+        qbo_bill_id: owner.qbo_bill_id, qbo_bill_request_id: owner.qbo_bill_request_id,
+        qbo_bill_status: owner.qbo_bill_status, qbo_bill_error: owner.qbo_bill_error,
+        qbo_bill_receipt_id: owner.qbo_bill_request_id ? owner.id : null,
+      };
+    };
     const correction = i.correctionReceiptId ? receipts?.find(receipt => receipt.id === i.correctionReceiptId) : null;
     if (i.correctionReceiptId && !correction) throw new CommandError("receipt not found", 404, "not_found");
     return {
-      ...header, vendor: vendors as unknown as { name: string; email: string | null } | null,
+      ...header, vendor: vendors as unknown as { name: string; email: string | null; qbo_vendor_id: string | null; qbo_realm_id: string | null } | null,
       lines: (lines ?? []).map(({ materials, ...l }) => ({
         ...l, qty_ordered: Number(l.qty_ordered), material: materials as unknown as { name: string; purchase_uom: string; purchase_uom_factor: number; base_uom: string; lot_tracked: boolean } | null,
         qty_received: Number(balance.get(l.id as string)?.qty_received ?? 0), qty_open: Number(balance.get(l.id as string)?.qty_open ?? l.qty_ordered),
@@ -299,7 +314,7 @@ defineQuery({
             purchase_uom_factor: count.purchase_uom_factor, base_uom: count.base_uom, lot_tracked: Boolean(line?.materials?.lot_tracked) },
         };
       }) ?? [],
-      receipts: (receipts ?? []).map(receipt => ({ ...receipt, corrected_by_receipt_id: correctedBy.get(receipt.id) ?? null })),
+      receipts: (receipts ?? []).map(receipt => ({ ...receipt, ...billForReceipt(receipt), corrected_by_receipt_id: correctedBy.get(receipt.id) ?? null })),
     };
   },
 });
@@ -309,16 +324,16 @@ defineQuery({
 // vendor and contract, names, and the vendor's typed lead time).
 defineQuery({
   name: "get_material_requirements",
-  description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft",
+  description: "Material gaps for Planning: required including projected order and batch packaging demand, projected portion, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and resolved vendor and contract; a null vendor or an out-of-reach buy-by cannot draft",
   input: z.object({ shortOnly: z.boolean().optional().describe("Keep only materials with something short (short > 0)") }), roles: [...PURCHASING],
   handler: async (ctx, i) => {
     let q = ctx.db.from("material_requirements")
-      .select("material_id, material_name, base_uom, purchase_uom, required, on_hand, on_order, short, needed_by, buy_by, out_of_reach, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
+      .select("material_id, material_name, base_uom, purchase_uom, required, projected, on_hand, on_order, short, needed_by, buy_by, out_of_reach, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
       .eq("brewery_id", ctx.breweryId).order("needed_by").order("material_name");
     if (i.shortOnly) q = q.gt("short", 0);
     const rows = await unwrap(q);
     return (rows ?? []).map((r) => ({
-      ...r, required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
+      ...r, required: Number(r.required), projected: Number(r.projected), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
       purchase_units_short: Number(r.purchase_units_short),
     }));
   },

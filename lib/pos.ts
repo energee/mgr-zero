@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import { readSquareEnv } from "@/lib/env/server-parser";
 import {
   advanceSquareCatalogSync,
@@ -607,7 +608,7 @@ export async function syncSquareCatalogFacts(client: SquareClient, accessToken: 
 }
 
 export async function beginSquareOAuth(ctx: Ctx, client: SquareClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_square_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.config.redirectUri, p_state_hash: sha256(state),
@@ -798,7 +799,7 @@ function normalizeSquareOrders(
 }
 
 export async function syncSquareSales(ctx: Ctx, requestId: string, client: SquareClient) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   let start = await beginSquareSalesSync(ctx, requestId);
   if ("replayResult" in start) return start.replayResult;
   let tokens = await readVersionedIntegrationTokens(ctx, "square");

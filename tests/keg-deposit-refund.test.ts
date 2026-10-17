@@ -303,7 +303,7 @@ async function setup() {
   const buyer = await makeCustomerUser(customer.customerId);
   const db = await asUser(buyer.email);
   return { brewery, adminCtx, source, keg, customer,
-    portalCtx: { db, userId: buyer.id, breweryId: brewery.id, role: "customer" as const, customerId: customer.customerId } };
+    portalCtx: { db, userId: buyer.id, breweryId: brewery.id, roles: ["customer" as const], customerId: customer.customerId } };
 }
 
 async function shipTwoKegs(f: Awaited<ReturnType<typeof setup>>, beforeShip?: () => Promise<void>) {

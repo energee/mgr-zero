@@ -7,7 +7,7 @@ const auth = (staff: StaffMembership[] = [], customer: CustomerMembership[] = []
   getIdentity: vi.fn(async () => ({ userId: "user", email: "invited@test.local" })),
   getStaffMemberships: vi.fn(async () => staff),
   getCustomerMemberships: vi.fn(async () => customer),
-  getSupabaseClient: vi.fn(), getStaffRole: vi.fn(), getCustomerMembership: vi.fn(),
+  getSupabaseClient: vi.fn(), getStaffRoles: vi.fn(), getCustomerMembership: vi.fn(),
 } as unknown as RequestAuthContext);
 
 describe("invite acceptance", () => {
@@ -35,10 +35,10 @@ describe("invite acceptance", () => {
   });
 
   it("derives the displayed destination from membership", async () => {
-    const staff = [{ breweryId: "brewery", breweryName: "Demo Brewing", role: "warehouse" as const, timeZone: "America/New_York" }];
-    expect(await inviteLanding(auth(staff), "staff")).toMatchObject({ name: "Demo Brewing", role: "warehouse" });
+    const staff = [{ breweryId: "brewery", breweryName: "Demo Brewing", roles: ["warehouse" as const], timeZone: "America/New_York" }];
+    expect(await inviteLanding(auth(staff), "staff")).toMatchObject({ name: "Demo Brewing", roles: ["warehouse"] });
     expect(await inviteLanding(auth(staff), "customer")).toBeUndefined();
     const customer = [{ breweryId: "brewery", breweryName: "Demo Brewing", customerId: "customer", customerName: "Bar" }];
-    expect(await inviteLanding(auth([], customer), "customer")).toMatchObject({ name: "Demo Brewing", role: "customer" });
+    expect(await inviteLanding(auth([], customer), "customer")).toMatchObject({ name: "Demo Brewing", roles: ["customer"] });
   });
 });

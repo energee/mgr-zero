@@ -13,8 +13,8 @@ const breweryId = "brewery";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const day = (n: number) => new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10);
 
-const context = (tables: Record<string, Row[]>, role: Ctx["role"]): Ctx =>
-  ({ db: cappedDb(tables), userId: "staff", breweryId, role }) as Ctx;
+const context = (tables: Record<string, Row[]>, role: Ctx["roles"][number]): Ctx =>
+  ({ db: cappedDb(tables), userId: "staff", breweryId, roles: [role] }) as Ctx;
 
 const many = (make: (n: number) => Row): Row[] => Array.from({ length: 1001 }, (_, n) => ({ brewery_id: breweryId, ...make(n) }));
 

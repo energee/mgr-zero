@@ -208,7 +208,7 @@ describe("tenant-safe document counters", () => {
       for (const b of [brewery.id, other.id]) {
         // next_no lives in `private`, outside the Data API: PostgREST cannot resolve it at all.
         const { error } = await rawDatabase(ctx.db).rpc("next_no", { b, k: "order" });
-        expect(error?.code, `${ctx.role} next_no(${b === other.id ? "other" : "own"})`).toMatch(/^(42501|PGRST202)$/);
+        expect(error?.code, `${ctx.roles.join("+")} next_no(${b === other.id ? "other" : "own"})`).toMatch(/^(42501|PGRST202)$/);
       }
     }
     const { data: counters } = await admin.from("brewery_counters").select("key").eq("brewery_id", other.id);
@@ -325,8 +325,8 @@ describe("registered staff mutation role × RPC matrix", () => {
       input: async () => {
         const member = await makeStaff(brewery.id, "brewer");
         return {
-          command: { userId: member.id, role: "warehouse" },
-          rpc: { p_brewery: brewery.id, p_user: member.id, p_role: "warehouse" },
+          command: { userId: member.id, roles: ["warehouse"] },
+          rpc: { p_brewery: brewery.id, p_user: member.id, p_roles: ["warehouse"] },
         };
       },
     },

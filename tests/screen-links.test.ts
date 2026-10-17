@@ -123,10 +123,10 @@ describe("reported explorer flows", () => {
   it("keeps every portal screen accessible to every demo persona", () => {
     for (const screen of SCREENS.filter(s => s.portal)) {
       expect(needsFor(screen.name)).toEqual([]);
-      for (const persona of PERSONAS) expect(deniedFor(persona.role, screen.name)).toBe(false);
+      for (const persona of PERSONAS) expect(deniedFor(persona.roles, screen.name)).toBe(false);
     }
     for (const screen of ["Settings", "Accounting", "Point of sale", "Chat settings", "Chat disconnected"])
-      for (const role of ["sales", "warehouse"] as const) expect(deniedFor(role, screen), screen).toBe(true);
+      for (const role of ["sales", "warehouse"] as const) expect(deniedFor([role], screen), screen).toBe(true);
   });
 
   it("keeps deep-linked sheets over their owning pages", () => {

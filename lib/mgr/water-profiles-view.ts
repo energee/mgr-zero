@@ -3,6 +3,7 @@
 // list_water_profiles returns them and upsert_water_profile takes them.
 import type { EmptyState } from "./empty-state";
 import { IONS as CHEMISTRY_IONS, ION_LABELS, type Ions } from "@/lib/water-chemistry";
+import { hasAnyRole } from "./roles";
 
 export type Ion = `${keyof Ions}_ppm`;
 
@@ -22,10 +23,10 @@ export type WaterProfileFields = { name: string } & Record<Ion, string>;
 
 export const ionLine = (p: Record<Ion, number>) => IONS.map(([key, label]) => `${label} ${p[key]}`).join(" · ");
 
-/** Where the page's back arrow goes. Brewer cannot open Catalog (list_price_groups
- *  excludes brewer), so Brewer, who arrives from a recipe's Water sheet, goes back to Recipes. */
-export function waterProfilesBack(role: string): { label: string; href: string } {
-  return role === "brewer" ? { label: "Recipes", href: "/recipes" } : { label: "Catalog", href: "/catalog" };
+/** Catalog requires a role permitted to list price groups. A brewer without
+ *  one returns to Recipes even when they also hold Taproom. */
+export function waterProfilesBack(roles: readonly string[]): { label: string; href: string } {
+  return hasAnyRole(roles, ["admin", "sales", "warehouse"]) ? { label: "Catalog", href: "/catalog" } : { label: "Recipes", href: "/recipes" };
 }
 
 export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; back?: { label: string; href: string } }): WaterProfilesViewModel {
