@@ -60,7 +60,7 @@ enable_confirmations = false
 
 [auth.email.template.invite]
 subject = "You have been invited"
-content_path = "../../supabase/templates/invite.html"
+content_path = "./supabase/.temp/templates/invite.html"
 
 [auth.rate_limit]
 email_sent = 2
