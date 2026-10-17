@@ -240,7 +240,8 @@ describe("Recipes view", () => {
     expect(html).not.toContain(">Open<");
   });
 
-  it("the live Recipes page mounts RecipesView and links Create recipe to New recipe", () => {
+
+  it("the live Recipes page mounts RecipesView and links New recipe to /recipes/new", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
     expect(page).toMatch(/\/recipes\/new/);
