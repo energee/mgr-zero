@@ -109,9 +109,10 @@ describe("AI composer", () => {
     expect(unknown).not.toContain("<title>Vercel</title>");
   });
 
-  it("shows the brewery model in the conversation header", () => {
-    const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [], model: "openai/gpt-5.4" }));
-    expect(html).toContain("openai/gpt-5.4");
+  it("names no model in the conversation header (#998)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [] }));
+    expect(html).toContain("Answers use your brewery data and permissions.");
+    expect(html).not.toContain(" · ");
   });
 
   it("renders assistant markdown", () => {
