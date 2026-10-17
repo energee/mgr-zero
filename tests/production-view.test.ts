@@ -56,14 +56,16 @@ it("vessel readings preserve optional measurements and do not invent actors", ()
 
 describe("Batches view", () => {
   it("groups returned lifecycle facts without inventing readings or hiding closed batches", () => {
-    const base: BatchListRow = { id: "planned", batch_no: null, planned_on: "2026-09-12", planned_bbl: 12.5, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
+    const base: BatchListRow = { id: "planned", batch_no: null, planned_on: "2026-09-12", planned_bbl: 12.5, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: "Actual tank", active_occupancies: [] };
     expect(batchesFromQuery([base], []).planned?.[0].href).toBeUndefined();
-    const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: "Actual tank" }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12" }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
-    expect(model.planned[0]).toMatchObject({ verb: "Brew", href: "/batches/planned" });
-    expect(model.active[0]).toMatchObject({ verb: "Open", href: "/batches/active" });
-    expect(model.completed?.[0].key).toBe("closed");
+    const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: null }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12", vessel_name: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
+    // Facts arrive as fields, never as one delimited sentence; missing brand and recipe stay null.
+    expect(model.planned[0]).toEqual({ key: "planned", batchNo: "Batch", brand: null, recipe: null, plannedOn: "Sep 12, 2026", plannedBbl: 12.5, vessel: "Actual tank", brewable: true, href: "/batches/planned" });
+    expect(model.active[0]).toMatchObject({ brewable: false, href: "/batches/active", readings: [] });
+    expect(model.completed?.[0]).toMatchObject({ key: "closed", brewable: false });
+    expect(model.completed?.[0].readings).toBeUndefined();
     const html = htmlOf(createElement(BatchesView, { model, workHrefs: { all: "/work", batches: "/batches" }, newVesselHref: "/cellar/vessels/new" }));
-    for (const text of ["Planned", "Active", "Completed", "No open occupancy", "Actual tank", "12.5 bbl · Sep 12, 2026", "No vessels yet"]) expect(html).toContain(text);
+    for (const text of ["Planned", "Active", "Completed", "No open occupancy", "Actual tank", "No brand yet", "No recipe", "Sep 12, 2026", "12.5", "No vessels yet"]) expect(html).toContain(text);
     expect(html).not.toContain("2026-09-12");
     expect(html).not.toContain("°P");
     expect(html).toContain('href="/batches"');
@@ -73,11 +75,16 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
   });
-  it("maps planned Start and overdue Reading", () => {
+  it("offers Brew only on the planned fixture batches", () => {
     const model = toBatchesViewProps(batchesBrewer);
-    expect(model.planned[0]?.verb).toBe("Start");
-    expect(model.active[1]?.warning).toBe(true);
+    expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
+    expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
+  });
+
+  it("maps each vessel to its own fields and edit destination", () => {
+    const vessels = batchesFromQuery([], [{ id: "v4", name: "FV4", kind: "fermenter", capacity_bbl: 10, active: false }], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }).vessels;
+    expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
   });
 
   it("the Batches inventory record is BatchesView", () => {
