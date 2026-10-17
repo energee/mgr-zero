@@ -27,7 +27,7 @@ export function LoginForm({
   const fixture = portal ? portalSignIn : signIn;
   const model = {
     ...fixture,
-    note: error,
+    error,
     info: sent ? "Check your email for a sign-in link." : undefined,
   };
   return (

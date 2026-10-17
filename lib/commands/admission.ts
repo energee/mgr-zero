@@ -1,6 +1,6 @@
 // lib/commands/admission.ts — the per-user request admission check shared by the
-// HTTP entry points (/api/command and /api/chat). One budget per signed-in user,
-// enforced by the `consume_command_admission` RPC; callers shape the 429 response.
+// HTTP entry points (/api/command, /api/chat, and the portal payment broker).
+// One budget per signed-in user, enforced by `consume_command_admission`.
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 
 export type AdmissionDecision = { allowed: true } | { allowed: false; retryAfter: number };

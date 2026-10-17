@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/date-format";
 
 function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: ComplianceFiguresViewModel; inProcessDetail: string; warnings?: string[] }) {
   return <>
-    {E.tbl(["class", "begin", "+", "−", "end"], model.lines)}
+    {E.tbl(["class", "begin", "+", "−", "end"], model.lines, ["l", "r", "r", "r", "r"])}
     {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once in the removal totals below. Zeros print 0.00.")}
     {warnings.map((warning) => <Fragment key={warning}>{E.note(warning)}</Fragment>)}
     {E.row("Beer in process", inProcessDetail, model.inProcess)}
@@ -17,7 +17,7 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · non-additive breakdown`, row.bbl)}</Fragment>)}</> : null}
     {E.ttl("Destination-state totals")}
     {model.stateExport ? <>
-      {E.tbl(["state", "outward BBL", "returned BBL", "adjustment BBL", "net BBL", "sales", "credits", "net sales"], model.stateRows)}
+      {E.tbl(["state", "outward BBL", "returned BBL", "adjustment BBL", "net BBL", "sales", "credits", "net sales"], model.stateRows, ["l", "r", "r", "r", "r", "r", "r", "r"])}
       {E.info("Physical movement and invoiced beer sales have separate event dates. Returns reduce outward volume. Credits reduce beer sales; keg deposits are excluded. Unassigned facts have no recorded destination. Exported facts reconcile to these totals. State taxes and filing forms remain external.")}
       <DestinationStateExport {...model.stateExport} />
     </> : E.info("Supporting destination-state facts were not captured in this snapshot.")}

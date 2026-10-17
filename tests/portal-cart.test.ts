@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { submissionFailureMessage } from "@/app/(portal)/portal/cart";
-import { cartActionsDisabled, cartMissingInput, planDraftSync } from "@/lib/portal-cart";
+// Render the hydrated cart: the server snapshot would only show the loading note.
+vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof import("react")>(), useSyncExternalStore: () => true }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+import { Cart, submissionFailureMessage } from "@/app/(portal)/portal/cart";
+import { cartActionsDisabled, cartMissingInput, planDraftSync, workingCartKey } from "@/lib/portal-cart";
 
 describe("portal cart recovery", () => {
   it("does not claim an order is still a draft when submission may have committed", () => {
@@ -35,5 +40,26 @@ describe("portal cart disabled reason (#768)", () => {
     expect(cartMissingInput({ shipToId: "", lineCount: 1 })).toBe("Before saving or reviewing this order, choose a ship-to.");
     expect(cartMissingInput({ shipToId: "s", lineCount: 0 })).toBe("Before saving or reviewing this order, enter a quantity above zero.");
     expect(cartMissingInput({ shipToId: "", lineCount: 0 })).toBe("Before saving or reviewing this order, choose a ship-to and enter a quantity above zero.");
+  });
+});
+
+describe("portal cart messages (#904)", () => {
+  const scope = { actorId: crypto.randomUUID(), customerId: crypto.randomUUID(), breweryId: crypto.randomUUID() };
+  const shipTo = crypto.randomUUID();
+  const items = [{ skuId: crypto.randomUUID(), name: "Pils Keg", product: "Pils", unitPriceCents: 100 }];
+  const alerts = (html: string) => [...html.matchAll(/<div\b[^>]*role="alert"[^>]*>([\s\S]*?)<\/div>/g)].map(match => match[1].replace(/<[^>]+>/g, "")).join(" · ");
+  function render(qty: string) {
+    const saved = JSON.stringify({ savedAt: Date.now(), fields: { shipToId: shipTo, poNumber: "", note: "", requestedShipDate: null }, lines: [{ skuId: items[0].skuId, name: "Pils Keg", qty }, { skuId: "gone", name: "Old IPA", qty: "1" }] });
+    vi.stubGlobal("sessionStorage", { getItem: () => null });
+    vi.stubGlobal("localStorage", { getItem: (key: string) => key === workingCartKey(scope) ? saved : null, setItem: () => {}, removeItem: () => {} });
+    return renderToStaticMarkup(createElement(Cart, { customerName: "River Market", items, shipTos: [{ id: shipTo, label: "Dock", country: "US" }], scope, fulfillmentSource: { id: "source", name: "Brewery" } }));
+  }
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("announces quantity and missing-input validation, and the removed-items change, as alerts", () => {
+    const invalid = alerts(render("1.5"));
+    expect(invalid).toContain("Enter whole quantities of zero or more.");
+    expect(invalid).toContain("Removed unavailable or unpriced items: Old IPA");
+    expect(alerts(render("0"))).toContain("Before saving or reviewing this order, enter a quantity above zero.");
   });
 });

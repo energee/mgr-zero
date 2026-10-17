@@ -149,6 +149,14 @@ voided, or deleted; a live sync without cash-paid status clears its payment-conf
 marker, including credit-only closure. No settlement date is supplied. A reconnect,
 credential rotation, or loss of the required accounting permission while the
 link is being fetched also leaves payment unavailable.
+After invoice authorization and before any provider read or token refresh, the
+handoff consumes the same 120-requests-per-60-second per-user admission budget as
+`/api/command` and `/api/chat`. Denied or unavailable admission fails closed to
+the existing `303` invoice redirect with `?payment=unavailable`, not a provider
+request or a `429` API envelope. Unauthenticated requests and foreign invoices
+are rejected before admission. Wait a minute before reopening the invoice and
+trying again; no payment is submitted by a denied handoff. Provider errors are
+logged only as a safe classification, never raw credentials or bearer links.
 
 The public website-menu feed is the other narrow `GET` exception:
 `/api/public/menus/{publicId}`. Its opaque id selects one configured POS

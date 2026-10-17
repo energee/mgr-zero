@@ -161,6 +161,7 @@ export const WATER_HAZY: WaterDraft = {
 export const recipeHazyV4: RecipeViewModel = {
   title: "Hazy IPA v4",
   saved: "Aug 28, 2026",
+  versions: [4, 3, 2, 1].map((number) => ({ number, selected: number === 4, latest: number === 4 })),
   recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],

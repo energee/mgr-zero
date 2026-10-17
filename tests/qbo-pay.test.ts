@@ -116,6 +116,24 @@ describe("QuickBooks portal payment link", () => {
       ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch),
     )).resolves.toEqual({ kind: "redirect", url: "https://connect.intuit.com/pay/reopened" });
     expect(reopenedFetch).toHaveBeenCalledOnce();
+    // Other command/chat requests spend this same database-owned user budget.
+    sql(`insert into private.command_admissions(user_id,window_started_at,request_count)
+      values ('${user.id}',now(),119) on conflict(user_id) do update
+      set window_started_at=now(),request_count=119`);
+    reopenedFetch.mockClear();
+    await expect(resolvePortalInvoicePayment(ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch)))
+      .resolves.toEqual({ kind: "redirect", url: "https://connect.intuit.com/pay/reopened" });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await expect(resolvePortalInvoicePayment(ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch)))
+        .resolves.toEqual({ kind: "unavailable", reason: "rate_limited" });
+    }
+    expect(reopenedFetch).toHaveBeenCalledOnce();
+    expect(sql(`select request_count from private.command_admissions where user_id='${user.id}'`)).toEqual(["124"]);
+    // The next database window admits work again; there is no application link cache.
+    sql(`update private.command_admissions set window_started_at=now()-interval '61 seconds' where user_id='${user.id}'`);
+    await expect(resolvePortalInvoicePayment(ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch)))
+      .resolves.toEqual({ kind: "redirect", url: "https://connect.intuit.com/pay/reopened" });
+    expect(reopenedFetch).toHaveBeenCalledTimes(2);
     expect((await admin.from("invoices").update({
       paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live" as const, written_off_at: null,
       written_off_by: null, written_off_reason: null,
@@ -216,8 +234,16 @@ describe("QuickBooks portal payment link", () => {
       ctx, invoice.data.id, new QboOAuthClient(config, narrowedTransport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
 
+    const revokedTransport = vi.fn<typeof globalThis.fetch>(async () => {
+      expect((await admin.from("customer_users").delete().eq("user_id", user.id)).error).toBeNull();
+      return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
+    });
     expect((await admin.from("qbo_connections").update({ granted_scopes: ["com.intuit.quickbooks.accounting"] })
       .eq("id", connection.data.id)).error).toBeNull();
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, revokedTransport), new Set(["pay.example.test"]),
+    )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
+    expect((await admin.from("customer_users").insert({ customer_id: customer.customerId, user_id: user.id })).error).toBeNull();
     // A thrown link read reaches the caller (the Pay route logs it) instead of
     // being swallowed as an unlogged unavailable (#763).
     const throwingTransport = vi.fn<typeof globalThis.fetch>(async () => { throw new TypeError("fetch failed"); });
@@ -234,6 +260,27 @@ describe("QuickBooks portal payment link", () => {
     await expect(resolvePortalInvoicePayment(
       ctx, invoice.data.id, new QboOAuthClient(config, refreshTransport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "redirect", url: paymentUrl });
+    // Both requests read one expired generation before either refresh completes.
+    expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
+      .eq("id", connection.data.id)).error).toBeNull();
+    let finishRefreshes!: () => void;
+    const bothRefreshing = new Promise<void>((resolve) => { finishRefreshes = resolve; });
+    let refreshes = 0;
+    const racingTransport = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      if (init?.method !== "POST") return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
+      const attempt = ++refreshes;
+      if (refreshes === 2) finishRefreshes();
+      await bothRefreshing;
+      return Response.json({ access_token: `race-access-${attempt}`, refresh_token: `race-refresh-${attempt}`, expires_in: 3600 });
+    });
+    const raceResults = await Promise.all([1, 2].map(() => resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, racingTransport), new Set(["pay.example.test"]),
+    )));
+    expect(raceResults).toEqual(expect.arrayContaining([
+      { kind: "redirect", url: paymentUrl },
+      { kind: "unavailable", reason: "provider_unavailable" },
+    ]));
+    expect(racingTransport).toHaveBeenCalledTimes(3);
     expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
       .eq("id", connection.data.id)).error).toBeNull();
     const rejectedRefresh = vi.fn<typeof globalThis.fetch>(async () =>
@@ -245,7 +292,7 @@ describe("QuickBooks portal payment link", () => {
     expect(refreshTransport).toHaveBeenCalledTimes(2);
     expect(sql(`select c.credential_version||':'||t.credential_version from public.qbo_connections c
       join private.integration_tokens t on t.brewery_id=c.brewery_id and t.connection_id=c.id
-      where c.id='${connection.data.id}'`)).toEqual(["3:3"]);
+      where c.id='${connection.data.id}'`)).toEqual(["4:4"]);
     expect(JSON.stringify(sql(`select encode(payload_hash,'hex')||coalesce(result::text,'') from private.command_requests where actor_id='${user.id}'`)))
       .not.toContain("bearer-secret");
     expect(JSON.stringify(sql(`select request_body||coalesce(response::text,'') from qbo_pushes where invoice_id='${invoice.data.id}'`)))
