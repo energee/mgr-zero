@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     const messages = buildModelMessages(history.messages, { id: body.message.id, text: body.text });
     const result = streamText({
       model: gateway(ai.model),
+      maxOutputTokens: 2000,
+      abortSignal: req.signal,
       system: SYSTEM,
       messages,
       tools: createComposerTools(ctx, body.id),

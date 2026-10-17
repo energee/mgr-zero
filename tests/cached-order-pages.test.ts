@@ -13,10 +13,11 @@ import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { OrderForm } from "@/app/(app)/orders/order-form";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 
+const timeZone = "America/Los_Angeles";
 beforeEach(() => { state.pending = false; state.fetching = false; state.paused = false; state.error = null; state.calls = []; });
 
 it("feeds the existing order form cached live IDs, default ship-to and active SKUs", () => {
-  const form = NewOrderClient();
+  const form = NewOrderClient({ timeZone });
   expect(form.type).toBe(OrderForm);
   expect(form.props.customers[0].shipTos[0]).toMatchObject({ id: "dock", is_default: true });
   expect(form.props.skus).toEqual([{ id: "sku", label: "Brand — Keg" }]);
@@ -25,34 +26,36 @@ it("feeds the existing order form cached live IDs, default ship-to and active SK
 
 it("keeps cached form data mounted when a background refresh fails", () => {
   state.error = new Error("Could not refresh");
-  expect(NewOrderClient().type).toBe(OrderForm);
+  expect(NewOrderClient({ timeZone }).type).toBe(OrderForm);
 });
 
 it("feeds the existing form shared freshness feedback without replacing the form during refresh", () => {
   state.fetching = true;
-  const form = NewOrderClient();
+  const form = NewOrderClient({ timeZone });
   expect(form.type).toBe(OrderForm);
   expect(form.props.feedback.type).toBe(QueryFeedback);
+  expect(form.props.timeZone).toBe(timeZone);
+  expect(form.props.feedback.props.timeZone).toBe(timeZone);
   const feedback = renderToStaticMarkup(form.props.feedback);
   expect(feedback).toContain("Updating");
   expect(feedback).toContain("Last checked");
   expect(feedback).not.toContain('role="status"');
   state.paused = true;
-  expect(renderToStaticMarkup(NewOrderClient().props.feedback)).toContain("Showing last-known data");
+  expect(renderToStaticMarkup(NewOrderClient({ timeZone }).props.feedback)).toContain("Showing last-known data");
 });
 
 it("does not describe a cold cache as empty data or render skeletons", () => {
   state.pending = true;
-  const html = renderToStaticMarkup(NewOrderClient());
+  const html = renderToStaticMarkup(NewOrderClient({ timeZone }));
   expect(html).toContain("Loading order options");
   expect(html).not.toMatch(/animate-pulse|No customers|Go to/);
-  const orders = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const orders = renderToStaticMarkup(OrdersClient({ role: "sales", timeZone }));
   expect(orders).toContain("Loading orders");
   expect(orders).not.toContain("No orders yet");
 });
 
 it("preserves customer filters and read-only Warehouse controls", () => {
-  const html = renderToStaticMarkup(OrdersClient({ role: "warehouse", status: "draft", customerId: "buyer" }));
+  const html = renderToStaticMarkup(OrdersClient({ role: "warehouse", timeZone, status: "draft", customerId: "buyer" }));
   expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined }]]);
   expect(html).toContain("customerId=buyer");
   expect(html).not.toContain("New order");
@@ -60,7 +63,7 @@ it("preserves customer filters and read-only Warehouse controls", () => {
 
 it("shows when cached orders were checked, and keeps them visible while updating", () => {
   state.fetching = true;
-  const html = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const html = renderToStaticMarkup(OrdersClient({ role: "sales", timeZone }));
   expect(html).toContain("Updating");
   expect(html).toContain("Last checked");
   expect(html).toContain('dateTime="2026-09-13T12:00:00.000Z"');
@@ -70,18 +73,18 @@ it("shows when cached orders were checked, and keeps them visible while updating
 
 it("distinguishes offline cached data from a cold cache waiting for a connection", () => {
   state.paused = true;
-  const cached = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const cached = renderToStaticMarkup(OrdersClient({ role: "sales", timeZone }));
   expect(cached).toContain("Waiting for connection");
   expect(cached).toContain("Showing last-known data");
   state.pending = true;
-  const cold = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const cold = renderToStaticMarkup(OrdersClient({ role: "sales", timeZone }));
   expect(cold).toContain("Waiting for connection");
   expect(cold).not.toMatch(/Loading orders|Showing last-known data|No orders yet/);
 });
 
 it("labels a failed refresh as last-known data instead of presenting it as current", () => {
   state.error = new Error("Could not refresh");
-  const html = renderToStaticMarkup(OrdersClient({ role: "sales" }));
+  const html = renderToStaticMarkup(OrdersClient({ role: "sales", timeZone }));
   expect(html).toContain("Showing last-known data");
   expect(html).toContain("Try again");
   expect(html).toContain("Last checked");

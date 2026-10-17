@@ -23,7 +23,7 @@ function render(lines: { skuId: string; qty: string }[]) {
   harness.values = ["wholesale", "customer", "dock", "source", "", "", "", false, lines];
   harness.renderingOrder = true;
   // Selected SKUs must be offered options, or #714's unavailable-SKU gate blocks the save instead.
-  try { return OrderForm({ customers: [], locations: [], skus: [{ id: "sku-1", label: "One" }, { id: "sku-2", label: "Two" }] }); }
+  try { return OrderForm({ timeZone: "America/Los_Angeles", customers: [], locations: [], skus: [{ id: "sku-1", label: "One" }, { id: "sku-2", label: "Two" }] }); }
   finally { harness.renderingOrder = false; }
 }
 

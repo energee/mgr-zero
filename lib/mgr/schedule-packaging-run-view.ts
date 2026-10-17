@@ -25,7 +25,7 @@ export type SchedulePackagingRunViewModel = {
   leftLabel?: string;
   leftInSource?: string;
   /** Current material requirement projection for the draft outputs. */
-  materials?: (string | number)[][];
+  materials?: [material: string, planned: string, onHand: string | number, short: string | number][];
   materialsMessage?: string;
   warning?: string;
 };

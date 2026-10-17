@@ -67,6 +67,69 @@ describe("Square durable credential lifecycle", () => {
       .toEqual({ state: "disconnected", remote_revocation_state: "confirmed", last_error: null });
   });
 
+  it("does not revoke a seller now connected to another brewery (#640)", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const merchantId = `merchant-${crypto.randomUUID()}`;
+    const connection = await admin.from("pos_connections").insert({ brewery_id: brewery.id, merchant_id: merchantId,
+      state: "connected", credential_version: 1 }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','square','${connection.data!.id}','old-access','old-refresh',1)`);
+
+    const failedRequest = crypto.randomUUID();
+    const failedRevoke = vi.fn().mockRejectedValue(new Error("offline"));
+    await expect(disconnectSquare(ctx, connection.data!.id, failedRevoke, failedRequest))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "unresolved" });
+    expect(failedRevoke).toHaveBeenCalledWith({ accessToken: "old-access" });
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='square'`)).toEqual(["0"]);
+
+    const owner = await makeBrewery();
+    const ownerCtx = await makeStaffCtx(owner.id, "admin");
+    const oauth = new URL((await beginSquareOAuth(ownerCtx, new SquareClient(config, vi.fn()), "connect", crypto.randomUUID())).authorizeUrl);
+    const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
+      p_actor: ownerCtx.userId, p_brewery: owner.id, p_redirect_uri: config.redirectUri });
+    expect(claim.error).toBeNull();
+    const completed = await admin.rpc("complete_square_oauth", { p_intent: claim.data![0].intent_id, p_actor: ownerCtx.userId,
+      p_merchant_id: merchantId, p_merchant_label: "Replacement owner", p_access_token: "owner-access",
+      p_refresh_token: "owner-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
+      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
+    });
+    expect(completed.error).toBeNull();
+
+    const denied = await admin.rpc("begin_square_disconnect", { p_brewery: brewery.id, p_connection: connection.data!.id,
+      p_actor: ownerCtx.userId, p_request_id: crypto.randomUUID() });
+    expect(denied.error?.code).toBe("42501");
+
+    const retryRequest = crypto.randomUUID();
+    const retryRevoke = vi.fn().mockResolvedValue(undefined);
+    await expect(disconnectSquare(ctx, connection.data!.id, retryRevoke, retryRequest))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "unresolved" });
+    expect(retryRevoke).not.toHaveBeenCalled();
+    for (const requestId of [failedRequest, retryRequest]) {
+      await expect(disconnectSquare(ctx, connection.data!.id, retryRevoke, requestId))
+        .resolves.toEqual({ disconnected: true, remoteRevocationState: "unresolved" });
+    }
+    expect(retryRevoke).not.toHaveBeenCalled();
+    expect((await admin.from("pos_connections").select("state,remote_revocation_state,last_error")
+      .eq("id", connection.data!.id).single()).data)
+      .toEqual({ state: "recovery_required", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
+    const ownerConnection = await admin.from("pos_connections").select("id,state,remote_revocation_state")
+      .eq("brewery_id", owner.id).single();
+    expect(ownerConnection.data).toMatchObject({ state: "connected", remote_revocation_state: "not_requested" });
+    expect(sql(`select access_token from private.integration_tokens where brewery_id='${owner.id}' and provider='square'`)).toEqual(["owner-access"]);
+
+    // Once the replacement owner disconnects, an old unresolved retry can proceed.
+    const ownerRevoke = vi.fn().mockResolvedValue(undefined);
+    await expect(disconnectSquare(ownerCtx, ownerConnection.data!.id, ownerRevoke, crypto.randomUUID()))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
+    expect(ownerRevoke).toHaveBeenCalledWith({ accessToken: "owner-access" });
+    await expect(disconnectSquare(ctx, connection.data!.id, retryRevoke, crypto.randomUUID()))
+      .resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
+    expect(retryRevoke).toHaveBeenCalledTimes(1);
+    expect(retryRevoke).toHaveBeenCalledWith({ merchantId });
+  });
+
   it("disconnects a recovery-required connection that still holds its credential (#620)", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
