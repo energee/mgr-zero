@@ -185,7 +185,7 @@ export const E = {
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
     const body = <>{tone === "ok" ? <Dot cls="ok" /> : null}{t}</>;
     return (
-      <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5" asChild={Boolean(href)}>
+      <Badge variant={tone === "w" ? "secondary" : "outline"} className={cn("gap-1.5", tone === "w" && "bg-warning text-warning-foreground [a]:hover:bg-warning/80")} asChild={Boolean(href)}>
         {href ? <a href={href}>{body}</a> : body}
       </Badge>
     );
