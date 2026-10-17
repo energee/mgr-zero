@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const actorId = data?.claims.sub;
     const picked = (await cookies()).get("brewery")?.value;
     const activeBrewery = await getActiveBrewery();
-    if (typeof actorId !== "string" || activeBrewery.role !== "admin"
+    if (typeof actorId !== "string" || !activeBrewery.roles.includes("admin")
       || (picked && picked !== activeBrewery.id)) throw new Error("oauth state invalid");
     // QuickBooks can deliver a second callback for one consent; the first
     // already connected, so the replay reports that instead of a failure.

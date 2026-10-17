@@ -7,7 +7,7 @@ import { deniedHref } from "./denied";
 export function requirePagePermission(ctx: Ctx, name: string, resource = name.replace(/^(get|list)_/, "").replace(/_/g, " ")) {
   const definition = getCommandDefinition(name);
   if (definition && !canRun(ctx, name)) {
-    redirect(deniedHref(resource, Array.isArray(definition.roles) ? definition.roles : [definition.roles]));
+    redirect(deniedHref(resource, typeof definition.roles === "string" ? [definition.roles] : definition.roles));
   }
 }
 

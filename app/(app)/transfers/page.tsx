@@ -37,7 +37,7 @@ export default async function TransfersPage() {
         })),
       })}
       createAction={<NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} />}
-      workHrefs={workHrefsFor(brewery.role)}
+      workHrefs={workHrefsFor(brewery.roles)}
       linkRows
     />
   );

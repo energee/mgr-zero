@@ -26,7 +26,7 @@ export default async function InventoryDetailPage({ params, searchParams }: {
   return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: movements.slice(0, 50), backHref: "/inventory", timeZone: brewery.timeZone })}
     movementAction={m => m.compensates_id ? E.act("Original movement", "primary", `${href}?movement=${m.compensates_id}`)
       : m.reversed_by ? E.act("Reversal recorded", "primary", `${href}?movement=${m.id}`)
-      : canReverseMovement(m) ? (brewery.role === "admin" || brewery.role === "warehouse" ? <ReversalForm movement={m} /> : "Read only")
+      : canReverseMovement(m) ? (brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? <ReversalForm movement={m} /> : "Read only")
       : m.type === "sale_removal" && m.ref ? E.act("Return shipment", "primary", `/orders/${m.ref}`)
       : <span className="max-w-40 text-xs text-muted-foreground">{m.type === "depletion" ? "Count/depletion correction unavailable" : "Correct through the original workflow"}</span>}
     footer={<div className="flex gap-2">{movement && E.btn("All movements", "g", href)}{page > 0 && E.btn("Newer movements", "g", `${href}?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `${href}?page=${page + 2}`)}</div>} />;

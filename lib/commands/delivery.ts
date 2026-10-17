@@ -61,7 +61,7 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
       completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
-      unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
+      unwrap(ctx.db.from("brewery_users").select("user_id, roles").eq("brewery_id", ctx.breweryId).overlaps("roles", ["admin", "warehouse"])),
       breweryToday(ctx),
     ]);
     const routeIds = routes.map((r) => r.id);

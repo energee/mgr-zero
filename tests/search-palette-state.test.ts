@@ -24,10 +24,10 @@ describe("search palette state", () => {
 
 
 it("finds role-visible pages independently of record matches", () => {
-  expect(searchDestinations("admin", " invoice ").map(page => page.href)).toEqual(["/invoices"]);
-  expect(searchDestinations("sales", "CATALOG").map(page => page.href)).toEqual(["/catalog"]);
-  expect(searchDestinations("brewer", "catalog")).toEqual([]);
-  expect(searchDestinations("sales", "locations")).toEqual([]);
-  expect(searchDestinations("admin", "")).toEqual([]);
-  expect(searchDestinations("admin", "nothing matches")).toEqual([]);
+  expect(searchDestinations(["admin"], " invoice ").map(page => page.href)).toEqual(["/invoices"]);
+  expect(searchDestinations(["sales"], "CATALOG").map(page => page.href)).toEqual(["/catalog"]);
+  expect(searchDestinations(["brewer"], "catalog")).toEqual([]);
+  expect(searchDestinations(["sales"], "locations")).toEqual([]);
+  expect(searchDestinations(["admin"], "")).toEqual([]);
+  expect(searchDestinations(["admin"], "nothing matches")).toEqual([]);
 });

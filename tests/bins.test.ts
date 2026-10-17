@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database";
+import type { StaffRole } from "@/lib/commands/registry";
 import { rawDatabase } from "./raw-database";
 // tests/bins.test.ts — bins are brewery-configured subdivisions of a location; every
 // location is born with a trio and can never drop below one. Spec:
@@ -10,7 +11,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Row = { id: string; name: string };
-type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
+type Ctx = { db: SupabaseClient<Database>; userId: string; breweryId: string; roles: StaffRole[] };
 
 describe("bins", () => {
   let ctx: Ctx;

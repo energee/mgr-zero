@@ -25,7 +25,7 @@ const src = (file: string) => readFileSync(file, "utf8");
 describe("Routes", () => {
   it("keeps Transfers and Packaging Work navigation in their shared views", () => {
     for (const [route, view] of [["transfers", "transfers"], ["packaging", "packaging-runs"], ["purchase-orders", "purchase-orders"]]) {
-      expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.role)}");
+      expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.roles)}");
       expect(src(`components/mgr/views/${view}.tsx`)).toContain("<TabBar");
       expect(src(`components/mgr/views/${view}.tsx`)).not.toMatch(/tabs\?: ReactNode/);
     }
@@ -81,9 +81,9 @@ describe("Route", () => {
     expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
   });
   it("keeps Work route links within the staff navigation permissions", () => {
-    expect(workHrefsFor("brewer")).toEqual({ all: "/work", batches: "/batches", runs: "/packaging" });
-    expect(workHrefsFor("warehouse").routes).toBe("/routes");
-    expect(workHrefsFor("sales").routes).toBeUndefined();
+    expect(workHrefsFor(["brewer"])).toEqual({ all: "/work", batches: "/batches", runs: "/packaging" });
+    expect(workHrefsFor(["warehouse"]).routes).toBe("/routes");
+    expect(workHrefsFor(["sales"]).routes).toBeUndefined();
   });
   it("the Route inventory record is RouteView", () => {
     const body = screen("Route").body as { type: unknown; props: { model: unknown } };

@@ -8,6 +8,7 @@ import { oauthState, sha256 } from "@/lib/hash";
 import { readAppUrl } from "@/lib/env/server-parser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
 
 export const PROVIDER = "slack";
@@ -66,7 +67,7 @@ function authorizeUrl(state: string, redirectUri: string) {
 }
 
 async function beginIntent(ctx: Ctx, redirectUri: string, installationId: string | null, requestId: string) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const state = oauthState(requestId, ctx.userId);
   const url = authorizeUrl(state, redirectUri);
   const name = installationId === null ? "begin_chat_installation" : "begin_chat_reauthorization";
@@ -105,10 +106,10 @@ async function completeSlackInstallLocked(db: SupabaseClient<Database>, request:
   const jobs = serviceClient();
   const intent = await unwrap<Intent | null>(jobs.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state), p_actor: user.id }));
   if (!intent) throw new CommandError("oauth state invalid", 400);
-  const membership = await unwrap<{ role: string } | null>(
-    db.from("brewery_users").select("role").eq("brewery_id", intent.brewery_id).eq("user_id", user.id).maybeSingle(),
+  const membership = await unwrap<{ roles: string[] } | null>(
+    db.from("brewery_users").select("roles").eq("brewery_id", intent.brewery_id).eq("user_id", user.id).maybeSingle(),
   );
-  if (membership?.role !== "admin") throw new CommandError("oauth state invalid", 400);
+  if (!membership || !hasAnyRole(membership.roles, ["admin"])) throw new CommandError("oauth state invalid", 400);
   if (intent.consumed_at && intent.state === "active") {
     if (!await port.getInstallation(intent.external_installation_id)) {
       return failChatCredentialStore(intent.installation_id);
@@ -173,7 +174,7 @@ async function reconcileSlackInstallLocked(_db: SupabaseClient<Database>, instal
 // Disable-first: the RPC marks the row disconnected and invalidates links,
 // destinations, and action intents before the provider credential is touched.
 export async function disconnectSlackInstallation(ctx: Ctx, installationId: string, port: Pick<SlackOAuthPort, "deleteInstallation">, requestId: string = randomUUID()) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const disconnected = await unwrap(ctx.db.rpc("disconnect_chat_installation", { p_brewery: ctx.breweryId, p_installation: installationId, p_request_id: requestId }));
   if (disconnected === null) throw new CommandError("disconnect_chat_installation returned nothing", 404);
   return cleanupChatInstallation(ctx, installationId, port);

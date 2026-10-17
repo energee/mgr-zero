@@ -22,11 +22,11 @@ export default async function UnitsPage() {
   const ctx = await buildContext(brewery.id);
   const units = (await runCommand("get_gravity_unit", {}, ctx)) as Effective;
   // Settings is admin-only; everyone else reached Units from More (#444).
-  const toSettings = canOpen(brewery.role, "/settings");
+  const toSettings = canOpen(brewery.roles, "/settings");
   return (
     <UnitsView backLabel={toSettings ? "Settings" : "More"}
       model={toUnitsViewProps({ ...units, backHref: toSettings ? "/settings" : "/more" })}
-      controls={<GravityUnitForm brewery={units.brewery} mine={units.mine} canSetBrewery={ctx.role === "admin"} />}
+      controls={<GravityUnitForm brewery={units.brewery} mine={units.mine} canSetBrewery={ctx.roles.includes("admin")} />}
     />
   );
 }

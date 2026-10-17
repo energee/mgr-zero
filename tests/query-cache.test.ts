@@ -3,7 +3,7 @@ import { environmentManager, focusManager, isServer, onlineManager, QueryObserve
 import { command } from "@/lib/commands/client";
 import { commandQueryOptions, createQueryClient, subscribeToCommandChanges } from "@/lib/commands/query-cache";
 
-const scope = { actorId: "actor", breweryId: "brewery", role: "admin" };
+const scope = { actorId: "actor", breweryId: "brewery", roles: ["admin"] };
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -26,10 +26,18 @@ it("deduplicates concurrent reads and reuses fresh data without another request"
 });
 
 it("separates users, breweries, roles, customer scopes and query inputs", () => {
-  const keys = [scope, { ...scope, actorId: "other" }, { ...scope, breweryId: "other" }, { ...scope, role: "sales" }, { ...scope, customerId: "buyer" }]
+  const keys = [scope, { ...scope, actorId: "other" }, { ...scope, breweryId: "other" }, { ...scope, roles: ["sales"] }, { ...scope, customerId: "buyer" }]
     .map(context => JSON.stringify(commandQueryOptions(context, "list_orders", {}).queryKey));
   keys.push(JSON.stringify(commandQueryOptions(scope, "list_orders", { status: "draft" }).queryKey));
   expect(new Set(keys).size).toBe(6);
+});
+
+it("keys the held-role set independently of order without mutating it", () => {
+  const roles = ["sales", "brewer"];
+  const key = commandQueryOptions({ ...scope, roles }, "list_orders", {}).queryKey;
+  expect(key).toEqual(commandQueryOptions({ ...scope, roles: ["brewer", "sales"] }, "list_orders", {}).queryKey);
+  expect(key).not.toEqual(commandQueryOptions({ ...scope, roles: ["sales"] }, "list_orders", {}).queryKey);
+  expect(roles).toEqual(["sales", "brewer"]);
 });
 
 it("does not fetch a lazy query until enabled", async () => {

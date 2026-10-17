@@ -3,23 +3,25 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
-import { LinkTabs, WORK_CHIPS } from "@/components/mgr/work-tabs";
+import { LinkTabs, WORK_CHIPS, workHrefsFor } from "@/components/mgr/work-tabs";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
-import { hasRole, salesRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { salesRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
-export function OrdersClient({ role, timeZone, status, customerId, customerName, cursor }: { role: StaffRole; timeZone: string; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
+export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor }: { roles: readonly StaffRole[]; timeZone: string; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
   const customer = customerId ? customerName ?? page.rows[0]?.customers?.name ?? "Customer unavailable" : undefined;
-  const canWrite = hasRole(salesRoles, role); // create_order's roles
+  const canWrite = hasAnyRole(roles, salesRoles); // create_order's roles
+  const workHrefs = workHrefsFor(roles);
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
     if (customerId) query.set("customerId", customerId);
@@ -28,7 +30,7 @@ export function OrdersClient({ role, timeZone, status, customerId, customerName,
   };
   return (
     <OrdersView
-      model={toOrdersListViewProps({ role, status, customer, orders: page.rows })}
+      model={toOrdersListViewProps({ roles, status, customer, orders: page.rows })}
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
       listStatus={!result.data ? <QueryFeedback timeZone={timeZone} error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
       feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
@@ -37,7 +39,7 @@ export function OrdersClient({ role, timeZone, status, customerId, customerName,
       filters={(
         <>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <LinkTabs items={WORK_CHIPS} current="orders" className="w-full md:w-fit" />
+          <LinkTabs items={WORK_CHIPS.filter(([label]) => label in workHrefs)} current="orders" className="w-full md:w-fit" />
           <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
         </div>
         {customer && E.row("Customer filter", customer, E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}

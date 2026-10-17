@@ -73,7 +73,7 @@ describe("durable invitations", () => {
     const local = await makeStaffCtx((await makeBrewery()).id);
     const address = email(), ex = execution();
     const hook = { afterAuth: async () => {
-      await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", local.breweryId).eq("user_id", local.userId);
+      await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", local.breweryId).eq("user_id", local.userId);
     } };
     await expect(inviteStaff(local, { email: address, role: "sales" }, ex, hook)).rejects.toMatchObject({ code: "permission_denied" });
     const userId = sql(`select id from auth.users where email = '${address}'`)[0];
@@ -141,7 +141,7 @@ describe("durable invitations", () => {
     expect(sql(`select count(*) from auth.users u join public.brewery_users b on b.user_id = u.id where u.email = '${input.email}'`)).toEqual(["1"]);
   });
   it("rechecks database roles even when the supplied context claims admin", async () => {
-    await expect(runCommand("invite_staff", { email: email(), role: "admin" }, { ...warehouse, role: "admin", userId: ctx.userId })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("invite_staff", { email: email(), role: "admin" }, { ...warehouse, roles: ["admin"], userId: ctx.userId })).rejects.toMatchObject({ code: "permission_denied" });
     const sales = await makeStaffCtx(ctx.breweryId, "sales");
     await expect(runCommand("invite_staff", { email: email(), role: "sales" }, sales)).rejects.toMatchObject({ code: "permission_denied" });
     await expect(runCommand("invite_customer_user", { email: email(), customerId }, sales)).resolves.toHaveProperty("userId");
@@ -222,7 +222,7 @@ describe("portal user revocation", () => {
   const buyer = async () => {
     const user = await makeCustomerUser(customerId);
     const db = await asUser(user.email);
-    return { user, ctx: { db, userId: user.id, breweryId: staff.breweryId, role: "customer" as const, customerId } };
+    return { user, ctx: { db, userId: user.id, breweryId: staff.breweryId, roles: ["customer" as const], customerId } };
   };
   const list = (c: Ctx) => runCommand("list_customer_users", { customerId }, c) as Promise<PortalUser[]>;
 
@@ -266,7 +266,7 @@ describe("portal user revocation", () => {
     const { user } = await buyer();
     const input = { customerId, userId: user.id };
     await expect(runCommand("revoke_customer_user", input, brewer)).rejects.toMatchObject({ code: "permission_denied" });
-    await expect(runCommand("revoke_customer_user", input, { ...brewer, role: "admin" })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("revoke_customer_user", input, { ...brewer, roles: ["admin"] })).rejects.toMatchObject({ code: "permission_denied" });
     const other = await makeStaffCtx((await makeBrewery()).id);
     await expect(runCommand("revoke_customer_user", input, other)).rejects.toThrow(/portal user not found/);
     await expect(runCommand("list_customer_users", { customerId }, other)).resolves.toEqual([]);

@@ -80,6 +80,32 @@ describe("quiet hours", () => {
     expect(iso(await release("2026-03-08T06:30:00Z", "01:00", "03:00"))).toBe("2026-03-08T07:00:00.000Z");
   });
 
+  it("allows taproom plus brewer quiet hours, refuses taproom-only, and denies nonmembers in SQL", async () => {
+    const mixed = await makeStaffCtx(b.id, ["brewer", "taproom"]);
+    const taproom = await makeStaffCtx(b.id, "taproom");
+    const outsider = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await runCommand("set_notification_preference", {
+      reason: "submitted_order", enabled: true, quietHours: { start: "20:00", end: "07:00" },
+    }, mixed);
+    const saved = await admin.from("notification_preferences").select("quiet_hours_start, quiet_hours_end")
+      .eq("brewery_id", b.id).eq("user_id", mixed.userId);
+    expect(saved.error).toBeNull();
+    expect(saved.data).toHaveLength(7);
+    expect(saved.data?.every((row) => row.quiet_hours_start === "20:00:00" && row.quiet_hours_end === "07:00:00")).toBe(true);
+    await expect(runCommand("set_notification_preference", {
+      reason: "submitted_order", enabled: true, quietHours: { start: "20:00", end: "07:00" },
+    }, taproom)).rejects.toThrow(/permission/i);
+    for (const ctx of [taproom, outsider]) {
+      const denied = await ctx.db.rpc("set_notification_preference", {
+        p_brewery: b.id, p_reason: "submitted_order", p_enabled: true,
+        p_quiet_start: "20:00", p_quiet_end: "07:00", p_quiet_tz: null,
+        p_set_quiet: true, p_request_id: crypto.randomUUID(),
+      });
+      expect(denied.error?.code).toBe("42501");
+    }
+    await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, taproom);
+  });
+
   it("delays every first-release DM by brewery quiet hours, and lets a linked user override their own", async () => {
     await expect(runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: "21:00", end: "06:00" }, sales)).rejects.toThrow(/permission/i);
     await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: "21:00", end: "06:00" }, adminCtx);
@@ -183,5 +209,103 @@ describe("delivery leasing", () => {
 
     const denied = await adminCtx.db.rpc("lease_chat_deliveries", { p_limit: 1, p_lease_seconds: 60, p_now: "2036-09-05T14:00:00Z" });
     expect(denied.error?.message).toMatch(/permission denied|not find the function/i);
+  });
+});
+
+describe("multi-role notification union", () => {
+  type TodaySubjectRow = { subject_id: string; reason: string };
+  it("unions sales and warehouse Today, App Home, and deliveries once per destination, retaining live assignment checks", async () => {
+    const mixed = await makeStaffCtx(b.id, ["sales", "warehouse"]);
+    const other = await makeStaffCtx(b.id, ["sales", "warehouse"]);
+    const destination = await linkWithDm(mixed);
+    const otherDestination = await linkWithDm(other);
+    const submitted = await submittedOrder();
+    const pick = await submittedOrder();
+    expect((await adminCtx.db.rpc("confirm_order", { p_order: pick, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    const shipment = await ins("shipments", { brewery_id: b.id, order_id: pick, created_by: adminCtx.userId });
+    const route = await ins("routes", {
+      brewery_id: b.id, name: "Union assignment", delivery_date: "2026-09-05",
+      driver_user_id: mixed.userId, departed_at: "2026-09-05T12:00:00Z",
+    });
+    const stop = await ins("deliveries", { brewery_id: b.id, route_id: route.id, shipment_id: shipment.id, stop_no: 1 });
+    await scan("2036-09-05T14:00:00Z");
+
+    const today = await mixed.db.rpc("get_today_items", { p_brewery: b.id, p_now: "2036-09-05T14:00:00Z" });
+    expect(today.error).toBeNull();
+    for (const [subject, reason] of [[submitted, "submitted_order"], [pick, "pick_due"], [stop.id, "delivery_next"]]) {
+      expect((today.data as TodaySubjectRow[] | null)?.filter((row) => row.subject_id === subject && row.reason === reason)).toHaveLength(1);
+    }
+    const otherToday = await other.db.rpc("get_today_items", { p_brewery: b.id, p_now: "2036-09-05T14:00:00Z" });
+    expect(otherToday.error).toBeNull();
+    expect((otherToday.data as TodaySubjectRow[] | null)?.some((row) => row.subject_id === stop.id)).toBe(false);
+    const home = await admin.rpc("get_chat_home_items", {
+      p_installation: inst.id, p_external_user_id: `U-${mixed.userId.slice(0, 8)}`,
+    });
+    expect(home.error).toBeNull();
+    expect(home.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ subject_id: submitted, reason: "submitted_order" }),
+      expect.objectContaining({ subject_id: pick, reason: "pick_due" }),
+      expect.objectContaining({ subject_id: stop.id, reason: "delivery_next" }),
+    ]));
+    assert(Array.isArray(home.data));
+    for (const subject of [submitted, pick, stop.id]) {
+      expect(home.data.filter((item) => item !== null && typeof item === "object"
+        && !Array.isArray(item) && item.subject_id === subject)).toHaveLength(1);
+    }
+    const otherHome = await admin.rpc("get_chat_home_items", {
+      p_installation: inst.id, p_external_user_id: `U-${other.userId.slice(0, 8)}`,
+    });
+    expect(otherHome.error).toBeNull();
+    expect(otherHome.data).not.toEqual(expect.arrayContaining([expect.objectContaining({ subject_id: stop.id })]));
+
+    const occurrences = await admin.from("notification_occurrences").select("id, subject_id")
+      .in("subject_id", [submitted, pick, stop.id]).eq("state", "active");
+    expect(occurrences.error).toBeNull();
+    const rows = await admin.from("notification_deliveries").select("id, occurrence_id, destination_id")
+      .in("occurrence_id", occurrences.data!.map((row) => row.id));
+    expect(rows.error).toBeNull();
+    for (const occurrence of occurrences.data!) {
+      expect(rows.data?.filter((row) => row.occurrence_id === occurrence.id && row.destination_id === destination.id)).toHaveLength(1);
+    }
+    const assigned = occurrences.data!.find((row) => row.subject_id === stop.id)!;
+    expect(rows.data?.some((row) => row.occurrence_id === assigned.id && row.destination_id === otherDestination.id)).toBe(false);
+    const assignedDelivery = rows.data!.find((row) => row.occurrence_id === assigned.id && row.destination_id === destination.id)!;
+    await runCommand("snooze_notification", {
+      deliveryId: assignedDelivery.id, until: new Date(Date.now() + 60_000).toISOString(),
+    }, mixed);
+    const eligible = await admin.rpc("get_chat_delivery_context", { p_delivery: assignedDelivery.id, p_now: "2036-09-05T14:00:00Z" });
+    expect(eligible.error).toBeNull();
+    expect(eligible.data).toMatchObject({ recipient_eligible: true });
+    expect((await admin.from("brewery_users").update({ roles: ["sales"] })
+      .eq("brewery_id", b.id).eq("user_id", mixed.userId)).error).toBeNull();
+    const changedRoles = await admin.rpc("get_chat_delivery_context", { p_delivery: assignedDelivery.id, p_now: "2036-09-05T14:00:00Z" });
+    expect(changedRoles.error).toBeNull();
+    expect(changedRoles.data).toMatchObject({ recipient_eligible: false });
+    expect((await admin.from("brewery_users").update({ roles: ["sales", "warehouse"] })
+      .eq("brewery_id", b.id).eq("user_id", mixed.userId)).error).toBeNull();
+
+    // One candidate can match both held roles without multiplying recipients.
+    const submittedOccurrence = occurrences.data!.find((row) => row.subject_id === submitted)!;
+    expect((await admin.from("notification_occurrences").update({
+      payload: { recipient_roles: ["sales", "warehouse"] },
+    }).eq("id", submittedOccurrence.id)).error).toBeNull();
+    expect((await admin.from("notification_deliveries").delete().eq("occurrence_id", submittedOccurrence.id).eq("destination_id", destination.id)).error).toBeNull();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect((await admin.rpc("chat_fanout_deliveries", {
+        p_brewery: b.id, p_now: "2036-09-05T14:00:00Z", p_occurrence: submittedOccurrence.id,
+      })).error).toBeNull();
+    }
+    const deduplicated = await admin.from("notification_deliveries").select("id")
+      .eq("occurrence_id", submittedOccurrence.id).eq("destination_id", destination.id);
+    expect(deduplicated.error).toBeNull();
+    expect(deduplicated.data).toHaveLength(1);
+
+    expect((await admin.from("routes").update({ driver_user_id: other.userId }).eq("id", route.id)).error).toBeNull();
+    const reassigned = await admin.rpc("get_chat_delivery_context", { p_delivery: assignedDelivery.id, p_now: "2036-09-05T14:00:00Z" });
+    expect(reassigned.error).toBeNull();
+    expect(reassigned.data).toMatchObject({ recipient_eligible: false });
+    await expect(runCommand("snooze_notification", {
+      deliveryId: assignedDelivery.id, until: new Date(Date.now() + 60_000).toISOString(),
+    }, mixed)).rejects.toThrow(/permission/i);
   });
 });

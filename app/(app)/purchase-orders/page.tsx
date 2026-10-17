@@ -47,7 +47,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
       })}
       createAction={<Button size="sm" asChild><Link href="/purchase-orders/new">New PO</Link></Button>}
       linkRows
-      workHrefs={workHrefsFor(brewery.role)}
+      workHrefs={workHrefsFor(brewery.roles)}
       footer={
         <p className="text-sm text-muted-foreground">
           {all === "1" ? <Link href="/purchase-orders" className="underline">Open orders only</Link> : <Link href="/purchase-orders?all=1" className="underline">Show received and cancelled</Link>}

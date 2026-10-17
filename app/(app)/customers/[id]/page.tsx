@@ -23,14 +23,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const canWrite = brewery.role === "admin" || brewery.role === "sales";
+  const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [{ customer, shipTos }, channels, portalUsers] = (await Promise.all([
     orNotFound(runCommand("get_customer", { customerId: id }, ctx)), runCommand("list_sale_channels", {}, ctx),
     canWrite ? runCommand("list_customer_users", { customerId: id }, ctx) : [],
   ])) as [{ customer: Customer; shipTos: ShipTo[] }, SaleChannel[], PortalUser[]];
   return <CustomerDetailForm key={JSON.stringify(customer)} customerId={customer.id} canWrite={canWrite}
     model={toCustomerViewProps({ customer, shipTos, channels, portalUsers, backHref: "/customers" })}
-    deleteAction={brewery.role === "admin" ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} name={customer.name} redirect="/customers" /> : null}
+    deleteAction={brewery.roles.includes("admin") ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} name={customer.name} redirect="/customers" /> : null}
     detail={{
       shipTos: shipTos.map(s => ({
         key: s.id,

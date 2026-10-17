@@ -57,7 +57,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
 
 function deliveryAction(
   delivery: Stop["delivery"],
-  ctx: { role: string; userId: string },
+  ctx: { roles: readonly string[]; userId: string },
   invoice: Stop["invoice"],
   transfer: Stop["delivery"]["stock_transfers"],
   lines: Stop["lines"],
@@ -73,7 +73,7 @@ function deliveryAction(
     );
   }
   if (!delivery.routes?.departed_at) return E.status("The route has not departed", "w");
-  if (ctx.role !== "admin" && delivery.routes.driver_user_id !== ctx.userId) {
+  if (!ctx.roles.includes("admin") && delivery.routes.driver_user_id !== ctx.userId) {
     return E.status("Only the route's assigned driver or an admin may confirm this stop", "w");
   }
   return (

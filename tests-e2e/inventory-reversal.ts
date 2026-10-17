@@ -24,7 +24,7 @@ async function main() {
   const brewery = await makeBrewery("Exact reversal browser");
   const staff = await makeStaff(brewery.id);
   const sales = await makeStaff(brewery.id, "sales");
-  const ctx = { db: await asUser(staff.email), userId: staff.id, breweryId: brewery.id, role: "admin" as const };
+  const ctx = { db: await asUser(staff.email), userId: staff.id, breweryId: brewery.id, roles: ["admin" as const] };
   const cat = await seedCatalog(brewery.id, { sku: "Browser exact keg", packageType: "keg", bblPerUnit: 0.5 });
   const loc = await seedLocation(brewery.id);
   const originals: string[] = [];

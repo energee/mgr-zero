@@ -17,6 +17,7 @@ type Controls = {
   format?: (value: string) => void;
   active?: (value: boolean) => void;
   upc?: (value: string) => void;
+  batchSharePercent?: (value: string) => void;
   kegPool?: (value: string) => void;
 };
 
@@ -60,6 +61,10 @@ export function SkuView({
       {fields}
       <RegistryInput label="UPC (optional)" value={model.upc} onChange={controls.upc} />
       {model.showKegPool ? <>{E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { onChange: controls.kegPool })}{E.info("Wholesale orders charge this pool's deposit per keg. None charges no deposit.")}</> : null}
+      {model.batchSharePercent !== undefined ? <>
+        {E.edit("Batch package share (%)", model.batchSharePercent, "number", undefined, { onChange: controls.batchSharePercent, min: 0, max: 100, step: "any", "aria-invalid": model.batchSharePercent.trim() !== "" && !(Number(model.batchSharePercent) > 0 && Number(model.batchSharePercent) <= 100) })}
+        {E.info("Use more than 0% and at most 100% of a batch's volume for this SKU. All SKU shares for a brand together may not exceed 100%. Clear to stop projecting packaging materials for this SKU.")}
+      </> : E.info("Edit the SKU after creation to set its batch package share for projected packaging materials.")}
       {E.info(model.volumeInfo)}
       </>}
       {messages}

@@ -8,6 +8,7 @@ import { plural } from "@/lib/mgr/plural";
 import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
+import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 
 type Location = { id: string; name: string; uses: string[] };
 type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units: number };
@@ -22,7 +23,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   requirePagePermission(ctx, "get_taproom_count_snapshot", "Weekly count");
   const locations = await runCommand("list_locations", { use: "taproom" }, ctx) as Location[];
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
-  if (!location) return <WeeklyCountView model={{ backHref: "/beer", locations: [], location: "", role: brewery.role as "admin" | "warehouse" | "taproom", lotLabels: {}, history: [], timeZone: brewery.timeZone }} />;
+  if (!location) return <WeeklyCountView model={{ backHref: "/beer", locations: [], location: "", roles: brewery.roles, lotLabels: {}, history: [], timeZone: brewery.timeZone }} />;
 
   // Only the print labels need the snapshot's revision; the other reads go alongside the pair.
   const snapshotWithLabels = async () => {
@@ -39,10 +40,10 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const shownReceipt = receipt?.location_id === location.id ? receipt : null;
   const lotLabels = Object.fromEntries(printLabels.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.sku_id, row.lot_id), row.lot_code!]));
 
-  const role = brewery.role as "admin" | "warehouse" | "taproom";
+  const roles = brewery.roles;
   return <WeeklyCountView model={{
     backHref: "/beer", boardHref: `/taproom/board?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
-    locations: locations.map(item => [item.name, `/taproom?location=${item.id}`]), location: location.name, role, lotLabels, timeZone: brewery.timeZone,
+    locations: locations.map(item => [item.name, `/taproom?location=${item.id}`]), location: location.name, roles, lotLabels, timeZone: brewery.timeZone,
     receipt: shownReceipt ? {
       date: shownReceipt.counted_on, canCorrect: shownReceipt.correction_eligible,
       recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at, brewery.timeZone)}${shownReceipt.prior_count_id ? "" : " · first count"}`,
@@ -50,7 +51,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
       correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${formatDateTime(shownReceipt.corrected_at, brewery.timeZone)} · ${shownReceipt.correction_reason}` : undefined,
       lines: shownReceipt.lines.map((line, index) => {
         const savedIdentity = line.lot_id
-          ? role === "taproom" ? `tracked · saved row ${index + 1}` : `tracked lot ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ?? line.lot_id} · saved row ${index + 1}`
+          ? onlyRoles(roles, ["taproom"]) ? `tracked · saved row ${index + 1}` : `tracked lot ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ?? line.lot_id} · saved row ${index + 1}`
           : `untracked stock · saved row ${index + 1}`;
         return { key: line.id, name: line.sku_name ?? "Saved SKU",
           detail: `${line.bin_name ?? "Saved bin"} · ${savedIdentity} · ${Number(line.qty_before)} recorded, ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl ${line.movement_type === "destruction" ? "destroyed" : "depleted"}`}`,
@@ -59,8 +60,8 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
     } : undefined,
     history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
   }}
-    draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={role} timeZone={brewery.timeZone}
+    draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} roles={roles} timeZone={brewery.timeZone}
       print={<TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />} />}
-    correction={shownReceipt && role === "admin" && shownReceipt.correction_eligible ? <TaproomCountCorrection breweryId={brewery.id} locationId={location.id} countId={shownReceipt.root_id} lines={shownReceipt.lines} /> : null}
+    correction={shownReceipt && hasAnyRole(roles, ["admin"]) && shownReceipt.correction_eligible ? <TaproomCountCorrection breweryId={brewery.id} locationId={location.id} countId={shownReceipt.root_id} lines={shownReceipt.lines} /> : null}
   />;
 }

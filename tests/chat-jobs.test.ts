@@ -217,14 +217,14 @@ describe("delivery batch", () => {
       await admin.from("notification_deliveries").update({state:"terminal"}).eq("id",rows.find(d=>d.id!==target.id)!.id);
       if(change==="role") await admin.from("notification_deliveries").update({provider_message_id:"existing",provider_conversation_id:"D-existing"}).eq("id",target.id);
       if(change==="removed") await admin.from("brewery_users").delete().eq("brewery_id",b.id).eq("user_id",sales.userId);
-      else await admin.from("brewery_users").update({role:"brewer"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+      else await admin.from("brewery_users").update({ roles: ["brewer"] }).eq("brewery_id",b.id).eq("user_id",sales.userId);
       try{
         calls.sends.length=0;calls.updates.length=0;
         expect(await deliver()).toMatchObject({sent:0,updated:0,suppressed:1});
         expect(calls.sends).toHaveLength(0);expect(calls.updates).toHaveLength(0);
       } finally {
-        if(change==="removed") await ins("brewery_users",{brewery_id:b.id,user_id:sales.userId,role:"sales"});
-        else await admin.from("brewery_users").update({role:"sales"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+        if(change==="removed") await ins("brewery_users", { brewery_id: b.id, user_id: sales.userId, roles: ["sales"] });
+        else await admin.from("brewery_users").update({ roles: ["sales"] }).eq("brewery_id",b.id).eq("user_id",sales.userId);
       }
     }
   });
