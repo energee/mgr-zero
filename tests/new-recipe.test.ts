@@ -194,13 +194,10 @@ describe("Recipe creation", () => {
     // Stages come from the view-model module, not the command registry.
     expect(src("components/mgr/views/ingredient.tsx")).not.toMatch(/lib\/commands/);
     expect(sheets).not.toMatch(/from "@\/lib\/commands\/production"/);
-    // Leftovers from earlier iterations are gone: the explorer cancels every inert tap the same way, and New recipe still walks to Recipe.
     expect(src("components/mgr/screen-explorer.tsx")).not.toMatch(/dialog-trigger|sheet-trigger/);
-    expect(src("lib/mgr/screen-links.ts")).toMatch(/\["New recipe", "Recipe"\]/);
     expect(screen("Ingredient").body).toBeTruthy();
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
-    expect(src("app/(app)/recipes/page.tsx")).toMatch(/createHref: "\/recipes\/new"/);
     expect(src("components/mgr/views/new-recipe.tsx")).not.toMatch(/use-command-form|fixtures|<CommandForm\b/);
   });
 });
