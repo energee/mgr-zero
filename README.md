@@ -235,6 +235,9 @@ points `code-review` at a relative directory in that same checkout, not another
 floating repository. Dependabot does not update checkout's `with.ref`: review
 this pin manually with action updates, inspect the manifest and plugin diff,
 and keep its source local. Do not enable marketplace auto-update.
+The workflow renames only the checked-out catalog to `mgr-reviewed-plugins`:
+Claude Code reserves Anthropic's original catalog name for GitHub installs.
+The plugin files and immutable checkout pin remain unchanged.
 
 `agent-browser` 0.39.1's
 [npm distribution](https://registry.npmjs.org/agent-browser/0.39.1) bundles the
