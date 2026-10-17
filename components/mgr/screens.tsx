@@ -2997,7 +2997,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {S.h("Today · 4 waiting")}
       {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
