@@ -94,4 +94,30 @@ describe("Keg event history", () => {
     const page = src("app/(app)/kegs/history/page.tsx");
     expect(page).toMatch(/<KegHistoryView\b/);
   });
+
+  it("#972 labels the Keg pool and Customer controls, pool first, each showing its selection", () => {
+    const model = toKegHistoryViewProps({
+      pool: "sixth",
+      poolOptions: [{ value: "all", label: "All pools" }, { value: "sixth", label: "Owned ⅙ bbl" }],
+      customer: "ridgeline",
+      customerOptions: [{ value: "all", label: "All customers" }, { value: "ridgeline", label: "Ridgeline Tap Room" }],
+    });
+    const html = htmlOf(createElement(KegHistoryView, { model }));
+    // The visible label names the control it is for, and that control shows the pick.
+    const control = (label: string) => {
+      const id = new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`).exec(html)?.[1];
+      const at = id === undefined ? -1 : html.indexOf(`id="${id}"`);
+      return at < 0 ? undefined : html.slice(at, html.indexOf("</button>", at)).replace(/<[^>]+>/g, "");
+    };
+    expect(control("Keg pool")).toContain("Owned ⅙ bbl");
+    expect(control("Customer")).toContain("Ridgeline Tap Room");
+    expect(html.indexOf(">Keg pool<")).toBeLessThan(html.indexOf(">Customer<"));
+  });
+
+  it("#972 defaults both scopes to All", () => {
+    const model = toKegHistoryViewProps({});
+    expect([model.pool, model.customer]).toEqual(["all", "all"]);
+    expect(model.poolOptions).toEqual([{ value: "all", label: "All pools" }]);
+    expect(model.customerOptions).toEqual([{ value: "all", label: "All customers" }]);
+  });
 });
