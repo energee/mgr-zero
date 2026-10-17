@@ -613,8 +613,9 @@ replays the original result, and a reused id with a different payload is
 ### Where to generate it [#where]
 
 Generate the id at the moment the user commits (pressing Submit), not when the
-request is built. `lib/commands/client.ts` does exactly this in the app: one id
-per invocation, reused by any transport-level retry underneath it.
+request is built. `lib/commands/client.ts` does this in the app: each call to `command()` makes
+one id, unless the caller passes its own. It never retries a write by itself,
+so a retry is a new call that passes the same id.
 
 Timeouts, `5xx` responses, and `429` (after waiting for `Retry-After`) are the
 cases worth retrying, with the same id. Any other `4xx` will not change on
