@@ -17,6 +17,7 @@ export const settingsDemo: SettingsViewModel = {
   paLicense: "G-1234",
   phone: "(610) 555-0142",
   overdueHours: "24",
+  daysToPackage: "14",
   booksOpenedOn: "",
   hasFiledReports: true,
   basisCorrections: [basisCorrectionDemo],

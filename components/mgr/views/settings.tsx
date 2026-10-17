@@ -37,7 +37,7 @@ export function SettingsView({
         <section aria-labelledby="settings-brewery" className="@container min-w-0 rounded-xl border bg-card p-5 sm:p-6">
           <h2 id="settings-brewery" className="font-heading text-xl font-semibold">Brewery details</h2>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">Identity, compliance details, and daily operating defaults.</p>
-          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}</section>
+          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}</section>
         <section aria-labelledby="settings-defaults" className="flex min-w-0 flex-col gap-6 rounded-xl border bg-card p-5 sm:p-6">
           <div><h2 id="settings-defaults" className="font-heading text-xl font-semibold">Team defaults</h2><p className="mt-1 text-sm text-muted-foreground">Ask MGR and wholesale portal preferences.</p></div>
           <div>{aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}</div>

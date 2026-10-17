@@ -188,7 +188,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee
 
 Takes no input.
 
@@ -615,11 +615,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Change only the brewery fermentation reading cadence, in hours
+Change the brewery fermentation reading cadence in hours and optionally its days-to-package estimate for projected batch packaging demand
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `readingDueHours` | integer | yes |
+| `daysToPackage` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
