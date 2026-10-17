@@ -1530,7 +1530,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_invoice",
     writes: "none [Intuit takes the payment; confirmed payment status returns on the next manual sync]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; payment status was confirmed by sync"]],
-    spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
+    spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. The payment action always uses /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="pay" />,
   },
   {
@@ -1564,11 +1564,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Invoices",
     name: "Paid invoice",
-    job: "A paid invoice has no Pay; status and PDF remain",
+    job: "Review a paid invoice or ask the brewery a question",
     reads: "portal_invoice",
     writes: "none",
     states: DEFAULT_STATES,
-    spec: "QuickBooks sync confirmed payment status, not a settlement date. Pay is gone. Download PDF is the one action.",
+    spec: "QuickBooks sync confirmed payment status, not a settlement date. Pay is gone. Invoice facts and Question this invoice remain; MGR does not offer a PDF download.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoicePaid)} variant="paid" />,
   },
   {
