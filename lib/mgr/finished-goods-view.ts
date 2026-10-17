@@ -2,15 +2,19 @@
 import type { EmptyState } from "./empty-state";
 import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
+/** One SKU in the register. Counts are display text in package units; `atp`
+ *  (shown as Available) uses a true minus sign when negative, and `short` says so. */
 export type FinishedGoodsRowView = {
   key: string;
-  title: string;
-  detail: string;
+  name: string;
+  onHand: string;
+  allocated: string;
+  atp: string;
+  short: boolean;
+  /** SKU detail: the row's one identity link. */
   href: string;
-  shortfallHref?: string;
-  verb: "Review" | "Shortfall";
-  tone: "primary" | "attention";
-  warning: boolean;
+  /** Replenishment for this SKU; the view links it only when `short`. */
+  shortfallHref: string;
 };
 
 export type FinishedGoodsViewModel = {
@@ -72,18 +76,16 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
     valueLine: value ? `${money(value.cents)}${value.uncostedUnits ? ` · ${value.uncostedUnits} units without cost` : ""}` : undefined,
     empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
     rows: skus.map((s) => {
-      const allocated = round2(s.on_hand - s.atp);
       const short = s.atp < 0;
-      const atp = short ? `−${Math.abs(s.atp)}` : String(s.atp);
       return {
         key: s.id,
-        title: skuLabel(s),
-        detail: `${s.on_hand} on hand · ${allocated} allocated · ATP ${atp}`,
+        name: skuLabel(s),
+        onHand: String(s.on_hand),
+        allocated: String(round2(s.on_hand - s.atp)),
+        atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),
+        short,
         href: `/inventory/${s.id}`,
-        shortfallHref: short ? `/replenishment?sku=${s.id}` : undefined,
-        verb: short ? "Shortfall" : "Review",
-        tone: short ? "attention" : "primary",
-        warning: short,
+        shortfallHref: `/replenishment?sku=${s.id}`,
       };
     }),
   };
