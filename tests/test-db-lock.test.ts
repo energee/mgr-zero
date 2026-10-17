@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 
 const script = "scripts/test-db-lock.pl";
 const env = { ...process.env, MGR_TEST_DB_LOCK: join(mkdtempSync(join(tmpdir(), "mgr-lock-")), "lock") };
+// These tests intentionally use their own lock, not a proof parent's descriptor.
+delete (env as NodeJS.ProcessEnv).MGR_TEST_DB_LOCK_FD;
 
 async function holdShared() {
   const holder = spawn("perl", [script, "sh"], { env, stdio: ["pipe", "pipe", "ignore"] });
@@ -22,6 +24,35 @@ async function holdShared() {
 }
 
 const reset = (timeout: number) => spawnSync("perl", [script, "ex", "true"], { env, timeout });
+
+it("rejects an unprotected internal reset before touching the stack", () => {
+  const result = spawnSync("bash", ["scripts/test-db.sh", "--locked-reset"], { env, encoding: "utf8" });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("--locked-reset requires an inherited exclusive lock");
+});
+
+it("inherits an exclusive lock through nested commands without a second lock path", () => {
+  const result = spawnSync("perl", [script, "ex", "perl", script, "ex", "perl", script, "check"], { env, encoding: "utf8", timeout: 5000 });
+  expect(result.status, result.stderr).toBe(0);
+});
+
+it("rejects changing the lock path beneath an inherited proof", () => {
+  const result = spawnSync("perl", [script, "ex", "env", `MGR_TEST_DB_LOCK=${env.MGR_TEST_DB_LOCK}.other`, "perl", script, "check"], { env, encoding: "utf8", timeout: 5000 });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("does not protect");
+});
+
+it("keeps the inherited exclusive lock while a nested shared holder runs", async () => {
+  const holder = spawn("perl", [script, "ex", "perl", script, "sh"], { env, stdio: ["pipe", "pipe", "ignore"] });
+  try {
+    await once(holder.stdout, "data");
+    expect(reset(500).error).toMatchObject({ code: "ETIMEDOUT" });
+  } finally {
+    holder.stdin.end();
+    await once(holder, "exit");
+  }
+  expect(reset(5000).status).toBe(0);
+});
 
 describe("test database lock", () => {
   it("makes a reset wait for running tests", async () => {

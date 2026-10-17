@@ -10,6 +10,7 @@
 // note) at the top.
 "use client";
 import { Fragment, type ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -65,7 +66,7 @@ export function RecipeView({
     : E.edit("Version note", model.notes ?? "", "text", undefined, bind("notes"));
   const head = (
     <>
-      {parentForm}
+      {model.historical ? null : parentForm}
       {model.priceGroupOptions
         ? <>
           {E.pick("Default price group · optional", model.priceGroup ?? "", model.priceGroupOptions)}
@@ -74,6 +75,17 @@ export function RecipeView({
         : null}
       {model.recipeNote ? E.row("Recipe note", model.recipeNote) : null}
       {model.saved ? E.fld("Saved", model.saved) : null}
+      {model.versions?.length ? (
+        <nav aria-label="Recipe versions" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <span className="text-muted-foreground">Versions</span>
+          {model.versions.map((version) => (
+            <Link key={version.number} href={version.href ?? "#"} data-to="Recipe" aria-current={version.selected ? "page" : undefined} className="underline underline-offset-4 aria-[current=page]:font-semibold">
+              v{version.number}{version.latest ? " (current)" : ""}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      {model.historical ? E.note("Older version · read only. Open the current version to make changes.") : null}
       {/* Always mounted and polite: the prediction changes as the draft is typed,
           and an alert (E.info is one) would interrupt the screen reader on every keystroke. */}
       <div role="status">{E.polite(model.predicted)}</div>
@@ -110,7 +122,7 @@ export function RecipeView({
     </>
   );
   // The draft submits at the bottom; every other surface (the live read page and the inventory frame alike) puts its one verb in the title row.
-  const verb = controls ? undefined : E.btn("Create recipe version", "p", model.createHref);
+  const verb = controls || model.historical ? undefined : E.btn("Create recipe version", "p", model.createHref);
   return (
     <>
       {E.back(model.backLabel ?? "Recipes", model.title, verb, model.backHref)}

@@ -43,6 +43,8 @@ export type RecipeViewModel = {
   title: string;
   /** When the shown version was saved, as a date in the brewery's zone. */
   saved?: string;
+  versions?: { number: number; href?: string; selected: boolean; latest: boolean }[];
+  historical?: boolean;
   /** The recipe's own note (not the version note, which is `notes`). */
   recipeNote?: string;
   priceGroup?: string;
@@ -66,11 +68,12 @@ export type RecipeViewModel = {
   actualsNote?: string;
 };
 
-/** What get_recipe returns: the recipe, its latest version (null before the
- * first), that version's ingredients and water additions, and the prediction.
+/** What get_recipe returns: the recipe, its selected version (null before the
+ * first), all version numbers, that version's ingredients and water additions, and the prediction.
  * Postgres numerics may arrive as strings, so readers coerce with Number. */
 export type RecipeSnapshot = {
   recipe: { id: string; name: string; brand_id: string | null; note: string | null };
+  versions: number[];
   version: (ProcessColumns & {
     id: string; version: number; created_at: string; mash_temp_f: number | null; brewhouse_efficiency: number; yeast_attenuation: number;
     boil_minutes: number | null; note: string | null;
@@ -153,7 +156,7 @@ export function noMashText(stages: string[]): string | null {
   return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
 }
 
-/** The read page's model of a recipe: its latest saved version read out as text, or the empty state before the first version. */
+/** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
   ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string },
@@ -176,6 +179,8 @@ export function toRecipePageModel(
     ...base,
     title: `${recipe.name} v${v.version}`,
     saved: formatDate(v.created_at, ctx.timeZone),
+    historical: v.version !== s.versions[0],
+    versions: s.versions.map((number) => ({ number, href: `?v=${number}`, selected: number === v.version, latest: number === s.versions[0] })),
     ingredients: ingredients.map((i) => ({
       key: i.id, title: material.name(i.material_id),
       detail: ingredientDetail(i.stage, i.timing_minutes, perBblDisplay(Number(i.per_bbl_qty)), material.unit(i.material_id)),

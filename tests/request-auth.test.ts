@@ -1,8 +1,10 @@
 import type { Database } from "@/lib/supabase/database";
-// tests/request-auth.test.ts — proves request authentication and membership resolution stay distinct and deduplicated.
+// tests/request-auth.test.ts — proves request auth stays deduplicated and real failed entry submissions render assertive errors.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeBrewery, makeStaff, sql } from "./helpers";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { admin, makeBrewery, makeStaff, sql } from "./helpers";
 
 const request = vi.hoisted(() => ({ db: undefined as SupabaseClient<Database> | undefined }));
 const navigation = vi.hoisted(() => ({
@@ -26,8 +28,12 @@ vi.mock("next/navigation", () => ({
 import { buildContext } from "@/lib/commands/context";
 import { POST } from "@/app/api/command/route";
 import { publicEnv } from "@/lib/env/public";
-import { login } from "@/app/(auth)/actions";
+import { acceptInvite, login } from "@/app/(auth)/actions";
 import { createServerClient } from "@/lib/supabase/server";
+import LoginPage from "@/app/(auth)/login/page";
+import PortalLoginPage from "@/app/(auth)/portal/login/page";
+import AcceptPage from "@/app/(auth)/accept/page";
+import { LoginForm } from "@/components/login-form";
 
 afterEach(() => {
   request.db = undefined;
@@ -134,5 +140,50 @@ describe("request authentication", () => {
     expect(createServerClient).toHaveBeenCalledTimes(1);
     expect(getClaims).toHaveBeenCalledTimes(1);
     expect(membershipRequests).toBe(1);
+  });
+
+  it.each([false, true])("announces an actual rejected password sign-in as an alert (portal=%s)", async portal => {
+    request.db = requestClient(globalThis.fetch);
+    const form = new FormData();
+    form.set("email", `missing-${crypto.randomUUID()}@mgr.test`);
+    form.set("password", "incorrect-password-1");
+    if (portal) form.set("portal", "1");
+
+    await expect(login(form)).rejects.toThrow(`redirect:${portal ? "/portal" : ""}/login?error=1`);
+    const target = new URL(navigation.redirect.mock.lastCall![0], "https://mgr.test");
+    const page = portal ? PortalLoginPage : LoginPage;
+    const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve(Object.fromEntries(target.searchParams)) }));
+    expect(html).toMatch(/role="alert"[^>]*>[\s\S]*?data-slot="alert-description"[^>]*>Incorrect email or password\./);
+    expect(renderToStaticMarkup(createElement(LoginForm, { portal }))).not.toContain('role="alert"');
+  });
+
+  it.each([false, true])("keeps generic and expired-session sign-in failures assertive (portal=%s)", portal => {
+    for (const error of ["Sign-in failed.", "Your session expired. Sign in again."]) {
+      const html = renderToStaticMarkup(createElement(LoginForm, { portal, error }));
+      expect(html).toContain('role="alert"');
+      expect(html).not.toContain('role="note"');
+      expect(html).toContain(error);
+    }
+  });
+
+  it("announces failed invitation acceptance validation on the authenticated live page", async () => {
+    const brewery = await makeBrewery();
+    const staff = await makeStaff(brewery.id);
+    const updated = await admin.auth.admin.updateUserById(staff.id, { user_metadata: { mgr_invite_kind: "staff", mgr_invite_accepted: false } });
+    if (updated.error) throw updated.error;
+    request.db = await signInAs(staff.email, globalThis.fetch);
+    const before = renderToStaticMarkup(await AcceptPage({ searchParams: Promise.resolve({ audience: "staff" }) }));
+    expect(before).not.toContain('role="alert"');
+    const form = new FormData();
+    form.set("audience", "staff");
+    form.set("name", "Pat Brewer");
+    form.set("password", "short");
+
+    await expect(acceptInvite(form)).rejects.toThrow("redirect:/accept?audience=staff&error=1&name=Pat+Brewer");
+    const target = new URL(navigation.redirect.mock.lastCall![0], "https://mgr.test");
+    const html = renderToStaticMarkup(await AcceptPage({ searchParams: Promise.resolve(Object.fromEntries(target.searchParams)) }));
+    expect(html).toMatch(/role="alert"[^>]*>[\s\S]*?data-slot="alert-description"[^>]*>Enter your name and a password of at least 8 characters\./);
+    expect(html).toContain('value="Pat Brewer"');
+    expect(html).not.toContain('role="note"');
   });
 });

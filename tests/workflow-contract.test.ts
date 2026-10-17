@@ -1,9 +1,10 @@
 // tests/workflow-contract.test.ts — preserves the production-readiness workflow fixes merged in PRs #21 and #22.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { matchesGlob, resolve } from "node:path";
 import { configDefaults } from "vitest/config";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 const INVITE_TEST = "tests/commands-invites.test.ts";
 
@@ -13,7 +14,7 @@ function readWorkflow(name: string) {
 
 function readActionField(workflow: string, action: string, field: string) {
   const actionPattern = new RegExp(
-    `^( {8})uses: ${action.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s+#.*)?\\s*$`,
+    `^( {8})uses: ${action.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}@[^\\s]+(?:\\s+#.*)?\\s*$`,
     "m"
   );
   const step = workflow
@@ -67,7 +68,6 @@ const supabaseEnvMapper = readFileSync(resolve(__dirname, "..", "scripts", "supa
 const vitestConfig = readFileSync(resolve(__dirname, "..", "vitest.config.mts"), "utf8");
 const prePush = readFileSync(resolve(__dirname, "..", "scripts", "pre-push.sh"), "utf8");
 const hook = readFileSync(resolve(__dirname, "..", ".githooks", "pre-push"), "utf8");
-const testDb = readFileSync(resolve(__dirname, "..", "scripts", "test-db.sh"), "utf8");
 
 describe("workflow action field reader", () => {
   it("requires a direct scalar child of the action's with mapping", () => {
@@ -96,14 +96,14 @@ jobs:
     expect(() =>
       readActionField(
         fieldNestedUnderEnv,
-        "anthropics/claude-code-action@v1",
+        "anthropics/claude-code-action",
         "claude_args"
       )
     ).toThrow("Could not find active claude_args");
     expect(() =>
       readActionField(
         fieldInComment,
-        "anthropics/claude-code-action@v1",
+        "anthropics/claude-code-action",
         "claude_args"
       )
     ).toThrow("Could not find active claude_args");
@@ -111,6 +111,22 @@ jobs:
 });
 
 describe("production-readiness workflow contract", () => {
+  it("pins every external action to an immutable commit and uses one checkout revision", () => {
+    const checkouts = new Set<string>();
+    const directory = resolve(__dirname, "..", ".github", "workflows");
+    for (const file of readdirSync(directory).filter((name) => /\.ya?ml$/.test(name))) {
+      const workflow = parse(readWorkflow(file));
+      for (const job of Object.values(workflow.jobs) as { uses?: string; steps?: { uses?: string }[] }[]) {
+        for (const entry of [job, ...(job.steps ?? [])]) {
+          if (!entry.uses || entry.uses.startsWith("./")) continue;
+          expect(entry.uses, `${file}: ${entry.uses}`).toMatch(/@[0-9a-f]{40}\b$/);
+          if (entry.uses.startsWith("actions/checkout@")) checkouts.add(entry.uses);
+        }
+      }
+    }
+    expect(checkouts.size).toBe(1);
+  });
+
   it("runs pure screen tests in parallel and the remaining suite in three isolated database shards", () => {
     expect(ci).toContain('shard: ["1/3", "2/3", "3/3"]');
     expect(ci).toContain("bunx vitest run --fileParallelism --maxWorkers=2");
@@ -154,7 +170,7 @@ describe("production-readiness workflow contract", () => {
   });
 
   it("installs and runs with bun, not npm", () => {
-    expect(ci).toMatch(/^ {6}- uses: oven-sh\/setup-bun@v2(?:\s+#.*)?\s*$/m);
+    expect(ci).toMatch(/^ {6}- uses: oven-sh\/setup-bun@[0-9a-f]{40}(?:\s+#.*)?\s*$/m);
     expect(ci).toContain('bun-version-file: ".bun-version"');
     expect(ci).toMatch(/^ {6}- run: bun install --frozen-lockfile(?:\s+#.*)?\s*$/m);
     expect(ci).toMatch(/^ {6}- run: bun run lint(?:\s+#.*)?\s*$/m);
@@ -181,35 +197,6 @@ describe("production-readiness workflow contract", () => {
     expect(prePush).toContain("tests/migrations-applied.test.ts");
   });
 
-  // `supabase db reset` rebuilds the schema behind PostgREST, which cached it at
-  // boot; without the reload the whole suite fails with "Could not find the
-  // table 'public.breweries' in the schema cache" and reads as broken code.
-  it("reloads PostgREST's schema cache after resetting the test database", () => {
-    const reset = testDb.indexOf("supabase db reset");
-    // scripts/wait-rest.sh sends the reload and waits until PostgREST serves.
-    const reload = testDb.indexOf("scripts/wait-rest.sh");
-    expect(reset).toBeGreaterThan(-1);
-    expect(reload).toBeGreaterThan(reset);
-  });
-
-  // Parallel sessions share this one test database. scripts/test-db-lock.pl
-  // (behavior in tests/test-db-lock.test.ts) is held exclusive by a reset and
-  // shared by every vitest run, so neither can start under the other; a reset
-  // runs only when the migrations changed since the last one.
-  it("resets under the exclusive lock, and only when the schema changed", () => {
-    // The reset lives only in the --locked-reset branch, which the script
-    // reaches by re-running itself under the exclusive lock.
-    const reset = testDb.indexOf("supabase db reset");
-    expect(testDb).toContain("test-db-lock.pl ex bash scripts/test-db.sh --locked-reset");
-    expect(testDb.indexOf('= --locked-reset ]')).toBeGreaterThan(-1);
-    expect(testDb.indexOf('= --locked-reset ]')).toBeLessThan(reset);
-    expect(testDb.indexOf("mgr-schema")).toBeGreaterThan(-1);
-    expect(testDb.indexOf("mgr-schema")).toBeLessThan(reset);
-  });
-
-  it("holds the lock shared for every vitest run", () => {
-    expect(vitestConfig).toContain("tests/test-db-lock.setup.ts");
-  });
 
   it("leaves the build and the database shards to CI", () => {
     // Comments name the manual escape hatch; only what the hook runs counts.
@@ -264,7 +251,7 @@ describe("production-readiness workflow contract", () => {
   it("permits the review plugin to invoke Skill", () => {
     const claudeArgs = readActionField(
       review,
-      "anthropics/claude-code-action@v1",
+      "anthropics/claude-code-action",
       "claude_args"
     );
 
@@ -274,7 +261,7 @@ describe("production-readiness workflow contract", () => {
   it("does not enable verbose review output", () => {
     const claudeArgs = readActionField(
       review,
-      "anthropics/claude-code-action@v1",
+      "anthropics/claude-code-action",
       "claude_args"
     );
 
@@ -293,7 +280,7 @@ describe("production-readiness workflow contract", () => {
 
   it("keeps Claude read-only and publishes dream PRs as the MGR GitHub App", () => {
     expect(dreaming).toMatch(
-      /^ {8}uses: actions\/create-github-app-token@v2(?:\s+#.*)?\s*$/m
+      /^ {8}uses: actions\/create-github-app-token@[0-9a-f]{40}(?:\s+#.*)?\s*$/m
     );
     expect(dreaming).toContain("app-id: ${{ vars.MGR_APP_ID }}");
     expect(dreaming).toContain(
@@ -305,7 +292,7 @@ describe("production-readiness workflow contract", () => {
 
     const githubToken = readActionField(
       dreaming,
-      "anthropics/claude-code-action@v1",
+      "anthropics/claude-code-action",
       "github_token"
     );
 

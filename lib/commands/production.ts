@@ -183,21 +183,23 @@ const num = (v: unknown) => Number(v ?? 0);
 
 defineQuery({
   name: "get_recipe",
-  description: "One recipe with its latest version, that version's ingredients, and the OG/FG/ABV they predict",
-  input: z.object({ recipeId: z.string().uuid() }), roles: ["admin", "brewer"],
+  description: "One recipe with its requested version (latest by default), all version numbers, that version's ingredients, and the OG/FG/ABV they predict",
+  input: z.object({ recipeId: z.string().uuid(), version: z.number().int().positive().optional() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    // The recipe and its latest version are independent reads; the version
-    // query filters by recipe_id alone, so both go out at once.
-    const [recipe, version] = await Promise.all([
+    const versionQuery = ctx.db.from("recipe_versions").select("*").eq("recipe_id", i.recipeId);
+    const [recipe, version, versionRows] = await Promise.all([
       unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
         .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
-      // The whole version row: assumptions, schedules and process columns are all read as one unit.
-      latestOf<{ id: string; version: number; brewhouse_efficiency: number | null; yeast_attenuation: number | null }>(
-        ctx.db.from("recipe_versions").select("*")
-          .eq("recipe_id", i.recipeId), "version"),
+      i.version === undefined
+        ? latestOf<{ id: string; version: number; brewhouse_efficiency: number | null; yeast_attenuation: number | null }>(versionQuery, "version")
+        : unwrap(versionQuery.eq("version", i.version).maybeSingle()),
+      completeRows("Recipe versions", start => ctx.db.from("recipe_versions").select("version", { count: "exact" })
+        .eq("recipe_id", i.recipeId).order("version", { ascending: false }).range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
-    if (!version) return { recipe, version: null, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
+    if (!version && i.version !== undefined) throw new CommandError("recipe version not found", 404, "not_found");
+    const versions = versionRows.map((row) => row.version);
+    if (!version) return { recipe, version: null, versions, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
 
     const [ingredients, waterAdditions] = await Promise.all([
       unwrap(ctx.db.from("recipe_ingredients")
@@ -207,7 +209,7 @@ defineQuery({
     ]);
 
     return {
-      recipe, version, ingredients, waterAdditions,
+      recipe, version, versions, ingredients, waterAdditions,
       ...(recipeGravity({
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
