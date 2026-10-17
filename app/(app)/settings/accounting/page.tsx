@@ -17,6 +17,6 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
     sync={<QboSyncButton status={toQboSyncViewProps(syncStatus, brewery.timeZone)} disabled={!model.connected} />}
     connection={<QboConnectionAction configured={isQboConfigured()} reconnect={model.reconnect} />}
     defaults={model.connected && model.defaults ? <QboDefaultsForm {...model.defaults} /> : undefined}
-    messages={<>{params.connected && E.info("QuickBooks authorization completed for the selected company.")}{params.error && E.note("QuickBooks authorization was cancelled or could not finish. The existing connection was not replaced.")}</>}
+    messages={<>{params.connected && E.info("QuickBooks authorization completed for the selected company.")}{params.error && E.note("QuickBooks authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}</>}
   />;
 }

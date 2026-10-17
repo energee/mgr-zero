@@ -22,7 +22,7 @@ never copy it into a second place.
 | `lib/commands/compliance.ts` | Compliance registry, lot trace, generated and immutable filed reports, and completion-loss review. Loss reattribution allocates one exact part of a completion root through a frozen append-only signed pair; report removal totals include it once, while the cellar breakdown is explanatory. Direct cellar Taproom volume files under its frozen Taproom tax treatment (#816). |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
-| `lib/commands/admission.ts` | `consumeAdmission`: the per-user request budget (`consume_command_admission`) shared by `/api/command` and the Ask MGR `/api/chat` route; fails closed with 503 and returns a whole-second retry for the caller's 429. |
+| `lib/commands/admission.ts` | `consumeAdmission`: the per-user request budget (`consume_command_admission`) shared by `/api/command`, Ask MGR `/api/chat`, and the authenticated portal invoice-payment broker; fails closed with 503 and returns a whole-second retry for the caller's 429. The payment broker authorizes its invoice before admission and uses the existing unavailable redirect on denial. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/invites.ts` | Durable staff/customer invitations: RLS-bound claim and membership RPCs surround the sole Auth admin invite call. `private.invite_requests` and an Auth-transaction trigger preserve identity across lost responses; replay never regrants revoked membership. |
@@ -360,6 +360,7 @@ short version of this list.
 - `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
 - `.agents/PROGRESS.md` — dated Done log only. Same rule: state the change in the PR description, the dreaming PR writes it here.
 - `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
+- `.agents/codemaps/` — five short maps (architecture, backend, frontend, data, dependencies) of where things live. Each header names the commit it describes. Nothing regenerates them automatically: rerun Claude Code's `/ecc:update-codemaps` after structural changes. This file stays the owner of every rule; a map that disagrees with it is stale.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.claude/settings.json` — shared Claude Code allowlist: the proof checks and plain `git fetch`, in exact forms. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code (`git fetch --upload-pack`, `vitest --config`).

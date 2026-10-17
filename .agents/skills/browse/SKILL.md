@@ -7,8 +7,22 @@ allowed-tools: Bash(bunx agent-browser:*), Bash(agent-browser:*), Read
 # browse
 
 `agent-browser` (a devDep, `node_modules/.bin/agent-browser`) is the only browser
-tool in this repo. Its instructions ship with the binary and are version-matched,
-so read them live rather than from this file:
+tool in this repo. In each worktree, first run:
+
+```bash
+bun install --frozen-lockfile
+bunx agent-browser install
+```
+
+The locked 0.39.1 npm tarball includes the native CLI binaries; Bun checks its
+recorded SHA-512 integrity. Its postinstall is deliberately **not** trusted:
+never run it or `bun pm trust agent-browser`, because its fallback downloads a
+GitHub release binary without a checksum. `install` above prepares Chrome, not
+the CLI binary, and is not a digest verifier. It fetches upstream Chrome for
+Testing's Stable metadata and downloads Chrome unless that version is cached.
+See README's CI provenance notes for this remaining vendor download limitation.
+
+Its instructions ship with the binary and are version-matched, so read them live:
 
 ```bash
 bunx agent-browser skills get core --full

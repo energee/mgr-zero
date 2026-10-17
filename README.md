@@ -87,6 +87,11 @@ It checks out `.agents/worktrees/<branch>`, symlinks the gitignored
 `bun install`. A plain `git worktree add` has neither, so Supabase calls fail
 with `supabaseKey is required`.
 
+Browser setup is explicit in each worktree: after the frozen install, run
+`bunx agent-browser install`, then follow the
+[browse skill](.agents/skills/browse/SKILL.md). The native CLI is bundled in the
+locked npm tarball; do not trust or manually run its postinstall download hook.
+
 ```bash
 bun run dev   # http://localhost:3000
 ```
@@ -172,6 +177,67 @@ which applies migrations on the fresh stack, runs the full vitest suite
 against it, then
 `bun run lint`, `tsc --noEmit` and `bun run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
+
+### CI provenance and updates
+
+External `uses:` entries are pinned to 40-character commits (version comments
+are for humans); all checkouts use v6. Weekly GitHub Actions Dependabot PRs
+update those pins. Review the upstream commit/release diff, especially token
+handling and composite actions' own downloads, before merging; CI must pass.
+The workflow-contract test rejects mutable action references.
+
+The review marketplace is checked out separately at an immutable commit and
+passed as a local directory. The pinned action's
+[installer](https://github.com/anthropics/claude-code-action/blob/374f254f5efaf968abfe15d399fd90972e8138b9/base-action/src/install-plugins.ts)
+accepts local directories but rejects `https://…git#commit`; inventing such a
+URL would fail setup. The
+[marketplace manifest](https://github.com/anthropics/claude-code/blob/03b5892ee77de289bcd5dfa39f541525ade74aff/.claude-plugin/marketplace.json)
+points `code-review` at a relative directory in that same checkout, not another
+floating repository. Dependabot does not update checkout's `with.ref`: review
+this pin manually with action updates, inspect the manifest and plugin diff,
+and keep its source local. Do not enable marketplace auto-update.
+
+`agent-browser` 0.39.1's
+[npm distribution](https://registry.npmjs.org/agent-browser/0.39.1) bundles the
+native binaries for all supported platforms. Bun's frozen install verifies
+the npm tarball against the independently committed `bun.lock` SHA-512
+(`sha512-0zdIq0v2r9Gio7K5wIe/e2W9nyLoVC6tUGpGV+btuynBQT9aCgOk5IEIyK+6OtfKRzQjp96DQ/3akBqxccigTQ==`).
+Removing it from `trustedDependencies` prevents its unchecked GitHub-release
+fallback from running. On updates, review the new recorded integrity and
+confirm the tarball still contains the native binaries before accepting it.
+`tests/installer-integrity.test.ts` uses an isolated local fixture and fresh
+Bun caches to prove a valid tarball installs without its hook and a substituted
+tarball fails against the recorded digest.
+
+**Boundary, not an end-to-end vendor guarantee:** `bunx agent-browser install`
+installs Chrome, not the agent CLI, and does not validate a recorded digest.
+The upstream
+[Chrome installer](https://github.com/vercel-labs/agent-browser/blob/v0.39.1/cli/src/install.rs)
+fetches Chrome for Testing Stable metadata over HTTPS, then downloads the ZIP
+without an independently recorded checksum unless that version is cached.
+That explicit local opt-in is outside CI (CI does not run browser tests).
+Do not describe this as verified Chrome provenance. Pinning an action also
+does not pin every vendor runtime it installs (including Claude Code).
+No real review/model/provider operation is needed for local setup proof.
+
+Credential/permission inventory (unspecified scopes are denied wherever an
+explicit `permissions` mapping is present):
+
+| Action / job | Credentials and granted authority | Reason / boundary |
+| --- | --- | --- |
+| `actions/checkout` in CI | `GITHUB_TOKEN`: contents read | CI has an explicit read-only workflow default; no app key or provider secret. |
+| `actions/checkout` in review / doc / dream maintenance | Contents read; persisted credentials disabled | Read source only; marketplace checkout also disables persistence. |
+| `actions/checkout` in publication | Repository-scoped MGR App token: contents and pull requests write (dream also issues read) | Deterministic publication after validation, separate from the model. |
+| `actions/checkout` in `@claude` | Job token: contents, pull requests and issues write | User-requested code changes; intentionally not a read-only reviewer. |
+| `actions/setup-node`, `oven-sh/setup-bun`, [Supabase CLI setup](https://github.com/supabase/setup-cli) | Runner job context; no explicit application/provider secret input | Install pinned runtime versions; same job scopes, never elevated independently. |
+| `anthropics/claude-code-action` review | `CLAUDE_CODE_OAUTH_TOKEN`; contents / pull requests / issues read, id-token write | OIDC obtains the Claude GitHub App identity for review comments; model tool allowlist remains narrow. |
+| `anthropics/claude-code-action` doc / API maintenance | OAuth secret; explicit read-only `github.token`, id-token write | Model does not receive the publication App token. |
+| `anthropics/claude-code-action` dream maintenance | OAuth secret; explicit `github.token`, contents / pull requests / issues read | No publication permissions in the model job. |
+| `anthropics/claude-code-action` `@claude` | OAuth secret; contents / pull requests / issues write, actions read, id-token write | Intentional interactive write workflow; actions read supports CI inspection. |
+| `actions/create-github-app-token` | `MGR_APP_PRIVATE_KEY` and App ID | Dream identity requests metadata read only; publication tokens explicitly request contents / PR write and dream issues read, scoped to the current repository. |
+| `actions/upload-artifact`, `actions/download-artifact` | GitHub runner artifact runtime token | Same-run patch/bundle transport; neither gets the App key or OAuth secret as an input. |
+| Watcher (no third-party action except read-only checkout) | `github.token`: issues write; stale-dream job also contents read | Creates diagnostic issues only. |
+| Hosted jobs (no external actions) | Order-email / retention bearer secrets; `permissions: {}` | Existing operator-authorized service calls, never exercised by provenance verification. |
 
 ## Operations runbooks
 
