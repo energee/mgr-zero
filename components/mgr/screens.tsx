@@ -31,7 +31,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { InvoicesView } from "@/components/mgr/views/invoices";
-import { invoiceList } from "@/lib/mgr/fixtures/invoices";
+import { invoiceList, invoicesSync } from "@/lib/mgr/fixtures/invoices";
 import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { ImportView } from "@/components/mgr/views/import";
@@ -69,7 +69,7 @@ import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
-import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
+import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
@@ -1350,13 +1350,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Invoices",
-    to: { Review: "Invoice", Open: "Invoice", "Write off": "Invoice", "Re-push": "Invoice", "Sync QuickBooks": "Invoices", "Email delivery status": "Invoices" },
+    to: { "Sync QuickBooks": "Invoices", "Email delivery status": "Invoices" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection · get_qbo_sync_status",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks [verified company-bound invoice destination] · email delivery status [SCHEMA-GATE: post-v1 scope; the invoice query returns no delivery state]",
-    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync · no settlement date or user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
+    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync · no settlement date or user verb"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
-    body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "connected · company 9341", canConnect: true }} />,
+    body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
   },
   {
     step: 5,

@@ -15,17 +15,27 @@ export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | 
     : E.gated("Open in QuickBooks", link?.reason ?? "A verified provider link is unavailable. Open QuickBooks separately to find this document.");
 }
 
+/** The manual payment sync, shared by Invoices and Accounting: one row of last
+ *  success and its action, then only the exceptions (an unfinished or
+ *  superseded attempt, a failure, a saved retry). A completed latest attempt
+ *  is the last success, so it is not repeated. */
 export function QboSyncView({ busy = false, disabled = false, error, onSync, status }: { busy?: boolean; disabled?: boolean; error?: string | null; onSync?: () => void; status?: QboSyncStatus }) {
   // Failure history stores only time and operator; the view writes its own copy, and retry guidance follows the saved identity.
+  const latest = status?.latest && (!status.latest.completed || status.latest.superseded) ? status.latest : null;
   return <div className="flex flex-col gap-2">
-    {E.ttl("Manual payment sync")}
-    {E.fld("Last successful sync", status?.lastSuccess ? `${status.lastSuccess.at} · ${status.lastSuccess.operator}` : "No successful sync recorded")}
-    {status?.latest && E.fld("Latest sync activity", `${status.latest.at} · ${status.latest.operator} · ${status.latest.superseded ? "superseded · no payment changes applied" : status.latest.completed ? "completed" : "not completed"}`)}
-    {status?.latest?.superseded && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.", "alert")}
+    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div className="min-w-0">
+        {E.fld("Last successful sync", <span className="whitespace-normal [overflow-wrap:anywhere]">{status?.lastSuccess ? `${status.lastSuccess.at} · ${status.lastSuccess.operator}` : "No successful sync recorded"}</span>)}
+        <p className="text-sm text-muted-foreground">Payment status may be stale until you complete a manual sync.</p>
+      </div>
+      <div className="flex flex-col md:shrink-0">
+        {E.btn(busy ? "Syncing…" : status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", busy || disabled ? "g disabled" : "g", undefined, onSync)}
+      </div>
+    </div>
+    {latest && E.fld("Latest sync activity", `${latest.at} · ${latest.operator} · ${latest.superseded ? "superseded · no payment changes applied" : "not completed"}`)}
+    {latest?.superseded && E.info("The saved batch was superseded. Start a new manual sync to read current payment status.", "alert")}
     {status?.latestFailure && E.note(`Latest failed attempt: ${status.latestFailure.at} · ${status.latestFailure.operator}. Sync not completed for that attempt.`, "alert")}
     {status?.retryRequestId && E.info(disabled ? "QuickBooks must be reconnected before you retry the saved batch." : "Retry saved sync keeps your original invoice set and request identity.")}
-    {E.info("Payment status may be stale until you complete a manual sync. No automatic reconciliation runs.")}
-    {E.btn(busy ? "Syncing…" : status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", busy || disabled ? "g disabled" : "g", undefined, onSync)}
     <CommandFormMessage error={error} />
   </div>;
 }
