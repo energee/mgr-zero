@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
+import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "./portal-invoice-view";
 
 export type PortalInvoicesRowView = {
   key: string;
@@ -14,7 +15,7 @@ export type PortalInvoicesRowView = {
   total: string;
   href: string;
   unpaid: boolean;
-  tone: "" | "ok";
+  tone: "" | "ok" | "w";
 };
 
 export type PortalInvoicesViewModel = {
@@ -56,8 +57,13 @@ export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvo
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);
-      const unpaid = !credit && state === "unpaid" && !invoiceIsSettledWithoutPayment(inv);
       const total = invoiceCurrentTotalCents(inv, inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0));
+      const status: PortalInvoiceViewModel["status"] = credit ? "Credit"
+        : invoiceIsSettledWithoutPayment(inv) ? "Settled"
+        : state === "written_off" ? "Written off"
+        : state === "voided" ? "Voided" : state === "deleted" ? "Deleted"
+        : state === "paid" ? "Paid" : "Unpaid";
+      const unpaid = status === "Unpaid";
       return {
         key: inv.id,
         title: docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),
@@ -65,7 +71,7 @@ export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvo
         total: money(total),
         href: `/portal/invoices/${inv.id}`,
         unpaid,
-        tone: unpaid ? "" : state === "voided" || state === "deleted" ? "" : "ok",
+        tone: portalInvoiceStatusTone[status],
       };
     }),
   };
