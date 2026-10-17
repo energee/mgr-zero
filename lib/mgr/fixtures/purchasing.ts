@@ -60,6 +60,7 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
 
 export const receiptPoCountryMalt: ReceiptViewModel = {
   correction: {},
+  bill: { receiptId: "receipt-country-malt", status: "not_posted", action: "post" },
   title: "PO-0142 · received",
   status: "partially received",
   stillOwed: "1 Citra box · 44 lb",
@@ -69,6 +70,30 @@ export const receiptPoCountryMalt: ReceiptViewModel = {
     ["+300 lb rice hulls · receipt", "not lot-tracked"],
   ],
   info: "2-row is over by 2 bags and Citra short 1 on a substituted lot.",
+};
+
+export const receiptPoBillPending: ReceiptViewModel = {
+  ...receiptPoCountryMalt,
+  bill: { receiptId: "receipt-country-malt", requestId: "frozen-bill-request", status: "pending", action: "retry",
+    error: "QuickBooks did not return a confirmed Bill ID. Reconcile the original saved attempt." },
+};
+
+export const receiptPoBillPosted: ReceiptViewModel = {
+  ...receiptPoCountryMalt,
+  bill: { receiptId: "receipt-country-malt", requestId: "frozen-bill-request", status: "pushed", billId: "731" },
+  revisions: [{ label: "Original receipt" }],
+  tape: [
+    ["+2,200 lb 2-row · receipt", "lot CM-26-4410 · as expected"],
+    ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"],
+    ["+300 lb rice hulls · receipt", "not lot-tracked"],
+  ],
+  info: "Corrected receipt: two malt bags were counted twice. The original Bill remains posted in QuickBooks.",
+};
+
+export const receiptPoBillRejected: ReceiptViewModel = {
+  ...receiptPoCountryMalt,
+  bill: { receiptId: "receipt-country-malt", status: "push_failed", action: "corrected", mappingHref: "#",
+    error: "QuickBooks rejected the purchase account. Verify the exact account ID before posting a corrected Bill." },
 };
 
 export const correctReceiptCountryMalt: ReceivePoViewModel = {

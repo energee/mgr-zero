@@ -14,11 +14,16 @@ import { ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 import { personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { needsFor, type Persona } from "@/lib/mgr/demo-personas";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { ReceiptFixture } from "@/components/mgr/fixture-adapters";
 
 const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "disjunction" }).format(xs) : "admin");
 
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {
+  if (screen.name === "Receipt") {
+    const body = screen.body as ReactElement<ComponentProps<typeof ReceiptFixture>>;
+    return { ...screen, body: cloneElement(body, { roles: persona.roles }) };
+  }
   if (screen.name === "Orders") {
     const canWrite = hasAnyRole(persona.roles, ["admin", "sales"]);
     const model = toOrdersListViewProps({ ...ordersWorkList, roles: persona.roles });

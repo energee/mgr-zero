@@ -16,7 +16,7 @@ export default async function WorkPage() {
   const canCreate = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   return (
     <WorkList
-      rows={rows} defaults={defaultWorkKinds(brewery.roles)} subtitle={`${brewery.roles.join(", ")} default`}
+      rows={rows} defaults={defaultWorkKinds(brewery.roles)}
       chips={Object.keys(workHrefsFor(brewery.roles))}
       createAction={canCreate ? E.btn("New order", "g", "/orders") : null}
     />

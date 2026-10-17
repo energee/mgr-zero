@@ -25,6 +25,17 @@ describe("persona", () => {
     expect(html).toContain("pick due");
     expect(html).toContain("More");
   });
+  it.each([
+    [["sales", "admin"], true],
+    [["warehouse", "admin"], true],
+    [["sales", "warehouse"], false],
+    [["warehouse"], false],
+  ] as const)("shows receipt Bill actions only when the persona role set %j contains admin", (roles, canPost) => {
+    const screen = asPersona(by("Receipt"), { ...personaFor("admin"), roles: [...roles] });
+    const html = renderToStaticMarkup(createElement("div", null, screen.body));
+    expect(html.includes("Post Bill to QuickBooks")).toBe(canPost);
+    expect(html).toContain("QuickBooks Bill");
+  });
   it("is one demo user per staff role, each on the Team screen with that role", () => {
     expect(PERSONAS.map((p) => p.id)).toEqual(["admin", "sales", "warehouse", "brewer"]);
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));

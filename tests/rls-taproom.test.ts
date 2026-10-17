@@ -12,6 +12,7 @@ import { admin, asUser, ins, makeStaff, sql } from "./helpers";
 import { day, now, fixtures, matrix, keys, tenantRows, type Fixture, type Table, type Row } from "./rls-fixtures";
 import { checkSchema, localEnvironment, localExpectation } from "../scripts/test-db-schema.mjs";
 
+
 describe("taproom complete public RLS read boundary", () => {
   let own: Fixture, foreign: Fixture, db: SupabaseClient<Database>;
   beforeAll(async () => {
@@ -101,6 +102,7 @@ describe("taproom complete public RLS read boundary", () => {
       deliveries: "get_delivery_stop", routes: "list_routes", stock_transfers: "list_stock_transfers", stock_transfer_lines: "get_stock_transfer",
       lots: "list_movements", channel_prices: "list_channel_prices", price_group_barcodes: "list_price_group_barcodes",
       report_filings: "list_compliance_reports", brand_approvals: "get_compliance_registry",
+      reporting_basis_corrections: "list_reporting_basis_corrections", report_basis_amendments: "list_compliance_reports",
       state_registrations: "get_compliance_registry", brewery_state_licenses: "get_compliance_registry",
       pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",
       pos_item_mappings: "list_pos_variations", pos_locations: "list_pos_locations",
@@ -194,6 +196,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
     set_brewery_operating_defaults: [B,24,R()], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_one_way_keg_fee: [B,1000,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
+    correct_reporting_basis: [B,"2026-09-01",null,"Correct basis",R()],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     revoke_account_invitation: [B,consentInvite,R()],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
@@ -235,6 +238,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], submit_stock_transfer: [f.transfer.id,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
     set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
     set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_one_way_fee_mapping: [B,"qbo-fee",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
+    set_qbo_vendor_mapping: [B,VENDOR,"qbo-vendor",R()], set_qbo_purchase_account: [B,"qbo-account",R()],
+    start_qbo_receipt_bill: [B,receipt.id,R(),null],
     set_pos_location_mapping: [B,"L1",f.taps[0].id,R()], set_pos_item_mapping: [B,"I1","V1",SKU,null,false,R()],
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
@@ -302,6 +307,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     claim_qbo_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/qbo/callback"], qbo_oauth_already_completed: ["fixture-state",f.taproom.id,B], complete_qbo_invoice_sync: [B,f.taproom.id,R(),R(),"fixture-realm",[]],
     complete_qbo_oauth: [R(),f.taproom.id,"fixture-realm","Fixture","fixture-access","fixture-refresh",now,3600,3600,3600,[]], fail_qbo_oauth: [R(),f.taproom.id],
     finish_qbo_disconnect: [B,R(),f.taproom.id,R(),true], finish_qbo_push: [B,R(),f.taproom.id,"pushed","fixture-id",null,{},R()],
+    finish_qbo_receipt_bill: [B,receipt.id,f.taproom.id,R(),"fixture-bill",null,{},false],
     claim_square_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/square/callback"], fail_square_oauth: [R(),f.taproom.id,"not_required",null],
     complete_square_oauth: [R(),f.taproom.id,"fixture-merchant","Fixture","fixture-access","fixture-refresh",now,["ITEMS_READ"],[]],
     record_square_catalog_snapshot: [B,pos,f.taproom.id,1,R(),[],[]],

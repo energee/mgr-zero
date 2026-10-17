@@ -2,7 +2,7 @@ import { assert } from "vitest";
 import { createHash } from "node:crypto";
 import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
+import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
@@ -11,7 +11,9 @@ import {
   qboRealmInUse,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
-import { admin, DB, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, sql } from "./helpers";
+import { admin, DB, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 
 const config = {
   clientId: "client-id",
@@ -682,5 +684,568 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, recreateFetch), "remote_deleted"))
       .resolves.toMatchObject({ status: "pushed", remoteId: "fixed-2" });
     expect(sql(`select count(distinct provider_request_id) from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["3"]);
+  });
+});
+
+async function receiptBillFixture(options: {
+  vendorMapping?: boolean;
+  accountMapping?: boolean;
+  unitCostCents?: number | null;
+} = {}) {
+  const brewery = await makeBrewery();
+  const ctx = await makeStaffCtx(brewery.id, ["sales", "admin"]);
+  const location = await seedLocation(brewery.id);
+  const vendor = await runCommand("upsert_vendor", { name: "Receipt Bill supplier" }, ctx) as { id: string };
+  const material = await runCommand("upsert_material", {
+    name: "Receipt Bill malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 5,
+  }, ctx) as { id: string };
+  const unitCostCents = options.unitCostCents === undefined ? 333 : options.unitCostCents;
+  const po = await runCommand("create_purchase_order", {
+    vendorId: vendor.id,
+    lines: [{ materialId: material.id, qtyOrdered: 10, ...(unitCostCents === null ? {} : { unitCostCents }) }],
+  }, ctx) as { id: string };
+  await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, ctx);
+  const detail = await runCommand("get_purchase_order", { poId: po.id }, ctx) as { lines: { id: string }[] };
+  const lineId = detail.lines[0].id;
+  const receipt = await runCommand("receive_purchase_order", {
+    poId: po.id, locationId: location.id, binId: location.binId, receivedOn: "2026-09-20",
+    lines: [{ poLineId: lineId, qtyCounted: 3 }],
+  }, ctx) as { receipt_id: string };
+  const realm = `receipt-realm-${crypto.randomUUID()}`;
+  const connection = await admin.from("qbo_connections").insert({
+    brewery_id: brewery.id, realm_id: realm, realm_label: "Receipt fixture books", state: "connected",
+  }).select("id").single();
+  if (connection.error) throw connection.error;
+  sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+    values('${brewery.id}','qbo','${connection.data.id}','receipt-access','receipt-refresh')`);
+  if (options.vendorMapping !== false) {
+    await runCommand("set_qbo_vendor_mapping", { vendorId: vendor.id, qboVendorId: "vendor-exact-42" }, ctx);
+  }
+  if (options.accountMapping !== false) {
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "purchase-account-24" }, ctx);
+  }
+  return { brewery, ctx, location, vendor, material, po, lineId, receiptId: receipt.receipt_id, realm };
+}
+
+type ReceiptBillBody = {
+  VendorRef: { value: string };
+  TxnDate: string;
+  DocNumber: string;
+  PrivateNote: string;
+  Line: { Amount: number; DetailType: string; AccountBasedExpenseLineDetail: { AccountRef: { value: string } } }[];
+};
+
+function syntheticReceiptBills() {
+  const bills = new Map<string, ReceiptBillBody & { Id: string; SyncToken: string }>();
+  const posts: { requestId: string; body: string }[] = [];
+  const queries: string[] = [];
+  const state = { visible: true, loseNextResponse: false };
+  const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+    const url = new URL(String(input));
+    if (init?.method === "POST" && url.pathname.endsWith("/bill")) {
+      const requestId = url.searchParams.get("requestid");
+      assert(requestId);
+      const body = String(init.body);
+      posts.push({ requestId, body });
+      // Match Intuit's requestid semantics, but keep every attempted POST visible
+      // so reconciliation tests can separately enforce the no-second-POST path.
+      const bill = [...bills.values()].find(row => row.PrivateNote === `MGR receipt bill ${requestId}`)
+        ?? { ...JSON.parse(body) as ReceiptBillBody, Id: `bill-${posts.length}`, SyncToken: "0" };
+      bills.set(bill.Id, bill);
+      if (state.loseNextResponse) {
+        state.loseNextResponse = false;
+        throw new TypeError("socket closed after Bill committed");
+      }
+      return new Response(JSON.stringify({ Bill: bill }), { status: 200 });
+    }
+    if (init?.method === "GET" && url.pathname.endsWith("/query")) {
+      const query = url.searchParams.get("query")!;
+      queries.push(query);
+      const found = state.visible ? [...bills.values()].filter(bill => query.includes(`'${bill.DocNumber}'`)) : [];
+      return new Response(JSON.stringify({ QueryResponse: { Bill: found } }), { status: 200 });
+    }
+    throw new Error(`Unexpected synthetic Bill request: ${init?.method} ${url.pathname}`);
+  });
+  return { fetch, bills, posts, queries, state };
+}
+
+function receiptBillAttempts(breweryId: string) {
+  return sql(`select jsonb_build_object('receiptId',receipt_id,'providerRequestId',provider_request_id,
+    'requestBody',request_body)::text from private.qbo_receipt_bills where brewery_id='${breweryId}' order by created_at,id`)
+    .map(row => JSON.parse(row) as { receiptId: string; providerRequestId: string; requestBody: string });
+}
+
+describe("QuickBooks receipt Bills", () => {
+  it("post_receipt_bill retries with the same request id and never creates a second Bill", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      if (init?.method === "POST") {
+        const attempts = receiptBillAttempts(f.brewery.id);
+        expect(attempts).toEqual([{
+          receiptId: f.receiptId,
+          providerRequestId: new URL(String(input)).searchParams.get("requestid"),
+          requestBody: init.body,
+        }]);
+      }
+      return remote.fetch(input, init);
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client))
+      .rejects.toThrow(/Bill outcome is uncertain.*retry/i);
+    const [frozen] = receiptBillAttempts(f.brewery.id);
+    const body = JSON.parse(frozen.requestBody) as ReceiptBillBody;
+    expect(body.PrivateNote).toBe(`MGR receipt bill ${frozen.providerRequestId}`);
+    expect(body.DocNumber).toBe(`MGR-${frozen.providerRequestId.replaceAll("-", "").slice(0, 17)}`);
+    expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_request_id,qbo_bill_id")
+      .eq("id", f.receiptId).single()).data).toEqual({
+      qbo_bill_status: "pending", qbo_bill_request_id: frozen.providerRequestId, qbo_bill_id: null,
+    });
+
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    for (const replayId of [requestId, crypto.randomUUID()]) {
+      await expect(postReceiptBill(f.ctx, f.receiptId, replayId, new QboOAuthClient(config, noFetch)))
+        .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    }
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(remote.posts).toEqual([{ requestId: frozen.providerRequestId, body: frozen.requestBody }]);
+    expect(remote.queries).toEqual([`select * from Bill where DocNumber = '${body.DocNumber}'`]);
+    expect(remote.bills.size).toBe(1);
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([frozen]);
+    const detail = await runCommand("get_purchase_order", { poId: f.po.id }, f.ctx) as {
+      vendor: Record<string, unknown>; receipts: Record<string, unknown>[];
+    };
+    expect(detail.vendor).toMatchObject({ qbo_vendor_id: "vendor-exact-42", qbo_realm_id: f.realm });
+    expect(detail.receipts.find(receipt => receipt.id === f.receiptId)).toMatchObject({
+      qbo_bill_status: "pushed", qbo_bill_id: "bill-1", qbo_bill_request_id: frozen.providerRequestId,
+      qbo_bill_error: null, qbo_bill_receipt_id: f.receiptId,
+    });
+  });
+
+  it("replays the exact frozen payload and provider key only after an empty reconciliation query", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    const client = new QboOAuthClient(config, remote.fetch);
+    const requestId = crypto.randomUUID();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).rejects.toThrow(/uncertain/i);
+    const [frozen] = receiptBillAttempts(f.brewery.id);
+    remote.state.visible = false;
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "later-vendor" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "later-account" }, f.ctx);
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toEqual([
+      { requestId: frozen.providerRequestId, body: frozen.requestBody },
+      { requestId: frozen.providerRequestId, body: frozen.requestBody },
+    ]);
+    expect(remote.fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["POST", "GET", "POST"]);
+    expect(remote.bills.size).toBe(1);
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([frozen]);
+  });
+
+  it("keeps differently marked or ambiguous Bills pending without POSTing again", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    const frozen = receiptBillAttempts(f.brewery.id);
+    const bill = remote.bills.get("bill-1")!;
+    const originalMarker = bill.PrivateNote;
+    bill.PrivateNote = "A different payable happens to have the same document number";
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    bill.PrivateNote = originalMarker;
+    remote.bills.set("ambiguous-bill", { ...bill, Id: "ambiguous-bill" });
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    expect(remote.posts).toHaveLength(1);
+    expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
+    expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id").eq("id", f.receiptId).single()).data)
+      .toEqual({ qbo_bill_status: "pending", qbo_bill_id: null });
+    for (const malformed of [{}, { QueryResponse: [] }, { QueryResponse: { Bill: {} } }]) {
+      const malformedFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
+      await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, malformedFetch)))
+        .rejects.toThrow(/uncertain/i);
+      expect(malformedFetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+    }
+    remote.bills.delete("ambiguous-bill");
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toHaveLength(1);
+  });
+
+  it("freezes the vendor, account and receipt costs across mapping edits and a pending receipt correction", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    const [frozen] = receiptBillAttempts(f.brewery.id);
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "vendor-edited" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "account-edited" }, f.ctx);
+    // Later PO/master cost edits must not rewrite the already reserved payable.
+    expect((await admin.from("purchase_order_lines").update({ unit_cost_cents: 9999 }).eq("id", f.lineId)).error).toBeNull();
+    const corrected = await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Actually two bags", lines: [{ poLineId: f.lineId, qtyCounted: 2 }],
+    }, f.ctx) as { receipt_id: string };
+    await expect(postReceiptBill(f.ctx, corrected.receipt_id, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1", receiptId: f.receiptId });
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([frozen]);
+    expect(remote.posts).toEqual([{ requestId: frozen.providerRequestId, body: frozen.requestBody }]);
+    expect(JSON.parse(frozen.requestBody)).toMatchObject({
+      VendorRef: { value: "vendor-exact-42" },
+      Line: [{ Amount: 9.99, AccountBasedExpenseLineDetail: { AccountRef: { value: "purchase-account-24" } } }],
+    });
+    expect(remote.bills.size).toBe(1);
+  });
+
+  it("allows exactly one Bill POST while concurrent and repeated requests reconcile the shared attempt", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    let releasePost!: () => void;
+    let notifyPost!: () => void;
+    const postStarted = new Promise<void>(resolve => { notifyPost = resolve; });
+    const postReleased = new Promise<void>(resolve => { releasePost = resolve; });
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const response = await remote.fetch(input, init);
+      if (init?.method === "POST") {
+        notifyPost();
+        await postReleased;
+      }
+      return response;
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    const first = postReceiptBill(f.ctx, f.receiptId, requestId, client);
+    try {
+      await Promise.race([postStarted, first.then(() => { throw new Error("Bill POST was not held"); })]);
+      const concurrent = await Promise.all([requestId, crypto.randomUUID(), crypto.randomUUID()]
+        .map(id => postReceiptBill(f.ctx, f.receiptId, id, client)));
+      for (const result of concurrent) {
+        expect(result).toMatchObject({ status: "pushed", remoteId: "bill-1" });
+      }
+      expect(remote.posts).toHaveLength(1);
+      expect(receiptBillAttempts(f.brewery.id)).toHaveLength(1);
+    } finally {
+      releasePost();
+      await first;
+    }
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toHaveLength(1);
+    expect(remote.bills.size).toBe(1);
+  });
+
+  it.each([
+    { vendorMapping: false, accountMapping: true, message: /map this vendor/i },
+    { vendorMapping: true, accountMapping: false, message: /map the purchase account/i },
+  ])("requires explicit vendor/account mapping before reserving or sending ($vendorMapping/$accountMapping)", async options => {
+    const f = await receiptBillFixture(options);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .rejects.toThrow(options.message);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([]);
+    expect((await admin.from("receipts").select("qbo_bill_request_id,qbo_bill_status").eq("id", f.receiptId).single()).data)
+      .toEqual({ qbo_bill_request_id: null, qbo_bill_status: null });
+  });
+
+  it("blocks a missing movement cost rather than using a later PO price or sending a zero-dollar line", async () => {
+    const f = await receiptBillFixture({ unitCostCents: null });
+    expect((await admin.from("purchase_order_lines").update({ unit_cost_cents: 333 }).eq("id", f.lineId)).error).toBeNull();
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .rejects.toThrow(/no recorded unit cost/i);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([]);
+  });
+
+  it("prices the counted base movement, preserving fractional per-base cents and ignoring later PO costs", async () => {
+    const f = await receiptBillFixture();
+    const movement = await admin.from("receipt_lines").select("movement_id").eq("receipt_id", f.receiptId).single();
+    expect(movement.error).toBeNull();
+    const cost = await admin.from("material_movements").select("qty,unit_cost_cents").eq("id", movement.data!.movement_id!).single();
+    expect(cost.error).toBeNull();
+    expect(cost.data).toEqual({ qty: 15, unit_cost_cents: 66.6 });
+    expect((await admin.from("purchase_order_lines").update({ unit_cost_cents: 9999 }).eq("id", f.lineId)).error).toBeNull();
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch)))
+      .resolves.toMatchObject({ status: "pushed" });
+    const body = JSON.parse(remote.posts[0].body) as ReceiptBillBody;
+    expect(body).toMatchObject({ VendorRef: { value: "vendor-exact-42" }, TxnDate: "2026-09-20" });
+    expect(body.Line).toEqual([expect.objectContaining({
+      DetailType: "AccountBasedExpenseLineDetail", Amount: 9.99,
+      AccountBasedExpenseLineDetail: { AccountRef: { value: "purchase-account-24" } },
+    })]);
+  });
+
+  it("keeps all posted receipt corrections attached to the original Bill and never sends another", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    const frozen = receiptBillAttempts(f.brewery.id);
+    const firstCorrection = await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Two bags not three", lines: [{ poLineId: f.lineId, qtyCounted: 2 }],
+    }, f.ctx) as { receipt_id: string };
+    const secondCorrection = await runCommand("correct_purchase_receipt", {
+      receiptId: firstCorrection.receipt_id, reason: "One bag after final recount", lines: [{ poLineId: f.lineId, qtyCounted: 1 }],
+    }, f.ctx) as { receipt_id: string };
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    for (const receiptId of [f.receiptId, firstCorrection.receipt_id, secondCorrection.receipt_id]) {
+      await expect(postReceiptBill(f.ctx, receiptId, crypto.randomUUID(), new QboOAuthClient(config, noFetch)))
+        .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1", receiptId: f.receiptId });
+    }
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
+    expect(remote.posts).toHaveLength(1);
+    const detail = await runCommand("get_purchase_order", { poId: f.po.id }, f.ctx) as { receipts: Record<string, unknown>[] };
+    for (const receipt of detail.receipts) {
+      expect(receipt).toMatchObject({
+        qbo_bill_status: "pushed", qbo_bill_id: "bill-1", qbo_bill_receipt_id: f.receiptId,
+        qbo_bill_request_id: frozen[0].providerRequestId,
+      });
+    }
+    // OAuth changes both the realm and current connection ID. History must not
+    // keep a foreign key to that mutable identity or connecting another company fails.
+    expect((await admin.from("qbo_connections").update({ id: crypto.randomUUID(), realm_id: `replacement-${f.realm}` })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    await expect(postReceiptBill(f.ctx, secondCorrection.receipt_id, crypto.randomUUID(), new QboOAuthClient(config, noFetch)))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(noFetch).not.toHaveBeenCalled();
+  });
+
+  it("creates separate Bills for separate receipts on the same PO, not one Bill per purchase order", async () => {
+    const f = await receiptBillFixture();
+    const second = await runCommand("receive_purchase_order", {
+      poId: f.po.id, locationId: f.location.id, binId: f.location.binId, receivedOn: "2026-09-21",
+      lines: [{ poLineId: f.lineId, qtyCounted: 2 }],
+    }, f.ctx) as { receipt_id: string };
+    const remote = syntheticReceiptBills();
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ remoteId: "bill-1" });
+    await expect(postReceiptBill(f.ctx, second.receipt_id, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ remoteId: "bill-2" });
+    expect(receiptBillAttempts(f.brewery.id)).toHaveLength(2);
+    expect(new Set(remote.posts.map(post => post.requestId)).size).toBe(2);
+    expect(remote.posts.map(post => (JSON.parse(post.body) as ReceiptBillBody).Line[0].Amount)).toEqual([9.99, 6.66]);
+    expect(remote.bills.size).toBe(2);
+  });
+
+  it("denies non-admins, forged admin contexts and foreign tenant receipts before provider access", async () => {
+    const f = await receiptBillFixture();
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const client = new QboOAuthClient(config, fetch);
+    for (const roles of [["sales"], ["warehouse"], ["brewer"], ["taproom"], ["sales", "warehouse"]] as const) {
+      const denied = await makeStaffCtx(f.brewery.id, [...roles]);
+      await expect(postReceiptBill(denied, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/permission/i);
+      await expect(postReceiptBill({ ...denied, roles: ["admin"] }, f.receiptId, crypto.randomUUID(), client))
+        .rejects.toThrow(/permission/i);
+    }
+    const foreign = await receiptBillFixture();
+    await expect(postReceiptBill(foreign.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/receipt not found/i);
+    await expect(postReceiptBill({ ...foreign.ctx, breweryId: f.brewery.id }, f.receiptId, crypto.randomUUID(), client))
+      .rejects.toThrow(/permission|member/i);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([]);
+    expect(receiptBillAttempts(foreign.brewery.id)).toEqual([]);
+  });
+
+  it("keeps the central explicit-actor role check private and false for absent membership or allowed roles", async () => {
+    const f = await receiptBillFixture();
+    const foreign = await makeBrewery();
+    const results = sql(`select jsonb_build_array(
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}',null,array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${foreign.id}','${f.ctx.userId}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${crypto.randomUUID()}',array['admin']::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',array[]::public.staff_role[]),
+      private.actor_has_staff_roles('${f.brewery.id}','${f.ctx.userId}',null))::text`);
+    expect(JSON.parse(results[0])).toEqual([true, false, false, false, false, false]);
+    expect(sql(`select r.role from (values ('anon'),('authenticated'),('service_role')) r(role)
+      where has_function_privilege(r.role,'private.actor_has_staff_roles(uuid,uuid,public.staff_role[])','execute')`)).toEqual([]);
+  });
+
+  it("rechecks the current actor role at completion and recovers the same Bill after permission returns", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const response = await remote.fetch(input, init);
+      if (init?.method === "POST") {
+        expect((await admin.from("brewery_users").update({ roles: ["warehouse"] })
+          .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
+      }
+      return response;
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).rejects.toThrow(/reconciliation failed/i);
+    expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id").eq("id", f.receiptId).single()).data)
+      .toEqual({ qbo_bill_status: "pending", qbo_bill_id: null });
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse", "admin"] })
+      .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
+    await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toHaveLength(1);
+    expect(remote.bills.size).toBe(1);
+  });
+
+  it("only permits an explicitly corrected fresh attempt after a definite rejection and preserves the rejected snapshot", async () => {
+    const f = await receiptBillFixture();
+    const rejectedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (_input, init) => {
+      expect(init?.method).toBe("POST");
+      return new Response(JSON.stringify({ Fault: { Error: [{ Message: "Account is inactive" }] } }), { status: 400 });
+    });
+    const rejectedRequest = crypto.randomUUID();
+    await expect(postReceiptBill(f.ctx, f.receiptId, rejectedRequest, new QboOAuthClient(config, rejectedFetch)))
+      .rejects.toThrow(/QuickBooks rejected/i);
+    const [rejected] = receiptBillAttempts(f.brewery.id);
+    expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id,qbo_bill_error").eq("id", f.receiptId).single()).data)
+      .toMatchObject({ qbo_bill_status: "push_failed", qbo_bill_id: null, qbo_bill_error: expect.stringMatching(/rejected/i) });
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "corrected-vendor" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "corrected-account" }, f.ctx);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    for (const requestId of [rejectedRequest, crypto.randomUUID()]) {
+      await expect(postReceiptBill(f.ctx, f.receiptId, requestId, new QboOAuthClient(config, noFetch)))
+        .rejects.toThrow(/rejected/i);
+    }
+    expect(noFetch).not.toHaveBeenCalled();
+    const remote = syntheticReceiptBills();
+    const correctedRequest = crypto.randomUUID();
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, correctedRequest, client, "corrected"))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    const attempts = receiptBillAttempts(f.brewery.id);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toEqual(rejected);
+    expect(attempts[1].providerRequestId).not.toBe(rejected.providerRequestId);
+    expect(JSON.parse(attempts[1].requestBody)).toMatchObject({
+      VendorRef: { value: "corrected-vendor" },
+      Line: [{ Amount: 9.99, AccountBasedExpenseLineDetail: { AccountRef: { value: "corrected-account" } } }],
+    });
+    await expect(postReceiptBill(f.ctx, f.receiptId, correctedRequest, client, "corrected"))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    await expect(postReceiptBill(f.ctx, f.receiptId, rejectedRequest, new QboOAuthClient(config, noFetch)))
+      .rejects.toThrow(/rejected/i);
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(remote.posts).toHaveLength(1);
+    expect(rejectedFetch).toHaveBeenCalledTimes(1);
+    expect(sql(`select status from private.qbo_receipt_bills where brewery_id='${f.brewery.id}' order by created_at,id`))
+      .toEqual(["push_failed", "pushed"]);
+  });
+
+  it("allows a corrected attempt in a reconnected company after a definite rejection", async () => {
+    const f = await receiptBillFixture();
+    const rejectedFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ Fault: { Error: [{ Message: "Vendor is inactive" }] } }), { status: 400 }));
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, rejectedFetch)))
+      .rejects.toThrow(/QuickBooks rejected/i);
+    const newConnectionId = crypto.randomUUID();
+    expect((await admin.from("qbo_connections").update({ id: newConnectionId, realm_id: `replacement-${f.realm}` })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+      values('${f.brewery.id}','qbo','${newConnectionId}','new-access','new-refresh')
+      on conflict (brewery_id,provider) do update set connection_id=excluded.connection_id`);
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "new-company-vendor" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "new-company-account" }, f.ctx);
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch), "corrected"))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(JSON.parse(remote.posts[0].body)).toMatchObject({ VendorRef: { value: "new-company-vendor" } });
+    expect(sql(`select realm_id || '|' || status from private.qbo_receipt_bills where brewery_id='${f.brewery.id}' order by created_at,id`))
+      .toEqual([`${f.realm}|push_failed`, `replacement-${f.realm}|pushed`]);
+  });
+
+  it("refuses a corrected attempt while the original provider outcome is unknown", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    const client = new QboOAuthClient(config, remote.fetch);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    const frozen = receiptBillAttempts(f.brewery.id);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "changed-during-uncertainty" }, f.ctx);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, noFetch), "corrected"))
+      .rejects.toThrow(/definitive|pending/i);
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
+    expect(remote.posts).toHaveLength(1);
+  });
+
+  it("uses the single purchase account for every counted material and skips uncounted uncosted lines", async () => {
+    const f = await receiptBillFixture();
+    const free = await runCommand("upsert_material", {
+      name: "Complimentary samples", category: "malt", baseUom: "lb", purchaseUom: "lb",
+    }, f.ctx) as { id: string };
+    const absent = await runCommand("upsert_material", {
+      name: "Not delivered", category: "malt", baseUom: "lb", purchaseUom: "lb",
+    }, f.ctx) as { id: string };
+    const po = await runCommand("create_purchase_order", {
+      vendorId: f.vendor.id, lines: [
+        { materialId: f.material.id, qtyOrdered: 4, unitCostCents: 125 },
+        { materialId: free.id, qtyOrdered: 2, unitCostCents: 0 },
+        { materialId: absent.id, qtyOrdered: 1 },
+      ],
+    }, f.ctx) as { id: string };
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, f.ctx);
+    const detail = await runCommand("get_purchase_order", { poId: po.id }, f.ctx) as { lines: { id: string; material_id: string }[] };
+    const receipt = await runCommand("receive_purchase_order", {
+      poId: po.id, locationId: f.location.id, binId: f.location.binId,
+      lines: detail.lines.map(line => ({ poLineId: line.id, qtyCounted: line.material_id === absent.id ? 0 : line.material_id === free.id ? 2 : 3 })),
+    }, f.ctx) as { receipt_id: string };
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, receipt.receipt_id, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch)))
+      .resolves.toMatchObject({ status: "pushed" });
+    const body = JSON.parse(remote.posts[0].body) as ReceiptBillBody;
+    expect(body.Line.map(line => line.Amount).sort((a, b) => a - b)).toEqual([0, 3.75]);
+    for (const line of body.Line) {
+      expect(line.AccountBasedExpenseLineDetail.AccountRef.value).toBe("purchase-account-24");
+    }
+    expect(remote.posts).toHaveLength(1);
+  });
+
+  it("clears realm-scoped vendor and account mappings before an unposted receipt can target another company", async () => {
+    const f = await receiptBillFixture();
+    expect(await runCommand("get_qbo_connection", {}, f.ctx)).toMatchObject({ purchaseAccountId: "purchase-account-24" });
+    expect(await runCommand("list_vendors", {}, f.ctx)).toEqual([
+      expect.objectContaining({ id: f.vendor.id, qbo_vendor_id: "vendor-exact-42" }),
+    ]);
+    expect((await admin.from("qbo_connections").update({ realm_id: `replacement-${f.realm}` })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    expect(await runCommand("get_qbo_connection", {}, f.ctx)).toMatchObject({ purchaseAccountId: null });
+    expect(await runCommand("list_vendors", {}, f.ctx)).toEqual([
+      expect.objectContaining({ id: f.vendor.id, qbo_vendor_id: null }),
+    ]);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, noFetch)))
+      .rejects.toThrow(/map this vendor/i);
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual([]);
+  });
+
+  it("never retargets a frozen pending Bill to replacement company mappings", async () => {
+    const f = await receiptBillFixture();
+    const remote = syntheticReceiptBills();
+    remote.state.loseNextResponse = true;
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch)))
+      .rejects.toThrow(/uncertain/i);
+    const frozen = receiptBillAttempts(f.brewery.id);
+    expect((await admin.from("qbo_connections").update({ id: crypto.randomUUID(), realm_id: `replacement-${f.realm}` })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    await runCommand("set_qbo_vendor_mapping", { vendorId: f.vendor.id, qboVendorId: "new-company-vendor" }, f.ctx);
+    await runCommand("set_qbo_purchase_account", { qboAccountId: "new-company-account" }, f.ctx);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, noFetch)))
+      .rejects.toThrow(/original company|connection changed/i);
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
+    expect(remote.posts).toHaveLength(1);
   });
 });

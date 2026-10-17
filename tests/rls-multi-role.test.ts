@@ -10,7 +10,7 @@ const groups = {
   staff: ["allocations", "batch_additions", "batches", "brew_records", "breweries", "catalog_categories", "fermentation_readings", "format_bom", "inventory_movements", "keg_events", "material_contracts", "material_count_lines", "material_counts", "material_lots", "material_movements", "materials", "packaging_material_actuals", "packaging_material_records", "packaging_run_consumptions", "packaging_run_outputs", "packaging_runs", "price_groups", "purchase_order_lines", "purchase_orders", "receipt_lines", "receipts", "recipe_ingredients", "recipe_versions", "recipe_water_additions", "recipes", "styles", "transfers", "vendors", "vessel_occupancies", "vessels", "volume_adjustment_reclassifications", "volume_adjustments", "water_profiles"],
   all: ["brands", "format_components", "formats", "keg_pools", "skus", "tap_intervals", "taproom_count_lines", "taproom_counts"],
   salesWarehouse: ["customers", "deliveries", "invoice_lines", "invoices", "lots", "order_deposit_lines", "order_events", "order_lines", "orders", "routes", "sale_channels", "ship_tos", "shipments", "stock_transfer_lines", "stock_transfers"],
-  sales: ["brand_approvals", "brewery_state_licenses", "channel_prices", "invoice_questions", "price_group_barcodes", "qbo_customer_decisions", "qbo_customer_snapshots", "report_filings", "state_registrations"],
+  sales: ["brand_approvals", "brewery_state_licenses", "channel_prices", "invoice_questions", "price_group_barcodes", "qbo_customer_decisions", "qbo_customer_snapshots", "report_basis_amendments", "report_filings", "reporting_basis_corrections", "state_registrations"],
   warehouse: ["pos_catalog_items", "pos_catalog_ownership", "pos_catalog_variations", "pos_menu_lines", "pos_menus", "pos_sales", "pos_sale_expectations", "pos_sales_coverage"],
   warehouseTaproom: ["pos_item_mappings", "pos_locations"],
   integrations: ["pos_connections", "qbo_connections", "qbo_pushes"],
@@ -111,11 +111,11 @@ describe("all staff-dependent RLS policies preserve multi-role union (#797)", { 
     } finally { await connection.query("reset role"); }
   }
 
-  it("classifies all 92 live staff policies and all four separate portal policies", () => {
+  it("classifies all 94 live staff policies and all four separate portal policies", () => {
     const actual = sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)' order by 1`);
-    expect(policies).toHaveLength(92);
-    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(92);
+    expect(policies).toHaveLength(94);
+    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(94);
     expect(actual).toEqual(policies.map(test => `${test.table}:${test.policy}`).sort());
     expect(sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and not (coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)') order by 1`))

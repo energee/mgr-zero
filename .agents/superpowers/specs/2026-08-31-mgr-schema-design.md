@@ -680,6 +680,19 @@ their actual creation period. A nonzero direct-cellar Taproom amount files once,
 removal under its frozen Taproom tax treatment (#816);
 existing `report_filings.figures` snapshots remain immutable.
 
+### Reporting-basis correction history
+`reporting_basis_corrections` stores the immutable old/new nullable books-opened
+dates, `corrected_by`, `corrected_at`, and reason. Admin alone calls
+`correct_reporting_basis` after filing, with the expected current basis and a
+request ID. It shares the filing/setter cellar gate, then freezes the inventory
+ledger while comparing each filed period's before/after report figures.
+`report_basis_amendments` links every changed or newly invalidated filed period
+to that correction, retaining its before/after figures. Composite tenant FKs
+prevent cross-brewery links. Both tables are append-only with Admin/Sales reads;
+their presence derives the permanent **Needs amendment** flag. Original filed
+snapshots never change, and external amended filings are not transmitted by MGR.
+
+
 ## 12. Kegs (owned / leased / pay-per-fill fleets)
 
 ### `keg_pools`

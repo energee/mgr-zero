@@ -1,7 +1,9 @@
 import type { MonthlyComplianceSnapshot } from "@/lib/mgr/monthly-compliance-view";
+import { basisCorrectionDemo, DEMO_TIME_ZONE } from "./settings";
 
 export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
   monthLabel: "August 2026",
+  timeZone: DEMO_TIME_ZONE,
   losses: [{
     adjustment_id: "loss-1042", batch_id: "batch-1042", batch_no: 1042, closed_at: "2026-08-31", kind: "completion",
     original_bbl: "0.05741935", remaining_bbl: "0.03741935",
@@ -35,4 +37,20 @@ export const monthlyComplianceSeptember: MonthlyComplianceSnapshot = {
   monthLabel: "September 2026",
   losses: [],
   report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30" } },
+};
+
+/** Original filed figures beside the immutable correction evidence. */
+export const monthlyComplianceAmended: MonthlyComplianceSnapshot = {
+  ...monthlyComplianceAugust,
+  filing: {
+    id: "filing-august", jurisdiction: "TTB", period_start: "2026-08-01", period_end: "2026-08-31",
+    figures: monthlyComplianceAugust.report.figures, filed_at: "2026-09-02T14:00:00Z",
+    filed_by: basisCorrectionDemo.corrected_by, created_at: "2026-09-02T14:00:00Z", note: null,
+    needs_amendment: true,
+    basis_amendments: [{
+      filing_id: "filing-august", correction_id: basisCorrectionDemo.id, correction: basisCorrectionDemo,
+      old_figures: monthlyComplianceAugust.report.figures,
+      new_figures: { ...monthlyComplianceAugust.report.figures, lines: monthlyComplianceAugust.report.figures.lines.map(line => line.class === "can" ? { ...line, begin: 14.6, end: 17.7 } : line) },
+    }],
+  },
 };

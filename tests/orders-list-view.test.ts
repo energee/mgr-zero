@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"] }) }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"], timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
@@ -38,7 +38,7 @@ describe("Orders list view loop", () => {
 
   it("maps list_orders-shaped rows through nextAction", () => {
     const model = toOrdersListViewProps(ordersWorkList);
-    expect(model.subtitle).toBe("sales default");
+    expect(renderToStaticMarkup(createElement(OrdersView, { model }))).not.toContain("sales default");
     expect(model.rows.map((r) => r.verb)).toEqual(["Confirm", "Open", "Open", "Finish"]);
     expect(model.rows[0]?.title).toMatch(/^ORD-0231 ·/);
     expect(model.rows[1]?.warning).toBe(true);
@@ -89,6 +89,7 @@ describe("Orders list view loop", () => {
     expect(list.props.model).toEqual(toOrdersListViewProps(ordersWorkList));
     expect(renderToStaticMarkup(list.props.createAction)).toContain('href="/orders/new"');
     expect(list.props.feedback.type).toBe(QueryFeedback);
+    expect(list.props.feedback.props.timeZone).toBe("America/Los_Angeles");
     const inventory = screen("Orders").body as typeof list;
     expect(inventory.props.feedback.type).toBe(QueryFeedback);
   });

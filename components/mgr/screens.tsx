@@ -70,7 +70,7 @@ import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
 import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView } from "@/components/mgr/views/accounting";
-import { accountingExpired } from "@/lib/mgr/fixtures/accounting";
+import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { CustomerView } from "@/components/mgr/views/customer";
@@ -80,7 +80,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture } from "@/components/mgr/fixture-adapters";
+import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -212,7 +212,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
@@ -485,8 +485,8 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water": "Water profiles" },
-    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
-    states: permitted("admin only"),
+    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
+    states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
@@ -918,7 +918,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and state changes happen on their own surfaces]",
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"], ["loading", "inline status on first visit; cached rows remain during refresh"], ["error", "inline error and Try again; existing rows remain"]],
     spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry page. Order and Confirm order return here. OrdersView's listStatus and feedback slots use shared QueryFeedback: first-load text without skeletons, Last checked with Updating during refresh, and last-known data with connection or retry feedback. The visible list checks every five seconds and on tab return or reconnect; hidden and unmounted lists do not poll.",
-    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5,
@@ -1188,14 +1188,14 @@ export const SCREENS: Screen[] = [
     writes: "create_order",
     states: [...permitted("sales or admin required"), ["pricing loading", "Loading customer-priced SKUs; no empty claim"], ["pricing offline", "Waiting for connection; resumes on reconnect"], ["pricing failed", "error and Try again; cached choices marked last-known", 1], ["pricing empty", "no active SKUs priced for this customer; check Price groups"], ["customer changed", "unavailable selections keep quantities and labels; replace or remove before saving", 1]],
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Last checked uses the oldest option-list check, Updating preserves inputs, and connection or retry feedback identifies last-known data. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft. Offline, error and empty states are supplied through the shared feedback contract rather than additional fixture frames. Customer pricing uses the same feedback below the PO field and inside Select SKU: initial loading, paused connection, failed read with Try again, and last-known cached choices stay distinct from a successful empty list. A customer change preserves quantities and selections; an unavailable SKU keeps its label and a visible warning until replaced or removed. Save draft cannot count or submit an unavailable selection.",
-    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5, slice: 1, tab: "Work", name: "New order pricing loading",
     job: "Wait for the customer's priced SKU choices", reads: "list_skus", writes: "create_order",
     states: [["pricing loading", "first read; Save draft waits"]],
     spec: "The first customer pricing read shows loading feedback, never an empty claim. Save draft waits for the choices.",
-    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [] }} skuOptionsReady={false} skuFeedback={<QueryFeedback loading="Loading customer-priced SKUs" />} disabled />,
+    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [] }} skuOptionsReady={false} skuFeedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} loading="Loading customer-priced SKUs" />} disabled />,
   },
   {
     step: 5, slice: 1, tab: "Work", name: "New order unavailable SKU",
@@ -1311,17 +1311,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
-    job: "Review verified customer, SKU, deposit and one-way keg fee mappings for the connected company",
-    reads: "get_qbo_connection · list_customers · list_skus",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
-    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers or SKUs"]],
-    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={[
-      { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
-      { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
-      { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
-      { title: "One-way kegs", rows: [{ id: "one_way_fee", label: "One-way keg fee item", kind: "one_way_fee", detail: "One verified QuickBooks item for the non-refundable one-way keg fee" }] },
-    ]} />,
+    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Country Malt": "Mapping conflict", "Purchase account": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
+    job: "Review verified customer, SKU, vendor, purchase account, deposit and one-way keg fee mappings for the connected company",
+    reads: "get_qbo_connection · list_customers · list_skus · list_vendors",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_vendor_mapping · set_qbo_purchase_account · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} />,
   },
   {
     step: 5, slice: 1, tab: "More",
@@ -1530,7 +1525,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_invoice",
     writes: "none [Intuit takes the payment; confirmed payment status returns on the next manual sync]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; payment status was confirmed by sync"]],
-    spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
+    spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. The payment action always uses /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="pay" />,
   },
   {
@@ -1564,11 +1559,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Invoices",
     name: "Paid invoice",
-    job: "A paid invoice has no Pay; status and PDF remain",
+    job: "Review a paid invoice or ask the brewery a question",
     reads: "portal_invoice",
     writes: "none",
     states: DEFAULT_STATES,
-    spec: "QuickBooks sync confirmed payment status, not a settlement date. Pay is gone. Download PDF is the one action.",
+    spec: "QuickBooks sync confirmed payment status, not a settlement date. Pay is gone. Invoice facts and Question this invoice remain; MGR does not offer a PDF download.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoicePaid)} variant="paid" />,
   },
   {
@@ -1855,13 +1850,13 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt" },
-    job: "What posted after a receive, including over, short and what is still owed",
-    reads: "get_purchase_order [ordered less counted per line]",
-    writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
+    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
+    job: "What posted after a receive, including over, short, what is still owed, and its QuickBooks Bill",
+    reads: "get_purchase_order [ordered less counted per line; correction-chain Bill identity and status] · get_qbo_connection [admin only; purchase account] · list_vendors [admin Bill mapping readiness]",
+    writes: "post_receipt_bill [admin only; confirmation; one frozen Bill per receipt correction chain; pending retries query then replay the exact snapshot and provider request ID; definite rejection requires explicit newAttemptReason corrected]",
+    states: [["permission", "warehouse or admin required; only admin can post Bills", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"], ["unmapped", "fix exact vendor and purchase account IDs in Accounting mappings", 1], ["unknown", "retry checks for the Bill first then resends the same snapshot and provider request ID if absent", 1], ["rejected", "fix mappings then explicitly Post corrected Bill", 1], ["posted", "Bill posted, adjust in QuickBooks; payments are QuickBooks-only"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
-    body: <ReceiptView model={receiptPoCountryMalt} />,
+    body: <ReceiptFixture><ReceiptView model={receiptPoCountryMalt} /></ReceiptFixture>,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "Correct receipt",
@@ -2121,7 +2116,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Compliance months",
-    to: { "September 2026": "Period in progress" },
+    to: { "September 2026": "Period in progress", "August 2026": "Filed period needs amendment" },
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
@@ -2141,6 +2136,16 @@ export const SCREENS: Screen[] = [
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
+    to: { "Reattribute loss": "Filed period needs amendment" },
+    job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
+    reads: "list_compliance_reports · get_loss_review",
+    writes: "reattribute_loss",
+    states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
+    spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
   },
   {
     step: 7,
