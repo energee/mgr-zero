@@ -1,9 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "cn"
 import { Progress as ProgressPrimitive } from "radix-ui"
-
-import { cn } from "@/lib/utils"
 
 function Progress({
   className,
@@ -11,11 +10,8 @@ function Progress({
   ...props
 }: React.ComponentProps<typeof ProgressPrimitive.Root>) {
   return (
-    // value also reaches Root, unlike stock shadcn: Radix derives
-    // aria-valuenow and aria-valuetext from it, so a reader hears the amount.
     <ProgressPrimitive.Root
       data-slot="progress"
-      value={value}
       className={cn(
         "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
         className

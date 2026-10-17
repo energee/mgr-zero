@@ -6,7 +6,8 @@
 // here sets heights. Views import shadcn parts from @/components/ui directly.
 // E holds only MGR vocabulary that adds behavior or domain meaning to them:
 // status tones, quantity and volume fields, searchPick, the irr/del button
-// kinds. Never add an E helper that only wraps a single shadcn part.
+// kinds. Never add an E helper that only wraps a single shadcn part, and
+// retire an existing one when its callers are next touched (#909).
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
@@ -66,14 +67,20 @@ const RowMedia = ({ icon, cls }: { icon: IconSvgElement | React.ReactElement; cl
     <span className="relative">{glyph}<Dot cls={cls} className="-top-1 -right-1 absolute" /></span>
   ) : glyph;
 };
-const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
-  <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
-  <span className="text-muted-foreground text-sm leading-normal">{s}</span>
-  {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
-  {/* The bar tops out at full: a tank recorded over capacity (before #488)
-      still says its real bbl in the line above. */}
-  {f != null && <Progress value={Math.min(f, 100)} aria-label="Fill" className="mt-1" />}
-</>);
+/** A vessel tile's text and fill bar. `f` is percent full: the bar says a whole
+ *  percent and stays in the progress range, because a tank recorded outside its
+ *  capacity (before #488) still shows its real bbl in `s`. Stock shadcn Progress
+ *  spends `value` on the bar's width only, so aria-valuenow carries the same
+ *  bounded number to a reader. */
+const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => {
+  const full = f == null ? undefined : Math.round(Math.max(0, Math.min(f, 100)));
+  return (<>
+    <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
+    <span className="text-muted-foreground text-sm leading-normal">{s}</span>
+    {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
+    {full != null && <Progress value={full} aria-valuenow={full} aria-label="Fill" className="mt-1" />}
+  </>);
+};
 
 /** shadcn pins ItemMedia to the title line whenever a row has a description. That
  *  read top-heavy once row icons went to 24px (and always did for a face), so media
@@ -156,9 +163,8 @@ export const E = {
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
   /** No box (#909 §2E): the row's text sits flush with the column's headings
-   *  and fields. A row draws one row and cannot see its neighbour, so the
-   *  hairline between consecutive rows is CSS in app/globals.css, keyed on
-   *  `data-row` on the row's outer element (E.nav's link, when it has one).
+   *  and fields. A row cannot see its neighbour, so the hairline between
+   *  consecutive rows is CSS in app/globals.css, keyed on `data-row`.
    *  foot: fields that belong to this row, drawn inside it on their own
    *  line. A lot code and a best-by are facts about the line being received,
    *  so they sit in it; listing them after the row made the reader match
@@ -490,11 +496,11 @@ export const E = {
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
-   *  and E.btn already do; fixtures leave it out and the explorer resolves the
-   *  label instead. */
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string) => {
+   *  and E.btn already do; `to` names the inventory destination when its label
+   *  is not that screen's name. Fixtures leave both out unless a route is shown. */
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string, to?: string) => {
     const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
-    return href ? <Link href={href} data-row className="relative block">{row}</Link> : row;
+    return href ? <Link href={href} data-to={to} className="block">{row}</Link> : row;
   },
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than

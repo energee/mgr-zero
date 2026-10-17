@@ -230,11 +230,12 @@
 
 /* Unboxed rows (E.row in components/mgr/e.tsx, #909 §2E). A row that follows
    another row draws a hairline 6px above itself, the middle of the page
-   column's 12px gap; a lone row, or the first of a run, draws none. Many lists
-   key each row with a wrapper <div>, so a wrapper holding a row counts as a
-   row, and a row first in its wrapper draws the rule for it. */
-:is([data-row], :has(> [data-row])) + [data-row]::before,
-:is([data-row], :has(> [data-row])) + div > [data-row]:first-child::before {
+   column's 12px gap; a lone row, or the first of a run, draws none. Lists
+   often wrap each row in a keyed element (a <div>, an E.nav link, or a receipt
+   revision's keyed div and link), so those exact row boundaries draw the rule. */
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + [data-row]::before,
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + * > [data-row]:first-child::before,
+:is([data-row], :has(> [data-row]), :has(> a > [data-row])) + * > a > [data-row]:first-child::before {
   content: "";
   position: absolute;
   inset-inline: 0;
