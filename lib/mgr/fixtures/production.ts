@@ -29,17 +29,16 @@ export const cellarMapBrewer: CellarMapViewModel = {
 
 export const batchesBrewer: BatchesSnapshot = {
   title: "Work",
-  subtitle: "brewer default",
   vessels: [
-    { key: "fv1", title: "FV1", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
-    { key: "fv3", title: "FV3", detail: "fermenter · 15 bbl", verb: "Edit", tone: "info" },
+    { key: "fv1", name: "FV1", kind: "fermenter", capacityBbl: 15, active: true },
+    { key: "fv3", name: "FV3", kind: "fermenter", capacityBbl: 15, active: true },
   ],
   planned: [
-    { key: "b0416", title: "B-0416 · Hazy IPA v4", detail: "Fri 9/4 · 15 bbl", verb: "Start", tone: "info" },
+    { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA v4", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null, brewable: true },
   ],
   active: [
-    { key: "b0409", title: "B-0409 · Pils", detail: "FV1 · 12.8 bbl", verb: "Open", tone: "primary", readings: [{ key: "pils-fv1", title: "FV1", detail: "1.9 °P · 68 °F · read 4 h ago" }] },
-    { key: "b0413", title: "B-0413 · Stout", detail: "FV3 · 13.5 bbl", verb: "Open", tone: "primary", warning: true, readings: [{ key: "stout-fv3", title: "FV3", detail: "5.2 °P · 68 °F · reading overdue 31 h" }] },
+    { key: "b0409", batchNo: "B-0409", brand: "Pils", recipe: "Pils v3", plannedOn: "Aug 28, 2026", plannedBbl: 15, vessel: "FV1", brewable: false, readings: [{ key: "pils-fv1", vessel: "FV1", reading: "1.9 °P · 68 °F · Sep 3, 2026, 8:10 AM" }] },
+    { key: "b0413", batchNo: "B-0413", brand: "Stout", recipe: "Stout v2", plannedOn: "Aug 31, 2026", plannedBbl: 15, vessel: "FV3", brewable: false, readings: [{ key: "stout-fv3", vessel: "FV3", reading: "5.2 °P · 68 °F · Sep 2, 2026, 5:00 PM" }] },
   ],
 };
 

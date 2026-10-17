@@ -8,12 +8,13 @@ it("keeps split occupancies and absent readings explicit with exact recording li
     { id: "second", vessel_name: "FV2", latest_reading: null },
   ] };
   const model = batchesFromQuery([batch], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading` });
-  expect(model.active?.[0]).toMatchObject({ verb: "Open", href: "/batches/batch", readings: [
-    { title: "FV1", detail: expect.stringContaining("5.0 °P"), href: "/cellar/first/reading" },
-    { title: "FV2", detail: "No readings yet", href: "/cellar/second/reading" },
+  expect(model.active?.[0]).toMatchObject({ batchNo: "B-0001", brand: "Pils", recipe: null, brewable: false, href: "/batches/batch", readings: [
+    { key: "first", vessel: "FV1", reading: expect.stringContaining("5.0 °P"), href: "/cellar/first/reading" },
+    { key: "second", vessel: "FV2", reading: "No readings yet", href: "/cellar/second/reading" },
   ] });
   expect(batchesFromQuery([batch], []).active?.[0].readings?.[0].href).toBeUndefined();
-  expect(batchesFromQuery([{ ...batch, active_occupancies: [] }], []).active?.[0].detail).toContain("No open occupancy");
+  // No open occupancy is an empty list, not a reading and not a string glued to another fact.
+  expect(batchesFromQuery([{ ...batch, active_occupancies: [] }], []).active?.[0].readings).toEqual([]);
 });
 
 it("preserves an absent temperature instead of printing a synthetic value", () => {
