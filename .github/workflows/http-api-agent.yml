@@ -119,6 +119,9 @@ jobs:
             echo "$screens"
             exit 1
           fi
+          # Parse untrusted prose without app imports, evaluation or includes.
+          # Reject active content before it can reach the App-authenticated job.
+          bunx vitest run --config vitest.mdx.config.mts tests/mdx-safety.test.ts
           git diff --cached --check
           # The work travels to publish as a patch, not as copies of the files.
           # Copies meant publish laid a snapshot of this (older) tree over a
