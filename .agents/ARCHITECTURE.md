@@ -360,6 +360,7 @@ short version of this list.
 - `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
 - `.agents/PROGRESS.md` — dated Done log only. Same rule: state the change in the PR description, the dreaming PR writes it here.
 - `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
+- `.agents/codemaps/` — five short maps (architecture, backend, frontend, data, dependencies) of where things live. Each header names the commit it describes. Nothing regenerates them automatically: rerun Claude Code's `/ecc:update-codemaps` after structural changes. This file stays the owner of every rule; a map that disagrees with it is stale.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.claude/settings.json` — shared Claude Code allowlist: the proof checks and plain `git fetch`, in exact forms. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code (`git fetch --upload-pack`, `vitest --config`).
