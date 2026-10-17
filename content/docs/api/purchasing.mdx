@@ -18,6 +18,18 @@ least one receipt is closed short (`close_purchase_order_short`), which keeps
 the received stock and releases only the unreceived remainder. Each call is
 refused for the other case, and the actor and time are recorded with the reason.
 
+`get_material_requirements` returns one row per material. `required` includes
+firm demand and projected packaging; `projected` is the projected part in the
+material's base units. Order projection nets finished goods, open run outputs
+and projected batch packages against open order allocations. Standing
+allocations hold stock but never project alone. Order `needed_by` is the
+earliest open requested ship date, falling back to today. Batch projection
+uses each active SKU's default volume share and the brewery's days-to-package
+estimate. A non-cancelled run linked directly or through its source occupancy
+replaces the entire batch projection, even after the run closes. An unlinked
+tankless run cannot replace a particular batch. Projected shortfalls draft
+with the same vendor, lead-time and whole-purchase-unit rules as firm demand.
+
 `set_qbo_vendor_mapping` accepts the vendor's exact QuickBooks ID and
 `set_qbo_purchase_account` sets one expense or inventory asset account for all
 materials. Both require Admin and a connected company. A different company
@@ -184,7 +196,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft
+Material gaps for Planning: required including projected order and batch packaging demand, projected portion, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and resolved vendor and contract; a null vendor or an out-of-reach buy-by cannot draft
 
 | Field | Type | Required |
 | --- | --- | --- |

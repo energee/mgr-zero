@@ -14,7 +14,7 @@ import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
 import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
 
-type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null };
+type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null; batch_share: number | string | null };
 type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
 type Format = { package_type: string | null; id: string; name: string; bbl_per_unit: string | null; effective_bbl_per_unit: string | number | null };
 
