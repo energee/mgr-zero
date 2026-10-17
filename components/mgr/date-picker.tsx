@@ -26,7 +26,8 @@ function formatISODate(date: Date) {
   return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
 }
 
-export function DatePicker({ label, defaultValue = "", value, onChange, disabled, required, name }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean; name?: string }) {
+/** `aria-describedby` names the help text the caller composes beside the field. */
+export function DatePicker({ label, defaultValue = "", value, onChange, disabled, required, name, "aria-describedby": describedBy }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean; name?: string; "aria-describedby"?: string }) {
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
   const controlled = value !== undefined;
   const date = controlled ? parseISODate(value) : internalDate;
@@ -53,6 +54,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
             disabled={disabled}
             id={triggerId}
             aria-labelledby={`${labelId} ${triggerId}`}
+            aria-describedby={describedBy}
             variant="outline"
             className="w-full min-w-0 shrink justify-start text-left font-normal"
           >

@@ -134,7 +134,7 @@ describe("QuickBooks current invoice state", () => {
     const read = await new QboOAuthClient(config, transport).readInvoice("realm", "credit", "access", new Map(), "CreditMemo");
     if (!read.ok) throw new Error("unexpected provider failure");
     expect(read.balanceCents).toBeNull();
-    expect(qboInvoicePresentation({ kind: "credit_memo", role: "sales", connected: true, syncStatus: "pushed",
+    expect(qboInvoicePresentation({ kind: "credit_memo", roles: ["sales"], connected: true, syncStatus: "pushed",
       remoteState: "live", totalCents: read.totalCents, balanceCents: read.balanceCents, cashCollectedCents: read.cashCollectedCents }))
       .toEqual({ detail: "pushed to QuickBooks", actions: [] });
   });
@@ -482,7 +482,7 @@ describe("QuickBooks current invoice state", () => {
     const customerUser = await makeCustomerUser(f.customer.customerId);
     const portalCtx = {
       db: await asUser(customerUser.email), userId: customerUser.id, breweryId: f.brewery.id,
-      role: "customer" as const, customerId: f.customer.customerId,
+      roles: ["customer" as const], customerId: f.customer.customerId,
     };
     const portalDetail = await runCommand("portal_invoice", { invoiceId: f.invoice.id }, portalCtx) as Parameters<typeof toPortalInvoiceViewProps>[0];
     const { rows: portalList } = await runCommand("portal_invoices", {}, portalCtx) as { rows: Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"] };

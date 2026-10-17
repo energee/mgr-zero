@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: "sales" }) }));
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: "sales" }) }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"], timeZone: "America/Los_Angeles" }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
 vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
@@ -29,7 +29,7 @@ describe("Orders list view loop", () => {
     ["admin", ["Finish", "Confirm", "Pick", "Ship", "Put back", "Open", "Open"]],
   ])("offers only authorized actions for %s", (role, verbs) => {
     const states = ["draft", "submitted", "confirmed", "picked", "picked", "shipped", "cancelled"] as const;
-    const rows = toOrdersListViewProps({ role, orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
+    const rows = toOrdersListViewProps({ roles: [role], orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
     expect(rows.map(r => r.verb)).toEqual(verbs);
     for (const [i, row] of rows.entries()) {
       expect(row.href).toBe(`/orders/${i}${row.verb === "Confirm" ? "/confirm" : row.verb === "Put back" ? "/restock" : ""}`);
@@ -38,7 +38,7 @@ describe("Orders list view loop", () => {
 
   it("maps list_orders-shaped rows through nextAction", () => {
     const model = toOrdersListViewProps(ordersWorkList);
-    expect(model.subtitle).toBe("sales default");
+    expect(renderToStaticMarkup(createElement(OrdersView, { model }))).not.toContain("sales default");
     expect(model.rows.map((r) => r.verb)).toEqual(["Confirm", "Open", "Open", "Finish"]);
     expect(model.rows[0]?.title).toMatch(/^ORD-0231 ·/);
     expect(model.rows[1]?.warning).toBe(true);
@@ -46,14 +46,14 @@ describe("Orders list view loop", () => {
   });
 
   it("names an empty filtered list without inventing rows", () => {
-    const model = toOrdersListViewProps({ role: "sales", status: "shipped", orders: [] });
+    const model = toOrdersListViewProps({ roles: ["sales"], status: "shipped", orders: [] });
     expect(model.empty?.title).toBe("No shipped orders");
     expect(model.rows).toEqual([]);
   });
 
   it("names the customer filter in the empty state (#768)", () => {
-    expect(toOrdersListViewProps({ role: "sales", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No orders for Ridgeline Tap Room");
-    expect(toOrdersListViewProps({ role: "sales", status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
+    expect(toOrdersListViewProps({ roles: ["sales"], customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No orders for Ridgeline Tap Room");
+    expect(toOrdersListViewProps({ roles: ["sales"], status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
   });
 
   it("labels the customer filter with the customer's name even when no order matches (#768)", async () => {
@@ -89,6 +89,7 @@ describe("Orders list view loop", () => {
     expect(list.props.model).toEqual(toOrdersListViewProps(ordersWorkList));
     expect(renderToStaticMarkup(list.props.createAction)).toContain('href="/orders/new"');
     expect(list.props.feedback.type).toBe(QueryFeedback);
+    expect(list.props.feedback.props.timeZone).toBe("America/Los_Angeles");
     const inventory = screen("Orders").body as typeof list;
     expect(inventory.props.feedback.type).toBe(QueryFeedback);
   });

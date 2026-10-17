@@ -36,7 +36,7 @@ describe("Recipe creation", () => {
     expect(body.props.parentForm.type).toBe(NewRecipeFieldsView);
     expect(screen("New recipe")).toBeUndefined();
     expect(SCREEN_ROUTES.find((r) => r.name === "New recipe")).toBeUndefined();
-    expect(resolveTap(screen("Recipes"), "Create recipe")).toBe("Recipe");
+    expect(resolveTap(screen("Recipes"), "New recipe")).toBe("Recipe");
   });
 
   it("bounds the process numbers as create_recipe_version does, so the browser refuses them first (#447)", () => {
@@ -194,13 +194,10 @@ describe("Recipe creation", () => {
     // Stages come from the view-model module, not the command registry.
     expect(src("components/mgr/views/ingredient.tsx")).not.toMatch(/lib\/commands/);
     expect(sheets).not.toMatch(/from "@\/lib\/commands\/production"/);
-    // Leftovers from earlier iterations are gone: the explorer cancels every inert tap the same way, and Create recipe still walks to Recipe.
     expect(src("components/mgr/screen-explorer.tsx")).not.toMatch(/dialog-trigger|sheet-trigger/);
-    expect(src("lib/mgr/screen-links.ts")).toMatch(/\["Create recipe", "Recipe"\]/);
     expect(screen("Ingredient").body).toBeTruthy();
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
-    expect(src("app/(app)/recipes/page.tsx")).toMatch(/E\.btn\("Create recipe", "p", "\/recipes\/new"\)/);
     expect(src("components/mgr/views/new-recipe.tsx")).not.toMatch(/use-command-form|fixtures|<CommandForm\b/);
   });
 });

@@ -124,7 +124,7 @@ export const orderTransferComplete: CompleteTransferSnapshot = {
 
 /** Work → Orders list: the four next-action rows the inventory draws. */
 export const ordersWorkList: OrdersListSnapshot = {
-  role: "sales",
+  roles: ["sales"],
   orders: [
     {
       id: ORDER_231,

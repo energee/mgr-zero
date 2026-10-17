@@ -29,11 +29,11 @@ describe("get_* commands with an unknown or malformed id", () => {
 });
 
 describe("portal_order with an unknown or malformed id (review on #144)", () => {
-  let cust: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
+  let cust: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; roles: ["customer"]; customerId: string };
   beforeAll(async () => {
     const { customerId } = await seedCustomer(ctx.breweryId);
     const user = await makeCustomerUser(customerId);
-    cust = { db: await asUser(user.email), userId: user.id, breweryId: ctx.breweryId, role: "customer", customerId };
+    cust = { db: await asUser(user.email), userId: user.id, breweryId: ctx.breweryId, roles: ["customer"], customerId };
   });
   it("unknown uuid → 404 not_found", async () => {
     await expect(runCommand("portal_order", { orderId: NIL }, cust)).rejects.toMatchObject({ status: 404, code: "not_found" });

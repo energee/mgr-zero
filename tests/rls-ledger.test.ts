@@ -78,7 +78,7 @@ describe("stock helpers resolve staff membership once per query", () => {
   it("applies each membership's own role and the request brewery scope", async () => {
     const [a, b] = [await makeBrewery(), await makeBrewery()];
     const user = await makeStaff(a.id, "taproom");
-    await admin.from("brewery_users").insert({ brewery_id: b.id, user_id: user.id, role: "brewer" });
+    await admin.from("brewery_users").insert({ brewery_id: b.id, user_id: user.id, roles: ["brewer"] });
     const stock = async (breweryId: string) => {
       const { skuId } = await seedCatalog(breweryId);
       const wh = await seedLocation(breweryId, { name: "WH" });

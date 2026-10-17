@@ -14,8 +14,9 @@ const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
   it("keeps batch history and exact occupancy reading destinations distinct", () => {
-    expect(resolveTap(by("Batches"), "Open")).toBe("Brew day");
-    expect(resolveTap(by("Batches"), "B-0409 · Pils")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "B-0409")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "FV1")).toBe("Vessel detail");
     expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");
   });
   it("opens the live invitation sheet and import route", () => {
@@ -123,10 +124,10 @@ describe("reported explorer flows", () => {
   it("keeps every portal screen accessible to every demo persona", () => {
     for (const screen of SCREENS.filter(s => s.portal)) {
       expect(needsFor(screen.name)).toEqual([]);
-      for (const persona of PERSONAS) expect(deniedFor(persona.role, screen.name)).toBe(false);
+      for (const persona of PERSONAS) expect(deniedFor(persona.roles, screen.name)).toBe(false);
     }
     for (const screen of ["Settings", "Accounting", "Point of sale", "Chat settings", "Chat disconnected"])
-      for (const role of ["sales", "warehouse"] as const) expect(deniedFor(role, screen), screen).toBe(true);
+      for (const role of ["sales", "warehouse"] as const) expect(deniedFor([role], screen), screen).toBe(true);
   });
 
   it("keeps deep-linked sheets over their owning pages", () => {

@@ -52,11 +52,11 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
+  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
@@ -122,9 +122,10 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_brewery_operating_defaults", description: "Change only the brewery fermentation reading cadence, in hours",
-  input: z.object({ readingDueHours }), roles: ["admin"],
+  name: "set_brewery_operating_defaults", description: "Change the brewery fermentation reading cadence in hours and optionally its days-to-package estimate for projected batch packaging demand",
+  input: z.object({ readingDueHours, daysToPackage: z.number().int().min(1).max(120).optional().describe("Days from brewing (or the planned brew date) to projected packaging; omit to keep the current value") }), roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_operating_defaults", {
     p_brewery: ctx.breweryId, p_reading_due_hours: i.readingDueHours, p_request_id: execution.requestId,
+    p_days_to_package: i.daysToPackage,
   })),
 });

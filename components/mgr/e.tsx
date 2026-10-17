@@ -3,7 +3,11 @@
 // deleted in #133 once ported) but styled as shadcn defaults: quiet surfaces, one accent,
 // color only where it carries meaning (a status dot, not a filled row).
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
-// here sets heights. Screen authors use only these and never components/ui.
+// here sets heights. Views import shadcn parts from @/components/ui directly.
+// E holds only MGR vocabulary that adds behavior or domain meaning to them:
+// status tones, quantity and volume fields, searchPick, the irr/del button
+// kinds. Never add an E helper that only wraps a single shadcn part, and
+// retire an existing one when its callers are next touched (#909).
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
@@ -21,6 +25,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -62,12 +67,20 @@ const RowMedia = ({ icon, cls }: { icon: IconSvgElement | React.ReactElement; cl
     <span className="relative">{glyph}<Dot cls={cls} className="-top-1 -right-1 absolute" /></span>
   ) : glyph;
 };
-const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
-  <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
-  <span className="text-muted-foreground text-sm leading-normal">{s}</span>
-  {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
-  {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
-</>);
+/** A vessel tile's text and fill bar. `f` is percent full: the bar says a whole
+ *  percent and stays in the progress range, because a tank recorded outside its
+ *  capacity (before #488) still shows its real bbl in `s`. Stock shadcn Progress
+ *  spends `value` on the bar's width only, so aria-valuenow carries the same
+ *  bounded number to a reader. */
+const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => {
+  const full = f == null ? undefined : Math.round(Math.max(0, Math.min(f, 100)));
+  return (<>
+    <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
+    <span className="text-muted-foreground text-sm leading-normal">{s}</span>
+    {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
+    {full != null && <Progress value={full} aria-valuenow={full} aria-label="Fill" className="mt-1" />}
+  </>);
+};
 
 /** shadcn pins ItemMedia to the title line whenever a row has a description. That
  *  read top-heavy once row icons went to 24px (and always did for a face), so media
@@ -149,13 +162,18 @@ export const E = {
   ttl: (t: React.ReactNode, id?: string) => <h2 id={id} className={cn("mt-2 text-sm font-medium text-muted-foreground", id && "scroll-m-20")}>{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
-  /** foot: fields that belong to this row, drawn inside its card on their own
+  /** No box (#909 §2E): the row's text sits flush with the column's headings
+   *  and fields. A row cannot see its neighbour, so the hairline between
+   *  consecutive rows is CSS in app/globals.css, keyed on `data-row`.
+   *  foot: fields that belong to this row, drawn inside it on their own
    *  line. A lot code and a best-by are facts about the line being received,
-   *  so they sit in it; listing them under the card made the reader match
+   *  so they sit in it; listing them after the row made the reader match
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
-   *  takes a full line without any layout of its own. */
+   *  takes a full line without any layout of its own. It draws no rule of
+   *  its own: one would read as the hairline between rows and cut the line's
+   *  fields away from it. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
+    <Item data-row data-gated={cls === "dis" || undefined} className={cn("relative rounded-none border-0 px-0", cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -166,7 +184,7 @@ export const E = {
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
-      {foot ? <ItemFooter className="mt-3 flex-col items-stretch gap-2 border-t pt-3">{foot}</ItemFooter> : null}
+      {foot ? <ItemFooter className="flex-col items-stretch gap-2">{foot}</ItemFooter> : null}
     </Item>
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status.
@@ -191,14 +209,15 @@ export const E = {
     );
   },
   /** An on/off setting. */
-  sw: (on: boolean, label: string, onChange?: (checked: boolean) => void) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} />,
+  sw: (on: boolean, label: string, onChange?: (checked: boolean) => void, disabled = false) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} disabled={disabled} />,
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void) => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean }) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
+        {...attributes}
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
         type={onClick ? "button" : undefined}
@@ -305,7 +324,7 @@ export const E = {
    *  (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     const { onChange, hideLabel, contextualLabels, ...attributes } = controls ?? {};
-    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} />;
+    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={controls?.["aria-describedby"]} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
@@ -346,11 +365,11 @@ export const E = {
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** Several picked values at once: a location is often a taproom and storage
    *  and a warehouse, so the control has to admit more than one answer. */
-  picks: (label: string, values: string[], options: string[]) => (
-    <Field>
+  picks: (label: string, values: string[], options: (string | { value: string; label: string })[], controls?: { onChange?: (values: string[]) => void; disabled?: boolean; "aria-invalid"?: boolean }) => (
+    <Field data-disabled={controls?.disabled} data-invalid={controls?.["aria-invalid"]}>
       <FieldLabel>{label}</FieldLabel>
-      <ToggleGroup type="multiple" defaultValue={values} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
-        {options.map((o) => <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem>)}
+      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-invalid={controls?.["aria-invalid"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
+        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value}>{o.label}</ToggleGroupItem>)}
       </ToggleGroup>
     </Field>
   ),
@@ -478,18 +497,18 @@ export const E = {
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
-   *  and E.btn already do; fixtures leave it out and the explorer resolves the
-   *  label instead. */
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string) => {
+   *  and E.btn already do; `to` names the inventory destination when its label
+   *  is not that screen's name. Fixtures leave both out unless a route is shown. */
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string, to?: string) => {
     const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
-    return href ? <Link href={href} className="block">{row}</Link> : row;
+    return href ? <Link href={href} data-to={to} className="block">{row}</Link> : row;
   },
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (role: StaffRole = "admin", container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
+  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!roles.length} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
 };
 
 function isPin(n: ReactNode) {

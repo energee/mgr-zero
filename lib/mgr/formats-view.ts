@@ -6,7 +6,9 @@ import { effectiveBbl } from "./format-view";
 
 export type FormatsRowView = {
   key: string;
+  /** Format, Basis, Volume, From; the format's name is the row's link. */
   cells: string[];
+  /** Where the name links; live only (formatHref). */
   href?: string;
 };
 

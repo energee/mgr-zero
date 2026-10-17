@@ -10,19 +10,20 @@ import type { StaffRole } from "@/lib/commands/registry";
 import { STAFF_NAV } from "@/lib/mgr/nav";
 import { ROUTES } from "@/lib/mgr/screen-links";
 import { haystack, screenByName } from "@/lib/mgr/screen-explorer";
+import { hasAnyRole } from "./roles";
 
-export type Persona = { role: StaffRole; name: string; handle: string; avatar?: string };
+export type Persona = { id: StaffRole; roles: StaffRole[]; name: string; handle: string; avatar?: string };
 
 // The people on the Team screen (components/mgr/screens.tsx), one per role,
 // with the faces in public/mock; tests/screen-persona.test.ts holds them to it.
 export const PERSONAS: Persona[] = [
-  { role: "admin", name: "Maria Alvarez", handle: "@maria", avatar: MARIA },
-  { role: "sales", name: "Ted", handle: "@ted", avatar: "/mock/ted.jpg" },
-  { role: "warehouse", name: "Sam Ortiz", handle: "@sam", avatar: "/mock/sam.jpg" },
-  { role: "brewer", name: "Dave Chen", handle: "@dave", avatar: "/mock/dave.jpg" },
+  { id: "admin", roles: ["admin"], name: "Maria Alvarez", handle: "@maria", avatar: MARIA },
+  { id: "sales", roles: ["sales"], name: "Ted", handle: "@ted", avatar: "/mock/ted.jpg" },
+  { id: "warehouse", roles: ["warehouse"], name: "Sam Ortiz", handle: "@sam", avatar: "/mock/sam.jpg" },
+  { id: "brewer", roles: ["brewer"], name: "Dave Chen", handle: "@dave", avatar: "/mock/dave.jpg" },
 ];
 
-export const personaFor = (role: StaffRole) => PERSONAS.find((p) => p.role === role) ?? PERSONAS[0];
+export const personaFor = (id: StaffRole) => PERSONAS.find((p) => p.id === id) ?? PERSONAS[0];
 
 /** The customer the portal frames are signed in as: the buyer at the account
  * the staff screens ship to. One person, no roles — the portal has none. */
@@ -68,9 +69,9 @@ export function needsFor(screen: string): StaffRole[] {
 /** True when `role` may not open `screen`: it needs roles and `role` is not
  * among them. A screen that needs nobody (a portal page, one with no route and
  * no permission state) is reached through its parent, which was already checked. */
-export function deniedFor(role: StaffRole, screen: string): boolean {
+export function deniedFor(roles: readonly StaffRole[], screen: string): boolean {
   const needs = needsFor(screen);
-  return needs.length > 0 && !needs.includes(role);
+  return needs.length > 0 && !hasAnyRole(roles, needs);
 }
 
 /** The sleuth: MGR screens whose record says the content depends on the

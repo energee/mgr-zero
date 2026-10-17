@@ -131,8 +131,8 @@ describe("complete finished-goods reads", () => {
       .toEqual({ binRows: 1_502, atpRows: 1_001, assembled: 1_001 });
     expect(binRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
     expect(atpRows.every((row) => row.brewery_id === brewery.id && row.sku_id !== foreignSku.skuId)).toBe(true);
-    expect(model.rows.find((row) => row.title.endsWith("Cap target"))?.detail)
-      .toBe("508 on hand · 3 allocated · ATP 505");
+    expect(model.rows.find((row) => row.name.endsWith("Cap target")))
+      .toMatchObject({ onHand: "508", allocated: "3", atp: "505" });
 
     const customer = await seedCustomer(brewery.id);
     await priceSku(brewery.id, {
@@ -185,7 +185,7 @@ describe("complete finished-goods reads", () => {
       } },
     });
     expect((await db.auth.signInWithPassword({ email: staff.email, password: "test-password-1" })).error).toBeNull();
-    await expect(runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, role: "admin" }))
+    await expect(runCommand("get_atp", {}, { db, userId: staff.id, breweryId: brewery.id, roles: ["admin"] }))
       .rejects.toMatchObject({ status: 409, code: "conflict", message: expect.stringMatching(/changed while loading/i) });
     expect(churned).toBe(true);
   }, 30_000);

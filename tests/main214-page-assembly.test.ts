@@ -6,9 +6,9 @@ import { BreweryProvider } from "@/lib/brewery-provider";
 // tests render the page subtree on its own, so they supply it here.
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
-const state = vi.hoisted(() => ({ role: "admin", calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown> }));
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: state.role }) }));
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }), isUuid: () => true }));
+const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown> }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles }) }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: state.roles }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
@@ -50,7 +50,7 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { CustomerDetailForm } from "@/app/(app)/customers/customer-detail-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
-beforeEach(() => { state.role = "admin"; state.calls = []; });
+beforeEach(() => { state.roles = ["admin"]; state.calls = []; });
 it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
   expect(page.type).toBe(CatalogView);
@@ -66,13 +66,13 @@ it("assembles the shared SKU list with the brand's packages and both SKU sheets"
   expect(page.type).toBe(SkuListView);
   const html = render(page);
   for (const text of ["Hazy · SKUs", "Half keg", "inactive", "New SKU", "Edit SKU"]) expect(html).toContain(text);
-  state.role = "warehouse";
+  state.roles = ["warehouse"];
   const readonly = render(await SkuListPage({ params: Promise.resolve({ id: "brand" }) }));
   expect(readonly).not.toMatch(/New SKU|Edit SKU|Add SKU/);
   expect(readonly).toContain("Half keg");
 });
 it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied controls for %s", async role => {
-  state.role = role;
+  state.roles = [role];
   const catalog = await CatalogPage();
   const customers = await CustomersPage();
   expect(catalog.type).toBe(CatalogView);
@@ -90,7 +90,7 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
   for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
-  state.role = "warehouse"; state.calls = [];
+  state.roles = ["warehouse"]; state.calls = [];
   const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(state.calls).not.toContain("list_customer_users");
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
@@ -101,7 +101,7 @@ it("bins shared view retains actual stock move inputs and suppresses Warehouse-o
   expect(page.type).toBe(LocationBinsView);
   expect(page.props.footer.props.stock).toEqual([{ skuId: "sku", qty: 4 }]);
   expect(page.props.footer.props.bins[0].id).toBe("bin");
-  state.role = "sales"; state.calls = [];
+  state.roles = ["sales"]; state.calls = [];
   const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
   expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);

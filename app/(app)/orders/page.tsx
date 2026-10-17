@@ -13,5 +13,5 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // The filter names its customer even when no order matches, so the name
   // comes from get_customer rather than the first listed row.
   const customer = params.customerId ? await optionalPageQuery<{ customer: { name: string } }>("get_customer", { customerId: params.customerId }, ctx) : undefined;
-  return <OrdersClient role={brewery.role} status={params.status} customerId={params.customerId} customerName={customer?.customer.name} cursor={pageCursor(params.cursor)} />;
+  return <OrdersClient roles={brewery.roles} timeZone={brewery.timeZone} status={params.status} customerId={params.customerId} customerName={customer?.customer.name} cursor={pageCursor(params.cursor)} />;
 }

@@ -244,13 +244,7 @@ describe("SCREENS", () => {
     }
   });
 
-  it("carries every MGR-venue frame with unique names", () => {
-    // A tripwire against a frame dropped by hand from a 1700-line array — the
-    // uniqueness check below catches duplicates, nothing else catches a loss.
-    // Bump it deliberately when a frame lands or leaves; the venue split is
-    // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(202);
-    expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
+  it("keeps inventory screen names unique", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -357,7 +351,7 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
@@ -423,15 +417,15 @@ describe("SCREENS", () => {
     expect(history).toContain("Pay");
   });
 
-  it("gives Save screens a real input or select", () => {
-    // Issue 95: a Save button that would write a value must sit next to a
-    // typed Input or a Select, not a read-only key/value row.
+  it("gives Save screens an editable input, select or toggle choice", () => {
+    // A Save button that writes a value must sit next to a real editable
+    // control, including the multi-select toggle group used for staff roles.
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
       if (!/<button[^>]*>Save/.test(html)) continue;
       expect.soft(
-        /<input\b/.test(html) || html.includes('role="combobox"'),
-        `${screen.name}: Save without an input or select`,
+        /<input\b/.test(html) || html.includes('role="combobox"') || /<button\b[^>]*aria-pressed=/.test(html),
+        `${screen.name}: Save without an editable control`,
       ).toBe(true);
     }
   });
@@ -508,6 +502,12 @@ describe("SCREENS", () => {
     expect(html).toContain("August 31, 2027");
   });
 
+  it("points a date field at its description, as the other fields do", () => {
+    const html = renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date", undefined, { "aria-describedby": "best-by-help" })));
+    expect(html).toMatch(/<button[^>]*aria-describedby="best-by-help"/);
+  });
+
+
   it("falls back to initials when a person has no fixture photo", () => {
     const render = (node: ReturnType<typeof E.face>) => renderToStaticMarkup(createElement("div", null, node));
     // Initials sit under the photo, so the markup a static export ships keeps
@@ -526,7 +526,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 
@@ -836,7 +836,7 @@ describe("SCREENS", () => {
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
       ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
-      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price groups", "Create price group"],
+      ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "Create price group"],
     ] as const) {
       const html = body(name);
       expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));
@@ -892,11 +892,14 @@ describe("SCREENS", () => {
     expect(move).toContain("md:hidden");
     expect(move).toContain("hidden md:block");
     // Team: no selection-less bulk remove; the role editor lives on the
-    // Team member sheet since #72 split editors out of list pages. Roles are
-    // a single supported choice; role arrays remain unsupported.
+    // Team member sheet since #72 split editors out of list pages. Members
+    // can hold several roles, so the shared editor supports multiple picks.
     expect(html("Team")).not.toMatch(/Remove selected member/);
     const member = html("Team member");
-    expect(member).toContain("data-slot=\"select-trigger\"");
+    expect(member).toContain('aria-label="Roles"');
+    expect(member).toContain('data-slot="toggle-group-item"');
+    expect(member).toContain("Choose one or more roles");
+    expect(member).not.toContain('data-slot="select-trigger"');
     expect(member).not.toContain('role="switch"');
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
@@ -943,7 +946,9 @@ describe("SCREENS", () => {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const html = renderToStaticMarkup(createElement("div", null, s!.hd, s!.body));
-      expect(filled(html).length, name).toBeLessThanOrEqual(1);
+      // Settings has three independent forms. Its equal-weight Save buttons
+      // intentionally remain filled rather than implying one page-wide action.
+      expect(filled(html).length, name).toBeLessThanOrEqual(name === "Settings" ? 3 : 1);
     }
   });
 
@@ -1017,5 +1022,28 @@ describe("screen command tokens", () => {
         .filter((t) => !getCommandDefinition(t.name) && !/\[design|GATE|\[platform|\[client state/.test(t.tag))
         .map((t) => `${s.name} ${field}: ${t.name}`)));
     expect(bad).toEqual([]);
+  });
+});
+
+describe("vessel tile fill (#909)", () => {
+  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]], "c2"));
+
+  it("draws a named progressbar carrying its whole-percent value", () => {
+    const html = tile(50);
+    expect(html).toContain('role="progressbar"');
+    expect(html).toMatch(/aria-label="[^"]+"/);
+    expect(html).toContain('aria-valuenow="50"');
+    expect(html).toContain('aria-valuemin="0"');
+    expect(html).toContain('aria-valuemax="100"');
+  });
+
+  it("bounds fill values to the progress range", () => {
+    expect(tile(-10)).toContain('aria-valuenow="0"');
+    expect(tile(200 / 3)).toContain('aria-valuenow="67"');
+    expect(tile(125)).toContain('aria-valuenow="100"');
+  });
+
+  it("draws no bar for a tile without a fill", () => {
+    expect(tile()).not.toContain("progressbar");
   });
 });

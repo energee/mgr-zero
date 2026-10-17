@@ -18,25 +18,27 @@ import { switchBrewery } from "@/app/(auth)/actions";
 import { Composer } from "@/components/mgr/composer";
 import { CommandQueryProvider } from "@/components/mgr/query-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { onlyRoles } from "@/lib/mgr/roles";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
+  const roleScope = brewery.roles.toSorted().join(",");
   return (
-    <SearchCacheProvider key={`${identity?.userId}:${brewery.id}:${brewery.role}`}>
+    <SearchCacheProvider key={`${identity?.userId}:${brewery.id}:${roleScope}`}>
       <BreweryProvider id={brewery.id} actorId={identity!.userId}>
-        <CommandQueryProvider key={`${identity!.userId}:${brewery.id}:${brewery.role}`} scope={{ actorId: identity!.userId, breweryId: brewery.id, role: brewery.role }}>
+        <CommandQueryProvider key={`${identity!.userId}:${brewery.id}:${roleScope}`} scope={{ actorId: identity!.userId, breweryId: brewery.id, roles: brewery.roles }}>
         <AppShell
           brand={brewery.name}
-          items={navFor(shippedNav(STAFF_NAV), brewery.role)}
+          items={navFor(shippedNav(STAFF_NAV), brewery.roles)}
           sidebarOpen={sidebarOpen}
-          composer={<Composer key={`${identity!.userId}:${brewery.id}:${brewery.role}`} role={brewery.role} />}
+          composer={<Composer key={`${identity!.userId}:${brewery.id}:${roleScope}`} roles={brewery.roles} />}
           headerRight={
             <>
-              {brewery.role !== "taproom" && <SearchSheet role={brewery.role} />}
+              {!onlyRoles(brewery.roles, ["taproom"]) && <SearchSheet roles={brewery.roles} />}
               <MeSheet>
                 <MeView
                   model={{
-                    role: brewery.role,
+                    roles: brewery.roles,
                     email: identity?.email ?? "",
                     breweries: memberships.map((m) => ({ id: m.breweryId, name: m.breweryName, current: m.breweryId === brewery.id })),
                   }}

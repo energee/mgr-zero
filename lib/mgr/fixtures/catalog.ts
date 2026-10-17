@@ -73,6 +73,8 @@ export const catalogBrands: CatalogSnapshot = {
     {
       id: BRAND_STOUT,
       name: STOUT,
+      // A staff-only alias, so the frame shows the line under the name.
+      alias: "Winter #2",
       abv: 7.2,
       styles: { name: "Stout" },
       skus: [{ id: SKU_STOUT.sku_id }],
@@ -120,6 +122,7 @@ export const skuHazyHalf: SkuSnapshot = {
     upc: "00810123450127",
     active: true,
     format_id: FMT_HALF,
+    batch_share: 0.25,
     formats: { name: "½ bbl keg", package_type: "keg" },
   },
   formats: packagedFormats,

@@ -13,7 +13,7 @@ describe('pours in the sellable SKU catalog', () => {
   it('counts pours without adding another brand row', () => {
     const view = toCatalogViewProps({ brands: [{ id:'brand', name:'Lupula', abv:7, styles:null, skus:[{id:'case'}], pours:[pour] }], priceGroups:[] });
     expect(view.brands).toHaveLength(1);
-    expect(view.brands[0].detail).toContain('2 SKUs');
+    expect(view.brands[0].skus).toBe('2');
   });
 });
 

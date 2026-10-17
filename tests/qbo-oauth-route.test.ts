@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const lifecycle = vi.hoisted(() => ({
   claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(), alreadyCompleted: vi.fn(),
 }));
-const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, role: "admin" }));
+const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, roles: ["admin"] }));
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: vi.fn(() => session.breweryCookie ? { value: session.breweryCookie } : undefined) })),
 }));
 
 vi.mock("@/lib/brewery", () => ({
-  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture brewery", role: session.role })),
+  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture brewery", roles: session.roles })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -32,7 +32,7 @@ import { GET } from "@/app/api/integrations/qbo/oauth/route";
 describe("QuickBooks OAuth callback route", () => {
   beforeEach(() => {
     session.breweryCookie = "brewery-1";
-    session.role = "admin";
+    session.roles = ["admin"];
     vi.stubEnv("QBO_CLIENT_ID", "client-id");
     vi.stubEnv("QBO_CLIENT_SECRET", "client-secret");
     vi.stubEnv("QBO_REDIRECT_URI", "https://mgr.test/api/integrations/qbo/oauth");
@@ -144,7 +144,7 @@ describe("QuickBooks OAuth callback route", () => {
     ["a non-Admin membership", "brewery-1", "sales"],
   ])("rejects %s before claiming state or fetching QuickBooks", async (_label, cookie, role) => {
     session.breweryCookie = cookie;
-    session.role = role;
+    session.roles = [role];
     const fetch = vi.fn<typeof globalThis.fetch>();
     vi.stubGlobal("fetch", fetch);
 

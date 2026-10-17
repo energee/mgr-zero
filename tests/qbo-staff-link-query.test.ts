@@ -52,7 +52,7 @@ describe("staff invoice link query boundaries", () => {
     const result = await runCommand("get_invoice", { invoiceId: f.invoice.id }, warehouse) as { quickbooksLink: Link };
     expect(result.quickbooksLink).toBeNull();
     const other = await makeBrewery();
-    await ins("brewery_users", { brewery_id: other.id, user_id: f.ctx.userId, role: "admin" });
+    await ins("brewery_users", { brewery_id: other.id, user_id: f.ctx.userId, roles: ["admin"] });
     await expect(runCommand("get_invoice", { invoiceId: f.invoice.id }, { ...f.ctx, breweryId: other.id })).rejects.toThrow();
     const { rows: list } = await runCommand("list_invoices", {}, { ...f.ctx, breweryId: other.id }) as { rows: unknown[] };
     expect(list).toEqual([]);

@@ -37,7 +37,7 @@ it("reschedules and cancels a batch with exact replay, retained history and no d
   const cancelled = await runCommand("cancel_batch", { batchId: batch.id }, ctx, cancelExecution);
   expect(cancelled).toMatchObject({ id: batch.id, cancelled_at: expect.any(String), brewed_on: null });
   expect(await runCommand("cancel_batch", { batchId: batch.id }, ctx, cancelExecution)).toEqual(cancelled);
-  const requirements = await admin.from("material_requirements").select("required").eq("brewery_id", ctx.breweryId).eq("material_id", malt);
+  const requirements = await ctx.db.from("material_requirements").select("required").eq("brewery_id", ctx.breweryId).eq("material_id", malt);
   expect(requirements.error).toBeNull();
   expect(requirements.data).toEqual([]);
   const volume = await admin.from("product_volume_requirements").select("supply_bbl").eq("brand_id", catalog.brandId).single();
@@ -72,7 +72,7 @@ it("cancelled runs stop demanding beer and no longer block completion, without d
   expect(volume.data?.demand_bbl).toBe(0);
   const cancelledMaterials = await admin.from("packaging_run_requirements").select("run_id").eq("run_id", run.id);
   expect(cancelledMaterials.error).toBeNull(); expect(cancelledMaterials.data).toEqual([]);
-  const aggregate = await admin.from("material_requirements").select("required").eq("brewery_id", ctx.breweryId).eq("material_id", packagingMaterial);
+  const aggregate = await ctx.db.from("material_requirements").select("required").eq("brewery_id", ctx.breweryId).eq("material_id", packagingMaterial);
   expect(aggregate.error).toBeNull(); expect(aggregate.data).toEqual([]);
   const detail = await runCommand("get_packaging_run", { runId: run.id }, ctx) as { outputs: unknown[] };
   expect(detail.outputs).toHaveLength(1);

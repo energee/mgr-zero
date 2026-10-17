@@ -39,6 +39,10 @@ removals = ending. Rules that v1 got wrong at least once:
   (`report_filings`).
 - Production into finished goods belongs to the Packaged-on month; packaging cannot
   be dated into a filed month or after today.
+- The first filing locks the ordinary books-opened date. An admin correction
+  records the old/new basis, actor, time and reason permanently, and flags every
+  filed period whose report figures change or whose start the new basis
+  invalidates. Filed snapshots remain unchanged; amended filings happen outside MGR.
 - Zero cells print as `0.00`, never blank.
 - The cellar column is the one identity exemption: beer leaves the cellar by being
   packaged, which is not a removal; its balance is carried on the beer-in-process line.

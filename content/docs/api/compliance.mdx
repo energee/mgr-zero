@@ -33,6 +33,25 @@ no-match. COLAs completed more than 15 years ago are not found.
 
 {/* ops:compliance */}
 
+## correct_reporting_basis [#correct_reporting_basis]
+
+`command` · admin
+
+Admin correction after filing: record immutable old/new books-opened basis, actor, time and reason, and flag every affected filed period as needing amendment; original snapshots stay unchanged
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `booksOpenedOn` | date (YYYY-MM-DD) or null | yes |
+| `expectedBooksOpenedOn` | date (YYYY-MM-DD) or null | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "correct_reporting_basis", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "booksOpenedOn": "2026-01-31", "expectedBooksOpenedOn": "2026-01-31", "reason": "string" } }'
+```
+
 ## file_compliance_report [#file_compliance_report]
 
 `command` · admin, sales
@@ -137,6 +156,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_lots", "input": {} }'
+```
+
+## list_reporting_basis_corrections [#list_reporting_basis_corrections]
+
+`query` · admin, sales
+
+Immutable reporting-basis correction history, newest first, including old/new values, actor, time and reason
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_reporting_basis_corrections", "input": {} }'
 ```
 
 ## reattribute_loss [#reattribute_loss]

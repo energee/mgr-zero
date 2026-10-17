@@ -29,7 +29,7 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
       occupancyId={occupancyId}
       identity={readingIdentity(occupancy)}
       unit={gravityUnit.effective}
-      role={brewery.role as "admin" | "brewer"}
+      roles={brewery.roles}
       openByDefault
       returnHref={`/cellar/vessels/${occupancy.vessel_id}`}
       prior={readings[0] ? {
