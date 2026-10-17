@@ -1,32 +1,26 @@
-// components/mgr/views/keg-history.tsx — Keg event history. Live slots filter
-// chips; inventory draws Customer / Keg pool picks.
-import { Fragment, type ReactNode } from "react";
+// components/mgr/views/keg-history.tsx — Keg event history: the keg ledger
+// newest first, scoped by the Keg pool and Customer picks (ScopePick, so the
+// URL holds the scope). Inventory and the live page draw the same controls.
+import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
+import { ScopePick } from "@/components/mgr/scope-pick";
 import type { KegHistoryViewModel } from "@/lib/mgr/keg-history-view";
 
 export type { KegHistoryViewModel };
 
-export function KegHistoryView({
-  model,
-  filters,
-}: {
-  model: KegHistoryViewModel;
-  filters?: ReactNode;
-}) {
+export function KegHistoryView({ model }: { model: KegHistoryViewModel }) {
   return (
     <>
       {E.back("Keg fleet", "Keg event history", undefined, model.backHref)}
-      {filters ?? (
-        <>
-          {E.pick("Customer", model.customer, model.customerOptions)}
-          {E.pick("Keg pool", model.pool, model.poolOptions)}
-        </>
+      {E.cols(
+        <ScopePick label="Keg pool" value={model.pool} options={model.poolOptions} />,
+        <ScopePick label="Customer" value={model.customer} options={model.customerOptions} search />,
       )}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, row.who ?? "", row.warning ? "w" : row.ok ? "ok" : "")}
+            {E.row(row.title, row.detail, "", row.warning ? "w" : row.ok ? "ok" : "")}
           </Fragment>
         ))}
     </>
