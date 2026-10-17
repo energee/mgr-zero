@@ -1,7 +1,7 @@
 <!-- Protocol for timing four core tasks at pilot data volumes (#728); evidence goes to #311. -->
 # Pilot latency protocol
 
-Status: **draft, awaiting owner values**. Owner: Ted. Tracks
+Status: **volumes and limits agreed 2026-10-16; authorization awaiting owner**. Owner: Ted. Tracks
 [#728](https://github.com/energee/mgr-zero/issues/728); evidence belongs to the
 release index [#311](https://github.com/energee/mgr-zero/issues/311).
 
@@ -35,17 +35,18 @@ Authorized by: ____________ Date: ____________ Environment: ____________
 ## Pilot dataset volumes
 
 Proposed defaults assume one small brewery with about a year of history.
-The owner replaces them with the pilot brewery's expected numbers.
+Agreed values (owner, 2026-10-16) are 3× the pilot brewery's expected size:
+about 50 SKUs, 30 customers and 30 orders a week over 2 years (about 3,000 orders).
 
 | Measure | Proposed default | Agreed value | Measured count at run |
 | --- | ---: | ---: | ---: |
-| Active SKUs | 150 | | |
-| Customers | 300 | | |
-| Ship-tos | 400 | | |
-| Orders in history | 5,000 | | |
-| Order lines in history | 25,000 | | |
-| Inventory ledger rows | 50,000 | | |
-| Invoices in history | 5,000 | | |
+| Active SKUs | 150 | 150 | |
+| Customers | 300 | 90 | |
+| Ship-tos | 400 | 120 | |
+| Orders in history | 5,000 | 9,000 | |
+| Order lines in history | 25,000 | 45,000 | |
+| Inventory ledger rows | 50,000 | 90,000 | |
+| Invoices in history | 5,000 | 9,000 | |
 
 A run at volumes well below the agreed values is not evidence for this issue.
 
@@ -64,10 +65,10 @@ Each task starts at the user's action and ends when the result is usable on scre
 
 | Task | Proposed warm limit | Proposed cold limit | Agreed warm limit | Agreed cold limit |
 | --- | ---: | ---: | ---: | ---: |
-| T1 Older-order lookup | 2 s | 4 s | | |
-| T2 Buyer order submission | 3 s | 5 s | | |
-| T3 Staff confirmation | 2 s | 4 s | | |
-| T4 Representative report | 5 s | 10 s | | |
+| T1 Older-order lookup | 2 s | 4 s | 1 s | 3 s |
+| T2 Buyer order submission | 3 s | 5 s | 1 s | 3 s |
+| T3 Staff confirmation | 2 s | 4 s | 1 s | 3 s |
+| T4 Representative report | 5 s | 10 s | 1 s | 3 s |
 
 A task passes when the median of the warm runs is within the agreed warm limit.
 The first cold run (first load after a deploy or an idle period) must be within the agreed cold limit.
