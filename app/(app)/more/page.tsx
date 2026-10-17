@@ -9,7 +9,7 @@ import { toMoreViewProps } from "@/lib/mgr/more-view";
 
 export default async function MorePage() {
   const brewery = await getActiveBrewery();
-  const items = navFor(shippedNav(STAFF_NAV), brewery.role).find((t) => t.label === "More")?.children ?? [];
+  const items = navFor(shippedNav(STAFF_NAV), brewery.roles).find((t) => t.label === "More")?.children ?? [];
   return (
     <MoreView
       model={toMoreViewProps(items.map((c) => ({ key: c.href, title: c.label, detail: c.about ?? "", href: c.href })))}

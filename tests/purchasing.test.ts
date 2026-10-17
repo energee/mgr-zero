@@ -58,7 +58,7 @@ describe("vendors, materials, contracts", () => {
     expect(materials.find((m) => m.id === citra.id)).toMatchObject({ default_vendor_id: ych.id, purchase_uom_factor: 44, lot_tracked: true });
 
     // Pickers read the thin list, not the contract report.
-    expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: ych.id, name: "YCH Hops", active: true, lead_time_days: 10 }]);
+    expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: ych.id, name: "YCH Hops", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
   });
 
   it("a sales user may not edit vendors", async () => {

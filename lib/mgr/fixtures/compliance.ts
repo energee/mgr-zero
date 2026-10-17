@@ -12,7 +12,7 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
   cadence: 0,
   months: [
     { key: "2026-09", title: "September 2026", detail: "in progress · file once the month ends", tone: "w" },
-    { key: "2026-08", title: "August 2026", detail: "filed 2026-09-02 · 41.20 bbl taxable", tone: "ok" },
+    { key: "2026-08", title: "August 2026", detail: "needs amendment · filed 2026-09-02", tone: "w" },
     { key: "2026-07", title: "July 2026", detail: "filed 2026-08-04 · 38.75 bbl taxable", tone: "ok" },
   ],
   registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses" },

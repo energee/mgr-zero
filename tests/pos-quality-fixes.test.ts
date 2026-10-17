@@ -118,11 +118,11 @@ describe("Square quality-review lifecycle fences", () => {
     await failSquareOAuth(intentId, ctx.userId, "pending", connection.merchantId);
     await failSquareOAuth(intentId, ctx.userId, "confirmed", connection.merchantId);
     expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["confirmed"]);
-    expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
       .toBeNull();
     release();
     await expect(pending).resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
-    expect((await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
+    expect((await admin.from("brewery_users").update({ roles: ["admin"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
       .toBeNull();
 
     const nextOauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "reconnect", crypto.randomUUID())).authorizeUrl);

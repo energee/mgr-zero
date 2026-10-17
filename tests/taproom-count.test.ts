@@ -464,7 +464,7 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
   await expect(runCommand("correct_taproom_count", { ...correction, countId: (first as { effective_id: string }).effective_id }, adminCtx)).rejects.toThrow(/original count/);
   expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", root.id)).data).toHaveLength(1);
 
-  expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", f.brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
+  expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", f.brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
   expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
     p_corrections: correction.corrections.map(row => ({ line_id: row.lineId, qty_counted: row.qtyCounted })),
     p_reason: correction.reason, p_request_id: requestId })).error?.code).toBe("42501");

@@ -196,7 +196,7 @@ async function setup() {
   await runCommand("set_portal_fulfillment_source", { locationId: source.id }, adminCtx);
   const buyer = await makeCustomerUser(customer.customerId);
   const db = await asUser(buyer.email);
-  return { brewery, adminCtx, source, catalog, customer, poolId: pool.data!.id as string, ctx: { db, userId: buyer.id, breweryId: brewery.id, role: "customer" as const, customerId: customer.customerId } };
+  return { brewery, adminCtx, source, catalog, customer, poolId: pool.data!.id as string, ctx: { db, userId: buyer.id, breweryId: brewery.id, roles: ["customer" as const], customerId: customer.customerId } };
 }
 
 const quoteInput = (f: Awaited<ReturnType<typeof setup>>) => ({

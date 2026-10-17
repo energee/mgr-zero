@@ -6,13 +6,14 @@ import { commandQueryOptions, createQueryClient, subscribeToCommandChanges, type
 
 const Scope = createContext<QueryScope | null>(null);
 
-/** The layout keys this provider by actor/brewery/role. No cache survives a scope change. */
+/** The layout keys this provider by actor/brewery/roles. No cache survives a scope change. */
 export function CommandQueryProvider({ scope, children }: React.PropsWithChildren<{ scope: QueryScope }>) {
   const [client] = useState(createQueryClient);
+  const rolesKey = scope.roles?.toSorted().join(",");
   useEffect(() => {
     const unsubscribe = subscribeToCommandChanges(client, scope);
     return () => { unsubscribe(); client.clear(); };
-  }, [client, scope.actorId, scope.breweryId, scope.customerId, scope.role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [client, scope.actorId, scope.breweryId, scope.customerId, rolesKey]); // eslint-disable-line react-hooks/exhaustive-deps
   return <Scope.Provider value={scope}><QueryClientProvider client={client}>{children}</QueryClientProvider></Scope.Provider>;
 }
 

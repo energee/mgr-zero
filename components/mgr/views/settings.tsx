@@ -8,6 +8,7 @@ import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
+import { ReportingBasisView } from "@/components/mgr/views/reporting-basis";
 
 export type { SettingsViewModel };
 
@@ -17,6 +18,7 @@ export function SettingsView({
   fulfillmentForm,
   aiModelForm,
   deployment,
+  reportingBasisForm,
   hrefs = {},
 }: {
   model: SettingsViewModel;
@@ -24,6 +26,7 @@ export function SettingsView({
   fulfillmentForm?: ReactNode;
   aiModelForm?: ReactNode;
   deployment?: ReactNode;
+  reportingBasisForm?: ReactNode;
   hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water", string>>;
 }) {
   return (
@@ -34,13 +37,14 @@ export function SettingsView({
         <section aria-labelledby="settings-brewery" className="@container min-w-0 rounded-xl border bg-card p-5 sm:p-6">
           <h2 id="settings-brewery" className="font-heading text-xl font-semibold">Brewery details</h2>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">Identity, compliance details, and daily operating defaults.</p>
-          {breweryForm ?? <BrewerySettingsFormView initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}</section>
+          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}</section>
         <section aria-labelledby="settings-defaults" className="flex min-w-0 flex-col gap-6 rounded-xl border bg-card p-5 sm:p-6">
           <div><h2 id="settings-defaults" className="font-heading text-xl font-semibold">Team defaults</h2><p className="mt-1 text-sm text-muted-foreground">Ask MGR and wholesale portal preferences.</p></div>
           <div>{aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}</div>
           <div className="border-t pt-6">{fulfillmentForm ?? <PortalFulfillmentView locations={model.warehouseOptions} currentId={model.warehouseId} />}</div>
         </section>
       </div>
+      {model.hasFiledReports ? reportingBasisForm ?? <ReportingBasisView basis={model.booksOpenedOn || null} history={model.basisCorrections ?? []} timeZone={model.timezone} /> : null}
       <div className="mt-2 grid gap-8 border-t pt-6 @min-[48rem]:grid-cols-2">
         <section aria-labelledby="settings-people" className="flex min-w-0 flex-col gap-2">
           <h2 id="settings-people" className="mb-2 font-heading text-xl font-semibold">People and places</h2>

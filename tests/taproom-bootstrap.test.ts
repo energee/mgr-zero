@@ -1,7 +1,7 @@
 import { beforeAll, expect, it, vi } from "vitest";
 import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
-import { runCommand, type StaffRole } from "@/lib/commands/registry";
+import { runCommand, type PreTenantCtx, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { issueChatLinkProof } from "@/lib/chat/linking";
 import { ctxForBearer } from "@/lib/commands/context";
@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 it("bootstraps own taproom membership without private brewery columns", async () => {
   const auth = createRequestAuthContext(async () => ctx.db);
-  expect((await auth.getStaffMemberships()).find(m => m.breweryId === ctx.breweryId)).toMatchObject({ role: "taproom", breweryId: ctx.breweryId });
+  expect((await auth.getStaffMemberships()).find(m => m.breweryId === ctx.breweryId)).toMatchObject({ roles: ["taproom"], breweryId: ctx.breweryId });
   expect((await ctx.db.from("breweries").select().eq("id", ctx.breweryId)).data).toEqual([]);
   const projection = await ctx.db.from("staff_brewery").select().eq("id", ctx.breweryId).single();
   expect(projection.error).toBeNull();
@@ -75,20 +75,20 @@ it("selects only verified active own personal destinations and keeps other prefe
 it("preserves cookie and bearer membership across own breweries and rejects a foreign selection", async () => {
   const own = await makeBrewery();
   const foreign = await makeBrewery();
-  await ins("brewery_users", { brewery_id: own.id, user_id: ctx.userId, role: "taproom" });
+  await ins("brewery_users", { brewery_id: own.id, user_id: ctx.userId, roles: ["taproom"] });
   const request = createRequestAuthContext(async () => ctx.db);
-  // A fresh context per call: no memberships loaded, so getStaffRole reads the one
+  // A fresh context per call: no memberships loaded, so getStaffRoles reads the one
   // brewery_users row under RLS. Reusing `request` would test only the cached branch.
   const fresh = () => createRequestAuthContext(async () => ctx.db);
   const memberships = await request.getStaffMemberships();
   for (const breweryId of [ctx.breweryId, own.id]) {
-    expect(memberships.find(m => m.breweryId === breweryId)).toMatchObject({ breweryId, role: "taproom" });
-    expect(await request.getStaffRole(breweryId)).toBe("taproom");
-    expect(await fresh().getStaffRole(breweryId)).toBe("taproom");
-    expect(await ctxForBearer(ctx.db, ctx.userId, breweryId)).toMatchObject({ breweryId, role: "taproom" });
+    expect(memberships.find(m => m.breweryId === breweryId)).toMatchObject({ breweryId, roles: ["taproom"] });
+    expect(await request.getStaffRoles(breweryId)).toEqual(["taproom"]);
+    expect(await fresh().getStaffRoles(breweryId)).toEqual(["taproom"]);
+    expect(await ctxForBearer(ctx.db, ctx.userId, breweryId)).toMatchObject({ breweryId, roles: ["taproom"] });
   }
   expect(memberships.some(m => m.breweryId === foreign.id)).toBe(false);
-  expect(await fresh().getStaffRole(foreign.id)).toBeNull();
+  expect(await fresh().getStaffRoles(foreign.id)).toBeNull();
   await expect(ctxForBearer(ctx.db, ctx.userId, foreign.id)).rejects.toMatchObject({ status: 403 });
 });
 it("links and unlinks own Slack identity with replay and refuses other people's links", async () => {
@@ -129,7 +129,7 @@ it("rejects quiet-hour changes through a verified Slack callback as well as the 
   await ins("chat_user_links", { brewery_id: b.id, installation_id: installation, provider: "slack", external_user_id: "U-CALLBACK", user_id: staff.userId, state: "active" });
   const intent = await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-CALLBACK", p_action: "mgr_save_preferences" });
   expect(intent.error).toBeNull();
-  await admin.from("brewery_users").update({ role: "taproom" }).eq("brewery_id", b.id).eq("user_id", staff.userId);
+  await admin.from("brewery_users").update({ roles: ["taproom"] }).eq("brewery_id", b.id).eq("user_id", staff.userId);
   const hidden = await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-CALLBACK", p_action: "mgr_preferences" });
   expect(hidden.error).toBeNull(); expect(hidden.data).toBeNull();
   const receipt = await ins("chat_callback_receipts", { brewery_id: b.id, installation_id: installation, provider: "slack", callback_id: crypto.randomUUID(), callback_kind: "mgr_save_preferences", external_user_id: "U-CALLBACK", disposition: "pending", payload_hash: "fixture", received_at: new Date().toISOString() });
@@ -137,6 +137,23 @@ it("rejects quiet-hour changes through a verified Slack callback as well as the 
   expect(result.error).toBeNull();
   expect(result.data).toEqual({ disposition: "ignored", code: "invalid_action" });
   expect((await admin.from("notification_preferences").select("id").eq("brewery_id", b.id)).data).toEqual([]);
+});
+
+it("allows quiet-hour callback consent for Taproom + Brewer and rechecks the union on consumption", async () => {
+  const b = await makeBrewery();
+  const staff = await makeStaffCtx(b.id, ["brewer", "taproom"]);
+  const installation = (await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Multi-role callback", state: "active", installer_user_id: staff.userId, token_store_key: crypto.randomUUID() })).id;
+  await ins("chat_user_links", { brewery_id: b.id, installation_id: installation, provider: "slack", external_user_id: "U-MIXED-CALLBACK", user_id: staff.userId, state: "active" });
+  const intent = await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-MIXED-CALLBACK", p_action: "mgr_save_preferences" });
+  expect(intent.error).toBeNull();
+  expect(intent.data).toMatch(/^[0-9a-f-]{36}$/);
+  const receipt = await ins("chat_callback_receipts", { brewery_id: b.id, installation_id: installation, provider: "slack", callback_id: crypto.randomUUID(), callback_kind: "mgr_save_preferences", external_user_id: "U-MIXED-CALLBACK", disposition: "pending", payload_hash: "fixture", received_at: new Date().toISOString() });
+  const saved = await admin.rpc("consume_chat_action_intent", { p_receipt: receipt.id, p_intent: intent.data, p_action: "mgr_save_preferences", p_input: { reason: "operations_digest", enabled: true, start: "22:00", end: "08:00", timezone: "UTC" } });
+  expect(saved.error).toBeNull();
+  expect(saved.data).toEqual({ disposition: "processed" });
+  const preference = await admin.from("notification_preferences").select("quiet_hours_start,quiet_hours_end").eq("brewery_id", b.id).eq("user_id", staff.userId).eq("reason", "operations_digest").single();
+  expect(preference.error).toBeNull();
+  expect(preference.data).toEqual({ quiet_hours_start: "22:00:00", quiet_hours_end: "08:00:00" });
 });
 
 it("Beer reads only allowed taproom stock and never queries forbidden aggregates", async () => {
@@ -162,13 +179,13 @@ it("keeps authenticated provisioning separate from the actor's tenant role", asy
   const b = await makeBrewery(); const staff = await makeStaffCtx(b.id, "taproom");
   const requestId = crypto.randomUUID();
   const input = { name: `Provision-${requestId}`, timezone: "America/New_York" };
-  const pretenant = { db: staff.db, userId: staff.userId, breweryId: null, role: null };
+  const pretenant: PreTenantCtx = { db: staff.db, userId: staff.userId, breweryId: null, roles: [] };
   const result = await runCommand("provision_brewery", input, pretenant, { requestId, correlationId: requestId });
   expect(await runCommand("provision_brewery", input, pretenant, { requestId, correlationId: requestId })).toEqual(result);
-  const memberships = await admin.from("brewery_users").select("brewery_id,role").eq("user_id", staff.userId);
+  const memberships = await admin.from("brewery_users").select("brewery_id,roles").eq("user_id", staff.userId);
   expect(memberships.data).toHaveLength(2);
-  expect(memberships.data).toContainEqual({ brewery_id: b.id, role: "taproom" });
-  expect(memberships.data?.filter(m => m.brewery_id !== b.id).map(m => m.role)).toEqual(["admin"]);
+  expect(memberships.data).toContainEqual({ brewery_id: b.id, roles: ["taproom"] });
+  expect(memberships.data?.filter(m => m.brewery_id !== b.id).map(m => m.roles)).toEqual([["admin"]]);
 });
 
 it("keeps direct table DML forbidden even on the role's readable tables", async () => {
@@ -203,7 +220,7 @@ it("rejects a real pending snooze callback after Sales becomes Taproom without c
   const before = (await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data;
   const dueBefore = await runCommand("get_today", {}, staff);
   expect((dueBefore as unknown[]).length).toBeGreaterThan(0);
-  expect((await admin.from("brewery_users").update({ role: "taproom" }).eq("brewery_id", b.id).eq("user_id", staff.userId)).error).toBeNull();
+  expect((await admin.from("brewery_users").update({ roles: ["taproom"] }).eq("brewery_id", b.id).eq("user_id", staff.userId)).error).toBeNull();
   expect(await consume(stale)).toEqual({ disposition: "ignored", code: "invalid_action" });
   expect((await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data).toEqual(before);
   expect((await admin.from("notification_occurrences").select("state").eq("id", occurrence.id).single()).data).toEqual({ state: "active" });

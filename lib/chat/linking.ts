@@ -17,7 +17,7 @@ export type ResolvedChatActor = {
   breweryId: string;
   externalUserId: string;
   userId: string;
-  role: StaffRole;
+  roles: StaffRole[];
 };
 
 export async function issueChatLinkProof(db: SupabaseClient<Database>, installationId: string, externalUserId: string) {
@@ -40,6 +40,6 @@ export async function resolveChatActor(
     p_provider: provider, p_external_installation_id: installationExternalId, p_external_user_id: externalUserId,
   }));
   if (!data) return null;
-  const r = data as { installation_id: string; brewery_id: string; external_user_id: string; user_id: string; role: StaffRole };
-  return { installationId: r.installation_id, breweryId: r.brewery_id, externalUserId: r.external_user_id, userId: r.user_id, role: r.role };
+  const r = data as { installation_id: string; brewery_id: string; external_user_id: string; user_id: string; roles: StaffRole[] };
+  return { installationId: r.installation_id, breweryId: r.brewery_id, externalUserId: r.external_user_id, userId: r.user_id, roles: r.roles };
 }

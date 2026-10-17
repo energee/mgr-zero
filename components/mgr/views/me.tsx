@@ -13,7 +13,7 @@ export function MeView({ model, footer, switchAction, avatar }: {
 }) {
   return (
     <>
-      {model.name ? E.row(model.name, model.role, "", "", avatar ?? E.face({ className: "size-10" })) : null}
+      {model.name ? E.row(model.name, model.roles.join(", "), "", "", avatar ?? E.face({ className: "size-10" })) : null}
       {E.fld("Signed in as", model.email)}
       {E.ttl("Brewery")}
       {model.breweries.map((brewery) => <Fragment key={brewery.id ?? brewery.name}>{E.row(

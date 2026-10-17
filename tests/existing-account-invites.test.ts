@@ -11,7 +11,7 @@ describe("existing account invitation consent", () => {
     const inviter = await makeStaffCtx((await makeBrewery()).id);
     const recipient = await makeStaff((await makeBrewery()).id);
     const customer = await seedCustomer(inviter.breweryId);
-    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, role: null };
+    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, roles: [] };
     const ex = execution();
     const name = kind === "staff" ? "invite_staff" : "invite_customer_user";
     const input = kind === "staff" ? { email: recipient.email, role: "sales" } : { email: recipient.email, customerId: customer.customerId };
@@ -41,9 +41,9 @@ describe("existing account invitation consent", () => {
   it("rejects wrong identity and expired invitations", async () => {
     const inviter = await makeStaffCtx((await makeBrewery()).id);
     const recipient = await makeStaff((await makeBrewery()).id);
-    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, role: null };
+    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, roles: [] };
     const result = await runCommand("invite_staff", { email: recipient.email, role: "sales" }, inviter) as { inviteId: string };
-    const wrong: PreTenantCtx = { ...inviter, breweryId: null, role: null };
+    const wrong: PreTenantCtx = { ...inviter, breweryId: null, roles: [] };
     await expect(runCommand("accept_account_invitation", { inviteId: result.inviteId }, wrong)).rejects.toMatchObject({ code: "permission_denied" });
     sql(`update private.invite_requests set consent_expires_at = now() - interval '1 second' where id = '${result.inviteId}'`);
     await expect(runCommand("accept_account_invitation", { inviteId: result.inviteId }, ctx)).rejects.toThrow(/expired/);
@@ -51,7 +51,7 @@ describe("existing account invitation consent", () => {
   it.each(["revoked", "permission", "email"])("rejects consent after %s changes", async change => {
     const inviter = await makeStaffCtx((await makeBrewery()).id);
     const recipient = await makeStaff((await makeBrewery()).id);
-    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, role: null };
+    const ctx: PreTenantCtx = { db: await asUser(recipient.email), userId: recipient.id, breweryId: null, roles: [] };
     const result = await runCommand("invite_staff", { email: recipient.email, role: "sales" }, inviter) as { inviteId: string };
     if (change === "revoked") await runCommand("revoke_account_invitation", { inviteId: result.inviteId }, inviter);
     if (change === "permission") await admin.from("brewery_users").delete().eq("user_id", inviter.userId).eq("brewery_id", inviter.breweryId);
@@ -67,10 +67,10 @@ describe("existing account invitation consent", () => {
     const second = await seedCustomer(inviter.breweryId, { name: "Second customer" });
     await admin.from("customer_users").insert({ customer_id: first.customerId, user_id: recipient.id });
     const db = await asUser(recipient.email);
-    const ctx: PreTenantCtx = { db, userId: recipient.id, breweryId: null, role: null };
+    const ctx: PreTenantCtx = { db, userId: recipient.id, breweryId: null, roles: [] };
     const result = await runCommand("invite_customer_user", { email: recipient.email, customerId: second.customerId }, inviter) as { inviteId: string };
     expect(await runCommand("accept_account_invitation", { inviteId: result.inviteId }, ctx)).toMatchObject({ customerId: second.customerId });
-    expect(await ctxForBearer(db, recipient.id, inviter.breweryId, second.customerId)).toMatchObject({ customerId: second.customerId, role: "customer" });
+    expect(await ctxForBearer(db, recipient.id, inviter.breweryId, second.customerId)).toMatchObject({ customerId: second.customerId, roles: ["customer"] });
     await expect(ctxForBearer(db, recipient.id, inviter.breweryId, crypto.randomUUID())).rejects.toMatchObject({ code: "not_member" });
   });
 

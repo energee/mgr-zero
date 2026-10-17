@@ -14,8 +14,8 @@ import { canRun, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 it("offers sales and fulfillment actions only to their registered roles", () => {
-  function render(role: Ctx["role"], status: "submitted" | "picked") {
-    const ctx = { role } as Ctx;
+  function render(role: Ctx["roles"][number], status: "submitted" | "picked") {
+    const ctx = { roles: [role] } as Ctx;
     return renderToStaticMarkup(createElement(LifecycleButtons, { orderId: "order", status, canSell: canRun(ctx, "confirm_order"), canFulfill: canRun(ctx, "record_pick") }));
   }
   expect(render("warehouse", "submitted")).not.toContain("Confirm");

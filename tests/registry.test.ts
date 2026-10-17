@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import { defineCommand, defineQuery, runCommand, unwrap, _clearRegistry, CommandError, getCommandDefinition, type CommandExecution, type Ctx } from "@/lib/commands/registry";
+import { canRun, defineCommand, defineQuery, runCommand, unwrap, _clearRegistry, CommandError, getCommandDefinition, type CommandExecution, type Ctx } from "@/lib/commands/registry";
 
 // These unit tests never access the database; handlers exercise registry behavior only.
 const testDb = null as unknown as Ctx["db"];
@@ -13,7 +13,7 @@ describe("command registry", () => {
     defineQuery({ name: "hmr_read", input: z.object({}), roles: ["admin"], handler: async () => "new" });
     vi.unstubAllEnvs();
 
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin"] };
     await expect(runCommand("hmr_read", {}, ctx)).resolves.toBe("new");
   });
 
@@ -30,7 +30,7 @@ describe("command registry", () => {
       name: "echo", input: z.object({ msg: z.string() }), roles: ["admin"],
       handler: async (_ctx, input) => ({ echoed: input.msg }),
     });
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin"] };
     await expect(runCommand("echo", { msg: "hi" }, ctx)).resolves.toEqual({ echoed: "hi" });
     // Output is unknown until the caller narrows it; there is no type parameter to assert through.
     // @ts-expect-error runCommand has no output type parameter
@@ -57,7 +57,7 @@ describe("command registry", () => {
       correlationId: "4b6017b6-66e9-469d-8d83-3f6f7f2db667",
       origin: "ui",
     };
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin"] };
 
     const writeMetadata = getCommandDefinition("write");
     const readMetadata = getCommandDefinition("read");
@@ -79,8 +79,38 @@ describe("command registry", () => {
       name: "echo", input: z.object({ msg: z.string() }), roles: ["admin"],
       handler: async (_ctx, input) => ({ echoed: input.msg }),
     });
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "warehouse" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["warehouse", "brewer"] };
     await expect(runCommand("echo", { msg: "hi" }, ctx)).rejects.toThrow(/permission/i);
+  });
+
+  it("grants the union of sales and brewer commands without granting admin", async () => {
+    _clearRegistry();
+    for (const role of ["sales", "brewer", "admin"] as const) {
+      defineCommand({ name: `${role}_write`, input: z.object({}), roles: [role], handler: async () => role });
+    }
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["sales", "brewer"] };
+    for (const role of ["sales", "brewer"]) {
+      expect(canRun(ctx, `${role}_write`)).toBe(true);
+      await expect(runCommand(`${role}_write`, {}, ctx)).resolves.toBe(role);
+    }
+    const warehouseBrewer: Ctx = { ...ctx, roles: ["warehouse", "brewer"] };
+    expect(canRun(warehouseBrewer, "admin_write")).toBe(false);
+    await expect(runCommand("admin_write", {}, warehouseBrewer)).rejects.toMatchObject({ status: 403, code: "permission_denied" });
+  });
+
+  it("keeps explicit portal and staff role contexts separate", async () => {
+    _clearRegistry();
+    defineQuery({ name: "staff_read", input: z.object({}), roles: ["admin", "sales"], handler: async () => "staff" });
+    defineQuery({ name: "portal_read", input: z.object({}), roles: "customer", handler: async () => "portal" });
+    const staff: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin", "sales"] };
+    const portal: Ctx = { ...staff, roles: ["customer"], customerId: "c" };
+    expect(canRun(staff, "portal_read")).toBe(false);
+    expect(canRun(portal, "staff_read")).toBe(false);
+    await expect(runCommand("portal_read", {}, portal)).resolves.toBe("portal");
+    await expect(runCommand("staff_read", {}, portal)).rejects.toMatchObject({ status: 403 });
+    const mixed: Ctx = { ...portal, roles: ["customer", "admin"] };
+    expect(canRun(mixed, "staff_read")).toBe(false);
+    expect(canRun(mixed, "portal_read")).toBe(false);
   });
 
   it("handler plain Error falls through without wrapping", async () => {
@@ -89,7 +119,7 @@ describe("command registry", () => {
       name: "failing", input: z.object({}), roles: ["admin"],
       handler: async () => { throw new Error("db connection failed"); },
     });
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin"] };
     try {
       await runCommand("failing", {}, ctx);
       throw new Error("should have thrown");
@@ -105,7 +135,7 @@ describe("command registry", () => {
       name: "controlled", input: z.object({}), roles: ["admin"],
       handler: async () => { throw new CommandError("validation failed: item not found"); },
     });
-    const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
+    const ctx: Ctx = { db: testDb, userId: "u", breweryId: "b", roles: ["admin"] };
     try {
       await runCommand("controlled", {}, ctx);
       throw new Error("should have thrown");

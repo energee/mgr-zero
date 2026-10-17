@@ -9,7 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { SkuView } from "@/components/mgr/views/sku";
 import { RegistryInput } from "@/components/mgr/views/registry-fields";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toSkuViewProps, skuCreateCommand, type KegPoolOption } from "@/lib/mgr/sku-view";
+import { toSkuViewProps, skuCreateCommand, skuUpdateCommand, type KegPoolOption } from "@/lib/mgr/sku-view";
 
 export type FormatOption = { id: string; name: string; package_type?: string | null };
 
@@ -45,28 +45,31 @@ export function SkuForm({ brandId, formats, pools = [] }: { brandId: string; for
 }
 
 // Only mutable SKU facts are sent; changing its package means creating another SKU.
-export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku: { id: string; name: string; active: boolean; upc: string | null; keg_pool_id?: string | null }; formatName: string; packageType?: string | null; pools?: KegPoolOption[] }) {
+export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku: { id: string; name: string; active: boolean; upc: string | null; keg_pool_id?: string | null; batch_share: number | string | null }; formatName: string; packageType?: string | null; pools?: KegPoolOption[] }) {
+  const initial = toSkuViewProps({ formats: [], pools, sku: { ...sku, format_id: "", formats: { name: formatName, package_type: packageType } } });
   const [kegPool, setKegPool] = useState(sku.keg_pool_id ?? "");
   const [active, setActive] = useState(sku.active);
   const [upc, setUpc] = useState(sku.upc ?? "");
-  const reset = () => { setActive(sku.active); setUpc(sku.upc ?? ""); setKegPool(sku.keg_pool_id ?? ""); };
-  const form = useCommandForm("update_sku", {
-    build: () => ({ skuId: sku.id, active, upc, ...(packageType === "keg" && kegPool !== (sku.keg_pool_id ?? "") ? { kegPoolId: kegPool || null } : {}) }), reset,
+  const [batchSharePercent, setBatchSharePercent] = useState(initial.batchSharePercent ?? "");
+  const reset = () => { setActive(sku.active); setUpc(sku.upc ?? ""); setKegPool(sku.keg_pool_id ?? ""); setBatchSharePercent(initial.batchSharePercent ?? ""); };
+  const edit = skuUpdateCommand({ skuId: sku.id, active, upc, batchSharePercent, ...(packageType === "keg" && kegPool !== (sku.keg_pool_id ?? "") ? { kegPoolId: kegPool || null } : {}) });
+  const form = useCommandForm(edit.name, {
+    build: () => edit.input, reset,
   });
   return (
     <CommandForm open={form.open} onOpenChange={(open) => { if (open) reset(); form.setOpen(open); }} title={`Edit SKU · ${sku.name}`} trigger={<Button variant="outline" size="sm">Edit SKU</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={(event) => { if (!edit.valid) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <SkuView
           // A saved SKU keeps its format, so the picker has no options to offer.
-          model={{ ...toSkuViewProps({ formats: [], pools, sku: { ...sku, format_id: "", formats: { name: formatName, package_type: packageType } } }), format: formatName, active, upc, kegPool }}
-          controls={{ active: setActive, upc: setUpc, kegPool: setKegPool }}
+          model={{ ...initial, active, upc, kegPool, batchSharePercent }}
+          controls={{ active: setActive, upc: setUpc, kegPool: setKegPool, batchSharePercent: setBatchSharePercent }}
           locked
           messages={<>
             <p className="text-sm">Create another SKU to use a different format. Changing the keg pool affects future orders only.</p>
             <p className="text-sm text-muted-foreground">Inactive SKUs leave inventory and order history intact and cannot be added to new orders. Clear UPC to remove it.</p>
             <CommandFormMessage error={form.error} />
           </>}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save SKU"}</Button></CommandFormFooter>}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !edit.valid}>{form.submitting ? "Saving…" : "Save SKU"}</Button></CommandFormFooter>}
         />
       </form>
     </CommandForm>

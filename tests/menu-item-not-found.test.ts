@@ -10,7 +10,7 @@ const FORMAT = "00000000-0000-4000-8000-000000000000";
 
 function ctxRaising(message: string): Ctx {
   const db = { rpc: () => Promise.resolve({ data: null, error: { code: "P0001", message } }) };
-  return { db, userId: FORMAT, breweryId: FORMAT, role: "warehouse" } as unknown as Ctx;
+  return { db, userId: FORMAT, breweryId: FORMAT, roles: ["warehouse"] } as unknown as Ctx;
 }
 
 describe("get_pos_menu_item on a stale link", () => {

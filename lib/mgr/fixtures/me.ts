@@ -3,7 +3,7 @@ import type { MeViewModel } from "@/lib/mgr/me-view";
 
 export const meMaria: MeViewModel = {
   name: "Maria Alvarez",
-  role: "admin",
+  roles: ["admin"],
   email: "maria@demobrewing.com",
   breweries: [
     { name: "Demo Brewing", current: true },

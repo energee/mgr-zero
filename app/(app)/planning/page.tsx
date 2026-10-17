@@ -17,7 +17,7 @@ export default async function PlanningPage() {
   const gaps = (await runCommand("get_material_requirements", { shortOnly: true }, ctx)) as MaterialRequirementSnapshot[];
   const buyable = gaps.filter((g) => g.vendor_id && !g.out_of_reach);
   const vendors = new Set(buyable.map((g) => g.vendor_id));
-  const canDraft = brewery.role === "admin" || brewery.role === "warehouse";
+  const canDraft = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
 
   return <PlanningView model={toPlanningViewProps({ requirements: gaps })}
     footer={canDraft ? <DraftButton materialIds={buyable.map((g) => g.material_id)} vendorCount={vendors.size} /> : null} />;
