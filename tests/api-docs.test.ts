@@ -3,11 +3,14 @@
 // screen names has a page to live on, and no page is orphaned. The tables
 // themselves are generated (lib/mgr/api-operations.ts), so this covers the
 // derivation and the page set rather than the prose.
-import { readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { compile, run } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { z } from "zod";
 import { SCREENS } from "@/components/mgr/screens";
 import { API_AREAS, apiOperations, areaOf, operationsInArea } from "@/lib/mgr/api-operations";
@@ -516,18 +519,123 @@ describe("post-merge HTTP API maintainer", () => {
     expect(workflow).not.toMatch(/allowedTools[^\n]*Bash/);
     expect(workflow).toContain("Edit(content/docs/api/*.mdx)");
     expect(workflow).toMatch(/Edit\(components\/mgr\/screens\.tsx\)/);
+    expect(workflow).not.toMatch(/allowedTools[^\n]*Edit\(lib\/mgr\/api-operations\.ts\)/);
   });
 
-  it("lets the agent annotate screens but never rewrite one", () => {
+  it("validates paths and literal annotations before importing the maintained sources", () => {
     const workflow = read(".github/workflows/http-api-agent.yml");
+    const validate = parse(workflow).jobs.maintain.steps.find((step: { id?: string }) => step.id === "validate").run as string;
+    const render = validate.indexOf("bun run docs:api");
+    expect(validate.indexOf("unexpected=")).toBeLessThan(render);
+    expect(validate.indexOf("bun scripts/validate-api-agent-screens.ts")).toBeLessThan(render);
+    expect(validate).toContain("content/docs/api/[a-z-]+\\.mdx");
+    expect(validate).not.toContain("lib/mgr/api-operations");
+  });
 
-    // screens.tsx is the current focus and three worktrees touch it. Restricting
-    // the diff to reads:/writes: lines makes "annotate an operation"
-    // structurally different from "rewrite a screen's spec or body".
-    expect(workflow).toMatch(/grep -vE '\(reads\|writes\):'/);
-    // And the validate step may not accept a file outside the three it renders.
-    expect(workflow).toContain("content/docs/api/[a-z-]+\\.mdx");
-    expect(workflow).toContain("2026-09-06-api-operations-backlog.md");
+  const fixtureScreen = '/** Existing block comment\n * Preserve its context. */\nexport const SCREENS = [{\n    reads: "get_order", writes: "none",\n}];\nexport const screen = SCREENS[0];\n';
+
+  // Execute the real validation shell, including Bun imports, in an isolated
+  // repository. No model, provider, credentials or application database involved.
+  function validateEdit(edit: (put: (path: string, text: string) => void) => void, check: (repo: string, result: SpawnSyncReturns<string>) => void) {
+    const repo = mkdtempSync(join(tmpdir(), "api-agent-validation-"));
+    const put = (path: string, text: string) => {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      writeFileSync(join(repo, path), text);
+    };
+    const git = (...args: string[]) => {
+      const result = spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr);
+      return result.stdout;
+    };
+    try {
+      put("package.json", JSON.stringify({ scripts: { "docs:api": "bun scripts/write-api-docs.ts" } }));
+      // Keep trusted validation tests available when the workflow invokes them,
+      // without copying app modules or replacing a real gate with a shell stub.
+      for (const file of readdirSync(join(root, "tests")).filter((file) => file.endsWith("-safety.test.ts"))) {
+        mkdirSync(join(repo, "tests"), { recursive: true });
+        copyFileSync(join(root, "tests", file), join(repo, "tests", file));
+      }
+      for (const file of readdirSync(root).filter((file) => /^vitest\..*\.config\.mts$/.test(file))) {
+        copyFileSync(join(root, file), join(repo, file));
+      }
+      symlinkSync(join(root, "node_modules"), join(repo, "node_modules"), "dir");
+      put(".gitignore", "node_modules\n");
+      put("vitest.config.mts", 'export default { test: { include: ["tests/*-safety.test.ts"] } };\n');
+      put("components/mgr/screens.tsx", fixtureScreen);
+      put("scripts/validate-api-agent-screens.ts", read("scripts/validate-api-agent-screens.ts"));
+      put("lib/mgr/api-operations.ts", 'export { screen } from "../../components/mgr/screens";\n');
+      put("content/docs/api/orders.mdx", "# Orders\n");
+      put("scripts/write-api-docs.ts", [
+        'import { screen } from "../lib/mgr/api-operations";',
+        'import { mkdirSync, writeFileSync } from "node:fs";',
+        'writeFileSync("generator-ran", "yes");',
+        'writeFileSync("content/docs/api/orders.mdx", `# Orders\\n${screen.reads}\\n${screen.writes}\\n`);',
+        'mkdirSync(".agents/superpowers/plans", { recursive: true });',
+        'writeFileSync(".agents/superpowers/plans/2026-09-06-api-operations-backlog.md", "Generated backlog\\n");',
+      ].join("\n"));
+      git("init", "--quiet");
+      git("add", "-A");
+      git("-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--quiet", "-m", "fixture");
+      edit(put);
+      const workflow = parse(read(".github/workflows/http-api-agent.yml"));
+      const validation = workflow.jobs.maintain.steps.find((step: { id?: string }) => step.id === "validate").run as string;
+      const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", validation], {
+        cwd: repo, encoding: "utf8", env: { ...process.env, GITHUB_OUTPUT: join(repo, ".git", "output") },
+      });
+      check(repo, result);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  }
+
+  it.each([
+    ["expression initializer", "components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', '(globalThis.x = 1, "a")')],
+    ["top-level sentinel", "components/mgr/screens.tsx", `${fixtureScreen}await Bun.write("payload-executed", "yes");\n`],
+    ["increment prefix", "components/mgr/screens.tsx", `${fixtureScreen}++globalThis.x; await Bun.write("payload-executed", "yes");\n`],
+    ["diff header impersonation", "components/mgr/screens.tsx", `${fixtureScreen}++ b/1; var b; await Bun.write("payload-executed", "yes");\n`],
+    ["trailing property code", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", body: await Bun.write("payload-executed", "yes"),')],
+    ["template interpolation", "components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', '`get_${await Bun.write("payload-executed", "yes")}`')],
+    ["binary/NUL payload", "components/mgr/screens.tsx", `${fixtureScreen}// \u0000\nawait Bun.write("payload-executed", "yes");\n`],
+    ["existing block-comment escape", "components/mgr/screens.tsx", fixtureScreen.replace("/** Existing block comment\n", '/** Existing block comment\n  reads: "*/ await Bun.write(String.fromCharCode(112,97,121,108,111,97,100,45,101,120,101,99,117,116,101,100), String.fromCharCode(121)) /*",\n')],
+    ["new screen property", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", extra: "product change",')],
+    ["removed annotation property", "components/mgr/screens.tsx", fixtureScreen.replace(' writes: "none",', "")],
+    ["added annotation property", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", reads: "get_atp",')],
+    ["new screen record", "components/mgr/screens.tsx", fixtureScreen.replace("}];", '}, { reads: "get_atp", writes: "none" }];')],
+    ["non-screen reads property", "components/mgr/screens.tsx", `${fixtureScreen}export const other = { reads: "not an annotation" };\n`],
+    ["changed comment", "components/mgr/screens.tsx", fixtureScreen.replace("Preserve its context.", "Changed comment.")],
+    ["validator replacement", "scripts/validate-api-agent-screens.ts", 'await Bun.write("payload-executed", "yes");\n'],
+    ["registry execution", "lib/mgr/api-operations.ts", 'await Bun.write("payload-executed", "yes");\nexport { screen } from "../../components/mgr/screens";\n'],
+  ])("rejects source changes before generation: %s", (_label, path, source) => {
+    validateEdit((put) => put(path, source), (repo, result) => {
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(existsSync(join(repo, "generator-ran"))).toBe(false);
+      expect(existsSync(join(repo, "payload-executed"))).toBe(false);
+      expect(existsSync(join(repo, "api-reference.patch"))).toBe(false);
+    });
+  });
+
+  it.each([
+    ["get_order · get_atp [view]", "submit_order"],
+    ["", "none"],
+    ["get_order [*/ literal /*]", "none"],
+  ])("accepts literal annotation changes and stages deterministic output: %s", (reads, writes) => {
+    validateEdit((put) => put("components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', JSON.stringify(reads)).replace('"none"', JSON.stringify(writes))), (repo, result) => {
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(existsSync(join(repo, "generator-ran"))).toBe(true);
+      const patch = readFileSync(join(repo, "api-reference.patch"), "utf8");
+      expect(patch).toContain(`+    reads: ${JSON.stringify(reads)}, writes: ${JSON.stringify(writes)},`);
+      expect(patch).toContain("+Generated backlog");
+      expect(readFileSync(join(repo, "content/docs/api/orders.mdx"), "utf8")).toBe(`# Orders\n${reads}\n${writes}\n`);
+    });
+  });
+
+  it("keeps an unchanged audit a no-op without importing the generator", () => {
+    validateEdit(() => {}, (repo, result) => {
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(join(repo, ".git", "output"), "utf8")).toContain("changed=false");
+      expect(existsSync(join(repo, "generator-ran"))).toBe(false);
+      expect(existsSync(join(repo, "api-reference.patch"))).toBe(false);
+    });
   });
 
   // Two jobs, because maintain runs the model with read-only permissions and
@@ -566,6 +674,8 @@ describe("post-merge HTTP API maintainer", () => {
     // out there as report-only.
     expect(prompt).toContain("lib/commands/");
     expect(prompt).toContain("tests/api-command.test.ts");
+    expect(prompt).toContain("`lib/mgr/api-operations.ts` is read-only too");
+    expect(prompt).toContain("report the name and proposed area in your closing summary");
     expect(workflow).toContain("## In CI");
   });
 });
