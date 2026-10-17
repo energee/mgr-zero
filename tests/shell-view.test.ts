@@ -256,7 +256,7 @@ describe("Work view", () => {
   });
   it("preserves query identities and role-default filtering without inventing destinations", () => {
     const common = { id: "same", detail: "Due today", href: "/orders/actual", verb: "Answer", tone: "attention" as const, dueAt: null };
-    const model = workFromQuery([{ ...common, kind: "orders", label: "An invoice question" }, { ...common, kind: "batches", label: "A reading", href: "/cellar/actual/reading" }], "sales default", ["orders"]);
+    const model = workFromQuery([{ ...common, kind: "orders", label: "An invoice question" }, { ...common, kind: "batches", label: "A reading", href: "/cellar/actual/reading" }], ["orders"]);
     expect(model.rows.map(row => row.key)).toEqual(["orders:same", "batches:same"]);
     expect(filterWorkRows(model, "all").map(row => row.verb)).toEqual(["Answer"]);
     expect(filterWorkRows(model, "batches")[0]).toMatchObject({ href: "/cellar/actual/reading", icon: "thermometer", warning: true });
@@ -266,7 +266,7 @@ describe("Work view", () => {
   });
   it("maps warehouse work rows and chips", () => {
     const model = toWorkViewProps(workWarehouse);
-    expect(model.subtitle).toBe("warehouse default");
+    expect(renderToStaticMarkup(createElement(WorkView, { model }))).not.toContain("warehouse default");
     expect(model.rows[0]?.verb).toBe("Confirm");
     expect(model.workChips[0]).toBe("all");
   });
