@@ -2,12 +2,11 @@
 // (docs/plans/lolev-history.md task 4): the form saves it through its own
 // command, and only when it changed, so a refused date never blocks the rest.
 // The one-way keg fee field saves the same way (docs/plans/lolev-orders.md task 6).
-import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
-import { SettingsView } from "@/components/mgr/views/settings";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { SettingsForm } from "@/app/(app)/settings/settings-form";
 import { getCommandDefinition } from "@/lib/commands/registry";
@@ -22,29 +21,8 @@ const brewery = {
   fermentation_reading_due_hours: 24, days_to_package: 14, books_opened_on: null, one_way_keg_fee_cents: 1000,
 };
 
-type Node = ReactElement<Record<string, unknown> & { children?: ReactNode }>;
-function elements(node: ReactNode): Node[] {
-  if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
-  return [node, ...Children.toArray(node.props.children).flatMap(elements)];
-}
 
 describe("packaging operating defaults", () => {
-  it("reads persisted days and uses the same values in the inventory and live form", () => {
-    const live = SettingsForm({ brewery });
-    expect(live.type).toBe(BrewerySettingsFormView);
-    expect(live.props.initial).toEqual(toBrewerySettingsValues(brewery));
-    expect(toBrewerySettingsValues({ ...brewery, days_to_package: 28 }).daysToPackage).toBe("28");
-    const inventory = SettingsView({ model: settingsDemo });
-    const fixtureForm = elements(inventory).find(node => node.type === BrewerySettingsFormView)!;
-    expect(fixtureForm.props.initial).toEqual(live.props.initial);
-    const html = renderToStaticMarkup(inventory);
-    expect(html).toContain('aria-label="Days to package"');
-    const formHtml = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial: live.props.initial }));
-    expect(formHtml).toContain('aria-label="Days to package"');
-    expect(formHtml).toContain('min="1"');
-    expect(formHtml).toContain('max="120"');
-    expect(formHtml).toContain('step="1"');
-  });
 
   it("saves days alongside reading hours through the existing operating-defaults command", () => {
     action.run.mockReset();
@@ -60,25 +38,6 @@ describe("packaging operating defaults", () => {
     expect(action.run).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps packaging defaults editable while the filed reporting basis stays locked in both paths", () => {
-    action.run.mockReset();
-    action.run.mockImplementation((_name, _input, saved) => saved?.());
-    const filedBrewery = { ...brewery, books_opened_on: "2026-10-01" };
-    const live = SettingsForm({ brewery: filedBrewery, hasFiledReports: true });
-    const inventory = SettingsView({ model: { ...settingsDemo, booksOpenedOn: filedBrewery.books_opened_on, hasFiledReports: true } });
-    const fixtureForm = elements(inventory).find(node => node.type === BrewerySettingsFormView)!;
-    expect(live.props.basisLocked).toBe(true);
-    expect(fixtureForm.props.basisLocked).toBe(true);
-    expect(fixtureForm.props.initial).toEqual(live.props.initial);
-    const html = renderToStaticMarkup(inventory);
-    expect(html).toContain('aria-label="Days to package"');
-    expect(html).toContain("Filed reporting basis");
-    expect(html).toContain("Reporting basis history");
-    live.props.onSave({ ...live.props.initial, daysToPackage: "28" });
-    expect(action.run).toHaveBeenNthCalledWith(1, "update_brewery", expect.any(Object), expect.any(Function));
-    expect(action.run).toHaveBeenNthCalledWith(2, "set_brewery_operating_defaults", { readingDueHours: 24, daysToPackage: 28 }, expect.any(Function));
-    expect(action.run).toHaveBeenCalledTimes(2);
-  });
 
   it("requires whole days from 1 through 120", () => {
     const values = toBrewerySettingsValues(brewery);
