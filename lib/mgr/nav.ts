@@ -14,6 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@/components/mgr/icon";
 import type { StaffRole } from "@/lib/commands/registry";
+import { hasAnyRole } from "./roles";
 
 export type NavItem = {
   label: string;
@@ -94,7 +95,7 @@ export const PORTAL_NAV: readonly NavItem[] = [
   { label: "Account", href: "/portal/account", icon: UserCircleIcon },
 ];
 
-const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);
+const allowed = (item: NavItem, roles: readonly StaffRole[]) => hasAnyRole(roles, ["admin"]) || !item.roles || hasAnyRole(roles, item.roles);
 
 /**
  * Drop entries the role may not see. Children thin out, and a group whose
@@ -102,10 +103,10 @@ const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.ro
  * child keeps its own href too, so a phone tab can still land on the group
  * route (warehouse More opens Invoices, which warehouse may read).
  */
-export function navFor(items: readonly NavItem[], role: StaffRole): NavItem[] {
+export function navFor(items: readonly NavItem[], roles: readonly StaffRole[]): NavItem[] {
   return items
-    .filter((i) => allowed(i, role))
-    .map((i) => (i.children ? { ...i, children: i.children.filter((c) => allowed(c, role)) } : i))
+    .filter((i) => allowed(i, roles))
+    .map((i) => (i.children ? { ...i, children: i.children.filter((c) => allowed(c, roles)) } : i))
     .filter((i) => !i.children || i.children.length > 0);
 }
 
@@ -141,9 +142,9 @@ function longestMatch<T>(pathname: string, candidates: readonly (readonly [T, st
  * no entry covers has no nav gate and counts as open. Back links use this so
  * they never point a role at a page that sends it to No access (#444).
  */
-export function canOpen(role: StaffRole, path: string): boolean {
+export function canOpen(roles: readonly StaffRole[], path: string): boolean {
   const best = longestMatch(path, STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]).map((i) => [i, i.href] as const));
-  return !best || allowed(best, role);
+  return !best || allowed(best, roles);
 }
 
 /** The tab whose href (or a child's) is the longest prefix of the path. */

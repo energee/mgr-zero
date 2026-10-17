@@ -57,7 +57,7 @@ urgency and every other state are timestamps (`closed_at`, `delivered_at`) or de
 - `P-ledger`: `staff_read` select + `staff_insert` (see Ledgers).
 - `P-customer`: portal customers `select` where the row's `customer_id in (select
   my_customer_ids())`.
-- `P-admin`: `admin_all for all using (staff_role(brewery_id) = 'admin')`.
+- `P-admin`: `admin_all for all using (has_staff_role(brewery_id, array['admin']::staff_role[]))`.
 Default is `P-staff`. Customer-facing tables list `P-customer` explicitly.
 
 **Document numbers.** `brewery_counters (brewery_id, key text, next bigint, pk
@@ -71,9 +71,10 @@ a listed unique. Every list view has a covering index listed under `idx`.
 
 **Extensions.** `btree_gist` (vessel occupancy exclusion).
 
-**Helper functions carried forward unchanged:** `my_brewery_ids()`, `my_customer_ids()`,
-`is_staff_of(b)`, `staff_role(b)`. **(impl)** Every function sets `search_path = ''` and
-schema-qualifies its references (decisions doc, iron rule 5 follow-on).
+**Membership helpers:** `my_brewery_ids()`, `my_customer_ids()`, `is_staff_of(b)`,
+`staff_roles(b)` and `has_staff_role(b, roles)`. The staff helpers use the member's
+role array; no scalar `staff_role(uuid)` helper remains. **(impl)** Every function
+sets `search_path = ''` and schema-qualifies its references (decisions doc, iron rule 5 follow-on).
 
 **Units (impl, per `brewing-domain.md`):** volume bbl, temperature °F, gravity °Plato,
 money cents.
@@ -112,24 +113,30 @@ money cents.
 ### `breweries` — unchanged
 `name, ttb_registry_no, pa_license_no, timezone default 'America/New_York', settings jsonb
 default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
-`admin_update` update `staff_role(id)='admin'`. No `unique(id, brewery_id)` (it is the root).
+`admin_update` update `has_staff_role(id, array['admin']::staff_role[])`. No `unique(id, brewery_id)` (it is the root).
 `one_way_keg_fee_cents int not null default 0 check (>= 0)`: the flat fee each
 one-way keg shipped carries instead of a deposit, set by admin-only
 `set_one_way_keg_fee`; 0 adds no fee line (`20261016100700_one_way_keg_fee.sql`).
 
-### `brewery_users` — roles become an array (decided 2026-09-07, not built)
-**Decided, not built — tracking issue #797.** The shipped table has one scalar
-`role staff_role not null`, and every RLS predicate calls the scalar
-`staff_role(b)`. The array design below is the decision, not the schema.
+### `brewery_users` — multiple staff roles (#797)
 pk `(brewery_id, user_id)`, `roles staff_role[] not null check (cardinality(roles) > 0)`.
-One person sells and brews; forcing a single role made them admin or made them
-choose. An array on the same row is the smallest change: `staff_role(b)` becomes
-`staff_roles(b)` returning the array, `assert_staff(p_brewery, p_roles)` already
-takes an array and checks overlap (`roles && p_roles`), every RPC call site stays
-as written, and `navFor` unions the nav of each role. A junction table was
-rejected: a second table, RLS, and a join for no behavior the array lacks. Last
-admin is now "the last row whose array contains admin". RLS unchanged
-(`member_read`, `admin_write`).
+Roles are a one-dimensional, null-free, unique array sorted in enum order:
+`admin, sales, warehouse, brewer, taproom`. There is no scalar role column or
+primary role. `staff_roles(b)` returns the array, or null for a non-member;
+`has_staff_role(b, roles)` checks overlap and returns false for a non-member.
+`assert_staff(p_brewery, p_roles)` checks the same overlap. Allowed lists include
+Admin wherever Admin has access; the helper does not add it implicitly.
+
+One person sells and brews. Their permissions and navigation are the union of
+their held roles. A single-role restriction applies only if every held role is
+restricted, so Taproom + Brewer retains Brewer's Search and quiet-hour access.
+Admin includes every staff permission and can be stored alongside other roles.
+`update_staff_role` accepts a nonempty `roles` array. Invitations still grant
+one scalar role, and an admin can add more afterward in Team member.
+Last admin means the last member whose array contains Admin: removing Admin
+is a demotion even when another role remains. It is refused for the last admin.
+Portal customer membership stays in `customer_users`, separate from staff roles.
+An array avoids a junction table and join with no additional behavior.
 The brewery-bound command context cannot bootstrap these two rows, and the listed
 policies expose no client insert path. Provisioning shipped as the pre-tenant
 `provision_brewery` command (`lib/commands/tenancy.ts`), which calls a

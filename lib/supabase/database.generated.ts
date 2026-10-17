@@ -363,14 +363,14 @@ isOneToOne: false
                   ]
                 },"brewery_users": {
                   Row: {
-                    "brewery_id": string,"created_at": string,"gravity_unit": string | null,"role": Database["public"]['Enums']["staff_role"],"user_id": string
+                    "brewery_id": string,"created_at": string,"gravity_unit": string | null,"roles": (Database["public"]['Enums']["staff_role"])[],"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"created_at"?: string,"gravity_unit"?: string | null,"role": Database["public"]['Enums']["staff_role"],"user_id": string
+                    "brewery_id": string,"created_at"?: string,"gravity_unit"?: string | null,"roles": (Database["public"]['Enums']["staff_role"])[],"user_id": string
                   }
                   Update: {
-                    "brewery_id"?: string,"created_at"?: string,"gravity_unit"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"user_id"?: string
+                    "brewery_id"?: string,"created_at"?: string,"gravity_unit"?: string | null,"roles"?: (Database["public"]['Enums']["staff_role"])[],"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -5052,6 +5052,9 @@ isOneToOne: false
 "has_active_canonical_chat_installation":
 { Args: { "p_external_installation_id": string }; Returns: boolean
                            },
+"has_staff_role":
+{ Args: { "b": string,"p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: boolean
+                           },
 "import_csv_row":
 { Args: { "p_brewery": string,"p_request_id": string,"p_row_n": number }; Returns: Json
                            },
@@ -5116,7 +5119,7 @@ isOneToOne: false
                            },
 "list_team_members":
 { Args: { "p_brewery": string }; Returns: {
-              "created_at": string,"email": string,"role": Database["public"]['Enums']["staff_role"],"user_id": string
+              "created_at": string,"email": string,"roles": (Database["public"]['Enums']["staff_role"])[],"user_id": string
             }[]
                            },
 "mark_chat_installation_reauthorization":
@@ -5494,8 +5497,8 @@ isOneToOne: false
               "ai_model": string,"gravity_unit": string,"id": string,"name": string,"timezone": string
             }[]
                            },
-"staff_role":
-{ Args: { "b": string }; Returns: Database["public"]['Enums']["staff_role"]
+"staff_roles":
+{ Args: { "b": string }; Returns: (Database["public"]['Enums']["staff_role"])[]
                            },
 "start_qbo_push":
 { Args: { "p_brewery": string,"p_invoice": string,"p_new_attempt_reason": string,"p_request_id": string }; Returns: Json
@@ -5578,7 +5581,7 @@ isOneToOne: false
 { Args: { "p_active": boolean,"p_batch_share"?: number,"p_brewery": string,"p_clear_batch_share"?: boolean,"p_clear_keg_pool"?: boolean,"p_id": string,"p_keg_pool"?: string,"p_request_id": string,"p_upc": string }; Returns: Json
                            },
 "update_staff_role":
-{ Args: { "p_brewery": string,"p_request_id": string,"p_role": Database["public"]['Enums']["staff_role"],"p_user": string }; Returns: Json
+{ Args: { "p_brewery": string,"p_request_id": string,"p_roles": (Database["public"]['Enums']["staff_role"])[],"p_user": string }; Returns: Json
                            },
 "upsert_brand":
 { Args: { "p_abv": number,"p_alias"?: string,"p_brewery": string,"p_category": string,"p_description": string,"p_hops": string,"p_id": string,"p_name": string,"p_price_group": string,"p_request_id": string,"p_style": string }; Returns: Json

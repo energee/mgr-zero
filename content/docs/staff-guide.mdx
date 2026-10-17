@@ -51,9 +51,11 @@ SKU fields in **New Order** open their own picker. For a wholesale order with a 
 
 Shared forms use the same text fields and pickers throughout MGR. Number-field minus/plus buttons change the value by one, keeping its decimal part; you can also type decimals where the field allows them. Reading cadence uses whole hours. Optional numbers can stay blank. Quantities with a unit beside them keep that unit visible.
 
-## Know what your role can do [#roles]
+## Know what your roles can do [#roles]
 
-*MGR checks your role when you submit an action. A button can still be on the page even when your role cannot finish it. The same limits apply to the database itself: customers, orders, invoices, prices, and compliance filings are readable only by the roles listed for them below, even through the API.*
+A member can hold more than one staff role. You get everything each role allows: Sales + Brewer can manage customers and brew batches. Adding Taproom never takes away another role's access. Admin already includes every staff permission, whether held alone or alongside other roles. Staff roles do not grant access to a customer's portal account; portal membership stays separate.
+
+*MGR checks your roles when you submit an action. A button can still be on the page even when your roles cannot finish it. The same limits apply to the database itself: customers, orders, invoices, prices, and compliance filings are readable only by the roles listed for them below, even through the API.*
 
 | Role | What you can do |
 | --- | --- |
@@ -837,12 +839,14 @@ For orders, MGR projects only the open order quantity not covered by finished go
 
 ## Team [#team]
 
-The invitation and member sheets use the same **Role** selector, including Taproom, with a short description of the selected role. Buyer invitations stay fixed to **Buyer**. In **Team member**, **Save role** enables only after a change; both saving and removal lock the controls until that request finishes. Real roster rows use initials when no photo is supplied, never an explorer fixture photo.
+**Invite staff** chooses one **Role**, including Taproom, with a short description. Buyer invitations stay fixed to **Buyer**. **Team member** has a **Roles** chooser: select one or more roles, then **Save roles**. Saving is available only after the selection changes and at least one role is selected. An empty selection shows **Choose at least one role.** Both saving and removal lock the controls until that request finishes. Real roster rows use initials when no photo is supplied, never an explorer fixture photo.
 
 <Screen name="Team" />
 <Screen name="Team member" />
 
-Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them and confirm, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Warehouse, Sales, Brewer, Taproom, or Admin), and **Send invite**. A new email says **Invite sent**; an email with an existing MGR sign-in says **Invitation pending** instead, since that recipient must accept it themselves (see [Accept an invitation](#getting-started)). The roster shows memberships, without a pending-acceptance status. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts receive a pending consent invitation and appear in the roster only after accepting. Ask them to sign in and open [Invitations](/invitations); no new password is needed. There is no resend or invitation-revocation control. Multiple simultaneous staff roles are unsupported. Non-admin staff are sent to **No access** if they open the address directly.
+Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and roles, listed in this order: Admin, Sales, Warehouse, Brewer, Taproom. Your own row is marked **you**. Open another member's row to change their **Roles** and **Save roles**, or **Remove** them and confirm, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one member with Admin: removing Admin from the last admin is refused even if that person keeps another role. The last admin cannot be removed, and nobody can remove themselves.
+
+**Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role**, and **Send invite**. Invitations grant one role; after acceptance, an admin can add more from **Team member**. A new email says **Invite sent**; an email with an existing MGR sign-in says **Invitation pending** instead, since that recipient must accept it themselves (see [Accept an invitation](#getting-started)). The roster shows memberships, without a pending-acceptance status. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts receive a pending consent invitation and appear in the roster only after accepting. Ask them to sign in and open [Invitations](/invitations); no new password is needed. There is no resend or invitation-revocation control. Non-admin staff are sent to **No access** if they open Team's address directly.
 
 ## Settings [#settings]
 
@@ -1007,7 +1011,7 @@ To close a brewery account, an administrator first disconnects QuickBooks, Squar
 Do not hunt for hidden controls for these:
 
 - public account sign-up
-- resending or revoking an invitation, or assigning multiple staff roles
+- resending or revoking an invitation
 - editing a purchase order after it is saved, or sending one by email from MGR
 - deleting a customer that has history, a single ship-to, inventory history, orders, invoices, or credit memos
 - recording payments

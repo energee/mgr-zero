@@ -12,7 +12,7 @@ let b: { id: string }, sales: Ctx, warehouse: Ctx, buyer: Ctx, other: Ctx, invoi
 
 async function customerCtx(customerId: string): Promise<Ctx> {
   const u = await makeCustomerUser(customerId);
-  return { db: await asUser(u.email), userId: u.id, breweryId: b.id, role: "customer", customerId };
+  return { db: await asUser(u.email), userId: u.id, breweryId: b.id, roles: ["customer"], customerId };
 }
 
 beforeAll(async () => {

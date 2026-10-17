@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { oauthState, sha256 } from "@/lib/hash";
 import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import { consumeAdmission } from "@/lib/commands/admission";
 import {
   beginQboInvoiceSync,
@@ -228,7 +229,7 @@ export async function resolvePortalInvoicePayment(
 }
 
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
   const state = oauthState(requestId, ctx.userId);
   await unwrap(ctx.db.rpc("begin_qbo_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.redirectUri, p_state_hash: sha256(state),
@@ -321,7 +322,7 @@ export async function pushInvoiceToQbo(
   client: QboOAuthClient,
   newAttemptReason?: "corrected" | "remote_deleted",
 ) {
-  if (ctx.role !== "admin" && ctx.role !== "sales") {
+  if (!hasAnyRole(ctx.roles, ["admin", "sales"])) {
     throw new CommandError("permission denied: QuickBooks push requires admin or sales", 403, "permission_denied");
   }
   const start = await unwrap(ctx.db.rpc("start_qbo_push", {
@@ -434,7 +435,7 @@ export async function postReceiptBill(ctx: Ctx, receiptId: string, requestId: st
 }
 
 export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOAuthClient) {
-  if (ctx.role !== "admin" && ctx.role !== "sales") {
+  if (!hasAnyRole(ctx.roles, ["admin", "sales"])) {
     throw new CommandError("permission denied: QuickBooks sync requires admin or sales", 403, "permission_denied");
   }
   const start = await beginQboInvoiceSync(ctx, requestId);

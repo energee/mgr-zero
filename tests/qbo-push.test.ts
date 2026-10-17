@@ -552,7 +552,7 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(deposit.ctx, deposit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, depositFetch)))
       .resolves.toMatchObject({ remoteId: "deposit-invoice" });
     expect(String(depositFetch.mock.calls[0][1]?.body)).toContain('"value": "deposit-item"');
-    expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", deposit.brewery.id).eq("user_id", deposit.ctx.userId)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", deposit.brewery.id).eq("user_id", deposit.ctx.userId)).error).toBeNull();
     await expect(pushInvoiceToQbo(deposit.ctx, deposit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
       .rejects.toMatchObject({ status: 403 });
     const foreign = await pushFixture();
@@ -629,7 +629,7 @@ describe("QuickBooks durable outbound push", () => {
       remote.set(key, entity);
       if (demote) {
         demote = false;
-        expect((await admin.from("brewery_users").update({ role: "warehouse" })
+        expect((await admin.from("brewery_users").update({ roles: ["warehouse"] })
           .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
       }
       return new Response(JSON.stringify(entity), { status: 200 });
@@ -638,7 +638,7 @@ describe("QuickBooks durable outbound push", () => {
     const requestId = crypto.randomUUID();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).rejects.toThrow("QuickBooks push reconciliation failed");
     expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
-    expect((await admin.from("brewery_users").update({ role: "admin" })
+    expect((await admin.from("brewery_users").update({ roles: ["admin"] })
       .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).resolves.toMatchObject({
       status: "pushed", remoteId: "finish-recovery-1",
@@ -693,7 +693,7 @@ async function receiptBillFixture(options: {
   unitCostCents?: number | null;
 } = {}) {
   const brewery = await makeBrewery();
-  const ctx = await makeStaffCtx(brewery.id, "admin");
+  const ctx = await makeStaffCtx(brewery.id, ["sales", "admin"]);
   const location = await seedLocation(brewery.id);
   const vendor = await runCommand("upsert_vendor", { name: "Receipt Bill supplier" }, ctx) as { id: string };
   const material = await runCommand("upsert_material", {
@@ -1042,10 +1042,10 @@ describe("QuickBooks receipt Bills", () => {
     const f = await receiptBillFixture();
     const fetch = vi.fn<typeof globalThis.fetch>();
     const client = new QboOAuthClient(config, fetch);
-    for (const role of ["sales", "warehouse", "brewer", "taproom"] as const) {
-      const denied = await makeStaffCtx(f.brewery.id, role);
+    for (const roles of [["sales"], ["warehouse"], ["brewer"], ["taproom"], ["sales", "warehouse"]] as const) {
+      const denied = await makeStaffCtx(f.brewery.id, [...roles]);
       await expect(postReceiptBill(denied, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/permission/i);
-      await expect(postReceiptBill({ ...denied, role: "admin" }, f.receiptId, crypto.randomUUID(), client))
+      await expect(postReceiptBill({ ...denied, roles: ["admin"] }, f.receiptId, crypto.randomUUID(), client))
         .rejects.toThrow(/permission/i);
     }
     const foreign = await receiptBillFixture();
@@ -1078,7 +1078,7 @@ describe("QuickBooks receipt Bills", () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
       const response = await remote.fetch(input, init);
       if (init?.method === "POST") {
-        expect((await admin.from("brewery_users").update({ role: "warehouse" })
+        expect((await admin.from("brewery_users").update({ roles: ["warehouse"] })
           .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
       }
       return response;
@@ -1088,7 +1088,7 @@ describe("QuickBooks receipt Bills", () => {
     await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).rejects.toThrow(/reconciliation failed/i);
     expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id").eq("id", f.receiptId).single()).data)
       .toEqual({ qbo_bill_status: "pending", qbo_bill_id: null });
-    expect((await admin.from("brewery_users").update({ role: "admin" })
+    expect((await admin.from("brewery_users").update({ roles: ["warehouse", "admin"] })
       .eq("brewery_id", f.brewery.id).eq("user_id", f.ctx.userId)).error).toBeNull();
     await expect(postReceiptBill(f.ctx, f.receiptId, requestId, client)).resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
     expect(remote.posts).toHaveLength(1);

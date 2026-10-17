@@ -19,8 +19,9 @@ describe("water profiles view", () => {
     expect(toWaterProfilesViewProps({ profiles: [] }).empty?.title).toBe("No water profiles yet");
   });
   it("sends Brewer back to Recipes, since Brewer cannot open Catalog", () => {
-    expect(waterProfilesBack("brewer")).toEqual({ label: "Recipes", href: "/recipes" });
-    expect(waterProfilesBack("admin")).toEqual({ label: "Catalog", href: "/catalog" });
-    expect(toWaterProfilesViewProps({ profiles: [], back: waterProfilesBack("brewer") })).toMatchObject({ backLabel: "Recipes", backHref: "/recipes" });
+    expect(waterProfilesBack(["brewer"])).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(waterProfilesBack(["brewer", "taproom"])).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(waterProfilesBack(["admin"])).toEqual({ label: "Catalog", href: "/catalog" });
+    expect(toWaterProfilesViewProps({ profiles: [], back: waterProfilesBack(["brewer"]) })).toMatchObject({ backLabel: "Recipes", backHref: "/recipes" });
   });
 });

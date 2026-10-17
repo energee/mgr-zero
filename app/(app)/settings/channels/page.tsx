@@ -30,7 +30,7 @@ export default async function ChannelsPage() {
   const channels = (await runCommand("list_sale_channels", {}, ctx)) as SaleChannel[];
   const canEdit = canRun(ctx, "upsert_sale_channel"), canDelete = canRun(ctx, "delete_sale_channel");
   // Settings is admin-only; sales and warehouse return to More (#444).
-  const toSettings = canOpen(brewery.role, "/settings");
+  const toSettings = canOpen(brewery.roles, "/settings");
   return (
     <SaleChannelsView
       model={toSaleChannelsViewProps({ channels, backHref: toSettings ? "/settings" : "/more" })}

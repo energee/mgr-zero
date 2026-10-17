@@ -314,7 +314,7 @@ it("denies a precommit saved close after role revocation and keeps its original 
   stubCommandFetch(async () => { throw new TypeError("Request never reached server"); });
   expect(await mount().run("close_packaging_run", f.input)).toBe(false);
   const [saved] = readRecoveries(sessionStorage, recovery.context);
-  sql(`update public.brewery_users set role='sales' where brewery_id='${f.brewery.id}' and user_id='${f.ctx.userId}'`);
+  sql(`update public.brewery_users set roles=array['sales']::public.staff_role[] where brewery_id='${f.brewery.id}' and user_id='${f.ctx.userId}'`);
   const denied = stubCommandFetch(async (_url, init) => {
     const request = JSON.parse(init.body as string);
     expect(request).toMatchObject({ requestId: saved.requestId, input: f.input });
@@ -360,6 +360,6 @@ it("keeps the lot receipt tenant-scoped, denies non-packaging roles, and gives f
     const denied = await makeStaffCtx(f.brewery.id, role);
     expect((await denied.db.rpc("get_packaging_run_lot", { p_brewery: f.brewery.id, p_run: f.run.id })).error?.code).toBe("42501");
   }
-  sql(`update public.brewery_users set role='sales' where brewery_id='${f.brewery.id}' and user_id='${f.ctx.userId}'`);
+  sql(`update public.brewery_users set roles=array['sales']::public.staff_role[] where brewery_id='${f.brewery.id}' and user_id='${f.ctx.userId}'`);
   expect((await f.ctx.db.rpc("get_packaging_run_lot", { p_brewery: f.brewery.id, p_run: f.run.id })).error?.code).toBe("42501");
 });

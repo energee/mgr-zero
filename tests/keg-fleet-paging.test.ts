@@ -32,7 +32,7 @@ function fixture() {
 
 // Only the transport is simulated: registry permissions, paging, joins and totals are real.
 function context(tables: Record<string, Row[]>, failure?: PageFailure, reads?: PageRead[]): Ctx {
-  return { db: cappedDb(tables, { failure, reads }), userId: "staff", breweryId, role: "warehouse" };
+  return { db: cappedDb(tables, { failure, reads }), userId: "staff", breweryId, roles: ["warehouse"] };
 }
 
 type Fleet = {
@@ -88,7 +88,7 @@ describe("complete keg fleet (#726)", () => {
 
   it.each(["sales", "brewer", "taproom", "customer"] as const)("denies %s before reading fleet data", async role => {
     const reads: PageRead[] = [];
-    await expect(fleet({ ...context(fixture(), undefined, reads), role })).rejects.toThrow(/permission/i);
+    await expect(fleet({ ...context(fixture(), undefined, reads), roles: [role] })).rejects.toThrow(/permission/i);
     expect(reads).toEqual([]);
   });
 });

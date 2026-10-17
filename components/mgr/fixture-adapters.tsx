@@ -12,6 +12,7 @@ import { formatControls, type FormatViewModel } from "@/lib/mgr/format-view";
 import type { ReceiptView } from "@/components/mgr/views/receipt";
 import type { StaffRole } from "@/lib/commands/registry";
 import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 /** Wraps the inventory `<FormatView>` as a child, so the drawn element stays FormatView
  *  (screen-view-composition finds it) while this adapter owns its state. */
@@ -35,11 +36,11 @@ export function CatalogCategoriesFixture({ categories }: { categories: string[] 
 }
 
 /** Inventory-only simulation: a lost response followed by successful reconciliation. */
-export function ReceiptFixture({ children, role = "admin" }: {
-  children: ReactElement<ComponentProps<typeof ReceiptView>>; role?: StaffRole;
+export function ReceiptFixture({ children, roles = ["admin"] }: {
+  children: ReactElement<ComponentProps<typeof ReceiptView>>; roles?: readonly StaffRole[];
 }) {
   const [model, setModel] = useState(children.props.model);
-  const canPost = role === "admin";
+  const canPost = hasAnyRole(roles, ["admin"]);
   return cloneElement(children, {
     model: canPost || !model.bill ? model : { ...model, bill: { ...model.bill, action: undefined, mappingHref: undefined } },
     onPostBill: canPost ? async () => {

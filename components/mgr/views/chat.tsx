@@ -178,7 +178,7 @@ export function ChatLinkedPeopleView({ people, backHref, linkHref, busy = false,
   return <>
     {E.back("Chat", "Linked people", undefined, backHref)}
     {!people.length && E.info("No current staff have linked Slack yet.")}
-    {people.map(person => <div key={person.id}>{E.row(person.name, `${person.role} · Slack ${person.slackIdentity} · linked ${person.linkedAt.slice(0, 10)}`, <Button variant="destructive" size="sm" disabled={busy} onClick={() => onUnlink?.(person.id)}>Unlink</Button>)}</div>)}
+    {people.map(person => <div key={person.id}>{E.row(person.name, `${person.roles.join(", ")} · Slack ${person.slackIdentity} · linked ${person.linkedAt.slice(0, 10)}`, <Button variant="destructive" size="sm" disabled={busy} onClick={() => onUnlink?.(person.id)}>Unlink</Button>)}</div>)}
     <CommandFormMessage error={error} />
     {E.btn("Link your Slack", "g", linkHref)}
   </>;

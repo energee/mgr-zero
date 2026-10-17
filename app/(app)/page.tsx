@@ -17,17 +17,18 @@ import { FirstRunChecklist, type FirstRun } from "./first-run";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
 import { formatDayHeader } from "@/lib/date-format";
+import { onlyRoles } from "@/lib/mgr/roles";
 
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const date = formatDayHeader(new Date(), brewery.timeZone);
   // Admin reads Today alongside the first-run state, not after it; a new brewery's Today is empty and cheap.
-  const [state, adminItems] = brewery.role === "admin"
+  const [state, adminItems] = brewery.roles.includes("admin")
     ? await Promise.all([runCommand("get_first_run_state", {}, ctx) as Promise<FirstRun>, runCommand("get_today", {}, ctx) as Promise<TodayItem[]>])
     : [null, null];
   if (state && !state.hasLocation && !state.hasBrand) return <FirstRunChecklist brewery={brewery.name} state={state} />;
-  if (brewery.role === "taproom") {
+  if (onlyRoles(brewery.roles, ["taproom"])) {
     const locations = (await runCommand("list_locations", { use: "taproom" }, ctx)) as { id: string; name: string }[];
     const location = locations[0];
     if (!location) {

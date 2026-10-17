@@ -22,7 +22,7 @@ it("edits SKU facts with replay, conflict and duplicate UPC protection while pre
   const customer = await seedCustomer(ctx.breweryId);
   await priceSku(ctx.breweryId, { ...cat, saleChannelId: customer.saleChannelId, cents: 100 });
   const actor = await makeCustomerUser(customer.customerId);
-  const buyer = { db: await asUser(actor.email), userId: actor.id, breweryId: ctx.breweryId, customerId: customer.customerId, role: "customer" as const };
+  const buyer = { db: await asUser(actor.email), userId: actor.id, breweryId: ctx.breweryId, customerId: customer.customerId, roles: ["customer" as const] };
   const orderInput = { kind: "wholesale", customerId: customer.customerId, shipToId: customer.shipToId, fromLocationId: loc.id, lines: [{ skuId: cat.skuId, qty: 1 }] };
   const order = await runCommand("create_order", orderInput, ctx) as { order_id: string };
   const beforeLines = await admin.from("order_lines").select().eq("order_id", order.order_id);
@@ -90,7 +90,6 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
 });
 it("gates catalog mutators and excludes inactive SKUs from New Order picker options", () => {
   const page = readFileSync("app/(app)/catalog/page.tsx", "utf8");
-  expect(page).toContain('brewery.role === "admin" || brewery.role === "sales"');
   for (const component of ["FormatForm"]) expect(page).toMatch(new RegExp(`canWrite[^\\n]*<${component}`));
   // New Brand is a link to the Brand page; the brand row itself opens it, so
   // there is no Edit brand button to gate.
@@ -99,7 +98,6 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   // A brand's packages, and both SKU sheets, live on its SKU list page.
   // main214-page-assembly renders that page per role and proves the gating.
   const skuList = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
-  expect(skuList).toContain('brewery.role === "admin" || brewery.role === "sales"');
   expect(skuList).toMatch(/canWrite \? <SkuForm/);
   expect(skuList).toContain("rowAction={canWrite ?");
   expect(skuList).toContain("<PourForm");

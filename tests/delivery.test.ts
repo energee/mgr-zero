@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DB, admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
-import { runCommand } from "@/lib/commands/registry";
+import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string };
@@ -84,6 +84,17 @@ describe("deliveries schema", () => {
 });
 
 describe("save_route and list_routes", () => {
+  it("lists eligible multi-role drivers once and excludes members without warehouse or admin", async () => {
+    const combined = await makeStaffCtx(b.id, ["sales", "warehouse"]);
+    const nonDriver = await makeStaffCtx(b.id, ["sales", "brewer"]);
+    const listed = await runCommand("list_routes", { date: "2030-01-01" }, combined) as {
+      drivers: { user_id: string; roles: StaffRole[] }[];
+    };
+    expect(listed.drivers.filter(driver => driver.user_id === combined.userId))
+      .toEqual([{ user_id: combined.userId, roles: ["sales", "warehouse"] }]);
+    expect(listed.drivers.some(driver => driver.user_id === nonDriver.userId)).toBe(false);
+  });
+
   it("saves a mixed route, lists it by date, and refuses a shipment already on an open route", async () => {
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     const [sh1, sh2, tr] = [await shipment(), await shipment(), await transfer()];
@@ -96,7 +107,7 @@ describe("save_route and list_routes", () => {
     const listed = await runCommand("list_routes", { date: "2026-09-11" }, warehouse) as {
       routes: { id: string; name: string; driver_user_id: string; stops: { stop_no: number; shipment_id: string | null; stock_transfer_id: string | null; label: string }[] }[];
       unassigned: { id: string; kind: string }[];
-      drivers: { user_id: string; role: string }[];
+      drivers: { user_id: string; roles: StaffRole[] }[];
     };
     const route = listed.routes.find((r) => r.id === saved.routeId)!;
     expect(route.name).toBe("Route A");

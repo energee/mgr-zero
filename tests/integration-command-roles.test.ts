@@ -24,7 +24,7 @@ const integrationCommands: Record<string, StaffRole[]> = {
   sync_square_sales: ["admin"],
 };
 
-const ctxFor = (role: StaffRole) => ({ breweryId: "11111111-1111-4111-8111-111111111111", role, userId: "22222222-2222-4222-8222-222222222222" } as unknown as OperationCtx);
+const ctxFor = (...roles: StaffRole[]) => ({ breweryId: "11111111-1111-4111-8111-111111111111", roles, userId: "22222222-2222-4222-8222-222222222222" } as unknown as OperationCtx);
 
 describe("integration command registration", () => {
   it.each(Object.keys(integrationCommands))("%s is registered with a schema", (name) => {
@@ -45,6 +45,18 @@ describe("integration command registration", () => {
     expect(denied.length, `${name} would allow all of staff`).toBeGreaterThan(0);
     for (const role of denied) expect(canRun(ctxFor(role), name), `${name} must deny ${role}`).toBe(false);
     for (const role of allowed) expect(canRun(ctxFor(role), name), `${name} must allow ${role}`).toBe(true);
+  });
+
+  it("unions integration permissions without granting admin operations", () => {
+    const salesWarehouse = ctxFor("warehouse", "sales");
+    for (const name of ["get_qbo_connection", "push_invoice_to_qbo", "sync_qbo_payments"]) {
+      expect(canRun(salesWarehouse, name), name).toBe(true);
+    }
+    for (const name of ["connect_qbo", "disconnect_qbo", "connect_square", "sync_square_sales"]) {
+      expect(canRun(salesWarehouse, name), name).toBe(false);
+      expect(canRun(ctxFor("warehouse", "admin"), name), name).toBe(true);
+    }
+    expect(canRun(ctxFor("warehouse", "brewer"), "push_invoice_to_qbo")).toBe(false);
   });
 
   it.each(Object.keys(integrationCommands))("%s rejects garbage input", (name) => {

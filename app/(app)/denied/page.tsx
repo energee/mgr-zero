@@ -7,7 +7,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { deniedCopy } from "@/lib/mgr/denied";
 export default async function DeniedPage({ searchParams }: { searchParams: Promise<{ for?: string; needs?: string }> }) {
   const [{ for: resource = "this page", needs = "" }, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
-  const copy = deniedCopy({ resource, role: brewery.role, needs: needs.split(",").filter(Boolean) });
+  const copy = deniedCopy({ resource, roles: brewery.roles, needs: needs.split(",").filter(Boolean) });
   return (
     <DeniedView
       model={{ ...copy, backHref: "/" }}

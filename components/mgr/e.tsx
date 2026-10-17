@@ -347,11 +347,11 @@ export const E = {
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** Several picked values at once: a location is often a taproom and storage
    *  and a warehouse, so the control has to admit more than one answer. */
-  picks: (label: string, values: string[], options: string[]) => (
-    <Field>
+  picks: (label: string, values: string[], options: (string | { value: string; label: string })[], controls?: { onChange?: (values: string[]) => void; disabled?: boolean; "aria-invalid"?: boolean }) => (
+    <Field data-disabled={controls?.disabled} data-invalid={controls?.["aria-invalid"]}>
       <FieldLabel>{label}</FieldLabel>
-      <ToggleGroup type="multiple" defaultValue={values} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
-        {options.map((o) => <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem>)}
+      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-invalid={controls?.["aria-invalid"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
+        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value}>{o.label}</ToggleGroupItem>)}
       </ToggleGroup>
     </Field>
   ),
@@ -490,7 +490,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (role: StaffRole = "admin", container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!role} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
+  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!roles.length} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
 };
 
 function isPin(n: ReactNode) {

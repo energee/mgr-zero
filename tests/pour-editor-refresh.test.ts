@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", role: "admin" }) }));
+vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["admin"] }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({}) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 vi.mock("@/lib/commands/all", () => ({}));

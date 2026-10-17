@@ -22,7 +22,7 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const canWrite = brewery.role === "admin" || brewery.role === "sales";
+  const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [brands, formats, pools, barcodes] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<Brand[]>,
     // A SKU is always a packaged format, so one filtered read serves both the

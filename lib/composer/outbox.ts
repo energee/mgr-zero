@@ -3,6 +3,7 @@ import { CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 export { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 
@@ -19,7 +20,7 @@ export const OUTBOX_RETIREMENT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const OUTBOX_QUARANTINE_KEY = "mgr-offline-outbox:quarantine";
 
 const staffRole = z.enum(["admin", "sales", "warehouse", "brewer", "taproom"]);
-const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), role: staffRole }).strict();
+const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), roles: z.array(staffRole).min(1).readonly() }).strict();
 const retirementSchema = z.object({ retiredAt: z.number().int().nonnegative() }).strict();
 const attemptSchema = z.object({
   version: z.literal(1),
@@ -38,7 +39,7 @@ const attemptSchema = z.object({
   lastError: z.string().optional(),
 }).strict().superRefine((entry, context) => {
   if (entry.id !== entry.requestId) context.addIssue({ code: "custom", message: "Outbox identity changed" });
-  if (!fermentationReadingOfflinePolicy.roles.includes(entry.scope.role as "admin" | "brewer")) {
+  if (!hasAnyRole(entry.scope.roles, fermentationReadingOfflinePolicy.roles)) {
     context.addIssue({ code: "custom", message: "Command is not eligible for this role" });
   }
 });
@@ -58,6 +59,26 @@ export type OutboxSendResult = { status: "sent" | "uncertain" | "fix" | "permiss
 
 const sends = new WeakMap<object, Map<string, { startedAt: number; pending: Promise<OutboxSendResult> }>>();
 
+// Persisted readings predate the role-array cutover. Upgrade their scope once
+// on load; this is a storage migration, not an accepted command/context shape.
+const scalarStoredScope = scopeSchema.omit({ roles: true }).extend({ role: staffRole }).strict();
+type ParsedStoredAttempt = { entry: OutboxAttempt; upgraded: boolean };
+function parseStoredAttempt(value: unknown): ParsedStoredAttempt {
+  let upgraded = false;
+  if (value && typeof value === "object" && "scope" in value) {
+    const scope = value.scope;
+    if (scope && typeof scope === "object" && "role" in scope) {
+      const oldScope = scalarStoredScope.safeParse(scope);
+      if (oldScope.success) {
+        const { role, ...identity } = oldScope.data;
+        value = { ...value, scope: { ...identity, roles: [role] } };
+        upgraded = true;
+      }
+    }
+  }
+  return { entry: attemptSchema.parse(value), upgraded };
+}
+
 /**
  * Splits the legacy array into valid attempts and the raw text of everything
  * else. Unparseable JSON or a non-array quarantines the whole value; otherwise
@@ -70,9 +91,8 @@ function parseOutbox(raw: string): { entries: OutboxAttempt[]; rejected: string[
   const entries: OutboxAttempt[] = [];
   const rejected: string[] = [];
   for (const element of value) {
-    const parsed = attemptSchema.safeParse(element);
-    if (parsed.success) entries.push(parsed.data);
-    else rejected.push(JSON.stringify(element));
+    try { entries.push(parseStoredAttempt(element).entry); }
+    catch { rejected.push(JSON.stringify(element)); }
   }
   return { entries, rejected };
 }
@@ -174,11 +194,13 @@ function storedAttempt(storage: OutboxStorage, id: string): OutboxAttempt | null
   if (isRetired(storage, id)) return null;
   const raw = storage.getItem(entryKey(id));
   if (raw === null) return null;
+  let parsed: ParsedStoredAttempt;
   try {
-    const parsed = attemptSchema.parse(JSON.parse(raw));
-    if (parsed.id !== id) throw new Error("key mismatch");
-    return parsed;
+    parsed = parseStoredAttempt(JSON.parse(raw));
+    if (parsed.entry.id !== id) throw new Error("key mismatch");
   } catch { throw new Error("Offline outbox row could not be read. Nothing was sent or replaced."); }
+  if (parsed.upgraded) writeAttempt(storage, parsed.entry);
+  return parsed.entry;
 }
 
 function migrateLegacyOutbox(storage: OutboxStorage) {
@@ -205,10 +227,16 @@ export function readOutbox(storage: OutboxStorage): OutboxAttempt[] {
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
     if (!key?.startsWith(OUTBOX_ENTRY_PREFIX)) continue;
-    try {
-      const entry = attemptSchema.parse(JSON.parse(storage.getItem(key) ?? ""));
-      if (key === entryKey(entry.id) && !isRetired(storage, entry.id)) entries.push(entry);
-    } catch { /* One malformed row cannot hide or replace valid siblings. */ }
+    let parsed: ParsedStoredAttempt;
+    try { parsed = parseStoredAttempt(JSON.parse(storage.getItem(key) ?? "")); }
+    catch { continue; } // One malformed row cannot hide or replace valid siblings.
+    const { entry, upgraded } = parsed;
+    if (key === entryKey(entry.id) && !isRetired(storage, entry.id)) {
+      // Persist before exposing a replayable entry. A write failure retains the
+      // original row and surfaces instead of silently hiding an uncertain read.
+      if (upgraded) writeAttempt(storage, entry);
+      entries.push(entry);
+    }
   }
   return entries.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt) || a.id.localeCompare(b.id));
 }
@@ -273,8 +301,8 @@ function failureMessage(error: unknown) {
 async function sendOne(storage: OutboxStorage, id: string, scope: OfflineScope, send: OutboxTransport, startedAt: number): Promise<OutboxSendResult> {
   const entry = readOutbox(storage).find((candidate) => candidate.id === id);
   if (!entry || entry.scope.actorId !== scope.actorId || entry.scope.breweryId !== scope.breweryId) return { status: "not_current" };
-  if (!fermentationReadingOfflinePolicy.roles.includes(scope.role as "admin" | "brewer")) {
-    const denied = { ...entry, state: "permission_changed" as const, lastError: `Your role changed from ${entry.scope.role}; this reading will not be sent.` };
+  if (!hasAnyRole(scope.roles, fermentationReadingOfflinePolicy.roles)) {
+    const denied = { ...entry, state: "permission_changed" as const, lastError: `Your roles changed from ${entry.scope.roles.join(", ")}; this reading will not be sent.` };
     replaceAttempt(storage, denied, id);
     return { status: "permission_changed", entry: denied };
   }
