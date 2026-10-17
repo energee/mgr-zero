@@ -59,8 +59,8 @@ export function shipToFormFields(shipTo: ShipToRecord | undefined, customerCount
 
 /** A ship-to as one line: street, then the city, state and zip, then the
  *  country outside the US. Missing parts drop out, so a foreign ship-to with
- *  no address reads as its country. Screens that show only the place (order,
- *  portal, delivery) pass no street or zip. */
+ *  no address reads as its country. Callers that only show the place (such
+ *  as order summaries) may omit street and zip. */
 export type ShipToAddressParts = { country: string } & Partial<Record<"address1" | "address2" | "city" | "state" | "zip", string | null>>;
 
 export function shipToAddress(s: ShipToAddressParts): string {

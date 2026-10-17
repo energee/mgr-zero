@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-
 import { describe, expect, it } from "vitest";
+// ponytail: yaml is already installed transitively (fumadocs); a real parser without a new dependency.
+import { parse as load } from "yaml";
 
 const read = (path: string) => readFileSync(path, "utf8");
-// ponytail: js-yaml is already installed transitively (eslint); a real parser without a new dependency.
-const { load } = createRequire(import.meta.url)("js-yaml") as { load: (source: string) => unknown };
 
 describe("dreaming workflow", () => {
   it("is valid YAML (a column-0 line inside a `run: |` block once broke the file)", () => {

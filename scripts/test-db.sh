@@ -13,6 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 WD=tests/supabase
+scripts/test-stack-templates.sh
 psql_test() { PGPASSWORD=postgres psql -h 127.0.0.1 -p 54352 -U postgres -d postgres -qtAc "$1"; }
 # Hash of everything a reset builds from: the migrations (names and contents)
 # and the stack config; seed is off. It is stored as the database's comment,

@@ -4,7 +4,11 @@
 // and Today's delivery_next follows the assigned driver.
 import { beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
-import { DB, admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
+import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
+import { DB, admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -12,6 +16,7 @@ let b: { id: string };
 let adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let whId: string, whBinId: string, storageId: string, storageBinId: string;
 let customerId: string, shipToId: string, skuId: string, lotId: string;
+let exportCustomerId: string;
 
 beforeAll(async () => {
   b = await makeBrewery();
@@ -30,13 +35,19 @@ beforeAll(async () => {
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
+  const exportChannelId = await channelId(b.id, "Export");
+  const exporter = await runCommand("upsert_customer", {
+    name: "Fictional Export Account", type: "retailer", country: "JP", saleChannelId: exportChannelId,
+  }, adminCtx) as { id: string };
+  exportCustomerId = exporter.id;
+  await priceSku(b.id, { saleChannelId: exportChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
 });
 
-/** A shipped wholesale order; returns its shipment id. */
-async function shipment(qty = 2, invoiceTiming: "now" | "on_delivery" = "now", sourceLotId?: string) {
+/** A shipped wholesale order for its customer and destination; returns its shipment id. */
+async function shipment(qty = 2, invoiceTiming: "now" | "on_delivery" = "now", sourceLotId?: string, destination = { customerId, shipToId }) {
   const { order_id: id } = await runCommand("create_order", {
-    kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty }],
+    kind: "wholesale", ...destination, fromLocationId: whId, lines: [{ skuId, qty }],
   }, adminCtx) as { order_id: string };
   await runCommand("submit_order", { orderId: id }, adminCtx);
   await runCommand("confirm_order", { orderId: id }, adminCtx);
@@ -124,6 +135,74 @@ describe("save_route and list_routes", () => {
       .rejects.toThrow(/driver/i);
     // a route cannot be empty (Routes says New route is the only action when there is nothing to deliver)
     await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [] }, adminCtx)).rejects.toThrow();
+  });
+
+  it.each([
+    {
+      name: "US street, second line and postal code",
+      address: { label: "Dock", country: "US", address1: "123 Fictional Lane", address2: "Suite 4", city: "Phoenixville", state: "PA", zip: "19460" },
+      missing: false,
+    },
+    {
+      name: "foreign street and postal code without a US state",
+      address: { label: "Receiving", country: "JP", address1: "2-3 Fictional Street", address2: "Floor 5", city: "Tokyo", state: null, zip: "100-0001" },
+      missing: false,
+    },
+    {
+      name: "US destination with unrecorded street and postal code",
+      address: { label: "Dock", country: "US", address1: null, address2: null, city: "Phoenixville", state: "PA", zip: null },
+      missing: true,
+    },
+    {
+      name: "foreign destination with only its label and country",
+      address: { label: "Receiving", country: "JP", address1: null, address2: null, city: null, state: null, zip: null },
+      missing: true,
+    },
+  ])("hands off the $name through the assigned driver's authorized stop query", async ({ address, missing }) => {
+    const driver = await makeStaffCtx(b.id, "warehouse");
+    const destinationCustomerId = address.country === "US" ? customerId : exportCustomerId;
+    const shipTo = await runCommand("upsert_ship_to", {
+      customerId: destinationCustomerId, label: address.label, country: address.country,
+      address1: address.address1 ?? undefined, address2: address.address2 ?? undefined,
+      city: address.city ?? undefined, state: address.state ?? undefined, zip: address.zip ?? undefined,
+    }, adminCtx) as { id: string };
+    const sh = await shipment(1, "on_delivery", undefined, { customerId: destinationCustomerId, shipToId: shipTo.id });
+    const { routeId } = await runCommand("save_route", {
+      deliveryDate: "2026-09-13", driverUserId: driver.userId, stops: [{ shipmentId: sh, stopNo: 1 }],
+    }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, driver);
+    const listed = await runCommand("list_routes", { id: routeId }, driver) as { routes: { stops: { id: string }[] }[] };
+    const deliveryId = listed.routes[0].stops[0].id;
+    const detail = await runCommand("get_delivery_stop", { deliveryId }, driver) as {
+      delivery: { shipments: { orders: { customers: { name: string }; ship_tos: ShipToSnapshot } }; stock_transfers: null };
+      lines: { id: string; name: string; qty: number }[];
+    };
+    // Exact authorized projection: no billing/provider fields and no invented address parts.
+    expect(detail.delivery.shipments.orders.ship_tos).toEqual(address);
+    expect(detail.delivery.stock_transfers).toBeNull();
+    const html = renderToStaticMarkup(createElement(ConfirmDeliveryView, { model: {
+      title: "Driver stop", heading: detail.delivery.shipments.orders.customers.name,
+      shipTo: detail.delivery.shipments.orders.ship_tos, invoiceTiming: "On delivery · saved",
+      lines: detail.lines.map((line) => ({ key: line.id, title: line.name, qty: String(line.qty) })),
+    } }));
+    for (const part of [address.label, address.address1, address.address2, address.city, address.state, address.zip]) {
+      if (part) expect(html).toContain(part);
+    }
+    if (address.country === "JP") expect(html).toContain("Japan");
+    expect(html.includes('role="alert"')).toBe(missing);
+    if (missing) {
+      const notice = html.match(/data-slot="alert-description"[^>]*>([^<]*)</)?.[1] ?? "";
+      expect(notice).toMatch(/street/i);
+      expect(notice).toMatch(/postal/i);
+      expect(html).not.toContain("1 Main St");
+      expect(html).not.toContain("19460");
+    }
+    expect(html).not.toContain("null");
+    const brewer = await makeStaffCtx(b.id, "brewer");
+    await expect(runCommand("get_delivery_stop", { deliveryId }, brewer)).rejects.toMatchObject({ code: "permission_denied" });
+    const otherBrewery = await makeBrewery();
+    const outsider = await makeStaffCtx(otherBrewery.id, "warehouse");
+    await expect(runCommand("get_delivery_stop", { deliveryId }, outsider)).rejects.toThrow();
   });
 
   it("get_delivery_stop describes a transfer stop by its destination and picked lines", async () => {

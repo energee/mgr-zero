@@ -60,7 +60,7 @@ export const confirmDeliveryStop1: ConfirmDeliveryViewModel = {
   backTo: "Driver route",
   title: "Route A · Stop 1 of 3",
   heading: "Ridgeline Tap Room",
-  shipTo: "Tap Room · Phoenixville, PA",
+  shipTo: { label: "Tap Room", country: "US", address1: "123 Fictional Lane", address2: "Suite 4", city: "Phoenixville", state: "PA", zip: "19460" },
   invoiceTiming: "On delivery · saved",
   lines: [
     { key: "hazy", title: "Hazy IPA · ½ bbl keg", qty: "4" },

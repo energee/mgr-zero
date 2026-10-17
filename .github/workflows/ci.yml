@@ -99,7 +99,9 @@ jobs:
         with: { bun-version-file: ".bun-version" }
       - run: bun install --frozen-lockfile
       - uses: supabase/setup-cli@v1
-        with: { version: 2.116.0 }
+        with: { version: 2.121.0 }
+      # The CLI only reads auth templates inside the test project's root.
+      - run: scripts/test-stack-templates.sh
       # Only the services the tests touch: Postgres, Auth, PostgREST, Kong,
       # and mailpit (Auth delivers invite emails to it — excluding it makes
       # inviteUserByEmail fail with "Error sending invite email").

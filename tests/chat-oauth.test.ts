@@ -4,7 +4,6 @@ import { rawDatabase } from "./raw-database";
 // hashed ten-minute state, exact redirect binding, idempotent activation, scope
 // checks, reconciliation, and disable-first disconnect (live DB, fake Slack port).
 import { createHash } from "node:crypto";
-import { WebClient } from "@slack/web-api";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, DB, sql } from "./helpers";
 import {
@@ -351,7 +350,11 @@ it.each([false, true])("holds real adapter token consumers until staged persiste
   await chatReady();
   const slack = slackAdapter(), teamId = `T-${crypto.randomUUID()}`;
   const send = vi.fn();
-  const exchange = vi.spyOn(WebClient.prototype, "apiCall").mockImplementation(async (method, options) => {
+  // Spy on the SDK's actual client class, not a separately installed Web API
+  // version. The callback-local adapter and token clients share this prototype.
+  const client = slack.withBotToken("xoxb-test-prototype", () => slack.webClient);
+  const clientPrototype = Object.getPrototypeOf(client) as typeof client;
+  const exchange = vi.spyOn(clientPrototype, "apiCall").mockImplementation(async (method, options) => {
     if (method === "oauth.v2.access") return { ok: true, access_token: "xoxb-staged", team: { id: teamId, name: "Staged" }, scope: REQUIRED_SLACK_SCOPES.join(","), bot_user_id: "B1" };
     if (method === "auth.test") return { ok: true, response_metadata: { scopes: [...REQUIRED_SLACK_SCOPES] } };
     if (method === "conversations.list") return { ok: true, channels: [] };

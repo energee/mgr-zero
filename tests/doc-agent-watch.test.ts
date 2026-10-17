@@ -1,11 +1,10 @@
 // tests/doc-agent-watch.test.ts — the doc agents fail loudly and re-audit on a clock.
 // Dreaming failed 13 days running (9/29–10/11) on one allowlist line and nobody saw it.
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
+import { parse as load } from "yaml";
 
 const read = (path: string) => readFileSync(path, "utf8");
-const { load } = createRequire(import.meta.url)("js-yaml") as { load: (source: string) => unknown };
 type Workflow = { on: Record<string, { workflows?: string[]; types?: string[] } | null>; jobs: Record<string, { if?: string; permissions?: Record<string, string> }> };
 
 describe("doc agent watch", () => {

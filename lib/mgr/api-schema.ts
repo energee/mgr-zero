@@ -3,7 +3,7 @@
 // /docs/api page come from here, so an operation's docs cannot describe input
 // its handler does not accept. Use Zod's core discriminated schema definitions.
 import { core } from "zod";
-import type { $ZodType, $ZodTypes } from "zod/v4/core";
+import type { $ZodChecks, $ZodType, $ZodTypes } from "zod/v4/core";
 
 // Zod documents this union cast for schema walkers; each definition is then
 // narrowed by its type discriminator before accessing type-specific fields.
@@ -102,9 +102,15 @@ export function sampleValue(node: $ZodType): unknown {
       return fit;
     }
     case "number": {
-      // A bounded field (a reading's 25–212 °F) falls back to its own minimum.
-      const { minimum } = inner._zod.bag as { minimum?: number };
-      const fit = [...NUMBER_CANDIDATES, minimum].find((c) => c !== undefined && core.safeParse(inner, c).success);
+      // Numeric bounds live in the check definitions, not the internal metadata
+      // bag. Try their endpoints too (e.g. a reading's 25–212 °F); the validator
+      // still decides whether an endpoint satisfies every check, including >/<.
+      const bounds = (def.checks ?? []).flatMap(check => {
+        const checkDef = (check as $ZodChecks)._zod.def;
+        return (checkDef.check === "greater_than" || checkDef.check === "less_than") && typeof checkDef.value === "number"
+          ? [checkDef.value] : [];
+      });
+      const fit = [...NUMBER_CANDIDATES, ...bounds].find(c => core.safeParse(inner, c).success);
       if (fit === undefined) throw new Error("api-schema: no sample number satisfies this field's checks");
       return fit;
     }

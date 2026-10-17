@@ -55,8 +55,8 @@ describe("production tooling contract", () => {
   });
 
   it("pins the Next.js framework and lint preset to the approved patch", () => {
-    expect(packageJson.dependencies?.next).toBe("16.3.4");
-    expect(packageJson.devDependencies?.["eslint-config-next"]).toBe("16.3.4");
+    expect(packageJson.dependencies?.next).toBe("16.4.2");
+    expect(packageJson.devDependencies?.["eslint-config-next"]).toBe("16.4.2");
   });
 
   it("uses Next's compiler-owned server marker without a standalone dependency", () => {
