@@ -163,7 +163,8 @@ describe("Recipe creation", () => {
     expect(src("app/(app)/recipes/new/page.tsx")).toMatch(/<RecipeEditor\b/);
     const detail = src("app/(app)/recipes/[id]/page.tsx");
     expect(detail).toMatch(/<RecipeView\b/);
-    expect(detail).not.toMatch(/detail=|searchParams/);
+    // Version history may use search params; the removed alternate detail drawing must stay gone.
+    expect(detail).not.toMatch(/detail=/);
     const next = src("app/(app)/recipes/[id]/new/page.tsx");
     expect(next).toMatch(/<RecipeEditor\b/);
     // The next version starts as a copy of the current one, and a draft left in this tab comes back.
