@@ -1,68 +1,85 @@
-// components/mgr/views/invoices.tsx — the staff Invoices register. A table from
-// md up and an unboxed phone list below, both drawn from toInvoiceListRow; a
-// 390px table would scroll. The number is each row's one link to detail, where
-// every accounting action lives.
+// components/mgr/views/invoices.tsx — the staff Invoices register. The desktop
+// table and phone rows consume the same structured invoice facts; financial
+// detail is never recovered from display text.
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
-import { Item, ItemContent, ItemGroup, ItemHeader, ItemSeparator } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Item, ItemContent, ItemGroup, ItemHeader, ItemSeparator } from "@/components/ui/item";
 import type { InvoiceListRow } from "@/lib/mgr/invoices-view";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { QboSyncView } from "./accounting";
 
-/** At least 24px tall, so the link meets the WCAG 2.2 AA target size. */
-const NumberLink = ({ row }: { row: InvoiceListRow }) => (
-  <Link href={row.href ?? "#"} className="inline-flex min-h-6 items-center font-medium underline underline-offset-4">{row.number}</Link>
+/** Uses the shared coarse-pointer target height without turning navigation into a button. */
+const DetailLink = ({ row }: { row: InvoiceListRow }) => (
+  <Link href={row.href ?? "#"} data-to="Invoice" aria-label={`Open ${row.document.number}`} className="inline-flex min-h-6 items-center font-medium underline underline-offset-4 pointer-coarse:min-h-12">
+    {row.document.number}
+  </Link>
 );
 
-const Due = ({ row }: { row: InvoiceListRow }) => row.due && (
-  <span className="inline-flex items-center gap-2">{row.overdue && E.status("Overdue", "w")}{row.due}</span>
-);
+const FactValue = ({ children }: { children: ReactNode }) => <span className="whitespace-normal [overflow-wrap:anywhere]">{children}</span>;
 
-const Status = ({ row }: { row: InvoiceListRow }) => (
-  <span className="flex flex-col items-start gap-1">
+function DueAndPayment({ row }: { row: InvoiceListRow }) {
+  return <div>
+    {E.fld("Due", <FactValue>{row.overdue ? <>{E.status("Overdue", "w")}{row.due.value}</> : row.due.value}</FactValue>)}
+    {E.fld("Payment", <FactValue>{row.payment}</FactValue>)}
+  </div>;
+}
+
+function MoneyFacts({ row }: { row: InvoiceListRow; }) {
+  return <div>
+    {E.fld(row.total.label, <FactValue>{row.total.value}</FactValue>)}
+    {row.localSubtotal && E.fld(row.localSubtotal.label, <FactValue>{row.localSubtotal.value}</FactValue>)}
+  </div>;
+}
+
+function Accounting({ row }: { row: InvoiceListRow }) {
+  const detail = row.accounting ?? (row.needsMapping ? "Needs mapping" : "No accounting exception");
+  return <div className="flex min-w-0 flex-col items-end gap-1">
     {row.needsMapping && E.status("Needs mapping", "w")}
-    {row.status}
+    <FactValue>{detail}</FactValue>
     {row.quickbooksHref && E.act("Open in QuickBooks", "primary", row.quickbooksHref)}
-  </span>
-);
-
-const LocalSubtotal = ({ row }: { row: InvoiceListRow }) => row.localSubtotal && (
-  <span className="block text-muted-foreground">Local subtotal {row.localSubtotal}</span>
-);
+  </div>;
+}
 
 function Register({ rows }: { rows: InvoiceListRow[] }) {
   return <>
     <div className="hidden md:block">
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
-          <TableRow><TableHead>Number</TableHead><TableHead>Customer</TableHead><TableHead>Due</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Total</TableHead></TableRow>
+          <TableRow>
+            <TableHead className="w-[10%] whitespace-normal">Document</TableHead>
+            <TableHead className="w-[15%] whitespace-normal">Customer</TableHead>
+            <TableHead className="w-[15%] whitespace-normal text-right">Total</TableHead>
+            <TableHead className="w-[15%] whitespace-normal text-right">QuickBooks balance</TableHead>
+            <TableHead className="w-[15%] whitespace-normal">Due / payment</TableHead>
+            <TableHead className="w-[30%] whitespace-normal">Accounting</TableHead>
+          </TableRow>
         </TableHeader>
         <TableBody>
-          {/* Baseline, not middle: wrapped status text stays level with the number. */}
           {rows.map(row => <TableRow key={row.id} className="[&>td]:align-baseline">
-            <TableCell><NumberLink row={row} /></TableCell>
-            {/* shadcn cells never wrap; customer and status text must, not clip. */}
-            <TableCell className="whitespace-normal">{row.customer}</TableCell>
-            <TableCell><Due row={row} /></TableCell>
-            <TableCell className="whitespace-normal"><Status row={row} /></TableCell>
-            <TableCell className="text-right">{row.total}<LocalSubtotal row={row} /></TableCell>
+            <TableCell className="whitespace-normal"><div className="flex flex-col gap-1"><DetailLink row={row} /><span className="text-muted-foreground text-xs">{row.document.kind === "credit_memo" ? "Credit memo" : "Invoice"}</span></div></TableCell>
+            <TableCell className="whitespace-normal"><FactValue>{row.customer}</FactValue></TableCell>
+            <TableCell className="whitespace-normal text-right"><MoneyFacts row={row} /></TableCell>
+            <TableCell className="whitespace-normal text-right">{E.fld(row.balance.label, <FactValue>{row.balance.value}</FactValue>)}</TableCell>
+            <TableCell className="whitespace-normal"><DueAndPayment row={row} /></TableCell>
+            <TableCell className="whitespace-normal"><Accounting row={row} /></TableCell>
           </TableRow>)}
         </TableBody>
       </Table>
     </div>
     <ItemGroup className="gap-0 md:hidden">
-      {rows.map((row, i) => <Fragment key={row.id}>
-        {i > 0 && <ItemSeparator className="my-0" />}
+      {rows.map((row, index) => <Fragment key={row.id}>
+        {index > 0 && <ItemSeparator className="my-0" />}
         <Item role="listitem" className="px-0">
-          <ItemHeader><NumberLink row={row} /><span className="font-medium">{row.total}</span></ItemHeader>
+          <ItemHeader><DetailLink row={row} /></ItemHeader>
           <ItemContent className="gap-0">
-            <span className="text-muted-foreground">{row.customer}</span>
-            <LocalSubtotal row={row} />
-            {row.due && E.fld("Due", <Due row={row} />)}
-            {E.fld("Status", <Status row={row} />)}
+            {E.fld("Customer", <FactValue>{row.customer}</FactValue>)}
+            <MoneyFacts row={row} />
+            {E.fld(row.balance.label, <FactValue>{row.balance.value}</FactValue>)}
+            <DueAndPayment row={row} />
+            {E.fld("Accounting", <Accounting row={row} />)}
           </ItemContent>
         </Item>
       </Fragment>)}

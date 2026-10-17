@@ -23,9 +23,7 @@ describe("QuickBooks control boundaries", () => {
     expect(source).toMatch(/key=\{qboMappingVersion\([\w.]*currentId\)\}/);
   });
 
-  it("uses QuickBooks presentation for unpaid pushed rows even when they drifted", () => {
-    // The page delegates to the list-row adapter, which uses qbo.detail
-    // unconditionally — so assert the behaviour, not the shape of the source.
+  it("keeps accounting review separate from payment and current totals", () => {
     expect(invoiceList).toMatch(/toInvoiceListRow\(invoice, brewery\.role/);
     expect(listRow).not.toMatch(/&& !inv\.qbo_accountant_drift/);
     const row = toInvoiceListRow({
@@ -35,8 +33,9 @@ describe("QuickBooks control boundaries", () => {
       written_off_at: null, subtotal_cents: 98000, total_cents: 99000, has_pending_qbo_push: false,
       customers: { name: "Ridgeline" }, quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7&companyId=9341", reason: null },
     }, "admin", true, "America/New_York");
-    expect(row.status).toContain("edited in QuickBooks · review there");
-    expect(row.localSubtotal).toBe("$980.00");
+    expect(row.accounting).toBe("Review accounting in QuickBooks");
+    expect(row.payment).toBe("Balance due");
+    expect(row.localSubtotal?.value).toBe("$980.00");
     expect(row.quickbooksHref).toContain("txnId=7");
   });
 });
