@@ -170,10 +170,14 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
 }) {
   const [binId, setBinId] = useState(""), [channelId, setChannelId] = useState("");
   const configure = (event: FormEvent) => { event.preventDefault(); onConfigure?.(binId, channelId); };
+  // With no mapped location there is nothing to configure or list: name the
+  // setup step and link to it instead (#997).
+  const mapped = Boolean(model.selectedLocationId);
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
-    <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>
-    {E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
+    {!mapped && <>{E.blank({ title: "No Square location mapped", description: "Connect Square, then map a Square location to an MGR location." })}{E.btn("Set up Square", "p", "/settings/pos")}</>}
+    {mapped && <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>}
+    {mapped && E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
     {model.message && E.note(model.message)}
     {model.selectedLocationId && !model.binName && <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={configure}>
       {E.ttl(`Configure ${model.locationName}`)}
@@ -187,8 +191,8 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />
-    {E.ttl("Also in Square")}
-    {E.info("These destination-native rows are never renamed, priced, or retired by MGR. Map or ignore them so their sales have an explicit disposition.")}
+    {mapped && E.ttl("Also in Square")}
+    {mapped && E.info("These destination-native rows are never renamed, priced, or retired by MGR. Map or ignore them so their sales have an explicit disposition.")}
     {model.externalItems.map(item => <div key={item.label}>{E.row(item.label, item.detail, item.href ? E.act(item.disposition === "ignored" ? "Review" : "Map", "primary", item.href) : E.status(item.disposition), item.disposition === "queued" ? "w" : "")}</div>)}
   </>;
 }

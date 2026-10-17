@@ -138,3 +138,15 @@ describe("POS UI truth", () => {
     });
   });
 });
+
+describe("Menu with no mapped Square location (#997)", () => {
+  it("names the missing setup step and links to it, without data-model callouts", () => {
+    const model = { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [] };
+    const html = renderToStaticMarkup(createElement(PosMenuView, { model }));
+    expect(html).toContain("Connect Square, then map a Square location");
+    expect(html).toContain('href="/settings/pos"');
+    expect(html).not.toContain("Also in Square");
+    expect(html).not.toContain("One catalog");
+    expect(html).not.toContain("No mapped Square location is available.");
+  });
+});
