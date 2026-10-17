@@ -4,7 +4,7 @@ description: "A member's work list, notifications, search and chat."
 ---
 
 Today is the one read a member starts from: work assigned to them, due now, or
-overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
+overdue, filtered by their roles. `get_today` takes an optional offset-aware ISO
 `now`, which is what makes the view testable at a fixed moment.
 
 Confirmed orders without a requested ship date emit `pick_due` with `dueAt: null`
@@ -20,7 +20,7 @@ top of them.
 
 `search_entities` accepts at most eight `kinds` entries. Repeated kinds are
 searched only once; arrays longer than eight are rejected before any search
-reads. Omit `kinds` or pass an empty array to search all kinds your role can
+reads. Omit `kinds` or pass an empty array to search all kinds your roles can
 open.
 
 {/* ops:today */}

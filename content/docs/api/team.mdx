@@ -13,9 +13,10 @@ ends its access without deleting the history that member wrote.
 `update_staff_role` replaces a member's roles with the nonempty `roles` array
 in its input; duplicate values are removed and the response uses enum order.
 Removing `admin` is a demotion even when other roles remain, and is refused
-when it would leave the brewery without an admin. The old scalar `role`
-input is no longer accepted by that command. `invite_staff` still grants
-one role; an admin can add others afterward.
+when it would leave the brewery without an admin. A request that sends `role`
+without `roles` fails with `400 invalid_input`; an extra `role` key beside
+`roles` is ignored. `invite_staff` still grants one role; an admin can add
+others afterward.
 
 `invite_staff` assigns one role; `invite_customer_user` links one customer. An
 email with no confirmed Auth account is sent an Auth invitation and the
