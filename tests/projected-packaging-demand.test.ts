@@ -168,7 +168,7 @@ describe("order packaging projections", () => {
     expect(foreignShortfall.data).toEqual([]);
     const customer = await seedCustomer(f.brewery.id);
     const user = await makeCustomerUser(customer.customerId);
-    const portal = { db: await asUser(user.email), userId: user.id, breweryId: f.brewery.id, roles: ["customer"] as const, customerId: customer.customerId };
+    const portal = { db: await asUser(user.email), userId: user.id, breweryId: f.brewery.id, roles: ["customer" as const], customerId: customer.customerId };
     const portalShortfall = await portal.db.rpc("order_packaging_shortfall_rows");
     expect(portalShortfall.error).toBeNull();
     expect(portalShortfall.data).toEqual([]);
