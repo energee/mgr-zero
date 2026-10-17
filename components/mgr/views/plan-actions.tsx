@@ -19,10 +19,13 @@ export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCa
     {E.ttl("Change plan")}
     {E.edit("Planned date", date, "date", undefined, { onChange: setDate, disabled: busy, required: true })}
     <CommandFormMessage error={error} />
-    {E.act("Reschedule", "primary", undefined, () => onReschedule?.(date), busy || !date || date === plannedOn)}
-    <ConfirmDeleteControl title="Cancel plan" name="Cancel this plan? The record stays in history."
-      warning="No stock or beer is moved. Plans with recorded physical work cannot be cancelled."
-      busy={busy} error={error} onDelete={onCancel} dismissLabel="Keep plan" busyLabel="Cancelling…" />
+    {/* Cancel plan stays small beside Reschedule: a destructive verb is never the page's biggest control (#995). */}
+    <div className="flex flex-wrap items-center gap-2">
+      {E.act("Reschedule", "primary", undefined, () => onReschedule?.(date), busy || !date || date === plannedOn)}
+      <ConfirmDeleteControl title="Cancel plan" name="Cancel this plan? The record stays in history."
+        warning="No stock or beer is moved. Plans with recorded physical work cannot be cancelled."
+        busy={busy} error={error} onDelete={onCancel} dismissLabel="Keep plan" busyLabel="Cancelling…" size="sm" />
+    </div>
   </section>;
 }
 
