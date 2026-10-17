@@ -38,6 +38,15 @@ describe("packaging views", () => {
     expect(htmlOf(createElement(RepackView, { model: repackCase, footer: null }))).not.toMatch(/Record repack/);
   });
 
+  it("labels material identity and planned quantity separately with the requirements vocabulary", () => {
+    const html = htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun }));
+    const headers = [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(match => match[1]);
+    expect(headers).toEqual(["Material", "Planned", "On hand", "Short"]);
+    const cells = [...html.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map(match => match[1]);
+    expect(cells.slice(0, 8)).toEqual(["cans", "2,832 each", "3,100", "0", "ends", "2,832 each", "2,400", "432"]);
+    expect(html).toContain("432 ends short");
+  });
+
   it("the live list mounts PackagingRunsView and slots both controlled forms", () => {
     const page = readFileSync("app/(app)/packaging/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/packaging-runs"/);
