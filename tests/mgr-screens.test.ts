@@ -1039,3 +1039,34 @@ describe("vessel tile fill (#909)", () => {
     expect(tile()).not.toContain("progressbar");
   });
 });
+
+describe("Confirm order shortage message (#990)", () => {
+  it("names every short line in one message instead of one note per line", async () => {
+    const { toConfirmOrderViewProps } = await import("../lib/mgr/confirm-order-view");
+    const { ConfirmOrderView } = await import("../components/mgr/views/confirm-order");
+    const { orderSubmittedRidgeline: base } = await import("../lib/mgr/fixtures/orders");
+    const [hazy, pils] = base.lines;
+    const extra = { id: "l-extra", sku_id: "sku-extra", qty_ordered: 2, skus: { name: "Extra stout · case" } };
+    const model = toConfirmOrderViewProps({
+      ...base,
+      lines: [{ ...hazy, qty_ordered: 9 }, pils, extra],
+      atp: [...base.atp, { sku_id: "sku-extra", qty: 1 }],
+      sourceOnHand: [...base.sourceOnHand!, { sku_id: "sku-extra", qty: 5 }],
+    });
+    // The per-line marker stays on every short line.
+    expect(model.lines.map((l) => l.tone)).toEqual(["w", "w", "w"]);
+    expect(model.shortageNote).toBe(
+      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing Warehouse cannot pick the full quantity. ` +
+      "Confirming oversells ATP for Extra stout · case; that stays your call.",
+    );
+    const html = renderToStaticMarkup(createElement(ConfirmOrderView, { model }));
+    expect(html.match(/Replenish Warehouse/g)).toHaveLength(1);
+    expect(html.match(/Confirming oversells/g)).toHaveLength(1);
+  });
+
+  it("shows no shortage message when every line is covered", async () => {
+    const { toConfirmOrderViewProps } = await import("../lib/mgr/confirm-order-view");
+    const { orderSubmittedRidgeline: base } = await import("../lib/mgr/fixtures/orders");
+    expect(toConfirmOrderViewProps({ ...base, lines: [base.lines[0]] }).shortageNote).toBeNull();
+  });
+});

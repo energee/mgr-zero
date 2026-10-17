@@ -7,13 +7,11 @@ import { expires, type RegistryRowView } from "@/lib/mgr/registry-rows";
 export type LicensesViewModel = {
   backHref?: string;
   licenses: RegistryRowView[];
-  note: string;
 };
 
 export type LicensesSnapshot = {
   backHref?: string;
   licenses: License[];
-  note: string;
 };
 
 export function toLicensesViewProps(s: LicensesSnapshot): LicensesViewModel {
@@ -25,6 +23,5 @@ export function toLicensesViewProps(s: LicensesSnapshot): LicensesViewModel {
       detail: `${license.license_no ?? "no number"}${expires(license.expires_on)}`,
       verb: "Edit",
     })),
-    note: s.note,
   };
 }
