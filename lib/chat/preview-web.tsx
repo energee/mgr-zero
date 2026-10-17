@@ -13,7 +13,7 @@ const SURFACE_LABEL: Record<ChatPreviewFixture["surface"], string> = {
   modal: "Dialog",
 };
 
-const TONE_CLASS = { neutral: "text-muted-foreground", healthy: "text-green-700", attention: "text-amber-700" } as const;
+const TONE_CLASS = { neutral: "text-muted-foreground", healthy: "text-success-foreground", attention: "text-attention-foreground" } as const;
 
 // Every target ≥ 24×24 CSS px (min-h-6 + padding); state never by color alone.
 const BTN = "inline-flex min-h-6 min-w-6 items-center rounded border px-3 py-1 text-sm";
@@ -33,7 +33,7 @@ function Item({ item }: { item: PortableNotification }) {
     <li className="flex flex-col gap-1 border-t py-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-medium">{item.subject.safeLabel} · {item.title}</span>
-        {item.urgency === "attention" ? <span className="text-xs text-amber-700">Needs attention</span> : null}
+        {item.urgency === "attention" ? <span className="text-xs text-attention-foreground">Needs attention</span> : null}
       </div>
       <span className="text-sm text-muted-foreground">{item.detail}</span>
       <div className="flex flex-wrap gap-2">{item.actions.map((action) => <Action key={action.id + action.label} action={action} />)}</div>
