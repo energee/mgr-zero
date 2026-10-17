@@ -2,8 +2,8 @@
 // actions and links; the shared model draws the list and Work chips.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { TabBar } from "@/components/mgr/qty";
 import type { PurchaseOrdersViewModel } from "@/lib/mgr/purchase-orders-view";
+import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type { PurchaseOrdersViewModel };
 
@@ -20,11 +20,10 @@ export function PurchaseOrdersView({
   footer?: ReactNode;
   linkRows?: boolean;
 }) {
-  const names = workHrefs ? model.workChips.filter(name => workHrefs[name]) : model.workChips;
   return (
     <>
       {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New PO"))}
-      <TabBar names={names} on={names.indexOf(model.workChips[model.workChipIndex])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
+      <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
