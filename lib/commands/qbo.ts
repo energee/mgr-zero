@@ -76,6 +76,32 @@ defineCommand({
 });
 
 defineCommand({
+  name: "set_qbo_vendor_mapping", description: "Bind a vendor's exact QuickBooks ID to the connected company for receipt Bills",
+  input: z.object({ vendorId: z.string().uuid(), qboVendorId: z.string().trim().min(1) }), roles: ["admin"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_vendor_mapping", {
+    p_brewery: ctx.breweryId, p_vendor: input.vendorId, p_qbo_vendor_id: input.qboVendorId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_qbo_purchase_account", description: "Set the exact QuickBooks expense or inventory asset account ID used by all material receipt Bills",
+  input: z.object({ qboAccountId: z.string().trim().min(1) }), roles: ["admin"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_purchase_account", {
+    p_brewery: ctx.breweryId, p_qbo_account_id: input.qboAccountId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "post_receipt_bill", description: "Post one frozen Bill per receipt revision chain; an uncertain retry reconciles the original Bill without creating another; corrections and payments remain in QuickBooks",
+  input: z.object({ receiptId: z.string().uuid(), newAttemptReason: z.literal("corrected").optional() }), roles: ["admin"], requiresConfirmation: true,
+  handler: async (ctx, input, execution) => {
+    // Keep server-only transport out of the provider-free registry/docs loader.
+    const { postReceiptBill, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+    return postReceiptBill(ctx, input.receiptId, execution.requestId, new QboOAuthClient(qboConfig()), input.newAttemptReason);
+  },
+});
+
+defineCommand({
   name: "push_invoice_to_qbo", description: "Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID",
   input: z.object({
     invoiceId: z.string().uuid(),

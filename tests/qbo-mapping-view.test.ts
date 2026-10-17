@@ -33,3 +33,14 @@ it("keeps fixture mapping controls safe and does not invent ambiguity", () => {
   expect(html).not.toContain("Two QuickBooks customers");
   expect(html).not.toContain('href="/');
 });
+
+it("uses exact vendor and brewery-wide purchase account IDs for receipt Bills", () => {
+  const vendor = renderToStaticMarkup(createElement(QboMappingView, { kind: "vendor", value: "00512" }));
+  expect(vendor).toContain("QuickBooks vendor ID");
+  expect(vendor).toContain('value="00512"');
+  expect(vendor).toContain("never chooses automatically");
+  const account = renderToStaticMarkup(createElement(QboMappingView, { kind: "purchase_account", value: "84" }));
+  expect(account).toContain("QuickBooks account ID");
+  expect(account).toContain("One brewery-wide purchase account");
+  expect(account).toContain("Payments are managed only in QuickBooks");
+});

@@ -1,7 +1,7 @@
 // lib/supabase/integration-tokens.ts — the only server boundary for private integration credentials.
 import "server-only";
 import { toJson } from "./json";
-import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -567,7 +567,7 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
 export async function getQboHealth(ctx: Ctx) {
   requireIntegrationRole(ctx);
   const { data, error } = await ctx.db.from("qbo_connections")
-    .select("id,realm_id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at,qbo_deposit_item_id,qbo_one_way_fee_item_id,allow_online_ach_payment,allow_online_credit_card_payment")
+    .select("id,realm_id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at,qbo_deposit_item_id,qbo_one_way_fee_item_id,qbo_purchase_account_id,allow_online_ach_payment,allow_online_credit_card_payment")
     .eq("brewery_id", ctx.breweryId).maybeSingle();
   if (error) throw new Error("QuickBooks health is unavailable");
   if (!data) return { connected: false, state: "disconnected" as const, realmLabel: null, lastError: null };
@@ -579,6 +579,7 @@ export async function getQboHealth(ctx: Ctx) {
     refreshExpiresAt: data.refresh_expires_at as string | null, refreshHardExpiresAt: data.refresh_hard_expires_at as string | null,
     depositItemId: data.qbo_deposit_item_id as string | null,
     oneWayFeeItemId: data.qbo_one_way_fee_item_id as string | null,
+    purchaseAccountId: data.qbo_purchase_account_id as string | null,
     allowAch: data.allow_online_ach_payment as boolean,
     allowCard: data.allow_online_credit_card_payment as boolean,
   };
@@ -622,6 +623,20 @@ export async function finishQboPush(ctx: Ctx, input: {
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("QuickBooks push reconciliation failed");
   return data as { pushId: string; status: "pushed" | "push_failed"; remoteId: string | null };
+}
+
+export async function finishQboReceiptBill(ctx: Ctx, input: {
+  receiptId: string; providerRequestId: string; remoteId: string | null; error: string | null; response: Record<string, unknown>; definitiveRejection?: boolean;
+}) {
+  if (!canRun(ctx, "post_receipt_bill")) throw new CommandError("permission denied: receipt Bills require admin", 403);
+  const { data, error } = await createAdminClient().rpc("finish_qbo_receipt_bill", {
+    p_brewery: ctx.breweryId, p_receipt: input.receiptId, p_actor: ctx.userId,
+    p_provider_request_id: input.providerRequestId, p_remote_id: input.remoteId, p_error: input.error, p_response: toJson(input.response),
+    p_definitive_rejection: input.definitiveRejection ?? false,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("QuickBooks Bill reconciliation failed");
+  return data as { receiptId: string; status: "pending" | "pushed" | "push_failed"; remoteId: string | null };
 }
 
 export type QboInvoiceSyncResult = { superseded: true } | {
