@@ -23,7 +23,6 @@ export const licensesDemo: LicensesSnapshot = {
   licenses: [
     { id: "pa", state: "PA", kind: "brewery", license_no: "G-21884", expires_on: "2027-06-30", note: null },
   ],
-  note: "Order confirmation does not read licenses yet; a warning for an unlicensed destination state is planned and will never block.",
 };
 
 export const brandApprovalStout: BrandApprovalViewModel = {
@@ -72,7 +71,7 @@ export const lotTraceHazy: LotTraceSnapshot = {
     { sku_id: "case", bin_id: "cooler", sku: "Hazy IPA · 16 oz case", bin: "Cooler", location: "Warehouse", qty: 118, bbl: 7.61 },
   ],
   recipients: [],
-  warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
+  warning: "Stock recorded without this lot code is not traced here.",
 };
 
 

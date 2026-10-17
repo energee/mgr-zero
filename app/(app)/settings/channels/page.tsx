@@ -22,7 +22,7 @@ import { ChannelForm } from "./channel-form";
 
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 
-const TAX_INFO = "A channel’s tax treatment is the default for removals recorded on it. A customer may override it on their own record, and the resolved treatment is frozen onto each movement when it is recorded, so editing a channel later never restates a filed month.";
+const TAX_INFO = "Changing a channel’s tax treatment applies to new sales only; filed months stay as they were.";
 
 export default async function ChannelsPage() {
   const brewery = await getActiveBrewery();

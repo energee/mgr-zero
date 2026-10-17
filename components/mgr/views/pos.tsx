@@ -143,7 +143,6 @@ export function PosMappingView({ variations, targets, sales, coverage, busy, err
     {coverage.length ? coverage.map((line, index) => <div key={`${line}-${index}`}>{E.row(line, "Completed observation window", E.status("Complete", "ok"), "ok")}</div>) : E.note("No complete Square sales coverage yet. A failed or partial sync is not counted as coverage.")}
     {E.ttl("Recent Square facts")}
     {sales.length ? sales.map(sale => <div key={sale.id}>{E.row(sale.label, sale.detail, sale.href || sale.openable ? E.act("Open", "primary", sale.href) : sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
-    {E.note("The physical count posts depletion. Square sales and returns supply the expected amount used for variance.")}
   </>;
 }
 
@@ -173,7 +172,6 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
     <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>
-    {E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
     {model.message && E.note(model.message)}
     {model.selectedLocationId && !model.binName && <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={configure}>
       {E.ttl(`Configure ${model.locationName}`)}
@@ -188,7 +186,7 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
     {notice}
     <CommandFormMessage error={error ?? null} />
     {E.ttl("Also in Square")}
-    {E.info("These destination-native rows are never renamed, priced, or retired by MGR. Map or ignore them so their sales have an explicit disposition.")}
+    {E.info("Map or ignore these Square items so their sales can be reconciled.")}
     {model.externalItems.map(item => <div key={item.label}>{E.row(item.label, item.detail, item.href ? E.act(item.disposition === "ignored" ? "Review" : "Map", "primary", item.href) : E.status(item.disposition), item.disposition === "queued" ? "w" : "")}</div>)}
   </>;
 }
