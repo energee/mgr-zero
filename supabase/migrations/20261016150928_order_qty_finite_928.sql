@@ -3,7 +3,7 @@
 -- separate assert_portal_order_lines guard still requires whole packaged units.
 create or replace function private.assert_order_lines(p_lines jsonb) returns void
 language plpgsql immutable set search_path = '' as $$
-declare l jsonb; v_qty numeric;
+declare l jsonb;
 begin
   if jsonb_typeof(p_lines) is distinct from 'array' then
     raise exception 'order requires at least one line';
@@ -14,11 +14,11 @@ begin
   for l in select value from jsonb_array_elements(p_lines) loop
     -- Check the JSON type before casting: numeric strings, null and missing
     -- quantities are not order quantities, even when PostgreSQL can cast them.
+    -- A JSON number is always finite, so only the sign remains to check.
     if jsonb_typeof(l->'qty') is distinct from 'number' then
       raise exception 'order quantities must be positive finite numbers';
     end if;
-    v_qty := (l->>'qty')::numeric;
-    if v_qty::text in ('NaN','Infinity','-Infinity') or v_qty <= 0 then
+    if (l->>'qty')::numeric <= 0 then
       raise exception 'order quantities must be positive finite numbers';
     end if;
   end loop;
