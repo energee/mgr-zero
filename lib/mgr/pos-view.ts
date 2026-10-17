@@ -161,6 +161,6 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
       detail: row.disposition === "ignored" ? "Explicitly ignored" : "Not mapped · sales stay queued",
       disposition: row.disposition, href: "/settings/pos/mapping",
     })),
-    message: !selected ? "No mapped Square location is available." : !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
+    message: selected && !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
   };
 }
