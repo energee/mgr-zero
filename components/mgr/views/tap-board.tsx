@@ -7,7 +7,7 @@ import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { tapLabel, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
@@ -55,7 +55,7 @@ export function TapKegView({ sheet: controlledSheet, skus, timeZone, onEdit, clo
   </>;
 }
 
-export type TapBoardNavigation = { backHref?: string; countHref?: string; varianceHref?: string; locations: [string, string?][]; location: string };
+export type TapBoardNavigation = { backHref?: string; countHref?: string; varianceHref?: string; locations: ScopeOption[]; location: string };
 
 /** `timeZone` is the brewery's: the server renders this client view first, so both sides must format in one zone (#442). */
 export function TapBoardView({ state: controlledState, skus, timeZone, navigation, recentEvents, pollError, onOpen, onClose, onEdit, onSubmit, onReload }: {
@@ -77,7 +77,7 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {E.back("Beer", "Tap board", undefined, navigation.backHref)}
     <div className="flex items-center justify-between gap-2">{E.ttl("On tap")}<Button type="button" size="sm" disabled={navigation.locations.length === 0} onClick={() => open("tap", null)}>Tap keg</Button></div>
     {(navigation.countHref || navigation.varianceHref) && <div className="flex flex-wrap gap-3 text-sm">{navigation.countHref && <Link className="underline" href={navigation.countHref}>Weekly count</Link>}{navigation.varianceHref && <Link className="underline" href={navigation.varianceHref}>Variance by brand</Link>}</div>}
-    {navigation.locations.length > 0 && (navigation.locations.some(([, href]) => href) ? <LinkTabs items={navigation.locations.map(([name, href]) => [name, href ?? "#"])} current={navigation.location} /> : E.tabs(navigation.locations.map(([name]) => name), navigation.locations.findIndex(([name]) => name === navigation.location)))}
+    {navigation.locations.length > 0 && <ScopePick label="Location" value={navigation.location} options={navigation.locations} />}
     <CommandForm open={Boolean(sheet)} onOpenChange={next => { if (!next && !locked) { if (onClose) onClose(); else setInternalState(current => ({ ...current, sheet: null })); } }} title={sheet?.kind === "kick" ? "Kick keg" : sheet?.kind === "swap" ? "Swap keg" : "Tap keg"}>
       {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} timeZone={timeZone} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
     </CommandForm>

@@ -30,9 +30,12 @@ const weeklyDraft = countDraftFromSnapshot({ location_id: "ridgeline", counted_o
 weeklyDraft.draft.lines[0].quantity = "4";
 weeklyDraft.draft.lines[1].quantity = "2";
 weeklyDraft.draft.lines[1].disposition = "destroyed";
+/** The inventory's taprooms: no hrefs, so the Location pick stays inert. */
+const TAPROOMS = [{ value: "ridgeline", label: "Ridgeline Tap Room" }, { value: "downtown", label: "Downtown" }];
+
 export const weeklyCount: WeeklyCountViewModel = {
   timeZone: DEMO_TIME_ZONE,
-  locations: [["Ridgeline Tap Room"], ["Downtown"]], location: "Ridgeline Tap Room", roles: ["admin"], draft: weeklyDraft,
+  locations: TAPROOMS, location: "ridgeline", roles: ["admin"], draft: weeklyDraft,
   lotLabels: { "cold:hazy-half:hazy-lot": "L-260901-HZ" },
   receipt: { date: "Sep 8", recorded: "Latest uncorrected count", canCorrect: true,
     correctionForm: correctionStateFromReceipt("saved-sep8", [{ id: "saved2", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold", lot_id: "L-260901-HZ", qty_before: 7, qty_counted: 2 }]),
@@ -41,7 +44,7 @@ export const weeklyCount: WeeklyCountViewModel = {
 };
 
 export const taproomVariance: TaproomVarianceViewModel = {
-  weeks: 4, timeZone: DEMO_TIME_ZONE,
+  weeks: 4, timeZone: DEMO_TIME_ZONE, locations: TAPROOMS, location: "ridgeline",
   trend: { brand: "Hazy IPA", detail: "short 4 weeks running · 1.8 bbl total · −4%" },
   report: {
     weeks: 4, window_start: "2026-08-12", window_end: "2026-09-08", as_of: "2026-09-08T16:00:00Z", reason: null,

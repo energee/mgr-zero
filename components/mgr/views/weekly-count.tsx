@@ -8,7 +8,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
-import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
 import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
@@ -21,7 +21,9 @@ export function WeeklyCountPrintAction({ busy = false, empty = false, error, onP
 }
 
 export type WeeklyCountViewModel = {
-  backHref?: string; boardHref?: string; varianceHref?: string; locations: [string, string?][]; location: string;
+  backHref?: string; boardHref?: string; varianceHref?: string;
+  /** Taprooms; `location` is the selected option's value (a location id live). */
+  locations: ScopeOption[]; location: string;
   draft?: TaproomCountState; roles: readonly StaffRole[]; lotLabels: Record<string, string>;
   receipt?: { date: string; recorded: string; priorHref?: string; correction?: string; correctionForm?: TaproomCorrectionState; canCorrect: boolean; lines: { key: string; name: string; detail: string; result: string }[] };
   history: { key: string; date: string; detail: string; href?: string }[];
@@ -34,7 +36,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
     <div className="contents print:hidden">
       {E.back("Beer", "Weekly count", undefined, model.backHref)}
       {(model.boardHref || model.varianceHref) && <div className="flex flex-wrap gap-3 text-sm">{model.boardHref && <Link className="underline" href={model.boardHref}>Tap board</Link>}{model.varianceHref && <Link className="underline" href={model.varianceHref}>Variance by brand</Link>}</div>}
-      {model.locations.length > 0 && (model.locations.some(([, href]) => href) ? <LinkTabs items={model.locations.map(([name, href]) => [name, href ?? "#"])} current={model.location} className="w-full" /> : E.tabs(model.locations.map(([name]) => name), model.locations.findIndex(([name]) => name === model.location), "w-full"))}
+      {model.locations.length > 0 && <ScopePick label="Location" value={model.location} options={model.locations} />}
     </div>
     {model.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
       {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} roles={model.roles} lotLabels={model.lotLabels} timeZone={model.timeZone} />}

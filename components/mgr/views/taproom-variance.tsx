@@ -2,6 +2,7 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { formatDateTime } from "@/lib/date-format";
 import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ScopePick } from "@/components/mgr/scope-pick";
 import { varianceBbl as bbl, varianceReason as reason, type TaproomVarianceViewModel } from "@/lib/mgr/taproom-variance-view";
 
 export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel }) {
@@ -10,7 +11,7 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
     {E.back("Beer", "Variance", undefined, model.backHref)}
     {E.ttl("Variance by brand")}
     {(model.countHref || model.boardHref) && <div className="flex flex-wrap gap-3 text-sm">{model.countHref && <Link className="underline" href={model.countHref}>Weekly count</Link>}{model.boardHref && <Link className="underline" href={model.boardHref}>Tap board</Link>}</div>}
-    {model.locations && <LinkTabs items={model.locations} current={model.location ?? ""} className="w-full md:w-fit" />}
+    {model.locations && <ScopePick label="Location" value={model.location ?? ""} options={model.locations} />}
     {model.weekHrefs ? <LinkTabs items={model.weekHrefs} current={`${model.weeks} weeks`} className="w-full md:w-fit" /> : E.tabs(["4 weeks", "12 weeks"], model.weeks === 12 ? 1 : 0)}
     {!report ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
       {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]), ["l", "r", "r", "r", "r"])}

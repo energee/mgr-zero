@@ -31,6 +31,6 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
 
   return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} timeZone={brewery.timeZone} navigation={{
     backHref: "/beer", countHref: `/taproom?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
-    locations: locations.map(item => [item.name, `/taproom/board?location=${item.id}`]), location: location.name,
+    locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom/board?location=${item.id}` })), location: location.id,
   }} />;
 }
