@@ -26,7 +26,7 @@ describe("Routes", () => {
   it("keeps Transfers and Packaging Work navigation in their shared views", () => {
     for (const [route, view] of [["transfers", "transfers"], ["packaging", "packaging-runs"], ["purchase-orders", "purchase-orders"]]) {
       expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.roles)}");
-      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<TabBar");
+      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<WorkKindTabs");
       expect(src(`components/mgr/views/${view}.tsx`)).not.toMatch(/tabs\?: ReactNode/);
     }
   });
