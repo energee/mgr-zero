@@ -24,6 +24,8 @@ export type PlanningSnapshot = {
   reviews?: { key: string; title: string; detail: string; warning?: boolean }[];
   drafts?: { key: string; title: string; detail: string; quantity: string; warning?: boolean }[];
   info?: string;
+  /** The brewery's day (YYYY-MM-DD); a gap needed before it is overdue (#993). */
+  today?: string;
 };
 
 export type PlanningViewModel = {
@@ -38,19 +40,23 @@ const fmt = (value: number) => value.toLocaleString("en-US", { maximumFractionDi
 
 export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewModel {
   return {
-    requirements: (snapshot.requirements ?? []).filter((row) => row.short > 0).map((row) => ({
-      key: row.material_id,
-      title: row.material_name ?? row.material_id,
-      detail: [
-        `need ${fmt(row.required)} · on hand ${fmt(row.on_hand)} · on order ${fmt(row.on_order)} ${row.base_uom ?? ""}`,
-        row.projected > 0 ? `includes ${fmt(row.projected)} projected` : undefined,
-        row.needed_by ? `needed by ${formatDate(row.needed_by)}` : undefined,
-        row.vendor_name ? `${row.vendor_name}${row.lead_time_days === null ? " · no lead time typed" : ` · ${row.lead_time_days} day lead${row.buy_by ? ` · buy by ${formatDate(row.buy_by)}` : ""}`}` : "no contract and no default vendor",
-        row.out_of_reach ? "past the buy-by date · left out of the draft" : undefined,
-      ].filter(Boolean).join(" · "),
-      quantity: `${fmt(row.purchase_units_short)} ${row.purchase_uom ?? ""}`.trim(),
-      warning: !row.vendor_id || row.out_of_reach,
-    })),
+    requirements: (snapshot.requirements ?? []).filter((row) => row.short > 0).map((row) => {
+      const overdue = Boolean(snapshot.today && row.needed_by && row.needed_by < snapshot.today);
+      return {
+        key: row.material_id,
+        title: row.material_name ?? row.material_id,
+        detail: [
+          overdue ? "overdue" : undefined,
+          `need ${fmt(row.required)} · on hand ${fmt(row.on_hand)} · on order ${fmt(row.on_order)} ${row.base_uom ?? ""}`,
+          row.projected > 0 ? `includes ${fmt(row.projected)} projected` : undefined,
+          row.needed_by ? `needed by ${formatDate(row.needed_by)}` : undefined,
+          row.vendor_name ? `${row.vendor_name}${row.lead_time_days === null ? " · no lead time typed" : ` · ${row.lead_time_days} day lead${row.buy_by ? ` · buy by ${formatDate(row.buy_by)}` : ""}`}` : "no contract and no default vendor",
+          row.out_of_reach ? "past the buy-by date · left out of the draft" : undefined,
+        ].filter(Boolean).join(" · "),
+        quantity: `${fmt(row.purchase_units_short)} ${row.purchase_uom ?? ""}`.trim(),
+        warning: !row.vendor_id || row.out_of_reach || overdue,
+      };
+    }),
     horizon: snapshot.horizon,
     reviews: snapshot.reviews,
     drafts: snapshot.drafts,
