@@ -272,6 +272,15 @@ describe("production-readiness workflow contract", () => {
     expect(review).toContain("github.event.pull_request.user.type != 'Bot'");
   });
 
+  it("posts a simplify comment that land-pr requires beside the code review", () => {
+    const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
+    expect(review).toContain(".pi/prompts/simplify.md");
+    expect(review).toContain("## Simplify");
+    expect(landPr).toContain("## Code review");
+    expect(landPr).toContain("## Simplify");
+    expect(landPr).toContain("gh pr ready");
+  });
+
   it("treats GitHub Actions as trusted workflow context for dreaming", () => {
     expect(dreaming).toContain(
       "You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied"

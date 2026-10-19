@@ -16,7 +16,8 @@
 # failed (including an added migration that sorts before main's newest, which
 # `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
 # reason, 5 push did not land, 6 main gained a migration since the sync (rerun
-# to resync).
+# to resync), 7 the CI code review and simplify comments never posted (see the
+# Claude Code Review run; add the `review` label to rerun it).
 # Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
@@ -32,6 +33,26 @@ cd "$wt" || exit 1
 echo "== #$n $b @ $wt"
 [ "$(git branch --show-current)" = "$b" ] || { echo "wrong branch"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "dirty tree"; exit 1; }
+
+# Every human PR merges with both comments claude-code-review.yml posts. That
+# workflow skips drafts, so mark the PR ready (or relabel it when an earlier run
+# left no comment); the review runs during the local proof below.
+reviewed() {
+  local bodies
+  bodies=$(gh pr view "$n" --json comments --jq '.comments[]|select(.author.login=="claude")|.body') || return 1
+  grep -q '^## Code review' <<<"$bodies" && grep -q '^## Simplify' <<<"$bodies"
+}
+bot=$(gh pr view "$n" --json author --jq .author.is_bot) || exit 1
+if [ "$bot" = false ] && ! reviewed; then
+  if [ "$(gh pr view "$n" --json isDraft --jq .isDraft)" = true ]; then
+    gh pr ready "$n" || exit 1
+  else
+    # Only a fresh add fires `labeled`, so drop the label first; that fails
+    # harmlessly when the PR lacks it, and the add is the step that must work.
+    gh pr edit "$n" --remove-label review >/dev/null 2>&1
+    gh pr edit "$n" --add-label review >/dev/null || exit 1
+  fi
+fi
 
 git fetch -q origin
 # The remote may have moved (another session, GitHub's Update branch): merge it, never reset.
@@ -100,5 +121,9 @@ if [ "$do_merge" = --merge ]; then
   # db push applies migrations in timestamp order: a migration landing on main after
   # this sync must be merged in (and this PR's timestamp checked) before merging.
   [ -z "$(git diff --name-only HEAD...origin/main -- supabase)" ] || { echo "main gained supabase changes since sync; rerun"; exit 6; }
+  if [ "$bot" = false ]; then
+    for _ in $(seq 20); do reviewed && break; sleep 30; done
+    reviewed || { echo "no '## Code review' and '## Simplify' comments on #$n; check the Claude Code Review run"; exit 7; }
+  fi
   gh pr merge "$n" --merge --match-head-commit "$head" && gh pr view "$n" --json state --jq .state
 fi

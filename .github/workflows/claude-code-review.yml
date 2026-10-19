@@ -71,3 +71,18 @@ jobs:
           claude_args: '--model opus --allowedTools "Skill,mcp__github_inline_comment__create_inline_comment"'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
+
+      # Simplify as findings only: a CI push of simplify edits is unreviewed
+      # (AGENTS.md step 5), so the author applies them. land-pr.sh requires
+      # this comment and the code review comment before it merges.
+      - name: Run Claude simplify review
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} for simplification only.
+            Read AGENTS.md and .pi/prompts/simplify.md, then apply those criteria to `gh pr diff ${{ github.event.pull_request.number }}` only.
+            Do not edit files, commit, or push. Name each finding as file:line, the simpler form, and why.
+            Then post exactly one comment with `gh pr comment ${{ github.event.pull_request.number }} --body "..."`.
+            Its first line must be `## Simplify`; if nothing qualifies, the body is `## Simplify` then `No simplifications found.`
+          claude_args: '--model opus --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*)"'
