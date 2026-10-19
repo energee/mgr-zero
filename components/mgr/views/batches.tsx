@@ -1,23 +1,14 @@
 // components/mgr/views/batches.tsx — the Batches register. Each lifecycle group
-// is a table from md up and an unboxed list on the phone; vessel setup is one
-// table below them. Adapters supply the rows and every destination.
+// and the vessel setup list are drawn by the shared RecordTable: a table from
+// md up and an unboxed list on the phone. Adapters supply the rows and every
+// destination; a fixture row has no href, so its name is an inert tap.
 import { Fragment, type ReactNode } from "react";
-import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
-import { Item, ItemContent, ItemGroup, ItemHeader, ItemSeparator, ItemTitle } from "@/components/ui/item";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RecordTable } from "@/components/mgr/views/record-table";
 import type { BatchesRowView, BatchesViewModel, BatchOccupancyView, BatchVesselView } from "@/lib/mgr/batches-view";
 
 export type { BatchesViewModel };
-
-/** A row's one identity link: the batch number or the vessel name. A fixture
- *  passes no href and gets an inert "#", as E.link does; `to` names the screen
- *  the explorer opens, since the copy is a record, not a screen name.
- *  Coarse pointers retain the shared 48px control target. */
-const RecordLink = ({ href, to, children }: { href?: string; to: string; children: ReactNode }) => (
-  <Link href={href ?? "#"} data-to={to} className="inline-flex min-h-6 items-center font-medium underline underline-offset-4 pointer-coarse:min-h-12">{children}</Link>
-);
 
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span className="text-muted-foreground">{missing}</span>;
@@ -35,88 +26,45 @@ function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
   ) : <span className="text-muted-foreground">No open occupancy</span>;
 }
 
-/** One lifecycle group from md up. A batch with readings lists its open
- *  occupancies in the vessel cell; any other batch shows the vessel names it
- *  has. A group where no batch has either draws no vessel column at all. */
+/** One lifecycle group. A batch with readings lists its open occupancies in
+ *  the vessel cell; any other batch shows the vessel names it has. A group
+ *  where no batch has either draws no vessel column at all, and one with no
+ *  plannable batch draws no Brew column. */
 function GroupTable({ rows }: { rows: BatchesRowView[] }) {
   const brew = rows.some(row => row.brewable);
   const vesselHead = rows.some(row => row.readings) ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
-  return (
-    <div className="hidden md:block">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Batch</TableHead>
-            <TableHead>Brand</TableHead>
-            <TableHead>Recipe</TableHead>
-            <TableHead>Planned on</TableHead>
-            <TableHead className="text-right">Planned barrels</TableHead>
-            {vesselHead && <TableHead>{vesselHead}</TableHead>}
-            {brew && <TableHead><span className="sr-only">Action</span></TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map(row => <TableRow key={row.key} className="[&>td]:align-baseline">
-            <TableCell><RecordLink href={row.href} to="Brew day">{row.batchNo}</RecordLink></TableCell>
-            <TableCell className="whitespace-normal">{orMissing(row.brand, "No brand yet")}</TableCell>
-            <TableCell className="whitespace-normal">{orMissing(row.recipe, "No recipe")}</TableCell>
-            <TableCell>{row.plannedOn}</TableCell>
-            <TableCell className="text-right">{row.plannedBbl}</TableCell>
-            {vesselHead && <TableCell className="whitespace-normal">{row.readings ? <Occupancies readings={row.readings} /> : row.vessel}</TableCell>}
-            {brew && <TableCell className="text-right">{row.brewable && E.act("Brew", "info", row.href)}</TableCell>}
-          </TableRow>)}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-/** The same group on the phone: each batch's facts labeled, its open occupancies under a rule. */
-function GroupList({ rows }: { rows: BatchesRowView[] }) {
-  return (
-    <ItemGroup className="gap-0 md:hidden">
-      {rows.map((row, index) => <Fragment key={row.key}>
-        {index > 0 && <ItemSeparator />}
-        <Item role="listitem" className="px-0">
-          <ItemHeader>
-            <ItemTitle><RecordLink href={row.href} to="Brew day">{row.batchNo}</RecordLink></ItemTitle>
-            {row.brewable && E.act("Brew", "info", row.href)}
-          </ItemHeader>
-          <ItemContent className="gap-0">
-            {E.fld("Brand", orMissing(row.brand, "No brand yet"))}
-            {E.fld("Recipe", orMissing(row.recipe, "No recipe"))}
-            {E.fld("Planned on", row.plannedOn)}
-            {E.fld("Planned barrels", row.plannedBbl)}
-            {row.readings ? <><ItemSeparator /><Occupancies readings={row.readings} /></> : row.vessel && E.fld("Vessel", row.vessel)}
-          </ItemContent>
-        </Item>
-      </Fragment>)}
-    </ItemGroup>
-  );
+  return <RecordTable
+    headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(vesselHead ? [vesselHead] : []), ...(brew ? [<span key="action" className="sr-only">Action</span>] : [])]}
+    align={["l", "l", "l", "l", "r", ...(vesselHead ? ["l" as const] : []), ...(brew ? ["r" as const] : [])]}
+    rows={rows.map(row => ({
+      key: row.key,
+      href: row.href,
+      to: "Brew day",
+      cells: [
+        row.batchNo,
+        orMissing(row.brand, "No brand yet"),
+        orMissing(row.recipe, "No recipe"),
+        row.plannedOn,
+        row.plannedBbl,
+        ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
+        ...(brew ? [row.brewable && E.act("Brew", "info", row.href)] : []),
+      ],
+    }))}
+  />;
 }
 
 /** Vessel setup: the name opens its edit page, and inactive is said in words. */
 function VesselTable({ vessels }: { vessels: BatchVesselView[] }) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Vessel</TableHead>
-          <TableHead>Kind</TableHead>
-          <TableHead className="text-right">Capacity (bbl)</TableHead>
-          <TableHead>Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {vessels.map(vessel => <TableRow key={vessel.key}>
-          <TableCell><RecordLink href={vessel.href} to="Vessel detail">{vessel.name}</RecordLink></TableCell>
-          <TableCell>{vessel.kind}</TableCell>
-          <TableCell className="text-right">{vessel.capacityBbl}</TableCell>
-          <TableCell>{vessel.active ? "Active" : "Inactive"}</TableCell>
-        </TableRow>)}
-      </TableBody>
-    </Table>
-  );
+  return <RecordTable
+    headers={["Vessel", "Kind", "Capacity (bbl)", "Status"]}
+    align={["l", "l", "r", "l"]}
+    rows={vessels.map(vessel => ({
+      key: vessel.key,
+      href: vessel.href,
+      to: "Vessel detail",
+      cells: [vessel.name, vessel.kind, vessel.capacityBbl, vessel.active ? "Active" : "Inactive"],
+    }))}
+  />;
 }
 
 export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
@@ -131,7 +79,6 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
         return rows.length ? <Fragment key={title}>
           {E.ttl(title)}
           <GroupTable rows={rows} />
-          <GroupList rows={rows} />
         </Fragment> : null;
       })}
     </>}

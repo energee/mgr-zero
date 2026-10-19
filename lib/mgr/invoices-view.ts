@@ -77,7 +77,8 @@ export function toInvoiceListRow(inv: InvoiceListRecord, roles: readonly StaffRo
     balance: { label: "QuickBooks balance", cents: inv.qbo_balance_cents, value: inv.qbo_balance_cents == null ? "Unavailable" : money(inv.qbo_balance_cents) },
     localSubtotal: inv.qbo_accountant_drift ? { label: "Local subtotal", cents: inv.subtotal_cents, value: money(inv.subtotal_cents) } : null,
     due: { day: dueDay, value: dueDay ? formatDate(dueDay) : inv.kind === "credit_memo" ? "No payment due" : "Due date unavailable" },
-    overdue: dueDay !== null && state === "unpaid" && (inv.qbo_balance_cents == null || inv.qbo_balance_cents > 0) && inv.total_cents > 0 && dueDay < breweryDate(timeZone, now),
+    // An unknown balance is not overdue (#1025): only a known positive balance is owed.
+    overdue: dueDay !== null && state === "unpaid" && inv.qbo_balance_cents != null && inv.qbo_balance_cents > 0 && inv.total_cents > 0 && dueDay < breweryDate(timeZone, now),
     payment: paymentFact(inv, state),
     accounting: accountingFact(inv, state, roles, connected, inv.has_pending_qbo_push, qbo.detail),
     needsMapping: qbo.actions.includes("fix_mapping"),

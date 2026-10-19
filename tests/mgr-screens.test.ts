@@ -462,7 +462,10 @@ describe("SCREENS", () => {
     const formats = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Formats")!.body));
     expect(menu.match(/<h[12][^>]*>[^<]*(?:POS )?menu/gi)).toHaveLength(1);
     expect(pos.match(/<h[12][^>]*>Point of sale/gi)).toHaveLength(1);
-    expect(menu + formats).toContain("min-w-max");
+    // RecordTable lets long names wrap instead of widening past the column, and
+    // the phone gets a labeled list rather than a scrolling table (#1025).
+    expect(formats).not.toContain("min-w-max");
+    expect(formats).toContain('role="listitem"');
     const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
