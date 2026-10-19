@@ -41,8 +41,26 @@ describe("Today due times", () => {
   });
 
   it("adds no clock time to a date-only deadline such as a ship date", () => {
-    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [{ ...item("1", "2026-10-08T04:00:00Z", "pick_due"), detail: "pick due · ships Oct 8, 2026" }], now });
+    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [{ ...item("1", "2026-10-08T04:00:00Z", "pick_due"), detail: "pick due · ships Oct 8, 2026" }], timeZone, now });
     expect(model.rows[0].detail).toBe("pick due · ships Oct 8, 2026");
     expect(model.rows[0].dueAt).toBe("2026-10-08T04:00:00Z");
+  });
+
+  it("marks a ship or route date before the brewery's today as overdue (#993)", () => {
+    // Ship dates arrive as midnight of their brewery day; Oct 7 is yesterday in New York.
+    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [
+      { ...item("1", "2026-10-07T04:00:00Z", "pick_due"), detail: "pick due · ships Oct 7, 2026" },
+      { ...item("2", "2026-10-08T04:00:00Z", "submitted_order"), detail: "submitted · ships Oct 8, 2026" },
+      { ...item("3", "2026-10-07T04:00:00Z", "submitted_order"), detail: "submitted · ships Oct 7, 2026" },
+    ], timeZone, now });
+    expect(model.rows.map((r) => [r.detail, r.warning])).toEqual([
+      ["pick due · ships Oct 7, 2026 · overdue", true],
+      ["submitted · ships Oct 8, 2026", false],
+      ["submitted · ships Oct 7, 2026 · overdue", true],
+    ]);
+  });
+
+  it("needs the brewery zone to judge a date-only deadline", () => {
+    expect(() => toTodayViewProps({ date: "Thu, Oct 8", items: [item("1", "2026-10-07T04:00:00Z", "pick_due")], now })).toThrow(/time zone/);
   });
 });
