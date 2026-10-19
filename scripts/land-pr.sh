@@ -16,8 +16,8 @@
 # failed (including an added migration that sorts before main's newest, which
 # `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
 # reason, 5 push did not land, 6 main gained a migration since the sync (rerun
-# to resync), 7 the CI code review and simplify comments never posted (see the
-# Claude Code Review run; add the `review` label to rerun it).
+# to resync), 7 no claude-code-review.yml run passed both its simplify and
+# claude-review jobs (read that run; the `review` label reruns it).
 # Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
@@ -34,16 +34,25 @@ echo "== #$n $b @ $wt"
 [ "$(git branch --show-current)" = "$b" ] || { echo "wrong branch"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "dirty tree"; exit 1; }
 
-# Every human PR merges with both comments claude-code-review.yml posts. That
-# workflow skips drafts, so mark the PR ready (or relabel it when an earlier run
-# left no comment); the review runs during the local proof below.
+# Every human PR merges after one claude-code-review.yml run in which both jobs
+# succeeded: `simplify` (Claude Code's /simplify, which pushes its fixes to the
+# branch) and `claude-review`. Job success, not a comment, is the signal: the
+# review plugin posts nothing when no finding clears its confidence bar. That
+# workflow skips drafts, so mark the PR ready, or relabel it when no run passed,
+# then wait for the run before syncing: the sync below merges simplify's push.
 reviewed() {
-  local bodies
-  bodies=$(gh pr view "$n" --json comments --jq '.comments[]|select(.author.login=="claude")|.body') || return 1
-  grep -q '^## Code review' <<<"$bodies" && grep -q '^## Simplify' <<<"$bodies"
+  local id
+  for id in $(gh run list --workflow claude-code-review.yml --branch "$b" --limit 10 --json databaseId --jq '.[].databaseId'); do
+    [ "$(gh run view "$id" --json jobs --jq '[.jobs[]|select(.conclusion=="success")|.name]|sort|join(",")')" = claude-review,simplify ] && return 0
+  done
+  return 1
 }
-bot=$(gh pr view "$n" --json author --jq .author.is_bot) || exit 1
-if [ "$bot" = false ] && ! reviewed; then
+running() { [ -n "$(gh run list --workflow claude-code-review.yml --branch "$b" --json status --jq '.[]|select(.status!="completed")|.status')" ]; }
+# Exempt, as the workflow skips them: bot PRs, and PRs editing the workflow
+# itself (claude-code-action refuses a workflow file that differs from main's).
+gated=$(gh pr view "$n" --json author --jq '.author.is_bot|not') || exit 1
+gh pr diff "$n" --name-only | grep -qx .github/workflows/claude-code-review.yml && gated=false
+if [ "$gated" = true ] && ! reviewed; then
   if [ "$(gh pr view "$n" --json isDraft --jq .isDraft)" = true ]; then
     gh pr ready "$n" || exit 1
   else
@@ -52,6 +61,9 @@ if [ "$bot" = false ] && ! reviewed; then
     gh pr edit "$n" --remove-label review >/dev/null 2>&1
     gh pr edit "$n" --add-label review >/dev/null || exit 1
   fi
+  sleep 30
+  for _ in $(seq 40); do running || break; sleep 30; done
+  reviewed || { echo "#$n has no Claude Code Review run where simplify and claude-review both succeeded; read that run"; exit 7; }
 fi
 
 git fetch -q origin
@@ -121,9 +133,5 @@ if [ "$do_merge" = --merge ]; then
   # db push applies migrations in timestamp order: a migration landing on main after
   # this sync must be merged in (and this PR's timestamp checked) before merging.
   [ -z "$(git diff --name-only HEAD...origin/main -- supabase)" ] || { echo "main gained supabase changes since sync; rerun"; exit 6; }
-  if [ "$bot" = false ]; then
-    for _ in $(seq 20); do reviewed && break; sleep 30; done
-    reviewed || { echo "no '## Code review' and '## Simplify' comments on #$n; check the Claude Code Review run"; exit 7; }
-  fi
   gh pr merge "$n" --merge --match-head-commit "$head" && gh pr view "$n" --json state --jq .state
 fi

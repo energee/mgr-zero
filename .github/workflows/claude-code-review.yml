@@ -16,7 +16,11 @@ jobs:
     # the action hard-fails on non-human actors, and reviewing its own output
     # adds no value. Covers dreaming/main, documentation/user-guide, mgr[bot].
     # A `labeled` event runs only for the `review` label.
+    # After `simplify`, so the review reads the simplified head; !cancelled()
+    # still reviews when simplify fails or is skipped.
+    needs: simplify
     if: >-
+      !cancelled() &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.type != 'Bot' &&
       (github.event.action != 'labeled' || github.event.label.name == 'review')
@@ -68,21 +72,44 @@ jobs:
           # run logged one permission denial and a wasted retry.
           # --model: the opus alias tracks the latest Opus; unpinned, the
           # action fell back to Sonnet.
-          claude_args: '--model opus --allowedTools "Skill,mcp__github_inline_comment__create_inline_comment"'
+          # --append-system-prompt: the plugin otherwise ends silently when no
+          # finding clears its bar, which reads the same as a review that never ran.
+          claude_args: '--model opus --allowedTools "Skill,mcp__github_inline_comment__create_inline_comment" --append-system-prompt "Whenever the review ends without posting inline comments, for any reason, post one gh pr comment that starts with ## Code review and says in one line why nothing was flagged."'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
-      # Simplify as findings only: a CI push of simplify edits is unreviewed
-      # (AGENTS.md step 5), so the author applies them. land-pr.sh requires
-      # this comment and the code review comment before it merges.
-      - name: Run Claude simplify review
+  # Claude Code's built-in /simplify on the PR's own changes, applied and
+  # pushed to the PR branch. The Claude GitHub App needs contents: write to
+  # push (see claude.yml); its push re-runs ci.yml on the simplified head, which
+  # is the check on its edits, and claude-review then reviews it. Same-repo PRs
+  # only: a fork's branch is not ours to push to. land-pr.sh requires this job's
+  # success before merging.
+  simplify:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action != 'labeled' || github.event.label.name == 'review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Run Claude /simplify
         uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} for simplification only.
-            Read AGENTS.md and .pi/prompts/simplify.md, then apply those criteria to `gh pr diff ${{ github.event.pull_request.number }}` only.
-            Do not edit files, commit, or push. Name each finding as file:line, the simpler form, and why.
-            Then post exactly one comment with `gh pr comment ${{ github.event.pull_request.number }} --body "..."`.
-            Its first line must be `## Simplify`; if nothing qualifies, the body is `## Simplify` then `No simplifications found.`
-          claude_args: '--model opus --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*)"'
+            /simplify Scope: only the changes this PR makes, `git diff origin/main...HEAD`.
+            If files changed, `git add` them, commit with the message `refactor: apply /simplify`, and `git push origin HEAD`.
+            If nothing changed, do not commit.
+          # Edit and git only, never a repo script: with Edit, any script it may
+          # run (package.json, lint config) is code it can rewrite while holding
+          # a push token. The push re-runs ci.yml, which land-pr.sh waits on.
+          claude_args: '--model opus --allowedTools "Skill,Task,Read,Edit,Grep,Glob,Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD)"'

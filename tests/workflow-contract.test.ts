@@ -272,12 +272,14 @@ describe("production-readiness workflow contract", () => {
     expect(review).toContain("github.event.pull_request.user.type != 'Bot'");
   });
 
-  it("posts a simplify comment that land-pr requires beside the code review", () => {
+  it("runs /simplify before the code review, and land-pr requires both", () => {
     const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
-    expect(review).toContain(".pi/prompts/simplify.md");
-    expect(review).toContain("## Simplify");
-    expect(landPr).toContain("## Code review");
-    expect(landPr).toContain("## Simplify");
+    const jobs = parse(review).jobs;
+    expect(jobs.simplify.steps.at(-1).with.prompt).toMatch(/^\/simplify /);
+    expect(jobs.simplify.permissions.contents).toBe("write");
+    expect(jobs["claude-review"].needs).toBe("simplify");
+    expect(jobs["claude-review"].steps.at(-1).with.claude_args).toContain("## Code review");
+    expect(landPr).toContain("= claude-review,simplify ]");
     expect(landPr).toContain("gh pr ready");
   });
 
