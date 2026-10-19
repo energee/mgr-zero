@@ -13,7 +13,7 @@ import { RecordTable } from "./record-table";
 /** The current total, with the local subtotal under it when an accountant edited the invoice. */
 const total = (row: InvoiceListRow) => <>
   {row.total.value}
-  {row.localSubtotal && <span className="block text-muted-foreground">{row.localSubtotal.label} {row.localSubtotal.value}</span>}
+  {row.localSubtotal && <span className="block text-muted-foreground">Local subtotal {row.localSubtotal.value}</span>}
 </>;
 
 /** Accounting exceptions only: an ordinary row has none and says nothing. */
