@@ -136,6 +136,21 @@ describe("Brew day view", () => {
     expect(turn).toContain("Record brew turn");
     for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(turn).not.toContain(label);
   });
+  it("draws Cancel plan as a small control beside Reschedule, not a full-width button (#995)", () => {
+    const html = htmlOf(createElement(PlanActions, { plannedOn: "2026-09-04" }));
+    const cancel = /<button[^>]*>Cancel plan<\/button>/.exec(html)?.[0] ?? "";
+    expect(cancel).toContain('data-size="sm"');
+    expect(html.indexOf("Reschedule")).toBeLessThan(html.indexOf("Cancel plan"));
+    expect(html).toMatch(/<div class="flex flex-wrap[^"]*">[\s\S]*Reschedule[\s\S]*Cancel plan/);
+  });
+
+  it("rounds a pinned plan's per-bbl quantity the way the recipe page does (#995)", () => {
+    const model = { ...brewDayHazy, plan: { ...brewDayHazy.plan!, ingredients: [{ id: "i", material_id: "m", materialName: "2-row", unit: "lb", stage: "mash" as const, per_bbl_qty: 18.181818 }] } };
+    const html = htmlOf(createElement(BrewDayView, { model }));
+    expect(html).toContain("18.2 lb per bbl");
+    expect(html).not.toContain("18.181818");
+  });
+
   it("makes multiple recorded turns reachable in the inventory", () => {
     const html = htmlOf(screen("Brew day").body);
     for (const label of ["Add brew turn", "Correct turn 1", "Correct turn 2", "Turn 1", "Turn 2"]) expect(html).toContain(label);
