@@ -170,12 +170,12 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
 }) {
   const [binId, setBinId] = useState(""), [channelId, setChannelId] = useState("");
   const configure = (event: FormEvent) => { event.preventDefault(); onConfigure?.(binId, channelId); };
-  // With no mapped location there is nothing to configure or list: name the
-  // setup step and link to it instead (#997).
+  // With no mapped location there is nothing to configure or list: show the
+  // model's setup step instead (#997). Its link, if any, comes from the caller.
   const mapped = Boolean(model.selectedLocationId);
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
-    {!mapped && <>{E.blank({ title: "No Square location mapped", description: "Connect Square, then map a Square location to an MGR location." })}{E.btn("Set up Square", "p", "/settings/pos")}</>}
+    {model.setup && <>{E.blank(model.setup)}{model.setup.action && E.btn(model.setup.action.label, "p", model.setup.action.href)}</>}
     {mapped && <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>}
     {mapped && E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
     {model.message && E.note(model.message)}
