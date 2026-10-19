@@ -9,20 +9,13 @@ import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
+import { purchaseOrderNext, toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import "@/lib/commands/all";
 import { poNo } from "@/lib/mgr/doc-no";
 
 
 type Po = { id: string; po_no: number; status: string; expected_on: string | null; ordered_on: string | null; vendor_name: string | null; lines_open: number };
 
-/** The row's next action. A received or cancelled order has none: its row is
- *  a plain link, because "Open" on a closed order reads as reopen (#996). */
-function next(po: Po): { verb: string; tone: "info" | "attention" } | undefined {
-  if (po.status === "draft") return { verb: "Mark sent", tone: "info" };
-  if (po.status === "received" || po.status === "cancelled") return undefined;
-  return { verb: "Receive", tone: po.status === "partially_received" ? "attention" : "info" };
-}
 const status = (po: Po) => {
   if (po.status === "partially_received") return `partially received · ${po.lines_open} ${po.lines_open === 1 ? "line" : "lines"} still due`;
   if (po.status === "sent") return `sent${po.ordered_on ? ` ${po.ordered_on}` : ""}${po.expected_on ? ` · expected ${po.expected_on}` : ""}`;
@@ -41,7 +34,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
         title: "Work",
         subtitle: all === "1" ? "every order" : "open orders",
         includeClosed: all === "1",
-        rows: pos.map(po => ({ key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), ...next(po), href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" })),
+        rows: pos.map(po => ({ key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), ...purchaseOrderNext(po.status), href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" })),
       })}
       createAction={<Button size="sm" asChild><Link href="/purchase-orders/new">New PO</Link></Button>}
       linkRows

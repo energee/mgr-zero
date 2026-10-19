@@ -26,7 +26,7 @@ import {
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
-import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { poLineCounts } from "../lib/mgr/new-po-view";
@@ -46,6 +46,14 @@ describe("Purchase orders", () => {
     expect(markup).toContain('href="/purchase-orders/po"');
     expect(markup).toContain('aria-label="Open"');
     expect(markup).not.toMatch(/>Open</);
+  });
+
+  it("each order status names its next action; received and cancelled have none (#996)", () => {
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
+    expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
+    expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
+    expect(purchaseOrderNext("received")).toBeUndefined();
+    expect(purchaseOrderNext("cancelled")).toBeUndefined();
   });
 
   it("the Purchase orders inventory record is PurchaseOrdersView", () => {
