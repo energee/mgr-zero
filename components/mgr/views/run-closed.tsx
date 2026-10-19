@@ -29,7 +29,7 @@ export function RunClosedView({
           row.sku_name ?? row.sku_id, row.qty_actual === null ? "Not recorded" : row.qty_actual,
         ]), ["l", "r"]) : E.info("No outputs recorded.")}
       </> : null}
-      {model.records ? <PackagingMaterialHistory records={model.records} /> : null}
+      {model.records ? <PackagingMaterialHistory records={model.records} timeZone={model.timeZone} /> : null}
       {model.correction ? <PackagingMaterialCorrection {...model.correction} /> : null}
       {action}
     </>

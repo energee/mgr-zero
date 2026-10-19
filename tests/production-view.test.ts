@@ -34,6 +34,10 @@ describe("Production dates (#991)", () => {
     const closed = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, lot: { ...runClosedHazy.lot!, best_by: "2027-03-04" } } }));
     expect(closed).toContain("Sep 5, 2026");
     expect(closed).toContain("Mar 4, 2027");
+    // created_at is an instant: 02:00 UTC on Sep 6 is still Sep 5 in New York.
+    const history = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, timeZone: "America/New_York", records: [{ ...runClosedHazy.records![0]!, created_at: "2026-09-06T02:00:00Z" }] } }));
+    expect(history).toMatch(/Original close<[^]*?Sep 5, 2026/);
+    expect(history).not.toContain("2026-09-06");
     expect(htmlOf(createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28" } }))).toContain("Sep 28, 2026");
     const brewed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }));
     expect(brewed).toContain("Sep 4, 2026");

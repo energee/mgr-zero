@@ -6,6 +6,7 @@ import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-v
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
+import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
@@ -138,6 +139,7 @@ export const runClosedHazy: RunClosedViewModel = {
   bblDrawn: 40,
   lot: { id: "lot-hazy", code: "L-260905-HZ", packaged_on: "2026-09-05", best_by: null },
   outputs: [{ sku_id: "cases", sku_name: "Hazy cases", qty_actual: 118 }],
+  timeZone: DEMO_TIME_ZONE,
 };
 
 /** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
