@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { CustomerView } from "../components/mgr/views/customer";
 import { CustomersView } from "../components/mgr/views/customers";
+import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
@@ -31,6 +32,13 @@ describe("Customers list", () => {
     expect(isValidElement(screen("Customers").body)).toBe(true);
     expect(body.type).toBe(CustomersView);
     expect(body.props.model).toEqual(toCustomersViewProps(customersList));
+  });
+
+  // #994: both Customers records draw live's search strip, as Recipes, Vendors and Materials do.
+  it.each(["Customers", "Customers missing email"])("the %s inventory record passes ListControls as its search", (name) => {
+    const body = screen(name).body as { props: { search?: { type: unknown; props: { search: { label: string } } } } };
+    expect(body.props.search?.type).toBe(ListControls);
+    expect(body.props.search?.props.search.label).toBe("Search customers");
   });
 
   it("the inventory list still offers Add customer and Open", () => {

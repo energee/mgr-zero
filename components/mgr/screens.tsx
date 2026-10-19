@@ -1214,7 +1214,7 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
-    body: <CustomersView model={toCustomersViewProps(customersList)} />,
+    body: <CustomersView model={toCustomersViewProps(customersList)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
@@ -1224,7 +1224,7 @@ export const SCREENS: Screen[] = [
     writes: "none [Invite and Remove access on Customer detail correct portal access]",
     states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
     spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
-    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} />,
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5,

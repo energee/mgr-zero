@@ -82,6 +82,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
               verb: "Edit",
               warning: c.qty_available <= 0,
             })),
+            filtered: Boolean(params.q),
           })}
           header={E.hd("Contracts", "", <ContractForm vendors={options} materials={materials} />)}
           rowTrailing={(row) => {

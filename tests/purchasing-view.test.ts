@@ -366,6 +366,9 @@ describe("Vendors and Materials on hand search", () => {
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
     expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
+    // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
+    expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
+    expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
   });
 });
 

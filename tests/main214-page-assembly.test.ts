@@ -160,6 +160,11 @@ it.each([
   expect(html).toContain('value="west"');
   expect(html).toContain(empty);
 });
+it("says no contracts match when a vendor search finds none", async () => {
+  const html = render(await VendorsPage({ searchParams: Promise.resolve({ q: "west" }) }));
+  expect(html).toContain("No contracts match");
+  expect(html).not.toContain("No contracts yet");
+});
 
 // docs/plans/list-filters.md: the URL's search, sort and category reach list_brands; a bad sort falls back.
 it("passes Catalog's URL filters to list_brands", async () => {
