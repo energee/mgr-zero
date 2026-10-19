@@ -25,7 +25,6 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   const breweryId = expectedContext.breweryId ?? "";
   const [conversationId, setConversationId] = useState<string>();
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   // A failure carries the recovery that fits it, so Try again re-runs what
   // actually failed — the setup load, the new chat, or the proposal commit —
@@ -64,12 +63,8 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   // regenerating the last AI turn; `live` drops a response the scope outlived.
   async function loadSetup(live: () => boolean) {
     try {
-      const [conversations, ai] = await Promise.all([
-        run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
-        run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
-      ]);
+      const conversations = await run("list_chat_conversations", {}) as { id: string }[];
       if (!live()) return;
-      setModel(ai.model);
       if (!conversations[0]) { await newChat(false, live); return; }
       const id = conversations[0].id;
       const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
@@ -130,7 +125,7 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }
 
   return <>
-    <ComposerConversationView messages={transcript} model={model} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposalError && <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm">{proposalError}</p>}
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
