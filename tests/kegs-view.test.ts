@@ -12,9 +12,10 @@ import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { kegShortageText, toKegFleetViewProps } from "../lib/mgr/keg-fleet-view";
+import { kegShortageText, toKegFleetViewProps, withLocationBin } from "../lib/mgr/keg-fleet-view";
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
-import { toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
+import { kegHistoryScope, toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
+import { formatDate } from "../lib/date-format";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -100,6 +101,16 @@ describe("Customer keg balance", () => {
   });
 });
 
+describe("Record keg event", () => {
+  it("#1025 resets the bin when the location changes, in live and inventory alike", () => {
+    const value = kegFleetMicrostar.eventForm!;
+    expect(withLocationBin(value, { ...value, locationId: "cold" }, () => "")).toMatchObject({ locationId: "cold", binId: "" });
+    expect(withLocationBin(value, { ...value, locationId: "cold" }, (id) => `${id}-first`).binId).toBe("cold-first");
+    expect(withLocationBin(value, { ...value, qty: "9" }, () => "")).toMatchObject({ binId: value.binId, qty: "9" });
+    for (const file of ["components/mgr/views/keg-event-form.tsx", "app/(app)/kegs/event-form.tsx"]) expect(src(file), file).toMatch(/withLocationBin\(/);
+  });
+});
+
 describe("Keg event history", () => {
   it("the Keg event history inventory record is KegHistoryView", () => {
     const body = screen("Keg event history").body as { type: unknown; props: { model: unknown } };
@@ -110,6 +121,39 @@ describe("Keg event history", () => {
   it("the live history page mounts KegHistoryView", () => {
     const page = src("app/(app)/kegs/history/page.tsx");
     expect(page).toMatch(/<KegHistoryView\b/);
+  });
+
+  it("#1025 prints inventory dates the way the live page does", () => {
+    for (const row of kegHistoryLedger.rows!) {
+      const day = row.detail.split(" · ")[0];
+      // Live formats each event with formatDate ("Sep 3, 2026"); "9/03" was the old fixture.
+      expect(formatDate(new Date(`${day} UTC`), "UTC"), row.key).toBe(day);
+    }
+  });
+
+  const POOL = "11111111-1111-4111-8111-111111111111";
+  const CUSTOMER = "22222222-2222-4222-8222-222222222222";
+  const pools = [{ id: POOL, name: "Owned ½ bbl" }];
+  const customers = [{ id: CUSTOMER, name: "Ridgeline" }];
+
+  it("#1025 links each pool and customer option to the page with that scope changed", () => {
+    const scope = kegHistoryScope({});
+    expect(scope).toMatchObject({ poolId: undefined, customerId: undefined });
+    expect(scope.poolOptions(pools).map((o) => o.href)).toEqual(["/kegs/history", `/kegs/history?pool=${POOL}`]);
+    expect(scope.customerOptions(customers).map((o) => o.href)).toEqual(["/kegs/history", `/kegs/history?customer=${CUSTOMER}`]);
+  });
+
+  it("#1025 keeps the other filter when one changes, so the two combine", () => {
+    const byCustomer = kegHistoryScope({ customer: CUSTOMER });
+    expect(byCustomer.customerId).toBe(CUSTOMER);
+    expect(byCustomer.poolOptions(pools).map((o) => o.href)).toEqual([`/kegs/history?customer=${CUSTOMER}`, `/kegs/history?customer=${CUSTOMER}&pool=${POOL}`]);
+    const both = kegHistoryScope({ pool: POOL, customer: CUSTOMER });
+    expect(both.customerOptions(customers)[0].href).toBe(`/kegs/history?pool=${POOL}`);
+    expect(both.poolOptions(pools)[0].href).toBe(`/kegs/history?customer=${CUSTOMER}`);
+  });
+
+  it("#1025 ignores a scope that is not one uuid", () => {
+    expect(kegHistoryScope({ pool: "nope", customer: ["x", "y"] })).toMatchObject({ poolId: undefined, customerId: undefined });
   });
 
   it("#972 labels the Keg pool and Customer controls, pool first, each showing its selection", () => {

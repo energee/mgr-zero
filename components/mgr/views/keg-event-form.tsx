@@ -9,7 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { E } from "@/components/mgr/e";
 import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/mgr/enums";
 import { REASON_EFFECT, REASON_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
-import { kegEventReady, mayHaveKegCustomer, needsKegCustomer, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { kegEventReady, mayHaveKegCustomer, needsKegCustomer, withLocationBin, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 
 const SIZE_OPTIONS = KEG_SIZES.map((value) => ({ value, label: SIZE_LABEL[value] }));
 const REASON_OPTIONS = KEG_EVENT_REASONS.map((value) => ({ value, label: REASON_LABEL[value] }));
@@ -67,7 +67,9 @@ export function KegEventPresentation({ open, onOpenChange, trigger, value, optio
   );
 }
 
-/** Inventory-only controlled fixture. It never submits a command and closing discards local edits. */
+/** Inventory-only controlled fixture. It never submits a command and closing
+ *  discards local edits. Its bins carry no location, so a changed location
+ *  clears the bin rather than keep one from the old location. */
 export function KegEventFixtureForm({ initialValue, options }: { initialValue: KegEventValue; options: KegEventOptions }) {
   const [open, setOpen] = useState(true);
   const [value, setValue] = useState(initialValue);
@@ -80,5 +82,5 @@ export function KegEventFixtureForm({ initialValue, options }: { initialValue: K
     setOpenAndReset(false);
   };
   return <KegEventPresentation open={open} onOpenChange={setOpenAndReset} trigger={<Button data-preview-action size="sm">Record keg event</Button>}
-    value={value} options={options} onChange={setValue} onSubmit={submit} ready={kegEventReady(value)} />;
+    value={value} options={options} onChange={(next) => setValue(withLocationBin(value, next, () => ""))} onSubmit={submit} ready={kegEventReady(value)} />;
 }
