@@ -53,7 +53,7 @@ export type TodaySnapshot = {
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
-  /** breweries.timezone; required when any item carries a timed dueAt. */
+  /** breweries.timezone; required when any item carries a dueAt (timed or a ship/route date). */
   timeZone?: string;
   /** The clock that decides overdue versus due; tests pin it. */
   now?: Date;
