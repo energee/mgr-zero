@@ -1,11 +1,12 @@
-// components/mgr/views/orders-list.tsx — Work → Orders list. Live passes
-// OrderForm as createAction and LinkTabs as filters; inventory uses the
-// fixture verbs and E.tabs.
+// components/mgr/views/orders-list.tsx — Work → Orders list. The Work kind
+// strip is the shared WorkKindTabs; live passes OrderForm as createAction and
+// the status LinkTabs as filters; inventory uses the fixture verbs and E.tabs.
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { OrdersListViewModel } from "@/lib/mgr/orders-list-view";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
+import { WorkKindTabs } from "./work-kind-tabs";
 
 export type { OrdersListViewModel };
 
@@ -16,6 +17,7 @@ export function OrdersView({
   pagination,
   createAction,
   filters,
+  workHrefs,
   linkRows,
   listStatus,
   feedback,
@@ -23,7 +25,10 @@ export function OrdersView({
   pagination?: HistoryNavigationProps;
   model: OrdersListViewModel;
   createAction?: ReactNode;
+  /** The status filter under the Work kind strip; inventory draws inert state tabs. */
   filters?: ReactNode;
+  /** Live: the Work chips this role may open. */
+  workHrefs?: Record<string, string>;
   /** Live list: row verbs are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
   listStatus?: ReactNode;
@@ -32,12 +37,8 @@ export function OrdersView({
   return (
     <>
       {E.hd("Orders", undefined, createAction !== undefined ? createAction : E.btn("New order"))}
-      {filters !== undefined ? filters : (
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
-          {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
-        </div>
-      )}
+      <WorkKindTabs chips={WORK_CHIPS} current="orders" tabs={WORK_TABS} hrefs={workHrefs} />
+      {filters !== undefined ? filters : E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
       {feedback}
       {listStatus ?? (model.empty
         ? E.blank(model.empty)
