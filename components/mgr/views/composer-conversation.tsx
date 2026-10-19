@@ -6,9 +6,8 @@ const DISALLOWED_ELEMENTS = ["img"];
 
 export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
 
-export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat, onSetupRetry }: {
+export function ComposerConversationView({ messages, activity, error, onRetry, onNewChat, onSetupRetry }: {
   messages: ComposerConversationMessage[];
-  model?: string;
   activity?: string;
   error?: string;
   onRetry?: () => void;
@@ -18,7 +17,7 @@ export function ComposerConversationView({ messages, model, activity, error, onR
   return (
     <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <header className="flex flex-col gap-2 px-1 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
+        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p></div>
         <Button type="button" size="sm" variant="ghost" onClick={onSetupRetry ?? onNewChat}>{onSetupRetry ? "Retry setup" : "New chat"}</Button>
       </header>
       <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
