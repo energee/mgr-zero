@@ -85,6 +85,15 @@ describe("recipes and immutable versions", () => {
     expect(await names("nothing")).toEqual([]);
   });
 
+  it("list_recipes q treats * as literal text (#1029)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    for (const name of ["Plain Pils", "Star*Gazer"]) await runCommand("create_recipe", { name }, own);
+    const names = async (q: string) => ((await runCommand("list_recipes", { q }, own)) as { name: string }[]).map((r) => r.name);
+    expect(await names("*")).toEqual(["Star*Gazer"]);
+    expect(await names("r*g")).toEqual(["Star*Gazer"]);
+    expect(await names(".")).toEqual([]);
+  });
+
   it("get_recipe returns the requested older version and lists all versions", async () => {
     const recipe = await runCommand("create_recipe", { name: "History IPA" }, ctx) as { id: string };
     const historyMalt = await seedMaterial(b.id, { name: "History malt", category: "malt", extractPotential: 1.037 });

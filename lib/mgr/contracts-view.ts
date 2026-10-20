@@ -28,6 +28,6 @@ export function toContractsViewProps(s: ContractsSnapshot): ContractsViewModel {
     rows,
     empty: rows.length > 0 ? undefined
       : s.filtered ? { title: "No contracts match", description: "Clear the search to see every contract." }
-      : { title: "No contracts yet", description: "A contract records beer promised to a customer before it is brewed." },
+      : { title: "No contracts yet", description: "A contract records a quantity of a material a vendor commits to supply, which purchase orders then draw down." },
   };
 }

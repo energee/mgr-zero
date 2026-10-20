@@ -13,7 +13,7 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
 // The process spec (recipe-builder spec D2, D6, D7). Stored as given; the RPC
@@ -164,7 +164,7 @@ defineQuery({
   input: z.object({ q: z.string().trim().max(100).optional().describe("Only recipes whose name contains this text") }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     let query = ctx.db.from("recipes").select("id, name, brand_id, note, created_at").eq("brewery_id", ctx.breweryId);
-    if (i.q) query = query.ilike("name", `%${escapeLike(i.q)}%`);
+    if (i.q) query = query.regexIMatch("name", escapeRegex(i.q));
     const recipes = (await unwrap(query.order("name"))) ?? [];
     if (recipes.length === 0) return [];
     const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id, version")

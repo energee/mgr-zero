@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
@@ -345,9 +345,10 @@ defineQuery({
   handler: async (ctx, i) => {
     let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share)").eq("brewery_id", ctx.breweryId);
     if (i.q) {
-      // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again.
-      const pattern = `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
-      brands = brands.or(`name.ilike.${pattern},alias.ilike.${pattern}`);
+      // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted,
+      // so commas and parentheses stay literal, and `"` and `\` (including escapeRegex's) are escaped again.
+      const pattern = `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+      brands = brands.or(`name.imatch.${pattern},alias.imatch.${pattern}`);
     }
     if (i.category) brands = brands.eq("category", i.category);
     if (i.sort === "abv") brands = brands.order("abv", { ascending: false, nullsFirst: false });

@@ -59,6 +59,16 @@ describe("search_entities", () => {
     expect((await search("ridge")).map((h) => h.id)).toContain(customerId);
     expect(await search("zzz-nothing")).toEqual([]);
   });
+  it("* is literal text in the prefix match, on names and brand aliases (#1029)", async () => {
+    const star = await ins("customers", { brewery_id: b.id, name: "Star* Tavern", type: "retailer", state: "PA", sale_channel_id: await channelId(b.id, "Wholesale") });
+    const brand = await ins("brands", { brewery_id: b.id, name: "Wild Card", alias: "Wild*Card" });
+    const format = await ins("formats", { brewery_id: b.id, name: "16oz can", basis: "packaged", package_type: "can", bbl_per_unit: 0.004 });
+    const sku = await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "Wild Card 16oz" });
+    expect((await search("*", adminCtx, ["customer", "sku"])).map((h) => h.id)).toEqual([]);
+    expect((await search("star*", adminCtx, ["customer"])).map((h) => h.id)).toEqual([star.id]);
+    expect((await search("tar*", adminCtx, ["customer"])).map((h) => h.id)).toEqual([]);
+    expect((await search("wild*", adminCtx, ["sku"])).map((h) => h.id)).toEqual([sku.id]);
+  });
   it("a document number past the column's range is no match, not an error", async () => {
     await expect(search("ORD-99999999999999999999")).resolves.toEqual([]);
     await expect(search("INV-2147483648")).resolves.toEqual([]);
