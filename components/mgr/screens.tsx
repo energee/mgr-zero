@@ -13,8 +13,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // and kept only for the Slack/QuickBooks/Square venue drawings.
 //
 // Two things this file deliberately does not draw. A create surface is the
-// edit surface with empty values (Create brewery is the pattern), so Add
-// customer, Add location, New PO, Add keg pool and Create price group open the
+// edit surface with empty values (Create brewery is the pattern), so New
+// customer, Add location, New PO, Add keg pool and New price group open the
 // records already here rather than earning frames of their own. And the
 // composer strip is staff shell chrome — screen-frame.tsx passes E.comp() to
 // staff frames — so it is present under every staff frame without any
@@ -1077,7 +1077,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Transfers",
-    to: { Submit: "Transfer detail", Pick: "Transfer detail", Receive: "Transfer detail", Open: "Transfer detail", "New transfer": "New transfer", "TRF-0007": "Transfer detail", "TRF-0006": "Transfer detail" },
+    to: { Submit: "Transfer detail", Pick: "Transfer detail", Receive: "Transfer detail", "New transfer": "New transfer", "TRF-0007": "Transfer detail", "TRF-0006": "Transfer detail" },
     job: "Move stock between two locations without an order or an invoice",
     reads: "list_stock_transfers · list_locations · list_bins · list_skus",
     writes: "create_stock_transfer",
@@ -1091,11 +1091,11 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     surface: "sheet",
     name: "New transfer",
-    to: { "Create transfer": "Transfer detail" },
+    to: { "Save draft": "Transfer detail" },
     job: "Draft a stock transfer: two locations, a bin at each end, SKU lines",
     reads: "list_locations · list_bins · list_skus",
     writes: "create_stock_transfer",
-    states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Create stays off until one SKU has a qty"]],
+    states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Save draft stays off until one SKU has a qty"]],
     spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location.",
     body: <NewTransferView model={toNewTransferViewProps(newTransferDraft)} />,
   },
@@ -1117,7 +1117,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Pick sheet",
-    to: { Pick: "Pick", Open: "Order" },
+    to: { Pick: "Pick" },
     job: "Group confirmed demand by ship date",
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
@@ -1229,7 +1229,6 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Customer detail",
-    to: { Open: "Customer keg balance" },
     job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
     reads: "get_customer · list_customer_users",
     writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
@@ -1387,7 +1386,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New Format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
+    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus · list_catalog_categories",
     writes: "upsert_brand · create_sku · update_sku",
@@ -2215,7 +2214,7 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     name: "POS mapping",
-    to: { "Save mapping": "POS mapping", Open: "POS sale detail", "Sync Square catalog": "POS mapping", "Sync Square sales": "POS mapping", "Taproom · Sep 1 to Sep 8": "POS mapping", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail" },
+    to: { "Save mapping": "POS mapping", "Sync Square catalog": "POS mapping", "Sync Square sales": "POS mapping", "Taproom · Sep 1 to Sep 8": "POS mapping", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail" },
     job: "Map or ignore Square variations and inspect immutable sales coverage without posting inventory",
     reads: "list_pos_variations · list_skus · list_formats · list_pos_sales",
     writes: "set_pos_item_mapping · sync_square_catalog · sync_square_sales",
@@ -2592,7 +2591,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Menu",
-    to: { Taproom: "Menu", Warehouse: "Menu", Open: "POS item", Map: "POS mapping", "Guest cider · pint": "POS mapping" },
+    to: { Taproom: "Menu", Warehouse: "Menu", Map: "POS mapping", "Guest cider · pint": "POS mapping" },
     job: "One catalog, published to every destination that sells from it",
     reads: "get_pos_menu [derived from brands × formats × configured-bin stock]",
     writes: "configure_pos_menu · set_pos_price_override [nullable, per POS location] · set_pos_website_publication · publish_pos_menu [complete derived location change set]",
@@ -2752,7 +2751,7 @@ export const SCREENS: Screen[] = [
     job: "Price every beer from one grid: groups down, formats across, a table per sale channel",
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
-    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: Create price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
+    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
     spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. A group with no pour of that name has no cell. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },

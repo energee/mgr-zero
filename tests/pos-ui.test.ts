@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PosItemView, PosMenuView } from "@/components/mgr/views/pos";
+import { PosItemView, PosMappingView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup } from "@/lib/mgr/pos-view";
@@ -90,7 +90,9 @@ describe("POS UI truth", () => {
     const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
     expect(menu).toContain("Publish changes");
     expect(menu).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish changes/);
-    expect(menu).toContain("Open");
+    // The excluded item only navigates: a row link, not an Open verb (#1026).
+    expect(menu).toContain('aria-label="Open"');
+    expect(menu).not.toMatch(/>Open</);
     const item = renderToStaticMarkup(createElement(PosItemView, { item: { brand: "Hazy", format: "Pint", sources: "", serving: "16 oz", price: "$7.00", override: "", websitePublished: false, available: false } }));
     expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish item to Square/);
   });
@@ -99,7 +101,21 @@ describe("POS UI truth", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
     expect(html("Point of sale")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
     expect(html("POS mapping")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
-    expect(html("POS mapping")).toContain("Open");
+    // A recent sale opens by its row arrow, not an Open verb (#1026).
+    expect(html("POS mapping")).toContain('aria-label="Open"');
+    expect(html("POS mapping")).not.toMatch(/>Open</);
+  });
+
+  it("a live menu item and a live sale are row links to their detail (#1026)", () => {
+    const model = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", externalItems: [], excluded: [],
+      items: [{ brandId: "hazy", formatId: "pint", label: "Hazy · Pint", retail: "$7.00", source: "format", destinations: "Square", available: true, href: "/menu/item/pint" }] };
+    const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
+    expect(menu).toContain('href="/menu/item/pint"');
+    expect(menu).not.toMatch(/>Open</);
+    const mapping = renderToStaticMarkup(createElement(PosMappingView, { variations: [], targets: [], coverage: [],
+      sales: [{ id: "s", label: "Sale · Hazy", detail: "1 pint", amount: "$7.00", status: "mapped", href: "/settings/pos/sales/s" }] }));
+    expect(mapping).toContain('href="/settings/pos/sales/s"');
+    expect(mapping).not.toMatch(/>Open</);
   });
 
   it("keeps live POS route sheets on the inventory body layout", () => {

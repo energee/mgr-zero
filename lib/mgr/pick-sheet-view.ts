@@ -11,7 +11,9 @@ export type PickSheetRowView = {
   title: string;
   detail: string;
   href: string;
-  verb: "Pick" | "Open";
+  /** Pick on a confirmed order; any other status has no next action here,
+   *  so its row is a plain link to the order (#1026). */
+  verb?: "Pick";
   /** Order was changed after pick (#811): count only the added or raised lines. */
   changedAfterPick?: boolean;
 };
@@ -64,7 +66,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
           title: `${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`,
           detail: `${o.status} · ${plural(o.order_lines.length, "line")}`,
           href: `/orders/${o.id}`,
-          verb: o.status === "confirmed" ? "Pick" as const : "Open" as const,
+          verb: o.status === "confirmed" ? "Pick" as const : undefined,
           changedAfterPick: o.repick_since ? true : undefined,
         };
       });

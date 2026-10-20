@@ -62,9 +62,9 @@ describe("Price groups view", () => {
     expect(model.formats).toEqual(["Hazy · sixtel"]);
   });
 
-  it("renders Create price group, group links, and the Hazy / Pils cells", () => {
+  it("renders New price group, group links, and the Hazy / Pils cells", () => {
     const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
-    expect(html).toMatch(/>Create price group</);
+    expect(html).toMatch(/>New price group</);
     expect(html).toMatch(/Wholesale/);
     expect(html).toMatch(/Taproom/);
     expect(html).toMatch(/data-to="Price group"/);
@@ -84,7 +84,7 @@ describe("Price groups view", () => {
       renderCell: (channel, row, col, label) => createElement("b", null, `${channel.name}/${row.name}/${col}`, label),
     }));
     expect(html).toMatch(/CREATE/);
-    expect(html).not.toMatch(/Create price group/);
+    expect(html).not.toMatch(/New price group/);
     expect(html).toMatch(/G:2/);
     expect(html).not.toMatch(/data-to="Price group"/);
     expect(html).toContain(`<b>Wholesale/2/0${money(15000)}</b>`);

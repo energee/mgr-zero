@@ -41,6 +41,16 @@ describe("Pick sheet view loop", () => {
     expect(html()).not.toContain("changed after pick");
   });
 
+  it("a row that is no longer confirmed has no verb; it is a row link, not an Open verb (#1026)", () => {
+    const orders = pickSheet.orders.map((o, i) => i === 1 ? { ...o, status: "picked" } : o);
+    const model = toPickSheetViewProps({ orders });
+    expect(model.groups[0]!.rows.map((r) => r.verb)).toEqual(["Pick", undefined, "Pick"]);
+    const markup = html(model, { linkRows: true });
+    expect(markup).toMatch(/href="\/orders\/00000000-0000-4000-8000-000000000232"/);
+    expect(markup).toContain('aria-label="Open"');
+    expect(markup).not.toMatch(/>Open</);
+  });
+
   it("names an empty sheet without inventing rows", () => {
     const model = toPickSheetViewProps({ orders: [] });
     expect(model.empty?.title).toBe("Nothing confirmed to pick");

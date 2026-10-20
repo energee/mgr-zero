@@ -60,7 +60,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
           }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Create transfer"}</Button>
+          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save draft"}</Button>
         </CommandFormFooter>}
         />
       </form>

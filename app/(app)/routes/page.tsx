@@ -1,5 +1,6 @@
 // app/(app)/routes/page.tsx — Work › Deliveries (screen record Routes): every
-// route not yet returned from list_routes with its next verb, the shipped
+// route not yet returned from list_routes with its next verb (routeNext; an
+// assigned route not yet departed is a plain row link), the shipped
 // orders and picked transfers on no route, and New route → /routes/new.
 // Warehouse and Admin.
 import { E } from "@/components/mgr/e";
@@ -9,7 +10,7 @@ import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
-import { toRoutesViewProps } from "@/lib/mgr/routes-view";
+import { routeNext, toRoutesViewProps } from "@/lib/mgr/routes-view";
 import "@/lib/commands/all";
 import { driverLabel, type RouteList } from "./labels";
 
@@ -21,8 +22,7 @@ export default async function RoutesPage() {
     ...routes.map(route => ({
       key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
       detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
-      verb: route.departed_at ? "Resume" : route.driver_user_id ? "Open" : "Assign",
-      tone: route.departed_at ? "info" as const : route.driver_user_id ? "primary" as const : "attention" as const,
+      ...routeNext(route),
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),
     ...unassigned.map(document => ({ key: document.id, title: document.label, detail: "shipped · no route", verb: "Add to route", tone: "attention" as const, href: "/routes/new", warning: true })),

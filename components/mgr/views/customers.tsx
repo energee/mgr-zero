@@ -1,5 +1,5 @@
 // components/mgr/views/customers.tsx — Customers list. Live passes
-// CustomerForm as createAction and linkRows; inventory uses Add customer
+// CustomerForm as createAction and linkRows; inventory uses New customer
 // and unlinked rows.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -23,7 +23,7 @@ export function CustomersView({
 }) {
   return (
     <>
-      {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("Add customer"), backHref)}
+      {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("New customer"), backHref)}
       {model.missingPortalEmail && E.info("Customers without a current portal login email. Open a customer and use Invite to add buyer access; Remove access replaces an obsolete login. Email presence is a readiness check, not proof of delivery or sending.")}
       {search}
       {model.empty

@@ -59,7 +59,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
     <CatalogView
       model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) })}
       controls={controls}
-      createAction={canWrite ? E.btn("New Brand", "p", "/catalog/brands/new") : null}
+      createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
       linkRows
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
       formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}

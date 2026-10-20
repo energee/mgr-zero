@@ -13,7 +13,7 @@ export function RoutesView({ model, createAction, workHrefs }: {
     {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New route"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty ? E.blank(model.empty) : model.rows.map(row => <Fragment key={row.key}>
-      {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}
+      {row.verb ? E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "") : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, row.href)}
     </Fragment>)}
   </>;
 }

@@ -15,7 +15,7 @@ export function TransfersView({
   model: TransfersViewModel;
   createAction?: ReactNode;
   workHrefs?: Record<string, string>;
-  /** Live: verbs are links. Inventory leaves them unlabeled taps. */
+  /** Live: verbs and verb-less rows are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
 }) {
   return (
@@ -26,7 +26,9 @@ export function TransfersView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
+            {row.verb
+              ? E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")
+              : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
     </>

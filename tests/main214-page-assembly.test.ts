@@ -86,7 +86,7 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(catalog.props.createAction).toBeNull();
   expect(customers.props.createAction).toBeNull();
   expect(render(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
-  expect(render(customers)).not.toContain("Add customer");
+  expect(render(customers)).not.toContain("New customer");
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
@@ -123,7 +123,7 @@ it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();
   const customers = await CustomersPage();
   expect(render(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
-  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
+  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("New customer");
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {

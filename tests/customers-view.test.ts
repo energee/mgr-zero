@@ -41,9 +41,10 @@ describe("Customers list", () => {
     expect(body.props.search?.props.search.label).toBe("Search customers");
   });
 
-  it("the inventory list offers Add customer, and each row opens by its arrow, not an Open verb (#996)", () => {
+  it("the inventory list offers New customer, as live does, and each row opens by its arrow, not an Open verb (#996, #1026)", () => {
     const markup = html(screen("Customers").body);
-    expect(markup).toMatch(/>Add customer</);
+    expect(markup).toMatch(/>New customer</);
+    expect(readFileSync("app/(app)/customers/customer-form.tsx", "utf8")).toContain('"New customer"');
     expect(markup).not.toMatch(/>Open</);
     expect(markup).toContain('aria-label="Open"');
   });
@@ -118,7 +119,9 @@ describe("Customer detail", () => {
     expect(markup).toMatch(/Type/);
     expect(markup).toMatch(/Retailer/);
     expect(markup).toMatch(/Main/);
-    expect(markup).toMatch(/>Open</);
+    // The keg balance row only navigates: one row link, not an Open verb (#1026).
+    expect(markup).toMatch(/<a[^>]*href="\/kegs\/x"[^>]*>[\s\S]*?Customer keg balance/);
+    expect(markup).not.toMatch(/>Open</);
     expect(markup).toMatch(/>Save customer</);
     expect(markup).toMatch(/Customer name/);
   });

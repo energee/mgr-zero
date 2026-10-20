@@ -123,7 +123,7 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
 
 export const E = {
   palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
-  /** Page title. `action` is a list-create button (New order, Add customer):
+  /** Page title. `action` is a list-create button (New order, New customer):
    *  full-width under the title on the phone, on the title row from md up. */
   hd: (t: React.ReactNode, r: React.ReactNode = "", action?: React.ReactNode) => {
     const title = (
