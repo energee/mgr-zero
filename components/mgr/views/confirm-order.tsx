@@ -29,7 +29,7 @@ export function ConfirmOrderView({
       {model.lines.map((line) => (
         <Fragment key={line.key}>{E.row(line.name, "", line.trailing, line.tone ?? "")}</Fragment>
       ))}
-      {model.oversellNotes.map((note) => <Fragment key={note}>{E.note(note)}</Fragment>)}
+      {model.shortageNote ? E.note(model.shortageNote) : null}
       {complianceNote ? E.note(complianceNote) : null}
       {E.sp()}
       {footer !== undefined ? footer : E.btns([["Confirm order", "p"], ["Cancel order", "del"]])}

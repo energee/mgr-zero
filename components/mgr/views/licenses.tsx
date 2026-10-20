@@ -26,7 +26,6 @@ export function LicensesView({
       ))}
       {model.licenses.length === 0 && E.blank("No licenses yet")}
       {addLicenses !== undefined ? addLicenses : E.btn("Add license", "g")}
-      {E.note(model.note)}
     </>
   );
 }
