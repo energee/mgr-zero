@@ -155,8 +155,7 @@ describe("Location detail", () => {
     expect(html).toMatch(/Uses/);
     expect(html).toMatch(/Storage · Taproom · Warehouse/);
     expect(html).not.toMatch(/>Open</);
-    expect(html).toContain('aria-label="Open"');
-    expect(html).toMatch(new RegExp(`href="/locations/${LOC_TAPROOM.id}/bins"`));
+    expect(html).toMatch(new RegExp(`<a[^>]*href="/locations/${LOC_TAPROOM.id}/bins"[^>]*>(?:(?!</a>)[\\s\\S])*Location bins`));
     expect(html).not.toMatch(/>Save location</);
     expect(html).not.toMatch(/Location name/);
   });

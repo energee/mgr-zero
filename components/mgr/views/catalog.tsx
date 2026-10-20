@@ -29,7 +29,7 @@ export function CatalogView({
 }) {
   return (
     <>
-      {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("Add brand"), model.backHref)}
+      {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("New brand"), model.backHref)}
       {controls}
       {model.empty
         ? E.blank(model.empty)

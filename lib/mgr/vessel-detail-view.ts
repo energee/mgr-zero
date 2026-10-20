@@ -15,7 +15,8 @@ export function formatLatestReading(reading: VesselReading | undefined | null, u
 export type VesselDetailViewModel = {
   backHref?: string;
   title: string;
-  occupancy?: { title: string; detail: string; verb: string; warning?: boolean; href?: string };
+  /** The open occupancy; its row only opens the batch, so it is a row link, not a verb (#1026). */
+  occupancy?: { title: string; detail: string; warning?: boolean; href?: string };
   readingHref?: string;
   currentReading: string;
   history: { key: string; title: string; detail: string; who?: string }[];

@@ -104,7 +104,7 @@ export const brewDayTurnsHazy: BrewDayViewModel = {
 
 export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
-  occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", verb: "Open batch", warning: true },
+  occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", warning: true },
   currentReading: "5.2 °P · 68.2 °F · overdue 31 h",
   history: [
     { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },

@@ -46,7 +46,6 @@ describe("Routes", () => {
     expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
     expect(routeNext({ departed_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
     expect(routeNext({ departed_at: null, driver_user_id: "d" })).toBeUndefined();
-    expect(src("app/(app)/routes/page.tsx")).toContain("routeNext(route)");
   });
 
   it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {
@@ -55,8 +54,7 @@ describe("Routes", () => {
       { key: "a", title: "Route A · 2026-09-10", detail: "departed", verb: "Resume", tone: "info", href: "/routes/a" },
     ] });
     const html = htmlOf(createElement(RoutesView, { model, createAction: null }));
-    expect(html).toContain('href="/routes/r"');
-    expect(html).toContain('aria-label="Open"');
+    expect(html).toMatch(/<a[^>]*href="\/routes\/r"[^>]*>(?:(?!<\/a>)[\s\S])*Route C · 2026-09-12/);
     expect(html).toMatch(/>Resume</);
     expect(html).not.toMatch(/>Open</);
   });

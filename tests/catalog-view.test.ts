@@ -139,9 +139,9 @@ describe("Catalog view", () => {
     expect(html.indexOf('role="search"')).toBeLessThan(html.indexOf(brandOf(SKU_HAZY)));
   });
 
-  it("renders Add brand, Hazy IPA, Price groups, and Water profiles", () => {
+  it("renders New brand, Hazy IPA, Price groups, and Water profiles", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
-    expect(html).toMatch(/>Add brand</);
+    expect(html).toMatch(/>New brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
     for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
@@ -159,7 +159,7 @@ describe("Catalog view", () => {
       linkRows: true,
     }));
     expect(html).toMatch(/NEW BRAND/);
-    expect(html).not.toMatch(/>Add brand</);
+    expect(html).not.toMatch(/>New brand</);
     expect(html).toMatch(/FORMATS SLOT/);
     expect(html).toMatch(/href="\/pricing"/);
     expect(html).toContain(brandOf(SKU_HAZY));

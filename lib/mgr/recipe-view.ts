@@ -36,7 +36,7 @@ export type RecipeViewModel = {
   backHref?: string;
   /** The back link's text; "Recipes" unless the page sits under a recipe (the draft). */
   backLabel?: string;
-  /** Where Create recipe version goes on a cut version; the draft editor submits instead. */
+  /** Where New recipe version goes on a cut version; the draft editor submits instead. */
   createHref?: string;
   /** A recipe with no version yet: drawn instead of the editor, so no number is invented. */
   empty?: string;

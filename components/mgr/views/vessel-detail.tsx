@@ -13,7 +13,7 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
 }) {
   return <>
     {E.back("Cellar map", model.title, undefined, model.backHref)}
-    {model.occupancy ? E.row(model.occupancy.title, model.occupancy.detail, E.act(model.occupancy.verb, "info", model.occupancy.href), model.occupancy.warning ? "w" : "") : E.blank("No open occupancy")}
+    {model.occupancy ? E.nav(model.occupancy.title, model.occupancy.detail, model.occupancy.warning ? "w" : "", undefined, model.occupancy.href) : E.blank("No open occupancy")}
     {E.fld("Current reading", model.currentReading)}
     {model.readingHref && E.btn("Reading", "p", model.readingHref)}
     {E.ttl("Reading history")}

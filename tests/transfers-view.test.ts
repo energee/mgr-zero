@@ -39,9 +39,8 @@ describe("Transfers list", () => {
     ] });
     expect(model.rows.map((r) => r.verb)).toEqual([undefined, undefined]);
     const html = htmlOf(createElement(TransfersView, { model, createAction: null, linkRows: true }));
-    expect(html).toContain('href="/transfers/rec"');
-    expect(html).toContain('href="/transfers/can"');
-    expect(html).toContain('aria-label="Open"');
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/rec"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0008/);
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/can"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0009/);
     expect(html).not.toMatch(/>Open</);
   });
 

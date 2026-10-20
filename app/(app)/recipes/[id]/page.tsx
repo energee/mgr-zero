@@ -1,7 +1,7 @@
 // app/(app)/recipes/[id]/page.tsx — one recipe, drawn by RecipeView: its
 // selected version read out as text (toRecipePageModel), with the OG/FG/ABV
 // get_recipe predicts (never stored) or why it predicted none. The page only
-// fetches and renders. Create recipe version opens ./new, where
+// fetches and renders. New recipe version opens ./new, where
 // recipe-version-form.tsx makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeBrandPicker } from "./recipe-brand-picker";

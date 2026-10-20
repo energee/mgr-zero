@@ -5,7 +5,7 @@
 // (recipes/[id]/recipe-version-form.tsx) passes `controls`: the fields become
 // controlled, the schedule and ingredient rows open their sheets through
 // `slots`, the bottom button submits, and `controls.blockedReason` says what the
-// draft still lacks. Without `controls`, Create recipe version sits in the
+// draft still lacks. Without `controls`, New recipe version sits in the
 // title row. parentForm draws the recipe's parent fields (name, style, brand,
 // note) at the top.
 "use client";
@@ -122,7 +122,7 @@ export function RecipeView({
     </>
   );
   // The draft submits at the bottom; every other surface (the live read page and the inventory frame alike) puts its one verb in the title row.
-  const verb = controls || model.historical ? undefined : E.btn("Create recipe version", "p", model.createHref);
+  const verb = controls || model.historical ? undefined : E.btn("New recipe version", "p", model.createHref);
   return (
     <>
       {E.back(model.backLabel ?? "Recipes", model.title, verb, model.backHref)}

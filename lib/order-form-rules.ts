@@ -1,4 +1,4 @@
-// lib/order-form-rules.ts — the pure "is this New Order form submittable" rule
+// lib/order-form-rules.ts — the pure "is this New order form submittable" rule
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
 // brewery it also yields the hint naming what to create first.

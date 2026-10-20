@@ -34,9 +34,8 @@ describe("toKegReportViewProps", () => {
     const mismatches = [{ customer_id: "m", name: "Al’s Bar", pool_id: "p", pool_name: "Owned", keg_size: "half_bbl", kegs_out: 3, kegs_on_deposit: 2 }];
     const model = toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs");
     const html = renderToStaticMarkup(createElement(KegReportView, { model }));
-    expect(html).toContain('href="/kegs/customers/c"');
-    expect(html).toContain('href="/kegs/customers/m"');
-    expect(html).toContain('aria-label="Open"');
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/c"[^>]*>(?:(?!<\/a>)[\s\S])*Ridgeline Tap Room/);
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/m"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar/);
     expect(html).not.toMatch(/Open balance/);
   });
   it("an empty fleet is the empty state", () => {

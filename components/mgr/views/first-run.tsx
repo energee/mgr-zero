@@ -1,5 +1,5 @@
 // components/mgr/views/first-run.tsx — First-run checklist. Live slots
-// LocationForm / InviteForm / Add brand; inventory draws the expanded step 1.
+// LocationForm / InviteForm / New brand; inventory draws the expanded step 1.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { FirstRunViewModel } from "@/lib/mgr/first-run-view";

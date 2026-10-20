@@ -91,7 +91,7 @@ describe("POS UI truth", () => {
     expect(menu).toContain("Publish changes");
     expect(menu).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish changes/);
     // The excluded item only navigates: a row link, not an Open verb (#1026).
-    expect(menu).toContain('aria-label="Open"');
+    expect(menu).toMatch(/<a[^>]*href="#"[^>]*>(?:(?!<\/a>)[\s\S])*Hazy · Pint/);
     expect(menu).not.toMatch(/>Open</);
     const item = renderToStaticMarkup(createElement(PosItemView, { item: { brand: "Hazy", format: "Pint", sources: "", serving: "16 oz", price: "$7.00", override: "", websitePublished: false, available: false } }));
     expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish item to Square/);
@@ -102,7 +102,8 @@ describe("POS UI truth", () => {
     expect(html("Point of sale")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
     expect(html("POS mapping")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
     // A recent sale opens by its row arrow, not an Open verb (#1026).
-    expect(html("POS mapping")).toContain('aria-label="Open"');
+    const saleRow = html("POS mapping").split('data-slot="item"').find(item => item.includes("Sale · Hazy IPA · pint"));
+    expect(saleRow).toContain('aria-label="Open"');
     expect(html("POS mapping")).not.toMatch(/>Open</);
   });
 
@@ -110,11 +111,11 @@ describe("POS UI truth", () => {
     const model = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", externalItems: [], excluded: [],
       items: [{ brandId: "hazy", formatId: "pint", label: "Hazy · Pint", retail: "$7.00", source: "format", destinations: "Square", available: true, href: "/menu/item/pint" }] };
     const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
-    expect(menu).toContain('href="/menu/item/pint"');
+    expect(menu).toMatch(/<a[^>]*href="\/menu\/item\/pint"[^>]*>(?:(?!<\/a>)[\s\S])*Hazy · Pint/);
     expect(menu).not.toMatch(/>Open</);
     const mapping = renderToStaticMarkup(createElement(PosMappingView, { variations: [], targets: [], coverage: [],
       sales: [{ id: "s", label: "Sale · Hazy", detail: "1 pint", amount: "$7.00", status: "mapped", href: "/settings/pos/sales/s" }] }));
-    expect(mapping).toContain('href="/settings/pos/sales/s"');
+    expect(mapping).toMatch(/<a[^>]*href="\/settings\/pos\/sales\/s"[^>]*>(?:(?!<\/a>)[\s\S])*Sale · Hazy/);
     expect(mapping).not.toMatch(/>Open</);
   });
 

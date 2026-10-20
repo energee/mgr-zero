@@ -46,7 +46,8 @@ describe("Customers list", () => {
     expect(markup).toMatch(/>New customer</);
     expect(readFileSync("app/(app)/customers/customer-form.tsx", "utf8")).toContain('"New customer"');
     expect(markup).not.toMatch(/>Open</);
-    expect(markup).toContain('aria-label="Open"');
+    const first = toCustomersViewProps(customersList).rows[0]!.title;
+    expect(markup.split('data-slot="item"').find(item => item.includes(first))).toContain('aria-label="Open"');
   });
 
   it("a live customer row is one link to its detail page (#996)", () => {

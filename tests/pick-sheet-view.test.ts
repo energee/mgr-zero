@@ -46,8 +46,7 @@ describe("Pick sheet view loop", () => {
     const model = toPickSheetViewProps({ orders });
     expect(model.groups[0]!.rows.map((r) => r.verb)).toEqual(["Pick", undefined, "Pick"]);
     const markup = html(model, { linkRows: true });
-    expect(markup).toMatch(/href="\/orders\/00000000-0000-4000-8000-000000000232"/);
-    expect(markup).toContain('aria-label="Open"');
+    expect(markup).toMatch(/<a[^>]*href="\/orders\/00000000-0000-4000-8000-000000000232"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar · ORD-0232/);
     expect(markup).not.toMatch(/>Open</);
   });
 

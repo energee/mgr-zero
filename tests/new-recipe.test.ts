@@ -51,7 +51,7 @@ describe("Recipe creation", () => {
   it("RecipeView is the one editor: controlled when given controls, static for the fixture", () => {
     const fixture = renderToStaticMarkup(createElement(RecipeView, { model: recipeHazyV4 }));
     expect(fixture).not.toMatch(/<form\b/);
-    expect(fixture).toMatch(/Create recipe version/);
+    expect(fixture).toMatch(/New recipe version/);
     const set = vi.fn();
     const live = renderToStaticMarkup(createElement(RecipeView, { model: { title: "New recipe", preBoil: "16.8", notes: "" }, controls: { set, onSubmit: () => {}, submitLabel: "Create recipe" } }));
     expect(live).toMatch(/<form\b/);
@@ -115,12 +115,12 @@ describe("Recipe creation", () => {
       expect(cut).not.toMatch(/Boil time min/);
     });
 
-    it("the one Create recipe version sits in the title row, empty or versioned, read-only or not", () => {
+    it("the one New recipe version sits in the title row, empty or versioned, read-only or not", () => {
       for (const model of [versioned, empty]) {
         for (const readOnly of [true, false]) {
           const html = draw({ model, readOnly, parentForm: createElement("p", null, "PARENT") });
-          expect(html.match(/Create recipe version/g)).toHaveLength(1);
-          const verb = html.indexOf("Create recipe version");
+          expect(html.match(/New recipe version/g)).toHaveLength(1);
+          const verb = html.indexOf("New recipe version");
           expect(verb).toBeGreaterThan(html.indexOf("</h1>"));
           expect(verb).toBeLessThan(html.indexOf("PARENT"));
           expect(html).toMatch(/href="\/recipes\/x\/new"/);
