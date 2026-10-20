@@ -21,7 +21,7 @@ import { VolumeField } from "@/components/mgr/volume-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -469,8 +469,9 @@ export const E = {
     </Table>
   ),
   /** A blank list. A bare node is the whole message; an {@link EmptyState}
-   *  splits it into the fact and the sentence saying what to do next. */
-  blank: (t: React.ReactNode | EmptyState, icon?: IconSvgElement) => {
+   *  splits it into the fact and the sentence saying what to do next.
+   *  `action` sits centered under that sentence, not at the page's foot. */
+  blank: (t: React.ReactNode | EmptyState, icon?: IconSvgElement, action?: React.ReactNode) => {
     const state = t && typeof t === "object" && "title" in t ? t as EmptyState : undefined;
     const description = state ? state.description : t as React.ReactNode;
     return (
@@ -480,6 +481,7 @@ export const E = {
           {state && <EmptyTitle>{state.title}</EmptyTitle>}
           {description && <EmptyDescription>{description}</EmptyDescription>}
         </EmptyHeader>
+        {action && <EmptyContent className="md:*:self-center">{action}</EmptyContent>}
       </Empty>
     );
   },

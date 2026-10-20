@@ -57,6 +57,12 @@ export const needsKegCustomer = (r: KegEventReason) => r === "shipped" || r === 
 /** Lost may name the customer the kegs were lost at; found never does. */
 export const mayHaveKegCustomer = (r: KegEventReason) => needsKegCustomer(r) || r === "lost";
 
+/** The next Record keg event value. A changed location takes `firstBin(location)`
+ *  (live: that location's first bin; inventory: none), so a bin never outlives
+ *  the location it belongs to. */
+export const withLocationBin = (prev: KegEventValue, next: KegEventValue, firstBin: (locationId: string) => string): KegEventValue =>
+  next.locationId !== prev.locationId ? { ...next, binId: firstBin(next.locationId) } : next;
+
 /** Whether Record keg event can submit: a pool, a bin, a positive count, and a customer when the reason needs one. */
 export const kegEventReady = (v: KegEventValue) =>
   Boolean(v.poolId && v.locationId && v.binId && Number(v.qty) > 0 && (!needsKegCustomer(v.reason) || v.customerId));

@@ -9,12 +9,15 @@ export type { VendorsViewModel };
 export function VendorsView({
   model,
   header,
+  controls,
   createAction,
   rowTrailing,
   footer,
 }: {
   model: VendorsViewModel;
   header?: ReactNode;
+  /** The search strip (components/mgr/list-controls.tsx). */
+  controls?: ReactNode;
   createAction?: ReactNode;
   rowTrailing?: (row: VendorsRowView) => ReactNode;
   footer?: ReactNode;
@@ -22,6 +25,7 @@ export function VendorsView({
   return (
     <>
       {header ?? E.back("More", "Vendors", createAction !== undefined ? createAction : E.btn("Add vendor"), model.backHref)}
+      {controls}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

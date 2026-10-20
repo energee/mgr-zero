@@ -11,7 +11,8 @@ import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
 
 export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | null | undefined }) {
   if (link === null) return null;
-  return link?.href ? E.act("Open in QuickBooks", "primary", link.href)
+  // A secondary destination: it must not compete with the document's own actions.
+  return link?.href ? E.btn("Open in QuickBooks", "g", link.href)
     : E.gated("Open in QuickBooks", link?.reason ?? "A verified provider link is unavailable. Open QuickBooks separately to find this document.");
 }
 

@@ -20,7 +20,7 @@ it("shares guest requirements and coarse fill controls without inventing own SKU
 });
 
 it("retains both keg actions without nesting buttons or inventing yield bars", () => {
-  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [["Taproom"]], location: "Taproom" } }));
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
   expect(html.match(/>Swap<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html.match(/>Kick<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);

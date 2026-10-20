@@ -462,7 +462,10 @@ describe("SCREENS", () => {
     const formats = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Formats")!.body));
     expect(menu.match(/<h[12][^>]*>[^<]*(?:POS )?menu/gi)).toHaveLength(1);
     expect(pos.match(/<h[12][^>]*>Point of sale/gi)).toHaveLength(1);
-    expect(menu + formats).toContain("min-w-max");
+    // RecordTable lets long names wrap instead of widening past the column, and
+    // the phone gets a labeled list rather than a scrolling table (#1025).
+    expect(formats).not.toContain("min-w-max");
+    expect(formats).toContain('role="listitem"');
     const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
@@ -873,7 +876,8 @@ describe("SCREENS", () => {
     // one-option chip group, a link and a role editor.
     const html = (name: string) =>
       renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const name of ["Chat settings", "Menu", "Tap board", "Variance by brand"]) {
+    // Tap board's taproom choice is a Location select since #973 (tests/location-scope.test.ts).
+    for (const name of ["Chat settings", "Menu", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {

@@ -1,5 +1,6 @@
 // lib/mgr/taproom-variance-view.ts — variance report row types and how a variance figure reads.
 import { bblExact } from "@/lib/volume";
+import type { ScopeOption } from "@/components/mgr/scope-pick";
 
 export type VarianceRow = { brand_id: string; brand_name: string; expected_bbl: number | null; actual_bbl: number; destroyed_bbl: number; variance_bbl: number | null; excluded_bbl: number; unattributed_bbl: number; split: boolean; compared_periods: number };
 export type VariancePeriod = { count_id: string; prior_count_id: string | null; counted_on: string; starts_at: string | null; ends_at: string; starts_before_window: boolean; coverage_complete: boolean; unmapped_lines: number; expected_bbl: number | null; actual_bbl: number; destroyed_bbl: number; reason: string | null };
@@ -11,6 +12,7 @@ export type TaproomVarianceViewModel = {
   report?: VarianceReport; backHref?: string; countHref?: string; boardHref?: string;
   /** breweries.timezone: period boundaries print in it (#442). */
   timeZone: string;
-  locations?: [string, string][]; location?: string; weeks: number; weekHrefs?: [string, string][];
+  /** Taprooms; `location` is the selected option's value (a location id live). */
+  locations?: ScopeOption[]; location?: string; weeks: number; weekHrefs?: [string, string][];
   trend?: { brand: string; detail: string; href?: string };
 };

@@ -2,7 +2,8 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toPosMenuModel, type PosMenuSnapshot } from "@/lib/mgr/pos-view";
+import { toPosMenuModel, toPosMenuSetup, type PosMenuSnapshot } from "@/lib/mgr/pos-view";
+import { hasAnyRole } from "@/lib/mgr/roles";
 import "@/lib/commands/all";
 import { PosMenuControl } from "@/components/mgr/views/pos-controls";
 
@@ -32,5 +33,6 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
     runCommand("list_bins", { locationId: location.mgrLocationId }, ctx) as Promise<Bin[]>,
   ]) : [null, [] as Bin[]];
   const model = toPosMenuModel(snapshot, mapped, location?.externalLocationId ?? "");
+  if (!location) model.setup = toPosMenuSetup(observed.length, hasAnyRole(brewery.roles, ["admin"]));
   return <PosMenuControl model={model} bins={bins} channels={channels} />;
 }

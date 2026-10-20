@@ -336,6 +336,14 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   expect(html).not.toContain("/reading");
 });
 
+// #994: an empty search is not an empty recipe book.
+describe("Recipes search", () => {
+  it("says no recipes match, not no recipes yet, when a search is on", () => {
+    expect(toRecipesViewProps({ recipes: [], filtered: true }).empty).toEqual({ title: "No recipes match", description: "Clear the search to see every recipe." });
+    expect(toRecipesViewProps({ recipes: [] }).empty?.title).toBe("No recipes yet");
+  });
+});
+
 describe("cellar readings (#700)", () => {
   it("formats each open occupancy's latest reading from one list_batches read", () => {
     const reading = { id: "r1", at: "2026-09-01T15:00:00Z", temp_f: 66, gravity_plato: 4.5, ph: null, note: null };

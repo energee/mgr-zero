@@ -1,4 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
+import { InvoicesView } from "../components/mgr/views/invoices";
+import { QboStaffInvoiceLinkView } from "../components/mgr/views/accounting";
 import { toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
 const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, customers: { name: "Actual customer" } };
@@ -108,6 +112,26 @@ it("marks outstanding invoices overdue only after the brewery-local due day", ()
   }
 });
 
+it("#1025 does not mark an unknown balance overdue: a failed push says Payment unverified only", () => {
+  const now = new Date("2026-10-04T12:00:00Z");
+  const failed = toInvoiceListRow({ ...invoice, qbo_sync_status: "push_failed", qbo_sync_error: "rejected", qbo_balance_cents: null }, ["admin"], true, "UTC", now);
+  expect(failed.payment).toBe("Payment unverified");
+  expect(failed.overdue).toBe(false);
+  expect(toInvoiceListRow({ ...invoice, qbo_balance_cents: null }, ["admin"], true, "UTC", now).overdue).toBe(false);
+});
+
+it("#1025 draws an ordinary row without an accounting caption, QuickBooks as a secondary action, and no dead link", () => {
+  const ordinary = toInvoiceListRow(invoice, ["admin"], true, "UTC");
+  const linked = { ...toInvoiceListRow({ ...invoice, id: "linked", quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7", reason: null } }, ["admin"], true, "UTC"), href: "/invoices/linked" };
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [ordinary, linked], backHref: "/more" }));
+  expect(html).not.toContain("No accounting exception");
+  expect(html).not.toContain('href="#"');
+  expect(html).toContain('href="/invoices/linked"');
+  expect(html).toMatch(/<a[^>]*data-variant="outline"[^>]*href="https:\/\/app\.qbo[^"]*"[^>]*>Open in QuickBooks/);
+  const detail = renderToStaticMarkup(createElement(QboStaffInvoiceLinkView, { link: { href: "https://app.qbo.intuit.com/x", reason: null } }));
+  expect(detail).toContain('data-variant="outline"');
+});
+
 it("reads a historical not_synced invoice as paid and not in QuickBooks, with nothing to fix", () => {
   const historical = { ...invoice, qbo_sync_status: "not_synced" as const, paid_at: "2025-08-14T16:00:00Z", due_on: "2025-08-14", qbo_balance_cents: null };
   const row = toInvoiceListRow(historical, ["admin"], true, "America/New_York", new Date("2026-10-15T12:00:00Z"));
@@ -115,4 +139,11 @@ it("reads a historical not_synced invoice as paid and not in QuickBooks, with no
   expect(row.payment).toBe("Paid");
   expect(row.overdue).toBe(false);
   expect(row.needsMapping).toBe(false);
+});
+
+it("#1030 starts the Accounting cell at the left edge its header uses", () => {
+  const voided = toInvoiceListRow({ ...invoice, qbo_remote_state: "voided" }, ["admin"], false, "UTC");
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [voided], backHref: "/more" }));
+  expect(html).toMatch(/<th[^>]*class="[^"]*text-left[^"]*"[^>]*>Accounting<\/th>/);
+  expect(html).not.toContain("items-end");
 });

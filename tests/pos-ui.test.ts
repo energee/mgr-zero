@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
-import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup } from "@/lib/mgr/pos-view";
 import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
@@ -136,5 +136,48 @@ describe("POS UI truth", () => {
       Menu: "app/(app)/menu/page.tsx",
       "POS item": "app/(app)/menu/item/[formatId]/page.tsx",
     });
+  });
+});
+
+describe("Menu with no mapped Square location (#997)", () => {
+  const unmapped = (observed: number, admin: boolean) => renderToStaticMarkup(createElement(PosMenuView, {
+    model: { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: toPosMenuSetup(observed, admin) },
+  }));
+
+  it("sends an admin to connect Square when no Square location has been seen", () => {
+    const html = unmapped(0, true);
+    expect(html).toContain("Connect Square, then map a Square location");
+    expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
+    expect(html).not.toContain("Also in Square");
+    expect(html).not.toContain("One catalog");
+    expect(html).not.toContain("No mapped Square location is available.");
+  });
+
+  it("draws the setup action inside the empty state, under its message (#1020 review)", () => {
+    const html = unmapped(0, true);
+    expect(html).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Set up Square/);
+  });
+
+  it("sends an admin to map a location when Square locations exist but none is mapped", () => {
+    const html = unmapped(2, true);
+    expect(html).not.toContain("Connect Square");
+    expect(html).toContain("none is mapped to an MGR location");
+    expect(html).toMatch(/href="\/settings\/pos\/locations"[^>]*>Map Square locations/);
+  });
+
+  it.each([0, 2])("gives a non-admin no settings link, only a sentence to ask an admin (%i observed)", (observed) => {
+    const html = unmapped(observed, false);
+    expect(html).toContain("Ask an admin");
+    expect(html).not.toContain("/settings/pos");
+    expect(html).not.toContain("Set up Square");
+    expect(html).not.toContain("Map Square locations");
+  });
+
+  it("keeps the live settings path out of the shared view and inert in the inventory frames", () => {
+    expect(readFileSync("components/mgr/views/pos.tsx", "utf8")).not.toContain("/settings/pos\"");
+    for (const name of ["Menu setup", "Menu unmapped"]) {
+      const html = renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
+      expect(html, name).not.toContain("/settings/pos");
+    }
   });
 });

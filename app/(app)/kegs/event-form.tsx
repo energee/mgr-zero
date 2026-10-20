@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { KegEventPresentation } from "@/components/mgr/views/keg-event-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { KEG_EVENT_REASONS } from "@/lib/mgr/enums";
-import { kegEventReady, mayHaveKegCustomer, toKegOption as toOption, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { kegEventReady, mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 
 export function KegEventForm({ pools, locations, bins, customers }: {
   pools: { id: string; name: string }[];
@@ -20,7 +20,7 @@ export function KegEventForm({ pools, locations, bins, customers }: {
   const [value, setValue] = useState(initial);
   const binsAt = (locationId: string) => bins.filter((b) => b.location_id === locationId);
   // Choosing a location preselects its first bin.
-  const change = (next: KegEventValue) => setValue(next.locationId !== value.locationId ? { ...next, binId: binsAt(next.locationId)[0]?.id ?? "" } : next);
+  const change = (next: KegEventValue) => setValue(withLocationBin(value, next, (locationId) => binsAt(locationId)[0]?.id ?? ""));
   const form = useCommandForm("record_keg_event", {
     build: () => ({
       poolId: value.poolId, kegSize: value.kegSize, reason: value.reason, locationId: value.locationId, binId: value.binId, qty: Number(value.qty),

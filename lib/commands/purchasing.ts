@@ -8,6 +8,7 @@ import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwr
 import { isoDate } from "./packaging";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
+import { escapeLike } from "@/lib/escape-like";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
 const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
@@ -99,11 +100,13 @@ defineQuery({
 // drawdown numbers from contract_balances (committed, received, on order,
 // available) so Contracts and Contract read the same figures.
 defineQuery({
-  name: "list_vendors_and_contracts", description: "Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available)",
-  input: z.object({}), roles: [...PURCHASING],
-  handler: async (ctx) => {
+  name: "list_vendors_and_contracts", description: "Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only vendors whose name contains q",
+  input: z.object({ q: z.string().trim().max(100).optional().describe("Only vendors whose name contains this text") }), roles: [...PURCHASING],
+  handler: async (ctx, i) => {
+    let vendorQuery = ctx.db.from("vendors").select("id, name, email, phone, payment_terms, lead_time_days, active").eq("brewery_id", ctx.breweryId);
+    if (i.q) vendorQuery = vendorQuery.ilike("name", `%${escapeLike(i.q)}%`);
     const [vendors, contracts, balances, observed] = await Promise.all([
-      unwrap(ctx.db.from("vendors").select("id, name, email, phone, payment_terms, lead_time_days, active").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(vendorQuery.order("name")),
       unwrap(ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on, materials(name)").eq("brewery_id", ctx.breweryId).order("created_at")),
       unwrap(ctx.db.from("contract_balances").select("contract_id, qty_committed, qty_received, qty_on_order, qty_available").eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("vendor_lead_times").select("vendor_id, sent_via, n, avg_lead_days, avg_first_lead_days, avg_late_days").eq("brewery_id", ctx.breweryId)),
@@ -135,13 +138,17 @@ defineQuery({
 // a null one contributes no gravity) and PO/count line pickers. Inactive
 // materials are hidden unless asked for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential",
-  input: z.object({ includeInactive: z.boolean().optional() }), roles: [...PURCHASING],
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only those whose name contains q",
+  input: z.object({
+    includeInactive: z.boolean().optional(),
+    q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
+  }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
       .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, active")
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
+    if (i.q) q = q.ilike("name", `%${escapeLike(i.q)}%`);
     return unwrap(q);
   },
 });

@@ -9,12 +9,15 @@ export type { MaterialsOnHandViewModel };
 export function MaterialsOnHandView({
   model,
   header,
+  controls,
   createAction,
   rowTrailing,
   definitionsHref,
 }: {
   model: MaterialsOnHandViewModel;
   header?: ReactNode;
+  /** The search strip (components/mgr/list-controls.tsx). */
+  controls?: ReactNode;
   createAction?: ReactNode;
   rowTrailing?: (row: MaterialsOnHandRowView) => ReactNode;
   definitionsHref?: string;
@@ -23,6 +26,7 @@ export function MaterialsOnHandView({
     <>
       {header ?? E.back("Beer", "Materials on hand", createAction !== undefined ? createAction : E.btn("Add material"), model.backHref)}
       {E.nav("Material definitions", "", "", undefined, definitionsHref)}
+      {controls}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
