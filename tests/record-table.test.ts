@@ -36,3 +36,30 @@ it("names the destination screen on the name, live or inert", () => {
   expect(html([{ key: "a", cells: ["Alpha", "", ""], to: "SKU detail" }]).match(/data-to="SKU detail"/g)).toHaveLength(2);
   expect(html([{ key: "a", cells: ["Alpha", "", ""], to: "SKU detail", href: "/x" }])).toMatch(/href="\/x"[^>]*data-to="SKU detail"|data-to="SKU detail"[^>]*href="\/x"/);
 });
+
+/** The class attribute of every <tag> in the markup, in order. */
+const classesOf = (out: string, tag: string) => [...out.matchAll(new RegExp(`<${tag}\\s[^>]*class="([^"]*)"`, "g"))].map((m) => m[1]);
+
+it("#1030 never breaks a number inside its value, while text cells still wrap", () => {
+  const [name, status, count] = classesOf(html([{ key: "a", cells: ["Alpha", "Long status text", "$1,040.00"] }]), "td");
+  expect(count).toContain("whitespace-nowrap");
+  expect(count).toContain("tabular-nums");
+  expect(count).not.toContain("wrap-anywhere");
+  expect(status).toContain("wrap-anywhere");
+  expect(name).not.toContain("whitespace-nowrap");
+});
+
+it("#1030 aligns each column's header and its cells the same way", () => {
+  const out = html([{ key: "a", cells: ["Alpha", "ok", "1"] }]);
+  const side = (cls: string) => (cls.includes("text-right") ? "r" : "l");
+  expect(classesOf(out, "th").map(side)).toEqual(["l", "l", "r"]);
+  expect(classesOf(out, "td").map(side)).toEqual(["l", "l", "r"]);
+});
+
+it("#1030 starts every phone value at one left edge, numbers included, and never wraps a label", () => {
+  const out = html([{ key: "a", cells: ["Alpha", "ok", "12"] }]);
+  const values = classesOf(out, "dd");
+  expect(values).toHaveLength(2);
+  for (const cls of values) expect(cls).not.toContain("text-right");
+  for (const cls of classesOf(out, "dt")) expect(cls).toContain("whitespace-nowrap");
+});

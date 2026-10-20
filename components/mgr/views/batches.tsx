@@ -18,9 +18,10 @@ const orMissing = (value: string | null, missing: string) => value ?? <span clas
 function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
   return readings.length ? (
     <ul className="grid gap-1">
-      {readings.map(occupancy => <li key={occupancy.key} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="min-w-0 break-words"><span className="font-medium">{occupancy.vessel}</span> · {occupancy.reading}</span>
-        {E.act("Reading", "info", occupancy.href)}
+      {readings.map(occupancy => <li key={occupancy.key} className="flex items-center justify-between gap-3">
+        {/* The text wraps in its own space, so Reading always sits at the line's right end. */}
+        <span className="min-w-0 flex-1 break-words"><span className="font-medium">{occupancy.vessel}</span> · {occupancy.reading}</span>
+        <span className="shrink-0">{E.act("Reading", "info", occupancy.href)}</span>
       </li>)}
     </ul>
   ) : <span className="text-muted-foreground">No open occupancy</span>;

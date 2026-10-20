@@ -29,6 +29,9 @@ export type RecordTableRow = {
 };
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
+/** A table cell: text may wrap anywhere, but a number never breaks inside
+ *  its value ("$1,040.0" / "0"), and its digits line up down the column. */
+const cellClass = (a: "l" | "r" | undefined) => cn(alignClass(a), a === "r" ? "whitespace-nowrap tabular-nums" : "whitespace-normal wrap-anywhere");
 /** The one record link style: identity targets wrap and retain the shared
  *  48px minimum on coarse pointers. Other links in a register cell use it too. */
 export const RECORD_LINK = "inline-flex min-h-6 min-w-0 max-w-full shrink items-center whitespace-normal wrap-anywhere text-left font-medium underline underline-offset-4 pointer-coarse:min-h-12";
@@ -46,7 +49,8 @@ function name(row: RecordTableRow) {
 
 export function RecordTable({ headers, align, rows }: {
   headers: ReactNode[];
-  /** Per column: "l" for text, "r" for numbers. */
+  /** Per column of the table, header and cells alike: "l" for text, "r" for
+   *  numbers. The phone list starts every value at the left. */
   align: ("l" | "r")[];
   rows: RecordTableRow[];
 }) {
@@ -69,7 +73,7 @@ export function RecordTable({ headers, align, rows }: {
                   {row.note && <p className="text-muted-foreground">{row.note}</p>}
                 </TableCell>
                 {row.cells.slice(1).map((cell, index) => (
-                  <TableCell key={index} className={cn("whitespace-normal wrap-anywhere", ABOVE_COVER, alignClass(align[index + 1]))}>{cell}</TableCell>
+                  <TableCell key={index} className={cn(ABOVE_COVER, cellClass(align[index + 1]))}>{cell}</TableCell>
                 ))}
               </TableRow>
             ))}
@@ -86,9 +90,13 @@ export function RecordTable({ headers, align, rows }: {
                 {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}
                 <dl className="mt-1 grid gap-2 text-sm">
                   {row.cells.slice(1).map((cell, i) => said(cell) && (
-                    <div key={i} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3">
-                      <dt className="text-muted-foreground">{headers[i + 1]}</dt>
-                      <dd className={cn("min-w-0 break-words", ABOVE_COVER, alignClass(align[i + 1]))}>{cell}</dd>
+                    // Every value starts at one left edge, numbers too. The label never
+                    // wraps and is at least 8.5rem; the value takes all but 9.5rem of the
+                    // line, so a label wider than the label column pushes its value onto
+                    // a full-width line of its own beneath it.
+                    <div key={i} className="flex flex-wrap gap-x-3 gap-y-1">
+                      <dt className="min-w-[8.5rem] whitespace-nowrap text-muted-foreground">{headers[i + 1]}</dt>
+                      <dd className={cn("min-w-0 grow basis-[calc(100%-9.5rem)] break-words", ABOVE_COVER)}>{cell}</dd>
                     </div>
                   ))}
                 </dl>

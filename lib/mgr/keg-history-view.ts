@@ -27,14 +27,20 @@ export type KegHistorySnapshot = Partial<Omit<KegHistoryViewModel, "empty">>;
 
 export function toKegHistoryViewProps(s: KegHistorySnapshot): KegHistoryViewModel {
   const rows = s.rows ?? [];
+  const pool = s.pool ?? "all";
+  const customer = s.customer ?? "all";
+  // Asking to widen the filter only makes sense when a filter is set.
+  const filtered = pool !== "all" || customer !== "all";
   return {
     backHref: s.backHref,
-    pool: s.pool ?? "all",
+    pool,
     poolOptions: s.poolOptions ?? [{ value: "all", label: "All pools" }],
-    customer: s.customer ?? "all",
+    customer,
     customerOptions: s.customerOptions ?? [{ value: "all", label: "All customers" }],
     rows,
-    empty: rows.length === 0 ? { title: "No matching events", description: "Widen the filter to see more of the keg's history." } : undefined,
+    empty: rows.length > 0 ? undefined
+      : filtered ? { title: "No matching events", description: "Widen the filter to see more of the keg's history." }
+      : { title: "No keg events yet", description: "Record a keg event on Keg fleet to start the history." },
   };
 }
 

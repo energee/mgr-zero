@@ -19,10 +19,11 @@ const total = (row: InvoiceListRow) => <>
 /** Accounting exceptions only: an ordinary row has none and says nothing. */
 function accounting(row: InvoiceListRow) {
   if (!row.accounting && !row.needsMapping && !row.quickbooksHref) return null;
-  return <div className="flex min-w-0 flex-col items-end gap-1">
+  return <div className="flex min-w-0 flex-col items-start gap-1">
     {row.needsMapping && E.status("Needs mapping", "w")}
     {row.accounting}
-    {row.quickbooksHref && E.btn("Open in QuickBooks", "g", row.quickbooksHref)}
+    {/* E.btn ends a group on the right on the desk; the span keeps it on the column's left edge. */}
+    {row.quickbooksHref && <span>{E.btn("Open in QuickBooks", "g", row.quickbooksHref)}</span>}
   </div>;
 }
 
