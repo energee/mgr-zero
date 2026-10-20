@@ -1,36 +1,47 @@
 // lib/mgr/order-view.ts — the Order screen's view-model: one shape for the
 // inventory mock and for get_order. Mapping lives here so the page does not
-// compose a second E.* tree.
-import type { ReactNode } from "react";
-import { formatDate } from "@/lib/date-format";
+// compose a second E.* tree. It also owns the order's price summary: line
+// amounts and the before-tax order amount, from the order's own frozen facts.
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToAddress } from "./ship-to-view";
 import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
-import { formatDateTime } from "@/lib/date-format";
+import { formatDate, formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
+import type { PriceSummaryModel } from "@/components/mgr/views/price-summary";
 
 export type OrderLineView = {
   key: string;
   name: string;
-  detail: string;
-  tone?: "" | "w" | "ok";
+  /** Display quantities: a decimal stays a decimal, null reads "Not recorded" (never 0). */
+  ordered: string;
+  picked: string;
+  shipped: string;
+  /** Brewery-wide ATP; "Not supplied" when get_order returned none (never 0). */
+  atp: string;
+  unitPrice: string;
+  /** Ordered quantity × captured price, rounded to the cent. */
+  amount: string;
+  shortReason?: string;
+  /** The line's problem in words, so the tone dot is never the only signal. */
+  warning?: string;
 };
 
 export type OrderViewModel = {
   backHref?: string;
   title: string;
-  where: string;
+  /** The customer's name, or "Taproom transfer". */
+  customer: string;
+  kind: "Wholesale" | "Taproom transfer";
   currentState: string;
+  stateTone: "ok" | "w" | "";
   next: string;
-  fulfillmentSource?: string;
-  shipTo?: string;
-  /** Collected at the brewery: never routed (orders.pickup). */
-  pickup: boolean;
-  customerPo?: string;
-  requested?: string;
-  note?: string;
+  /** breweries.timezone, named under the history. */
+  timeZone: string;
+  /** Order details, in order; a fixed fact with no value reads "Not specified". The note is `wide`. */
+  facts: { label: string; value: string; wide?: boolean }[];
+  summary: PriceSummaryModel;
   /** "$X · margin Y%" for a shipped order, when the caller may run get_order_cogs (#810). */
   costLine?: string;
   restockNote?: string;
@@ -39,11 +50,10 @@ export type OrderViewModel = {
   putBackHref?: string;
   confirmHref?: string;
   editHref?: string;
-  completeHref?: string;
   lines: OrderLineView[];
-  /** Keg deposits and one-way keg fees, frozen on the order at submit. */
-  kegCharges: { key: string; name: string; detail: string }[];
-  events: [ReactNode, ReactNode?][];
+  /** Keg deposits and one-way keg fees, frozen on the order at submit, each named with its line. */
+  kegCharges: { key: string; name: string; detail: string; amount: string }[];
+  events: { key: string; at: string; event: string; detail: string }[];
 };
 
 export type OrderSnapshot = {
@@ -103,28 +113,66 @@ function lineChange(entries: unknown, skuNames: Map<string, string>): string {
   return arr.map(([skuId, qty]) => `${skuNames.get(skuId) ?? "line"} ${qty}`).join(", ");
 }
 
-function lineTone(picked: number | null, ordered: number, atp?: number): OrderLineView["tone"] {
-  if (picked !== null && picked > ordered) return "w";
-  if (atp !== undefined && atp < 0) return "w";
-  if (atp !== undefined) return "ok";
-  return "";
+function lineWarning(picked: number | null, ordered: number, atp?: number): string | undefined {
+  if (picked !== null && picked > ordered) return `Picked ${picked}, more than ordered`;
+  if (atp !== undefined && atp < 0) return "Brewery ATP is below zero";
+  return undefined;
 }
 
-function lineDetail(
-  ordered: number,
-  picked: number | null,
-  shipped: number | null,
-  unitPriceCents: number,
-  atp?: number,
-  shortReason?: string | null,
-): string {
-  const bits = [`ordered ${ordered}`];
-  if (picked !== null) bits.push(`picked ${picked}`);
-  if (shipped !== null) bits.push(`shipped ${shipped}`);
-  bits.push(`${money(unitPriceCents)} each`);
-  if (atp !== undefined) bits.push(`ATP ${atp}`);
-  if (shortReason) bits.push(`short: ${shortReason}`);
-  return bits.join(" · ");
+const qtyText = (qty: number | null) => (qty === null ? "Not recorded" : String(qty));
+
+/** qty × cents rounded to the nearest cent, half up, the way the database
+ *  rounds a numeric line amount. qty is numeric(12,2), so it is scaled to
+ *  whole hundredths first: the product stays an exact integer, where a float
+ *  product (1.15 × 50 = 57.4999…) would round the wrong way.
+ *  ponytail: exact only while hundredths × cents stays under 2^53 (about
+ *  9×10^15, e.g. 1,000,000 units at $900,000 each); no order comes near it. */
+export function orderLineCents(qty: number, unitCents: number): number {
+  const hundredths = Math.round(Number(qty) * 100) * Number(unitCents);
+  return Math.floor((hundredths + 50) / 100);
+}
+
+/** The order's money summary: the before-tax order amount for a submitted
+ *  wholesale order, an items estimate for a draft (or a draft cancelled before
+ *  it was ever submitted, since keg charges freeze at submit), nothing payable
+ *  for a transfer. A total needs every charge collection; an undefined
+ *  deposits list or line fee means it was not supplied, which is not the same
+ *  as none. */
+function orderSummary(
+  order: OrderSnapshot["order"],
+  lines: OrderSnapshot["lines"],
+  deposits: OrderSnapshot["deposits"],
+  events: OrderSnapshot["events"],
+): PriceSummaryModel {
+  if (order.kind === "taproom_transfer") return { rows: [], note: "Taproom transfer · not a customer charge. No invoice or balance due." };
+  const itemsCents = lines.reduce((sum, l) => sum + orderLineCents(l.qty_ordered, l.unit_price_cents), 0);
+  const items = money(itemsCents);
+  const neverSubmitted = order.status === "draft" || (order.status === "cancelled" && !events.some((e) => e.event === "submitted"));
+  if (neverSubmitted) {
+    return {
+      rows: [{ label: "Keg deposits and fees", value: "Not finalized until submission" }],
+      total: { label: "Items estimate", value: items },
+      note: "Saved lines at their captured prices. Keg deposits and one-way fees are set when the order is submitted.",
+    };
+  }
+  if (!deposits || lines.some((l) => l.one_way_fee_cents === undefined)) {
+    return { rows: [{ label: "Ordered items", value: items }], note: "Order amount unavailable: complete charge and line data required." };
+  }
+  const depositCents = deposits.reduce((sum, d) => sum + Number(d.amount_cents), 0);
+  const feeCents = lines.reduce((sum, l) => sum + (l.one_way_fee_cents ? orderLineCents(l.qty_ordered, l.one_way_fee_cents) : 0), 0);
+  const total = money(itemsCents + depositCents + feeCents);
+  const rows = [
+    { label: "Ordered items", value: items },
+    { label: "Returnable keg deposits", value: money(depositCents) },
+    { label: "One-way keg fees", value: money(feeCents) },
+  ];
+  if (order.status === "cancelled") {
+    return { rows, total: { label: "Cancelled order amount · before tax", value: total }, note: "What the order came to when it was cancelled: history, not an amount to collect." };
+  }
+  if (order.status === "shipped") {
+    return { rows, total: { label: "Order amount · before tax", value: total }, note: "Ordered quantities; not final invoiced amount. The invoice bills what shipped; tax is not included here." };
+  }
+  return { rows, total: { label: "Order amount · before tax", value: total }, note: "Ordered quantities and captured charges. Not an invoice or balance due. The shipped / invoiced amount can differ; tax is not included here." };
 }
 
 function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lines"]): string | undefined {
@@ -146,33 +194,36 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits = [] }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
-  const where = order.customers
-    ? [order.customers.name, order.ship_tos && shipToAddress(order.ship_tos)].filter(Boolean).join(" · ")
-    : "Taproom transfer";
+  const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
+  const source = order.from_location_id ? locations?.find((l) => l.id === order.from_location_id)?.name : undefined;
+  const shipTo = order.pickup ? "Pickup" : order.ship_tos ? [order.ship_tos.label, shipToAddress(order.ship_tos)].filter(Boolean).join(" · ") : undefined;
   return {
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
-    where,
+    customer: order.customers?.name ?? "Taproom transfer",
+    kind: order.kind === "taproom_transfer" ? "Taproom transfer" : "Wholesale",
     currentState: `${titled(order.status)}${order.needs_restock ? " · restock pending" : ""}`,
+    stateTone: order.needs_restock ? "w" : order.status === "cancelled" ? "" : "ok",
     next: `Next: ${nextState(order.status, order.needs_restock)}`,
-    fulfillmentSource: order.from_location_id
-      ? locations?.find((l) => l.id === order.from_location_id)?.name
-      : undefined,
-    shipTo: order.ship_tos?.label,
-    pickup: Boolean(order.pickup),
-    customerPo: order.po_number ?? undefined,
-    requested: order.requested_ship_date ? formatDate(order.requested_ship_date) : undefined,
-    note: order.note ?? undefined,
+    timeZone,
+    facts: [
+      { label: "Fulfillment source", value: source ?? "Not specified" },
+      // A transfer has no ship-to; its destination is not on this read, so it is left out rather than guessed.
+      ...(order.kind === "wholesale" || order.pickup ? [{ label: "Ship-to", value: shipTo ?? "Not specified" }] : []),
+      { label: "Requested ship date", value: order.requested_ship_date ? formatDate(order.requested_ship_date) : "Not specified" },
+      ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number ?? "Not specified" }] : []),
+      ...(order.note ? [{ label: "Note", value: order.note, wide: true }] : []),
+    ],
+    summary: orderSummary(order, lines, deposits, events),
     costLine: costLineFor(order, cogs),
     restockNote: restockNoteFor(order, lines),
     repickNote: order.repick_since && order.status === "confirmed" ? "Changed after pick: count the added or raised lines; the rest is already staged." : undefined,
     putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
     editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
-    completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? (backHref ? `/orders/${order.id}/complete` : "#") : undefined,
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const picked = l.qty_picked === null ? null : Number(l.qty_picked);
@@ -181,21 +232,29 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       return {
         key: l.id,
         name: l.skus?.name ?? "Line",
-        detail: lineDetail(ordered, picked, shipped, Number(l.unit_price_cents), qtyAtp, l.short_reason),
-        tone: lineTone(picked, ordered, qtyAtp),
+        ordered: qtyText(ordered),
+        picked: qtyText(picked),
+        shipped: qtyText(shipped),
+        atp: qtyAtp === undefined ? "Not supplied" : String(qtyAtp),
+        unitPrice: money(Number(l.unit_price_cents)),
+        amount: money(orderLineCents(ordered, l.unit_price_cents)),
+        shortReason: l.short_reason ?? undefined,
+        warning: lineWarning(picked, ordered, qtyAtp),
       };
     }),
     kegCharges: [
-      ...deposits.map((d) => ({ key: `deposit-${d.order_line_id}`, name: d.description,
-        detail: `${Number(d.qty_ordered)} × ${money(d.unit_price_cents)} · ${money(d.amount_cents)}` })),
-      ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: "One-way keg fee",
-        detail: `${l.skus?.name ?? "Line"} · ${Number(l.qty_ordered)} × ${money(l.one_way_fee_cents!)} · ${money(Number(l.qty_ordered) * l.one_way_fee_cents!)}` })),
+      ...(deposits ?? []).map((d) => ({ key: `deposit-${d.order_line_id}`, name: `${d.description} · ${lineNames.get(d.order_line_id) ?? "Line"}`,
+        detail: `${Number(d.qty_ordered)} × ${money(d.unit_price_cents)} · captured on the order`, amount: money(Number(d.amount_cents)) })),
+      ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: `One-way keg fee · ${l.skus?.name ?? "Line"}`,
+        detail: `${Number(l.qty_ordered)} × ${money(l.one_way_fee_cents!)} · captured on the order`, amount: money(orderLineCents(l.qty_ordered, l.one_way_fee_cents!)) })),
     ],
-    events: events.map((e) => [
-      `${formatDateTime(e.created_at, timeZone)} · ${e.event.replace(/_/g, " ")}`,
-      e.event === "lines_adjusted"
+    events: events.map((e) => ({
+      key: e.id,
+      at: formatDateTime(e.created_at, timeZone),
+      event: titled(e.event.replace(/_/g, " ")),
+      detail: e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",
-    ]),
+    })),
   };
 }

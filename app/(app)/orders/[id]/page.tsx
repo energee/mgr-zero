@@ -1,9 +1,12 @@
 // app/(app)/orders/[id]/page.tsx — Order (screen record): the staff home for
-// one order: state and next action, lines with ATP, the event history, and
-// the restock flag, and (Admin and Sales, shipped only) Cost and margin from
+// one order: state and next action, order details and the before-tax price
+// summary, lines with ATP, keg charges, the event history, and the restock
+// flag, and (Admin and Sales, shipped only) Cost and margin from
 // get_order_cogs. The drawing is OrderView (shared with the inventory);
-// lifecycle-buttons.tsx holds the status-gated verbs (Submit, Adjust, Pick,
-// Ship, Cancel). Draft edits use /orders/[id]/edit. Confirming happens only
+// lifecycle-buttons.tsx holds the status-gated verbs: LifecycleButtons in the
+// header (Submit, Ship or Complete transfer, Record pick, Adjust lines; Put
+// back leads instead while beer is staged) and CancelOrderAction in the bottom
+// row, both inside OrderActionScope so they share one command action. Draft edits use /orders/[id]/edit. Confirming happens only
 // through Review and confirm at /orders/[id]/confirm (#713). Adjust lines is /orders/[id]/adjust;
 // a taproom transfer completes at
 // /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
@@ -18,10 +21,10 @@ import { toOrderViewProps, type OrderSnapshot } from "@/lib/mgr/order-view";
 import type { OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { LifecycleButtons } from "./lifecycle-buttons";
+import { CancelOrderAction, LifecycleButtons, OrderActionScope } from "./lifecycle-buttons";
 
 type Order = { id: string; order_no: number | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; pickup: boolean; repick_since: string | null; from_location_id?: string; customers: { name: string } | null; ship_tos: { label: string; country: string; city: string | null; state: string | null } | null };
-type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; one_way_fee_cents: number | null; skus: { name: string } | null };
+type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; one_way_fee_cents: number | null; short_reason: string | null; skus: { name: string } | null };
 type OrderEvent = { id: string; event: string; actor: string; payload: Record<string, unknown>; created_at: string };
 type Atp = { sku_id: string; qty: number };
 
@@ -38,13 +41,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone, cogs, deposits });
   if (!canSell) model.confirmHref = undefined;
   if (!canRun(ctx, "update_draft_order")) model.editHref = undefined;
-  if (!canFulfill) { model.putBackHref = undefined; model.completeHref = undefined; }
+  if (!canFulfill) model.putBackHref = undefined;
   return (
-    <OrderView
-      model={model}
-      footer={(
-        <LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status} />
-      )}
-    />
+    <OrderActionScope>
+      <OrderView
+        model={model}
+        actions={<LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} restockFirst={model.putBackHref !== undefined} orderId={order.id} status={order.status} />}
+        footer={<CancelOrderAction canSell={canSell} orderId={order.id} status={order.status} />}
+      />
+    </OrderActionScope>
   );
 }

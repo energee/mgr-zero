@@ -646,7 +646,8 @@ describe("SCREENS", () => {
     expect(html("Driver")).toMatch(/Resume/);
     expect(html("Order")).not.toMatch(/Adjust line/);
     expect(html("Order")).toMatch(/>Add line</);
-    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(3);
+    // Each line's Adjust draws in the desk table and again in the phone list.
+    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(6);
     expect(html("Confirm order")).toMatch(/Submitted · ships Sep 10, 2026/);
     expect(html("Confirm order")).not.toMatch(/Next: confirm/);
     expect(html("Confirm order")).toMatch(/>Confirm order</);
