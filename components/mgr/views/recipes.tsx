@@ -2,16 +2,21 @@
 // and live: a back to More and New recipe. Each row opens its recipe. Live
 // passes the back, create and row hrefs in the model; inventory leaves them
 // for the explorer to resolve.
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipesViewModel } from "@/lib/mgr/recipes-view";
 
 export type { RecipesViewModel };
 
-export function RecipesView({ model }: { model: RecipesViewModel }) {
+export function RecipesView({ model, controls }: {
+  model: RecipesViewModel;
+  /** The search strip (components/mgr/list-controls.tsx). */
+  controls?: ReactNode;
+}) {
   return (
     <>
       {E.back("More", "Recipes", E.btn("New recipe", "p", model.createHref), model.backHref)}
+      {controls}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

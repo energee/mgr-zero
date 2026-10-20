@@ -51,7 +51,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging runs", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records }}
+        model={{ title, backTo: "Packaging runs", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records, timeZone: brewery.timeZone }}
         action={latest && correctionPlan ? <MaterialCorrection key={latest.id} runId={run.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );

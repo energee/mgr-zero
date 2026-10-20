@@ -40,6 +40,7 @@ import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
+import { ScopePick } from "@/components/mgr/scope-pick";
 
 it("does not fetch customer options when Orders has no customer filter", async () => {
   state.calls = [];
@@ -114,6 +115,14 @@ it("renders the selected shortfall with actual package volume and competing orde
   const controls = page.props.children[4].props.children;
   expect(controls[0]).toBe(false);
   expect(controls[1].props.canCreate).toBe(false);
+});
+
+it("#973 scopes Replenishment by a labeled Location select that keeps the SKU", async () => {
+  state.roles = ["warehouse"];
+  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
+  const scope = page.props.children[3];
+  expect(scope.type).toBe(ScopePick);
+  expect(scope.props).toEqual({ label: "Location", value: "tap", options: [{ value: "tap", label: "Taproom", href: "/replenishment?location=tap&sku=active" }] });
 });
 
 it.each(["warehouse", "admin", "sales"])("renders the actual Orders page with the permitted create control for %s", async role => {

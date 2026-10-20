@@ -7,7 +7,7 @@ export const searchPalette: SearchViewModel = {
     { heading: "Pages", items: [["Invoices", "Open page", "Invoices"], ["Catalog", "brands and SKUs", "Catalog"]] },
     { heading: "SKUs", items: [["Hazy IPA · ½ bbl", "ATP 11"]] },
     { heading: "Orders", items: [["ORD-0231 · Ridgeline", "4 × Hazy"]] },
-    { heading: "Lots", items: [["L-240831-HZ", "packaged 8/31"]] },
+    { heading: "Lots", items: [["L-240831-HZ", "packaged Aug 31, 2026"]] },
   ],
 };
 

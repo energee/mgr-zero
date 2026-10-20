@@ -8,8 +8,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { replenishmentLines } from "@/lib/replenishment-form";
 
@@ -45,23 +43,7 @@ export function ReplenishForm({
       if (!canCreate) { e.preventDefault(); return; }
       void form.submit(e);
     }} className="flex flex-col gap-4">
-      <div className="flex max-w-xs flex-col gap-2">
-        <Label htmlFor="replen-from">From warehouse</Label>
-        <Select disabled={!canCreate} value={fromLocationId} onValueChange={setFromLocationId}>
-          <SelectTrigger id="replen-from">
-            <SelectValue placeholder="Select warehouse" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {warehouses.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
+      {E.pick("From warehouse", fromLocationId, warehouses.map((w) => ({ value: w.id, label: w.name })), { id: "replen-from", placeholder: "Select warehouse", disabled: !canCreate, onChange: setFromLocationId })}
 
       {suggestions.length ? (
         <table className="w-full text-sm">

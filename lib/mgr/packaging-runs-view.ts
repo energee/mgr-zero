@@ -53,7 +53,7 @@ function row(run: PackagingRunSnapshot, timeZone: string, href?: string): Packag
     return { key: run.id, title, detail, warning: Boolean(run.loss_bbl), href };
   }
   const verb = run.material_shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
-  const detail = [run.planned_on, run.vessel_name ?? "no source yet", run.qty_planned ? `${run.qty_planned} ${run.planned_unit ?? "units"} planned` : undefined, run.material_shortfall].filter(Boolean).join(" · ");
+  const detail = [formatDate(run.planned_on), run.vessel_name ?? "no source yet", run.qty_planned ? `${run.qty_planned} ${run.planned_unit ?? "units"} planned` : undefined, run.material_shortfall].filter(Boolean).join(" · ");
   return { key: run.id, title, detail, verb, tone: run.material_shortfall || run.started_at ? "attention" : "info", warning: Boolean(run.material_shortfall), href };
 }
 

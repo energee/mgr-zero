@@ -75,6 +75,16 @@ describe("recipes and immutable versions", () => {
     expect(listed.map((r) => r.id)).toContain(recipe.id);
   });
 
+  it("list_recipes q matches the recipe name in the query, with % and _ literal (#994)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    for (const name of ["Hazy 100% IPA", "West_Coast", "WestXCoast"]) await runCommand("create_recipe", { name }, own);
+    const names = async (q: string) => ((await runCommand("list_recipes", { q }, own)) as { name: string }[]).map((r) => r.name);
+    expect(await names("west")).toEqual(["West_Coast", "WestXCoast"]);
+    expect(await names("100%")).toEqual(["Hazy 100% IPA"]);
+    expect(await names("t_c")).toEqual(["West_Coast"]);
+    expect(await names("nothing")).toEqual([]);
+  });
+
   it("get_recipe returns the requested older version and lists all versions", async () => {
     const recipe = await runCommand("create_recipe", { name: "History IPA" }, ctx) as { id: string };
     const historyMalt = await seedMaterial(b.id, { name: "History malt", category: "malt", extractPotential: 1.037 });

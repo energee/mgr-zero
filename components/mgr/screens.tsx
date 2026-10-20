@@ -1213,7 +1213,7 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
-    body: <CustomersView model={toCustomersViewProps(customersList)} />,
+    body: <CustomersView model={toCustomersViewProps(customersList)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
@@ -1222,7 +1222,7 @@ export const SCREENS: Screen[] = [
     writes: "none [Invite and Remove access on Customer detail correct portal access]",
     states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
     spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
-    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} />,
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5,
@@ -1793,7 +1793,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["blended", "member batches and stored source transfers, without percentages", 1], ["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
     spec: "The lot is one packaging run. Ingredients link to material-lot recall; exact reversals are excluded and additions from every recorded member batch are included before its downstream departure. Trace follows recorded transfers backward from its tank before run close, tightening the time cutoff at every upstream transfer. Member batches and original transfer quantities are shown without proportional attribution or estimated shares; later arrivals are excluded. Trace lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
-    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
+    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7, slice: 5, tab: "Beer", group: "Global", name: "Material lot trace",
@@ -1802,7 +1802,7 @@ export const SCREENS: Screen[] = [
     to: { "L-240831-HZ": "Lot trace" },
     states: [["still on hand", "remaining recorded material can be quarantined", 1], ["unpackaged batch", "consumption without a finished lot remains visible"], ["no shipments", "no recorded customer shipments"], ["unknown lot", "not found"]],
     spec: "Header Search finds material lot codes, even when exhausted, for Admin and Sales. Trace follows effective consumption into every brew turn and cellar addition, packaging-material consumption and recorded blend membership, then finished lots and actual recipients. Exact reversed consumptions are excluded. Unlinked tracked consumption is shown explicitly; historical untracked material cannot be assigned a lot. Quantities show recorded use, not estimated shares. The same MaterialLotTraceView serves inventory and live reads.",
-    body: <MaterialLotTraceView model={toMaterialLotTraceViewProps(materialLotTraceCitra)} />,
+    body: <MaterialLotTraceView model={toMaterialLotTraceViewProps(materialLotTraceCitra, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7,
@@ -1877,7 +1877,7 @@ export const SCREENS: Screen[] = [
     writes: "none [counts happen in the Cycle count sheet]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
     spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
-    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} />,
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -1900,11 +1900,11 @@ export const SCREENS: Screen[] = [
     name: "Vendors",
     to: { Edit: "Vendor" },
     job: "List suppliers and open one supplier's terms",
-    reads: "list_vendors_and_contracts",
+    reads: "list_vendors_and_contracts · list_vendors [while a search is on: the new-contract vendor picker still offers every vendor]",
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
-    body: <VendorsView model={toVendorsViewProps(vendorsList)} />,
+    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -1985,7 +1985,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and versioning happen on Recipe]",
     states: [["no version yet", "a recipe saved without a version reads no version yet, in the warning style"], ["empty", "no recipes yet: New recipe is the only action"]],
     spec: "The More landing's Recipes row opens this list, and its back returns to More. Each row is titled with the recipe's current version and opens Recipe at it; New recipe opens Recipe with no version yet: the parent fields above the first version's editor, one save.",
-    body: <RecipesView model={toRecipesViewProps(recipesList)} />,
+    body: <RecipesView model={toRecipesViewProps(recipesList)} controls={<ListControls search={{ label: "Search recipes", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -2299,7 +2299,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [["Taproom"], ["Warehouse"]], location: "Taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -2407,7 +2407,7 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Can labels": "Material", "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
+    to: { "Can labels": "Material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
     job: "See demand gaps and draft one purchase order per vendor, without priority state",
     reads: "get_material_requirements",
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
@@ -2466,7 +2466,7 @@ export const SCREENS: Screen[] = [
     writes: "unlink_chat_user",
     states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: <ChatLinkedPeopleView people={linkedChatPeople} />,
+    body: <ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 8,
@@ -2600,6 +2600,34 @@ export const SCREENS: Screen[] = [
     redrawn: true,
     spec: <>This was an authoring surface and is now a read-out. Brand, format and availability are all derived (brand from what is in the bin, formats from the brand, availability from taproom stock), so publishing is zero-touch and a new brand reaches the register the moment stock lands. Retail resolves as the location’s own price override, falling back to the format’s default retail price, which is why the table shows the inherited number and names its Source: an exception has to be legible, or a stale price from last summer becomes silently authoritative. The override column stays empty unless someone sets it, so a format-wide price change actually propagates; writing the default into every row on publish would freeze each one at its first price, which is the failure mode this drawing exists to prevent. Publish changes survives because MGR still owns when the provider copy is refreshed, and sends the complete derived change set for the selected location. Square keeps one durable parent item per brand’s poured menu group, with pint, taster and the brand’s other poured formats as variations; publishing one brand updates that whole item. Location is a scope rather than a column: Square uses per-location presence on the variations, so MGR maintains one catalog and varies where each format appears; two parallel menus would fight that model and double every retire. Everything under the switcher is read for one location: stock, availability, and the price override that is keyed by POS location. A column would only serve a cross-location comparison nobody performs, while every action here is taken against one register. Renamed from POS menu: the register is no longer the only destination. The website is the third consumer of this catalog after Square and QuickBooks, not an integration of its own: a bespoke web feed would produce a third answer to what are we selling right now, and would leak unannounced beer, which is the same ownership boundary the Square item library taught. So the website is a read client keeping no copy, and the sync logic it runs today exists only because it keeps one. Its existing beers are adopted exactly as pre-integration Square items are: matched to a brand once, then maintained from here, so nothing vanishes from a public page the day MGR connects. Transport is deliberately not drawn: a menu changes a handful of times a day, so a cached read of the published rows is as fresh as a socket per visitor without opening an anonymous realtime path. Destination-native rows sit <i>below</i> that button rather than in the table: position is what says they are outside the publishable set, which no label reliably does. They appear at all because an unmapped taproom item is the reason a sale fails to reconcile, and Map is the only action MGR ever offers against a row it does not own.</>,
     body: <PosMenuView model={{ locations: [{ id: "taproom", label: "Taproom" }, { id: "warehouse", label: "Warehouse" }], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", items: [{ brandId: "hazy", formatId: "pint", label: "Hazy IPA · pint", retail: "$7.00", source: "format", destinations: "Square · Website", available: true }], excluded: [{ brandId: "stout", formatId: "stout-pint", label: "Stout · pint", retail: "$7.00", source: "format", destinations: "Square", available: false, reason: "no taproom stock" }], externalItems: [{ label: "Guest cider · pint", detail: "Not mapped · sales stay queued", disposition: "queued" }] }} />,
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    name: "Menu setup",
+    to: { "Set up Square": "Point of sale" },
+    job: "Say what Menu is missing when Square has no locations yet",
+    reads: "list_pos_locations",
+    writes: "none",
+    states: [["admin", "Set up Square opens Point of sale"], ["warehouse", "no link; asks an admin, because Point of sale settings are admin-only", 1]],
+    spec: "Drawn as an admin. No Square location has been seen, so Square still has to be connected before any location can be mapped. Only an admin can open Point of sale settings, so only an admin gets the button; Warehouse reads a sentence asking an admin instead of a link that would land on No access.",
+    body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    name: "Menu unmapped",
+    to: { "Map Square locations": "Square locations" },
+    job: "Say what Menu is missing when Square locations exist but none is mapped",
+    reads: "list_pos_locations",
+    writes: "none",
+    states: [["admin", "Map Square locations opens Square locations"], ["warehouse", "no link; asks an admin to map one", 1]],
+    spec: "Drawn as an admin. Square locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link, for the same admin-only reason as Menu setup.",
+    body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations" } } }} />,
   },
   {
     step: 7,
@@ -2994,8 +3022,8 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships Sep 3, 2026 · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
@@ -3072,7 +3100,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Order", "ORD-0231 · 3 lines · requested Thu · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.f([["Order", "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },

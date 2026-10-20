@@ -17,7 +17,8 @@ describe("Pick sheet view loop", () => {
     const model = toPickSheetViewProps(pickSheet);
     expect(model.empty).toBeUndefined();
     expect(model.groups).toHaveLength(1);
-    expect(model.groups[0]?.title).toBe("2026-09-03");
+    expect(model.groups[0]?.title).toBe("Sep 3, 2026");
+    expect(model.groups[0]?.key).toBe("2026-09-03");
     expect(model.groups[0]?.rows.map((r) => r.title)).toEqual([
       "Ridgeline Tap Room · ORD-0231",
       "Al’s Bar · ORD-0232",
@@ -53,7 +54,7 @@ describe("Pick sheet view loop", () => {
         { ...pickSheet.orders[1]!, requested_ship_date: null },
       ],
     });
-    expect(model.groups.map((g) => g.title)).toEqual(["2026-09-02", "Unscheduled"]);
+    expect(model.groups.map((g) => g.title)).toEqual(["Sep 2, 2026", "Unscheduled"]);
     expect(model.groups[0]?.rows).toHaveLength(1);
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });

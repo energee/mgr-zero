@@ -37,8 +37,8 @@ describe("Planning view", () => {
     expect(model.requirements[0]).toMatchObject({ key: "labels", quantity: "2 roll", warning: false });
     expect(model.requirements[0].detail).toContain("need 960");
     expect(model.requirements[0].detail).toContain("includes 480 projected");
-    expect(model.requirements[0].detail).toContain("needed by 2026-10-30");
-    expect(model.requirements[0].detail).toContain("buy by 2026-10-23");
+    expect(model.requirements[0].detail).toContain("needed by Oct 30, 2026");
+    expect(model.requirements[0].detail).toContain("buy by Oct 23, 2026");
   });
 
   it("the live route mounts PlanningView, slots DraftButton, and has no E tree", () => {
