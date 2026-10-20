@@ -180,10 +180,10 @@ describe("Units view", () => {
     expect(model.example).toBe(formatGravity(12.5, "sg"));
   });
 
-  it("renders back, stored-in-Plato info, chip groups, and the example", () => {
+  it("renders back, the display-only info, chip groups, and the example", () => {
     const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
     expect(html).toMatch(/Units/);
-    expect(html).toMatch(/Gravity is always stored in °Plato/);
+    expect(html).toMatch(/This changes only how gravity is shown and typed\./);
     expect(html).toMatch(/Brewery default/);
     expect(html).toMatch(/Your preference/);
     expect(html).toMatch(/Use brewery default/);
@@ -202,7 +202,7 @@ describe("Units view", () => {
     expect(html).toMatch(/CONTROLS/);
     expect(html).not.toMatch(/Use brewery default/);
     expect(html).not.toMatch(/Brewery default/);
-    expect(html).toMatch(/Gravity is always stored in °Plato/);
+    expect(html).toMatch(/This changes only how gravity is shown and typed\./);
     expect(html).toMatch(/A 12.5 °P reading shows as/);
     expect(html).toContain(formatGravity(12.5, "plato"));
   });

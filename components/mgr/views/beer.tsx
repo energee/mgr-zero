@@ -23,7 +23,6 @@ export function BeerView({
         {E.ttl("Taproom stock")}
         {model.stock.length ? model.stock.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.qty)}</Fragment>) : E.blank(model.stockEmpty ?? "No stock recorded")}
       </section>}
-      {model.blank ? E.blank(model.blank) : null}
     </>
   );
 }
