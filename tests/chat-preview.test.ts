@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { assertPortableNotification } from "@/lib/chat/contracts";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
+import { SCREENS } from "@/components/mgr/screens";
 
 const forbiddenKeys = new Set([
   "email", "phone", "price", "balance", "licenseNumber", "signature",
@@ -26,6 +27,13 @@ describe("chat preview fixtures", () => {
   it("provides the ten committed preview scenarios with unique IDs", () => {
     expect(CHAT_PREVIEW_FIXTURES.map((fixture) => fixture.id)).toEqual(expectedIds);
     expect(new Set(CHAT_PREVIEW_FIXTURES.map((fixture) => fixture.id)).size).toBe(CHAT_PREVIEW_FIXTURES.length);
+  });
+
+  it("App Home and Personal queue fixtures show the formatDate ship-date wording (#991)", () => {
+    const appHome = CHAT_PREVIEW_FIXTURES.find((fixture) => fixture.id === "app-home")!;
+    const submitted = appHome.items.find((item) => item.reason === "submitted_order")!;
+    expect(submitted.detail).toMatch(/^submitted · ships Sep 3, 2026/);
+    expect(JSON.stringify(SCREENS.find((screen) => screen.name === "Personal queue")!.body)).toContain("submitted · ships Sep 3, 2026");
   });
 
   it("validates every portable item and excludes sensitive keys and values", () => {

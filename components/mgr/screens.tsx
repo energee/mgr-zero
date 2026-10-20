@@ -2994,8 +2994,8 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships Sep 3, 2026 · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
@@ -3072,7 +3072,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Order", "ORD-0231 · 3 lines · requested Thu · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.f([["Order", "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },

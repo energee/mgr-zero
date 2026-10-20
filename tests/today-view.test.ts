@@ -41,8 +41,8 @@ describe("Today due times", () => {
   });
 
   it("adds no clock time to a date-only deadline such as a ship date", () => {
-    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [{ ...item("1", "2026-10-08T04:00:00Z", "pick_due"), detail: "pick due · ships Thu 10/8" }], timeZone, now });
-    expect(model.rows[0].detail).toBe("pick due · ships Thu 10/8");
+    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [{ ...item("1", "2026-10-08T04:00:00Z", "pick_due"), detail: "pick due · ships Oct 8, 2026" }], timeZone, now });
+    expect(model.rows[0].detail).toBe("pick due · ships Oct 8, 2026");
     expect(model.rows[0].dueAt).toBe("2026-10-08T04:00:00Z");
   });
 

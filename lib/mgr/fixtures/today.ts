@@ -24,8 +24,8 @@ export const todayEmpty: TodayViewModel = {
 export const todaySales: TodayViewModel = {
   date: DATE,
   rows: [
-    { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Thu", verb: "Confirm", tone: "success", warning: true, icon: "package" },
-    { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Fri", verb: "Confirm", tone: "success", icon: "package" },
+    { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
+    { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
     { key: "pils", title: "Pils · 16 oz case", detail: "Not enough Pils for 2 orders", verb: "Choose who gets it", tone: "attention", warning: true },
     { key: "hazy", title: "Hazy IPA · ½ bbl", detail: "11 ready · fine" },
     { key: "oh", title: "Al’s Bar · OH", detail: "Al’s Bar can’t receive Stout in OH", verb: "Fix registration", tone: "attention", warning: true },
