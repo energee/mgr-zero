@@ -1,7 +1,6 @@
-// components/mgr/work-tabs.tsx — the live Work chip bar and its sibling state
-// bar: one Tabs list whose triggers are links, so a chip is a navigation, not
-// client state. Pages under Work draw it under E.hd("Work", …) exactly as the
-// screen records draw E.tabs(WORK_CHIPS, …).
+// components/mgr/work-tabs.tsx — where each Work chip goes for a role
+// (workHrefsFor, read by views/work-kind-tabs.tsx) and LinkTabs, a tab list
+// whose triggers are links, so a tab is a navigation, not client state.
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";

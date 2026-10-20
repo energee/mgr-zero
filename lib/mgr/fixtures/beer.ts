@@ -10,5 +10,4 @@ export const beerOverview: BeerViewModel = {
     { key: "materials", title: "Materials", detail: "3 shortages", href: "/materials" },
     { key: "kegs", title: "Kegs", detail: "142 out · 9 overdue", href: "/kegs" },
   ],
-  blank: "Each summary opens its dedicated area; this page does not expand indefinitely.",
 };

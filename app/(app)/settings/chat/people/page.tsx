@@ -5,7 +5,7 @@ import type { ChatLinkedPerson } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatLinkedPeople } from "../chat-settings-client";
 export default async function ChatPeoplePage() {
-  const { ctx } = await requireAdminContext("Linked people");
+  const { brewery, ctx } = await requireAdminContext("Linked people");
   const people = await runCommand("list_chat_user_links", {}, ctx) as ChatLinkedPerson[];
-  return <ChatLinkedPeople people={people} />;
+  return <ChatLinkedPeople people={people} timeZone={brewery.timeZone} />;
 }

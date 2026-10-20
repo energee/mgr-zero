@@ -37,7 +37,7 @@ export const todayBrewer: TodayViewModel = {
   date: DATE,
   rows: [
     { key: "fv3", title: "FV3 · Stout", detail: "reading overdue 31 h", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
-    { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Fri 9/4 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },
+    { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Sep 4, 2026 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },
     { key: "run", title: "RUN-0031 · Hazy cans", detail: "packaged today · close due", verb: "Close", tone: "info", warning: true, icon: "package" },
     { key: "fv1", title: "FV1 · Pils", detail: "1.9 °P · read 4 h ago", icon: "thermo" },
   ],

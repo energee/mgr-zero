@@ -2,6 +2,9 @@
 
 <!-- One-line progress note: the dreaming workflow copies it into .agents/PROGRESS.md. -->
 
+<!-- Fill in the issue this PR finishes so GitHub closes it on merge. For partial work, delete the line and list what remains on the issue. -->
+Closes #
+
 ## Durable decisions (for the dreaming log)
 
 <!-- Rulings future work must preserve, or delete this section. Dreaming reads it into .agents/MEMORY.md. -->

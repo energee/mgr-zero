@@ -6,6 +6,7 @@
 import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { breweryToday, canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -32,8 +33,8 @@ const VIA: Record<string, string> = { mailto: "from a mail client", external: "o
 function statusLine(po: Po) {
   if (po.closed_at) return `${po.status === "cancelled" ? "cancelled" : "closed short"} · ${po.close_reason}`;
   if (po.status === "draft") return "draft · not yet sent";
-  const sent = po.ordered_on ? `Marked sent ${po.ordered_on}${po.sent_via ? ` · ${VIA[po.sent_via] ?? po.sent_via}` : ""}` : po.status;
-  const expected = po.expected_on ? ` · expected ${po.expected_on}` : "";
+  const sent = po.ordered_on ? `Marked sent ${formatDate(po.ordered_on)}${po.sent_via ? ` · ${VIA[po.sent_via] ?? po.sent_via}` : ""}` : po.status;
+  const expected = po.expected_on ? ` · expected ${formatDate(po.expected_on)}` : "";
   return `${sent}${expected}${po.status === "partially_received" ? " · partially received" : po.status === "received" ? " · received" : ""}`;
 }
 
@@ -46,7 +47,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
   if (correctReceipt && po.correction_receipt) {
     return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
       lines={po.correction_lines} locations={[]} bins={[]} today={po.correction_receipt.received_on}
-      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${po.correction_receipt.received_on}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
+      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${formatDate(po.correction_receipt.received_on)}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
   }
   if (receipt) {
     // Warehouse retains receipt access without acquiring admin-only accounting reads or actions.
@@ -68,7 +69,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: { para
     closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)
       ? po.receipts.length ? "short" : "cancel" : undefined,
     history: po.receipts.map(receipt => ({
-      key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${receipt.received_on}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: receiptHref(`/purchase-orders/${po.id}`, receipt.id),
+      key: receipt.id, label: `${receipt.corrects_receipt_id ? "Corrected" : "Received"} ${formatDate(receipt.received_on)}${receipt.corrected_by_receipt_id ? " · superseded" : ""}`, href: receiptHref(`/purchase-orders/${po.id}`, receipt.id),
       detail: receipt.receipt_lines.map(count => {
         const line = lineById.get(count.po_line_id);
         const variance = Number(count.variance);

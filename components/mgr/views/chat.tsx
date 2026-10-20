@@ -1,6 +1,7 @@
 "use client";
 import { useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
@@ -174,11 +175,11 @@ export function ChatDisconnectView({ connected = true, cleanupPending = false, b
   </div>;
 }
 
-export function ChatLinkedPeopleView({ people, backHref, linkHref, busy = false, error, onUnlink }: { people: ChatLinkedPerson[]; backHref?: string; linkHref?: string; busy?: boolean; error?: string | null; onUnlink?: (id: string) => void }) {
+export function ChatLinkedPeopleView({ people, timeZone, backHref, linkHref, busy = false, error, onUnlink }: { people: ChatLinkedPerson[]; timeZone: string; backHref?: string; linkHref?: string; busy?: boolean; error?: string | null; onUnlink?: (id: string) => void }) {
   return <>
     {E.back("Chat", "Linked people", undefined, backHref)}
     {!people.length && E.info("No current staff have linked Slack yet.")}
-    {people.map(person => <div key={person.id}>{E.row(person.name, `${person.roles.join(", ")} · Slack ${person.slackIdentity} · linked ${person.linkedAt.slice(0, 10)}`, <Button variant="destructive" size="sm" disabled={busy} onClick={() => onUnlink?.(person.id)}>Unlink</Button>)}</div>)}
+    {people.map(person => <div key={person.id}>{E.row(person.name, `${person.roles.join(", ")} · Slack ${person.slackIdentity} · linked ${formatDate(person.linkedAt, timeZone)}`, <Button variant="destructive" size="sm" disabled={busy} onClick={() => onUnlink?.(person.id)}>Unlink</Button>)}</div>)}
     <CommandFormMessage error={error} />
     {E.btn("Link your Slack", "g", linkHref)}
   </>;

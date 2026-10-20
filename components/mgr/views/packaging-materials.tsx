@@ -4,6 +4,7 @@ import { useState } from "react";
 import { emptyPackagingActual, packagingCorrectionReady, patchActual, removeActual } from "@/lib/mgr/packaging-actuals";
 import { materialSourceKey } from "@/lib/mgr/material-source";
 import { toTicks } from "@/lib/mgr/quantity-input";
+import { formatDate } from "@/lib/date-format";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import type { PackagingActualDraft, PackagingClosePlan, PackagingMaterialRecord, PackagingRequirement } from "@/lib/mgr/packaging-actuals";
@@ -41,9 +42,10 @@ export function PackagingMaterialActuals({ plan, rows, locations, bins, disabled
   </>;
 }
 
-export function PackagingMaterialHistory({ records }: { records: PackagingMaterialRecord[] }) {
+/** `timeZone` is breweries.timezone: an original close's created_at prints as its day there. */
+export function PackagingMaterialHistory({ records, timeZone }: { records: PackagingMaterialRecord[]; timeZone: string }) {
   return <>{E.ttl("Material record history")}{records.length ? records.map(record => <section key={record.id} className="flex flex-col gap-2">
-    {E.fld(record.corrects_id ? "Correction" : "Original close", record.correction_reason ?? record.created_at)}
+    {E.fld(record.corrects_id ? "Correction" : "Original close", record.correction_reason ?? formatDate(record.created_at, timeZone))}
     {E.tbl(["Planned material", "Quantity"], record.planned.map(row => [row.name, `${qty(row.qty)} ${row.unit}`]), ["l", "r"])}
     {E.tbl(["Material / source", "Used", "Lost", "Unused"], record.actuals.map(row => [`${row.material_name} · ${row.location_name} / ${row.bin_name} · ${row.lot_code ?? "untracked"} (${row.unit})`, qty(row.qty_used), qty(row.qty_loss), qty(row.qty_unused)]), ["l", "r", "r", "r"])}
   </section>) : E.info("This run closed before confirmed material records were available.")}</>;

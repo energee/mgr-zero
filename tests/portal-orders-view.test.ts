@@ -22,7 +22,7 @@ describe("Order history view", () => {
     const model = toPortalOrdersViewProps(portalOrdersList);
     expect(model.subtitle).toBe(RIDGELINE.name);
     expect(model.rows.map((r) => r.title)).toEqual(["ORD-0231", "ORD-0225", "ORD-0221"]);
-    expect(model.rows[0]?.detail).toMatch(/Confirmed · ships 2026-09-10/);
+    expect(model.rows[0]?.detail).toMatch(/Confirmed · ships Sep 10, 2026/);
     expect(model.rows[0]?.verb).toBeUndefined();
     expect(model.rows[0]?.href).toMatch(/\/portal\/orders\//);
     expect(model.rows[1]?.title).toBe("ORD-0225");
@@ -49,7 +49,7 @@ describe("Order history view", () => {
         order_lines: [{ id: "l1", qty_ordered: 4, qty_shipped: null }],
       }],
     });
-    expect(bare.rows[0]?.detail).toBe("Confirmed · ships 2026-09-10");
+    expect(bare.rows[0]?.detail).toBe("Confirmed · ships Sep 10, 2026");
     expect(bare.rows[0]?.detail).not.toMatch(/\$/);
   });
 
@@ -64,7 +64,7 @@ describe("Order history view", () => {
     const html = htmlOf(createElement(PortalOrdersView, { model: toPortalOrdersViewProps(portalOrdersList) }));
     expect(html).toMatch(/>Reorder</);
     expect(html).toMatch(/ORD-0225/);
-    expect(html).toMatch(/Confirmed · ships 2026-09-10/);
+    expect(html).toMatch(/Confirmed · ships Sep 10, 2026/);
     expect(html).toMatch(/Shipped/);
     expect(html).toContain(RIDGELINE.name);
     expect(html).not.toMatch(/→/);
@@ -119,7 +119,7 @@ describe("Order detail view", () => {
       events: [{ id: "e-adj", event: "lines_adjusted", created_at: "2026-08-26T12:00:00.000Z" }],
       shipment: null,
     });
-    expect(model.status).toBe("Confirmed · ships 2026-09-10");
+    expect(model.status).toBe("Confirmed · ships Sep 10, 2026");
     expect(model.po).toBe("4471");
     expect(model.note).toBe("dock closed Mondays");
     expect(model.adjusted).toMatch(/adjusted this order/);
