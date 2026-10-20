@@ -66,7 +66,10 @@ export type InvoiceSnapshot = {
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
     qbo_total_cents?: number | null;
+    /** Set by sync when accounting edited the invoice in QuickBooks: the only authority for "edited". */
     qbo_accountant_drift?: boolean;
+    /** QuickBooks TotalTax; qbo_total_cents includes it. */
+    qbo_tax_cents?: number | null;
     /** Cash QuickBooks recorded against the invoice; credits and write-downs are not cash. */
     qbo_cash_collected_cents?: number;
     written_off_at?: string | null;
@@ -135,9 +138,11 @@ function invoiceState(invoice: InvoiceSnapshot["invoice"]): InvoiceViewModel["st
 
 /** The invoice's money: subtotals by kind, one total, then the balance and
  *  cash QuickBooks supplied. The QuickBooks total (zero included) wins over
- *  the local sum; when they differ, the frozen MGR subtotal is labeled beside
- *  it. Only an invoice still owed or paid shows a balance: a credit memo,
- *  voided, deleted or written-off document is not money due. */
+ *  the local sum. Only the sync's accountant-edit flag makes it "edited": then
+ *  the frozen MGR subtotal is labeled beside it. An unedited taxed invoice
+ *  differs only by QuickBooks tax, which gets its own row. Only an invoice
+ *  still owed shows a balance (a paid one only when QuickBooks supplied it): a
+ *  credit memo, voided, deleted or written-off document is not money due. */
 function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnapshot["lines"]): PriceSummaryModel {
   const byGroup = new Map<string, number>();
   for (const line of lines) {
@@ -152,11 +157,13 @@ function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnaps
   if (invoice.kind === "credit_memo") {
     return { rows, total: { label: "Credit memo total", value: money(totalCents) }, note: "Credit issued to the customer, not money they owe." };
   }
-  const edited = totalCents !== localCents;
+  const edited = Boolean(invoice.qbo_accountant_drift);
   if (edited) rows.push({ label: "Frozen MGR line subtotal", value: money(localCents) });
+  else if (invoice.qbo_tax_cents != null && invoice.qbo_tax_cents > 0) rows.push({ label: "Tax (QuickBooks)", value: money(invoice.qbo_tax_cents) });
   const state = invoiceCurrentState(invoice);
   const cash = invoice.qbo_cash_collected_cents ?? 0;
-  const settlement = state === "unpaid" || state === "paid" ? [
+  const owedOrKnown = state === "unpaid" || (state === "paid" && invoice.qbo_balance_cents != null);
+  const settlement = owedOrKnown ? [
     { label: "Outstanding balance", value: invoice.qbo_balance_cents == null ? "Unknown" : money(invoice.qbo_balance_cents), strong: true },
     ...(cash > 0 ? [{ label: "Cash received in QuickBooks", value: money(cash) }] : []),
   ] : undefined;
@@ -164,6 +171,7 @@ function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnaps
     rows,
     total: { label: edited ? "Current invoice total" : "Total", value: money(totalCents) },
     note: edited ? "Edited in QuickBooks. The original lines do not change; review the difference in QuickBooks."
+      : state === "voided" ? "Voided in QuickBooks. Nothing is owed."
       : invoice.qbo_total_cents != null ? "From QuickBooks." : "Sum of the invoice lines.",
     settlement,
   };

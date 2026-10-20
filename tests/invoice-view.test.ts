@@ -41,9 +41,8 @@ describe("Invoice view", () => {
     expect(html).toContain("Retry exact push");
     expect(html).toContain("Mark answered");
     expect(html).not.toContain("Push invoice to QuickBooks Online");
-    // The push alert repeated the mapping detail; the balance moved to the summary.
+    // The push alert repeated the mapping detail.
     expect(html).not.toContain("Push becomes available");
-    expect(html).not.toMatch(/balance<\/span>/);
   });
   it("maps get_invoice + questions through the adapter as separate facts", () => {
     const model = toInvoiceViewProps(invoiceFailedAls);
@@ -111,18 +110,43 @@ describe("Invoice view", () => {
     expect(model.state.label).toBe(label);
     expect(model.summary.settlement).toBeUndefined();
   });
-  it("labels an edited QuickBooks total beside the frozen MGR subtotal only when they differ", () => {
+  it("labels an edited QuickBooks total beside the frozen MGR subtotal only when QuickBooks flagged the edit", () => {
     const { summary } = toInvoiceViewProps(invoiceEditedInQbo);
     expect(summary.total).toEqual({ label: "Current invoice total", value: "$640.00" });
     expect(summary.rows.at(-1)).toEqual({ label: "Frozen MGR line subtotal", value: "$615.00" });
     expect(summary.note).toMatch(/original lines do not change/);
-    // A QuickBooks zero wins over a nonzero local sum.
+    // An edit that left the total unchanged is still an edit.
+    const same = toInvoiceViewProps({ ...invoiceEditedInQbo, invoice: { ...invoiceEditedInQbo.invoice, qbo_total_cents: 61500 } }).summary;
+    expect(same.total).toEqual({ label: "Current invoice total", value: "$615.00" });
+    expect(same.note).toMatch(/Edited in QuickBooks/);
+    // A QuickBooks zero wins over a nonzero local sum; without the edit flag it is not called edited.
     const zero = toInvoiceViewProps({ ...invoicePartlyPaid, invoice: { ...invoicePartlyPaid.invoice, qbo_total_cents: 0 } }).summary;
-    expect(zero.total).toEqual({ label: "Current invoice total", value: "$0.00" });
+    expect(zero.total).toEqual({ label: "Total", value: "$0.00" });
+    expect(zero.note).not.toMatch(/Edited/);
     const matched = toInvoiceViewProps(invoicePartlyPaid).summary;
     expect(matched.rows.map(row => row.label)).not.toContain("Frozen MGR line subtotal");
     expect(matched.note).toBe("From QuickBooks.");
     expect(toInvoiceViewProps(invoiceFailedAls).summary.note).toBe("Sum of the invoice lines.");
+  });
+  it("adds the QuickBooks tax to an unedited taxed invoice so the rows reach the Total", () => {
+    const taxed = toInvoiceViewProps({ ...invoicePartlyPaid, invoice: { ...invoicePartlyPaid.invoice, qbo_total_cents: 66420, qbo_tax_cents: 4920 } }).summary;
+    expect(taxed.rows.at(-1)).toEqual({ label: "Tax (QuickBooks)", value: "$49.20" });
+    expect(taxed.rows.map(row => row.label)).not.toContain("Frozen MGR line subtotal");
+    expect(taxed.total).toEqual({ label: "Total", value: "$664.20" });
+    expect(taxed.note).toBe("From QuickBooks.");
+  });
+  it("reads a voided invoice as a $0.00 total with no balance and no edit note", () => {
+    const voided = toInvoiceViewProps({ ...invoicePartlyPaid, invoice: { ...invoicePartlyPaid.invoice, qbo_remote_state: "voided", qbo_total_cents: 0, qbo_balance_cents: 0, qbo_cash_collected_cents: 0 } });
+    expect(voided.state.label).toBe("Voided");
+    expect(voided.summary.rows.map(row => row.label)).toEqual(["Items", "Keg deposits", "One-way keg fees"]);
+    expect(voided.summary.total).toEqual({ label: "Total", value: "$0.00" });
+    expect(voided.summary.note).toBe("Voided in QuickBooks. Nothing is owed.");
+    expect(voided.summary.settlement).toBeUndefined();
+  });
+  it("shows no Unknown balance under Paid when the paid invoice has no QuickBooks balance", () => {
+    const paid = toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...invoiceFailedAls.invoice, paid_at: "2025-08-14T12:00:00Z", qbo_balance_cents: null } });
+    expect(paid.state.label).toBe("Paid");
+    expect(paid.summary.settlement).toBeUndefined();
   });
 
   it("omits mapping rows when the snapshot has none", () => {

@@ -14,6 +14,7 @@ import { PriceSummary } from "@/components/mgr/views/price-summary";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QboStaffInvoiceLinkView } from "./accounting";
+import { sentenceCase } from "@/lib/mgr/labels";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
 import { cn } from "@/lib/utils";
@@ -30,8 +31,6 @@ export const InvoiceReturnButton = ({ href }: { href?: string }) => (
     {href ? <Link href={href}>Return</Link> : "Return"}
   </Button>
 );
-
-const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export function InvoiceView({
   model,
@@ -140,7 +139,7 @@ export function InvoiceView({
               {typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate}
               {quickbooks || actions || staffLink?.href ? (
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  {quickbooks ? <p className="text-sm font-semibold">{sentence(quickbooks.detail)}</p> : null}
+                  {quickbooks ? <p className="text-sm font-semibold">{sentenceCase(quickbooks.detail)}</p> : null}
                   <div className="flex flex-col gap-2 md:ml-auto md:items-end">
                     {showLink && staffLink?.href ? <QboStaffInvoiceLinkView link={staffLink} /> : null}
                     {actions}
