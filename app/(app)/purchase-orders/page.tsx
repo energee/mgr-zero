@@ -10,19 +10,13 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
+import { purchaseOrderNext, toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import "@/lib/commands/all";
 import { poNo } from "@/lib/mgr/doc-no";
 
 
 type Po = { id: string; po_no: number; status: string; expected_on: string | null; ordered_on: string | null; vendor_name: string | null; lines_open: number };
 
-function verb(po: Po): [string, "info" | "attention" | "success"] {
-  if (po.status === "draft") return ["Mark sent", "info"];
-  if (po.status === "received") return ["Open", "success"];
-  if (po.status === "cancelled") return ["Open", "info"];
-  return ["Receive", po.status === "partially_received" ? "attention" : "info"];
-}
 const status = (po: Po) => {
   if (po.status === "partially_received") return `partially received · ${po.lines_open} ${po.lines_open === 1 ? "line" : "lines"} still due`;
   if (po.status === "sent") return `sent${po.ordered_on ? ` ${formatDate(po.ordered_on)}` : ""}${po.expected_on ? ` · expected ${formatDate(po.expected_on)}` : ""}`;
@@ -41,10 +35,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
         title: "Work",
         subtitle: all === "1" ? "every order" : "open orders",
         includeClosed: all === "1",
-        rows: pos.map(po => {
-          const [label, tone] = verb(po);
-          return { key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), verb: label, tone, href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" };
-        }),
+        rows: pos.map(po => ({ key: po.id, title: `${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, detail: status(po), ...purchaseOrderNext(po.status), href: `/purchase-orders/${po.id}`, warning: po.status === "partially_received" })),
       })}
       createAction={<Button size="sm" asChild><Link href="/purchase-orders/new">New PO</Link></Button>}
       linkRows

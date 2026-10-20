@@ -16,7 +16,8 @@ it("retains cancelled plans as history without offering physical work", () => {
   expect(batches.cancelled?.[0]).toMatchObject({ key: "cancelled", brewable: false });
   const runs = toPackagingRunsViewProps([{ ...batch, run_no: 4, started_at: null, qty_planned: 12 }], "UTC", id => `/packaging/${id}`);
   expect(runs.upcoming).toEqual([]);
-  expect(runs.recent[0]).toMatchObject({ verb: "Open", detail: expect.stringContaining("Cancelled") });
+  expect(runs.recent[0]).toMatchObject({ href: "/packaging/cancelled", detail: expect.stringContaining("Cancelled") });
+  expect(runs.recent[0]?.verb).toBeUndefined();
 });
 
 it("shares plan controls across inventory and live views and hides them for cancelled work", () => {
