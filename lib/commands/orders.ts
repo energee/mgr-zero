@@ -6,7 +6,7 @@ import { z } from "zod";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
-import { salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
+import { ORDER_STATUSES, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
@@ -254,7 +254,7 @@ defineCommand({
 defineQuery({
   name: "list_orders", description: "Orders newest-first, optionally by status and customer",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), ...historyInput }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_STATUSES).optional(), ...historyInput }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("orders").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.status) q = q.eq("status", i.status);
